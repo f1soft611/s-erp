@@ -11,6 +11,7 @@ React + TypeScript 기반의 ERP 시스템에서 공통으로 사용할 수 있�
 목표는 일반적인 DataTable이 아니라 다음 ERP 업무 특성을 만족하는 전문 Grid를 만드는 것이다.
 
 - 대량 데이터 처리
+- 대용량 조회 최적화
 - Excel 중심 업무
 - 빠른 키보드 입력
 - 인라인 편집
@@ -20,6 +21,7 @@ React + TypeScript 기반의 ERP 시스템에서 공통으로 사용할 수 있�
 - 사용자별 Grid Layout
 - ERP 업무에 맞는 코드/명칭 입력
 - 합계/소계
+- Row Merge
 - Tree / Group 기능 확장
 
 ---
@@ -109,11 +111,17 @@ src/
 │       ├── aggregation/
 │       │   └── GridAggregation.ts
 │       │
+│       ├── merge/
+│       │   └── GridRowMerge.ts
+│       │
 │       ├── layout/
 │       │   └── GridLayout.ts
 │       │
 │       ├── pagination/
 │       │   └── GridPagination.tsx
+│       │
+│       ├── virtualization/
+│       │   └── GridVirtualizer.ts
 │       │
 │       ├── export/
 │       │   └── GridExcelExport.ts
@@ -156,6 +164,7 @@ const columns: ERPGridColumn<Item>[] = [
     width: 200,
     type: 'text',
     editable: false,
+    mergeRows: true,
   },
   {
     field: 'qty',
@@ -193,6 +202,43 @@ type ERPGridColumnType =
   | 'autocomplete'
   | 'code'
   | 'button';
+```
+
+Row Merge 설정:
+
+```typescript
+type ERPGridRowMergeMode = 'none' | 'sameValue' | 'custom';
+
+interface ERPGridColumn<T> {
+  field: keyof T;
+  mergeRows?: boolean | ERPGridRowMergeMode;
+  mergeKey?: keyof T | ((row: T, rowIndex: number) => string | number | null);
+  mergeWhen?: (currentRow: T, previousRow: T) => boolean;
+}
+```
+
+기본 사용은 `mergeRows: true`만 지정하면 같은 컬럼의 연속 동일 값을 자동 병합한다.
+
+복합 기준이 필요한 경우 `mergeKey` 또는 `mergeWhen`을 사용한다.
+
+예:
+
+```typescript
+const columns: ERPGridColumn<PurchaseLine>[] = [
+  {
+    field: 'customerName',
+    headerName: '거래처',
+    width: 180,
+    mergeRows: true,
+  },
+  {
+    field: 'orderNo',
+    headerName: '발주번호',
+    width: 140,
+    mergeRows: 'custom',
+    mergeKey: (row) => `${row.customerCode}:${row.orderNo}`,
+  },
+];
 ```
 
 ---
@@ -374,11 +420,7 @@ Ctrl + C
 각 Row는 상태를 관리한다.
 
 ```typescript
-type GridRowState =
-  | 'normal'
-  | 'inserted'
-  | 'updated'
-  | 'deleted';
+type GridRowState = 'normal' | 'inserted' | 'updated' | 'deleted';
 ```
 
 예:
@@ -436,6 +478,82 @@ Delete
 Ctrl + D
 → Row 복제
 ```
+
+---
+
+# 11-1. Row Merge
+
+ERP 전표, 발주, 생산지시, BOM, 재고조회 화면에서 같은 값이 반복되는 컬럼을 행 단위로 병합 표시할 수 있어야 한다.
+
+대표 사용 사례:
+
+```text
+거래처
+발주번호
+품목군
+공정
+창고
+부서
+프로젝트
+```
+
+기본 원칙:
+
+- 컬럼 설정만으로 쉽게 활성화할 수 있어야 한다.
+- 연속된 Row의 값이 같은 경우에만 병합한다.
+- 정렬, 필터, 페이지 변경 후에는 현재 표시 Row 기준으로 다시 계산한다.
+- 실제 Row 데이터는 합치지 않고 화면 표시만 병합한다.
+- 편집, 선택, 복사, 붙여넣기, Validation은 원본 Row 단위로 동작한다.
+- 병합된 셀을 클릭하면 병합 범위의 첫 번째 Row Cell에 Focus를 둔다.
+- 병합된 영역 안에서도 행 선택과 체크박스 선택은 개별 Row 기준으로 유지한다.
+
+지원 모드:
+
+```text
+sameValue
+→ 같은 컬럼 값이 연속으로 반복될 때 자동 병합
+
+custom
+→ mergeKey 또는 mergeWhen 결과가 같은 경우 병합
+```
+
+Grid 전체 옵션:
+
+```tsx
+<ERPGrid rows={rows} columns={columns} enableRowMerge />
+```
+
+컬럼별 옵션:
+
+```typescript
+{
+  field: 'customerName',
+  headerName: '거래처',
+  mergeRows: true,
+}
+```
+
+복합 병합 기준:
+
+```typescript
+{
+  field: 'orderNo',
+  headerName: '발주번호',
+  mergeRows: 'custom',
+  mergeKey: row => `${row.customerCode}:${row.orderNo}`,
+}
+```
+
+Public API:
+
+```typescript
+grid.refreshRowMerge();
+grid.getRowMergeRanges();
+```
+
+Virtual Scrolling을 사용할 경우 병합 범위 계산은 전체 Row 기준으로 수행하되, DOM 렌더링은 현재 Viewport에 필요한 Cell만 생성한다.
+
+Excel Export 시 기본값은 병합 표시를 유지하지 않고 원본 Row 값을 반복 출력한다. 화면 표시와 동일한 병합 Excel이 필요한 경우 별도 옵션으로 제공한다.
 
 ---
 
@@ -504,7 +622,7 @@ None
     field: 'itemCode',
     direction: 'asc',
   },
-]
+];
 ```
 
 ---
@@ -672,7 +790,7 @@ Grid 자체가 API를 호출하도록 강하게 결합하지 않는다.
   page,
   pageSize,
   sort,
-  filters
+  filters,
 }
 ```
 
@@ -685,6 +803,29 @@ fetchItems(query);
 ```
 
 Grid는 UI와 상태를 관리하고 API 통신은 Feature/Service Layer가 담당한다.
+
+대용량 조회에서는 다음 원칙을 따른다.
+
+- Grid는 전체 데이터를 한 번에 요청하지 않는다.
+- 검색 조건, 정렬, 필터, 페이지 정보가 변경될 때만 조회 Query를 갱신한다.
+- 사용자가 검색어를 빠르게 입력하는 경우 debounce 또는 명시적 조회 버튼으로 불필요한 요청을 줄인다.
+- 이전 조회가 완료되기 전에 새 조회가 시작되면 이전 요청을 취소하거나 응답을 무시할 수 있어야 한다.
+- `totalCount` 조회 비용이 큰 화면에서는 전체 건수 조회를 선택 옵션으로 분리할 수 있어야 한다.
+- 대용량 집계, 합계, 소계는 가능하면 서버에서 계산하고 Grid는 결과 표시를 담당한다.
+- 조회 결과는 `rowKey` 기준으로 안정적으로 식별하며, 페이지 변경이나 부분 갱신 시 선택/편집 상태가 잘못 섞이지 않아야 한다.
+
+확장 Query 예:
+
+```typescript
+interface GridQuery {
+  page: number;
+  pageSize: number;
+  sort?: GridSort[];
+  filters?: GridFilter[];
+  cursor?: string | null;
+  includeTotalCount?: boolean;
+}
+```
 
 ---
 
@@ -789,6 +930,33 @@ Server-side Pagination
 
 특히 Row 수가 증가하더라도 DOM Node가 비정상적으로 증가하지 않도록 한다.
 
+조회 최적화 요구사항:
+
+```text
+Server-side Pagination 우선
+Cursor 기반 조회 확장 가능
+Virtual Row Rendering
+Virtual Column Rendering
+Request Debounce
+Request Cancellation
+Stale Response Ignore
+Lazy Total Count
+Server-side Aggregation
+Stable Row Key
+Partial Row Update
+```
+
+대용량 데이터 처리 원칙:
+
+- 초기 진입 시 필요한 페이지 또는 Viewport 범위만 조회한다.
+- 필터/정렬은 클라이언트 전체 데이터 기준이 아니라 서버 Query 기준으로 동작해야 한다.
+- 화면에 보이는 Row/Column만 렌더링하되 키보드 이동과 Focus는 전체 Grid 좌표를 유지한다.
+- 스크롤 이동 중에는 Cell 측정, 병합 범위 계산, 집계 계산 같은 비용 큰 작업을 반복하지 않는다.
+- Row 높이가 고정인 화면은 고정 높이 Virtual Scroll을 우선 사용한다.
+- Row 높이가 가변인 화면은 측정 Cache를 두고, 전체 Row 재측정을 피한다.
+- 대량 붙여넣기나 일괄 수정은 화면 렌더링과 데이터 변경 계산을 분리해서 처리한다.
+- 서버 조회 실패 시 기존 데이터를 즉시 지우지 않고 오류 상태와 재조회 수단을 제공한다.
+
 ---
 
 # 23. Performance
@@ -814,14 +982,43 @@ Grid
 필요한 경우:
 
 ```typescript
-React.memo
-useMemo
-useCallback
+React.memo;
+useMemo;
+useCallback;
 ```
 
 을 사용한다.
 
 단, 무조건 사용하는 것이 아니라 실제 렌더링 비용을 고려한다.
+
+### Large Query Performance
+
+대용량 조회 화면은 렌더링 최적화뿐 아니라 Query 비용을 함께 관리한다.
+
+필수 고려 사항:
+
+```text
+Query Parameter Stability
+AbortController 기반 요청 취소
+동일 Query 중복 요청 방지
+검색 조건 변경 시 선택/편집 상태 정리
+로딩 중 중복 저장/붙여넣기 차단
+대량 데이터 Excel Export는 서버 Export로 분리
+```
+
+Grid 내부 상태는 조회 조건과 표시 데이터를 분리한다.
+
+```typescript
+interface GridDataState<T> {
+  rows: T[];
+  totalCount?: number;
+  loading: boolean;
+  query: GridQuery;
+  lastLoadedAt?: string;
+}
+```
+
+`rows` 배열이 변경되더라도 컬럼 정의, 선택 상태, 편집 상태, 레이아웃 상태가 불필요하게 함께 초기화되지 않도록 한다.
 
 ---
 
@@ -922,7 +1119,7 @@ any 사용을 최소화한다.
 금지:
 
 ```typescript
-const row: any
+const row: any;
 ```
 
 권장:
@@ -937,17 +1134,14 @@ interface ERPGridRow {
 Generic을 적극적으로 사용한다.
 
 ```typescript
-ERPGrid<T>
-ERPGridColumn<T>
+ERPGrid<T>;
+ERPGridColumn<T>;
 ```
 
 예:
 
 ```tsx
-<ERPGrid<Item>
-  rows={items}
-  columns={columns}
-/>
+<ERPGrid<Item> rows={items} columns={columns} />
 ```
 
 ---
@@ -958,7 +1152,6 @@ ERPGridColumn<T>
 
 ```typescript
 interface ERPGridRef<T> {
-
   // Selection
   getSelectedRows(): T[];
   getSelectedRowIds(): Array<string | number>;
@@ -988,6 +1181,10 @@ interface ERPGridRef<T> {
   // Clipboard
   copy(): void;
   paste(): Promise<void>;
+
+  // Row Merge
+  refreshRowMerge(): void;
+  getRowMergeRanges(): GridRowMergeRange<T>[];
 
   // Layout
   getLayout(): GridLayout;
@@ -1049,6 +1246,41 @@ return (
     pagination
     sortable
     filterable
+  />
+);
+```
+
+Row Merge 사용 예:
+
+```tsx
+const columns: ERPGridColumn<PurchaseLine>[] = [
+  {
+    field: 'customerName',
+    headerName: '거래처',
+    width: 180,
+    mergeRows: true,
+  },
+  {
+    field: 'orderNo',
+    headerName: '발주번호',
+    width: 140,
+    mergeRows: 'custom',
+    mergeKey: (row) => `${row.customerCode}:${row.orderNo}`,
+  },
+  {
+    field: 'itemName',
+    headerName: '품목명',
+    width: 220,
+  },
+];
+
+return (
+  <ERPGrid
+    gridId="PURCHASE_ORDER"
+    rowKey="id"
+    columns={columns}
+    rows={rows}
+    enableRowMerge
   />
 );
 ```
@@ -1141,17 +1373,21 @@ Agent는 모든 기능을 한 번에 구현하지 않는다.
 1. Render Optimization
 2. Row Memoization
 3. Virtual Scroll
-4. Large Dataset Test
+4. Virtual Column
+5. Server-side Query Optimization
+6. Request Cancellation
+7. Large Dataset Test
 ```
 
 ## Phase 8 - Advanced
 
 ```text
-1. Grouping
-2. Tree Grid
-3. Undo/Redo
-4. Context Menu
-5. Advanced Excel
+1. Row Merge
+2. Grouping
+3. Tree Grid
+4. Undo/Redo
+5. Context Menu
+6. Advanced Excel
 ```
 
 ---
@@ -1222,6 +1458,20 @@ Pagination
 Aggregation
 ```
 
+## Row Merge
+
+```text
+같은 값 자동 병합
+mergeKey 기반 복합 병합
+정렬 후 병합 범위 재계산
+필터 후 병합 범위 재계산
+페이지 변경 후 병합 범위 재계산
+병합 셀 Focus
+병합 셀 선택
+Virtual Scroll 병합 표시
+Excel Export 원본값 반복 출력
+```
+
 ## Performance
 
 최소 다음 데이터를 테스트한다.
@@ -1230,6 +1480,21 @@ Aggregation
 1,000 rows
 10,000 rows
 100,000 rows
+```
+
+대용량 조회 테스트:
+
+```text
+초기 조회 시 현재 Page만 요청
+검색 조건 빠른 변경 시 마지막 요청만 반영
+정렬 변경 시 서버 Query 재생성
+필터 변경 시 서버 Query 재생성
+페이지 변경 시 선택/편집 상태 오염 없음
+Virtual Scroll DOM Node 수 제한
+100,000건 스크롤 중 입력 지연 확인
+totalCount 비활성 화면 조회 확인
+서버 집계 결과 표시 확인
+Excel Export 서버 분리 확인
 ```
 
 ---

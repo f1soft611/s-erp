@@ -7,19 +7,99 @@ import {
   Chip,
   FormControlLabel,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from '@mui/material';
+import { useRef, useState } from 'react';
+import { F1Grid } from '../../../../../shared/components/f1-grid/F1Grid';
+import type {
+  F1GridChanges,
+  F1GridColumn,
+  F1GridRef,
+} from '../../../../../shared/components/f1-grid/f1Grid.types';
 import type { MenuManagementRow } from '../types/menuManagement.types';
 
 type MenuManagementPanelProps = { menus: MenuManagementRow[] };
 
 export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
+  const gridRef = useRef<F1GridRef<MenuManagementRow>>(null);
+  const [changes, setChanges] = useState<F1GridChanges<MenuManagementRow>>({
+    insertedRows: [],
+    updatedRows: [],
+    deletedRows: [],
+  });
+  const [newMenuSequence, setNewMenuSequence] = useState(1);
+  const columns: F1GridColumn<MenuManagementRow>[] = [
+    {
+      field: 'code',
+      headerName: '코드',
+      width: 90,
+      editable: true,
+      mergeRows: true,
+    },
+    {
+      field: 'name',
+      headerName: '메뉴명',
+      width: 160,
+      editable: true,
+      mergeRows: true,
+    },
+    {
+      field: 'parent',
+      headerName: '상위 메뉴',
+      width: 130,
+      editable: true,
+      mergeRows: true,
+    },
+    {
+      field: 'order',
+      headerName: '정렬',
+      width: 80,
+      editable: true,
+      type: 'number',
+      align: 'center',
+      headerAlign: 'center',
+    },
+    {
+      field: 'enabled',
+      headerName: '사용 여부',
+      width: 120,
+      editable: true,
+      type: 'checkbox',
+      headerCheckbox: true,
+      headerAlign: 'center',
+      align: 'center',
+    },
+    {
+      field: 'status',
+      headerName: '상태',
+      type: 'select',
+      editable: (row) => row.status === 'draft',
+      headerAlign: 'center',
+      align: 'center',
+      options: [
+        { value: 'draft', label: '작성중' },
+        { value: 'confirmed', label: '확정' },
+      ],
+    },
+  ];
+
+  function createMenuRow(): MenuManagementRow {
+    const sequence = newMenuSequence;
+    setNewMenuSequence((current) => current + 1);
+    return {
+      id: `new-menu-${sequence}`,
+      code: `NEW${sequence}`,
+      name: '새 메뉴',
+      parent: '루트',
+      order: 0,
+      enabled: true,
+      status: 'draft',
+      description: '',
+      permissionGroup: '관리',
+    };
+  }
+
   return (
     <Box
       sx={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 2, p: 3 }}
@@ -43,39 +123,51 @@ export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               메뉴 관리
             </Typography>
-            <Button variant="contained" size="small">
-              새 메뉴
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                size="small"
+                onClick={() => gridRef.current?.deleteSelectedRows()}
+              >
+                삭제
+              </Button>
+              <Button
+                size="small"
+                onClick={() => gridRef.current?.duplicateSelectedRows()}
+              >
+                복제
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => gridRef.current?.addRow()}
+              >
+                새 메뉴
+              </Button>
+            </Box>
           </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>코드</TableCell>
-                <TableCell>메뉴명</TableCell>
-                <TableCell>상위 메뉴</TableCell>
-                <TableCell>정렬</TableCell>
-                <TableCell>사용 여부</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {menus.map((menu) => (
-                <TableRow key={menu.id} hover>
-                  <TableCell>{menu.code}</TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {menu.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {menu.description}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{menu.parent}</TableCell>
-                  <TableCell>{menu.order}</TableCell>
-                  <TableCell>{menu.enabled ? '사용' : '미사용'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <F1Grid
+            ref={gridRef}
+            rows={menus}
+            columns={columns}
+            rowKey="id"
+            columnLine
+            ariaLabel="F1-GRID 메뉴 관리"
+            createRow={createMenuRow}
+            createDuplicate={(menu) => ({
+              ...menu,
+              id: `${menu.id}-copy-${Date.now()}`,
+              code: `${menu.code}-COPY`,
+            })}
+            onChangesChange={setChanges}
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 1, display: 'block' }}
+          >
+            변경: 신규 {changes.insertedRows.length}건 / 수정{' '}
+            {changes.updatedRows.length}건 / 삭제 {changes.deletedRows.length}건
+          </Typography>
         </CardContent>
       </Card>
       <Card

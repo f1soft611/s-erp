@@ -5,6 +5,7 @@ export type MenuManagementRow = {
   parent: string;
   order: number;
   enabled: boolean;
+  status: 'draft' | 'confirmed';
   description: string;
   permissionGroup: string;
 };
