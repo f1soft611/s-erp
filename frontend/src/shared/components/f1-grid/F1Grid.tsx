@@ -67,6 +67,21 @@ function getRowId<T extends object>(row: T, rowKey: keyof T): F1GridRowId {
   return rowId;
 }
 
+function getMergeGroupStart<T extends object>(
+  rows: T[],
+  rowIndex: number,
+  field: keyof T,
+): number {
+  let start = rowIndex;
+  while (
+    start > 0 &&
+    Object.is(rows[start - 1][field], rows[rowIndex][field])
+  ) {
+    start -= 1;
+  }
+  return start;
+}
+
 function F1GridInner<T extends object>(
   {
     rows,
@@ -520,10 +535,29 @@ function F1GridInner<T extends object>(
                 const focused = isSameCell(focusedCell, cell);
                 const value = row[column.field];
                 const editable = isCellEditable(column, row);
-                const mergeInfo = mergeInfoByColumn[columnIndex]?.[rowIndex];
+                const editingRowIndex = editingCell
+                  ? visibleRows.findIndex(
+                      (item) => getRowId(item, rowKey) === editingCell.rowId,
+                    )
+                  : -1;
+                const mergeEditing = Boolean(
+                  column.mergeRows &&
+                  editingCell?.columnIndex === columnIndex &&
+                  editingRowIndex >= 0 &&
+                  getMergeGroupStart(visibleRows, rowIndex, column.field) ===
+                    getMergeGroupStart(
+                      visibleRows,
+                      editingRowIndex,
+                      column.field,
+                    ),
+                );
+                const mergeInfo = mergeEditing
+                  ? undefined
+                  : mergeInfoByColumn[columnIndex]?.[rowIndex];
                 const merged = Boolean(
                   column.mergeRows &&
                   rowIndex > 0 &&
+                  !mergeEditing &&
                   !editing &&
                   Object.is(visibleRows[rowIndex - 1][column.field], value),
                 );

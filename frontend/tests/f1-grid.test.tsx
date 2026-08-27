@@ -335,6 +335,9 @@ describe('F1-GRID interaction', () => {
         .gridRow,
     ).toBe('1/span 2');
     fireEvent.doubleClick(screen.getAllByRole('gridcell')[1]);
+    expect(getComputedStyle(screen.getAllByRole('gridcell')[0]).gridRow).toBe(
+      '1',
+    );
     fireEvent.change(screen.getByDisplayValue('draft'), {
       target: { value: 'confirmed' },
     });
@@ -343,6 +346,28 @@ describe('F1-GRID interaction', () => {
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'reports', status: 'confirmed' }),
     ]);
+  });
+
+  it('only unmerges the group containing the edited cell', () => {
+    const mergeColumns: F1GridColumn<MenuRow>[] = [
+      { field: 'status', headerName: '상태', editable: true, mergeRows: true },
+    ];
+    const mergeRows = [
+      { ...rows[0], status: 'draft' },
+      { ...rows[1], id: 'reports', status: 'draft' },
+      { ...rows[0], id: 'confirmed-1', status: 'confirmed' },
+      { ...rows[1], id: 'confirmed-2', status: 'confirmed' },
+    ];
+
+    render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
+
+    fireEvent.doubleClick(screen.getAllByRole('gridcell')[1]);
+
+    expect(
+      getComputedStyle(
+        screen.getAllByRole('gridcell', { name: 'confirmed' })[0],
+      ).gridRow,
+    ).toBe('3/span 2');
   });
 
   it('does not create an updated row when an edit is committed without a value change', () => {
