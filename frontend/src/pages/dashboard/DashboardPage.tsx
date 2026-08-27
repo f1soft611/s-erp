@@ -63,6 +63,9 @@ function findMenuPath(
   return undefined;
 }
 
+const defaultModule = moduleItems[0];
+const defaultMenuId = defaultModule.menus[0]?.id ?? '';
+
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
@@ -71,14 +74,14 @@ function DashboardPage() {
   const { themeMode, setThemeMode, displayScale, setDisplayScale } =
     useAppSettings();
   const pathSegments = location.pathname.split('/').filter(Boolean);
-  const routeModuleId = pathSegments[1] ?? 'groupware';
-  const routeMenuId = pathSegments[2] ?? 'approval';
+  const routeModuleId = pathSegments[1] ?? defaultModule.id;
+  const routeMenuId = pathSegments[2] ?? defaultMenuId;
 
   const selectedModuleId = moduleItems.some(
     (module) => module.id === routeModuleId,
   )
     ? routeModuleId
-    : 'groupware';
+    : defaultModule.id;
 
   const selectedModule =
     moduleItems.find((module) => module.id === selectedModuleId) ??
@@ -89,11 +92,12 @@ function DashboardPage() {
     selectedMenuPath?.node.pageKey && !selectedMenuPath.node.children?.length
       ? selectedMenuPath
       : undefined;
-  const fallbackMenu = selectedModule.menus[0] ?? {
-    id: 'approval',
-    name: '전자결재',
-    pageKey: 'approval',
-  };
+  const fallbackMenu = selectedModule.menus[0] ??
+    defaultModule.menus[0] ?? {
+      id: defaultMenuId,
+      name: defaultModule.name,
+      pageKey: defaultMenuId,
+    };
   const fallbackMenuPath = findMenuPath(selectedModule.tree, fallbackMenu.id);
   const selectedMenuId = selectedMenu?.node.id ?? fallbackMenu.id;
   const expandedItemIds =
@@ -103,9 +107,10 @@ function DashboardPage() {
   useEffect(() => {
     const pathname = location.pathname;
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const firstModule = moduleItems[0];
-      const firstMenu = firstModule.tree[0]?.children?.[0]?.id ?? 'approval';
-      navigate(`/dashboard/${firstModule.id}/${firstMenu}`, { replace: true });
+      const firstMenu = defaultModule.menus[0]?.id ?? defaultMenuId;
+      navigate(`/dashboard/${defaultModule.id}/${firstMenu}`, {
+        replace: true,
+      });
     }
   }, [location.pathname, navigate]);
 
@@ -114,10 +119,7 @@ function DashboardPage() {
   const handleModuleChange = (moduleId: string) => {
     const nextModule =
       moduleItems.find((module) => module.id === moduleId) ?? moduleItems[0];
-    const nextMenu =
-      nextModule.tree[0]?.children?.[0]?.id ??
-      nextModule.menus[0]?.id ??
-      'approval';
+    const nextMenu = nextModule.menus[0]?.id ?? defaultMenuId;
     navigate(`/dashboard/${nextModule.id}/${nextMenu}`);
   };
 
@@ -144,7 +146,7 @@ function DashboardPage() {
   };
 
   const content = useMemo(
-    () => pageContentMap[currentMenu.pageKey ?? 'approval'] ?? defaultPage,
+    () => pageContentMap[currentMenu.pageKey ?? defaultMenuId] ?? defaultPage,
     [currentMenu.pageKey],
   );
 

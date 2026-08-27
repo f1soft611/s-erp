@@ -1,0 +1,82 @@
+{
+  "user": {
+    "userId": "admin",
+    "roles": ["ADMIN"]
+  },
+  "menus": [
+    {
+      "menuId": 100,
+      "parentMenuId": null,
+      "name": "그룹웨어",
+      "icon": "Groups",
+      "path": "/groupware",
+      "children": [
+        {
+          "menuId": 110,
+          "parentMenuId": 100,
+          "name": "종합현황",
+          "path": "/groupware/overview",
+          "permissions": {
+            "read": true,
+            "create": true,
+            "update": true,
+            "delete": true
+          }
+        },
+        {
+          "menuId": 120,
+          "parentMenuId": 100,
+          "name": "문서관리",
+          "path": "/groupware/documents",
+          "permissions": {
+            "read": true,
+            "create": true,
+            "update": true,
+            "delete": true
+          }
+        }
+      ]
+    },
+    {
+      "menuId": 200,
+      "parentMenuId": null,
+      "name": "환경설정",
+      "icon": "Settings",
+      "path": "/settings",
+      "children": [
+        {
+          "menuId": 210,
+          "parentMenuId": 200,
+          "name": "시스템 관리",
+          "path": "/settings/system",
+          "children": [
+            {
+              "menuId": 211,
+              "parentMenuId": 210,
+              "name": "권한관리",
+              "path": "/settings/system/roles",
+              "permissions": {
+                "read": true,
+                "create": true,
+                "update": true,
+                "delete": true
+              }
+            },
+            {
+              "menuId": 212,
+              "parentMenuId": 210,
+              "name": "메뉴관리",
+              "path": "/settings/system/menus",
+              "permissions": {
+                "read": true,
+                "create": true,
+                "update": true,
+                "delete": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

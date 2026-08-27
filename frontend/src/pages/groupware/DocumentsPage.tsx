@@ -9,83 +9,21 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { DocumentsPage } from '../../groupware/DocumentsPage';
-import { OverviewPage } from '../../groupware/OverviewPage';
-import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
-import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
-import type { ModuleItem, PageContent } from '../types/dashboard';
+import type { ModuleItem, PageContent } from '../dashboard/types/dashboard';
 
-type DashboardContentProps = {
+type DocumentsPageProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
 };
 
-function TrendIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ width: '1em', height: '1em', display: 'block' }}
-    >
-      <path d="M4 17.5 9 12l3 3 8-9" />
-      <path d="M15 6h5v5" />
-    </svg>
-  );
-}
-
-export function DashboardContent({
+export function DocumentsPage({
   selectedModule,
   currentMenuName,
   content,
-}: DashboardContentProps) {
+}: DocumentsPageProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-
-  if (selectedModule.id === 'groupware' && currentMenuName === '종합현황') {
-    return (
-      <OverviewPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'groupware' && currentMenuName === '문서관리') {
-    return (
-      <DocumentsPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'settings' && currentMenuName === '권한관리') {
-    return (
-      <RoleManagementPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'settings' && currentMenuName === '메뉴관리') {
-    return (
-      <MenuManagementPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -247,18 +185,9 @@ export function DashboardContent({
                   }}
                 >
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    업무 요약
+                    문서 요약
                   </Typography>
-                  <Box
-                    component="span"
-                    sx={{
-                      display: 'flex',
-                      fontSize: 18,
-                      color: 'primary.main',
-                    }}
-                  >
-                    <TrendIcon />
-                  </Box>
+                  <Chip label="업데이트" size="small" color="secondary" />
                 </Box>
                 <Stack spacing={1.5}>
                   <Box
@@ -269,7 +198,7 @@ export function DashboardContent({
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      진행 건수
+                      전체 문서
                     </Typography>
                     <Typography sx={{ fontWeight: 700 }}>
                       {content.cards[0]?.value ?? '0'}
@@ -283,31 +212,17 @@ export function DashboardContent({
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      검토 항목
+                      기안 대기
                     </Typography>
                     <Typography sx={{ fontWeight: 700 }}>
                       {content.cards[1]?.value ?? '0'}
                     </Typography>
                   </Box>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      완료율
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {content.cards[3]?.value ?? '0%'}
-                    </Typography>
-                  </Box>
                   <Divider />
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip label="대시보드" size="small" />
-                    <Chip label="업무 추적" size="small" />
-                    <Chip label="일정" size="small" />
+                    <Chip label="문서" size="small" />
+                    <Chip label="결재" size="small" />
+                    <Chip label="보관" size="small" />
                   </Box>
                 </Stack>
               </CardContent>
