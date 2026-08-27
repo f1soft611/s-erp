@@ -1,0 +1,220 @@
+<h2>F1-GRID: initial foundation</h2>
+<p class="subtitle">
+  Choose the first implementation boundary. Later extensions remain possible in
+  every option.
+</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">F1-GRID / Purchase lines</div>
+        <div
+          class="mockup-body"
+          style="font: 12px/1.5 sans-serif; padding: 0; color: #1f2937"
+        >
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 92px 1fr 72px 92px;
+              background: #e6edf1;
+              font-weight: 700;
+              border-bottom: 1px solid #b9c6cf;
+              padding: 9px 6px;
+            "
+          >
+            <span></span><span>Item code</span><span>Item name</span
+            ><span style="text-align: right">Qty</span
+            ><span style="text-align: right">Price</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 92px 1fr 72px 92px;
+              padding: 8px 6px;
+              border-bottom: 1px solid #d9e0e5;
+            "
+          >
+            <span>☐</span><span>A-100</span><span>Steel bracket</span
+            ><span style="text-align: right">12</span
+            ><span style="text-align: right">4,800</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 92px 1fr 72px 92px;
+              padding: 8px 6px;
+              border-bottom: 1px solid #d9e0e5;
+              background: #e8f3f7;
+            "
+          >
+            <span>☑</span><span>A-101</span
+            ><span style="outline: 2px solid #16718a; outline-offset: -2px"
+              >Bolt set</span
+            ><span style="text-align: right">50</span
+            ><span style="text-align: right">1,200</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 92px 1fr 72px 92px;
+              padding: 8px 6px;
+            "
+          >
+            <span>☐</span><span>A-102</span><span>Washer set</span
+            ><span style="text-align: right">50</span
+            ><span style="text-align: right">600</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Input foundation</h3>
+      <p>
+        Column configuration, keyboard focus, inline edit, row selection,
+        Insert/Delete/Duplicate, row states, and change extraction.
+      </p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">F1-GRID / Orders</div>
+        <div
+          class="mockup-body"
+          style="font: 12px/1.5 sans-serif; padding: 0; color: #1f2937"
+        >
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 86px 1fr 68px 82px;
+              background: #e6edf1;
+              font-weight: 700;
+              border-bottom: 1px solid #b9c6cf;
+              padding: 9px 6px;
+            "
+          >
+            <span></span><span>Customer</span><span>Order no.</span
+            ><span style="text-align: right">Qty</span
+            ><span style="text-align: right">Amount</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 86px 1fr 68px 82px;
+              padding: 8px 6px;
+              border-bottom: 1px solid #d9e0e5;
+            "
+          >
+            <span>☐</span><span>Hanul</span><span>PO-24081</span
+            ><span style="text-align: right">12</span
+            ><span style="text-align: right">57,600</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 86px 1fr 68px 82px;
+              padding: 8px 6px;
+              border-bottom: 1px solid #d9e0e5;
+            "
+          >
+            <span>☐</span><span>Hanul</span><span>PO-24081</span
+            ><span style="text-align: right">7</span
+            ><span style="text-align: right">33,600</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 86px 1fr 68px 82px;
+              padding: 8px 6px;
+              background: #f5f8fa;
+              font-weight: 700;
+            "
+          >
+            <span></span><span>Total</span><span></span
+            ><span style="text-align: right">19</span
+            ><span style="text-align: right">91,200</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Input + analysis</h3>
+      <p>
+        Option A plus client-side sorting, basic filters, column aggregation,
+        and same-value row merge.
+      </p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">F1-GRID / Server query</div>
+        <div
+          class="mockup-body"
+          style="font: 12px/1.5 sans-serif; padding: 0; color: #1f2937"
+        >
+          <div
+            style="
+              display: flex;
+              gap: 6px;
+              padding: 8px;
+              border-bottom: 1px solid #b9c6cf;
+            "
+          >
+            <span style="border: 1px solid #9aa9b5; padding: 2px 7px"
+              >Filter</span
+            ><span style="border: 1px solid #9aa9b5; padding: 2px 7px"
+              >Sort</span
+            ><span style="border: 1px solid #9aa9b5; padding: 2px 7px"
+              >Columns</span
+            >
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 100px 1fr 90px;
+              background: #e6edf1;
+              font-weight: 700;
+              padding: 9px 6px;
+            "
+          >
+            <span></span><span>Item code</span><span>Item name</span
+            ><span style="text-align: right">Qty</span>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 28px 100px 1fr 90px;
+              padding: 8px 6px;
+              border-bottom: 1px solid #d9e0e5;
+            "
+          >
+            <span>☐</span><span>A-100</span><span>Steel bracket</span
+            ><span style="text-align: right">12</span>
+          </div>
+          <div style="padding: 9px 6px; background: #f5f8fa; text-align: right">
+            1–50 / 12,440&nbsp;&nbsp; ◀ 1 2 3 ▶
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Query-ready platform</h3>
+      <p>
+        Option B plus server query state, pagination, layout persistence model,
+        and virtual scrolling groundwork.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">
+    Recommendation: <strong>A</strong>. It establishes a tested, usable ERP
+    editing core without prematurely locking in server contracts or
+    virtualization behavior.
+  </p>
+</div>

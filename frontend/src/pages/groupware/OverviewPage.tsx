@@ -9,13 +9,9 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { DocumentsPage } from '../../groupware/DocumentsPage';
-import { OverviewPage } from '../../groupware/OverviewPage';
-import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
-import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
-import type { ModuleItem, PageContent } from '../types/dashboard';
+import type { ModuleItem, PageContent } from '../dashboard/types/dashboard';
 
-type DashboardContentProps = {
+type OverviewPageProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
@@ -39,53 +35,13 @@ function TrendIcon() {
   );
 }
 
-export function DashboardContent({
+export function OverviewPage({
   selectedModule,
   currentMenuName,
   content,
-}: DashboardContentProps) {
+}: OverviewPageProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-
-  if (selectedModule.id === 'groupware' && currentMenuName === '종합현황') {
-    return (
-      <OverviewPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'groupware' && currentMenuName === '문서관리') {
-    return (
-      <DocumentsPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'settings' && currentMenuName === '권한관리') {
-    return (
-      <RoleManagementPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
-
-  if (selectedModule.id === 'settings' && currentMenuName === '메뉴관리') {
-    return (
-      <MenuManagementPage
-        selectedModule={selectedModule}
-        currentMenuName={currentMenuName}
-        content={content}
-      />
-    );
-  }
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

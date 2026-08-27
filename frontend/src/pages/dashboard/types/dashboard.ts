@@ -6,10 +6,37 @@ export type MenuItem = {
   pageKey: string;
 };
 
+export type MenuPermission = {
+  read: boolean;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};
+
+export type MenuNode = {
+  menuId: number;
+  parentMenuId: number | null;
+  name: string;
+  icon?: string;
+  path?: string;
+  permissions?: MenuPermission;
+  children?: MenuNode[];
+};
+
+export type UserMenuResponse = {
+  user: {
+    userId: string;
+    roles: string[];
+  };
+  menus: MenuNode[];
+};
+
 export type MenuTreeNode = {
   id: string;
   name: string;
+  menuId?: number;
   pageKey?: string;
+  permissions?: MenuPermission;
   children?: MenuTreeNode[];
 };
 
@@ -37,4 +64,5 @@ export type PageContent = {
   description: string;
   cards: ContentCard[];
   items: ContentItem[];
+  kind?: 'summary' | 'roles' | 'menus';
 };
