@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: egovframework.com.EgovMessageSourceTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.486 s - in egovframework.com.EgovMessageSourceTest

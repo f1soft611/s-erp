@@ -1,0 +1,26 @@
+frontend/AGENTS.md
+backend/backend-dev
+backend/backend-prod
+AGENTS.md
+
+# Local environment and server configuration
+.env
+.env.*
+!.env.example
+*.local.properties
+*.local.yml
+*.local.yaml
+backend/src/main/resources/application-dev.properties
+backend/src/main/resources/application-prod.properties
+
+# Private keys, certificates, and credential exports
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.pub
+credentials.json
+secrets.json
