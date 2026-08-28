@@ -6,3 +6,5 @@ export * from './merge/GridRowMerge';
 export * from './utils/grid.utils';
 export * from './keyboard/GridKeyboard';
 export * from './selection/GridSelection';
+export * from './clipboard/GridClipboard';
+export * from './validation/GridValidation';

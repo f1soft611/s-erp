@@ -25,6 +25,8 @@ type GridRowProps<T extends object> = {
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onUpdateCell: (field: keyof T, value: unknown) => void;
+  onUpdateRow: (changes: Partial<T>) => void;
+  getCellError: (rowId: F1GridRowId, field: keyof T) => string | undefined;
   onStopEdit: () => void;
   onCellRef: (
     rowId: F1GridRowId,
@@ -58,6 +60,8 @@ export function GridRow<T extends object>({
   onDraftChange,
   onKeyDown,
   onUpdateCell,
+  onUpdateRow,
+  getCellError,
   onStopEdit,
   onCellRef,
   onEditingCellRef,
@@ -148,6 +152,15 @@ export function GridRow<T extends object>({
             onCheckboxChange={(checked) => {
               onUpdateCell(column.field, checked);
             }}
+            onCodePick={() => {
+              const applyPatch = (patch: Partial<T>) => {
+                onUpdateRow(patch);
+              };
+              const patch = column.onOpenCodePicker?.(row, applyPatch);
+              onStopEdit();
+              if (patch) applyPatch(patch);
+            }}
+            errorMessage={getCellError(rowId, column.field)}
             onCellRef={(node) => {
               onCellRef(rowId, columnIndex, node);
               if (editing) onEditingCellRef(node);

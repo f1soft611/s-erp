@@ -23,6 +23,8 @@ type GridBodyProps<T extends object> = {
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onUpdateRow: (rowId: F1GridRowId, field: keyof T, value: unknown) => void;
+  onPatchRow: (rowId: F1GridRowId, changes: Partial<T>) => void;
+  getCellError: (rowId: F1GridRowId, field: keyof T) => string | undefined;
   onStopEdit: () => void;
   onCellRef: (
     rowId: F1GridRowId,
@@ -69,6 +71,8 @@ export function GridBody<T extends object>({
   onDraftChange,
   onKeyDown,
   onUpdateRow,
+  onPatchRow,
+  getCellError,
   onStopEdit,
   onCellRef,
   onEditingCellRef,
@@ -152,6 +156,8 @@ export function GridBody<T extends object>({
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}
             onUpdateCell={(field, value) => onUpdateRow(rowId, field, value)}
+            onUpdateRow={(changes) => onPatchRow(rowId, changes)}
+            getCellError={getCellError}
             onStopEdit={onStopEdit}
             onCellRef={onCellRef}
             onEditingCellRef={onEditingCellRef}

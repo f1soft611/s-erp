@@ -22,6 +22,8 @@ type GridCellProps<T extends object> = {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onSelectChange: (value: unknown) => void;
   onCheckboxChange: (checked: boolean) => void;
+  onCodePick: () => void;
+  errorMessage?: string;
   onCellRef: (node: HTMLElement | null) => void;
 };
 
@@ -49,6 +51,8 @@ export function GridCell<T extends object>({
   onKeyDown,
   onSelectChange,
   onCheckboxChange,
+  onCodePick,
+  errorMessage,
   onCellRef,
 }: GridCellProps<T>) {
   const value = row[column.field];
@@ -58,6 +62,8 @@ export function GridCell<T extends object>({
     <Box
       key={String(column.field)}
       role="gridcell"
+      data-grid-error={errorMessage}
+      title={errorMessage}
       tabIndex={focused ? 0 : -1}
       ref={onCellRef}
       onClick={onFocus}
@@ -79,6 +85,9 @@ export function GridCell<T extends object>({
           : rowIndex + 1,
         borderTop: merged ? 0 : 1,
         borderColor: 'divider',
+        bgcolor: errorMessage ? 'error.lighter' : undefined,
+        boxShadow: errorMessage ? 'inset 0 0 0 1px' : undefined,
+        color: errorMessage ? 'error.main' : undefined,
         outline: focused ? '2px solid' : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -2,
@@ -109,6 +118,7 @@ export function GridCell<T extends object>({
           onChange={onDraftChange}
           onKeyDown={onKeyDown}
           onSelectChange={onSelectChange}
+          onCodePick={onCodePick}
         />
       ) : (
         getCellDisplayValue(column, value)

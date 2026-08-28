@@ -73,6 +73,18 @@
                 "update": true,
                 "delete": true
               }
+            },
+            {
+              "menuId": 213,
+              "parentMenuId": 210,
+              "name": "F1 Grid 테스트",
+              "path": "/settings/system/f1-grid-test",
+              "permissions": {
+                "read": true,
+                "create": true,
+                "update": true,
+                "delete": true
+              }
             }
           ]
         }

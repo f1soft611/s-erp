@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ForwardedRef,
+  type ClipboardEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
@@ -33,6 +34,12 @@ import { getNextEditableCell } from '../keyboard/GridKeyboard';
 import { getSelectedRowIds as resolveSelectedRowIds } from '../selection/GridSelection';
 import { getGridMergeInfo } from '../merge/GridRowMerge';
 import { getGridRowId, getStateKey, isCellEditable } from '../utils/grid.utils';
+import {
+  coerceClipboardValue,
+  parseGridTsv,
+  toGridTsv,
+} from '../clipboard/GridClipboard';
+import { validateGridRow } from '../validation/GridValidation';
 
 export type F1GridProps<T extends object> = {
   rows: T[];
@@ -72,6 +79,7 @@ function F1GridInner<T extends object>(
   const [focusedCell, setFocusedCell] = useState<F1GridCell>();
   const [editingCell, setEditingCell] = useState<F1GridCell>();
   const [draftValue, setDraftValue] = useState('');
+  const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
 
@@ -100,10 +108,23 @@ function F1GridInner<T extends object>(
 
   useEffect(() => {
     if (!focusedCell) return;
-    cellNodeRefs.current
-      .get(`${String(focusedCell.rowId)}:${focusedCell.columnIndex}`)
-      ?.focus();
-  }, [focusedCell]);
+    const cellNode = cellNodeRefs.current.get(
+      `${String(focusedCell.rowId)}:${focusedCell.columnIndex}`,
+    );
+    if (!cellNode) return;
+
+    if (
+      editingCell?.rowId === focusedCell.rowId &&
+      editingCell.columnIndex === focusedCell.columnIndex
+    ) {
+      (
+        cellNode.querySelector('input, select, textarea') as HTMLElement | null
+      )?.focus();
+      return;
+    }
+
+    cellNode.focus();
+  }, [editingCell, focusedCell]);
 
   useEffect(() => {
     onChangesChange?.(getGridChanges(data, rowKey));
@@ -111,6 +132,90 @@ function F1GridInner<T extends object>(
 
   function getCell(rowId: F1GridRowId, columnIndex: number): F1GridCell {
     return { rowId, columnIndex };
+  }
+
+  function getErrorKey(rowId: F1GridRowId, field: keyof T): string {
+    return `${String(rowId)}:${String(field)}`;
+  }
+
+  function validate(): boolean {
+    const nextErrors: Record<string, string> = {};
+    visibleRows.forEach((row) => {
+      const rowId = getGridRowId(row, rowKey);
+      Object.entries(validateGridRow(row, columns)).forEach(
+        ([field, message]) => {
+          nextErrors[`${String(rowId)}:${field}`] = message;
+        },
+      );
+    });
+    setCellErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleCopy(event: ClipboardEvent<HTMLElement>) {
+    const selectedRows = visibleRows.filter((row) =>
+      selectedIds.includes(getGridRowId(row, rowKey)),
+    );
+    const value =
+      selectedRows.length > 0
+        ? toGridTsv(selectedRows, columns)
+        : focusedCell
+          ? String(
+              visibleRows.find(
+                (row) => getGridRowId(row, rowKey) === focusedCell.rowId,
+              )?.[columns[focusedCell.columnIndex]?.field] ?? '',
+            )
+          : '';
+    if (!value) return;
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', value);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLElement>) {
+    if (!focusedCell) return;
+    const text = event.clipboardData.getData('text/plain');
+    if (!text) return;
+    event.preventDefault();
+    const startRowIndex = visibleRows.findIndex(
+      (row) => getGridRowId(row, rowKey) === focusedCell.rowId,
+    );
+    if (startRowIndex < 0) return;
+
+    setData((current) => {
+      let next = current;
+      const targetRows = current.rows.filter(
+        (row) =>
+          current.stateById[getStateKey(getGridRowId(row, rowKey))] !==
+          'deleted',
+      );
+      parseGridTsv(text).forEach((values, valueRowIndex) => {
+        let targetRow = targetRows[startRowIndex + valueRowIndex];
+        if (!targetRow && createRow) {
+          targetRow = createRow();
+          next = addGridRow(next, targetRow, rowKey);
+          targetRows.push(targetRow);
+        }
+        if (!targetRow) return;
+        const changes: Partial<T> = {};
+        values.forEach((rawValue, valueColumnIndex) => {
+          const column = columns[focusedCell.columnIndex + valueColumnIndex];
+          if (!column || !isCellEditable(column, targetRow)) return;
+          const value = coerceClipboardValue(rawValue, column);
+          if (value !== undefined) {
+            (changes as Record<keyof T, unknown>)[column.field] = value;
+          }
+        });
+        if (Object.keys(changes).length > 0) {
+          next = updateGridRow(
+            next,
+            rowKey,
+            getGridRowId(targetRow, rowKey),
+            changes,
+          );
+        }
+      });
+      return next;
+    });
   }
 
   function selectRow(rowId: F1GridRowId, event?: MouseEvent<HTMLElement>) {
@@ -177,7 +282,12 @@ function F1GridInner<T extends object>(
     if (!editingCell) return;
 
     const column = columns[editingCell.columnIndex];
-    const value = column.type === 'number' ? Number(draftValue) : draftValue;
+    const value =
+      column.type === 'number' ||
+      column.type === 'decimal' ||
+      column.type === 'currency'
+        ? Number(draftValue)
+        : draftValue;
     const row = data.rows.find(
       (item) => getGridRowId(item, rowKey) === editingCell.rowId,
     );
@@ -185,7 +295,10 @@ function F1GridInner<T extends object>(
     if (
       column &&
       row &&
-      (column.type !== 'number' || !Number.isNaN(value)) &&
+      ((column.type !== 'number' &&
+        column.type !== 'decimal' &&
+        column.type !== 'currency') ||
+        !Number.isNaN(value)) &&
       !Object.is(row[column.field], value)
     ) {
       setData((current) =>
@@ -268,6 +381,50 @@ function F1GridInner<T extends object>(
     );
 
     if (currentFocusedRowIndex < 0) return;
+
+    if (event.key === 'Insert') {
+      event.preventDefault();
+      handleAddRow();
+      return;
+    }
+
+    if (event.ctrlKey && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      handleDuplicateSelectedRows();
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      if (selectedIds.length > 0) {
+        handleDeleteSelectedRows();
+      } else {
+        const row = visibleRows[currentFocusedRowIndex];
+        const column = columns[focusedCell.columnIndex];
+        if (row && column && isCellEditable(column, row)) {
+          setData((current) =>
+            updateGridRow(current, rowKey, focusedCell.rowId, {
+              [column.field]: '',
+            } as Partial<T>),
+          );
+        }
+      }
+      return;
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      const direction = event.key === 'Home' ? 1 : -1;
+      const indexes = columns.map((_, index) => index);
+      if (direction === -1) indexes.reverse();
+      const columnIndex = indexes.find((index) =>
+        isCellEditable(columns[index], visibleRows[currentFocusedRowIndex]),
+      );
+      if (columnIndex !== undefined) {
+        setFocusedCell(getCell(focusedCell.rowId, columnIndex));
+      }
+      return;
+    }
 
     if (event.key === 'Enter' || event.key === 'F2') {
       event.preventDefault();
@@ -411,6 +568,7 @@ function F1GridInner<T extends object>(
     getChanges() {
       return getGridChanges(data, rowKey);
     },
+    validate,
     startEdit(rowId: F1GridRowId, field: keyof T) {
       const colIndex = columns.findIndex((col) => col.field === field);
       if (colIndex >= 0) {
@@ -429,6 +587,8 @@ function F1GridInner<T extends object>(
     <Box
       role="grid"
       aria-label={ariaLabel}
+      onCopy={handleCopy}
+      onPaste={handlePaste}
       sx={{
         width: '100%',
         overflowX: 'auto',
@@ -477,6 +637,10 @@ function F1GridInner<T extends object>(
             } as Partial<T>),
           );
         }}
+        onPatchRow={(rowId, changes) => {
+          setData((current) => updateGridRow(current, rowKey, rowId, changes));
+        }}
+        getCellError={(rowId, field) => cellErrors[getErrorKey(rowId, field)]}
         onStopEdit={stopEdit}
         onCellRef={(rowId, columnIndex, node) => {
           const key = `${String(rowId)}:${columnIndex}`;

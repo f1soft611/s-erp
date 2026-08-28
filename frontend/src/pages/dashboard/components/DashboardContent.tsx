@@ -13,6 +13,7 @@ import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
+import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import type { ModuleItem, PageContent } from '../types/dashboard';
 
 type DashboardContentProps = {
@@ -80,6 +81,19 @@ export function DashboardContent({
   if (selectedModule.id === 'settings' && currentMenuName === '메뉴관리') {
     return (
       <MenuManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+      />
+    );
+  }
+
+  if (
+    selectedModule.id === 'settings' &&
+    currentMenuName === 'F1 Grid 테스트'
+  ) {
+    return (
+      <F1GridTestPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}

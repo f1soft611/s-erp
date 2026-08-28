@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   addGridRow,
@@ -7,13 +7,20 @@ import {
   duplicateGridRows,
   F1Grid,
   getGridChanges,
+  getCellDisplayValue,
   getGridMergeInfo,
+  clampGridRowHeight,
+  getGridRowHeightByKey,
   getNextEditableCell,
   getSelectedRowIds,
   hasGridRowId,
   markRowsDeleted,
+  parseGridTsv,
   restoreGridRows,
+  toGridTsv,
   updateGridRow,
+  validateGridRow,
+  coerceClipboardValue,
   type F1GridColumn,
   type F1GridRef,
 } from '../src/shared/components/f1-grid';
@@ -75,6 +82,345 @@ const columns: F1GridColumn<MenuRow>[] = [
     ],
   },
 ];
+
+describe('F1-GRID clipboard', () => {
+  it('serializes rows to tab-separated values in column order', () => {
+    expect(toGridTsv(rows, columns)).toBe(
+      'DASH\t1\ttrue\t2026-08-27\tdraft\nSET\t2\ttrue\t2026-08-28\tconfirmed',
+    );
+  });
+
+  it('parses TSV and coerces numeric and checkbox column values', () => {
+    expect(parseGridTsv('ITEM-1\t12\tY')).toEqual([['ITEM-1', '12', 'Y']]);
+    expect(
+      coerceClipboardValue('12', {
+        field: 'order',
+        headerName: '정렬',
+        type: 'number',
+      }),
+    ).toBe(12);
+    expect(
+      coerceClipboardValue('Y', {
+        field: 'enabled',
+        headerName: '사용 여부',
+        type: 'checkbox',
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('F1-GRID validation', () => {
+  it('returns field errors for required, bounds, and custom validation', () => {
+    const errors = validateGridRow(
+      { id: 'line-1', itemCode: '', qty: 0, name: '금지 품목' },
+      [
+        { field: 'itemCode', headerName: '품목코드', required: true },
+        { field: 'qty', headerName: '수량', min: 1, max: 9 },
+        {
+          field: 'name',
+          headerName: '품목명',
+          validate: (value) =>
+            value === '금지 품목' ? '등록할 수 없는 품목입니다.' : true,
+        },
+      ],
+    );
+
+    expect(errors).toEqual({
+      itemCode: '품목코드은(는) 필수입니다.',
+      qty: '수량은(는) 1 이상이어야 합니다.',
+      name: '등록할 수 없는 품목입니다.',
+    });
+  });
+});
+
+describe('F1-GRID extended editors', () => {
+  it('formats currency values for display', () => {
+    expect(
+      getCellDisplayValue(
+        { field: 'price', headerName: '단가', type: 'currency' },
+        12000,
+      ),
+    ).toBe('12,000');
+  });
+
+  it('applies a code picker patch to related row fields', () => {
+    const gridRef =
+      createRef<
+        F1GridRef<{ id: string; itemCode: string; itemName: string }>
+      >();
+    const onOpenCodePicker = () => ({
+      itemCode: 'ITEM-002',
+      itemName: '테스트 품목',
+    });
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목' }]}
+        columns={[
+          {
+            field: 'itemCode',
+            headerName: '품목코드',
+            type: 'code',
+            editable: true,
+            onOpenCodePicker,
+          },
+          { field: 'itemName', headerName: '품목명', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
+    fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({
+        itemCode: 'ITEM-002',
+        itemName: '테스트 품목',
+      }),
+    ]);
+  });
+
+  it('stores autocomplete, decimal, datetime, and time editor values', () => {
+    type ExtendedRow = {
+      id: string;
+      status: string;
+      ratio: number;
+      deliveryAt: string;
+      workTime: string;
+    };
+    const gridRef = createRef<F1GridRef<ExtendedRow>>();
+    const extendedColumns: F1GridColumn<ExtendedRow>[] = [
+      {
+        field: 'status',
+        headerName: '상태',
+        type: 'autocomplete',
+        editable: true,
+        options: [
+          { value: 'ready', label: '준비' },
+          { value: 'done', label: '완료' },
+        ],
+      },
+      { field: 'ratio', headerName: '비율', type: 'decimal', editable: true },
+      {
+        field: 'deliveryAt',
+        headerName: '납기 일시',
+        type: 'datetime',
+        editable: true,
+      },
+      {
+        field: 'workTime',
+        headerName: '작업 시각',
+        type: 'time',
+        editable: true,
+      },
+    ];
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[
+          {
+            id: 'line-1',
+            status: 'ready',
+            ratio: 1.5,
+            deliveryAt: '2026-08-28T09:30',
+            workTime: '09:30',
+          },
+        ]}
+        columns={extendedColumns}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '준비' }));
+    fireEvent.change(screen.getByDisplayValue('ready'), {
+      target: { value: '완료' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('완료'), { key: 'Enter' });
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '1.5' }));
+    fireEvent.change(screen.getByDisplayValue('1.5'), {
+      target: { value: '2.75' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('2.75'), { key: 'Enter' });
+    fireEvent.doubleClick(
+      screen.getByRole('gridcell', { name: '2026-08-28T09:30' }),
+    );
+    fireEvent.change(screen.getByDisplayValue('2026-08-28T09:30'), {
+      target: { value: '2026-08-29T11:45' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('2026-08-29T11:45'), {
+      key: 'Enter',
+    });
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '09:30' }));
+    fireEvent.change(screen.getByDisplayValue('09:30'), {
+      target: { value: '14:15' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('14:15'), { key: 'Enter' });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({
+        status: 'done',
+        ratio: 2.75,
+        deliveryAt: '2026-08-29T11:45',
+        workTime: '14:15',
+      }),
+    ]);
+  });
+});
+
+describe('F1-GRID clipboard, validation, and keyboard commands', () => {
+  type ItemRow = {
+    id: string;
+    itemCode: string;
+    itemName: string;
+    qty: number;
+  };
+  const itemColumns: F1GridColumn<ItemRow>[] = [
+    {
+      field: 'itemCode',
+      headerName: '품목코드',
+      editable: true,
+      required: true,
+    },
+    { field: 'itemName', headerName: '품목명', editable: true },
+    {
+      field: 'qty',
+      headerName: '수량',
+      type: 'number',
+      editable: true,
+      min: 1,
+    },
+  ];
+  const itemRows: ItemRow[] = [
+    { id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목', qty: 1 },
+  ];
+
+  it('pastes TSV from the focused cell and adds overflow rows as inserted', () => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    let nextId = 2;
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={itemRows}
+        columns={itemColumns}
+        rowKey="id"
+        createRow={() => ({
+          id: `line-${nextId++}`,
+          itemCode: '',
+          itemName: '',
+          qty: 0,
+        })}
+      />,
+    );
+
+    const itemCodeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(itemCodeCell);
+    fireEvent.paste(itemCodeCell, {
+      clipboardData: {
+        getData: () => 'ITEM-010\t신규 품목\t3\nITEM-011\t추가 품목\t4',
+      },
+    });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({
+        id: 'line-1',
+        itemCode: 'ITEM-010',
+        itemName: '신규 품목',
+        qty: 3,
+      }),
+    ]);
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([
+      expect.objectContaining({
+        id: 'line-2',
+        itemCode: 'ITEM-011',
+        itemName: '추가 품목',
+        qty: 4,
+      }),
+    ]);
+  });
+
+  it('copies selected rows as tab-separated clipboard text', () => {
+    render(<F1Grid rows={itemRows} columns={itemColumns} rowKey="id" />);
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    const setData = vi.fn();
+
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: { setData },
+    });
+
+    expect(setData).toHaveBeenCalledWith(
+      'text/plain',
+      'ITEM-001\t기존 품목\t1',
+    );
+  });
+
+  it('returns false and marks invalid cells through validate()', () => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ ...itemRows[0], itemCode: '', qty: 0 }]}
+        columns={itemColumns}
+        rowKey="id"
+      />,
+    );
+
+    let valid = true;
+    act(() => {
+      valid = gridRef.current?.validate() ?? true;
+    });
+    expect(valid).toBe(false);
+    expect(
+      screen.getByRole('gridcell', { name: '품목코드은(는) 필수입니다.' }),
+    ).toHaveAttribute('data-grid-error', '품목코드은(는) 필수입니다.');
+  });
+
+  it('uses Home, End, Backspace, Insert, and Ctrl+D according to focus and selection', () => {
+    const gridRef = createRef<F1GridRef<ItemRow>>();
+    let nextId = 2;
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={itemRows}
+        columns={itemColumns}
+        rowKey="id"
+        createRow={() => ({
+          id: `line-${nextId++}`,
+          itemCode: '',
+          itemName: '',
+          qty: 0,
+        })}
+        createDuplicate={(row) => ({ ...row, id: `line-${nextId++}` })}
+      />,
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.click(codeCell);
+    fireEvent.keyDown(codeCell, { key: 'End' });
+    expect(document.activeElement).toBe(
+      screen.getByRole('gridcell', { name: '1' }),
+    );
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Home' });
+    expect(document.activeElement).toBe(codeCell);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.keyDown(codeCell, { key: 'Backspace' });
+    expect(gridRef.current?.getChanges().updatedRows[0]).toEqual(
+      expect.objectContaining({ itemCode: '' }),
+    );
+    fireEvent.keyDown(codeCell, { key: 'Insert' });
+    expect(gridRef.current?.getChanges().insertedRows).toHaveLength(1);
+    act(() => {
+      gridRef.current?.clearSelection();
+    });
+    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.keyDown(codeCell, { key: 'd', ctrlKey: true });
+    expect(gridRef.current?.getChanges().insertedRows).toHaveLength(2);
+  });
+});
 
 describe('F1-GRID row state', () => {
   it('rejects a duplicate row ID before adding a row', () => {
@@ -186,6 +532,15 @@ describe('F1-GRID row merge', () => {
       { isStart: true, span: 1 },
       { isStart: true, span: 1 },
     ]);
+  });
+});
+
+describe('F1-GRID row height', () => {
+  it('clamps row heights and applies keyboard resize steps', () => {
+    expect(clampGridRowHeight(12, 40, 300)).toBe(40);
+    expect(clampGridRowHeight(420, 40, 300)).toBe(300);
+    expect(getGridRowHeightByKey(40, 'ArrowDown', 40, 300, 4)).toBe(44);
+    expect(getGridRowHeightByKey(40, 'ArrowUp', 40, 300, 4)).toBe(40);
   });
 });
 
@@ -377,6 +732,18 @@ describe('F1-GRID interaction', () => {
         enabled: true,
       }),
     ]);
+  });
+
+  it('keeps the editor focused while typing multiple characters', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    fireEvent.doubleClick(codeCell);
+    const editor = screen.getByDisplayValue('DASH');
+
+    fireEvent.change(editor, { target: { value: 'DASH-' } });
+
+    expect(document.activeElement).toBe(editor);
   });
 
   it('keeps a merged value editable for a non-leading row', () => {

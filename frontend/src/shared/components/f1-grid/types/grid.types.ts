@@ -5,9 +5,15 @@ export type F1GridRowState = 'normal' | 'inserted' | 'updated' | 'deleted';
 export type F1GridEditorType =
   | 'text'
   | 'number'
+  | 'decimal'
+  | 'currency'
   | 'checkbox'
   | 'date'
-  | 'select';
+  | 'datetime'
+  | 'time'
+  | 'select'
+  | 'autocomplete'
+  | 'code';
 
 export type F1GridOption = {
   value: string | number | boolean;
@@ -21,6 +27,14 @@ export type F1GridColumn<T extends object> = {
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
   options?: F1GridOption[];
+  required?: boolean;
+  min?: number;
+  max?: number;
+  validate?: (value: T[keyof T], row: T) => string | boolean;
+  onOpenCodePicker?: (
+    row: T,
+    applyPatch: (changes: Partial<T>) => void,
+  ) => Partial<T> | undefined;
   align?: 'left' | 'center' | 'right';
   headerAlign?: 'left' | 'center' | 'right';
   mergeRows?: boolean;
@@ -43,6 +57,7 @@ export type F1GridRef<T extends object> = {
   duplicateSelectedRows(): void;
   getRows(): T[];
   getChanges(): F1GridChanges<T>;
+  validate(): boolean;
   startEdit(rowId: F1GridRowId, field: keyof T): void;
   stopEdit(): void;
 };

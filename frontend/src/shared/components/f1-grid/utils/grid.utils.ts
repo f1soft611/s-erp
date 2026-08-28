@@ -38,11 +38,18 @@ export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: T[keyof T],
 ): string {
-  if (column.type === 'select') {
+  if (column.type === 'select' || column.type === 'autocomplete') {
     return (
       column.options?.find((option) => Object.is(option.value, value))?.label ??
       String(value ?? '')
     );
+  }
+
+  if (column.type === 'currency') {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue)
+      ? new Intl.NumberFormat('ko-KR').format(numericValue)
+      : String(value ?? '');
   }
 
   return String(value ?? '');
