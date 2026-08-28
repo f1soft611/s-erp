@@ -1,21 +1,22 @@
 import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { F1Grid } from '../src/shared/components/f1-grid/F1Grid';
 import {
   addGridRow,
   createGridData,
   duplicateGridRows,
+  F1Grid,
   getGridChanges,
+  getGridMergeInfo,
+  getNextEditableCell,
+  getSelectedRowIds,
+  hasGridRowId,
   markRowsDeleted,
   restoreGridRows,
   updateGridRow,
-} from '../src/shared/components/f1-grid/f1Grid.state';
-import { getGridMergeInfo } from '../src/shared/components/f1-grid/f1Grid.merge';
-import type {
-  F1GridColumn,
-  F1GridRef,
-} from '../src/shared/components/f1-grid/f1Grid.types';
+  type F1GridColumn,
+  type F1GridRef,
+} from '../src/shared/components/f1-grid';
 
 type MenuRow = {
   id: string;
@@ -76,6 +77,15 @@ const columns: F1GridColumn<MenuRow>[] = [
 ];
 
 describe('F1-GRID row state', () => {
+  it('rejects a duplicate row ID before adding a row', () => {
+    const data = createGridData(rows, 'id');
+    const duplicate = addGridRow(data, rows[0], 'id');
+
+    expect(hasGridRowId(data.rows, 'id', 'dashboard')).toBe(true);
+    expect(hasGridRowId(data.rows, 'id', 'new-row')).toBe(false);
+    expect(duplicate.rows).toHaveLength(data.rows.length);
+  });
+
   it('keeps inserted rows inserted after edits and returns them as changes', () => {
     const added = addGridRow(
       createGridData(rows, 'id'),
@@ -180,6 +190,65 @@ describe('F1-GRID row merge', () => {
 });
 
 describe('F1-GRID interaction', () => {
+  it('rebases external rows when the grid has no pending changes', () => {
+    const { rerender } = render(
+      <F1Grid rows={rows} columns={columns} rowKey="id" />,
+    );
+
+    rerender(
+      <F1Grid
+        rows={[{ ...rows[0], code: 'DASH-UPDATED' }, rows[1]]}
+        columns={columns}
+        rowKey="id"
+      />,
+    );
+
+    expect(
+      screen.getByRole('gridcell', { name: 'DASH-UPDATED' }),
+    ).toBeVisible();
+  });
+
+  it('moves DOM focus to the next editable cell with Tab', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    fireEvent.click(codeCell);
+    fireEvent.doubleClick(codeCell);
+    fireEvent.keyDown(screen.getByDisplayValue('DASH'), { key: 'Tab' });
+
+    expect(document.activeElement).toBe(
+      screen.getByRole('gridcell', { name: '1' }),
+    );
+  });
+  it('calculates Ctrl and Shift selection from visible row indexes', () => {
+    expect(
+      getSelectedRowIds(['dashboard'], 'settings', {
+        ctrlKey: true,
+        shiftKey: false,
+      }),
+    ).toEqual(['dashboard', 'settings']);
+    expect(
+      getSelectedRowIds(['dashboard'], 'settings', {
+        ctrlKey: false,
+        shiftKey: true,
+        visibleRowIds: ['dashboard', 'settings', 'reports'],
+      }),
+    ).toEqual(['dashboard', 'settings']);
+  });
+
+  it('finds the next editable cell across a row boundary', () => {
+    expect(
+      getNextEditableCell(
+        { rowIndex: 0, columnIndex: 0 },
+        [
+          [true, false],
+          [false, true],
+        ],
+        1,
+      ),
+    ).toEqual({ rowIndex: 1, columnIndex: 1 });
+  });
+
   it('renders vertical column lines when columnLine is enabled', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 

@@ -78,7 +78,7 @@ src/
 ├── components/
 │   └── grid/
 │       ├── core/
-│       │   ├── ERPGrid.tsx
+│       │   ├── F1Grid.tsx
 │       │   ├── GridHeader.tsx
 │       │   ├── GridBody.tsx
 │       │   ├── GridRow.tsx
@@ -138,7 +138,7 @@ src/
 
 기능별 책임을 분리한다.
 
-`ERPGrid.tsx` 하나에 모든 기능을 구현하지 않는다.
+`F1Grid.tsx` 하나에 모든 기능을 구현하지 않는다.
 
 ---
 
@@ -149,7 +149,7 @@ src/
 예시:
 
 ```typescript
-const columns: ERPGridColumn<Item>[] = [
+const columns: F1GridColumn<Item>[] = [
   {
     field: 'itemCode',
     headerName: '품목코드',
@@ -189,7 +189,7 @@ const columns: ERPGridColumn<Item>[] = [
 기본 타입:
 
 ```typescript
-type ERPGridColumnType =
+type F1GridColumnType =
   | 'text'
   | 'number'
   | 'decimal'
@@ -207,11 +207,11 @@ type ERPGridColumnType =
 Row Merge 설정:
 
 ```typescript
-type ERPGridRowMergeMode = 'none' | 'sameValue' | 'custom';
+type F1GridRowMergeMode = 'none' | 'sameValue' | 'custom';
 
-interface ERPGridColumn<T> {
+interface F1GridColumn<T> {
   field: keyof T;
-  mergeRows?: boolean | ERPGridRowMergeMode;
+  mergeRows?: boolean | F1GridRowMergeMode;
   mergeKey?: keyof T | ((row: T, rowIndex: number) => string | number | null);
   mergeWhen?: (currentRow: T, previousRow: T) => boolean;
 }
@@ -224,7 +224,7 @@ interface ERPGridColumn<T> {
 예:
 
 ```typescript
-const columns: ERPGridColumn<PurchaseLine>[] = [
+const columns: F1GridColumn<PurchaseLine>[] = [
   {
     field: 'customerName',
     headerName: '거래처',
@@ -520,7 +520,7 @@ custom
 Grid 전체 옵션:
 
 ```tsx
-<ERPGrid rows={rows} columns={columns} enableRowMerge />
+<F1Grid rows={rows} columns={columns} enableRowMerge />
 ```
 
 컬럼별 옵션:
@@ -1035,7 +1035,7 @@ interface GridDataState<T> {
 예:
 
 ```tsx
-<ERPGridToolbar
+<F1GridToolbar
   buttons={[
     'refresh',
     'add',
@@ -1125,7 +1125,7 @@ const row: any;
 권장:
 
 ```typescript
-interface ERPGridRow {
+interface F1GridRow {
   id: string | number;
   [key: string]: unknown;
 }
@@ -1134,14 +1134,14 @@ interface ERPGridRow {
 Generic을 적극적으로 사용한다.
 
 ```typescript
-ERPGrid<T>;
-ERPGridColumn<T>;
+F1Grid<T>;
+F1GridColumn<T>;
 ```
 
 예:
 
 ```tsx
-<ERPGrid<Item> rows={items} columns={columns} />
+<F1Grid<Item> rows={items} columns={columns} />
 ```
 
 ---
@@ -1151,7 +1151,7 @@ ERPGridColumn<T>;
 최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다.
 
 ```typescript
-interface ERPGridRef<T> {
+interface F1GridRef<T> {
   // Selection
   getSelectedRows(): T[];
   getSelectedRowIds(): Array<string | number>;
@@ -1203,7 +1203,7 @@ interface ERPGridRef<T> {
 최종 사용 형태는 다음과 같이 단순해야 한다.
 
 ```tsx
-const columns: ERPGridColumn<Item>[] = [
+const columns: F1GridColumn<Item>[] = [
   {
     field: 'itemCode',
     headerName: '품목코드',
@@ -1236,7 +1236,7 @@ const columns: ERPGridColumn<Item>[] = [
 ];
 
 return (
-  <ERPGrid
+  <F1Grid
     gridId="PURCHASE_ORDER"
     rowKey="id"
     columns={columns}
@@ -1253,7 +1253,7 @@ return (
 Row Merge 사용 예:
 
 ```tsx
-const columns: ERPGridColumn<PurchaseLine>[] = [
+const columns: F1GridColumn<PurchaseLine>[] = [
   {
     field: 'customerName',
     headerName: '거래처',
@@ -1275,7 +1275,7 @@ const columns: ERPGridColumn<PurchaseLine>[] = [
 ];
 
 return (
-  <ERPGrid
+  <F1Grid
     gridId="PURCHASE_ORDER"
     rowKey="id"
     columns={columns}
@@ -1584,7 +1584,7 @@ ERP 업무 특성을 고려하지 않은 일반적인 Table UI를 구현하지 �
 최종적으로 ERP 각 화면에서 다음과 같이 사용할 수 있는 Grid를 만든다.
 
 ```tsx
-<ERPGrid
+<F1Grid
   gridId="SALES_ORDER"
   columns={columns}
   rows={rows}

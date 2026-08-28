@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import type { F1GridColumn, F1GridOption } from '../f1Grid.types';
+import type { F1GridColumn, F1GridOption } from '../types/grid.types';
 import { DateEditor } from './DateEditor';
 import { NumberEditor } from './NumberEditor';
 import { SelectEditor } from './SelectEditor';

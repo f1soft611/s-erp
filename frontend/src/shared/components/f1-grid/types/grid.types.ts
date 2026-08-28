@@ -24,7 +24,6 @@ export type F1GridColumn<T extends object> = {
   align?: 'left' | 'center' | 'right';
   headerAlign?: 'left' | 'center' | 'right';
   mergeRows?: boolean;
-  /** Shows a select-all/deselect-all checkbox in the header. Only applies to `type: 'checkbox'` columns. */
   headerCheckbox?: boolean;
 };
 
