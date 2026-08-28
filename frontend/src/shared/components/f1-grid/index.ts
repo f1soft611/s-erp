@@ -1,5 +1,4 @@
 export { F1Grid } from './core/F1Grid';
-export type { F1GridProps } from './core/F1Grid';
 export * from './types/grid.types';
 export * from './state/GridState';
 export * from './merge/GridRowMerge';
@@ -9,3 +8,7 @@ export * from './selection/GridSelection';
 export * from './clipboard/GridClipboard';
 export * from './validation/GridValidation';
 export * from './layout/GridRowHeight';
+export * from './columns/GridColumnManagement';
+export * from './sorting/GridSort';
+export * from './filter/GridFilter';
+export * from './columns/GridColumnPin';

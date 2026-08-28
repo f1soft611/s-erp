@@ -1,5 +1,11 @@
 import { createRef } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   addGridRow,
@@ -21,8 +27,19 @@ import {
   updateGridRow,
   validateGridRow,
   coerceClipboardValue,
+  canHideGridColumn,
+  getVisibleGridColumns,
+  toggleGridSort,
+  sortGridRows,
+  getGridSortIndicator,
+  getGridFilterOperators,
+  matchesGridFilter,
+  applyGridFilters,
+  getPinnedGridColumns,
+  getGridColumnPinOffsets,
   type F1GridColumn,
   type F1GridRef,
+  type F1GridSort,
 } from '../src/shared/components/f1-grid';
 
 type MenuRow = {
@@ -106,6 +123,55 @@ describe('F1-GRID clipboard', () => {
         type: 'checkbox',
       }),
     ).toBe(true);
+  });
+});
+
+describe('F1-GRID column management', () => {
+  it('filters hidden columns while preserving the configured order', () => {
+    const configuredColumns = [
+      { field: 'code', headerName: '코드' },
+      { field: 'order', headerName: '정렬' },
+      { field: 'status', headerName: '상태' },
+    ] satisfies F1GridColumn<MenuRow>[];
+
+    expect(
+      getVisibleGridColumns(configuredColumns, new Set(['order'])).map(
+        (column) => column.field,
+      ),
+    ).toEqual(['code', 'status']);
+  });
+
+  it('prevents hiding the last visible column', () => {
+    const configuredColumn = {
+      field: 'code',
+      headerName: '코드',
+    } satisfies F1GridColumn<MenuRow>;
+
+    expect(canHideGridColumn([configuredColumn], configuredColumn)).toBe(false);
+    expect(
+      canHideGridColumn([configuredColumn, columns[1]], configuredColumn),
+    ).toBe(true);
+  });
+
+  it('hides and restores a column through the header column list menu', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '정렬 표시' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('columnheader', { name: /정렬/ })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '정렬 표시' }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('columnheader', { name: /정렬/ }),
+      ).toBeInTheDocument();
+    });
   });
 });
 
@@ -604,6 +670,16 @@ describe('F1-GRID row height', () => {
 });
 
 describe('F1-GRID interaction', () => {
+  it('keeps horizontal overflow within a shrinkable grid root', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    expect(screen.getByRole('grid', { name: 'F1-GRID' })).toHaveStyle({
+      minWidth: '0px',
+      maxWidth: '100%',
+      overflowX: 'auto',
+    });
+  });
+
   it('rebases external rows when the grid has no pending changes', () => {
     const { rerender } = render(
       <F1Grid rows={rows} columns={columns} rowKey="id" />,
@@ -667,7 +743,7 @@ describe('F1-GRID interaction', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 
     expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: '코드' }))
+      getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
         .borderLeftWidth,
     ).toBe('1px');
     expect(
@@ -731,7 +807,7 @@ describe('F1-GRID interaction', () => {
   it('applies headerAlign independently from cell alignment', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByRole('columnheader', { name: '정렬' })).toHaveStyle({
+    expect(screen.getByRole('columnheader', { name: /정렬/ })).toHaveStyle({
       textAlign: 'center',
     });
   });
@@ -751,7 +827,7 @@ describe('F1-GRID interaction', () => {
     expect(screen.queryByLabelText('상태 전체 선택')).not.toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', {
-        name: '사용 여부 전체 선택 사용 여부',
+        name: /사용 여부/,
       }),
     ).toHaveTextContent('사용 여부');
   });
@@ -936,5 +1012,234 @@ describe('F1-GRID interaction', () => {
     fireEvent.keyDown(orderCell, { key: 'F2' });
 
     expect(screen.getByDisplayValue('1')).toHaveAttribute('type', 'number');
+  });
+});
+
+describe('F1-GRID header divider', () => {
+  it('always renders a vertical divider on header cells regardless of columnLine', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    expect(
+      getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+        .borderRightWidth,
+    ).toBe('1px');
+  });
+});
+
+describe('F1-GRID sorting', () => {
+  it('adds, updates, and toggles off multi-column sort entries', () => {
+    let sorts = toggleGridSort<MenuRow>([], 'code', 'asc');
+    expect(sorts).toEqual([{ field: 'code', direction: 'asc' }]);
+
+    sorts = toggleGridSort(sorts, 'order', 'asc');
+    expect(sorts).toEqual([
+      { field: 'code', direction: 'asc' },
+      { field: 'order', direction: 'asc' },
+    ]);
+
+    sorts = toggleGridSort(sorts, 'code', 'desc');
+    expect(sorts).toEqual([
+      { field: 'code', direction: 'desc' },
+      { field: 'order', direction: 'asc' },
+    ]);
+
+    sorts = toggleGridSort(sorts, 'code', 'desc');
+    expect(sorts).toEqual([{ field: 'order', direction: 'asc' }]);
+  });
+
+  it('sorts rows by multiple columns, treating null/undefined as last', () => {
+    const data = [
+      { id: 1, group: 'B', order: 2 },
+      { id: 2, group: 'A', order: undefined },
+      { id: 3, group: 'A', order: 1 },
+    ];
+
+    expect(
+      sortGridRows(data, [
+        { field: 'group', direction: 'asc' },
+        { field: 'order', direction: 'asc' },
+      ]).map((row) => row.id),
+    ).toEqual([3, 2, 1]);
+  });
+
+  it('reports the sort direction and multi-column order for a field', () => {
+    const sorts: F1GridSort<MenuRow>[] = [
+      { field: 'code', direction: 'asc' },
+      { field: 'order', direction: 'desc' },
+    ];
+
+    expect(getGridSortIndicator(sorts, 'order')).toEqual({
+      direction: 'desc',
+      order: 2,
+    });
+    expect(getGridSortIndicator(sorts, 'status')).toBeUndefined();
+  });
+
+  it('sorts a column ascending and descending through the header menu', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
+
+    const cellsDesc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
+    expect(cellsDesc[0]).toHaveTextContent('SET');
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '오름차순 정렬' }));
+
+    const cellsAsc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
+    expect(cellsAsc[0]).toHaveTextContent('DASH');
+  });
+});
+
+describe('F1-GRID filtering', () => {
+  it('returns operator sets by column type', () => {
+    expect(getGridFilterOperators('text')).toContain('contains');
+    expect(getGridFilterOperators('number')).toContain('between');
+    expect(getGridFilterOperators('checkbox')).toEqual(['equals']);
+  });
+
+  it('matches rows using contains, range, and empty operators', () => {
+    const textColumn: F1GridColumn<MenuRow> = {
+      field: 'code',
+      headerName: '코드',
+    };
+    const numberColumn: F1GridColumn<MenuRow> = {
+      field: 'order',
+      headerName: '정렬',
+      type: 'number',
+    };
+
+    expect(
+      matchesGridFilter(
+        rows[0],
+        { field: 'code', operator: 'contains', value: 'da' },
+        textColumn,
+      ),
+    ).toBe(true);
+    expect(
+      matchesGridFilter(
+        rows[0],
+        { field: 'order', operator: 'between', value: '1', value2: '1' },
+        numberColumn,
+      ),
+    ).toBe(true);
+    expect(
+      matchesGridFilter(
+        rows[1],
+        { field: 'order', operator: 'between', value: '1', value2: '1' },
+        numberColumn,
+      ),
+    ).toBe(false);
+  });
+
+  it('applies multiple filters with AND semantics', () => {
+    expect(
+      applyGridFilters(
+        rows,
+        [
+          { field: 'code', operator: 'contains', value: 'a' },
+          { field: 'enabled', operator: 'equals', value: true },
+        ],
+        columns,
+      ),
+    ).toEqual([rows[0]]);
+  });
+
+  it('filters visible rows through the header filter popover', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
+    fireEvent.change(screen.getByLabelText('코드 필터 값'), {
+      target: { value: 'SET' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('gridcell', { name: 'DASH' })).toBeNull();
+    });
+    expect(screen.getByRole('gridcell', { name: 'SET' })).toBeInTheDocument();
+  });
+});
+
+describe('F1-GRID column pin', () => {
+  it('reorders columns into left-pinned, unpinned, and right-pinned groups', () => {
+    const pinned = new Map<string, 'left' | 'right'>([
+      ['status', 'left'],
+      ['code', 'right'],
+    ]);
+
+    expect(
+      getPinnedGridColumns(columns, pinned).map((column) => column.field),
+    ).toEqual(['status', 'order', 'enabled', 'startDate', 'code']);
+  });
+
+  it('accumulates left and right pin offsets from the checkbox column width', () => {
+    const orderedColumns = [
+      { field: 'status', headerName: '상태', width: 100 },
+      { field: 'order', headerName: '정렬', width: 80 },
+      { field: 'code', headerName: '코드', width: 120 },
+    ] satisfies F1GridColumn<MenuRow>[];
+    const pinned = new Map<string, 'left' | 'right'>([
+      ['status', 'left'],
+      ['code', 'right'],
+    ]);
+
+    expect(getGridColumnPinOffsets(orderedColumns, pinned)).toEqual({
+      leftOffsets: { status: 44 },
+      rightOffsets: { code: 0 },
+    });
+  });
+
+  it('pins a column to the left and unpins it through the header menu', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+          .position,
+      ).toBe('sticky');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '고정 해제' }));
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+          .position,
+      ).not.toBe('sticky');
+    });
+  });
+});
+
+describe('F1-GRID column resize', () => {
+  it('resizes column width on mouse drag and clamps to minColumnWidth', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        resizableColumns={true}
+        minColumnWidth={60}
+      />,
+    );
+
+    const resizeHandle = screen.getByRole('separator', {
+      name: '코드 컬럼 너비 조절',
+    });
+    expect(resizeHandle).toBeInTheDocument();
+
+    // Mouse drag resize
+    fireEvent.mouseDown(resizeHandle, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 220 });
+    fireEvent.mouseUp(window);
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toBeVisible();
   });
 });

@@ -25,10 +25,13 @@ import {
   type F1GridData,
 } from '../state/GridState';
 import type {
-  F1GridChanges,
   F1GridColumn,
+  F1GridFilter,
+  F1GridPinSide,
+  F1GridProps,
   F1GridRef,
   F1GridRowId,
+  F1GridSort,
 } from '../types/grid.types';
 import { getNextEditableCell } from '../keyboard/GridKeyboard';
 import { getSelectedRowIds as resolveSelectedRowIds } from '../selection/GridSelection';
@@ -41,21 +44,17 @@ import {
 } from '../clipboard/GridClipboard';
 import { validateGridRow } from '../validation/GridValidation';
 import { clampGridRowHeight } from '../layout/GridRowHeight';
-
-export type F1GridProps<T extends object> = {
-  rows: T[];
-  columns: F1GridColumn<T>[];
-  rowKey: keyof T;
-  ariaLabel?: string;
-  columnLine?: boolean;
-  rowHeight?: number;
-  minRowHeight?: number;
-  maxRowHeight?: number;
-  resizableRows?: boolean;
-  createRow?: () => T;
-  createDuplicate?: (row: T) => T;
-  onChangesChange?: (changes: F1GridChanges<T>) => void;
-};
+import {
+  canHideGridColumn,
+  getVisibleGridColumns,
+} from '../columns/GridColumnManagement';
+import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
+import { applyGridFilters } from '../filter/GridFilter';
+import {
+  getGridColumnPinOffsets,
+  getGridColumnPinSide,
+  getPinnedGridColumns,
+} from '../columns/GridColumnPin';
 
 type F1GridCell = {
   rowId: F1GridRowId;
@@ -73,6 +72,8 @@ function F1GridInner<T extends object>(
     minRowHeight = 40,
     maxRowHeight = 300,
     resizableRows = true,
+    resizableColumns = true,
+    minColumnWidth = 50,
     createRow,
     createDuplicate,
     onChangesChange,
@@ -97,16 +98,97 @@ function F1GridInner<T extends object>(
     normalizedMaxRowHeight,
   );
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [hiddenColumnFields, setHiddenColumnFields] = useState<Set<string>>(
+    () =>
+      new Set(
+        columns
+          .filter((column) => column.hidden)
+          .map((column) => String(column.field)),
+      ),
+  );
+  const [sortState, setSortState] = useState<F1GridSort<T>[]>([]);
+  const [filterState, setFilterState] = useState<F1GridFilter<T>[]>([]);
+  const [pinnedFields, setPinnedFields] = useState<Map<string, F1GridPinSide>>(
+    () => new Map(),
+  );
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
 
-  const visibleRows = data.rows.filter(
-    (row) =>
-      data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
+  const visibleColumns = getPinnedGridColumns(
+    getVisibleGridColumns(columns, hiddenColumnFields),
+    pinnedFields,
   );
-  const mergeInfoByColumn = columns.map((column) =>
+  const { leftOffsets, rightOffsets } = getGridColumnPinOffsets(
+    visibleColumns,
+    pinnedFields,
+    columnWidths,
+  );
+
+  const visibleRows = sortGridRows(
+    applyGridFilters(
+      data.rows.filter(
+        (row) =>
+          data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
+      ),
+      filterState,
+      columns,
+    ),
+    sortState,
+  );
+  const mergeInfoByColumn = visibleColumns.map((column) =>
     column.mergeRows ? getGridMergeInfo(visibleRows, column.field) : [],
   );
+
+  function toggleSortColumn(
+    column: F1GridColumn<T>,
+    direction: 'asc' | 'desc',
+  ) {
+    setSortState((current) => toggleGridSort(current, column.field, direction));
+  }
+
+  function applyColumnFilter(
+    column: F1GridColumn<T>,
+    filter: F1GridFilter<T> | undefined,
+  ) {
+    setFilterState((current) => {
+      const withoutColumn = current.filter(
+        (item) => item.field !== column.field,
+      );
+      return filter ? [...withoutColumn, filter] : withoutColumn;
+    });
+  }
+
+  function pinColumn(column: F1GridColumn<T>, side: F1GridPinSide | undefined) {
+    setPinnedFields((current) => {
+      const next = new Map(current);
+      if (side) {
+        next.set(String(column.field), side);
+      } else {
+        next.delete(String(column.field));
+      }
+      return next;
+    });
+  }
+
+  function handleResizeColumn(column: F1GridColumn<T>, nextWidth: number) {
+    setColumnWidths((current) => ({
+      ...current,
+      [String(column.field)]: Math.max(minColumnWidth, nextWidth),
+    }));
+  }
+
+  function getPinOffset(
+    column: F1GridColumn<T>,
+  ): { side: 'left' | 'right'; offset: number } | undefined {
+    const side = getGridColumnPinSide(pinnedFields, column);
+    if (!side) return undefined;
+    const offset =
+      side === 'left'
+        ? leftOffsets[String(column.field)]
+        : rightOffsets[String(column.field)];
+    return offset === undefined ? undefined : { side, offset };
+  }
 
   useEffect(() => {
     if (lastRowsPropRef.current === rows) return;
@@ -186,12 +268,12 @@ function F1GridInner<T extends object>(
     );
     const value =
       selectedRows.length > 0
-        ? toGridTsv(selectedRows, columns)
+        ? toGridTsv(selectedRows, visibleColumns)
         : focusedCell
           ? String(
               visibleRows.find(
                 (row) => getGridRowId(row, rowKey) === focusedCell.rowId,
-              )?.[columns[focusedCell.columnIndex]?.field] ?? '',
+              )?.[visibleColumns[focusedCell.columnIndex]?.field] ?? '',
             )
           : '';
     if (!value) return;
@@ -226,7 +308,8 @@ function F1GridInner<T extends object>(
         if (!targetRow) return;
         const changes: Partial<T> = {};
         values.forEach((rawValue, valueColumnIndex) => {
-          const column = columns[focusedCell.columnIndex + valueColumnIndex];
+          const column =
+            visibleColumns[focusedCell.columnIndex + valueColumnIndex];
           if (!column || !isCellEditable(column, targetRow)) return;
           const value = coerceClipboardValue(rawValue, column);
           if (value !== undefined) {
@@ -285,7 +368,7 @@ function F1GridInner<T extends object>(
   }
 
   function startEdit(rowId: F1GridRowId, columnIndex: number) {
-    const column = columns[columnIndex];
+    const column = visibleColumns[columnIndex];
     const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
 
     if (
@@ -309,7 +392,7 @@ function F1GridInner<T extends object>(
   function commitEdit(nextCell?: F1GridCell) {
     if (!editingCell) return;
 
-    const column = columns[editingCell.columnIndex];
+    const column = visibleColumns[editingCell.columnIndex];
     const value =
       column.type === 'number' ||
       column.type === 'decimal' ||
@@ -369,6 +452,18 @@ function F1GridInner<T extends object>(
     });
   }
 
+  function toggleColumnVisibility(column: F1GridColumn<T>, visible: boolean) {
+    setHiddenColumnFields((current) => {
+      const next = new Set(current);
+      if (visible) {
+        next.delete(String(column.field));
+      } else if (canHideGridColumn(visibleColumns, column)) {
+        next.add(String(column.field));
+      }
+      return next;
+    });
+  }
+
   const commitEditRef = useRef(commitEdit);
   useEffect(() => {
     commitEditRef.current = commitEdit;
@@ -400,7 +495,7 @@ function F1GridInner<T extends object>(
     if (!focusedCell) return;
 
     const editableByRow = visibleRows.map((row) =>
-      columns.map(
+      visibleColumns.map(
         (column) => isCellEditable(column, row) && column.type !== 'checkbox',
       ),
     );
@@ -428,7 +523,7 @@ function F1GridInner<T extends object>(
         handleDeleteSelectedRows();
       } else {
         const row = visibleRows[currentFocusedRowIndex];
-        const column = columns[focusedCell.columnIndex];
+        const column = visibleColumns[focusedCell.columnIndex];
         if (row && column && isCellEditable(column, row)) {
           setData((current) =>
             updateGridRow(current, rowKey, focusedCell.rowId, {
@@ -443,10 +538,13 @@ function F1GridInner<T extends object>(
     if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
       const direction = event.key === 'Home' ? 1 : -1;
-      const indexes = columns.map((_, index) => index);
+      const indexes = visibleColumns.map((_, index) => index);
       if (direction === -1) indexes.reverse();
       const columnIndex = indexes.find((index) =>
-        isCellEditable(columns[index], visibleRows[currentFocusedRowIndex]),
+        isCellEditable(
+          visibleColumns[index],
+          visibleRows[currentFocusedRowIndex],
+        ),
       );
       if (columnIndex !== undefined) {
         setFocusedCell(getCell(focusedCell.rowId, columnIndex));
@@ -514,7 +612,7 @@ function F1GridInner<T extends object>(
       nextRowIndex = Math.min(visibleRows.length - 1, nextRowIndex + 1);
     if (event.key === 'ArrowLeft') nextColIndex = Math.max(0, nextColIndex - 1);
     if (event.key === 'ArrowRight')
-      nextColIndex = Math.min(columns.length - 1, nextColIndex + 1);
+      nextColIndex = Math.min(visibleColumns.length - 1, nextColIndex + 1);
 
     if (
       nextRowIndex !== currentFocusedRowIndex ||
@@ -538,7 +636,7 @@ function F1GridInner<T extends object>(
     setData((current) => addGridRow(current, newRow, rowKey));
     setSelectedIds([newRowId]);
 
-    const firstEditableCol = columns.findIndex(
+    const firstEditableCol = visibleColumns.findIndex(
       (column) => isCellEditable(column, newRow) && column.type !== 'checkbox',
     );
     if (firstEditableCol >= 0) {
@@ -598,7 +696,7 @@ function F1GridInner<T extends object>(
     },
     validate,
     startEdit(rowId: F1GridRowId, field: keyof T) {
-      const colIndex = columns.findIndex((col) => col.field === field);
+      const colIndex = visibleColumns.findIndex((col) => col.field === field);
       if (colIndex >= 0) {
         startEdit(rowId, colIndex);
       }
@@ -619,6 +717,8 @@ function F1GridInner<T extends object>(
       onPaste={handlePaste}
       sx={{
         width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
         overflowX: 'auto',
         border: 1,
         borderColor: 'divider',
@@ -627,10 +727,15 @@ function F1GridInner<T extends object>(
       }}
     >
       <GridHeader
-        columns={columns}
+        columns={visibleColumns}
+        allColumns={columns}
         columnLine={columnLine}
         selectedAll={selectedAll}
         selectedIds={selectedIds}
+        columnWidths={columnWidths}
+        resizableColumns={resizableColumns}
+        minColumnWidth={minColumnWidth}
+        onResizeColumn={handleResizeColumn}
         getColumnCheckboxState={getColumnCheckboxState}
         onToggleAllRows={() => {
           setSelectedIds(
@@ -640,12 +745,22 @@ function F1GridInner<T extends object>(
           );
         }}
         onToggleColumnCheckbox={toggleColumnCheckbox}
+        onToggleColumnVisibility={toggleColumnVisibility}
+        sorts={sortState}
+        onToggleSort={toggleSortColumn}
+        filters={filterState}
+        onApplyFilter={applyColumnFilter}
+        pinnedFields={pinnedFields}
+        onPinColumn={pinColumn}
+        leftOffsets={leftOffsets}
+        rightOffsets={rightOffsets}
       />
       <GridBody
         visibleRows={visibleRows}
-        columns={columns}
+        columns={visibleColumns}
         rowKey={rowKey}
         columnLine={columnLine}
+        columnWidths={columnWidths}
         defaultRowHeight={defaultRowHeight}
         minRowHeight={normalizedMinRowHeight}
         maxRowHeight={normalizedMaxRowHeight}
@@ -687,6 +802,7 @@ function F1GridInner<T extends object>(
           editingCellNodeRef.current = node;
         }}
         onUpdateRowHeight={updateRowHeight}
+        getPinOffset={getPinOffset}
       />
     </Box>
   );

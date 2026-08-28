@@ -169,7 +169,9 @@ function DashboardPage() {
         onMenuSelect={handleMenuSelect}
       />
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}
+      >
         <AppBar
           position="sticky"
           elevation={0}
@@ -181,11 +183,13 @@ function DashboardPage() {
         >
           <Box
             sx={{
-              px: 3,
+              px: { xs: 1, md: 3 },
               py: 1.75,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1,
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -195,10 +199,32 @@ function DashboardPage() {
             </Box>
 
             <Box
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                ml: 'auto',
+                minWidth: 0,
+                flexWrap: 'wrap',
+                justifyContent: 'flex-end',
+              }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FormControl size="small" sx={{ minWidth: 128 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <FormControl
+                  size="small"
+                  sx={{
+                    minWidth: { xs: 120, md: 128 },
+                    flex: { xs: '1 1 120px', md: '0 0 auto' },
+                  }}
+                >
                   <Select
                     value={themeMode}
                     onChange={handleThemeChange}
@@ -273,7 +299,13 @@ function DashboardPage() {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
+                <FormControl
+                  size="small"
+                  sx={{
+                    minWidth: { xs: 130, md: 150 },
+                    flex: { xs: '1 1 130px', md: '0 0 auto' },
+                  }}
+                >
                   <Select
                     value={displayScale}
                     onChange={handleDisplayScaleChange}

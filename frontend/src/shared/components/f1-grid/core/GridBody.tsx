@@ -8,6 +8,7 @@ type GridBodyProps<T extends object> = {
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
   columnLine: boolean;
+  columnWidths?: Record<string, number>;
   defaultRowHeight: number;
   minRowHeight: number;
   maxRowHeight: number;
@@ -38,6 +39,9 @@ type GridBodyProps<T extends object> = {
   ) => void;
   onEditingCellRef: (node: HTMLElement | null) => void;
   onUpdateRowHeight: (rowId: F1GridRowId, height: number) => void;
+  getPinOffset: (
+    column: F1GridColumn<T>,
+  ) => { side: 'left' | 'right'; offset: number } | undefined;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -64,6 +68,7 @@ export function GridBody<T extends object>({
   columns,
   rowKey,
   columnLine,
+  columnWidths,
   defaultRowHeight,
   minRowHeight,
   maxRowHeight,
@@ -88,6 +93,7 @@ export function GridBody<T extends object>({
   onCellRef,
   onEditingCellRef,
   onUpdateRowHeight,
+  getPinOffset,
 }: GridBodyProps<T>) {
   function getMergeEditing(rowIndex: number, columnIndex: number): boolean {
     const column = columns[columnIndex];
@@ -136,7 +142,10 @@ export function GridBody<T extends object>({
       sx={{
         display: 'grid',
         gridTemplateColumns: `44px ${columns
-          .map((column) => `${column.width ?? 140}px`)
+          .map(
+            (column) =>
+              `${columnWidths?.[String(column.field)] ?? column.width ?? 140}px`,
+          )
           .join(' ')}`,
         gridTemplateRows: visibleRows
           .map(
@@ -188,6 +197,7 @@ export function GridBody<T extends object>({
               getMergeEditing(rowIndex, columnIndex)
             }
             getMerged={(ri, ci, val) => getMerged(ri, ci, val)}
+            getPinOffset={getPinOffset}
           />
         );
       })}

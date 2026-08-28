@@ -7,7 +7,7 @@ import {
 } from '../src/pages/dashboard/services/dashboardData';
 
 describe('F1 Grid test page', () => {
-  it('registers the F1 Grid test menu and renders its sample grid', () => {
+  it('registers the F1 Grid test menu and renders its full options grid and toolbar', () => {
     expect(
       moduleItems.find((module) => module.id === 'settings')?.menus,
     ).toContainEqual(
@@ -25,13 +25,29 @@ describe('F1 Grid test page', () => {
       />,
     );
 
+    // Verify grid & action buttons
     expect(
       screen.getByRole('grid', { name: 'F1-GRID 기능 테스트' }),
     ).toBeVisible();
+    expect(screen.getByRole('button', { name: '행 추가' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '행 복제' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '행 삭제' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '삭제 복구' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '선택 해제' })).toBeVisible();
     expect(screen.getByRole('button', { name: '검증 실행' })).toBeVisible();
+
+    // Verify grid options toggles
+    expect(screen.getByLabelText('컬럼 구분선')).toBeChecked();
+    expect(screen.getByLabelText('행 높이 조절')).toBeChecked();
+    expect(screen.getByLabelText('컬럼 너비 리사이즈')).toBeChecked();
+
+    // Verify changes stats chips
+    expect(screen.getByText(/추가: 0건/)).toBeVisible();
+    expect(screen.getByText(/수정: 0건/)).toBeVisible();
+    expect(screen.getByText(/삭제: 0건/)).toBeVisible();
   });
 
-  it('updates item code and item name through the code picker dialog', async () => {
+  it('updates item code and patch values through the code picker dialog', async () => {
     render(
       <F1GridTestPage
         selectedModule={moduleItems.find((module) => module.id === 'settings')!}
@@ -40,17 +56,58 @@ describe('F1 Grid test page', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
+    const itemCodeCells = screen.getAllByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.doubleClick(itemCodeCells[0]);
     fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'ITEM-002 테스트 품목 선택' }),
+      screen.getByRole('button', {
+        name: /ITEM-002: 고내열 실리콘 패킹 가스켓 50A/,
+      }),
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('gridcell', { name: 'ITEM-002' })).toBeVisible();
       expect(
-        screen.getByRole('gridcell', { name: '테스트 품목' }),
+        screen.getAllByRole('gridcell', { name: 'ITEM-002' })[0],
       ).toBeVisible();
+      expect(
+        screen.getAllByRole('gridcell', {
+          name: '고내열 실리콘 패킹 가스켓 50A',
+        })[0],
+      ).toBeVisible();
+    });
+  });
+
+  it('runs validation and displays success notification', async () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '검증 실행' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('모든 데이터 검증을 통과하였습니다.'),
+      ).toBeVisible();
+    });
+  });
+
+  it('supports adding and duplicating rows through toolbar', async () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '행 추가' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/추가: 1건/)).toBeVisible();
     });
   });
 
@@ -63,22 +120,34 @@ describe('F1 Grid test page', () => {
       />,
     );
 
-    expect(
-      screen.getByText(/행 높이를 조절하면 여러 줄로 확인할 수 있는/),
-    ).toBeVisible();
-    const rowHeightHandle = screen.getByRole('button', {
+    expect(screen.getAllByText(/원통형 스테인리스 배관 부품/)[0]).toBeVisible();
+    const rowHeightHandles = screen.getAllByRole('button', {
       name: /행 높이 조절/,
     });
-    const itemName = screen.getByText(
-      /행 높이를 조절하면 여러 줄로 확인할 수 있는/,
+
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '40');
+
+    fireEvent.keyDown(rowHeightHandles[0], { key: 'ArrowDown' });
+
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '44');
+  });
+
+  it('provides column resize handles on all column headers', () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
     );
 
-    expect(rowHeightHandle).toHaveAttribute('aria-valuenow', '40');
-    expect(itemName).toHaveStyle({ whiteSpace: 'nowrap' });
-
-    fireEvent.keyDown(rowHeightHandle, { key: 'ArrowDown' });
-
-    expect(rowHeightHandle).toHaveAttribute('aria-valuenow', '44');
-    expect(itemName).toHaveStyle({ whiteSpace: 'normal' });
+    expect(
+      screen.getByRole('separator', { name: '품목코드 컬럼 너비 조절' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('separator', {
+        name: '품목명 (Row Merge) 컬럼 너비 조절',
+      }),
+    ).toBeVisible();
   });
 });

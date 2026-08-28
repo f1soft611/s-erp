@@ -27,6 +27,7 @@ type GridCellProps<T extends object> = {
   onCodePick: () => void;
   errorMessage?: string;
   onCellRef: (node: HTMLElement | null) => void;
+  pinOffset?: { side: 'left' | 'right'; offset: number };
 };
 
 function toJustifyContent(align: 'left' | 'center' | 'right') {
@@ -58,6 +59,7 @@ export function GridCell<T extends object>({
   onCodePick,
   errorMessage,
   onCellRef,
+  pinOffset,
 }: GridCellProps<T>) {
   const value = row[column.field];
   const editable = isCellEditable(column, row);
@@ -93,7 +95,15 @@ export function GridCell<T extends object>({
           : rowIndex + 1,
         borderTop: merged ? 0 : 1,
         borderColor: 'divider',
-        bgcolor: errorMessage ? 'error.lighter' : undefined,
+        position: pinOffset ? 'sticky' : undefined,
+        left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
+        right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
+        zIndex: pinOffset ? 1 : undefined,
+        bgcolor: pinOffset
+          ? 'background.paper'
+          : errorMessage
+            ? 'error.lighter'
+            : undefined,
         boxShadow: errorMessage ? 'inset 0 0 0 1px' : undefined,
         color: errorMessage ? 'error.main' : undefined,
         outline: focused ? '2px solid' : 'none',

@@ -42,6 +42,9 @@ type GridRowProps<T extends object> = {
   onUpdateRowHeight: (rowId: F1GridRowId, height: number) => void;
   getMergeEditing: (columnIndex: number) => boolean;
   getMerged: (rowIndex: number, columnIndex: number, value: unknown) => boolean;
+  getPinOffset: (
+    column: F1GridColumn<T>,
+  ) => { side: 'left' | 'right'; offset: number } | undefined;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -79,6 +82,7 @@ export function GridRow<T extends object>({
   onUpdateRowHeight,
   getMergeEditing,
   getMerged,
+  getPinOffset,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
     startY: number;
@@ -144,6 +148,9 @@ export function GridRow<T extends object>({
           justifyContent: 'center',
           borderTop: 1,
           borderColor: 'divider',
+          position: 'sticky',
+          left: 0,
+          zIndex: 1,
           bgcolor: isSelected ? 'action.selected' : 'background.paper',
         }}
       >
@@ -212,6 +219,7 @@ export function GridRow<T extends object>({
               onCellRef(rowId, columnIndex, node);
               if (editing) onEditingCellRef(node);
             }}
+            pinOffset={getPinOffset(column)}
           />
         );
       })}
