@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
+import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 import {
@@ -19,6 +20,7 @@ import {
   getGridMergeInfo,
   clampGridRowHeight,
   getGridRowHeightByKey,
+  getGridColumnTrack,
   getNextEditableCell,
   getSelectedRowIds,
   hasGridRowId,
@@ -43,6 +45,7 @@ import {
   type F1GridRef,
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
+import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
 
 type MenuRow = {
   id: string;
@@ -129,6 +132,18 @@ describe('F1-GRID clipboard', () => {
 });
 
 describe('F1-GRID column management', () => {
+  it('creates proportional grid tracks for flex columns', () => {
+    expect(
+      getGridColumnTrack({ field: 'code', headerName: '코드', flex: 1 }),
+    ).toBe('minmax(0px, 1fr)');
+    expect(
+      getGridColumnTrack(
+        { field: 'order', headerName: '정렬', flex: 2, width: 80 },
+        140,
+      ),
+    ).toBe('140px');
+  });
+
   it('filters hidden columns while preserving the configured order', () => {
     const configuredColumns = [
       { field: 'code', headerName: '코드' },
@@ -202,6 +217,18 @@ describe('F1-GRID validation', () => {
 });
 
 describe('F1-GRID extended editors', () => {
+  it('normalizes supported date input shortcuts from the current date', () => {
+    const now = dayjs('2026-08-28T12:00:00');
+
+    expect(normalizeDateInput('01', now)).toBe('2026-08-01');
+    expect(normalizeDateInput('0701', now)).toBe('2026-07-01');
+    expect(normalizeDateInput('250604', now)).toBe('2025-06-04');
+    expect(normalizeDateInput('20260801', now)).toBe('2026-08-01');
+    expect(normalizeDateInput('6-5', now)).toBe('2026-06-05');
+    expect(normalizeDateInput('1', now)).toBe('2026-08-01');
+    expect(normalizeDateInput('0231', now)).toBe('');
+  });
+
   it('formats currency values for display', () => {
     expect(
       getCellDisplayValue(
@@ -336,6 +363,65 @@ describe('F1-GRID extended editors', () => {
       }),
     ]);
   });
+
+  it('stores the option value when an autocomplete edit is committed via Tab', () => {
+    type StatusRow = { id: string; status: string; note: string };
+    const gridRef = createRef<F1GridRef<StatusRow>>();
+    const statusColumns: F1GridColumn<StatusRow>[] = [
+      {
+        field: 'status',
+        headerName: '상태',
+        type: 'autocomplete',
+        editable: true,
+        options: [
+          { value: 'ready', label: '준비' },
+          { value: 'done', label: '완료' },
+        ],
+      },
+      { field: 'note', headerName: '비고', editable: true },
+    ];
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'line-1', status: 'ready', note: '' }]}
+        columns={statusColumns}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '준비' }));
+    fireEvent.change(screen.getByDisplayValue('ready'), {
+      target: { value: '완료' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('완료'), { key: 'Tab' });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'line-1', status: 'done' }),
+    ]);
+  });
+
+  it('opens the time picker when the time editor button is clicked', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', workTime: '09:30' }]}
+        columns={[
+          {
+            field: 'workTime',
+            headerName: '작업 시각',
+            type: 'time',
+            editable: true,
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '09:30' }));
+    fireEvent.click(screen.getByRole('button', { name: /Choose time/ }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
 });
 
 describe('F1-GRID clipboard, validation, and keyboard commands', () => {
@@ -445,7 +531,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     ).toHaveAttribute('data-grid-error', '품목코드은(는) 필수입니다.');
   });
 
-  it('uses Home, End, Backspace, Insert, and Ctrl+D according to focus and selection', () => {
+  it('uses Home, End, Insert, and Ctrl+D while leaving Backspace to the editor', () => {
     const gridRef = createRef<F1GridRef<ItemRow>>();
     let nextId = 2;
     render(
@@ -476,9 +562,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
       gridRef.current?.clearSelection();
     });
     fireEvent.keyDown(codeCell, { key: 'Backspace' });
-    expect(gridRef.current?.getChanges().updatedRows[0]).toEqual(
-      expect.objectContaining({ itemCode: '' }),
-    );
+    expect(gridRef.current?.getChanges().updatedRows).toHaveLength(0);
     fireEvent.keyDown(codeCell, { key: 'Insert' });
     expect(gridRef.current?.getChanges().insertedRows).toHaveLength(1);
     act(() => {
@@ -796,6 +880,41 @@ describe('F1-GRID interaction', () => {
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', startDate: '2026-09-01' }),
     ]);
+  });
+
+  it('accepts a compact month-day value in a date cell', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+    const expectedDate = `${dayjs().year()}-06-05`;
+
+    render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '2026-08-27' }));
+    const dateInput = screen.getByDisplayValue('2026-08-27');
+    fireEvent.change(dateInput, { target: { value: '0605' } });
+    fireEvent.keyDown(dateInput, { key: 'Enter' });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'dashboard', startDate: expectedDate }),
+    ]);
+  });
+
+  it('keeps compact date text while the date cell is still being edited', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '2026-08-27' }));
+    const dateInput = screen.getByDisplayValue('2026-08-27');
+    fireEvent.change(dateInput, { target: { value: '0605' } });
+
+    expect(screen.getByDisplayValue('0605')).toBeInTheDocument();
+  });
+
+  it('does not draw the cell focus outline over a date editor', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
+    fireEvent.doubleClick(dateCell);
+
+    expect(dateCell).toHaveStyle({ outline: 'none' });
   });
 
   it('keeps predicate-disabled rows read-only', () => {

@@ -47,6 +47,20 @@ describe('F1 Grid test page', () => {
     expect(screen.getByText(/삭제: 0건/)).toBeVisible();
   });
 
+  it('renders a standalone date editor for shortcut input testing', () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    expect(screen.getByText('날짜 입력 테스트')).toBeVisible();
+    expect(screen.getByLabelText('축약 입력')).toHaveValue('2026-08-28');
+    expect(screen.getByRole('button', { name: '날짜 초기화' })).toBeVisible();
+  });
+
   it('updates item code and patch values through the code picker dialog', async () => {
     render(
       <F1GridTestPage
@@ -149,5 +163,22 @@ describe('F1 Grid test page', () => {
         name: '품목명 (Row Merge) 컬럼 너비 조절',
       }),
     ).toBeVisible();
+  });
+
+  it('shows the normalized result after entering a date shortcut', async () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    const dateInput = screen.getByLabelText('축약 입력');
+    fireEvent.change(dateInput, { target: { value: '0701' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('2026-07-01')).toBeVisible();
+    });
   });
 });

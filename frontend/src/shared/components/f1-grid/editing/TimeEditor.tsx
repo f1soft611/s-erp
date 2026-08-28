@@ -1,4 +1,7 @@
-import { InputBase } from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import dayjs from 'dayjs';
 import type { KeyboardEvent } from 'react';
 
 type TimeEditorProps = {
@@ -7,16 +10,34 @@ type TimeEditorProps = {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 };
 
+const TIME_FORMAT = 'HH:mm';
+
 export function TimeEditor({ value, onChange, onKeyDown }: TimeEditorProps) {
+  const parsedValue = value ? dayjs(value, TIME_FORMAT) : null;
+
   return (
-    <InputBase
-      autoFocus
-      fullWidth
-      type="time"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onKeyDown={onKeyDown}
-      sx={{ width: '100%', fontSize: 'inherit', bgcolor: 'background.paper' }}
-    />
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <TimePicker
+        value={parsedValue}
+        format={TIME_FORMAT}
+        onChange={(nextValue) =>
+          onChange(nextValue?.isValid() ? nextValue.format(TIME_FORMAT) : '')
+        }
+        slotProps={{
+          textField: {
+            autoFocus: true,
+            fullWidth: true,
+            variant: 'standard',
+            onKeyDown,
+            slotProps: { input: { disableUnderline: true } },
+            sx: {
+              width: '100%',
+              fontSize: 'inherit',
+              bgcolor: 'background.paper',
+            },
+          },
+        }}
+      />
+    </LocalizationProvider>
   );
 }

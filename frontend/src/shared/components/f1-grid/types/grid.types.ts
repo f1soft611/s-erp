@@ -24,6 +24,7 @@ export type F1GridColumn<T extends object> = {
   field: keyof T;
   headerName: string;
   width?: number;
+  flex?: number;
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
   options?: F1GridOption[];

@@ -20,6 +20,7 @@ import { canHideGridColumn } from '../columns/GridColumnManagement';
 import { getGridColumnPinSide } from '../columns/GridColumnPin';
 import { getGridFilterOperators } from '../filter/GridFilter';
 import { getGridSortIndicator } from '../sorting/GridSort';
+import { getGridColumnTrack } from '../utils/grid.utils';
 import type {
   F1GridColumn,
   F1GridFilter,
@@ -211,9 +212,8 @@ export function GridHeader<T extends object>({
         sx={{
           display: 'grid',
           gridTemplateColumns: `44px ${columns
-            .map(
-              (column) =>
-                `${columnWidths[String(column.field)] ?? column.width ?? 140}px`,
+            .map((column) =>
+              getGridColumnTrack(column, columnWidths[String(column.field)]),
             )
             .join(' ')}`,
           minWidth: 'max-content',
@@ -300,51 +300,77 @@ export function GridHeader<T extends object>({
                 '& .f1-grid-col-menu-btn': {
                   opacity: isMenuOpen ? 1 : 0,
                   transition: 'opacity 0.15s ease-in-out',
-                  ml: 'auto',
                   flexShrink: 0,
+                  position: 'absolute',
+                  right: 4,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
                 },
                 '&:hover .f1-grid-col-menu-btn, &:focus-within .f1-grid-col-menu-btn':
                   {
                     opacity: 1,
                   },
+                '&:hover .f1-grid-header-content, &:focus-within .f1-grid-header-content':
+                  {
+                    pr: 4,
+                  },
               }}
             >
-              {column.type === 'checkbox' && column.headerCheckbox ? (
-                <Checkbox
-                  size="small"
-                  checked={checkboxState.allChecked}
-                  indeterminate={checkboxState.indeterminate}
-                  disabled={!checkboxState.hasEditableRows}
-                  slotProps={{
-                    input: { 'aria-label': `${column.headerName} 전체 선택` },
-                  }}
-                  onChange={() =>
-                    onToggleColumnCheckbox(column, !checkboxState.allChecked)
-                  }
-                />
-              ) : null}
-              {column.headerName}
-              {sortIndicator ? (
-                <Box
-                  component="span"
-                  aria-label={`${column.headerName} 정렬 상태`}
-                  sx={{ display: 'flex', alignItems: 'center', fontSize: 12 }}
-                >
-                  {sortIndicator.direction === 'asc' ? (
-                    <ArrowUpwardIcon fontSize="inherit" />
-                  ) : (
-                    <ArrowDownwardIcon fontSize="inherit" />
-                  )}
-                  {sorts.length > 1 ? sortIndicator.order : null}
-                </Box>
-              ) : null}
-              {hasFilter ? (
-                <FilterListIcon
-                  fontSize="small"
-                  color="primary"
-                  aria-label={`${column.headerName} 필터 적용됨`}
-                />
-              ) : null}
+              <Box
+                className="f1-grid-header-content"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent:
+                    column.headerAlign === 'right'
+                      ? 'flex-end'
+                      : column.headerAlign === 'left'
+                        ? 'flex-start'
+                        : 'center',
+                  gap: 0.5,
+                  minWidth: 0,
+                  width: '100%',
+                  pr: isMenuOpen ? 4 : 0,
+                }}
+              >
+                {column.type === 'checkbox' && column.headerCheckbox ? (
+                  <Checkbox
+                    size="small"
+                    sx={{ p: 0.25, mr: -0.25 }}
+                    checked={checkboxState.allChecked}
+                    indeterminate={checkboxState.indeterminate}
+                    disabled={!checkboxState.hasEditableRows}
+                    slotProps={{
+                      input: { 'aria-label': `${column.headerName} 전체 선택` },
+                    }}
+                    onChange={() =>
+                      onToggleColumnCheckbox(column, !checkboxState.allChecked)
+                    }
+                  />
+                ) : null}
+                {column.headerName}
+                {sortIndicator ? (
+                  <Box
+                    component="span"
+                    aria-label={`${column.headerName} 정렬 상태`}
+                    sx={{ display: 'flex', alignItems: 'center', fontSize: 12 }}
+                  >
+                    {sortIndicator.direction === 'asc' ? (
+                      <ArrowUpwardIcon fontSize="inherit" />
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                    {sorts.length > 1 ? sortIndicator.order : null}
+                  </Box>
+                ) : null}
+                {hasFilter ? (
+                  <FilterListIcon
+                    fontSize="small"
+                    color="primary"
+                    aria-label={`${column.headerName} 필터 적용됨`}
+                  />
+                ) : null}
+              </Box>
               <IconButton
                 size="small"
                 className="f1-grid-col-menu-btn"

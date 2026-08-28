@@ -34,6 +34,17 @@ export function isCellEditable<T extends object>(
     : Boolean(column.editable);
 }
 
+export function getGridColumnTrack<T extends object>(
+  column: F1GridColumn<T>,
+  resizedWidth?: number,
+): string {
+  if (resizedWidth !== undefined) return `${resizedWidth}px`;
+  if (column.flex !== undefined && column.flex > 0) {
+    return `minmax(${column.width ?? 0}px, ${column.flex}fr)`;
+  }
+  return `${column.width ?? 140}px`;
+}
+
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: T[keyof T],

@@ -50,6 +50,7 @@ import {
 } from '../columns/GridColumnManagement';
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
+import { normalizeDateInput } from '../editing/DateEditor';
 import {
   getGridColumnPinOffsets,
   getGridColumnPinSide,
@@ -393,12 +394,22 @@ function F1GridInner<T extends object>(
     if (!editingCell) return;
 
     const column = visibleColumns[editingCell.columnIndex];
+    const matchedAutocompleteOption =
+      column.type === 'autocomplete'
+        ? column.options?.find(
+            (option) =>
+              option.label === draftValue ||
+              String(option.value) === draftValue,
+          )
+        : undefined;
     const value =
       column.type === 'number' ||
       column.type === 'decimal' ||
       column.type === 'currency'
         ? Number(draftValue)
-        : draftValue;
+        : column.type === 'date'
+          ? normalizeDateInput(draftValue) || draftValue
+          : (matchedAutocompleteOption?.value ?? draftValue);
     const row = data.rows.find(
       (item) => getGridRowId(item, rowKey) === editingCell.rowId,
     );
@@ -517,7 +528,7 @@ function F1GridInner<T extends object>(
       return;
     }
 
-    if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (event.key === 'Delete') {
       event.preventDefault();
       if (selectedIds.length > 0) {
         handleDeleteSelectedRows();

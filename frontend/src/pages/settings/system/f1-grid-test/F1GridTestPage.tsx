@@ -9,6 +9,7 @@ import {
   FormControlLabel,
   Paper,
   Switch,
+  TextField,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -24,6 +25,8 @@ import {
   type F1GridColumn,
   type F1GridRef,
 } from '../../../../shared/components/f1-grid';
+import { DateEditor } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
 import type {
   ModuleItem,
   PageContent,
@@ -115,6 +118,8 @@ export function F1GridTestPage({
   const [columnLine, setColumnLine] = useState(true);
   const [resizableRows, setResizableRows] = useState(true);
   const [resizableColumns, setResizableColumns] = useState(true);
+  const [dateShortcutInput, setDateShortcutInput] = useState('2026-08-28');
+  const [dateTestValue, setDateTestValue] = useState('2026-08-28');
 
   // 변경 사항 통계
   const [changes, setChanges] = useState<F1GridChanges<ItemRow>>({
@@ -154,7 +159,7 @@ export function F1GridTestPage({
       headerName: '사용여부',
       type: 'checkbox',
       headerCheckbox: true,
-      width: 90,
+      width: 120,
       align: 'center',
       headerAlign: 'center',
       editable: true,
@@ -164,6 +169,7 @@ export function F1GridTestPage({
       headerName: '품목코드',
       type: 'code',
       width: 130,
+      headerAlign: 'center',
       editable: true,
       required: true,
       onOpenCodePicker: (_row, applyPatch) => {
@@ -176,6 +182,8 @@ export function F1GridTestPage({
       headerName: '품목명 (Row Merge)',
       type: 'text',
       width: 220,
+      flex: 1,
+      headerAlign: 'center',
       editable: true,
       required: true,
       wrapText: true,
@@ -186,6 +194,7 @@ export function F1GridTestPage({
       headerName: '품목분류',
       type: 'select',
       width: 120,
+      headerAlign: 'center',
       editable: true,
       options: [
         { value: 'RAW', label: '원자재' },
@@ -193,47 +202,47 @@ export function F1GridTestPage({
         { value: 'FINISHED', label: '완제품' },
       ],
     },
-    {
-      field: 'status',
-      headerName: '진행상태',
-      type: 'autocomplete',
-      width: 120,
-      editable: true,
-      options: [
-        { value: 'ready', label: '대기' },
-        { value: 'progress', label: '진행중' },
-        { value: 'done', label: '완료' },
-        { value: 'hold', label: '보류' },
-      ],
-    },
+    // {
+    //   field: 'status',
+    //   headerName: '진행상태',
+    //   type: 'autocomplete',
+    //   width: 120,
+    //   editable: true,
+    //   options: [
+    //     { value: 'ready', label: '대기' },
+    //     { value: 'progress', label: '진행중' },
+    //     { value: 'done', label: '완료' },
+    //     { value: 'hold', label: '보류' },
+    //   ],
+    // },
     {
       field: 'qty',
       headerName: '수량',
       type: 'number',
       width: 100,
       align: 'right',
-      headerAlign: 'right',
+      headerAlign: 'center',
       editable: true,
       min: 1,
       required: true,
     },
     {
       field: 'price',
-      headerName: '단가 (원)',
+      headerName: '단가(원)',
       type: 'currency',
       width: 130,
       align: 'right',
-      headerAlign: 'right',
+      headerAlign: 'center',
       editable: true,
       min: 0,
     },
     {
       field: 'ratio',
-      headerName: '할인율 (%)',
+      headerName: '할인율(%)',
       type: 'decimal',
       width: 110,
       align: 'right',
-      headerAlign: 'right',
+      headerAlign: 'center',
       editable: true,
       min: 0,
       max: 100,
@@ -247,15 +256,15 @@ export function F1GridTestPage({
       headerAlign: 'center',
       editable: true,
     },
-    {
-      field: 'deliveryAt',
-      headerName: '납기일시',
-      type: 'datetime',
-      width: 170,
-      align: 'center',
-      headerAlign: 'center',
-      editable: true,
-    },
+    // {
+    //   field: 'deliveryAt',
+    //   headerName: '납기일시',
+    //   type: 'datetime',
+    //   width: 170,
+    //   align: 'center',
+    //   headerAlign: 'center',
+    //   editable: true,
+    // },
     {
       field: 'workTime',
       headerName: '작업시각',
@@ -296,6 +305,69 @@ export function F1GridTestPage({
           {content.description}
         </Typography>
       </Box>
+
+      <Paper
+        variant="outlined"
+        aria-label="날짜 입력 테스트"
+        sx={{ p: 2, bgcolor: 'background.default' }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: { xs: 'stretch', md: 'center' },
+            gap: 2,
+          }}
+        >
+          <Box sx={{ minWidth: { md: 150 } }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              날짜 입력 테스트
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              숫자 축약 입력 결과
+            </Typography>
+          </Box>
+          <Box sx={{ width: { xs: '100%', md: 220 } }}>
+            <TextField
+              label="축약 입력"
+              size="small"
+              fullWidth
+              value={dateShortcutInput}
+              onChange={(event) => {
+                const inputValue = event.target.value;
+                setDateShortcutInput(inputValue);
+                setDateTestValue(normalizeDateInput(inputValue));
+              }}
+              placeholder="01 / 0701 / 250604"
+            />
+          </Box>
+          <Box sx={{ width: { xs: '100%', md: 220 } }}>
+            <DateEditor
+              value={dateTestValue}
+              onChange={setDateTestValue}
+              onKeyDown={() => undefined}
+            />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2">
+              현재 결과: <strong>{dateTestValue || '입력 대기'}</strong>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              01 / 0701 / 250604 / 20260801
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              setDateShortcutInput('2026-08-28');
+              setDateTestValue('2026-08-28');
+            }}
+          >
+            날짜 초기화
+          </Button>
+        </Box>
+      </Paper>
 
       {/* 제어판: 옵션 토글 & 실시간 상태 통계 */}
       <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
