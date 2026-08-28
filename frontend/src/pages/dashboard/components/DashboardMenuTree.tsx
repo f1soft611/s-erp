@@ -3,9 +3,11 @@ import {
   Box,
   Card,
   CardContent,
+  IconButton,
   Typography,
   useTheme,
 } from '@mui/material';
+import CloseOutlined from '@mui/icons-material/CloseOutlined';
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import { useEffect, useState } from 'react';
 import type { MenuTreeNode, ModuleItem } from '../types/dashboard';
@@ -15,6 +17,7 @@ type DashboardMenuTreeProps = {
   expandedItemIds: string[];
   selectedMenuId: string;
   onMenuSelect: (menuId: string) => void;
+  onToggleMenu?: () => void;
 };
 
 export function DashboardMenuTree({
@@ -22,6 +25,7 @@ export function DashboardMenuTree({
   expandedItemIds,
   selectedMenuId,
   onMenuSelect,
+  onToggleMenu,
 }: DashboardMenuTreeProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -123,16 +127,28 @@ export function DashboardMenuTree({
         >
           모듈 선택
         </Typography>
-        <Typography
-          component="h3"
-          variant="caption"
-          sx={{
-            color: isDark ? '#94a3b8' : '#64748b',
-            fontWeight: 700,
-          }}
-        >
-          {selectedModule.name}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography
+            component="h3"
+            variant="caption"
+            sx={{
+              color: isDark ? '#94a3b8' : '#64748b',
+              fontWeight: 700,
+            }}
+          >
+            {selectedModule.name}
+          </Typography>
+          {onToggleMenu && (
+            <IconButton
+              size="small"
+              aria-label="메뉴 닫기"
+              onClick={onToggleMenu}
+              sx={{ color: isDark ? '#cbd5e1' : '#475569' }}
+            >
+              <CloseOutlined fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
       </Box>
       <Box
         sx={{
