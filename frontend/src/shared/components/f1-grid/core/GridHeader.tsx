@@ -219,6 +219,7 @@ export function GridHeader<T extends object>({
           minWidth: 'max-content',
           bgcolor: 'action.hover',
           fontWeight: 700,
+          isolation: 'isolate',
         }}
       >
         <Box
@@ -228,8 +229,11 @@ export function GridHeader<T extends object>({
             justifyContent: 'center',
             position: 'sticky',
             left: 0,
-            zIndex: 2,
-            bgcolor: 'action.hover',
+            zIndex: 4,
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? 'rgb(28, 36, 50)'
+                : 'rgb(232, 236, 244)',
           }}
         >
           <Checkbox
@@ -280,8 +284,19 @@ export function GridHeader<T extends object>({
                   pinSide === 'right'
                     ? rightOffsets[String(column.field)]
                     : undefined,
-                zIndex: pinSide ? 2 : undefined,
-                bgcolor: pinSide ? 'action.hover' : undefined,
+                zIndex: pinSide ? 3 : undefined,
+                backgroundColor: pinSide
+                  ? (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? 'rgb(28, 36, 50)'
+                        : 'rgb(232, 236, 244)'
+                  : undefined,
+                boxShadow:
+                  pinSide === 'left'
+                    ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                    : pinSide === 'right'
+                      ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                      : undefined,
                 '& .f1-grid-col-menu-btn': {
                   opacity: isMenuOpen ? 1 : 0,
                   transition: 'opacity 0.15s ease-in-out',

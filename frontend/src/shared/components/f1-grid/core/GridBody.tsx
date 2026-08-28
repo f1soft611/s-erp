@@ -154,6 +154,7 @@ export function GridBody<T extends object>({
           )
           .join(' '),
         minWidth: 'max-content',
+        isolation: 'isolate',
       }}
     >
       {visibleRows.map((row, rowIndex) => {

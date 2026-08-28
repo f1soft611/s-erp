@@ -150,8 +150,13 @@ export function GridRow<T extends object>({
           borderColor: 'divider',
           position: 'sticky',
           left: 0,
-          zIndex: 1,
-          bgcolor: isSelected ? 'action.selected' : 'background.paper',
+          zIndex: 3,
+          backgroundColor: (theme) =>
+            isSelected
+              ? theme.palette.mode === 'dark'
+                ? 'rgb(30, 48, 80)'
+                : 'rgb(232, 238, 252)'
+              : theme.palette.background.paper,
         }}
       >
         <Checkbox

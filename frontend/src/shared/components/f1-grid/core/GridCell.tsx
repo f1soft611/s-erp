@@ -98,13 +98,19 @@ export function GridCell<T extends object>({
         position: pinOffset ? 'sticky' : undefined,
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
-        zIndex: pinOffset ? 1 : undefined,
+        zIndex: pinOffset ? 2 : undefined,
         bgcolor: pinOffset
           ? 'background.paper'
           : errorMessage
             ? 'error.lighter'
             : undefined,
-        boxShadow: errorMessage ? 'inset 0 0 0 1px' : undefined,
+        boxShadow: pinOffset
+          ? pinOffset.side === 'left'
+            ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+            : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+          : errorMessage
+            ? 'inset 0 0 0 1px'
+            : undefined,
         color: errorMessage ? 'error.main' : undefined,
         outline: focused ? '2px solid' : 'none',
         outlineColor: 'primary.main',

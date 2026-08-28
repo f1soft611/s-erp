@@ -6,7 +6,9 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from 'vitest';
+import { createAppTheme } from '../src/theme/theme';
 import {
   addGridRow,
   createGridData,
@@ -1213,6 +1215,93 @@ describe('F1-GRID column pin', () => {
         getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
           .position,
       ).not.toBe('sticky');
+    });
+  });
+
+  it('keeps pinned header and body cells visually above scrolling cells', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    await waitFor(() => {
+      const pinnedHeader = screen.getByRole('columnheader', { name: /코드/ });
+      const pinnedCell = screen.getByRole('gridcell', { name: 'DASH' });
+
+      expect(pinnedHeader).toHaveStyle({
+        backgroundColor: 'rgb(232, 236, 244)',
+        zIndex: '3',
+      });
+      expect(pinnedCell).toHaveStyle({
+        backgroundColor: 'rgb(255, 255, 255)',
+        zIndex: '2',
+      });
+      expect(pinnedCell).toHaveStyle({
+        boxShadow: expect.stringContaining('inset'),
+      });
+    });
+  });
+
+  it('keeps the row-selection header above a pinned column header', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('columnheader', { name: '전체 행 선택' }),
+      ).toHaveStyle({
+        backgroundColor: 'rgb(232, 236, 244)',
+        zIndex: '4',
+      });
+    });
+  });
+
+  it('keeps row-selection cells above pinned body cells', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    await waitFor(() => {
+      const selectionCheckbox = screen.getByLabelText('dashboard 행 선택');
+      expect(selectionCheckbox.closest('.MuiBox-root')).toHaveStyle({
+        zIndex: '3',
+      });
+    });
+  });
+
+  it('keeps selected row-selection cells opaque above scrolling cells', async () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByLabelText('dashboard 행 선택'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText('dashboard 행 선택').closest('.MuiBox-root'),
+      ).toHaveStyle({
+        backgroundColor: 'rgb(232, 238, 252)',
+      });
+    });
+  });
+
+  it('uses a dark opaque background for pinned headers in dark mode', async () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <F1Grid rows={rows} columns={columns} rowKey="id" />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /코드/ })).toHaveStyle({
+        backgroundColor: 'rgb(28, 36, 50)',
+      });
     });
   });
 });
