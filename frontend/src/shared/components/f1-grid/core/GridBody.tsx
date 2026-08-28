@@ -2,6 +2,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Box } from '@mui/material';
 import { GridRow } from './GridRow';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import { getGridColumnTrack } from '../utils/grid.utils';
 
 type GridBodyProps<T extends object> = {
   visibleRows: T[];
@@ -142,9 +143,8 @@ export function GridBody<T extends object>({
       sx={{
         display: 'grid',
         gridTemplateColumns: `44px ${columns
-          .map(
-            (column) =>
-              `${columnWidths?.[String(column.field)] ?? column.width ?? 140}px`,
+          .map((column) =>
+            getGridColumnTrack(column, columnWidths?.[String(column.field)]),
           )
           .join(' ')}`,
         gridTemplateRows: visibleRows

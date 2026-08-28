@@ -96,38 +96,12 @@ AI 에이전트는 작업 유형에 따라 아래 우선순위를 따라야 합�
 
 ### 프론트엔드 검증 명령
 
-Windows 네이티브 PowerShell/명령프롬프트 환경에서 Vitest가 EMFILE(too many open files) 오류로 실패하는 경우가 있어, 향후 에이전트는 반드시 Git Bash 또는 WSL2로 실행해야 합니다.
-
-Git Bash 예시:
-
-```bash
-cd /d/f1soft/dev/react/S-ERP/frontend
-npm install
-npm run dev
-npm run build
-npm run test
-```
-
-WSL2 예시:
-
-```bash
-cd /mnt/d/f1soft/dev/react/S-ERP/frontend
-npm install
-npm run dev
-npm run build
-npm run test
-```
-
 프로젝트 스크립트는 [frontend/package.json](frontend/package.json) 에 정의되어 있습니다.
 
 - `npm run dev`: Vite 개발 서버 실행, 기본 주소는 `127.0.0.1:4173`
 - `npm run build`: TypeScript + Vite 빌드
 - `npm run test`: jsdom 환경에서 Vitest 단일 실행
-
-주의:
-
-- Windows native PowerShell에서 테스트가 EMFILE로 실패하면 코드 문제로 간주하지 않고, Git Bash/WSL2 실행으로 전환한다.
-- 이 규칙은 향후 작업자가 동일한 환경 이슈를 반복하지 않도록 고정한다.
+- 특정 테스트 파일 실행: `npm run test -- tests/f1-grid.test.tsx`
 
 ---
 

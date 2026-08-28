@@ -112,7 +112,7 @@ export function GridCell<T extends object>({
             ? 'inset 0 0 0 1px'
             : undefined,
         color: errorMessage ? 'error.main' : undefined,
-        outline: focused ? '2px solid' : 'none',
+        outline: focused && !editing ? '2px solid' : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -2,
         textAlign:
