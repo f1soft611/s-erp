@@ -26,7 +26,9 @@ describe('Theme settings', () => {
 
     expect(themeButton).toBeInTheDocument();
     expect(displayScaleButton).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: /테마/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: /테마/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('combobox', { name: /화면크기/i }),
     ).not.toBeInTheDocument();

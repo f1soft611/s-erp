@@ -75,8 +75,9 @@ function DashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
-  const [themeMenuAnchor, setThemeMenuAnchor] =
-    useState<HTMLElement | null>(null);
+  const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
   const [displayScaleMenuAnchor, setDisplayScaleMenuAnchor] =
     useState<HTMLElement | null>(null);
   const { themeMode, setThemeMode, displayScale, setDisplayScale } =
@@ -265,7 +266,9 @@ function DashboardPage() {
               <Tooltip title="테마 설정">
                 <IconButton
                   aria-label="테마 설정"
-                  aria-controls={themeMenuAnchor ? 'theme-settings-menu' : undefined}
+                  aria-controls={
+                    themeMenuAnchor ? 'theme-settings-menu' : undefined
+                  }
                   aria-haspopup="menu"
                   aria-expanded={themeMenuAnchor ? 'true' : undefined}
                   onClick={handleOpenThemeMenu}
