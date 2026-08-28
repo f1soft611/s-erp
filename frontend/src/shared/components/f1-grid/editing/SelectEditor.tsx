@@ -1,5 +1,5 @@
 import { Input, MenuItem, Select } from '@mui/material';
-import type { F1GridOption } from '../f1Grid.types';
+import type { F1GridOption } from '../types/grid.types';
 
 type SelectEditorProps = {
   value: string | number | boolean;

@@ -1,20 +1,23 @@
 import {
   AppBar,
   Box,
-  FormControl,
   IconButton,
+  ListItemIcon,
+  Menu,
   MenuItem,
-  Select,
+  Tooltip,
   Typography,
   useTheme,
 } from '@mui/material';
 import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
+import MenuOutlined from '@mui/icons-material/MenuOutlined';
+import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
 import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { logout } from '../../shared/services/authService';
@@ -25,6 +28,7 @@ import {
 } from './services/dashboardData';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
+import { useDashboardResponsive } from './hooks/useDashboardResponsive';
 import type { MenuTreeNode } from './types/dashboard';
 
 const themeOptions = [
@@ -71,8 +75,21 @@ function DashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
+  const [displayScaleMenuAnchor, setDisplayScaleMenuAnchor] =
+    useState<HTMLElement | null>(null);
   const { themeMode, setThemeMode, displayScale, setDisplayScale } =
     useAppSettings();
+  const {
+    isMobile,
+    isMenuPanelCollapsed,
+    isMobileMenuOpen,
+    contentRef,
+    toggleMenuPanel,
+    closeMobileMenu,
+  } = useDashboardResponsive();
   const pathSegments = location.pathname.split('/').filter(Boolean);
   const routeModuleId = pathSegments[1] ?? defaultModule.id;
   const routeMenuId = pathSegments[2] ?? defaultMenuId;
@@ -132,17 +149,24 @@ function DashboardPage() {
     navigate('/login', { replace: true });
   };
 
-  const handleThemeChange = (event: { target: { value: string } }) => {
-    const nextTheme = event.target.value === 'dark' ? 'dark' : 'light';
-    setThemeMode(nextTheme);
+  const handleOpenThemeMenu = (event: MouseEvent<HTMLElement>) => {
+    setThemeMenuAnchor(event.currentTarget);
   };
 
-  const handleDisplayScaleChange = (event: {
-    target: { value: number | string };
-  }) => {
-    const rawValue = event.target.value;
-    const nextScale = rawValue === 'reset' ? 1 : Number(rawValue);
+  const handleOpenDisplayScaleMenu = (event: MouseEvent<HTMLElement>) => {
+    setDisplayScaleMenuAnchor(event.currentTarget);
+  };
+
+  const handleThemeChange = (value: string) => {
+    const nextTheme = value === 'dark' ? 'dark' : 'light';
+    setThemeMode(nextTheme);
+    setThemeMenuAnchor(null);
+  };
+
+  const handleDisplayScaleChange = (value: number | string) => {
+    const nextScale = value === 'reset' ? 1 : Number(value);
     setDisplayScale(nextScale);
+    setDisplayScaleMenuAnchor(null);
   };
 
   const content = useMemo(
@@ -167,9 +191,17 @@ function DashboardPage() {
         selectedMenuId={selectedMenuId}
         onModuleChange={handleModuleChange}
         onMenuSelect={handleMenuSelect}
+        isMenuPanelCollapsed={isMenuPanelCollapsed}
+        isMobile={isMobile}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onToggleMenu={toggleMenuPanel}
+        onCloseMobileMenu={closeMobileMenu}
       />
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box
+        ref={contentRef}
+        sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}
+      >
         <AppBar
           position="sticky"
           elevation={0}
@@ -181,170 +213,127 @@ function DashboardPage() {
         >
           <Box
             sx={{
-              px: 3,
+              px: { xs: 1, md: 3 },
               py: 1.75,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                aria-label={
+                  isMobile
+                    ? isMobileMenuOpen
+                      ? '메뉴 닫기'
+                      : '메뉴 열기'
+                    : isMenuPanelCollapsed
+                      ? '메뉴 패널 펼치기'
+                      : '메뉴 패널 접기'
+                }
+                aria-expanded={
+                  isMobile ? isMobileMenuOpen : !isMenuPanelCollapsed
+                }
+                onClick={toggleMenuPanel}
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                {isMobile && isMobileMenuOpen ? (
+                  <MenuOpenOutlined fontSize="small" />
+                ) : isMobile || isMenuPanelCollapsed ? (
+                  <MenuOutlined fontSize="small" />
+                ) : (
+                  <MenuOpenOutlined fontSize="small" />
+                )}
+              </IconButton>
               <Typography variant="h6" component="h1" sx={{ fontWeight: 700 }}>
                 대시보드
               </Typography>
             </Box>
 
             <Box
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                ml: 'auto',
+                minWidth: 0,
+                flexWrap: 'wrap',
+                justifyContent: 'flex-end',
+              }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FormControl size="small" sx={{ minWidth: 128 }}>
-                  <Select
-                    value={themeMode}
-                    onChange={handleThemeChange}
-                    displayEmpty
-                    renderValue={(selected) => {
-                      const option = themeOptions.find(
-                        (item) => item.value === selected,
-                      );
-                      return (
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.75,
-                          }}
-                        >
-                          {isDarkTheme ? (
-                            <DarkModeOutlined
-                              fontSize="small"
-                              sx={{ color: '#93c5fd' }}
-                            />
-                          ) : (
-                            <LightModeOutlined
-                              fontSize="small"
-                              sx={{ color: '#f59e0b' }}
-                            />
-                          )}
-                          <Typography
-                            component="span"
-                            sx={{ fontSize: '0.9rem', fontWeight: 600 }}
-                          >
-                            {option?.label ?? '테마'}
-                          </Typography>
-                        </Box>
-                      );
-                    }}
-                    sx={{
-                      minHeight: 38,
-                      borderRadius: '999px',
-                      border: `1px solid ${theme.palette.divider}`,
-                      backgroundColor: isDarkTheme ? '#111827' : '#f8fafc',
-                      color: theme.palette.text.primary,
-                      px: 1,
-                      py: 0.25,
-                      fontSize: '0.92rem',
-                      fontWeight: 600,
-                      boxShadow: isDarkTheme
-                        ? 'inset 0 0 0 1px rgba(148, 163, 184, 0.18)'
-                        : 'inset 0 0 0 1px rgba(148, 163, 184, 0.12)',
-                      '& .MuiSelect-select': {
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        py: 0.6,
-                        pr: 3,
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderWidth: 0,
-                      },
-                      '&:focus-within': {
-                        outline: 'none',
-                        borderColor: theme.palette.primary.main,
-                        boxShadow: `0 0 0 3px ${theme.palette.primary.main}22`,
-                      },
-                    }}
-                    inputProps={{ 'aria-label': '테마' }}
+              <Tooltip title="테마 설정">
+                <IconButton
+                  aria-label="테마 설정"
+                  aria-controls={
+                    themeMenuAnchor ? 'theme-settings-menu' : undefined
+                  }
+                  aria-haspopup="menu"
+                  aria-expanded={themeMenuAnchor ? 'true' : undefined}
+                  onClick={handleOpenThemeMenu}
+                  sx={{ color: theme.palette.text.secondary }}
+                >
+                  {isDarkTheme ? (
+                    <DarkModeOutlined fontSize="small" />
+                  ) : (
+                    <LightModeOutlined fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+              <Menu
+                id="theme-settings-menu"
+                anchorEl={themeMenuAnchor}
+                open={Boolean(themeMenuAnchor)}
+                onClose={() => setThemeMenuAnchor(null)}
+              >
+                {themeOptions.map((option) => (
+                  <MenuItem
+                    key={option.value}
+                    selected={themeMode === option.value}
+                    onClick={() => handleThemeChange(option.value)}
                   >
-                    {themeOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <Select
-                    value={displayScale}
-                    onChange={handleDisplayScaleChange}
-                    displayEmpty
-                    renderValue={(selected) => {
-                      const option = displayScaleOptions.find(
-                        (item) => Number(item.value) === Number(selected),
-                      );
-                      return (
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.75,
-                          }}
-                        >
-                          <TuneOutlined
-                            fontSize="small"
-                            sx={{ color: '#8b5cf6' }}
-                          />
-                          <Typography
-                            component="span"
-                            sx={{ fontSize: '0.9rem', fontWeight: 600 }}
-                          >
-                            {option?.label ?? '화면크기'}
-                          </Typography>
-                        </Box>
-                      );
-                    }}
-                    sx={{
-                      minHeight: 38,
-                      borderRadius: '999px',
-                      border: `1px solid ${theme.palette.divider}`,
-                      backgroundColor: isDarkTheme ? '#111827' : '#f8fafc',
-                      color: theme.palette.text.primary,
-                      px: 1,
-                      py: 0.25,
-                      fontSize: '0.92rem',
-                      fontWeight: 600,
-                      boxShadow: isDarkTheme
-                        ? 'inset 0 0 0 1px rgba(148, 163, 184, 0.18)'
-                        : 'inset 0 0 0 1px rgba(148, 163, 184, 0.12)',
-                      '& .MuiSelect-select': {
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        py: 0.6,
-                        pr: 3,
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderWidth: 0,
-                      },
-                      '&:focus-within': {
-                        outline: 'none',
-                        borderColor: theme.palette.primary.main,
-                        boxShadow: `0 0 0 3px ${theme.palette.primary.main}22`,
-                      },
-                    }}
-                    inputProps={{ 'aria-label': '화면크기' }}
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Menu>
+              <Tooltip title="화면크기 설정">
+                <IconButton
+                  aria-label="화면크기 설정"
+                  aria-controls={
+                    displayScaleMenuAnchor
+                      ? 'display-scale-settings-menu'
+                      : undefined
+                  }
+                  aria-haspopup="menu"
+                  aria-expanded={displayScaleMenuAnchor ? 'true' : undefined}
+                  onClick={handleOpenDisplayScaleMenu}
+                  sx={{ color: theme.palette.text.secondary }}
+                >
+                  <TuneOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Menu
+                id="display-scale-settings-menu"
+                anchorEl={displayScaleMenuAnchor}
+                open={Boolean(displayScaleMenuAnchor)}
+                onClose={() => setDisplayScaleMenuAnchor(null)}
+              >
+                {displayScaleOptions.map((option) => (
+                  <MenuItem
+                    key={`${option.label}-${String(option.value)}`}
+                    selected={Number(option.value) === Number(displayScale)}
+                    onClick={() => handleDisplayScaleChange(option.value)}
                   >
-                    {displayScaleOptions.map((option) => (
-                      <MenuItem
-                        key={`${option.label}-${String(option.value)}`}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
+                    {option.icon ? (
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        {option.icon}
+                      </ListItemIcon>
+                    ) : null}
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Menu>
               <IconButton
                 aria-label="notifications"
                 sx={{ color: theme.palette.text.secondary }}

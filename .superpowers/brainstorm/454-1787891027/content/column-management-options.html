@@ -1,0 +1,57 @@
+<h2>컬럼 관리 방식 선택</h2>
+<p class="subtitle">ERP Grid의 15번 기능에 사용할 설정 UI를 골라 주세요.</p>
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A. 헤더 메뉴형</div>
+    <div class="mockup-body">
+      <div class="mock-nav">F1-GRID <span>컬럼 설정</span></div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 44px 130px 180px 100px;
+          gap: 1px;
+          background: #cbd5e1;
+          margin-top: 18px;
+        "
+      >
+        <div class="placeholder">□</div>
+        <div class="placeholder">품목코드 ⋮</div>
+        <div class="placeholder">품목명</div>
+        <div class="placeholder">수량</div>
+        <div class="placeholder">□</div>
+        <div class="placeholder">ITEM-001</div>
+        <div class="placeholder">제품 A</div>
+        <div class="placeholder">10</div>
+      </div>
+      <div class="mock-button" style="margin-top: 10px">
+        품목코드 메뉴: 숨김 · 왼쪽 고정 · 오른쪽 이동
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">B. 별도 설정 패널형</div>
+    <div class="mockup-body">
+      <div class="mock-nav">F1-GRID <span>⚙ 컬럼 설정</span></div>
+      <div style="display: flex; gap: 12px; margin-top: 18px">
+        <div style="flex: 1">
+          <div class="placeholder">품목코드</div>
+          <div class="placeholder">품목명</div>
+          <div class="placeholder">수량</div>
+          <div class="placeholder">단가</div>
+        </div>
+        <div style="width: 48%; border: 1px solid #94a3b8; padding: 12px">
+          <strong>컬럼 설정</strong>
+          <div class="mock-input">☑ 품목코드　↕　📌</div>
+          <div class="mock-input">☑ 품목명　　↕</div>
+          <div class="mock-input">☑ 수량　　　↕</div>
+          <div class="mock-input">☐ 단가　　　↕</div>
+          <button class="mock-button">적용</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="subtitle">
+  A는 빠른 작업에 유리하고, B는 숨김·순서·고정 상태를 한 곳에서 관리하기
+  쉽습니다.
+</p>

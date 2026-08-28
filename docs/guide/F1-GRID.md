@@ -78,7 +78,7 @@ src/
 ├── components/
 │   └── grid/
 │       ├── core/
-│       │   ├── ERPGrid.tsx
+│       │   ├── F1Grid.tsx
 │       │   ├── GridHeader.tsx
 │       │   ├── GridBody.tsx
 │       │   ├── GridRow.tsx
@@ -138,7 +138,7 @@ src/
 
 기능별 책임을 분리한다.
 
-`ERPGrid.tsx` 하나에 모든 기능을 구현하지 않는다.
+`F1Grid.tsx` 하나에 모든 기능을 구현하지 않는다.
 
 ---
 
@@ -149,7 +149,7 @@ src/
 예시:
 
 ```typescript
-const columns: ERPGridColumn<Item>[] = [
+const columns: F1GridColumn<Item>[] = [
   {
     field: 'itemCode',
     headerName: '품목코드',
@@ -189,7 +189,7 @@ const columns: ERPGridColumn<Item>[] = [
 기본 타입:
 
 ```typescript
-type ERPGridColumnType =
+type F1GridColumnType =
   | 'text'
   | 'number'
   | 'decimal'
@@ -207,11 +207,11 @@ type ERPGridColumnType =
 Row Merge 설정:
 
 ```typescript
-type ERPGridRowMergeMode = 'none' | 'sameValue' | 'custom';
+type F1GridRowMergeMode = 'none' | 'sameValue' | 'custom';
 
-interface ERPGridColumn<T> {
+interface F1GridColumn<T> {
   field: keyof T;
-  mergeRows?: boolean | ERPGridRowMergeMode;
+  mergeRows?: boolean | F1GridRowMergeMode;
   mergeKey?: keyof T | ((row: T, rowIndex: number) => string | number | null);
   mergeWhen?: (currentRow: T, previousRow: T) => boolean;
 }
@@ -224,7 +224,7 @@ interface ERPGridColumn<T> {
 예:
 
 ```typescript
-const columns: ERPGridColumn<PurchaseLine>[] = [
+const columns: F1GridColumn<PurchaseLine>[] = [
   {
     field: 'customerName',
     headerName: '거래처',
@@ -246,6 +246,29 @@ const columns: ERPGridColumn<PurchaseLine>[] = [
 # 6. 기본 Grid 기능
 
 다음 기능을 반드시 지원한다.
+
+## 5.1 긴 텍스트와 행 높이
+
+셀의 긴 내용은 기본적으로 한 줄로 표시하고, 컬럼 너비를 넘는 부분은 말줄임표(`...`)로 표시한다. 셀 표시값 전체는 `title` 속성으로 확인할 수 있다.
+
+행 하단의 높이 조절 핸들을 드래그하면 해당 행만 높이를 변경할 수 있다. 기본 높이는 `40px`, 최소 높이는 `40px`, 최대 높이는 `300px`이며, `ArrowUp`과 `ArrowDown`으로도 `4px` 단위 조절이 가능하다.
+
+```tsx
+<F1Grid
+  rows={rows}
+  columns={[
+    { field: 'itemName', headerName: '품목명', wrapText: true },
+    { field: 'itemCode', headerName: '품목코드' },
+  ]}
+  rowKey="id"
+  rowHeight={40}
+  minRowHeight={40}
+  maxRowHeight={300}
+  resizableRows
+/>
+```
+
+`wrapText: true`인 컬럼은 행 높이가 기본 높이보다 커지면 셀 안에서 줄바꿈한다. `wrapText`가 없는 컬럼은 행 높이가 커져도 한 줄 말줄임을 유지한다. 높이 설정은 현재 Grid 인스턴스에만 적용하며 서버나 사용자 레이아웃으로 저장하지 않는다.
 
 ## Selection
 
@@ -520,7 +543,7 @@ custom
 Grid 전체 옵션:
 
 ```tsx
-<ERPGrid rows={rows} columns={columns} enableRowMerge />
+<F1Grid rows={rows} columns={columns} enableRowMerge />
 ```
 
 컬럼별 옵션:
@@ -699,6 +722,8 @@ none
 
 금액 → 고정
 ```
+
+컬럼 표시 여부는 별도의 컬럼 관리 버튼을 추가하지 않고 각 컬럼 헤더 메뉴에서 관리한다. 헤더 메뉴의 `컬럼 목록` 하위 메뉴는 전체 컬럼을 체크박스로 제공하며, 체크 해제로 숨기고 다시 체크해 표시한다. 마지막으로 표시된 컬럼은 숨길 수 없다.
 
 ---
 
@@ -1035,7 +1060,7 @@ interface GridDataState<T> {
 예:
 
 ```tsx
-<ERPGridToolbar
+<F1GridToolbar
   buttons={[
     'refresh',
     'add',
@@ -1125,7 +1150,7 @@ const row: any;
 권장:
 
 ```typescript
-interface ERPGridRow {
+interface F1GridRow {
   id: string | number;
   [key: string]: unknown;
 }
@@ -1134,14 +1159,14 @@ interface ERPGridRow {
 Generic을 적극적으로 사용한다.
 
 ```typescript
-ERPGrid<T>;
-ERPGridColumn<T>;
+F1Grid<T>;
+F1GridColumn<T>;
 ```
 
 예:
 
 ```tsx
-<ERPGrid<Item> rows={items} columns={columns} />
+<F1Grid<Item> rows={items} columns={columns} />
 ```
 
 ---
@@ -1151,7 +1176,7 @@ ERPGridColumn<T>;
 최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다.
 
 ```typescript
-interface ERPGridRef<T> {
+interface F1GridRef<T> {
   // Selection
   getSelectedRows(): T[];
   getSelectedRowIds(): Array<string | number>;
@@ -1203,7 +1228,7 @@ interface ERPGridRef<T> {
 최종 사용 형태는 다음과 같이 단순해야 한다.
 
 ```tsx
-const columns: ERPGridColumn<Item>[] = [
+const columns: F1GridColumn<Item>[] = [
   {
     field: 'itemCode',
     headerName: '품목코드',
@@ -1236,7 +1261,7 @@ const columns: ERPGridColumn<Item>[] = [
 ];
 
 return (
-  <ERPGrid
+  <F1Grid
     gridId="PURCHASE_ORDER"
     rowKey="id"
     columns={columns}
@@ -1253,7 +1278,7 @@ return (
 Row Merge 사용 예:
 
 ```tsx
-const columns: ERPGridColumn<PurchaseLine>[] = [
+const columns: F1GridColumn<PurchaseLine>[] = [
   {
     field: 'customerName',
     headerName: '거래처',
@@ -1275,7 +1300,7 @@ const columns: ERPGridColumn<PurchaseLine>[] = [
 ];
 
 return (
-  <ERPGrid
+  <F1Grid
     gridId="PURCHASE_ORDER"
     rowKey="id"
     columns={columns}
@@ -1584,7 +1609,7 @@ ERP 업무 특성을 고려하지 않은 일반적인 Table UI를 구현하지 �
 최종적으로 ERP 각 화면에서 다음과 같이 사용할 수 있는 Grid를 만든다.
 
 ```tsx
-<ERPGrid
+<F1Grid
   gridId="SALES_ORDER"
   columns={columns}
   rows={rows}

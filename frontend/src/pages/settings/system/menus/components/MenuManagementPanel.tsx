@@ -11,12 +11,12 @@ import {
   Typography,
 } from '@mui/material';
 import { useRef, useState } from 'react';
-import { F1Grid } from '../../../../../shared/components/f1-grid/F1Grid';
-import type {
-  F1GridChanges,
-  F1GridColumn,
-  F1GridRef,
-} from '../../../../../shared/components/f1-grid/f1Grid.types';
+import {
+  F1Grid,
+  type F1GridChanges,
+  type F1GridColumn,
+  type F1GridRef,
+} from '../../../../../shared/components/f1-grid';
 import type { MenuManagementRow } from '../types/menuManagement.types';
 
 type MenuManagementPanelProps = { menus: MenuManagementRow[] };

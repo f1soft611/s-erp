@@ -30,6 +30,7 @@ describe('User menu mock data', () => {
     expect(settings.tree[0].children?.map((node) => node.name)).toEqual([
       '권한관리',
       '메뉴관리',
+      'F1 Grid 테스트',
     ]);
     expect(groupware.menus.map((menu) => menu.pageKey)).toEqual([
       'overview',
@@ -38,6 +39,7 @@ describe('User menu mock data', () => {
     expect(settings.menus.map((menu) => menu.pageKey)).toEqual([
       'roles',
       'menus',
+      'f1-grid-test',
     ]);
   });
 

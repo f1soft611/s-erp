@@ -136,4 +136,10 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '메뉴 정렬 순서 정비', meta: 'IT팀 · 어제', status: '완료' },
     ],
   },
+  'f1-grid-test': {
+    title: 'F1 Grid 테스트',
+    description: '클립보드, 검증, 확장 에디터와 키보드 입력을 확인합니다.',
+    cards: [],
+    items: [],
+  },
 } as const;

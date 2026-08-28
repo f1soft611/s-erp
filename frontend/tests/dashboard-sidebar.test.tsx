@@ -74,6 +74,70 @@ describe('Dashboard sidebar', () => {
     ).toBeInTheDocument();
   });
 
+  it('collapses only the menu panel while keeping module selection visible', async () => {
+    render(<App />);
+    await loginAsAdmin();
+
+    const collapseButton = screen.getByRole('button', {
+      name: /메뉴 패널 접기/i,
+    });
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('button', { name: /환경설정/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(collapseButton);
+
+    expect(
+      screen.getByRole('button', { name: /메뉴 패널 펼치기/i }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.getByRole('button', { name: /그룹웨어/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/모듈 선택/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /메뉴 패널 펼치기/i }));
+    expect(screen.getByText(/모듈 선택/i)).toBeInTheDocument();
+  });
+
+  it('opens and closes only the menu panel on mobile', async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query === '(max-width: 767px)',
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+
+    try {
+      render(<App />);
+      await loginAsAdmin();
+
+      expect(
+        screen.getByRole('button', { name: /그룹웨어/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /메뉴 열기/i }));
+      expect(screen.getByRole('tree')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /메뉴 닫기/i }));
+      expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
   it('selects the routed leaf menu on direct dashboard navigation', async () => {
     window.localStorage.setItem(
       's-erp-auth',

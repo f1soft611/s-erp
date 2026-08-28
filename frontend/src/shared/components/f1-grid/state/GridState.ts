@@ -2,27 +2,14 @@ import type {
   F1GridChanges,
   F1GridRowId,
   F1GridRowState,
-} from './f1Grid.types';
+} from '../types/grid.types';
+import { getGridRowId, getStateKey, hasGridRowId } from '../utils/grid.utils';
 
 export type F1GridData<T extends object> = {
   rows: T[];
   stateById: Record<string, F1GridRowState>;
   previousStateById: Record<string, F1GridRowState>;
 };
-
-function getStateKey(rowId: F1GridRowId): string {
-  return String(rowId);
-}
-
-function getRowId<T extends object>(row: T, rowKey: keyof T): F1GridRowId {
-  const rowId = row[rowKey];
-
-  if (typeof rowId !== 'string' && typeof rowId !== 'number') {
-    throw new Error('F1Grid rowKey must reference a string or number value.');
-  }
-
-  return rowId;
-}
 
 export function createGridData<T extends object>(
   rows: T[],
@@ -31,7 +18,7 @@ export function createGridData<T extends object>(
   const stateById: Record<string, F1GridRowState> = {};
 
   rows.forEach((row) => {
-    stateById[getStateKey(getRowId(row, rowKey))] = 'normal';
+    stateById[getStateKey(getGridRowId(row, rowKey))] = 'normal';
   });
 
   return { rows: [...rows], stateById, previousStateById: {} };
@@ -42,7 +29,9 @@ export function addGridRow<T extends object>(
   row: T,
   rowKey: keyof T,
 ): F1GridData<T> {
-  const stateKey = getStateKey(getRowId(row, rowKey));
+  const stateKey = getStateKey(getGridRowId(row, rowKey));
+
+  if (hasGridRowId(data.rows, rowKey, getGridRowId(row, rowKey))) return data;
 
   return {
     ...data,
@@ -67,7 +56,7 @@ export function updateGridRow<T extends object>(
   return {
     ...data,
     rows: data.rows.map((row) =>
-      getRowId(row, rowKey) === rowId ? { ...row, ...changes } : row,
+      getGridRowId(row, rowKey) === rowId ? { ...row, ...changes } : row,
     ),
     stateById: {
       ...data.stateById,
@@ -86,7 +75,7 @@ export function markRowsDeleted<T extends object>(
   const rowIdSet = new Set(rowIds.map(getStateKey));
 
   data.rows.forEach((row) => {
-    const stateKey = getStateKey(getRowId(row, rowKey));
+    const stateKey = getStateKey(getGridRowId(row, rowKey));
     const currentState = stateById[stateKey];
 
     if (rowIdSet.has(stateKey) && currentState && currentState !== 'deleted') {
@@ -121,17 +110,24 @@ export function duplicateGridRows<T extends object>(
   const rowIdSet = new Set(rowIds.map(getStateKey));
   const duplicates = data.rows
     .filter((row) => {
-      const stateKey = getStateKey(getRowId(row, rowKey));
+      const stateKey = getStateKey(getGridRowId(row, rowKey));
       return rowIdSet.has(stateKey) && data.stateById[stateKey] !== 'deleted';
     })
     .map(createDuplicate);
   const stateById = { ...data.stateById };
 
   duplicates.forEach((row) => {
-    stateById[getStateKey(getRowId(row, rowKey))] = 'inserted';
+    const rowId = getGridRowId(row, rowKey);
+    if (!hasGridRowId(data.rows, rowKey, rowId)) {
+      stateById[getStateKey(rowId)] = 'inserted';
+    }
   });
 
-  return { ...data, rows: [...data.rows, ...duplicates], stateById };
+  const uniqueDuplicates = duplicates.filter(
+    (row) => !hasGridRowId(data.rows, rowKey, getGridRowId(row, rowKey)),
+  );
+
+  return { ...data, rows: [...data.rows, ...uniqueDuplicates], stateById };
 }
 
 export function getGridChanges<T extends object>(
@@ -145,7 +141,7 @@ export function getGridChanges<T extends object>(
   };
 
   data.rows.forEach((row) => {
-    const state = data.stateById[getStateKey(getRowId(row, rowKey))];
+    const state = data.stateById[getStateKey(getGridRowId(row, rowKey))];
 
     if (state === 'inserted') changes.insertedRows.push(row);
     if (state === 'updated') changes.updatedRows.push(row);
