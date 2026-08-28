@@ -182,7 +182,7 @@ export function F1GridTestPage({
       headerName: '품목명 (Row Merge)',
       type: 'text',
       width: 220,
-      flex: 1,
+      flex: 2,
       headerAlign: 'center',
       editable: true,
       required: true,
@@ -193,7 +193,7 @@ export function F1GridTestPage({
       field: 'category',
       headerName: '품목분류',
       type: 'select',
-      width: 120,
+      flex: 1,
       headerAlign: 'center',
       editable: true,
       options: [
