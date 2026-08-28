@@ -14,8 +14,20 @@ export default defineConfig({
               test: /[\\/]node_modules[\\/](react|react-dom|react-router-dom)[\\/]/,
             },
             {
+              name: 'vendor-emotion',
+              test: /[\\/]node_modules[\\/]@emotion[\\/]/,
+            },
+            {
+              name: 'vendor-mui-icons',
+              test: /[\\/]node_modules[\\/]@mui[\\/]icons-material[\\/]/,
+            },
+            {
+              name: 'vendor-mui-x',
+              test: /[\\/]node_modules[\\/]@mui[\\/]x-[^\\/]+[\\/]/,
+            },
+            {
               name: 'vendor-mui',
-              test: /[\\/]node_modules[\\/](@mui|@emotion)[\\/]/,
+              test: /[\\/]node_modules[\\/]@mui[\\/]/,
             },
           ],
         },
