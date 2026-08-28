@@ -14,6 +14,8 @@ type GridCellProps<T extends object> = {
   editing: boolean;
   merged: boolean;
   mergeInfo?: { isStart: boolean; span: number };
+  rowHeight: number;
+  defaultRowHeight: number;
   rowIndex: number;
   draftValue: string;
   onFocus: () => void;
@@ -43,6 +45,8 @@ export function GridCell<T extends object>({
   editing,
   merged,
   mergeInfo,
+  rowHeight,
+  defaultRowHeight,
   rowIndex,
   draftValue,
   onFocus,
@@ -72,6 +76,10 @@ export function GridCell<T extends object>({
       sx={{
         gridColumn: columnIndex + 2,
         minHeight: 40,
+        minWidth: 0,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
         p: column.type === 'checkbox' ? 0.25 : 1,
         display: 'flex',
         alignItems: 'center',
@@ -121,7 +129,27 @@ export function GridCell<T extends object>({
           onCodePick={onCodePick}
         />
       ) : (
-        getCellDisplayValue(column, value)
+        <Box
+          component="span"
+          title={getCellDisplayValue(column, value)}
+          sx={{
+            display: 'block',
+            width: '100%',
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace:
+              column.wrapText && rowHeight > defaultRowHeight
+                ? 'normal'
+                : 'nowrap',
+            overflowWrap:
+              column.wrapText && rowHeight > defaultRowHeight
+                ? 'anywhere'
+                : 'normal',
+          }}
+        >
+          {getCellDisplayValue(column, value)}
+        </Box>
       )}
     </Box>
   );

@@ -247,6 +247,29 @@ const columns: F1GridColumn<PurchaseLine>[] = [
 
 다음 기능을 반드시 지원한다.
 
+## 5.1 긴 텍스트와 행 높이
+
+셀의 긴 내용은 기본적으로 한 줄로 표시하고, 컬럼 너비를 넘는 부분은 말줄임표(`...`)로 표시한다. 셀 표시값 전체는 `title` 속성으로 확인할 수 있다.
+
+행 하단의 높이 조절 핸들을 드래그하면 해당 행만 높이를 변경할 수 있다. 기본 높이는 `40px`, 최소 높이는 `40px`, 최대 높이는 `300px`이며, `ArrowUp`과 `ArrowDown`으로도 `4px` 단위 조절이 가능하다.
+
+```tsx
+<F1Grid
+  rows={rows}
+  columns={[
+    { field: 'itemName', headerName: '품목명', wrapText: true },
+    { field: 'itemCode', headerName: '품목코드' },
+  ]}
+  rowKey="id"
+  rowHeight={40}
+  minRowHeight={40}
+  maxRowHeight={300}
+  resizableRows
+/>
+```
+
+`wrapText: true`인 컬럼은 행 높이가 기본 높이보다 커지면 셀 안에서 줄바꿈한다. `wrapText`가 없는 컬럼은 행 높이가 커져도 한 줄 말줄임을 유지한다. 높이 설정은 현재 Grid 인스턴스에만 적용하며 서버나 사용자 레이아웃으로 저장하지 않는다.
+
 ## Selection
 
 - Single Row Selection

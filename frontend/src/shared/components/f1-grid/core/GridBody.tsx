@@ -8,6 +8,11 @@ type GridBodyProps<T extends object> = {
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
   columnLine: boolean;
+  defaultRowHeight: number;
+  minRowHeight: number;
+  maxRowHeight: number;
+  rowHeights: Record<string, number>;
+  resizableRows: boolean;
   selectedIds: F1GridRowId[];
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
@@ -32,6 +37,7 @@ type GridBodyProps<T extends object> = {
     node: HTMLElement | null,
   ) => void;
   onEditingCellRef: (node: HTMLElement | null) => void;
+  onUpdateRowHeight: (rowId: F1GridRowId, height: number) => void;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -58,6 +64,11 @@ export function GridBody<T extends object>({
   columns,
   rowKey,
   columnLine,
+  defaultRowHeight,
+  minRowHeight,
+  maxRowHeight,
+  rowHeights,
+  resizableRows,
   selectedIds,
   focusedCell,
   editingCell,
@@ -76,6 +87,7 @@ export function GridBody<T extends object>({
   onStopEdit,
   onCellRef,
   onEditingCellRef,
+  onUpdateRowHeight,
 }: GridBodyProps<T>) {
   function getMergeEditing(rowIndex: number, columnIndex: number): boolean {
     const column = columns[columnIndex];
@@ -126,7 +138,12 @@ export function GridBody<T extends object>({
         gridTemplateColumns: `44px ${columns
           .map((column) => `${column.width ?? 140}px`)
           .join(' ')}`,
-        gridAutoRows: 'minmax(40px, auto)',
+        gridTemplateRows: visibleRows
+          .map(
+            (row) =>
+              `${rowHeights[String(getRowId(row))] ?? defaultRowHeight}px`,
+          )
+          .join(' '),
         minWidth: 'max-content',
       }}
     >
@@ -161,6 +178,12 @@ export function GridBody<T extends object>({
             onStopEdit={onStopEdit}
             onCellRef={onCellRef}
             onEditingCellRef={onEditingCellRef}
+            rowHeight={rowHeights[String(rowId)] ?? defaultRowHeight}
+            defaultRowHeight={defaultRowHeight}
+            minRowHeight={minRowHeight}
+            maxRowHeight={maxRowHeight}
+            resizableRows={resizableRows}
+            onUpdateRowHeight={onUpdateRowHeight}
             getMergeEditing={(columnIndex) =>
               getMergeEditing(rowIndex, columnIndex)
             }

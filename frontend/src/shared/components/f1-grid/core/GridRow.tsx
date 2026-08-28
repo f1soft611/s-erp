@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -10,6 +10,11 @@ type GridRowProps<T extends object> = {
   columns: F1GridColumn<T>[];
   columnLine: boolean;
   isSelected: boolean;
+  rowHeight: number;
+  defaultRowHeight: number;
+  minRowHeight: number;
+  maxRowHeight: number;
+  resizableRows: boolean;
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
   draftValue: string;
@@ -34,6 +39,7 @@ type GridRowProps<T extends object> = {
     node: HTMLElement | null,
   ) => void;
   onEditingCellRef: (node: HTMLElement | null) => void;
+  onUpdateRowHeight: (rowId: F1GridRowId, height: number) => void;
   getMergeEditing: (columnIndex: number) => boolean;
   getMerged: (rowIndex: number, columnIndex: number, value: unknown) => boolean;
 };
@@ -49,6 +55,11 @@ export function GridRow<T extends object>({
   columns,
   columnLine,
   isSelected,
+  rowHeight,
+  defaultRowHeight,
+  minRowHeight,
+  maxRowHeight,
+  resizableRows,
   focusedCell,
   editingCell,
   draftValue,
@@ -65,9 +76,43 @@ export function GridRow<T extends object>({
   onStopEdit,
   onCellRef,
   onEditingCellRef,
+  onUpdateRowHeight,
   getMergeEditing,
   getMerged,
 }: GridRowProps<T>) {
+  const resizeStateRef = useRef<{
+    startY: number;
+    startHeight: number;
+  } | null>(null);
+
+  useEffect(() => {
+    function handlePointerMove(event: PointerEvent) {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) return;
+      onUpdateRowHeight(
+        rowId,
+        Math.min(
+          maxRowHeight,
+          Math.max(
+            minRowHeight,
+            resizeState.startHeight + event.clientY - resizeState.startY,
+          ),
+        ),
+      );
+    }
+
+    function handlePointerUp() {
+      resizeStateRef.current = null;
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [maxRowHeight, minRowHeight, onUpdateRowHeight, rowId]);
+
   function isSameCell(
     first: { rowId: F1GridRowId; columnIndex: number } | undefined,
     second: { rowId: F1GridRowId; columnIndex: number },
@@ -135,6 +180,8 @@ export function GridRow<T extends object>({
             editing={editing}
             merged={merged}
             mergeInfo={mergeInfo}
+            rowHeight={rowHeight}
+            defaultRowHeight={defaultRowHeight}
             rowIndex={rowIndex}
             draftValue={draftValue}
             onFocus={() => {
@@ -168,6 +215,50 @@ export function GridRow<T extends object>({
           />
         );
       })}
+      {resizableRows ? (
+        <Box
+          component="button"
+          type="button"
+          role="button"
+          aria-label={`${rowId} 행 높이 조절`}
+          aria-valuemin={minRowHeight}
+          aria-valuemax={maxRowHeight}
+          aria-valuenow={rowHeight}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            resizeStateRef.current = {
+              startY: event.clientY,
+              startHeight: rowHeight,
+            };
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            event.stopPropagation();
+            const direction = event.key === 'ArrowDown' ? 4 : -4;
+            onUpdateRowHeight(rowId, rowHeight + direction);
+          }}
+          sx={{
+            gridColumn: '1 / -1',
+            gridRow: rowIndex + 1,
+            alignSelf: 'end',
+            justifySelf: 'stretch',
+            height: 6,
+            minHeight: 6,
+            p: 0,
+            border: 0,
+            bgcolor: 'transparent',
+            cursor: 'row-resize',
+            zIndex: 2,
+            '&:focus-visible': {
+              outline: '2px solid',
+              outlineColor: 'primary.main',
+            },
+          }}
+        />
+      ) : null}
     </Box>
   );
 }

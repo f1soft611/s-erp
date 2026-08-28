@@ -8,3 +8,4 @@ export * from './keyboard/GridKeyboard';
 export * from './selection/GridSelection';
 export * from './clipboard/GridClipboard';
 export * from './validation/GridValidation';
+export * from './layout/GridRowHeight';

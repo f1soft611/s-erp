@@ -37,6 +37,7 @@ export type F1GridColumn<T extends object> = {
   ) => Partial<T> | undefined;
   align?: 'left' | 'center' | 'right';
   headerAlign?: 'left' | 'center' | 'right';
+  wrapText?: boolean;
   mergeRows?: boolean;
   headerCheckbox?: boolean;
 };

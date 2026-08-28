@@ -53,4 +53,32 @@ describe('F1 Grid test page', () => {
       ).toBeVisible();
     });
   });
+
+  it('renders a long wrap-text sample with row height controls', () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    expect(
+      screen.getByText(/행 높이를 조절하면 여러 줄로 확인할 수 있는/),
+    ).toBeVisible();
+    const rowHeightHandle = screen.getByRole('button', {
+      name: /행 높이 조절/,
+    });
+    const itemName = screen.getByText(
+      /행 높이를 조절하면 여러 줄로 확인할 수 있는/,
+    );
+
+    expect(rowHeightHandle).toHaveAttribute('aria-valuenow', '40');
+    expect(itemName).toHaveStyle({ whiteSpace: 'nowrap' });
+
+    fireEvent.keyDown(rowHeightHandle, { key: 'ArrowDown' });
+
+    expect(rowHeightHandle).toHaveAttribute('aria-valuenow', '44');
+    expect(itemName).toHaveStyle({ whiteSpace: 'normal' });
+  });
 });

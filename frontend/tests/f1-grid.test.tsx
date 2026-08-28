@@ -542,6 +542,65 @@ describe('F1-GRID row height', () => {
     expect(getGridRowHeightByKey(40, 'ArrowDown', 40, 300, 4)).toBe(44);
     expect(getGridRowHeightByKey(40, 'ArrowUp', 40, 300, 4)).toBe(40);
   });
+
+  it('resizes only the active row with keyboard and pointer input', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: 'first', description: '첫 번째 긴 설명' },
+          { id: 'second', description: '두 번째 긴 설명' },
+        ]}
+        columns={[{ field: 'description', headerName: '설명', wrapText: true }]}
+        rowKey="id"
+        minRowHeight={40}
+        maxRowHeight={120}
+      />,
+    );
+
+    const handles = screen.getAllByRole('button', {
+      name: /행 높이 조절/,
+    });
+    expect(handles).toHaveLength(2);
+    expect(handles[0]).toHaveAttribute('aria-valuenow', '40');
+    expect(handles[1]).toHaveAttribute('aria-valuenow', '40');
+
+    fireEvent.keyDown(handles[0], { key: 'ArrowDown' });
+    expect(handles[0]).toHaveAttribute('aria-valuenow', '44');
+    expect(handles[1]).toHaveAttribute('aria-valuenow', '40');
+
+    fireEvent.pointerDown(handles[0], { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientY: 300, pointerId: 1 });
+    expect(handles[0]).toHaveAttribute('aria-valuenow', '120');
+    expect(handles[1]).toHaveAttribute('aria-valuenow', '40');
+  });
+
+  it('uses ellipsis by default and wraps configured cells after resizing', () => {
+    const longText = '셀 안에서 여러 줄로 표시되어야 하는 긴 설명입니다.';
+    render(
+      <F1Grid
+        rows={[{ id: 'first', wrapped: longText, clipped: longText }]}
+        columns={[
+          { field: 'wrapped', headerName: '줄바꿈', wrapText: true },
+          { field: 'clipped', headerName: '말줄임' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const wrappedText = screen.getAllByText(longText)[0];
+    expect(wrappedText).toHaveAttribute('title', longText);
+    expect(wrappedText).toHaveStyle({ whiteSpace: 'nowrap' });
+    expect(wrappedText.parentElement).toHaveStyle({
+      minWidth: '0px',
+      overflow: 'hidden',
+    });
+
+    fireEvent.keyDown(screen.getByRole('button', { name: /행 높이 조절/ }), {
+      key: 'ArrowDown',
+    });
+    expect(wrappedText).toHaveStyle({ whiteSpace: 'normal' });
+  });
 });
 
 describe('F1-GRID interaction', () => {

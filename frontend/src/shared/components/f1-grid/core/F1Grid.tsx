@@ -40,6 +40,7 @@ import {
   toGridTsv,
 } from '../clipboard/GridClipboard';
 import { validateGridRow } from '../validation/GridValidation';
+import { clampGridRowHeight } from '../layout/GridRowHeight';
 
 export type F1GridProps<T extends object> = {
   rows: T[];
@@ -47,6 +48,10 @@ export type F1GridProps<T extends object> = {
   rowKey: keyof T;
   ariaLabel?: string;
   columnLine?: boolean;
+  rowHeight?: number;
+  minRowHeight?: number;
+  maxRowHeight?: number;
+  resizableRows?: boolean;
   createRow?: () => T;
   createDuplicate?: (row: T) => T;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
@@ -64,6 +69,10 @@ function F1GridInner<T extends object>(
     rowKey,
     ariaLabel = 'F1-GRID',
     columnLine = false,
+    rowHeight = 40,
+    minRowHeight = 40,
+    maxRowHeight = 300,
+    resizableRows = true,
     createRow,
     createDuplicate,
     onChangesChange,
@@ -80,6 +89,14 @@ function F1GridInner<T extends object>(
   const [editingCell, setEditingCell] = useState<F1GridCell>();
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+  const normalizedMinRowHeight = Math.max(1, minRowHeight);
+  const normalizedMaxRowHeight = Math.max(normalizedMinRowHeight, maxRowHeight);
+  const defaultRowHeight = clampGridRowHeight(
+    rowHeight,
+    normalizedMinRowHeight,
+    normalizedMaxRowHeight,
+  );
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
 
@@ -136,6 +153,17 @@ function F1GridInner<T extends object>(
 
   function getErrorKey(rowId: F1GridRowId, field: keyof T): string {
     return `${String(rowId)}:${String(field)}`;
+  }
+
+  function updateRowHeight(rowId: F1GridRowId, nextHeight: number) {
+    setRowHeights((current) => ({
+      ...current,
+      [String(rowId)]: clampGridRowHeight(
+        nextHeight,
+        normalizedMinRowHeight,
+        normalizedMaxRowHeight,
+      ),
+    }));
   }
 
   function validate(): boolean {
@@ -618,6 +646,11 @@ function F1GridInner<T extends object>(
         columns={columns}
         rowKey={rowKey}
         columnLine={columnLine}
+        defaultRowHeight={defaultRowHeight}
+        minRowHeight={normalizedMinRowHeight}
+        maxRowHeight={normalizedMaxRowHeight}
+        rowHeights={rowHeights}
+        resizableRows={resizableRows}
         selectedIds={selectedIds}
         focusedCell={focusedCell}
         editingCell={editingCell}
@@ -653,6 +686,7 @@ function F1GridInner<T extends object>(
         onEditingCellRef={(node) => {
           editingCellNodeRef.current = node;
         }}
+        onUpdateRowHeight={updateRowHeight}
       />
     </Box>
   );

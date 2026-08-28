@@ -38,7 +38,8 @@ const rows: ItemRow[] = [
   {
     id: 'line-1',
     itemCode: 'ITEM-001',
-    itemName: '기본 품목',
+    itemName:
+      '행 높이를 조절하면 여러 줄로 확인할 수 있는 테스트 품목 설명입니다.',
     qty: 1,
     price: 12000,
     ratio: 1.5,
@@ -84,7 +85,13 @@ export function F1GridTestPage({
         setPickerOpen(true);
       },
     },
-    { field: 'itemName', headerName: '품목명', editable: true, required: true },
+    {
+      field: 'itemName',
+      headerName: '품목명',
+      editable: true,
+      required: true,
+      wrapText: true,
+    },
     {
       field: 'qty',
       headerName: '수량',
@@ -149,6 +156,10 @@ export function F1GridTestPage({
         columns={columns}
         rowKey="id"
         ariaLabel="F1-GRID 기능 테스트"
+        rowHeight={40}
+        minRowHeight={40}
+        maxRowHeight={300}
+        resizableRows
         createRow={createSampleRow}
         createDuplicate={createSampleDuplicate}
       />
