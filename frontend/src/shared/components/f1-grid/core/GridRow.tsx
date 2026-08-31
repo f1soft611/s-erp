@@ -1,4 +1,10 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -45,6 +51,7 @@ type GridRowProps<T extends object> = {
   getPinOffset: (
     column: F1GridColumn<T>,
   ) => { side: 'left' | 'right'; offset: number } | undefined;
+  cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -83,6 +90,7 @@ export function GridRow<T extends object>({
   getMergeEditing,
   getMerged,
   getPinOffset,
+  cellAdornment,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
     startY: number;
@@ -173,7 +181,7 @@ export function GridRow<T extends object>({
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);
         const focused = isSameCell(focusedCell, cell);
-        const value = row[column.field];
+        const value = column.getValue?.(row) ?? row[column.field];
         const mergeEditing = getMergeEditing(columnIndex);
         const mergeInfo = mergeEditing
           ? undefined
@@ -209,7 +217,12 @@ export function GridRow<T extends object>({
               onStopEdit();
             }}
             onCheckboxChange={(checked) => {
-              onUpdateCell(column.field, checked);
+              const patch = column.onValueChange?.(row, checked);
+              if (patch) {
+                onUpdateRow(patch);
+              } else {
+                onUpdateCell(column.field, checked);
+              }
             }}
             onCodePick={() => {
               const applyPatch = (patch: Partial<T>) => {
@@ -225,6 +238,7 @@ export function GridRow<T extends object>({
               if (editing) onEditingCellRef(node);
             }}
             pinOffset={getPinOffset(column)}
+            adornment={cellAdornment?.(row, column)}
           />
         );
       })}

@@ -34,9 +34,11 @@ egovframework\com\cmm\interceptor\AuthenticInterceptor.class
 egovframework\com\cmm\annotation\IncludedInfo.class
 egovframework\com\cmm\service\EgovFileMngUtil.class
 egovframework\let\system\menus\domain\model\SystemMenuVO.class
+egovframework\let\system\permissions\controller\SystemPermissionApiController.class
 egovframework\com\cmm\EgovMessageSource.class
 egovframework\com\config\EgovConfigAppWhitelist.class
 egovframework\let\system\menus\domain\model\MenuPermissionVO.class
+egovframework\let\system\permissions\domain\repository\SystemPermissionDAO.class
 egovframework\com\config\EgovConfigAppIdGen.class
 egovframework\com\cmm\service\impl\EgovCmmUseServiceImpl.class
 egovframework\let\utl\fcc\service\EgovStringUtil.class
@@ -51,6 +53,7 @@ egovframework\com\cmm\exception\DbExceptionTranslator.class
 egovframework\let\uat\uia\service\EgovLoginService.class
 egovframework\let\system\roles\controller\SystemRoleApiController.class
 egovframework\let\uss\auth\service\impl\AuthManageDAO.class
+egovframework\let\system\permissions\service\SystemPermissionService.class
 egovframework\let\utl\sim\service\EgovFileScrty.class
 egovframework\com\config\EgovConfigAppMsg.class
 egovframework\let\utl\fcc\service\EgovNumberUtil.class
@@ -63,6 +66,7 @@ egovframework\let\system\roles\domain\repository\SystemRoleDAO.class
 egovframework\com\cmm\util\EgovResourceCloseHelper.class
 egovframework\com\cmm\service\EgovProperties.class
 egovframework\com\config\EgovConfigAppProperties.class
+egovframework\let\system\permissions\domain\model\SystemPermissionVO.class
 egovframework\let\system\modules\domain\model\SystemModuleVO.class
 egovframework\let\system\modules\domain\model\SystemModuleSearchConditionVO.class
 egovframework\com\cmm\filter\HTMLTagFilter.class
@@ -86,6 +90,7 @@ egovframework\let\uss\auth\service\RoleInfoVO.class
 egovframework\com\cmm\EgovComponentChecker.class
 egovframework\com\cmm\web\EgovMultipartResolver.class
 egovframework\let\uss\auth\service\RoleMenuPermissionVO.class
+egovframework\let\system\menus\domain\model\SystemMenuPermissionSaveRequestVO.class
 egovframework\com\config\EgovConfigAppAspect.class
 egovframework\com\cmm\EgovComTraceHandler.class
 egovframework\com\security\CustomAuthenticationPrincipalResolver.class
@@ -96,6 +101,7 @@ egovframework\let\system\menus\controller\MyMenuApiController.class
 egovframework\com\cmm\service\impl\EgovFileMngServiceImpl.class
 egovframework\let\system\menus\domain\model\MyMenuResponseVO$UserSummary.class
 egovframework\let\system\menus\domain\model\SystemMenuSearchConditionVO.class
+egovframework\let\system\permissions\service\impl\SystemPermissionServiceImpl.class
 egovframework\com\config\EgovWebServletContextListener.class
 egovframework\com\cmm\AltibaseClobStringTypeHandler.class
 egovframework\let\system\modules\service\impl\SystemModuleServiceImpl.class

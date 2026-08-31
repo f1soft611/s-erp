@@ -180,7 +180,12 @@ describe('Dashboard sidebar', () => {
       await screen.findByRole('heading', { name: /^메뉴관리$/i }),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/메뉴 관리/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/기본정보/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '루트 메뉴 추가' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/사용 여부/i).length).toBeGreaterThan(0);
   });
 });

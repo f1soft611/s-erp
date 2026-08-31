@@ -1,4 +1,5 @@
 export { F1Grid } from './core/F1Grid';
+export { F1Tree } from './tree/F1Tree';
 export * from './types/grid.types';
 export * from './state/GridState';
 export * from './merge/GridRowMerge';
@@ -12,3 +13,4 @@ export * from './columns/GridColumnManagement';
 export * from './sorting/GridSort';
 export * from './filter/GridFilter';
 export * from './columns/GridColumnPin';
+export * from './tree/TreeProjection';

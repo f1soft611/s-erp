@@ -65,11 +65,13 @@ type GridHeaderProps<T extends object> = {
   onToggleColumnVisibility: (column: F1GridColumn<T>, visible: boolean) => void;
   sorts: F1GridSort<T>[];
   onToggleSort: (column: F1GridColumn<T>, direction: 'asc' | 'desc') => void;
+  disableSorting?: boolean;
   filters: F1GridFilter<T>[];
   onApplyFilter: (
     column: F1GridColumn<T>,
     filter: F1GridFilter<T> | undefined,
   ) => void;
+  disableFiltering?: boolean;
   pinnedFields: Map<string, F1GridPinSide>;
   onPinColumn: (
     column: F1GridColumn<T>,
@@ -95,8 +97,10 @@ export function GridHeader<T extends object>({
   onToggleColumnVisibility,
   sorts,
   onToggleSort,
+  disableSorting = false,
   filters,
   onApplyFilter,
+  disableFiltering = false,
   pinnedFields,
   onPinColumn,
   leftOffsets,
@@ -408,29 +412,33 @@ export function GridHeader<T extends object>({
         open={Boolean(menuAnchor)}
         onClose={closeMenus}
       >
-        <MenuItem
-          onClick={() => {
-            if (menuColumn) onToggleSort(menuColumn, 'asc');
-            closeMenus();
-          }}
-        >
-          <ListItemIcon>
-            <ArrowUpwardIcon fontSize="small" />
-          </ListItemIcon>
-          오름차순 정렬
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            if (menuColumn) onToggleSort(menuColumn, 'desc');
-            closeMenus();
-          }}
-        >
-          <ListItemIcon>
-            <ArrowDownwardIcon fontSize="small" />
-          </ListItemIcon>
-          내림차순 정렬
-        </MenuItem>
-        <Divider />
+        {!disableSorting ? (
+          <>
+            <MenuItem
+              onClick={() => {
+                if (menuColumn) onToggleSort(menuColumn, 'asc');
+                closeMenus();
+              }}
+            >
+              <ListItemIcon>
+                <ArrowUpwardIcon fontSize="small" />
+              </ListItemIcon>
+              오름차순 정렬
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (menuColumn) onToggleSort(menuColumn, 'desc');
+                closeMenus();
+              }}
+            >
+              <ListItemIcon>
+                <ArrowDownwardIcon fontSize="small" />
+              </ListItemIcon>
+              내림차순 정렬
+            </MenuItem>
+            <Divider />
+          </>
+        ) : null}
         <MenuItem
           onClick={(event) => {
             event.stopPropagation();
@@ -439,13 +447,17 @@ export function GridHeader<T extends object>({
         >
           컬럼 목록
         </MenuItem>
-        <Divider />
-        <MenuItem onClick={openFilterPopover}>
-          <ListItemIcon>
-            <FilterListIcon fontSize="small" />
-          </ListItemIcon>
-          필터
-        </MenuItem>
+        {!disableFiltering ? (
+          <>
+            <Divider />
+            <MenuItem onClick={openFilterPopover}>
+              <ListItemIcon>
+                <FilterListIcon fontSize="small" />
+              </ListItemIcon>
+              필터
+            </MenuItem>
+          </>
+        ) : null}
         <Divider />
         <MenuItem
           onClick={() => {

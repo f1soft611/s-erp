@@ -78,6 +78,11 @@ function F1GridInner<T extends object>(
     createRow,
     createDuplicate,
     onChangesChange,
+    onSelectionChange,
+    rowProjection,
+    cellAdornment,
+    disableSorting = false,
+    disableFiltering = false,
   }: F1GridProps<T>,
   ref: ForwardedRef<F1GridRef<T>>,
 ) {
@@ -126,17 +131,17 @@ function F1GridInner<T extends object>(
     columnWidths,
   );
 
-  const visibleRows = sortGridRows(
-    applyGridFilters(
-      data.rows.filter(
-        (row) =>
-          data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
-      ),
-      filterState,
-      columns,
-    ),
-    sortState,
+  const activeRows = data.rows.filter(
+    (row) =>
+      data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
   );
+  const projectedRows = rowProjection?.(activeRows).rows ?? activeRows;
+  const filteredRows = disableFiltering
+    ? projectedRows
+    : applyGridFilters(projectedRows, filterState, columns);
+  const visibleRows = disableSorting
+    ? filteredRows
+    : sortGridRows(filteredRows, sortState);
   const mergeInfoByColumn = visibleColumns.map((column) =>
     column.mergeRows ? getGridMergeInfo(visibleRows, column.field) : [],
   );
@@ -229,6 +234,10 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     onChangesChange?.(getGridChanges(data, rowKey));
   }, [data, onChangesChange, rowKey]);
+
+  useEffect(() => {
+    onSelectionChange?.(selectedIds);
+  }, [onSelectionChange, selectedIds]);
 
   function getCell(rowId: F1GridRowId, columnIndex: number): F1GridCell {
     return { rowId, columnIndex };
@@ -439,7 +448,7 @@ function F1GridInner<T extends object>(
       isCellEditable(column, row),
     );
     const checkedCount = editableRows.filter((row) =>
-      Boolean(row[column.field]),
+      Boolean(column.getValue?.(row) ?? row[column.field]),
     ).length;
 
     return {
@@ -455,8 +464,9 @@ function F1GridInner<T extends object>(
       let next = current;
       visibleRows.forEach((row) => {
         if (!isCellEditable(column, row)) return;
+        const patch = column.onValueChange?.(row, nextValue);
         next = updateGridRow(next, rowKey, getGridRowId(row, rowKey), {
-          [column.field]: nextValue,
+          ...(patch ?? { [column.field]: nextValue }),
         } as Partial<T>);
       });
       return next;
@@ -702,6 +712,9 @@ function F1GridInner<T extends object>(
     getRows() {
       return visibleRows;
     },
+    getActiveRows() {
+      return activeRows;
+    },
     getChanges() {
       return getGridChanges(data, rowKey);
     },
@@ -759,8 +772,10 @@ function F1GridInner<T extends object>(
         onToggleColumnVisibility={toggleColumnVisibility}
         sorts={sortState}
         onToggleSort={toggleSortColumn}
+        disableSorting={disableSorting}
         filters={filterState}
         onApplyFilter={applyColumnFilter}
+        disableFiltering={disableFiltering}
         pinnedFields={pinnedFields}
         onPinColumn={pinColumn}
         leftOffsets={leftOffsets}
@@ -814,6 +829,7 @@ function F1GridInner<T extends object>(
         }}
         onUpdateRowHeight={updateRowHeight}
         getPinOffset={getPinOffset}
+        cellAdornment={cellAdornment}
       />
     </Box>
   );

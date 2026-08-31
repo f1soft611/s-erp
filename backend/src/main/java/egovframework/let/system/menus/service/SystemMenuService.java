@@ -3,6 +3,7 @@ package egovframework.let.system.menus.service;
 import java.util.List;
 
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
 
@@ -41,6 +42,17 @@ public interface SystemMenuService {
      * @exception Exception
      */
     SystemMenuVO updateMenu(Long tenantId, Long menuId, SystemMenuSaveRequestVO payload) throws Exception;
+
+        /**
+         * 리프 메뉴의 버튼 권한을 전체 교체한다.
+         *
+         * @param tenantId
+         * @param menuId
+         * @param payload
+         * @exception Exception
+         */
+        SystemMenuVO replaceMenuPermissions(Long tenantId, Long menuId,
+            SystemMenuPermissionSaveRequestVO payload) throws Exception;
 
     /**
      * 메뉴를 삭제한다. 하위 메뉴가 있으면 거부한다.

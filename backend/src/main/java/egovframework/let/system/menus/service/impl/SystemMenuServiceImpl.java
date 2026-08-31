@@ -3,8 +3,10 @@ package egovframework.let.system.menus.service.impl;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import egovframework.let.system.menus.domain.model.MenuPermissionVO;
 import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
@@ -50,7 +53,22 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         SystemMenuSearchConditionVO condition = new SystemMenuSearchConditionVO();
         condition.setTenantId(tenantId);
         condition.setModuleId(moduleId);
-        return systemMenuDAO.selectMenuList(condition);
+        List<SystemMenuVO> menus = systemMenuDAO.selectMenuList(condition);
+        Map<Long, List<String>> permissionCodesByMenuId = new HashMap<>();
+        for (SystemMenuVO menu : menus) {
+            permissionCodesByMenuId.put(menu.getMenuId(), new ArrayList<>());
+        }
+        for (Map<String, Object> row : systemMenuDAO.selectMenuPermissionCodeRows(condition)) {
+            Long menuId = ((Number) row.get("menuId")).longValue();
+            List<String> permissionCodes = permissionCodesByMenuId.get(menuId);
+            if (permissionCodes != null) {
+                permissionCodes.add((String) row.get("permissionCode"));
+            }
+        }
+        for (SystemMenuVO menu : menus) {
+            menu.setPermissionCodes(permissionCodesByMenuId.get(menu.getMenuId()));
+        }
+        return menus;
     }
 
     @Override
@@ -66,6 +84,8 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             throw new IllegalArgumentException("메뉴명은 필수입니다.");
         }
 
+        validateModuleOwnership(tenantId, payload.getModuleId());
+        validateParentMenu(tenantId, payload.getParentMenuId(), payload.getModuleId());
         validateMenuCodeDuplication(tenantId, payload.getMenuCode(), null);
 
         Map<String, Object> params = new HashMap<>();
@@ -90,7 +110,9 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             throw new IllegalArgumentException("메뉴명은 필수입니다.");
         }
 
-        findByIdOrThrow(tenantId, menuId);
+        SystemMenuVO existingMenu = findByIdOrThrow(tenantId, menuId);
+        validateModuleOwnership(tenantId, existingMenu.getModuleId());
+        validateParentMenu(tenantId, payload.getParentMenuId(), existingMenu.getModuleId());
 
         String menuCode = payload.getMenuCode() == null ? null : payload.getMenuCode().trim();
         if (StringUtils.hasText(menuCode)) {
@@ -113,6 +135,32 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
 
     @Override
     @Transactional
+    public SystemMenuVO replaceMenuPermissions(Long tenantId, Long menuId,
+            SystemMenuPermissionSaveRequestVO payload) throws Exception {
+        findByIdOrThrow(tenantId, menuId);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("menuId", menuId);
+        params.put("tenantId", tenantId);
+        if (systemMenuDAO.countChildMenus(params) > 0) {
+            throw new IllegalArgumentException("하위 메뉴가 있는 메뉴에는 버튼 권한을 설정할 수 없습니다.");
+        }
+
+        List<String> permissionCodes = normalizePermissionCodes(payload == null ? null : payload.getPermissionCodes());
+        if (!permissionCodes.isEmpty()
+                && systemMenuDAO.countActivePermissionCodes(permissionCodes) != permissionCodes.size()) {
+            throw new IllegalArgumentException("유효하지 않은 권한 코드입니다.");
+        }
+
+        systemMenuDAO.deleteMenuPermissions(menuId);
+        if (!permissionCodes.isEmpty()) {
+            systemMenuDAO.insertMenuPermissions(menuId, permissionCodes);
+        }
+        return findByIdOrThrow(tenantId, menuId);
+    }
+
+    @Override
+    @Transactional
     public void deleteMenu(Long tenantId, Long menuId) throws Exception {
         findByIdOrThrow(tenantId, menuId);
 
@@ -125,6 +173,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             throw new IllegalArgumentException("하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.");
         }
 
+        systemMenuDAO.deleteMenuPermissions(menuId);
         systemMenuDAO.deleteMenu(params);
     }
 
@@ -204,7 +253,50 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         if (menu == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "메뉴를 찾을 수 없습니다.");
         }
+        populatePermissionCodes(menu);
         return menu;
+    }
+
+    private void populatePermissionCodes(SystemMenuVO menu) throws Exception {
+        menu.setPermissionCodes(systemMenuDAO.selectMenuPermissionCodes(menu.getMenuId()));
+    }
+
+    private void validateModuleOwnership(Long tenantId, Long moduleId) throws Exception {
+        boolean ownedModule = systemModuleService.listModules(tenantId).stream()
+                .anyMatch(module -> moduleId.equals(module.getModuleId()));
+        if (!ownedModule) {
+            throw new IllegalArgumentException("유효하지 않은 모듈입니다.");
+        }
+    }
+
+    private void validateParentMenu(Long tenantId, Long parentMenuId, Long moduleId) throws Exception {
+        if (parentMenuId == null) {
+            return;
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("menuId", parentMenuId);
+        params.put("tenantId", tenantId);
+        SystemMenuVO parentMenu = systemMenuDAO.selectMenuById(params);
+        if (parentMenu == null) {
+            throw new IllegalArgumentException("유효하지 않은 상위 메뉴입니다.");
+        }
+        if (!moduleId.equals(parentMenu.getModuleId())) {
+            throw new IllegalArgumentException("상위 메뉴는 같은 모듈에 속해야 합니다.");
+        }
+    }
+
+    private List<String> normalizePermissionCodes(List<String> permissionCodes) {
+        if (permissionCodes == null || permissionCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Set<String> normalizedCodes = new LinkedHashSet<>();
+        for (String permissionCode : permissionCodes) {
+            if (StringUtils.hasText(permissionCode)) {
+                normalizedCodes.add(permissionCode.trim());
+            }
+        }
+        return new ArrayList<>(normalizedCodes);
     }
 
     private void validateMenuCodeDuplication(Long tenantId, String menuCode, Long excludeId) throws Exception {

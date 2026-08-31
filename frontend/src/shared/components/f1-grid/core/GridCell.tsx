@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -28,6 +28,7 @@ type GridCellProps<T extends object> = {
   errorMessage?: string;
   onCellRef: (node: HTMLElement | null) => void;
   pinOffset?: { side: 'left' | 'right'; offset: number };
+  adornment?: ReactNode;
 };
 
 function toJustifyContent(align: 'left' | 'center' | 'right') {
@@ -60,8 +61,9 @@ export function GridCell<T extends object>({
   errorMessage,
   onCellRef,
   pinOffset,
+  adornment,
 }: GridCellProps<T>) {
-  const value = row[column.field];
+  const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
 
   return (
@@ -145,27 +147,30 @@ export function GridCell<T extends object>({
           onCodePick={onCodePick}
         />
       ) : (
-        <Box
-          component="span"
-          title={getCellDisplayValue(column, value)}
-          sx={{
-            display: 'block',
-            width: '100%',
-            minWidth: 0,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace:
-              column.wrapText && rowHeight > defaultRowHeight
-                ? 'normal'
-                : 'nowrap',
-            overflowWrap:
-              column.wrapText && rowHeight > defaultRowHeight
-                ? 'anywhere'
-                : 'normal',
-          }}
-        >
-          {getCellDisplayValue(column, value)}
-        </Box>
+        <>
+          {adornment}
+          <Box
+            component="span"
+            title={getCellDisplayValue(column, value as T[keyof T])}
+            sx={{
+              display: 'block',
+              width: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'normal'
+                  : 'nowrap',
+              overflowWrap:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'anywhere'
+                  : 'normal',
+            }}
+          >
+            {getCellDisplayValue(column, value as T[keyof T])}
+          </Box>
+        </>
       )}
     </Box>
   );

@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { GridRow } from './GridRow';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -43,6 +43,7 @@ type GridBodyProps<T extends object> = {
   getPinOffset: (
     column: F1GridColumn<T>,
   ) => { side: 'left' | 'right'; offset: number } | undefined;
+  cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -95,6 +96,7 @@ export function GridBody<T extends object>({
   onEditingCellRef,
   onUpdateRowHeight,
   getPinOffset,
+  cellAdornment,
 }: GridBodyProps<T>) {
   function getMergeEditing(rowIndex: number, columnIndex: number): boolean {
     const column = columns[columnIndex];
@@ -199,6 +201,7 @@ export function GridBody<T extends object>({
             }
             getMerged={(ri, ci, val) => getMerged(ri, ci, val)}
             getPinOffset={getPinOffset}
+            cellAdornment={cellAdornment}
           />
         );
       })}

@@ -100,4 +100,54 @@ SELECT COUNT(*) FROM tb_menu
 WHERE parent_menu_id = #{menuId} AND tenant_id = #{tenantId}
 </select>
 
+<select id="selectMenuPermissionCodes" parameterType="long" resultType="string">
+SELECT p.permission_code
+FROM tb_menu_permission mp
+JOIN tb_permission p ON p.permission_id = mp.permission_id
+WHERE mp.menu_id = #{value}
+  AND p.use_at = 'Y'
+ORDER BY p.sort_order ASC, p.permission_id ASC
+</select>
+
+<select id="selectMenuPermissionCodeRows" parameterType="egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO" resultType="map">
+SELECT mn.menu_id AS "menuId", p.permission_code AS "permissionCode"
+FROM tb_menu mn
+JOIN tb_menu_permission mp ON mp.menu_id = mn.menu_id
+JOIN tb_permission p ON p.permission_id = mp.permission_id AND p.use_at = 'Y'
+WHERE mn.tenant_id = #{tenantId}
+<if test="moduleId != null">
+AND mn.module_id = #{moduleId}
+</if>
+<if test="useAt != null and useAt != ''">
+AND mn.use_at = #{useAt}
+</if>
+ORDER BY p.sort_order ASC, p.permission_id ASC
+</select>
+
+<delete id="deleteMenuPermissions" parameterType="long">
+DELETE FROM tb_menu_permission
+WHERE menu_id = #{value}
+</delete>
+
+<insert id="insertMenuPermissions" parameterType="map">
+INSERT INTO tb_menu_permission (menu_id, permission_id)
+SELECT #{menuId}, p.permission_id
+FROM tb_permission p
+WHERE p.use_at = 'Y'
+  AND p.permission_code IN
+  <foreach collection="permissionCodes" item="permissionCode" open="(" separator="," close=")">
+    #{permissionCode}
+  </foreach>
+</insert>
+
+<select id="countActivePermissionCodes" parameterType="list" resultType="int">
+SELECT COUNT(*)
+FROM tb_permission
+WHERE use_at = 'Y'
+  AND permission_code IN
+<foreach collection="list" item="permissionCode" open="(" separator="," close=")">
+  #{permissionCode}
+</foreach>
+</select>
+
 </mapper>

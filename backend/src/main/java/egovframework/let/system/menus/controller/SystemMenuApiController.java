@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -22,6 +22,7 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.EgovAccessControlHelper;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
 import egovframework.let.system.menus.service.SystemMenuService;
@@ -66,12 +67,12 @@ public class SystemMenuApiController {
     @Operation(summary = "메뉴 등록", security = { @SecurityRequirement(name = "Authorization") },
             tags = { "SystemMenuApiController" })
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "등록 성공"),
+            @ApiResponse(responseCode = "201", description = "등록 성공"),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 모듈 또는 상위 메뉴"),
             @ApiResponse(responseCode = "403", description = "인가된 사용자가 아님")
     })
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ResultVO createMenu(
+    public ResponseEntity<ResultVO> createMenu(
             @RequestBody SystemMenuSaveRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAdmin(user);
@@ -80,11 +81,13 @@ public class SystemMenuApiController {
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put("item", menu);
             resultMap.put("message", "메뉴가 성공적으로 등록되었습니다.");
-            return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+                return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
         } catch (IllegalArgumentException ex) {
             Map<String, Object> errorMap = new HashMap<>();
             errorMap.put("message", ex.getMessage());
-            return resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
         }
     }
 
@@ -92,10 +95,11 @@ public class SystemMenuApiController {
             tags = { "SystemMenuApiController" })
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "수정 성공"),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 상위 메뉴"),
             @ApiResponse(responseCode = "403", description = "인가된 사용자가 아님")
     })
     @PutMapping("/{id}")
-    public ResultVO updateMenu(
+    public ResponseEntity<ResultVO> updateMenu(
             @PathVariable Long id,
             @RequestBody SystemMenuSaveRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
@@ -105,11 +109,38 @@ public class SystemMenuApiController {
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put("item", menu);
             resultMap.put("message", "메뉴가 성공적으로 수정되었습니다.");
-            return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+            return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
         } catch (IllegalArgumentException ex) {
             Map<String, Object> errorMap = new HashMap<>();
             errorMap.put("message", ex.getMessage());
-            return resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
+        }
+    }
+
+    @Operation(summary = "메뉴 버튼 권한 저장", security = { @SecurityRequirement(name = "Authorization") },
+            tags = { "SystemMenuApiController" })
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "저장 성공"),
+            @ApiResponse(responseCode = "400", description = "리프 메뉴가 아니거나 유효하지 않은 권한 코드 요청"),
+            @ApiResponse(responseCode = "403", description = "인가된 사용자가 아님")
+    })
+    @PutMapping("/{id}/permissions")
+    public ResponseEntity<ResultVO> replaceMenuPermissions(
+            @PathVariable Long id,
+            @RequestBody SystemMenuPermissionSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAdmin(user);
+        try {
+            SystemMenuVO menu = systemMenuService.replaceMenuPermissions(user.getTenantId(), id, payload);
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("item", menu);
+            return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> errorMap = new HashMap<>();
+            errorMap.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
         }
     }
 
