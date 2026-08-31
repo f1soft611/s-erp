@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: egovframework.let.system.menus.service.SystemMenuPermissionServiceTest
--------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.901 s - in egovframework.let.system.menus.service.SystemMenuPermissionServiceTest
