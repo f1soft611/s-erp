@@ -1,0 +1,46 @@
+import { getStoredAuth } from './authService';
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+
+interface ApiEnvelope<T> {
+  resultCode: number | string;
+  resultMessage: string;
+  result: T;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const auth = getStoredAuth();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+
+  if (auth?.accessToken) {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const body = (await response.json()) as ApiEnvelope<T>;
+
+  if (!response.ok || String(body.resultCode) !== '200') {
+    throw new Error(body.resultMessage || '요청이 실패했습니다.');
+  }
+
+  return body.result;
+}
+
+export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
+
+export const apiPost = <T>(path: string, data: unknown): Promise<T> =>
+  request<T>(path, { method: 'POST', body: JSON.stringify(data) });
+
+export const apiPut = <T>(path: string, data: unknown): Promise<T> =>
+  request<T>(path, { method: 'PUT', body: JSON.stringify(data) });
+
+export const apiDelete = <T>(path: string): Promise<T> =>
+  request<T>(path, { method: 'DELETE' });

@@ -80,4 +80,14 @@ public class LoginDAO extends EgovAbstractMapper {
 		params.put("email", email);
 		return (String) selectOne("loginDAO.selectLoginCodeByTenantIdAndEmail", params);
 	}
+
+	/**
+	 * 테넌트 코드로 테넌트 ID를 조회한다.
+	 * @param tenantCode 테넌트 코드
+	 * @return 테넌트 ID
+	 * @exception Exception
+	 */
+	public Long selectTenantIdByCode(String tenantCode) throws Exception {
+		return (Long) selectOne("loginDAO.selectTenantIdByCode", tenantCode);
+	}
 }

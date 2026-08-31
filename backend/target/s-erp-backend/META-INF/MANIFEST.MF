@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Created-By: IntelliJ IDEA
+Built-By: socra
+Build-Jdk: Oracle OpenJDK version 1.8.0_201
+Implementation-Title: S-ERP Backend
+Implementation-Version: 1.0.0
+Implementation-Vendor-Id: org.egovframe.template
+Main-Class: ${start-class}
+

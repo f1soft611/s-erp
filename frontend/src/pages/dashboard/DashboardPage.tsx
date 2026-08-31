@@ -22,10 +22,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { logout } from '../../shared/services/authService';
 import {
+  buildModuleItems,
   defaultPage,
-  moduleItems,
+  moduleItems as staticModuleItems,
   pageContentMap,
 } from './services/dashboardData';
+import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
@@ -67,12 +69,25 @@ function findMenuPath(
   return undefined;
 }
 
-const defaultModule = moduleItems[0];
-const defaultMenuId = defaultModule.menus[0]?.id ?? '';
-
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
+  const [moduleItems, setModuleItems] = useState(staticModuleItems);
+  const defaultModule = moduleItems[0];
+  const defaultMenuId = defaultModule.menus[0]?.id ?? '';
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyMenus().then((response) => {
+      if (cancelled || !response) {
+        return;
+      }
+      setModuleItems(buildModuleItems(buildModuleDescriptors(response)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const location = useLocation();
   const theme = useTheme();
   const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(

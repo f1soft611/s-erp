@@ -1,10 +1,16 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
 import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { RoleManagementPanel } from './components/RoleManagementPanel';
-import { getRoleRows } from './services/roleManagement.service';
+import {
+  createRole,
+  fetchRoleRows,
+  type RoleSavePayload,
+} from './services/roleManagement.service';
+import type { RoleManagementRow } from './types/roleManagement.types';
 
 type RoleManagementPageProps = {
   selectedModule: ModuleItem;
@@ -19,6 +25,20 @@ export function RoleManagementPage({
 }: RoleManagementPageProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const [roles, setRoles] = useState<RoleManagementRow[]>([]);
+
+  const loadRoles = useCallback(() => {
+    fetchRoleRows().then(setRoles);
+  }, []);
+
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
+
+  const handleCreateRole = async (payload: RoleSavePayload) => {
+    await createRole(payload);
+    loadRoles();
+  };
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -50,7 +70,7 @@ export function RoleManagementPage({
           {content.description}
         </Typography>
       </Box>
-      <RoleManagementPanel roles={getRoleRows()} />
+      <RoleManagementPanel roles={roles} onCreateRole={handleCreateRole} />
     </Box>
   );
 }

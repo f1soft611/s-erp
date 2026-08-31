@@ -22,6 +22,7 @@ type LoginFormProps = {
   errors: Partial<Record<LoginFieldType, string>>;
   isSubmitting: boolean;
   submitMessage: string | null;
+  submitStatus: 'error' | null;
   showPassword: boolean;
   submitDisabled: boolean;
   onChange: (field: LoginFieldType, value: string) => void;
@@ -34,6 +35,7 @@ export function LoginForm({
   errors,
   isSubmitting,
   submitMessage,
+  submitStatus,
   showPassword,
   submitDisabled,
   onChange,
@@ -113,9 +115,7 @@ export function LoginForm({
           />
 
           {submitMessage ? (
-            <Alert
-              severity={submitMessage.includes('실패') ? 'error' : 'success'}
-            >
+            <Alert severity={submitStatus === 'error' ? 'error' : 'success'}>
               {submitMessage}
             </Alert>
           ) : null}
@@ -138,6 +138,34 @@ export function LoginForm({
           >
             {isSubmitting ? '로그인 중...' : '로그인'}
           </Button>
+
+          {import.meta.env.DEV ? (
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 1.5,
+                border: '1px solid rgba(148, 163, 184, 0.3)',
+                backgroundColor: 'rgba(248, 250, 252, 0.9)',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  display: 'block',
+                  color: 'text.secondary',
+                  fontWeight: 600,
+                }}
+              >
+                개발용 테스트 계정입니다.
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ display: 'block', color: 'text.secondary' }}
+              >
+                (업체코드: T1358606250 / 아이디: admin / 비밀번호: f1soft@611)
+              </Typography>
+            </Box>
+          ) : null}
 
           <Typography
             variant="caption"

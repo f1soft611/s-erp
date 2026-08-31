@@ -1,4 +1,5 @@
 import adminUserMenus from '../data/adminUserMenus.json';
+import { apiGet } from '../../../shared/services/apiClient';
 import type {
   MenuItem,
   MenuNode,
@@ -50,8 +51,10 @@ const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
       : [];
   });
 
-export const moduleDescriptors: ModuleDescriptor[] = userMenuResponse.menus.map(
-  (root) => {
+export const buildModuleDescriptors = (
+  response: UserMenuResponse,
+): ModuleDescriptor[] =>
+  response.menus.map((root) => {
     const tree = root.children?.map(toTreeNode) ?? [];
 
     return {
@@ -61,8 +64,10 @@ export const moduleDescriptors: ModuleDescriptor[] = userMenuResponse.menus.map(
       tree,
       menus: flattenMenuTree(tree),
     };
-  },
-);
+  });
+
+export const moduleDescriptors: ModuleDescriptor[] =
+  buildModuleDescriptors(userMenuResponse);
 
 const collectPermissions = (
   moduleId: string,
@@ -80,15 +85,32 @@ const collectPermissions = (
   });
 };
 
-export const menuPermissionMap: Map<string, MenuPermission> = (() => {
+export const buildMenuPermissionMap = (
+  descriptors: ModuleDescriptor[],
+): Map<string, MenuPermission> => {
   const map = new Map<string, MenuPermission>();
-  moduleDescriptors.forEach((module) => {
+  descriptors.forEach((module) => {
     collectPermissions(module.id, module.tree, map);
   });
   return map;
-})();
+};
+
+export const menuPermissionMap: Map<string, MenuPermission> =
+  buildMenuPermissionMap(moduleDescriptors);
 
 export const getMenuPermission = (
   moduleId: string,
   menuId: string,
 ): MenuPermission | undefined => menuPermissionMap.get(`${moduleId}:${menuId}`);
+
+/**
+ * 로그인 사용자 기준 모듈-메뉴 트리를 백엔드에서 조회한다.
+ * 실패 시 null을 반환하며, 호출부는 로컬 기본 데이터로 대체 처리한다.
+ */
+export const fetchMyMenus = async (): Promise<UserMenuResponse | null> => {
+  try {
+    return await apiGet<UserMenuResponse>('/api/v1/menus/my');
+  } catch {
+    return null;
+  }
+};

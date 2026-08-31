@@ -133,6 +133,7 @@ public class SecurityConfig {
                     .antMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS preflight 요청 허용
                         .antMatchers(AUTH_WHITELIST).permitAll()
                         .antMatchers(HttpMethod.GET, AUTH_GET_WHITELIST).permitAll()
+                        .antMatchers("/api/v1/**").authenticated()
                         .anyRequest().denyAll())
                 .sessionManagement(
                         (sessionManagement) -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

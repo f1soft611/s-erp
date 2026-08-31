@@ -6,11 +6,15 @@ export interface AuthSession {
   tenantCode: string;
   userId: string;
   accessToken: string;
+  refreshToken: string;
   expiresAt: string;
 }
 
 const AUTH_STORAGE_KEY = 's-erp-auth';
 const AUTH_CHANGE_EVENT = 's-erp-auth-change';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+const ACCESS_TOKEN_VALIDITY_MS = 3 * 60 * 60 * 1000;
 
 const syncBrowserLocation = (nextPath: string): void => {
   if (typeof window === 'undefined') {
@@ -52,32 +56,50 @@ export const getStoredAuth = (): AuthSession | null => {
 
 export const isAuthenticated = (): boolean => Boolean(getStoredAuth());
 
+interface LoginJwtResponse {
+  resultCode: string;
+  resultMessage: string;
+  jToken?: string;
+  refreshToken?: string;
+}
+
 export const login = async (
   credentials: LoginRequest,
 ): Promise<{ message: string; session: AuthSession }> => {
-  await new Promise((resolve) => {
-    window.setTimeout(resolve, 400);
-  });
-
   if (!credentials.tenantCode || !credentials.userId || !credentials.password) {
     throw new Error('필수 값이 누락되었습니다.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/login-jwt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenantCode: credentials.tenantCode,
+      id: credentials.userId,
+      password: credentials.password,
+    }),
+  });
+
+  const body = (await response.json()) as LoginJwtResponse;
+
+  if (!response.ok || body.resultCode !== '200' || !body.jToken) {
+    throw new Error(body.resultMessage || '로그인에 실패했습니다.');
   }
 
   const session: AuthSession = {
     tenantCode: credentials.tenantCode,
     userId: credentials.userId,
-    accessToken: 'mock-token-for-erp-session',
-    expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+    accessToken: body.jToken,
+    refreshToken: body.refreshToken ?? '',
+    expiresAt: new Date(Date.now() + ACCESS_TOKEN_VALIDITY_MS).toISOString(),
   };
 
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-  console.log('login service set auth, before sync', window.location.pathname);
   syncBrowserLocation('/dashboard');
-  console.log('login service after sync', window.location.pathname);
   notifyAuthChange();
 
   return {
-    message: '로그인 성공',
+    message: body.resultMessage || '로그인 성공',
     session,
   };
 };

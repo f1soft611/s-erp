@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 
 describe('Login page', () => {
@@ -26,13 +26,13 @@ describe('Login page', () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText(/업체코드/i), {
-      target: { value: 'A001' },
+      target: { value: 'T1358606250' },
     });
     fireEvent.change(screen.getByLabelText(/사용자 ID/i), {
       target: { value: 'admin' },
     });
     fireEvent.change(screen.getByLabelText(/비밀번호/i), {
-      target: { value: '1234' },
+      target: { value: 'f1soft@611' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
@@ -40,5 +40,38 @@ describe('Login page', () => {
     expect(
       await screen.findByRole('heading', { name: /대시보드/i }),
     ).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/login-jwt'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('shows an error message when the backend rejects the login', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ resultCode: '300', resultMessage: '로그인 실패' }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/업체코드/i), {
+      target: { value: 'T1358606250' },
+    });
+    fireEvent.change(screen.getByLabelText(/사용자 ID/i), {
+      target: { value: 'admin' },
+    });
+    fireEvent.change(screen.getByLabelText(/비밀번호/i), {
+      target: { value: 'wrong-password' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
+
+    expect(await screen.findByText(/로그인 실패/i)).toBeInTheDocument();
   });
 });

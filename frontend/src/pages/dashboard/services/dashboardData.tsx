@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import type { ModuleItem, PageContent } from '../types/dashboard';
-import { moduleDescriptors } from './menuService';
+import { moduleDescriptors, type ModuleDescriptor } from './menuService';
 
 function ModuleIcon({ name }: { name: string }): ReactNode {
   const map: Record<string, ReactNode> = {
@@ -13,15 +13,18 @@ function ModuleIcon({ name }: { name: string }): ReactNode {
   return map[name] ?? map.Settings;
 }
 
-export const moduleItems: ModuleItem[] = moduleDescriptors.map(
-  ({ id, name, iconName, tree, menus }) => ({
+export const buildModuleItems = (
+  descriptors: ModuleDescriptor[],
+): ModuleItem[] =>
+  descriptors.map(({ id, name, iconName, tree, menus }) => ({
     id,
     name,
     icon: <ModuleIcon name={iconName} />,
     tree,
     menus,
-  }),
-);
+  }));
+
+export const moduleItems: ModuleItem[] = buildModuleItems(moduleDescriptors);
 
 export const defaultPage: PageContent = {
   title: '업무 현황',

@@ -156,6 +156,14 @@ ORDER BY li.created_at DESC
 LIMIT 1
 </select>
 
+<select id="selectTenantIdByCode" parameterType="string" resultType="long">
+SELECT tenant_id
+FROM tb_tenant
+WHERE tenant_code = #{value}
+  AND COALESCE(use_at, 'Y') = 'Y'
+LIMIT 1
+</select>
+
 <update id="updatePassword">
 UPDATE tb_login_account
 SET

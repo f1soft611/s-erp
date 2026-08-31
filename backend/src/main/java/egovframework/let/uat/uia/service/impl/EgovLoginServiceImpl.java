@@ -61,6 +61,15 @@ public class EgovLoginServiceImpl extends EgovAbstractServiceImpl implements Ego
 			plainPassword = "";
 		}
 
+		if (vo.getTenantId() == null && vo.getTenantCode() != null && !vo.getTenantCode().trim().isEmpty()) {
+			Long tenantId = loginDAO.selectTenantIdByCode(vo.getTenantCode().trim());
+			if (tenantId == null) {
+				log.warn("Login failed: unknown tenantCode={}", vo.getTenantCode());
+				return new LoginVO();
+			}
+			vo.setTenantId(tenantId);
+		}
+
 		String enpassword = EgovFileScrty.encryptPassword(plainPassword, vo.getId());
 		vo.setPassword(enpassword);
 

@@ -18,6 +18,7 @@ export function useLoginForm() {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<'error' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const submitDisabled = useMemo(() => isSubmitting, [isSubmitting]);
@@ -57,6 +58,7 @@ export function useLoginForm() {
 
     if (submitMessage) {
       setSubmitMessage(null);
+      setSubmitStatus(null);
     }
   };
 
@@ -73,6 +75,7 @@ export function useLoginForm() {
 
     setIsSubmitting(true);
     setSubmitMessage(null);
+    setSubmitStatus(null);
 
     try {
       await login(values);
@@ -81,6 +84,7 @@ export function useLoginForm() {
       const errorMessage =
         error instanceof Error ? error.message : '로그인에 실패했습니다.';
       setSubmitMessage(errorMessage);
+      setSubmitStatus('error');
       return { ok: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
@@ -92,6 +96,7 @@ export function useLoginForm() {
     errors,
     isSubmitting,
     submitMessage,
+    submitStatus,
     showPassword,
     submitDisabled,
     setShowPassword,

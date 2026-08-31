@@ -10,6 +10,7 @@ function LoginPage() {
     errors,
     isSubmitting,
     submitMessage,
+    submitStatus,
     showPassword,
     submitDisabled,
     setShowPassword,
@@ -41,6 +42,7 @@ function LoginPage() {
         errors={errors}
         isSubmitting={isSubmitting}
         submitMessage={submitMessage}
+        submitStatus={submitStatus}
         showPassword={showPassword}
         submitDisabled={submitDisabled}
         onChange={handleChange}

@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
 import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
 import { MenuManagementPanel } from './components/MenuManagementPanel';
-import { getMenuRows } from './services/menuManagement.service';
+import { fetchMenuRows } from './services/menuManagement.service';
+import type { MenuManagementRow } from './types/menuManagement.types';
 
 type MenuManagementPageProps = {
   selectedModule: ModuleItem;
@@ -19,6 +21,11 @@ export function MenuManagementPage({
 }: MenuManagementPageProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const [menus, setMenus] = useState<MenuManagementRow[]>([]);
+
+  useEffect(() => {
+    fetchMenuRows().then(setMenus);
+  }, []);
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -50,7 +57,7 @@ export function MenuManagementPage({
           {content.description}
         </Typography>
       </Box>
-      <MenuManagementPanel menus={getMenuRows()} />
+      <MenuManagementPanel menus={menus} />
     </Box>
   );
 }
