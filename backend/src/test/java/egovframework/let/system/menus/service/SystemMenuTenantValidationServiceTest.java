@@ -8,7 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ class SystemMenuTenantValidationServiceTest {
         SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of());
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.emptyList());
         when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -44,7 +45,7 @@ class SystemMenuTenantValidationServiceTest {
         SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of(module(11L)));
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(11L)));
         when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -59,7 +60,7 @@ class SystemMenuTenantValidationServiceTest {
         SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of(module(MODULE_ID)));
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(MODULE_ID)));
         when(menuDAO.selectMenuById(anyMap())).thenReturn(menu(20L, 11L));
         when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
 
@@ -76,7 +77,7 @@ class SystemMenuTenantValidationServiceTest {
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
         when(menuDAO.selectMenuById(anyMap())).thenReturn(menu(30L, MODULE_ID), menu(20L, 11L));
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of(module(MODULE_ID)));
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(MODULE_ID)));
         when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -92,7 +93,7 @@ class SystemMenuTenantValidationServiceTest {
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
         when(menuDAO.selectMenuById(anyMap())).thenReturn(menu(30L, MODULE_ID));
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of(module(11L)));
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(11L)));
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
                 () -> service.updateMenu(TENANT_ID, 30L, request(MODULE_ID, null)));
@@ -106,11 +107,11 @@ class SystemMenuTenantValidationServiceTest {
         SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
         SystemModuleService moduleService = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
-        when(moduleService.listModules(TENANT_ID)).thenReturn(List.of(module(MODULE_ID)));
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(MODULE_ID)));
         when(menuDAO.selectMenuById(anyMap())).thenReturn(menu(20L, MODULE_ID), menu(31L, MODULE_ID));
         when(menuDAO.insertMenu(anyMap())).thenReturn(31L);
         when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
-        when(menuDAO.selectMenuPermissionCodes(31L)).thenReturn(List.of());
+        when(menuDAO.selectMenuPermissionCodes(31L)).thenReturn(Collections.emptyList());
 
         service.createMenu(TENANT_ID, request(MODULE_ID, 20L));
 

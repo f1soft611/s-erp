@@ -52,6 +52,7 @@ type GridRowProps<T extends object> = {
     column: F1GridColumn<T>,
   ) => { side: 'left' | 'right'; offset: number } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
+  showCheckbox?: boolean;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -91,6 +92,7 @@ export function GridRow<T extends object>({
   getMerged,
   getPinOffset,
   cellAdornment,
+  showCheckbox = true,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
     startY: number;
@@ -148,35 +150,37 @@ export function GridRow<T extends object>({
       aria-selected={isSelected}
       sx={{ display: 'contents' }}
     >
-      <Box
-        sx={{
-          gridColumn: 1,
-          gridRow: rowIndex + 1,
-          display: 'flex',
-          justifyContent: 'center',
-          borderTop: 1,
-          borderColor: 'divider',
-          position: 'sticky',
-          left: 0,
-          zIndex: 3,
-          backgroundColor: (theme) =>
-            isSelected
-              ? theme.palette.mode === 'dark'
-                ? 'rgb(30, 48, 80)'
-                : 'rgb(232, 238, 252)'
-              : theme.palette.background.paper,
-        }}
-      >
-        <Checkbox
-          size="small"
-          aria-label={`${rowId} 행 선택`}
-          checked={isSelected}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSetRowSelection(rowId, !isSelected);
+      {showCheckbox ? (
+        <Box
+          sx={{
+            gridColumn: 1,
+            gridRow: rowIndex + 1,
+            display: 'flex',
+            justifyContent: 'center',
+            borderTop: 1,
+            borderColor: 'divider',
+            position: 'sticky',
+            left: 0,
+            zIndex: 3,
+            backgroundColor: (theme) =>
+              isSelected
+                ? theme.palette.mode === 'dark'
+                  ? 'rgb(30, 48, 80)'
+                  : 'rgb(232, 238, 252)'
+                : theme.palette.background.paper,
           }}
-        />
-      </Box>
+        >
+          <Checkbox
+            size="small"
+            aria-label={`${rowId} 행 선택`}
+            checked={isSelected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSetRowSelection(rowId, !isSelected);
+            }}
+          />
+        </Box>
+      ) : null}
       {columns.map((column, columnIndex) => {
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);

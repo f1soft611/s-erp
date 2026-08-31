@@ -54,6 +54,7 @@ type GridHeaderProps<T extends object> = {
   columnWidths: Record<string, number>;
   resizableColumns?: boolean;
   minColumnWidth?: number;
+  showCheckbox?: boolean;
   onResizeColumn: (column: F1GridColumn<T>, nextWidth: number) => void;
   getColumnCheckboxState: (column: F1GridColumn<T>) => {
     allChecked: boolean;
@@ -90,6 +91,7 @@ export function GridHeader<T extends object>({
   columnWidths,
   resizableColumns = true,
   minColumnWidth = 50,
+  showCheckbox = true,
   onResizeColumn,
   getColumnCheckboxState,
   onToggleAllRows,
@@ -215,7 +217,7 @@ export function GridHeader<T extends object>({
         role="row"
         sx={{
           display: 'grid',
-          gridTemplateColumns: `44px ${columns
+          gridTemplateColumns: `${showCheckbox ? '44px ' : ''}${columns
             .map((column) =>
               getGridColumnTrack(column, columnWidths[String(column.field)]),
             )
@@ -226,28 +228,30 @@ export function GridHeader<T extends object>({
           isolation: 'isolate',
         }}
       >
-        <Box
-          role="columnheader"
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            position: 'sticky',
-            left: 0,
-            zIndex: 4,
-            backgroundColor: (theme) =>
-              theme.palette.mode === 'dark'
-                ? 'rgb(28, 36, 50)'
-                : 'rgb(232, 236, 244)',
-          }}
-        >
-          <Checkbox
-            size="small"
-            aria-label="전체 행 선택"
-            checked={selectedAll}
-            indeterminate={selectedIds.length > 0 && !selectedAll}
-            onChange={onToggleAllRows}
-          />
-        </Box>
+        {showCheckbox ? (
+          <Box
+            role="columnheader"
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              position: 'sticky',
+              left: 0,
+              zIndex: 4,
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgb(28, 36, 50)'
+                  : 'rgb(232, 236, 244)',
+            }}
+          >
+            <Checkbox
+              size="small"
+              aria-label="전체 행 선택"
+              checked={selectedAll}
+              indeterminate={selectedIds.length > 0 && !selectedAll}
+              onChange={onToggleAllRows}
+            />
+          </Box>
+        ) : null}
         {columns.map((column) => {
           const checkboxState = getColumnCheckboxState(column);
           const pinSide = getGridColumnPinSide(pinnedFields, column);

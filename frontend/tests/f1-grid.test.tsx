@@ -1285,6 +1285,31 @@ describe('F1-GRID filtering', () => {
 });
 
 describe('F1-GRID column pin', () => {
+  it('initially pins columns declared with the column pinned option', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { ...columns[0], pinned: 'left' },
+          columns[1],
+          { ...columns[2], pinned: 'right' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: /코드/ })).toHaveStyle({
+      position: 'sticky',
+      left: '44px',
+    });
+    expect(screen.getByRole('columnheader', { name: /사용 여부/ })).toHaveStyle(
+      {
+        position: 'sticky',
+        right: '0px',
+      },
+    );
+  });
+
   it('reorders columns into left-pinned, unpinned, and right-pinned groups', () => {
     const pinned = new Map<string, 'left' | 'right'>([
       ['status', 'left'],

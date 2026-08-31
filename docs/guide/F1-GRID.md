@@ -725,6 +725,15 @@ none
 
 컬럼 표시 여부는 별도의 컬럼 관리 버튼을 추가하지 않고 각 컬럼 헤더 메뉴에서 관리한다. 헤더 메뉴의 `컬럼 목록` 하위 메뉴는 전체 컬럼을 체크박스로 제공하며, 체크 해제로 숨기고 다시 체크해 표시한다. 마지막으로 표시된 컬럼은 숨길 수 없다.
 
+초기 렌더링부터 특정 컬럼을 고정하려면 컬럼 옵션에 `pinned`를 지정한다. 이후 사용자는 기존 헤더 메뉴에서 고정 위치를 변경하거나 해제할 수 있다.
+
+```typescript
+const columns: F1GridColumn<Item>[] = [
+  { field: 'itemCode', headerName: '품목코드', width: 130, pinned: 'left' },
+  { field: 'amount', headerName: '금액', width: 140, pinned: 'right' },
+];
+```
+
 ---
 
 # 16. Grid Layout 저장
@@ -929,6 +938,19 @@ ERP 메뉴, 조직, BOM 등에 사용할 수 있도록 Tree 구조를 확장 가
 ```
 
 Tree Grid는 일반 Grid와 별도의 컴포넌트로 분리하지 않고 Core Grid 위에서 확장 가능하도록 설계한다.
+
+초기 렌더링 시 모든 부모 노드를 펼치려면 `defaultExpandAll` 옵션을 사용한다. 기존처럼 세부 초기 펼침 상태가 필요하면 `defaultExpanded="all"`, `defaultExpanded="root"`, 또는 특정 row id 배열을 사용할 수 있다.
+
+```tsx
+<F1Tree
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  parentKey="parentId"
+  treeColumn="name"
+  defaultExpandAll
+/>
+```
 
 ---
 

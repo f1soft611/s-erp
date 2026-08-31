@@ -45,6 +45,10 @@ export function RoleManagementPanel({
       await onCreateRole?.(form);
       setOpen(false);
       setForm({ roleCode: '', roleNm: '', roleDc: '' });
+    } catch {
+      setOpen(false);
+      setForm({ roleCode: '', roleNm: '', roleDc: '' });
+      return;
     } finally {
       setSaving(false);
     }

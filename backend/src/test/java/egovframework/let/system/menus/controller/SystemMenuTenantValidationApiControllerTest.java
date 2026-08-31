@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
+import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class SystemMenuTenantValidationApiControllerTest {
         LoginVO user = new LoginVO();
         user.setTenantId(1L);
         user.setRoleCode("PLATFORM_ADMIN");
-        adminAuthentication = new UsernamePasswordAuthenticationToken(user, null, List.of());
+        adminAuthentication = new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
     }
 
     @Test

@@ -317,6 +317,27 @@ describe('menu management API integration', () => {
 });
 
 describe('MenuManagementPanel F1Tree workflow', () => {
+  it('notifies its page after saving menu changes', async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const onSaveSuccess = vi.fn();
+    apiMocks.apiPut.mockResolvedValue({});
+    render(
+      <MenuManagementPanel
+        menus={moduleTwoRows}
+        selectedModule={modules[1]}
+        permissions={permissions}
+        onRefresh={onRefresh}
+        onSaveSuccess={onSaveSuccess}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('엑셀 10'));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledWith(2, true));
+    expect(onSaveSuccess).toHaveBeenCalledWith('메뉴 변경사항을 저장했습니다.');
+  });
+
   it('saves permissions for an edited leaf after its ancestor is collapsed', async () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined);
     const nestedRows: MenuManagementRow[] = [

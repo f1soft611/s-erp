@@ -10,6 +10,14 @@ backend/backend-prod
 *.local.yaml
 backend/src/main/resources/application-dev.properties
 backend/src/main/resources/application-prod.properties
+backend/target/
+backend/.idea/
+backend/backend-dev
+backend/backend-prod
+
+# Build output and dependencies
+frontend/dist/
+frontend/node_modules/
 
 # Private keys, certificates, and credential exports
 *.pem

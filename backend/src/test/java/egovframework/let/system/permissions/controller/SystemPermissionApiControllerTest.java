@@ -5,7 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class SystemPermissionApiControllerTest {
 
     @Test
         void listPermissionsReturnsCompleteActivePermissionObjectsInSortOrderForAdmin() throws Exception {
-        when(systemPermissionService.listActivePermissions()).thenReturn(List.of(
+        when(systemPermissionService.listActivePermissions()).thenReturn(Arrays.asList(
                 new SystemPermissionVO(1L, "READ", "조회", 10),
             new SystemPermissionVO(3L, "CREATE", "등록", 20),
             new SystemPermissionVO(5L, "EXCEL", "엑셀", 20)));
@@ -81,7 +82,7 @@ class SystemPermissionApiControllerTest {
         LoginVO user = new LoginVO();
         user.setTenantId(1L);
         user.setRoleCode(roleCode);
-        return new UsernamePasswordAuthenticationToken(user, null, List.of());
+        return new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
     }
 
     private static class AuthenticationPrincipalResolver implements HandlerMethodArgumentResolver {

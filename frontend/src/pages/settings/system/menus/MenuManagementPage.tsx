@@ -14,6 +14,8 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
+import { useNotification } from '../../../../shared/context/NotificationContext';
 import type {
   ModuleItem,
   PageContent,
@@ -42,6 +44,7 @@ export function MenuManagementPage({
   content,
 }: MenuManagementPageProps) {
   const theme = useTheme();
+  const { showSuccess } = useNotification();
   const isDark = theme.palette.mode === 'dark';
   const [menus, setMenus] = useState<MenuManagementRow[]>([]);
   const [modules, setModules] = useState<MenuModuleOption[]>([]);
@@ -193,7 +196,12 @@ export function MenuManagementPage({
         <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           <FormControl
             size="small"
-            sx={{ minWidth: 220, maxWidth: '100%', flex: '0 1 280px' }}
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              minWidth: { sm: 220 },
+              maxWidth: '100%',
+              flex: '0 1 280px',
+            }}
           >
             <InputLabel id="menu-module-label">모듈 선택</InputLabel>
             <Select
@@ -214,11 +222,7 @@ export function MenuManagementPage({
           </FormControl>
         </Box>
       </Box>
-      {error ? (
-        <Typography role="alert" color="error" sx={{ px: 3, pt: 2 }}>
-          {error}
-        </Typography>
-      ) : null}
+      <PageMessageArea message={error} onClose={() => setError('')} />
       <MenuManagementPanel
         key={selectedModuleId ?? 'none'}
         menus={menus}
@@ -227,6 +231,8 @@ export function MenuManagementPage({
         onRefresh={requestRefresh}
         onDirtyChange={setDirty}
         onSavingChange={setSaving}
+        onSaveSuccess={showSuccess}
+        onError={setError}
       />
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>저장하지 않은 변경사항</DialogTitle>

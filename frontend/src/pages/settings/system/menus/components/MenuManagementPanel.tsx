@@ -37,6 +37,8 @@ type MenuManagementPanelProps = {
   ) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   onSavingChange?: (saving: boolean) => void;
+  onSaveSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
 };
 
 export function MenuManagementPanel({
@@ -46,6 +48,8 @@ export function MenuManagementPanel({
   onRefresh,
   onDirtyChange,
   onSavingChange,
+  onSaveSuccess,
+  onError,
 }: MenuManagementPanelProps) {
   const treeRef = useRef<F1TreeRef<MenuManagementRow>>(null);
   const saveCheckpointRef = useRef<MenuSaveCheckpoint | undefined>(undefined);
@@ -68,19 +72,36 @@ export function MenuManagementPanel({
     );
   }, [changes, onDirtyChange]);
 
+  function notifyError(nextMessage: string) {
+    if (onError) {
+      onError(nextMessage);
+      return;
+    }
+    setMessage(nextMessage);
+  }
+
+  function notifySaveSuccess(nextMessage: string) {
+    if (onSaveSuccess) {
+      onSaveSuccess(nextMessage);
+      return;
+    }
+    setMessage(nextMessage);
+  }
+
   const columns: F1GridColumn<MenuManagementRow>[] = [
+    {
+      field: 'name',
+      headerName: '메뉴명',
+      width: 220,
+      editable: true,
+      pinned: 'left',
+    },
     {
       field: 'code',
       headerName: '코드',
       width: 90,
       editable: true,
       mergeRows: true,
-    },
-    {
-      field: 'name',
-      headerName: '메뉴명',
-      width: 220,
-      editable: true,
     },
     {
       field: 'path',
@@ -164,7 +185,7 @@ export function MenuManagementPanel({
     if (!selectedModule || !treeRef.current?.validate() || saving) return;
     setSaving(true);
     onSavingChange?.(true);
-    setMessage('');
+    notifyError('');
     try {
       const currentChanges = treeRef.current.getChanges();
       const currentRows = treeRef.current.getActiveRows();
@@ -204,9 +225,9 @@ export function MenuManagementPanel({
       completedPermissionRowIdsRef.current.clear();
       setChanges({ insertedRows: [], updatedRows: [], deletedRows: [] });
       setTreeKey((current) => current + 1);
-      setMessage('메뉴 변경사항을 저장했습니다.');
+      notifySaveSuccess('메뉴 변경사항을 저장했습니다.');
     } catch (error) {
-      setMessage(
+      notifyError(
         error instanceof Error ? error.message : '메뉴 저장에 실패했습니다.',
       );
     } finally {
@@ -217,9 +238,10 @@ export function MenuManagementPanel({
 
   function handleRefresh() {
     if (!selectedModule) return;
+    notifyError('');
     const refresh = onRefresh?.(selectedModule.moduleId);
     void refresh?.catch((error) => {
-      setMessage(
+      notifyError(
         error instanceof Error
           ? error.message
           : '메뉴 목록을 불러오지 못했습니다.',
@@ -316,7 +338,8 @@ export function MenuManagementPanel({
             rowKey="id"
             parentKey="parentMenuId"
             treeColumn="name"
-            defaultExpanded="all"
+            defaultExpandAll
+            showCheckbox
             getRowOrder={(row) => row.order}
             columnLine
             ariaLabel="F1-TREE 메뉴 관리"
@@ -326,7 +349,7 @@ export function MenuManagementPanel({
               setHasSelectedTreeRow(rowIds.length > 0)
             }
             onDeleteBlocked={() =>
-              setMessage('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
+              notifyError('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
             }
           />
           <Typography

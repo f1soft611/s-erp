@@ -3,7 +3,6 @@ import {
   apiPost,
   apiPut,
 } from '../../../../../shared/services/apiClient';
-import { roleRows as mockRoleRows } from '../data/roleManagement.data';
 import type { RoleManagementRow } from '../types/roleManagement.types';
 
 interface SystemRoleVO {
@@ -38,18 +37,11 @@ const toRow = (role: SystemRoleVO): RoleManagementRow => ({
   },
 });
 
-/**
- * 실제 API에서 역할 목록을 조회한다. 실패 시 로컬 목업으로 대체한다.
- */
 export async function fetchRoleRows(): Promise<RoleManagementRow[]> {
-  try {
-    const result = await apiGet<{ resultList: SystemRoleVO[] }>(
-      '/api/v1/system/roles',
-    );
-    return result.resultList.map(toRow);
-  } catch {
-    return mockRoleRows;
-  }
+  const result = await apiGet<{ resultList: SystemRoleVO[] }>(
+    '/api/v1/system/roles',
+  );
+  return result.resultList.map(toRow);
 }
 
 export async function createRole(payload: RoleSavePayload): Promise<void> {
@@ -61,9 +53,4 @@ export async function updateRole(
   payload: RoleSavePayload,
 ): Promise<void> {
   await apiPut(`/api/v1/system/roles/${roleId}`, { useAt: 'Y', ...payload });
-}
-
-/** @deprecated 로컬 목업 동기 조회. 실제 데이터는 fetchRoleRows를 사용한다. */
-export function getRoleRows(): RoleManagementRow[] {
-  return mockRoleRows;
 }

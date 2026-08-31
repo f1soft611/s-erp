@@ -169,6 +169,7 @@ export function F1GridTestPage({
       headerName: '품목코드',
       type: 'code',
       width: 130,
+      pinned: 'left',
       headerAlign: 'center',
       editable: true,
       required: true,

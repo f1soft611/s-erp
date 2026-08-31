@@ -75,6 +75,7 @@ function F1GridInner<T extends object>(
     resizableRows = true,
     resizableColumns = true,
     minColumnWidth = 50,
+    showCheckbox = true,
     createRow,
     createDuplicate,
     onChangesChange,
@@ -116,7 +117,12 @@ function F1GridInner<T extends object>(
   const [sortState, setSortState] = useState<F1GridSort<T>[]>([]);
   const [filterState, setFilterState] = useState<F1GridFilter<T>[]>([]);
   const [pinnedFields, setPinnedFields] = useState<Map<string, F1GridPinSide>>(
-    () => new Map(),
+    () =>
+      new Map(
+        columns
+          .filter((column) => column.pinned)
+          .map((column) => [String(column.field), column.pinned!]),
+      ),
   );
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
@@ -759,6 +765,7 @@ function F1GridInner<T extends object>(
         columnWidths={columnWidths}
         resizableColumns={resizableColumns}
         minColumnWidth={minColumnWidth}
+        showCheckbox={showCheckbox}
         onResizeColumn={handleResizeColumn}
         getColumnCheckboxState={getColumnCheckboxState}
         onToggleAllRows={() => {
@@ -830,6 +837,7 @@ function F1GridInner<T extends object>(
         onUpdateRowHeight={updateRowHeight}
         getPinOffset={getPinOffset}
         cellAdornment={cellAdornment}
+        showCheckbox={showCheckbox}
       />
     </Box>
   );

@@ -86,6 +86,74 @@ describe('F1Tree interaction', () => {
     { field: 'name' as const, headerName: '메뉴명', editable: true },
   ];
 
+  it('expands every parent on first render when defaultExpandAll is enabled', () => {
+    render(
+      <F1Tree
+        rows={[
+          ...rows,
+          {
+            id: 'grandchild',
+            parentId: 'child',
+            order: 1,
+            name: 'Grand child',
+            hasChildren: false,
+            allowed: false,
+          },
+        ]}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 초기 전체 펼침 테스트"
+        defaultExpanded="root"
+        defaultExpandAll
+      />,
+    );
+
+    expect(screen.getByRole('gridcell', { name: 'Child' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Grand child' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Root 접기' })).toBeVisible();
+  });
+
+  it('expands every parent when rows load after the first render', () => {
+    const { rerender } = render(
+      <F1Tree
+        rows={[]}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 지연 로드 전체 펼침 테스트"
+        defaultExpandAll
+      />,
+    );
+
+    rerender(
+      <F1Tree
+        rows={[
+          ...rows,
+          {
+            id: 'grandchild',
+            parentId: 'child',
+            order: 1,
+            name: 'Grand child',
+            hasChildren: false,
+            allowed: false,
+          },
+        ]}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 지연 로드 전체 펼침 테스트"
+        defaultExpandAll
+      />,
+    );
+
+    expect(screen.getByRole('gridcell', { name: 'Child' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Grand child' })).toBeVisible();
+  });
+
   it('toggles descendants and expands a parent before adding a child', () => {
     const ref = createRef<F1TreeRef<TreeRow>>();
     render(
@@ -190,6 +258,25 @@ describe('F1Tree interaction', () => {
         parentName: 'Root',
       }),
     );
+  });
+
+  it('hides the row selection checkbox column when the checkbox option is disabled', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 체크박스 옵션 테스트"
+        defaultExpanded="all"
+        showCheckbox={false}
+      />,
+    );
+
+    expect(screen.queryByLabelText('root 행 선택')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('전체 행 선택')).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Root' })).toBeVisible();
   });
 
   it('does not delete a selected node that has descendants', () => {

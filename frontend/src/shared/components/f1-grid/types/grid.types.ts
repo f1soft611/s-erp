@@ -46,6 +46,7 @@ export type F1GridColumn<T extends object> = {
   mergeRows?: boolean;
   headerCheckbox?: boolean;
   hidden?: boolean;
+  pinned?: F1GridPinSide;
 };
 
 export type F1GridChanges<T> = {
@@ -100,6 +101,7 @@ export type F1GridProps<T extends object> = {
   resizableRows?: boolean;
   resizableColumns?: boolean;
   minColumnWidth?: number;
+  showCheckbox?: boolean;
   createRow?: () => T;
   createDuplicate?: (row: T) => T;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
@@ -132,6 +134,7 @@ export type F1TreeProps<T extends object> = Omit<
 > & {
   parentKey: keyof T;
   treeColumn: keyof T;
+  defaultExpandAll?: boolean;
   defaultExpanded?: 'all' | 'root' | F1GridRowId[];
   getRowOrder?: (row: T) => number;
   onDeleteBlocked?: (rowIds: F1GridRowId[]) => void;

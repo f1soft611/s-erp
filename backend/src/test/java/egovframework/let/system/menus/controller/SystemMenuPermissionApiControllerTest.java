@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -65,7 +67,7 @@ class SystemMenuPermissionApiControllerTest {
     void replaceMenuPermissionsReturnsSavedCodesForAdmin() throws Exception {
         SystemMenuVO menu = new SystemMenuVO();
         menu.setMenuId(11L);
-        menu.setPermissionCodes(List.of("READ", "CREATE"));
+        menu.setPermissionCodes(Arrays.asList("READ", "CREATE"));
         when(systemMenuService.replaceMenuPermissions(
                 org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.eq(11L),
@@ -122,8 +124,8 @@ class SystemMenuPermissionApiControllerTest {
     void listMenusReturnsPermissionCodesForRequestedModule() throws Exception {
         SystemMenuVO menu = new SystemMenuVO();
         menu.setMenuId(11L);
-        menu.setPermissionCodes(List.of("READ", "EXCEL"));
-        when(systemMenuService.listMenus(eq(1L), eq(2L))).thenReturn(List.of(menu));
+        menu.setPermissionCodes(Arrays.asList("READ", "EXCEL"));
+        when(systemMenuService.listMenus(eq(1L), eq(2L))).thenReturn(Collections.singletonList(menu));
 
         mockMvc.perform(get("/api/v1/system/menus")
                 .param("moduleId", "2")
@@ -140,7 +142,7 @@ class SystemMenuPermissionApiControllerTest {
         LoginVO user = new LoginVO();
         user.setTenantId(1L);
         user.setRoleCode(roleCode);
-        return new UsernamePasswordAuthenticationToken(user, null, List.of());
+        return new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
     }
 
     private static class AuthenticationPrincipalResolver implements HandlerMethodArgumentResolver {

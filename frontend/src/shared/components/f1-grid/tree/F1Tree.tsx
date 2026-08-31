@@ -3,7 +3,9 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Box, IconButton } from '@mui/material';
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type ForwardedRef,
@@ -24,6 +26,7 @@ function F1TreeInner<T extends object>(
   {
     parentKey,
     treeColumn,
+    defaultExpandAll,
     defaultExpanded = 'all',
     getRowOrder,
     onDeleteBlocked,
@@ -38,22 +41,41 @@ function F1TreeInner<T extends object>(
     rows: [],
     metaById: {},
   });
-  const allParentIds = rows
-    .filter((row) => rows.some((child) => child[parentKey] === row[rowKey]))
-    .map((row) => getGridRowId(row, rowKey));
-  const rootIds = rows
-    .filter((row) => row[parentKey] === null || row[parentKey] === undefined)
-    .map((row) => getGridRowId(row, rowKey));
+  const allParentIds = useMemo(
+    () =>
+      rows
+        .filter((row) => rows.some((child) => child[parentKey] === row[rowKey]))
+        .map((row) => getGridRowId(row, rowKey)),
+    [parentKey, rowKey, rows],
+  );
+  const rootIds = useMemo(
+    () =>
+      rows
+        .filter(
+          (row) => row[parentKey] === null || row[parentKey] === undefined,
+        )
+        .map((row) => getGridRowId(row, rowKey)),
+    [parentKey, rowKey, rows],
+  );
   const [expandedIds, setExpandedIds] = useState<Set<F1GridRowId>>(
     () =>
       new Set(
-        defaultExpanded === 'all'
+        defaultExpandAll || defaultExpanded === 'all'
           ? allParentIds
           : defaultExpanded === 'root'
             ? rootIds
             : defaultExpanded,
       ),
   );
+
+  useEffect(() => {
+    if (!defaultExpandAll || allParentIds.length === 0) return;
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      allParentIds.forEach((rowId) => next.add(rowId));
+      return next;
+    });
+  }, [allParentIds, defaultExpandAll]);
 
   const projectRows = (gridRows: T[]) => {
     const projection = projectTreeRows(
