@@ -5,6 +5,10 @@ import {
   CardContent,
   Checkbox,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   Stack,
   Table,
@@ -12,15 +16,44 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
 import type { RoleManagementRow } from '../types/roleManagement.types';
+import type { RoleSavePayload } from '../services/roleManagement.service';
 
 type RoleManagementPanelProps = {
   roles: RoleManagementRow[];
+  onCreateRole?: (payload: RoleSavePayload) => Promise<void> | void;
 };
 
-export function RoleManagementPanel({ roles }: RoleManagementPanelProps) {
+export function RoleManagementPanel({
+  roles,
+  onCreateRole,
+}: RoleManagementPanelProps) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ roleCode: '', roleNm: '', roleDc: '' });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.roleCode.trim() || !form.roleNm.trim()) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await onCreateRole?.(form);
+      setOpen(false);
+      setForm({ roleCode: '', roleNm: '', roleDc: '' });
+    } catch {
+      setOpen(false);
+      setForm({ roleCode: '', roleNm: '', roleDc: '' });
+      return;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Box
       sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 2, p: 3 }}
@@ -44,7 +77,11 @@ export function RoleManagementPanel({ roles }: RoleManagementPanelProps) {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               역할 목록
             </Typography>
-            <Button variant="contained" size="small">
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => setOpen(true)}
+            >
               권한 등록
             </Button>
           </Box>
@@ -94,7 +131,7 @@ export function RoleManagementPanel({ roles }: RoleManagementPanelProps) {
                 선택 역할
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                ADMIN
+                {roles[0]?.name ?? 'ADMIN'}
               </Typography>
             </Box>
             <Box>
@@ -128,6 +165,47 @@ export function RoleManagementPanel({ roles }: RoleManagementPanelProps) {
           </Stack>
         </CardContent>
       </Card>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>역할 등록</DialogTitle>
+        <DialogContent
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}
+        >
+          <TextField
+            label="역할 코드"
+            size="small"
+            value={form.roleCode}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, roleCode: e.target.value }))
+            }
+            autoFocus
+          />
+          <TextField
+            label="역할명"
+            size="small"
+            value={form.roleNm}
+            onChange={(e) => setForm((f) => ({ ...f, roleNm: e.target.value }))}
+          />
+          <TextField
+            label="설명"
+            size="small"
+            multiline
+            minRows={2}
+            value={form.roleDc}
+            onChange={(e) => setForm((f) => ({ ...f, roleDc: e.target.value }))}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>취소</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>
+            저장
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

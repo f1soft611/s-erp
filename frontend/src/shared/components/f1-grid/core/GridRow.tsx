@@ -1,4 +1,10 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -17,6 +23,14 @@ type GridRowProps<T extends object> = {
   resizableRows: boolean;
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
+  selectedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
+  copiedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
   draftValue: string;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -26,6 +40,16 @@ type GridRowProps<T extends object> = {
   onSelectRow: (rowId: F1GridRowId, event: MouseEvent<HTMLElement>) => void;
   onSetRowSelection: (rowId: F1GridRowId, checked: boolean) => void;
   onSetFocusedCell: (cell: { rowId: F1GridRowId; columnIndex: number }) => void;
+  onCellSelectionStart: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionDrag: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionEnd: () => void;
+  onCommitEdit: () => void;
   onStartEdit: (rowId: F1GridRowId, columnIndex: number) => void;
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -45,6 +69,8 @@ type GridRowProps<T extends object> = {
   getPinOffset: (
     column: F1GridColumn<T>,
   ) => { side: 'left' | 'right'; offset: number } | undefined;
+  cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
+  showCheckbox?: boolean;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -65,11 +91,19 @@ export function GridRow<T extends object>({
   resizableRows,
   focusedCell,
   editingCell,
+  selectedCellRange,
+  copiedCellRange,
   draftValue,
   mergeInfoByColumn,
+  visibleRows,
+  rowKey,
   onSelectRow,
   onSetRowSelection,
   onSetFocusedCell,
+  onCellSelectionStart,
+  onCellSelectionDrag,
+  onCellSelectionEnd,
+  onCommitEdit,
   onStartEdit,
   onDraftChange,
   onKeyDown,
@@ -83,6 +117,8 @@ export function GridRow<T extends object>({
   getMergeEditing,
   getMerged,
   getPinOffset,
+  cellAdornment,
+  showCheckbox = true,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
     startY: number;
@@ -140,40 +176,92 @@ export function GridRow<T extends object>({
       aria-selected={isSelected}
       sx={{ display: 'contents' }}
     >
-      <Box
-        sx={{
-          gridColumn: 1,
-          gridRow: rowIndex + 1,
-          display: 'flex',
-          justifyContent: 'center',
-          borderTop: 1,
-          borderColor: 'divider',
-          position: 'sticky',
-          left: 0,
-          zIndex: 3,
-          backgroundColor: (theme) =>
-            isSelected
-              ? theme.palette.mode === 'dark'
-                ? 'rgb(30, 48, 80)'
-                : 'rgb(232, 238, 252)'
-              : theme.palette.background.paper,
-        }}
-      >
-        <Checkbox
-          size="small"
-          aria-label={`${rowId} 행 선택`}
-          checked={isSelected}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSetRowSelection(rowId, !isSelected);
+      {showCheckbox ? (
+        <Box
+          sx={{
+            gridColumn: 1,
+            gridRow: rowIndex + 1,
+            display: 'flex',
+            justifyContent: 'center',
+            borderTop: 1,
+            borderBottom: rowIndex === visibleRows.length - 1 ? 1 : 0,
+            borderColor: 'divider',
+            position: 'sticky',
+            left: 0,
+            zIndex: 3,
+            backgroundColor: (theme) =>
+              isSelected
+                ? theme.palette.mode === 'dark'
+                  ? 'rgb(30, 48, 80)'
+                  : 'rgb(232, 238, 252)'
+                : theme.palette.background.paper,
           }}
-        />
-      </Box>
+        >
+          <Checkbox
+            size="small"
+            aria-label={`${rowId} 행 선택`}
+            checked={isSelected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSetRowSelection(rowId, !isSelected);
+            }}
+          />
+        </Box>
+      ) : null}
       {columns.map((column, columnIndex) => {
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);
         const focused = isSameCell(focusedCell, cell);
-        const value = row[column.field];
+        const isLastRow = rowIndex === visibleRows.length - 1;
+        const dragRowStartIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(selectedCellRange?.start.rowId ?? rowId),
+        );
+        const dragRowEndIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(selectedCellRange?.end.rowId ?? rowId),
+        );
+        const copyRowStartIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(copiedCellRange?.start.rowId ?? rowId),
+        );
+        const copyRowEndIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(copiedCellRange?.end.rowId ?? rowId),
+        );
+        const selected =
+          !!selectedCellRange &&
+          rowIndex >= Math.min(dragRowStartIndex, dragRowEndIndex) &&
+          rowIndex <= Math.max(dragRowStartIndex, dragRowEndIndex) &&
+          columnIndex >=
+            Math.min(
+              selectedCellRange.start.columnIndex,
+              selectedCellRange.end.columnIndex,
+            ) &&
+          columnIndex <=
+            Math.max(
+              selectedCellRange.start.columnIndex,
+              selectedCellRange.end.columnIndex,
+            );
+        const copied =
+          !!copiedCellRange &&
+          rowIndex >= Math.min(copyRowStartIndex, copyRowEndIndex) &&
+          rowIndex <= Math.max(copyRowStartIndex, copyRowEndIndex) &&
+          columnIndex >=
+            Math.min(
+              copiedCellRange.start.columnIndex,
+              copiedCellRange.end.columnIndex,
+            ) &&
+          columnIndex <=
+            Math.max(
+              copiedCellRange.start.columnIndex,
+              copiedCellRange.end.columnIndex,
+            );
+        const value = column.getValue?.(row) ?? row[column.field];
         const mergeEditing = getMergeEditing(columnIndex);
         const mergeInfo = mergeEditing
           ? undefined
@@ -190,16 +278,28 @@ export function GridRow<T extends object>({
             columnLine={columnLine}
             focused={focused}
             editing={editing}
+            selected={Boolean(selected || copied)}
+            copied={Boolean(copied)}
             merged={merged}
             mergeInfo={mergeInfo}
             rowHeight={rowHeight}
             defaultRowHeight={defaultRowHeight}
             rowIndex={rowIndex}
+            isLastRow={isLastRow}
             draftValue={draftValue}
             onFocus={() => {
               onSetFocusedCell(cell);
               onSelectRow(rowId, {} as MouseEvent<HTMLElement>);
             }}
+            onMouseDown={() => {
+              onSetFocusedCell(cell);
+              onCellSelectionStart(cell);
+            }}
+            onMouseEnter={() => {
+              if (selectedCellRange) onCellSelectionDrag(cell);
+            }}
+            onMouseUp={onCellSelectionEnd}
+            onBlur={onCommitEdit}
             onDoubleClick={() => onStartEdit(rowId, columnIndex)}
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}
@@ -209,7 +309,12 @@ export function GridRow<T extends object>({
               onStopEdit();
             }}
             onCheckboxChange={(checked) => {
-              onUpdateCell(column.field, checked);
+              const patch = column.onValueChange?.(row, checked);
+              if (patch) {
+                onUpdateRow(patch);
+              } else {
+                onUpdateCell(column.field, checked);
+              }
             }}
             onCodePick={() => {
               const applyPatch = (patch: Partial<T>) => {
@@ -225,6 +330,7 @@ export function GridRow<T extends object>({
               if (editing) onEditingCellRef(node);
             }}
             pinOffset={getPinOffset(column)}
+            adornment={cellAdornment?.(row, column)}
           />
         );
       })}

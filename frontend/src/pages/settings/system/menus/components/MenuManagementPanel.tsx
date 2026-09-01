@@ -3,53 +3,209 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
-  Chip,
-  FormControlLabel,
-  Stack,
-  TextField,
+  IconButton,
   Typography,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import AddIcon from '@mui/icons-material/Add';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
+import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import {
-  F1Grid,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
+import {
+  F1Tree,
   type F1GridChanges,
   type F1GridColumn,
-  type F1GridRef,
+  type F1TreeRef,
 } from '../../../../../shared/components/f1-grid';
+import {
+  DEFAULT_PERMISSION_GROUPS,
+  hasPermissionGroup,
+  togglePermissionGroup,
+} from '../../../../../shared/components/PermissionGroup';
+import {
+  createMenuSaveCheckpoint,
+  replaceMenuPermissions,
+  saveMenuChanges,
+  type MenuSaveCheckpoint,
+} from '../services/menuManagement.service';
 import type { MenuManagementRow } from '../types/menuManagement.types';
+import type {
+  MenuModuleOption,
+  MenuPermissionDefinition,
+} from '../types/menuManagement.types';
 
-type MenuManagementPanelProps = { menus: MenuManagementRow[] };
+type MenuManagementPanelProps = {
+  menus: MenuManagementRow[];
+  selectedModule?: MenuModuleOption;
+  permissions: MenuPermissionDefinition[];
+  onRefresh?: (
+    moduleId: number,
+    bypassDirtyConfirmation?: boolean,
+  ) => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
+  onSaveSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
+};
 
-export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
-  const gridRef = useRef<F1GridRef<MenuManagementRow>>(null);
+export type MenuManagementPanelHandle = {
+  saveCurrentChanges: () => Promise<void>;
+  deleteSelectedRows: () => void;
+  exportCurrentRows: () => void;
+};
+
+export const MenuManagementPanel = forwardRef<
+  MenuManagementPanelHandle,
+  MenuManagementPanelProps
+>(function MenuManagementPanel(
+  {
+    menus,
+    selectedModule,
+    onRefresh,
+    onDirtyChange,
+    onSavingChange,
+    onSaveSuccess,
+    onError,
+  },
+  ref,
+) {
+  const treeRef = useRef<F1TreeRef<MenuManagementRow>>(null);
+  const saveCheckpointRef = useRef<MenuSaveCheckpoint | undefined>(undefined);
+  const completedPermissionRowIdsRef = useRef(new Set<string>());
   const [changes, setChanges] = useState<F1GridChanges<MenuManagementRow>>({
     insertedRows: [],
     updatedRows: [],
     deletedRows: [],
   });
   const [newMenuSequence, setNewMenuSequence] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [hasSelectedTreeRow, setHasSelectedTreeRow] = useState(false);
+  const [treeKey, setTreeKey] = useState(0);
+
+  useImperativeHandle(ref, () => ({
+    saveCurrentChanges: handleSave,
+    deleteSelectedRows: () => {
+      treeRef.current?.deleteSelectedRows();
+    },
+    exportCurrentRows: () => {
+      const rows = treeRef.current?.getActiveRows() ?? [];
+      if (rows.length === 0) return;
+      const headers = columns.map((column) => column.headerName);
+      const csvRows = rows.map((row) =>
+        columns
+          .map((column) => {
+            const value = row[column.field as keyof MenuManagementRow];
+            const stringValue = Array.isArray(value)
+              ? value.join(';')
+              : value == null
+                ? ''
+                : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
+          .join(','),
+      );
+      const content = [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${selectedModule?.moduleName ?? 'menu'}-export.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    },
+  }));
+
+  useEffect(() => {
+    onDirtyChange?.(
+      changes.insertedRows.length > 0 ||
+        changes.updatedRows.length > 0 ||
+        changes.deletedRows.length > 0,
+    );
+  }, [changes, onDirtyChange]);
+
+  function notifyError(nextMessage: string) {
+    if (onError) {
+      onError(nextMessage);
+      return;
+    }
+    setMessage(nextMessage);
+  }
+
+  function notifySaveSuccess(nextMessage: string) {
+    if (onSaveSuccess) {
+      onSaveSuccess(nextMessage);
+      return;
+    }
+    setMessage(nextMessage);
+  }
+
+  const permissionColumns = DEFAULT_PERMISSION_GROUPS.map(
+    ({ key, label, codes }) => ({
+      field: `${key}Permission` as keyof MenuManagementRow,
+      headerName: label,
+      headerGroup: '기본기능',
+      width: 100,
+      type: 'checkbox' as const,
+      editable: (row: MenuManagementRow) => !row.hasChildren,
+      getValue: (row: MenuManagementRow) =>
+        hasPermissionGroup(row.permissionCodes, codes),
+      onValueChange: (row: MenuManagementRow, checked: unknown) => ({
+        permissionCodes: togglePermissionGroup(
+          row.permissionCodes,
+          codes,
+          Boolean(checked),
+        ),
+      }),
+      headerAlign: 'center' as const,
+      align: 'center' as const,
+    }),
+  ) as F1GridColumn<MenuManagementRow>[];
+
   const columns: F1GridColumn<MenuManagementRow>[] = [
     {
-      field: 'code',
-      headerName: '코드',
-      width: 90,
-      editable: true,
-      mergeRows: true,
+      field: 'id',
+      type: 'rownumber',
+      width: 60,
+      headerName: '순번',
+      headerAlign: 'center',
+      align: 'center',
+      pinned: 'left',
     },
     {
       field: 'name',
       headerName: '메뉴명',
-      width: 160,
+      width: 220,
+      editable: true,
+      pinned: 'left',
+    },
+    {
+      field: 'code',
+      headerName: '메뉴코드',
+      width: 140,
       editable: true,
       mergeRows: true,
     },
     {
-      field: 'parent',
-      headerName: '상위 메뉴',
-      width: 130,
+      field: 'path',
+      headerName: '경로',
+      width: 220,
       editable: true,
-      mergeRows: true,
+    },
+    {
+      field: 'description',
+      headerName: '메뉴설명',
+      width: 260,
+      editable: true,
+      wrapText: true,
     },
     {
       field: 'order',
@@ -67,21 +223,11 @@ export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
       editable: true,
       type: 'checkbox',
       headerCheckbox: true,
+      syncWithTreeCheckbox: false,
       headerAlign: 'center',
       align: 'center',
     },
-    {
-      field: 'status',
-      headerName: '상태',
-      type: 'select',
-      editable: (row) => row.status === 'draft',
-      headerAlign: 'center',
-      align: 'center',
-      options: [
-        { value: 'draft', label: '작성중' },
-        { value: 'confirmed', label: '확정' },
-      ],
-    },
+    ...permissionColumns,
   ];
 
   function createMenuRow(): MenuManagementRow {
@@ -89,77 +235,220 @@ export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
     setNewMenuSequence((current) => current + 1);
     return {
       id: `new-menu-${sequence}`,
+      moduleId: selectedModule?.moduleId ?? 0,
+      moduleName: selectedModule?.moduleName ?? '',
+      parentMenuId: null,
+      hasChildren: false,
       code: `NEW${sequence}`,
       name: '새 메뉴',
+      path: '',
+      iconName: null,
       parent: '루트',
       order: 0,
       enabled: true,
       status: 'draft',
       description: '',
       permissionGroup: '관리',
+      permissionCodes: [],
     };
+  }
+
+  function addChildMenu() {
+    const parent = treeRef.current?.getSelectedRows()[0];
+    if (!parent) return;
+    treeRef.current?.addChildRow(parent.id, {
+      moduleId: parent.moduleId,
+      moduleName: parent.moduleName,
+      parent: parent.name,
+    });
+  }
+
+  async function handleSave() {
+    if (!selectedModule || !treeRef.current?.validate() || saving) return;
+    setSaving(true);
+    onSavingChange?.(true);
+    notifyError('');
+    try {
+      const currentChanges = treeRef.current.getChanges();
+      const currentRows = treeRef.current.getActiveRows();
+      const saveCheckpoint =
+        saveCheckpointRef.current ?? createMenuSaveCheckpoint();
+      saveCheckpointRef.current = saveCheckpoint;
+      const savedMenus = await saveMenuChanges(currentChanges, saveCheckpoint);
+      const changedRowIds = new Set([
+        ...currentChanges.insertedRows.map((row) => row.id),
+        ...currentChanges.updatedRows.map((row) => row.id),
+      ]);
+      const structuralParentIds = new Set(
+        currentRows
+          .filter(
+            (row) =>
+              row.hasChildren ||
+              currentRows.some((child) => child.parentMenuId === row.id),
+          )
+          .map((row) => row.id),
+      );
+
+      for (const row of currentRows) {
+        if (
+          !changedRowIds.has(row.id) ||
+          structuralParentIds.has(row.id) ||
+          completedPermissionRowIdsRef.current.has(row.id)
+        ) {
+          continue;
+        }
+        const menuId = savedMenus.insertedMenuIds[row.id] ?? row.id;
+        await replaceMenuPermissions(menuId, row.permissionCodes);
+        completedPermissionRowIdsRef.current.add(row.id);
+      }
+
+      await onRefresh?.(selectedModule.moduleId, true);
+      saveCheckpointRef.current = undefined;
+      completedPermissionRowIdsRef.current.clear();
+      setChanges({ insertedRows: [], updatedRows: [], deletedRows: [] });
+      setTreeKey((current) => current + 1);
+      notifySaveSuccess('메뉴 변경사항을 저장했습니다.');
+    } catch (error) {
+      notifyError(
+        error instanceof Error ? error.message : '메뉴 저장에 실패했습니다.',
+      );
+    } finally {
+      setSaving(false);
+      onSavingChange?.(false);
+    }
   }
 
   return (
     <Box
-      sx={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 2, p: 3 }}
+      sx={{
+        p: { xs: 1.5, sm: 3 },
+        minWidth: 0,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}
     >
       <Card
         sx={{
-          borderRadius: 3,
+          borderRadius: 1,
           border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
         }}
       >
-        <CardContent sx={{ p: 2.5 }}>
+        <CardContent
+          sx={{
+            p: 2.5,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
+              alignItems: { xs: 'stretch', sm: 'center' },
+              flexWrap: 'wrap',
+              gap: 1,
               mb: 2,
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               메뉴 관리
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box
+              role="toolbar"
+              aria-label="메뉴 업무 액션"
+              sx={{
+                display: 'flex',
+                justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                gap: 1,
+                flexWrap: 'wrap',
+                minWidth: 0,
+              }}
+            >
               <Button
                 size="small"
-                onClick={() => gridRef.current?.deleteSelectedRows()}
+                startIcon={<AddIcon fontSize="small" />}
+                disabled={!selectedModule || saving}
+                onClick={() => {
+                  treeRef.current?.addRow();
+                  setHasSelectedTreeRow(true);
+                }}
               >
-                삭제
+                루트 메뉴 추가
               </Button>
               <Button
                 size="small"
-                onClick={() => gridRef.current?.duplicateSelectedRows()}
+                startIcon={<PlaylistAddIcon fontSize="small" />}
+                disabled={!selectedModule || !hasSelectedTreeRow || saving}
+                onClick={addChildMenu}
               >
-                복제
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => gridRef.current?.addRow()}
-              >
-                새 메뉴
+                하위 메뉴 추가
               </Button>
             </Box>
           </Box>
-          <F1Grid
-            ref={gridRef}
-            rows={menus}
-            columns={columns}
-            rowKey="id"
-            columnLine
-            ariaLabel="F1-GRID 메뉴 관리"
-            createRow={createMenuRow}
-            createDuplicate={(menu) => ({
-              ...menu,
-              id: `${menu.id}-copy-${Date.now()}`,
-              code: `${menu.code}-COPY`,
-            })}
-            onChangesChange={setChanges}
-          />
+          <Box
+            role="toolbar"
+            aria-label="메뉴 그리드 제어"
+            sx={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 0.5,
+              mb: 1.5,
+            }}
+          >
+            <IconButton
+              size="small"
+              aria-label="전체 펼치기"
+              disabled={!selectedModule || saving}
+              onClick={() => treeRef.current?.expandAll()}
+            >
+              <UnfoldMoreIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="전체 접기"
+              disabled={!selectedModule || saving}
+              onClick={() => treeRef.current?.collapseAll()}
+            >
+              <UnfoldLessIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <F1Tree
+              key={treeKey}
+              ref={treeRef}
+              rows={menus}
+              columns={columns}
+              rowKey="id"
+              parentKey="parentMenuId"
+              treeColumn="name"
+              storageKey="menu-management-tree"
+              defaultExpandAll
+              showCheckbox
+              treeCheckbox
+              height="100%"
+              maxHeight="100%"
+              getRowOrder={(row) => row.order}
+              columnLine
+              ariaLabel="F1-TREE 메뉴 관리"
+              createRow={createMenuRow}
+              onChangesChange={setChanges}
+              onSelectionChange={(rowIds) =>
+                setHasSelectedTreeRow(rowIds.length > 0)
+              }
+              onDeleteBlocked={() =>
+                notifyError('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
+              }
+            />
+          </Box>
           <Typography
             variant="caption"
             color="text.secondary"
@@ -168,64 +457,13 @@ export function MenuManagementPanel({ menus }: MenuManagementPanelProps) {
             변경: 신규 {changes.insertedRows.length}건 / 수정{' '}
             {changes.updatedRows.length}건 / 삭제 {changes.deletedRows.length}건
           </Typography>
-        </CardContent>
-      </Card>
-      <Card
-        sx={{
-          borderRadius: 3,
-          border: '1px solid rgba(148,163,184,0.18)',
-          boxShadow: 'none',
-        }}
-      >
-        <CardContent sx={{ p: 2.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-            기본정보
-          </Typography>
-          <Stack spacing={2}>
-            <TextField label="메뉴명" defaultValue="권한관리" size="small" />
-            <TextField
-              label="상위 메뉴"
-              defaultValue="시스템 관리"
-              size="small"
-            />
-            <TextField label="권한 그룹" defaultValue="관리" size="small" />
-            <TextField
-              label="설명"
-              defaultValue="역할별 접근 권한 설정"
-              size="small"
-              multiline
-              minRows={3}
-            />
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                사용 여부
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="사용"
-              />
-            </Box>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                정렬 순서
-              </Typography>
-              <Chip label="1" color="primary" variant="outlined" />
-            </Box>
-          </Stack>
+          {message ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {message}
+            </Typography>
+          ) : null}
         </CardContent>
       </Card>
     </Box>
   );
-}
+});

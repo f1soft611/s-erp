@@ -12,7 +12,7 @@ const basePalette = {
     main: '#0f172a',
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: 6,
   },
 };
 
@@ -54,13 +54,30 @@ export function createAppTheme(mode: AppThemeMode = 'light') {
     },
     components: {
       MuiButton: {
+        defaultProps: {
+          disableElevation: true,
+        },
         styleOverrides: {
           root: {
-            borderRadius: 12,
+            borderRadius: basePalette.shape.borderRadius,
             textTransform: 'none',
             boxShadow: 'none',
-            paddingTop: 8,
-            paddingBottom: 8,
+            minHeight: 32,
+            padding: '6px 12px',
+            fontSize: '0.8125rem',
+            lineHeight: 1.4,
+            letterSpacing: '0.01em',
+            transition: 'all 0.2s ease',
+          },
+          sizeSmall: {
+            minHeight: 28,
+            padding: '4px 10px',
+            fontSize: '0.75rem',
+          },
+          sizeLarge: {
+            minHeight: 40,
+            padding: '10px 18px',
+            fontSize: '0.9375rem',
           },
         },
       },

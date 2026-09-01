@@ -8,14 +8,16 @@ import {
 } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import dayjs from 'dayjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
+import { AppSettingsProvider } from '../src/shared/context/AppSettingsContext';
 import {
   addGridRow,
   createGridData,
   duplicateGridRows,
   F1Grid,
   getGridChanges,
+  getAutoFitColumnWidth,
   getCellDisplayValue,
   getGridMergeInfo,
   clampGridRowHeight,
@@ -33,6 +35,8 @@ import {
   coerceClipboardValue,
   canHideGridColumn,
   getVisibleGridColumns,
+  reorderGridColumns,
+  moveGridColumnOrder,
   toggleGridSort,
   sortGridRows,
   getGridSortIndicator,
@@ -168,6 +172,33 @@ describe('F1-GRID column management', () => {
     expect(
       canHideGridColumn([configuredColumn, columns[1]], configuredColumn),
     ).toBe(true);
+  });
+
+  it('reorders columns according to the given field order, keeping unknown fields at the end', () => {
+    const configuredColumns = [
+      { field: 'code', headerName: '코드' },
+      { field: 'order', headerName: '정렬' },
+      { field: 'status', headerName: '상태' },
+    ] satisfies F1GridColumn<MenuRow>[];
+
+    expect(
+      reorderGridColumns(configuredColumns, ['status', 'code']).map(
+        (column) => column.field,
+      ),
+    ).toEqual(['status', 'code', 'order']);
+  });
+
+  it('moves a field before the target field position', () => {
+    expect(moveGridColumnOrder(['a', 'b', 'c'], 'a', 'c')).toEqual([
+      'b',
+      'a',
+      'c',
+    ]);
+    expect(moveGridColumnOrder(['a', 'b', 'c'], 'c', 'a')).toEqual([
+      'c',
+      'a',
+      'b',
+    ]);
   });
 
   it('hides and restores a column through the header column list menu', async () => {
@@ -753,6 +784,40 @@ describe('F1-GRID row height', () => {
     });
     expect(wrappedText).toHaveStyle({ whiteSpace: 'normal' });
   });
+
+  it('scales default row height by the AppSettings display scale', () => {
+    window.localStorage.setItem('erp-display-scale', '1.2');
+    render(
+      <AppSettingsProvider>
+        <F1Grid
+          rows={[{ id: 'first', code: 'A' }]}
+          columns={[{ field: 'code', headerName: '코드' }]}
+          rowKey="id"
+          minRowHeight={40}
+          maxRowHeight={200}
+        />
+      </AppSettingsProvider>,
+    );
+
+    const handle = screen.getByRole('button', { name: /행 높이 조절/ });
+    expect(handle).toHaveAttribute('aria-valuenow', '48');
+    window.localStorage.removeItem('erp-display-scale');
+  });
+
+  it('defaults to an unscaled row height without an AppSettingsProvider', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'first', code: 'A' }]}
+        columns={[{ field: 'code', headerName: '코드' }]}
+        rowKey="id"
+        minRowHeight={40}
+        maxRowHeight={200}
+      />,
+    );
+
+    const handle = screen.getByRole('button', { name: /행 높이 조절/ });
+    expect(handle).toHaveAttribute('aria-valuenow', '40');
+  });
 });
 
 describe('F1-GRID interaction', () => {
@@ -764,6 +829,124 @@ describe('F1-GRID interaction', () => {
       maxWidth: '100%',
       overflowX: 'auto',
     });
+  });
+
+  it('renders grouped headers as a two-row header and respects grouped headers', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { field: 'code', headerName: '코드', headerGroup: '기본정보' },
+          { field: 'status', headerName: '상태', headerGroup: '기본정보' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const groupHeader = screen.getByText('기본정보');
+    expect(groupHeader).toBeInTheDocument();
+    expect(groupHeader.closest('[role="columnheader"]')).toBeTruthy();
+    expect(getComputedStyle(groupHeader).backgroundColor).toBe(
+      'rgba(0, 0, 0, 0)',
+    );
+    expect(screen.getByRole('gridcell', { name: 'DASH' })).toBeVisible();
+    expect(screen.getAllByRole('columnheader')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ textContent: '기본정보' }),
+        expect.objectContaining({ textContent: '코드' }),
+        expect.objectContaining({ textContent: '상태' }),
+      ]),
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    fireEvent.focus(codeCell);
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: { setData: vi.fn() },
+    });
+  });
+
+  it('keeps the default cursor outside edit mode and switches to a text cursor while editing', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목' }]}
+        columns={[
+          { field: 'itemCode', headerName: '품목코드', editable: true },
+          { field: 'itemName', headerName: '품목명', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const itemCodeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    expect(itemCodeCell).toHaveStyle({ cursor: 'default' });
+
+    fireEvent.doubleClick(itemCodeCell);
+    const input = screen.getByDisplayValue('ITEM-001');
+    expect(input).toHaveStyle({ cursor: 'text' });
+  });
+
+  it('supports cell-range drag selection across adjacent cells', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(start);
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    expect(start).toHaveAttribute('data-grid-selected', 'true');
+    expect(end).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('keeps drag selection plain and only shows the dashed copy range after copy, then clears on Escape', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(start);
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    expect(window.getComputedStyle(start).border).not.toContain('dashed');
+    expect(window.getComputedStyle(end).border).not.toContain('dashed');
+
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: {
+        getData: vi.fn(() => 'A\tAlpha\nB\tBeta'),
+        setData: vi.fn(),
+      },
+    });
+
+    expect(window.getComputedStyle(start).border).toContain('dashed');
+    expect(window.getComputedStyle(end).border).toContain('dashed');
+
+    fireEvent.keyDown(start, { key: 'Escape' });
+    expect(window.getComputedStyle(start).border).not.toContain('dashed');
+    expect(window.getComputedStyle(end).border).not.toContain('dashed');
   });
 
   it('rebases external rows when the grid has no pending changes', () => {
@@ -825,23 +1008,21 @@ describe('F1-GRID interaction', () => {
     ).toEqual({ rowIndex: 1, columnIndex: 1 });
   });
 
-  it('renders vertical column lines when columnLine is enabled', () => {
+  it('renders vertical column lines once between columns when columnLine is enabled', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 
-    expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
-        .borderLeftWidth,
-    ).toBe('1px');
-    expect(
-      getComputedStyle(screen.getByRole('gridcell', { name: 'DASH' }))
-        .borderLeftWidth,
-    ).toBe('1px');
-    expect(
-      getComputedStyle(screen.getByRole('gridcell', { name: 'DASH' }))
-        .borderLeftColor,
-    ).toBe(
-      getComputedStyle(screen.getByRole('gridcell', { name: 'DASH' }))
-        .borderTopColor,
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const orderHeader = screen.getByRole('columnheader', { name: /정렬/ });
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    const orderCell = screen.getByRole('gridcell', { name: '1' });
+
+    expect(getComputedStyle(codeHeader).borderLeftWidth).toBe('0px');
+    expect(getComputedStyle(codeHeader).borderRightWidth).toBe('0px');
+    expect(getComputedStyle(orderHeader).borderLeftWidth).toBe('1px');
+    expect(getComputedStyle(codeCell).borderLeftWidth).toBe('0px');
+    expect(getComputedStyle(orderCell).borderLeftWidth).toBe('1px');
+    expect(getComputedStyle(orderCell).borderLeftColor).toBe(
+      getComputedStyle(orderCell).borderTopColor,
     );
   });
 
@@ -1285,6 +1466,31 @@ describe('F1-GRID filtering', () => {
 });
 
 describe('F1-GRID column pin', () => {
+  it('initially pins columns declared with the column pinned option', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { ...columns[0], pinned: 'left' },
+          columns[1],
+          { ...columns[2], pinned: 'right' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: /코드/ })).toHaveStyle({
+      position: 'sticky',
+      left: '44px',
+    });
+    expect(screen.getByRole('columnheader', { name: /사용 여부/ })).toHaveStyle(
+      {
+        position: 'sticky',
+        right: '0px',
+      },
+    );
+  });
+
   it('reorders columns into left-pinned, unpinned, and right-pinned groups', () => {
     const pinned = new Map<string, 'left' | 'right'>([
       ['status', 'left'],
@@ -1449,5 +1655,317 @@ describe('F1-GRID column resize', () => {
 
     const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
     expect(codeHeader).toBeVisible();
+  });
+
+  it('computes an auto-fit width clamped by minWidth and column maxWidth', () => {
+    const narrowRows = [{ id: '1', code: 'A', headerName: '' } as MenuRow];
+    const wideRows = [
+      {
+        id: '1',
+        code: 'A-VERY-LONG-CODE-VALUE-1234567890',
+        headerName: '',
+      } as MenuRow,
+    ];
+
+    const narrowWidth = getAutoFitColumnWidth(columns[0], narrowRows, {
+      minWidth: 80,
+    });
+    expect(narrowWidth).toBe(80);
+
+    const wideWidth = getAutoFitColumnWidth(columns[0], wideRows, {
+      minWidth: 80,
+    });
+    expect(wideWidth).toBeGreaterThan(80);
+
+    const clampedWidth = getAutoFitColumnWidth(
+      { ...columns[0], maxWidth: 90 },
+      wideRows,
+      { minWidth: 80 },
+    );
+    expect(clampedWidth).toBe(90);
+  });
+
+  it('auto-fits column width to content on resize handle double-click', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        resizableColumns={true}
+        minColumnWidth={40}
+      />,
+    );
+
+    const resizeHandle = screen.getByRole('separator', {
+      name: '코드 컬럼 너비 조절',
+    });
+
+    fireEvent.dblClick(resizeHandle);
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toBeVisible();
+  });
+});
+
+describe('F1-GRID rownumber column', () => {
+  const rownumberColumns: F1GridColumn<MenuRow>[] = [
+    { field: 'id', headerName: '순번', type: 'rownumber', editable: true },
+    { field: 'code', headerName: '코드', editable: true },
+  ];
+
+  it('renders the current display position instead of the underlying field value', () => {
+    render(<F1Grid rows={rows} columns={rownumberColumns} rowKey="id" />);
+
+    const cells = screen.getAllByRole('gridcell', { name: /^[12]$/ });
+    expect(cells.map((cell) => cell.textContent)).toEqual(['1', '2']);
+  });
+
+  it('renumbers rows after sorting instead of keeping the original data order', () => {
+    render(<F1Grid rows={rows} columns={rownumberColumns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
+
+    const cells = screen.getAllByRole('gridcell', { name: /^[12]$/ });
+    expect(cells.map((cell) => cell.textContent)).toEqual(['1', '2']);
+    expect(
+      screen
+        .getAllByRole('gridcell')
+        .filter((cell) => cell.textContent === 'SET').length,
+    ).toBe(1);
+  });
+
+  it('does not enter edit mode when a rownumber cell is double-clicked', () => {
+    render(<F1Grid rows={rows} columns={rownumberColumns} rowKey="id" />);
+
+    const rownumberCell = screen.getAllByRole('gridcell', {
+      name: /^[12]$/,
+    })[0];
+    fireEvent.doubleClick(rownumberCell);
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+});
+
+describe('F1-GRID column drag reorder', () => {
+  function createDataTransfer() {
+    const store: Record<string, string> = {};
+    return {
+      setData: (type: string, value: string) => {
+        store[type] = value;
+      },
+      getData: (type: string) => store[type] ?? '',
+      effectAllowed: 'move',
+    } as unknown as DataTransfer;
+  }
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('reorders columns when a header is dragged and dropped on another header', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const dataTransfer = createDataTransfer();
+
+    fireEvent.dragStart(codeHeader, { dataTransfer });
+    fireEvent.dragOver(statusHeader, { dataTransfer });
+    fireEvent.drop(statusHeader, { dataTransfer });
+
+    const headerFields = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent)
+      .filter((text) => text);
+    expect(headerFields).toEqual([
+      '정렬',
+      '사용 여부',
+      '시작일',
+      '코드',
+      '상태',
+    ]);
+  });
+
+  it('marks the drop target header while dragging a column', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const dataTransfer = createDataTransfer();
+
+    fireEvent.dragStart(codeHeader, { dataTransfer });
+    fireEvent.dragOver(statusHeader, { dataTransfer });
+
+    expect(statusHeader).toHaveAttribute('data-drop-target', 'true');
+  });
+
+  it('excludes pinned columns from drag reorder targets', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).not.toHaveAttribute('draggable', 'true');
+  });
+
+  it('persists column order to localStorage when storageKey is provided', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-order"
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const dataTransfer = createDataTransfer();
+
+    fireEvent.dragStart(codeHeader, { dataTransfer });
+    fireEvent.drop(statusHeader, { dataTransfer });
+
+    const stored = window.localStorage.getItem('test-grid-column-order');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.order).toContain('status');
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-order"
+      />,
+    );
+    const headerFields = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent)
+      .filter((text) => text);
+    expect(headerFields).toEqual([
+      '정렬',
+      '사용 여부',
+      '시작일',
+      '코드',
+      '상태',
+    ]);
+  });
+
+  it('persists column width to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-width"
+        resizableColumns={true}
+        minColumnWidth={40}
+      />,
+    );
+
+    const resizeHandle = screen.getByRole('separator', {
+      name: '코드 컬럼 너비 조절',
+    });
+    fireEvent.mouseDown(resizeHandle, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 220 });
+    fireEvent.mouseUp(window);
+
+    const stored = window.localStorage.getItem('test-grid-column-width');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.widths.code).toBeGreaterThan(0);
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-width"
+        resizableColumns={true}
+        minColumnWidth={40}
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toBeInTheDocument();
+    const headerRow = screen.getAllByRole('row')[0];
+    expect(getComputedStyle(headerRow).gridTemplateColumns).toContain(
+      `${parsed.widths.code}px`,
+    );
+  });
+
+  it('persists hidden column list to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-hidden"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '코드 표시' }));
+
+    const stored = window.localStorage.getItem('test-grid-column-hidden');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.hidden).toContain('code');
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-hidden"
+      />,
+    );
+
+    expect(
+      screen.queryByRole('columnheader', { name: /^코드$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('persists pinned column state to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-pinned"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    const stored = window.localStorage.getItem('test-grid-column-pinned');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.pinned.code).toBe('left');
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-pinned"
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).not.toHaveAttribute('draggable', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    expect(
+      screen.getByRole('menuitem', { name: '고정 해제' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 });

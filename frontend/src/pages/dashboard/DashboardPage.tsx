@@ -17,15 +17,25 @@ import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
 import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
-import { logout } from '../../shared/services/authService';
+import { useNotification } from '../../shared/context/NotificationContext';
 import {
+  SESSION_WARNING_MESSAGE,
+  getSessionRemainingLabel,
+  getStoredAuth,
+  isAccessTokenExpiringSoon,
+  logout,
+} from '../../shared/services/authService';
+import {
+  buildPageContent,
+  buildModuleItems,
   defaultPage,
-  moduleItems,
+  moduleItems as staticModuleItems,
   pageContentMap,
 } from './services/dashboardData';
+import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
@@ -49,14 +59,26 @@ function findMenuPath(
   nodes: MenuTreeNode[],
   menuId: string,
   parentIds: string[] = [],
-): { node: MenuTreeNode; parentIds: string[] } | undefined {
+  parentNames: string[] = [],
+):
+  | {
+      node: MenuTreeNode;
+      parentIds: string[];
+      parentNames: string[];
+    }
+  | undefined {
   for (const node of nodes) {
     if (node.id === menuId) {
-      return { node, parentIds };
+      return { node, parentIds, parentNames };
     }
 
     const childPath = node.children
-      ? findMenuPath(node.children, menuId, [...parentIds, node.id])
+      ? findMenuPath(
+          node.children,
+          menuId,
+          [...parentIds, node.id],
+          [...parentNames, node.name],
+        )
       : undefined;
 
     if (childPath) {
@@ -67,12 +89,28 @@ function findMenuPath(
   return undefined;
 }
 
-const defaultModule = moduleItems[0];
-const defaultMenuId = defaultModule.menus[0]?.id ?? '';
-
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
+  const { showWarning } = useNotification();
+  const [moduleItems, setModuleItems] = useState(staticModuleItems);
+  const [sessionRemainingLabel, setSessionRemainingLabel] = useState('00:00');
+  const warningShownRef = useRef(false);
+  const defaultModule = moduleItems[0];
+  const defaultMenuId = defaultModule.menus[0]?.id ?? '';
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyMenus().then((response) => {
+      if (cancelled || !response) {
+        return;
+      }
+      setModuleItems(buildModuleItems(buildModuleDescriptors(response)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const location = useLocation();
   const theme = useTheme();
   const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
@@ -120,6 +158,13 @@ function DashboardPage() {
   const expandedItemIds =
     selectedMenu?.parentIds ?? fallbackMenuPath?.parentIds ?? [];
   const currentMenu = selectedMenu?.node ?? fallbackMenu;
+  const currentParentNames =
+    selectedMenu?.parentNames ?? fallbackMenuPath?.parentNames ?? [];
+  const breadcrumbItems = [
+    selectedModule.name,
+    ...currentParentNames,
+    currentMenu.name,
+  ];
 
   useEffect(() => {
     const pathname = location.pathname;
@@ -130,6 +175,27 @@ function DashboardPage() {
       });
     }
   }, [location.pathname, navigate]);
+
+  useEffect(() => {
+    const updateSessionState = () => {
+      const auth = getStoredAuth();
+      setSessionRemainingLabel(getSessionRemainingLabel(auth));
+
+      if (auth && isAccessTokenExpiringSoon(auth, 60_000)) {
+        if (!warningShownRef.current) {
+          showWarning(SESSION_WARNING_MESSAGE);
+          warningShownRef.current = true;
+        }
+        return;
+      }
+
+      warningShownRef.current = false;
+    };
+
+    updateSessionState();
+    const intervalId = window.setInterval(updateSessionState, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [showWarning]);
 
   const isDarkTheme = themeMode === 'dark';
 
@@ -169,10 +235,11 @@ function DashboardPage() {
     setDisplayScaleMenuAnchor(null);
   };
 
-  const content = useMemo(
-    () => pageContentMap[currentMenu.pageKey ?? defaultMenuId] ?? defaultPage,
-    [currentMenu.pageKey],
-  );
+  const content = useMemo(() => {
+    const baseContent =
+      pageContentMap[currentMenu.pageKey ?? defaultMenuId] ?? defaultPage;
+    return buildPageContent(baseContent, currentMenu);
+  }, [currentMenu]);
 
   return (
     <Box
@@ -248,7 +315,7 @@ function DashboardPage() {
                 )}
               </IconButton>
               <Typography variant="h6" component="h1" sx={{ fontWeight: 700 }}>
-                대시보드
+                {currentMenu.name}
               </Typography>
             </Box>
 
@@ -263,6 +330,19 @@ function DashboardPage() {
                 justifyContent: 'flex-end',
               }}
             >
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: theme.palette.action.hover,
+                  color: theme.palette.text.secondary,
+                  fontWeight: 700,
+                }}
+              >
+                로그인 유지 시간 {sessionRemainingLabel}
+              </Typography>
               <Tooltip title="테마 설정">
                 <IconButton
                   aria-label="테마 설정"
@@ -354,7 +434,10 @@ function DashboardPage() {
         <DashboardContent
           selectedModule={selectedModule}
           currentMenuName={currentMenu.name}
+          currentPageKey={currentMenu.pageKey ?? defaultMenuId}
+          breadcrumbItems={breadcrumbItems}
           content={content}
+          selectedMenuPermissions={currentMenu.permissions}
         />
       </Box>
     </Box>

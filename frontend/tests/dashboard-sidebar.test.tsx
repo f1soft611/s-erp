@@ -14,7 +14,7 @@ async function loginAsAdmin() {
   });
   fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
 
-  await screen.findByRole('heading', { name: /대시보드/i });
+  await screen.findByRole('heading', { name: /^종합현황$/i });
 }
 
 describe('Dashboard sidebar', () => {
@@ -145,7 +145,7 @@ describe('Dashboard sidebar', () => {
         tenantCode: 'A001',
         userId: 'admin',
         accessToken: 'mock-token',
-        expiresAt: '2026-08-28T00:00:00.000Z',
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }),
     );
     window.history.pushState({}, '', '/dashboard/groupware/documents');
@@ -158,6 +158,24 @@ describe('Dashboard sidebar', () => {
     expect(
       screen.getByRole('treeitem', { name: /^문서관리$/i }),
     ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('shows the active menu title in the fixed header without duplicate page titles', async () => {
+    render(<App />);
+    await loginAsAdmin();
+
+    fireEvent.click(screen.getByRole('button', { name: /환경설정/i }));
+    fireEvent.click(screen.getByRole('treeitem', { name: /^메뉴관리$/i }));
+
+    expect(
+      await screen.findByRole('heading', { name: /^메뉴관리$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', { name: /^메뉴관리$/i }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole('heading', { name: /^대시보드$/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the ERP-style role and menu management screens', async () => {
@@ -180,7 +198,12 @@ describe('Dashboard sidebar', () => {
       await screen.findByRole('heading', { name: /^메뉴관리$/i }),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/메뉴 관리/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/기본정보/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '루트 메뉴 추가' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/사용 여부/i).length).toBeGreaterThan(0);
   });
 });

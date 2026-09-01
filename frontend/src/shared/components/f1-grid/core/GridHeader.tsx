@@ -20,7 +20,7 @@ import { canHideGridColumn } from '../columns/GridColumnManagement';
 import { getGridColumnPinSide } from '../columns/GridColumnPin';
 import { getGridFilterOperators } from '../filter/GridFilter';
 import { getGridSortIndicator } from '../sorting/GridSort';
-import { getGridColumnTrack } from '../utils/grid.utils';
+import { getAutoFitColumnWidth, getGridColumnTrack } from '../utils/grid.utils';
 import type {
   F1GridColumn,
   F1GridFilter,
@@ -48,12 +48,14 @@ const OPERATOR_LABELS: Record<F1GridFilterOperator, string> = {
 type GridHeaderProps<T extends object> = {
   columns: F1GridColumn<T>[];
   allColumns: F1GridColumn<T>[];
+  rows: T[];
   columnLine: boolean;
   selectedAll: boolean;
   selectedIds: F1GridRowId[];
   columnWidths: Record<string, number>;
   resizableColumns?: boolean;
   minColumnWidth?: number;
+  showCheckbox?: boolean;
   onResizeColumn: (column: F1GridColumn<T>, nextWidth: number) => void;
   getColumnCheckboxState: (column: F1GridColumn<T>) => {
     allChecked: boolean;
@@ -65,11 +67,13 @@ type GridHeaderProps<T extends object> = {
   onToggleColumnVisibility: (column: F1GridColumn<T>, visible: boolean) => void;
   sorts: F1GridSort<T>[];
   onToggleSort: (column: F1GridColumn<T>, direction: 'asc' | 'desc') => void;
+  disableSorting?: boolean;
   filters: F1GridFilter<T>[];
   onApplyFilter: (
     column: F1GridColumn<T>,
     filter: F1GridFilter<T> | undefined,
   ) => void;
+  disableFiltering?: boolean;
   pinnedFields: Map<string, F1GridPinSide>;
   onPinColumn: (
     column: F1GridColumn<T>,
@@ -77,17 +81,24 @@ type GridHeaderProps<T extends object> = {
   ) => void;
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
+  onReorderColumn?: (
+    sourceField: string,
+    targetField: string,
+    position?: 'before' | 'after',
+  ) => void;
 };
 
 export function GridHeader<T extends object>({
   columns,
   allColumns,
+  rows,
   columnLine,
   selectedAll,
   selectedIds,
   columnWidths,
   resizableColumns = true,
   minColumnWidth = 50,
+  showCheckbox = true,
   onResizeColumn,
   getColumnCheckboxState,
   onToggleAllRows,
@@ -95,12 +106,15 @@ export function GridHeader<T extends object>({
   onToggleColumnVisibility,
   sorts,
   onToggleSort,
+  disableSorting = false,
   filters,
   onApplyFilter,
+  disableFiltering = false,
   pinnedFields,
   onPinColumn,
   leftOffsets,
   rightOffsets,
+  onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
@@ -108,6 +122,13 @@ export function GridHeader<T extends object>({
     null,
   );
   const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
+  const [draggedColumnField, setDraggedColumnField] = useState<string | null>(
+    null,
+  );
+  const [dropTargetField, setDropTargetField] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(
+    null,
+  );
   const [filterDraft, setFilterDraft] = useState<{
     operator: F1GridFilterOperator;
     value: string;
@@ -137,6 +158,13 @@ export function GridHeader<T extends object>({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+  }
+
+  function handleAutoFitColumn(column: F1GridColumn<T>) {
+    const nextWidth = getAutoFitColumnWidth(column, rows, {
+      minWidth: minColumnWidth,
+    });
+    onResizeColumn(column, nextWidth);
   }
 
   function closeMenus() {
@@ -205,46 +233,115 @@ export function GridHeader<T extends object>({
     activeOperator !== 'isEmpty' && activeOperator !== 'isNotEmpty';
   const needsSecondValue = activeOperator === 'between';
 
+  // pin된 컬럼은 그룹 라벨에서 제외한다. 나머지 컬럼은 그룹이 없으면 위/아래가
+  // 한 셀로 세로 병합되고, 그룹이 있으면 그룹 라벨(1행) + 컬럼명(2행)으로 나뉜다.
+  type GroupLabelSegment = { label: string; startIndex: number; span: number };
+
+  const groupLabelSegments: GroupLabelSegment[] = [];
+  for (let i = 0; i < columns.length; ) {
+    const column = columns[i];
+    if (!column.headerGroup || pinnedFields.has(String(column.field))) {
+      i += 1;
+      continue;
+    }
+    const label = column.headerGroup;
+    const startIndex = i;
+    let span = 0;
+    while (
+      i < columns.length &&
+      columns[i].headerGroup === label &&
+      !pinnedFields.has(String(columns[i].field))
+    ) {
+      span += 1;
+      i += 1;
+    }
+    groupLabelSegments.push({ label, startIndex, span });
+  }
+
+  const hasGroups = groupLabelSegments.length > 0;
+
+  function isGroupedColumn(column: F1GridColumn<T>): boolean {
+    return (
+      Boolean(column.headerGroup) && !pinnedFields.has(String(column.field))
+    );
+  }
+
+  const groupLabelNodes = groupLabelSegments.map((segment) => (
+    <Box
+      key={`group-${segment.label}-${segment.startIndex}`}
+      role="columnheader"
+      sx={{
+        gridColumn: `${(showCheckbox ? 2 : 1) + segment.startIndex} / span ${segment.span}`,
+        gridRow: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        px: 1,
+        py: 0.75,
+        borderRight: 1,
+        borderRightColor: 'divider',
+        borderLeft: columnLine ? 1 : 0,
+        borderLeftColor: 'divider',
+        color: 'text.primary',
+        fontSize: 'inherit',
+        fontWeight: 700,
+        lineHeight: 1.2,
+        minHeight: 36,
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      {segment.label}
+    </Box>
+  ));
+
   return (
     <>
       <Box
         role="row"
         sx={{
           display: 'grid',
-          gridTemplateColumns: `44px ${columns
+          gridTemplateColumns: `${showCheckbox ? '44px ' : ''}${columns
             .map((column) =>
               getGridColumnTrack(column, columnWidths[String(column.field)]),
             )
             .join(' ')}`,
+          gridTemplateRows: hasGroups ? 'auto auto' : undefined,
           minWidth: 'max-content',
           bgcolor: 'action.hover',
           fontWeight: 700,
           isolation: 'isolate',
         }}
       >
-        <Box
-          role="columnheader"
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            position: 'sticky',
-            left: 0,
-            zIndex: 4,
-            backgroundColor: (theme) =>
-              theme.palette.mode === 'dark'
-                ? 'rgb(28, 36, 50)'
-                : 'rgb(232, 236, 244)',
-          }}
-        >
-          <Checkbox
-            size="small"
-            aria-label="전체 행 선택"
-            checked={selectedAll}
-            indeterminate={selectedIds.length > 0 && !selectedAll}
-            onChange={onToggleAllRows}
-          />
-        </Box>
-        {columns.map((column) => {
+        {showCheckbox ? (
+          <Box
+            role="columnheader"
+            sx={{
+              gridColumn: 1,
+              gridRow: hasGroups ? '1 / span 2' : undefined,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'sticky',
+              left: 0,
+              zIndex: 4,
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgb(28, 36, 50)'
+                  : 'rgb(232, 236, 244)',
+            }}
+          >
+            <Checkbox
+              size="small"
+              aria-label="전체 행 선택"
+              checked={selectedAll}
+              indeterminate={selectedIds.length > 0 && !selectedAll}
+              onChange={onToggleAllRows}
+            />
+          </Box>
+        ) : null}
+        {groupLabelNodes}
+        {columns.map((column, columnIndex) => {
           const checkboxState = getColumnCheckboxState(column);
           const pinSide = getGridColumnPinSide(pinnedFields, column);
           const sortIndicator = getGridSortIndicator(sorts, column.field);
@@ -254,12 +351,82 @@ export function GridHeader<T extends object>({
           const isMenuOpen =
             menuColumn?.field === column.field &&
             Boolean(menuAnchor || columnListAnchor || filterAnchor);
+          const grouped = isGroupedColumn(column);
+          const isDraggingColumn = draggedColumnField === String(column.field);
+          const isDropTarget = dropTargetField === String(column.field);
+          const isBeforeDrop = isDropTarget && dropPosition === 'before';
+          const isAfterDrop = isDropTarget && dropPosition === 'after';
 
           return (
             <Box
               key={String(column.field)}
               role="columnheader"
+              draggable={Boolean(onReorderColumn) && !pinSide}
+              data-drop-target={isDropTarget ? 'true' : undefined}
+              data-drop-position={
+                isDropTarget ? (dropPosition ?? 'before') : undefined
+              }
+              aria-grabbed={isDraggingColumn || undefined}
+              onDragStart={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                setDraggedColumnField(String(column.field));
+                setDropTargetField(null);
+                setDropPosition(null);
+                event.dataTransfer.setData('text/plain', String(column.field));
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                if (
+                  draggedColumnField &&
+                  draggedColumnField !== String(column.field)
+                ) {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const hasPointerPosition =
+                    Number.isFinite(event.clientX) && rect.width > 0;
+                  const nextPosition =
+                    hasPointerPosition &&
+                    event.clientX - rect.left < rect.width / 2
+                      ? 'before'
+                      : hasPointerPosition
+                        ? 'after'
+                        : 'before';
+                  setDropTargetField(String(column.field));
+                  setDropPosition(nextPosition);
+                }
+              }}
+              onDragLeave={(event) => {
+                if (!onReorderColumn || pinSide || !dropTargetField) return;
+                const nextTarget = event.relatedTarget as Node | null;
+                if (nextTarget && event.currentTarget.contains(nextTarget))
+                  return;
+                setDropTargetField(null);
+                setDropPosition(null);
+              }}
+              onDrop={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                event.preventDefault();
+                const sourceField = event.dataTransfer.getData('text/plain');
+                if (!sourceField) return;
+                onReorderColumn(
+                  sourceField,
+                  String(column.field),
+                  dropPosition ?? 'before',
+                );
+                setDropTargetField(null);
+                setDropPosition(null);
+                setDraggedColumnField(null);
+              }}
+              onDragEnd={() => {
+                setDraggedColumnField(null);
+                setDropTargetField(null);
+                setDropPosition(null);
+              }}
               sx={{
+                gridColumn: (showCheckbox ? 2 : 1) + columnIndex,
+                gridRow: hasGroups ? (grouped ? 2 : '1 / span 2') : undefined,
                 p: 1,
                 display: 'flex',
                 alignItems: 'center',
@@ -271,10 +438,15 @@ export function GridHeader<T extends object>({
                       ? 'flex-start'
                       : 'center',
                 textAlign: column.headerAlign ?? 'left',
-                borderRight: 1,
+                borderTop: grouped ? 1 : 0,
+                borderTopColor: 'divider',
+                borderRight: columnLine ? 0 : 1,
                 borderRightColor: 'divider',
-                borderLeft: columnLine ? 1 : 0,
+                borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
                 borderLeftColor: 'divider',
+                minWidth: 0,
+                width: '100%',
+                boxSizing: 'border-box',
                 position: pinSide ? 'sticky' : 'relative',
                 left:
                   pinSide === 'left'
@@ -285,18 +457,48 @@ export function GridHeader<T extends object>({
                     ? rightOffsets[String(column.field)]
                     : undefined,
                 zIndex: pinSide ? 3 : undefined,
-                backgroundColor: pinSide
-                  ? (theme) =>
-                      theme.palette.mode === 'dark'
-                        ? 'rgb(28, 36, 50)'
-                        : 'rgb(232, 236, 244)'
-                  : undefined,
-                boxShadow:
-                  pinSide === 'left'
+                backgroundColor: isDropTarget
+                  ? 'rgba(25, 118, 210, 0.08)'
+                  : pinSide
+                    ? (theme) =>
+                        theme.palette.mode === 'dark'
+                          ? 'rgb(28, 36, 50)'
+                          : 'rgb(232, 236, 244)'
+                    : undefined,
+                border: isDropTarget ? 2 : undefined,
+                borderColor: isDropTarget ? 'primary.main' : undefined,
+                boxShadow: isDropTarget
+                  ? 'inset 0 0 0 1px rgba(25, 118, 210, 0.35), 0 0 0 1px rgba(25, 118, 210, 0.15)'
+                  : pinSide === 'left'
                     ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                     : pinSide === 'right'
                       ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                       : undefined,
+                opacity: isDraggingColumn ? 0.78 : 1,
+                '&::before': isBeforeDrop
+                  ? {
+                      content: '""',
+                      position: 'absolute',
+                      left: 4,
+                      top: 4,
+                      bottom: 4,
+                      width: 3,
+                      borderRadius: 999,
+                      backgroundColor: 'primary.main',
+                    }
+                  : undefined,
+                '&::after': isAfterDrop
+                  ? {
+                      content: '""',
+                      position: 'absolute',
+                      right: 4,
+                      top: 4,
+                      bottom: 4,
+                      width: 3,
+                      borderRadius: 999,
+                      backgroundColor: 'primary.main',
+                    }
+                  : undefined,
                 '& .f1-grid-col-menu-btn': {
                   opacity: isMenuOpen ? 1 : 0,
                   transition: 'opacity 0.15s ease-in-out',
@@ -384,6 +586,11 @@ export function GridHeader<T extends object>({
                   role="separator"
                   aria-label={`${column.headerName} 컬럼 너비 조절`}
                   onMouseDown={(event) => handleResizeStart(event, column)}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleAutoFitColumn(column);
+                  }}
                   sx={{
                     position: 'absolute',
                     right: 0,
@@ -408,29 +615,33 @@ export function GridHeader<T extends object>({
         open={Boolean(menuAnchor)}
         onClose={closeMenus}
       >
-        <MenuItem
-          onClick={() => {
-            if (menuColumn) onToggleSort(menuColumn, 'asc');
-            closeMenus();
-          }}
-        >
-          <ListItemIcon>
-            <ArrowUpwardIcon fontSize="small" />
-          </ListItemIcon>
-          오름차순 정렬
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            if (menuColumn) onToggleSort(menuColumn, 'desc');
-            closeMenus();
-          }}
-        >
-          <ListItemIcon>
-            <ArrowDownwardIcon fontSize="small" />
-          </ListItemIcon>
-          내림차순 정렬
-        </MenuItem>
-        <Divider />
+        {!disableSorting ? (
+          <>
+            <MenuItem
+              onClick={() => {
+                if (menuColumn) onToggleSort(menuColumn, 'asc');
+                closeMenus();
+              }}
+            >
+              <ListItemIcon>
+                <ArrowUpwardIcon fontSize="small" />
+              </ListItemIcon>
+              오름차순 정렬
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (menuColumn) onToggleSort(menuColumn, 'desc');
+                closeMenus();
+              }}
+            >
+              <ListItemIcon>
+                <ArrowDownwardIcon fontSize="small" />
+              </ListItemIcon>
+              내림차순 정렬
+            </MenuItem>
+            <Divider />
+          </>
+        ) : null}
         <MenuItem
           onClick={(event) => {
             event.stopPropagation();
@@ -439,13 +650,17 @@ export function GridHeader<T extends object>({
         >
           컬럼 목록
         </MenuItem>
-        <Divider />
-        <MenuItem onClick={openFilterPopover}>
-          <ListItemIcon>
-            <FilterListIcon fontSize="small" />
-          </ListItemIcon>
-          필터
-        </MenuItem>
+        {!disableFiltering ? (
+          <>
+            <Divider />
+            <MenuItem onClick={openFilterPopover}>
+              <ListItemIcon>
+                <FilterListIcon fontSize="small" />
+              </ListItemIcon>
+              필터
+            </MenuItem>
+          </>
+        ) : null}
         <Divider />
         <MenuItem
           onClick={() => {

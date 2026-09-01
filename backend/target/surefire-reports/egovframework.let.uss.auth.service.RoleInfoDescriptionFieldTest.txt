@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: egovframework.let.uss.auth.service.RoleInfoDescriptionFieldTest
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in egovframework.let.uss.auth.service.RoleInfoDescriptionFieldTest

@@ -53,6 +53,38 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 
 ---
 
+## 체크박스 옵션 정리
+
+현재 구현 기준으로 체크박스 관련 옵션은 의도가 다르므로 중복으로 보지 않는 것이 맞다.
+
+- `F1GridProps.showCheckbox`: 행 선택용 체크박스 컬럼 전체 표시 여부
+- `F1GridColumn.headerCheckbox`: `type: 'checkbox'` 컬럼에서 헤더 전체 선택 토글 허용
+- `F1TreeProps.treeCheckbox`: 트리 노드용 체크박스 선택 토글
+
+즉, `showCheckbox`는 Row Selector를 제어하고, `headerCheckbox`는 데이터 셀의 boolean 값을 편집하는 컬럼 동작을 제어한다.
+이 둘을 혼동하면 동일한 "체크박스" 이름 때문에 문서가 헷갈리기 쉽다.
+
+---
+
+## 추가 반영 기능 요약 (2026-09-01 기준)
+
+현재 구현된 `F1Grid`/`F1Tree`는 아래 기능을 실제로 지원한다.
+
+- 헤더 메뉴에서 컬럼 정렬, 필터, 고정, 숨김/표시를 조작할 수 있다.
+- 컬럼 리사이즈와 컬럼 고정 상태가 동시에 동작하며, 마지막 남은 표시 컬럼은 숨길 수 없다.
+- 행 높이 조절 핸들과 키보드 `ArrowUp`/`ArrowDown`으로 `4px` 단위 조절이 가능하다.
+- `wrapText: true` 옵션이 있는 컬럼은 행 높이가 커질 때 줄바꿈을 허용하고, 기본 컬럼은 한 줄 말줄임 유지한다.
+- `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
+- `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
+- `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
+- `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
+- `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
+- `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+
+이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
+
+---
+
 # 3. 최우선 개발 원칙
 
 ERP Grid는 다음 우선순위를 기준으로 개발한다.
@@ -200,8 +232,28 @@ type F1GridColumnType =
   | 'checkbox'
   | 'select'
   | 'autocomplete'
-  | 'code'
-  | 'button';
+  | 'code';
+
+interface F1GridColumn<T> {
+  field: keyof T;
+  headerName: string;
+  width?: number;
+  flex?: number;
+  editable?: boolean | ((row: T) => boolean);
+  type?: F1GridEditorType;
+  options?: { value: string | number | boolean; label: string }[];
+  required?: boolean;
+  min?: number;
+  max?: number;
+  validate?: (value: T[keyof T], row: T) => string | boolean;
+  align?: 'left' | 'center' | 'right';
+  headerAlign?: 'left' | 'center' | 'right';
+  wrapText?: boolean;
+  mergeRows?: boolean;
+  headerCheckbox?: boolean;
+  hidden?: boolean;
+  pinned?: 'left' | 'right';
+}
 ```
 
 Row Merge 설정:
@@ -279,6 +331,25 @@ const columns: F1GridColumn<PurchaseLine>[] = [
 - Current Page Select All
 - Shift Range Selection
 - Ctrl Multi Selection
+
+Grid-level checkbox column visibility is controlled by `showCheckbox` on `F1Grid`.
+This is different from a data column whose type is `checkbox` and may optionally enable `headerCheckbox` for header select-all.
+
+```tsx
+<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox={false} />;
+
+const columns: F1GridColumn<Item>[] = [
+  {
+    field: 'useYn',
+    headerName: '사용여부',
+    type: 'checkbox',
+    headerCheckbox: true,
+  },
+];
+```
+
+`showCheckbox={false}` hides the row-selection checkbox column entirely.
+`column.type === 'checkbox'` and `headerCheckbox: true` are for data editing inside the grid cell, not for toggling the row selector.
 
 API:
 
@@ -724,6 +795,16 @@ none
 ```
 
 컬럼 표시 여부는 별도의 컬럼 관리 버튼을 추가하지 않고 각 컬럼 헤더 메뉴에서 관리한다. 헤더 메뉴의 `컬럼 목록` 하위 메뉴는 전체 컬럼을 체크박스로 제공하며, 체크 해제로 숨기고 다시 체크해 표시한다. 마지막으로 표시된 컬럼은 숨길 수 없다.
+추가로 헤더 메뉴는 정렬/필터/고정/숨김/표시를 한 번에 제어하는 공통 UX를 제공한다.
+
+초기 렌더링부터 특정 컬럼을 고정하려면 컬럼 옵션에 `pinned`를 지정한다. 이후 사용자는 기존 헤더 메뉴에서 고정 위치를 변경하거나 해제할 수 있다.
+
+```typescript
+const columns: F1GridColumn<Item>[] = [
+  { field: 'itemCode', headerName: '품목코드', width: 130, pinned: 'left' },
+  { field: 'amount', headerName: '금액', width: 140, pinned: 'right' },
+];
+```
 
 ---
 
@@ -929,6 +1010,19 @@ ERP 메뉴, 조직, BOM 등에 사용할 수 있도록 Tree 구조를 확장 가
 ```
 
 Tree Grid는 일반 Grid와 별도의 컴포넌트로 분리하지 않고 Core Grid 위에서 확장 가능하도록 설계한다.
+
+초기 렌더링 시 모든 부모 노드를 펼치려면 `defaultExpandAll` 옵션을 사용한다. 기존처럼 세부 초기 펼침 상태가 필요하면 `defaultExpanded="all"`, `defaultExpanded="root"`, 또는 특정 row id 배열을 사용할 수 있다.
+
+```tsx
+<F1Tree
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  parentKey="parentId"
+  treeColumn="name"
+  defaultExpandAll
+/>
+```
 
 ---
 
