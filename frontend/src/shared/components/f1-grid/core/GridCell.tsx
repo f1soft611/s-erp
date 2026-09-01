@@ -77,7 +77,10 @@ export function GridCell<T extends object>({
 }: GridCellProps<T>) {
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
-  const displayValue = getCellDisplayValue(column, value as T[keyof T]);
+  const displayValue =
+    column.type === 'rownumber'
+      ? String(rowIndex + 1)
+      : getCellDisplayValue(column, value as T[keyof T]);
 
   return (
     <Box
@@ -113,21 +116,26 @@ export function GridCell<T extends object>({
       data-grid-selected={selected ? 'true' : 'false'}
       sx={{
         gridColumn: columnIndex + 2,
-        minHeight: 40,
+        minHeight: 0,
         minWidth: 0,
+        width: '100%',
         maxWidth: '100%',
         overflow: 'hidden',
         boxSizing: 'border-box',
         p: column.type === 'checkbox' ? 0.25 : 1,
         display: 'flex',
         alignItems: 'center',
+        alignSelf: 'stretch',
         justifyContent: toJustifyContent(
-          column.align ?? (column.type === 'number' ? 'right' : 'left'),
+          column.align ??
+            (column.type === 'number' || column.type === 'rownumber'
+              ? 'right'
+              : 'left'),
         ),
         cursor: editing ? 'text' : 'default',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        borderLeft: columnLine ? 1 : 0,
+        borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
         borderLeftColor: 'divider',
         gridRow: mergeInfo?.isStart
           ? `${rowIndex + 1} / span ${mergeInfo.span}`

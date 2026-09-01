@@ -9,7 +9,6 @@ import {
   DialogTitle,
   FormControl,
   IconButton,
-  InputLabel,
   MenuItem,
   Select,
   TextField,
@@ -332,23 +331,39 @@ export function MenuManagementPage({
             minWidth: { sm: 220 },
             maxWidth: '100%',
             flex: '0 1 280px',
-            alignSelf: 'flex-end',
+            height: 40,
             m: 0,
             '& .MuiOutlinedInput-root': {
+              height: '100%',
               borderRadius: 2,
               backgroundColor: 'rgba(255,255,255,0.72)',
             },
           }}
         >
-          <InputLabel id="menu-module-label">모듈 선택</InputLabel>
           <Select
-            labelId="menu-module-label"
-            label="모듈 선택"
             value={selectedModuleId ?? ''}
+            displayEmpty
+            inputProps={{ 'aria-label': '모듈 선택' }}
             disabled={loading || saving || modules.length === 0}
             onChange={(event) =>
               requestModuleChange(Number(event.target.value))
             }
+            renderValue={(selected) => {
+              if (selectedModuleId === undefined) return '모듈 선택';
+              const matchingModule = modules.find(
+                (module) => module.moduleId === Number(selected),
+              );
+              return matchingModule?.moduleName ?? '모듈 선택';
+            }}
+            sx={{
+              '& .MuiSelect-select': {
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: '40px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+              },
+            }}
           >
             {modules.map((module) => (
               <MenuItem key={module.moduleId} value={module.moduleId}>
@@ -360,6 +375,7 @@ export function MenuManagementPage({
 
         <TextField
           size="small"
+          margin="none"
           placeholder="메뉴명/코드 검색"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -395,8 +411,9 @@ export function MenuManagementPage({
             flex: '1 1 220px',
             minWidth: { xs: '100%', sm: 220 },
             maxWidth: 360,
-            alignSelf: 'flex-end',
+            height: 40,
             '& .MuiOutlinedInput-root': {
+              height: '100%',
               borderRadius: 2,
               backgroundColor: 'rgba(255,255,255,0.72)',
             },

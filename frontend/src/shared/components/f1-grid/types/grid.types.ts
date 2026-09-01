@@ -15,7 +15,8 @@ export type F1GridEditorType =
   | 'time'
   | 'select'
   | 'autocomplete'
-  | 'code';
+  | 'code'
+  | 'rownumber';
 
 export type F1GridOption = {
   value: string | number | boolean;
@@ -30,6 +31,7 @@ export type F1GridColumn<T extends object> = {
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;
   flex?: number;
+  maxWidth?: number;
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
   options?: F1GridOption[];
@@ -48,6 +50,7 @@ export type F1GridColumn<T extends object> = {
   headerCheckbox?: boolean;
   hidden?: boolean;
   pinned?: F1GridPinSide;
+  syncWithTreeCheckbox?: boolean;
 };
 
 export type F1GridChanges<T> = {
@@ -96,6 +99,7 @@ export type F1GridProps<T extends object> = {
   rowKey: keyof T;
   ariaLabel?: string;
   columnLine?: boolean;
+  storageKey?: string;
   rowHeight?: number;
   minRowHeight?: number;
   maxRowHeight?: number;
@@ -127,6 +131,7 @@ export type F1GridRef<T extends object> = {
   validate(): boolean;
   startEdit(rowId: F1GridRowId, field: keyof T): void;
   stopEdit(): void;
+  setCellValue(rowId: F1GridRowId, field: keyof T, value: unknown): void;
 };
 
 export type F1TreeProps<T extends object> = Omit<

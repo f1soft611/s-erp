@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react';
 import { Box } from '@mui/material';
+import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
 import {
@@ -47,6 +48,8 @@ import { clampGridRowHeight } from '../layout/GridRowHeight';
 import {
   canHideGridColumn,
   getVisibleGridColumns,
+  moveGridColumnOrder,
+  reorderGridColumns,
 } from '../columns/GridColumnManagement';
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
@@ -69,6 +72,7 @@ function F1GridInner<T extends object>(
     rowKey,
     ariaLabel = 'F1-GRID',
     columnLine = false,
+    storageKey,
     rowHeight = 40,
     minRowHeight = 40,
     maxRowHeight = 300,
@@ -109,10 +113,14 @@ function F1GridInner<T extends object>(
   } | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
-  const normalizedMinRowHeight = Math.max(1, minRowHeight);
-  const normalizedMaxRowHeight = Math.max(normalizedMinRowHeight, maxRowHeight);
+  const displayScale = useOptionalDisplayScale();
+  const normalizedMinRowHeight = Math.max(1, minRowHeight * displayScale);
+  const normalizedMaxRowHeight = Math.max(
+    normalizedMinRowHeight,
+    maxRowHeight * displayScale,
+  );
   const defaultRowHeight = clampGridRowHeight(
-    rowHeight,
+    rowHeight * displayScale,
     normalizedMinRowHeight,
     normalizedMaxRowHeight,
   );
@@ -136,11 +144,37 @@ function F1GridInner<T extends object>(
           .map((column) => [String(column.field), column.pinned!]),
       ),
   );
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    if (storageKey) {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {
+          // ignore malformed storage value and fall back to default order
+        }
+      }
+    }
+    return columns.map((column) => String(column.field));
+  });
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
 
+  useEffect(() => {
+    if (!storageKey) return;
+    window.localStorage.setItem(storageKey, JSON.stringify(columnOrder));
+  }, [columnOrder, storageKey]);
+
+  function reorderColumn(sourceField: string, targetField: string) {
+    setColumnOrder((current) =>
+      moveGridColumnOrder(current, sourceField, targetField),
+    );
+  }
+
+  const orderedColumns = reorderGridColumns(columns, columnOrder);
   const visibleColumns = getPinnedGridColumns(
-    getVisibleGridColumns(columns, hiddenColumnFields),
+    getVisibleGridColumns(orderedColumns, hiddenColumnFields),
     pinnedFields,
   );
   const { leftOffsets, rightOffsets } = getGridColumnPinOffsets(
@@ -825,6 +859,13 @@ function F1GridInner<T extends object>(
     stopEdit() {
       stopEdit();
     },
+    setCellValue(rowId: F1GridRowId, field: keyof T, value: unknown) {
+      setData((current) =>
+        updateGridRow(current, rowKey, rowId, {
+          [field]: value,
+        } as Partial<T>),
+      );
+    },
   }));
 
   const selectedAll =
@@ -841,6 +882,7 @@ function F1GridInner<T extends object>(
         minWidth: 0,
         maxWidth: '100%',
         overflowX: 'auto',
+        overflowY: 'hidden',
         border: 1,
         borderColor: 'divider',
         borderRadius: 1,
@@ -850,6 +892,7 @@ function F1GridInner<T extends object>(
       <GridHeader
         columns={visibleColumns}
         allColumns={columns}
+        rows={visibleRows}
         columnLine={columnLine}
         selectedAll={selectedAll}
         selectedIds={selectedIds}
@@ -878,6 +921,7 @@ function F1GridInner<T extends object>(
         onPinColumn={pinColumn}
         leftOffsets={leftOffsets}
         rightOffsets={rightOffsets}
+        onReorderColumn={reorderColumn}
       />
       <GridBody
         visibleRows={visibleRows}

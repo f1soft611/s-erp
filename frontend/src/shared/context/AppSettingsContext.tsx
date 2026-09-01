@@ -102,3 +102,8 @@ export function useAppSettings() {
   }
   return context;
 }
+
+export function useOptionalDisplayScale(): number {
+  const context = useContext(AppSettingsContext);
+  return context?.displayScale ?? DEFAULT_DISPLAY_SCALE;
+}

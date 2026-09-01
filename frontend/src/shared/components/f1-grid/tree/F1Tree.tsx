@@ -128,6 +128,21 @@ function F1TreeInner<T extends object>(
       }
       return next;
     });
+
+    const syncedCheckboxFields = gridProps.columns
+      .filter(
+        (column) =>
+          column.type === 'checkbox' && column.syncWithTreeCheckbox !== false,
+      )
+      .map((column) => column.field);
+    if (syncedCheckboxFields.length === 0) return;
+
+    const targetIds = [rowId, ...getDescendantIds(rowId)];
+    targetIds.forEach((id) => {
+      syncedCheckboxFields.forEach((field) => {
+        gridRef.current?.setCellValue(id, field, nextChecked);
+      });
+    });
   }
 
   useEffect(() => {
@@ -234,6 +249,8 @@ function F1TreeInner<T extends object>(
     validate: () => gridRef.current?.validate() ?? true,
     startEdit: (rowId, field) => gridRef.current?.startEdit(rowId, field),
     stopEdit: () => gridRef.current?.stopEdit(),
+    setCellValue: (rowId, field, value) =>
+      gridRef.current?.setCellValue(rowId, field, value),
     expandRow: addExpanded,
     collapseRow: removeExpanded,
     expandAll: () => setExpandedIds(new Set(allParentIds)),

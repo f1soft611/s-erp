@@ -701,6 +701,15 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByText('환경설정 > 시스템관리 > 메뉴관리'),
     ).toBeVisible();
+    const hiddenBreadcrumb = screen
+      .getAllByText('환경설정 > 시스템관리 > 메뉴관리')
+      .find((element) => element.getAttribute('aria-hidden') === 'true');
+    expect(hiddenBreadcrumb).toHaveStyle({ width: '1px', height: '1px' });
+    expect(
+      screen
+        .getByText('환경설정 > 시스템관리 > 메뉴관리')
+        .closest('.MuiTypography-root'),
+    ).toHaveStyle({ overflowWrap: 'anywhere' });
   });
 
   it('shows only query, save, and delete for read, write, and delete permissions', async () => {
@@ -766,16 +775,14 @@ describe('MenuManagementPage module selection', () => {
 
     await screen.findByRole('combobox', { name: '모듈 선택' });
 
-    const moduleSelector = screen
-      .getByRole('combobox', { name: '모듈 선택' })
-      .closest('.MuiFormControl-root');
-    const searchField = screen
-      .getByRole('textbox', { name: '메뉴 검색' })
-      .closest('.MuiFormControl-root');
+    const moduleSelector = screen.getByRole('combobox', { name: '모듈 선택' });
+    const searchField = screen.getByRole('textbox', { name: '메뉴 검색' });
+    const searchFieldRoot = searchField.closest('.MuiFormControl-root');
 
-    expect(moduleSelector).toHaveStyle({ alignSelf: 'flex-end' });
-    expect(searchField).toHaveStyle({ alignSelf: 'flex-end' });
-    expect(screen.getByRole('textbox', { name: '메뉴 검색' })).toBeVisible();
+    expect(moduleSelector).toBeVisible();
+    expect(searchField).toBeVisible();
+    expect(moduleSelector).toHaveAccessibleName('모듈 선택');
+    expect(searchFieldRoot).toHaveStyle({ margin: '0px' });
   });
 
   it('handles search input change, enter key search, and clear button', async () => {

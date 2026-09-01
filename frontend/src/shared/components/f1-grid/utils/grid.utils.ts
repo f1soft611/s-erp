@@ -29,6 +29,7 @@ export function isCellEditable<T extends object>(
   column: F1GridColumn<T>,
   row: T,
 ): boolean {
+  if (column.type === 'rownumber') return false;
   return typeof column.editable === 'function'
     ? column.editable(row)
     : Boolean(column.editable);
@@ -64,4 +65,46 @@ export function getCellDisplayValue<T extends object>(
   }
 
   return String(value ?? '');
+}
+
+const GRID_CELL_FONT = '400 13px "Roboto", "Helvetica", "Arial", sans-serif';
+const AUTO_FIT_CELL_PADDING = 32;
+
+let measureContext: CanvasRenderingContext2D | null | undefined;
+
+function getMeasureContext(): CanvasRenderingContext2D | null {
+  if (measureContext !== undefined) return measureContext;
+  measureContext =
+    typeof document === 'undefined'
+      ? null
+      : (document.createElement('canvas').getContext('2d') ?? null);
+  return measureContext;
+}
+
+function measureTextWidth(text: string): number {
+  const context = getMeasureContext();
+  if (!context) return text.length * 7;
+  context.font = GRID_CELL_FONT;
+  return context.measureText(text).width;
+}
+
+export function getAutoFitColumnWidth<T extends object>(
+  column: F1GridColumn<T>,
+  rows: T[],
+  options: { minWidth: number },
+): number {
+  const headerWidth = measureTextWidth(column.headerName);
+  const contentWidth = rows.reduce((widest, row) => {
+    const rawValue = column.getValue?.(row) ?? row[column.field];
+    const displayValue = getCellDisplayValue(column, rawValue as T[keyof T]);
+    return Math.max(widest, measureTextWidth(displayValue));
+  }, 0);
+
+  const measuredWidth =
+    Math.max(headerWidth, contentWidth) + AUTO_FIT_CELL_PADDING;
+  const clampedWidth = Math.max(options.minWidth, measuredWidth);
+
+  return column.maxWidth !== undefined
+    ? Math.min(column.maxWidth, clampedWidth)
+    : clampedWidth;
 }

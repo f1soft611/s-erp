@@ -20,7 +20,7 @@ import { canHideGridColumn } from '../columns/GridColumnManagement';
 import { getGridColumnPinSide } from '../columns/GridColumnPin';
 import { getGridFilterOperators } from '../filter/GridFilter';
 import { getGridSortIndicator } from '../sorting/GridSort';
-import { getGridColumnTrack } from '../utils/grid.utils';
+import { getAutoFitColumnWidth, getGridColumnTrack } from '../utils/grid.utils';
 import type {
   F1GridColumn,
   F1GridFilter,
@@ -48,6 +48,7 @@ const OPERATOR_LABELS: Record<F1GridFilterOperator, string> = {
 type GridHeaderProps<T extends object> = {
   columns: F1GridColumn<T>[];
   allColumns: F1GridColumn<T>[];
+  rows: T[];
   columnLine: boolean;
   selectedAll: boolean;
   selectedIds: F1GridRowId[];
@@ -80,11 +81,13 @@ type GridHeaderProps<T extends object> = {
   ) => void;
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
+  onReorderColumn?: (sourceField: string, targetField: string) => void;
 };
 
 export function GridHeader<T extends object>({
   columns,
   allColumns,
+  rows,
   columnLine,
   selectedAll,
   selectedIds,
@@ -107,6 +110,7 @@ export function GridHeader<T extends object>({
   onPinColumn,
   leftOffsets,
   rightOffsets,
+  onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
@@ -143,6 +147,13 @@ export function GridHeader<T extends object>({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+  }
+
+  function handleAutoFitColumn(column: F1GridColumn<T>) {
+    const nextWidth = getAutoFitColumnWidth(column, rows, {
+      minWidth: minColumnWidth,
+    });
+    onResizeColumn(column, nextWidth);
   }
 
   function closeMenus() {
@@ -258,12 +269,15 @@ export function GridHeader<T extends object>({
         py: 0.75,
         borderRight: 1,
         borderRightColor: 'divider',
-        borderLeft: 0,
+        borderLeft: columnLine ? 1 : 0,
+        borderLeftColor: 'divider',
         color: 'text.primary',
         fontSize: 'inherit',
         fontWeight: 700,
         lineHeight: 1.2,
         minHeight: 36,
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {segment.label}
@@ -332,6 +346,23 @@ export function GridHeader<T extends object>({
             <Box
               key={String(column.field)}
               role="columnheader"
+              draggable={Boolean(onReorderColumn) && !pinSide}
+              onDragStart={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                event.dataTransfer.setData('text/plain', String(column.field));
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (!onReorderColumn || pinSide) return;
+                event.preventDefault();
+                const sourceField = event.dataTransfer.getData('text/plain');
+                if (!sourceField) return;
+                onReorderColumn(sourceField, String(column.field));
+              }}
               sx={{
                 gridColumn: (showCheckbox ? 2 : 1) + columnIndex,
                 gridRow: hasGroups ? (grouped ? 2 : '1 / span 2') : undefined,
@@ -348,10 +379,13 @@ export function GridHeader<T extends object>({
                 textAlign: column.headerAlign ?? 'left',
                 borderTop: grouped ? 1 : 0,
                 borderTopColor: 'divider',
-                borderRight: 1,
+                borderRight: columnLine ? 0 : 1,
                 borderRightColor: 'divider',
-                borderLeft: columnLine ? 1 : 0,
+                borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
                 borderLeftColor: 'divider',
+                minWidth: 0,
+                width: '100%',
+                boxSizing: 'border-box',
                 position: pinSide ? 'sticky' : 'relative',
                 left:
                   pinSide === 'left'
@@ -461,6 +495,11 @@ export function GridHeader<T extends object>({
                   role="separator"
                   aria-label={`${column.headerName} 컬럼 너비 조절`}
                   onMouseDown={(event) => handleResizeStart(event, column)}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleAutoFitColumn(column);
+                  }}
                   sx={{
                     position: 'absolute',
                     right: 0,

@@ -172,6 +172,15 @@ export const MenuManagementPanel = forwardRef<
 
   const columns: F1GridColumn<MenuManagementRow>[] = [
     {
+      field: 'id',
+      type: 'rownumber',
+      width: 60,
+      headerName: '순번',
+      headerAlign: 'center',
+      align: 'center',
+      pinned: 'left',
+    },
+    {
       field: 'name',
       headerName: '메뉴명',
       width: 220,
@@ -214,6 +223,7 @@ export const MenuManagementPanel = forwardRef<
       editable: true,
       type: 'checkbox',
       headerCheckbox: true,
+      syncWithTreeCheckbox: false,
       headerAlign: 'center',
       align: 'center',
     },
@@ -402,7 +412,7 @@ export const MenuManagementPanel = forwardRef<
             showCheckbox
             treeCheckbox
             getRowOrder={(row) => row.order}
-            // columnLine
+            columnLine
             ariaLabel="F1-TREE 메뉴 관리"
             createRow={createMenuRow}
             onChangesChange={setChanges}

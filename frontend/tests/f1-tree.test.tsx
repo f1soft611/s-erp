@@ -293,6 +293,83 @@ describe('F1Tree interaction', () => {
     expect(childTreeCheckbox).not.toBeChecked();
   });
 
+  it('syncs checkbox-type data columns when treeCheckbox is toggled', () => {
+    const columnsWithCheckbox = [
+      ...columns,
+      {
+        field: 'allowed' as const,
+        headerName: '허용',
+        type: 'checkbox' as const,
+      },
+    ];
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columnsWithCheckbox}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 체크박스 컬럼 동기화 테스트"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const rootTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Root 트리 선택',
+    });
+    const rootAllowedCheckbox = screen.getByRole('checkbox', {
+      name: '허용 root',
+    });
+    const childAllowedCheckbox = screen.getByRole('checkbox', {
+      name: '허용 child',
+    });
+
+    expect(rootAllowedCheckbox).not.toBeChecked();
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootAllowedCheckbox).toBeChecked();
+    expect(childAllowedCheckbox).toBeChecked();
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootAllowedCheckbox).not.toBeChecked();
+    expect(childAllowedCheckbox).not.toBeChecked();
+  });
+
+  it('skips syncing checkbox columns marked with syncWithTreeCheckbox: false', () => {
+    const columnsWithCheckbox = [
+      ...columns,
+      {
+        field: 'allowed' as const,
+        headerName: '허용',
+        type: 'checkbox' as const,
+        syncWithTreeCheckbox: false,
+      },
+    ];
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columnsWithCheckbox}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 체크박스 컬럼 동기화 제외 테스트"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const rootTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Root 트리 선택',
+    });
+    const rootAllowedCheckbox = screen.getByRole('checkbox', {
+      name: '허용 root',
+    });
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootAllowedCheckbox).not.toBeChecked();
+  });
+
   it('hides the row selection checkbox column when the checkbox option is disabled', () => {
     render(
       <F1Tree

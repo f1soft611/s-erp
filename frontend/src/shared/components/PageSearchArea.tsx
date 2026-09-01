@@ -53,7 +53,7 @@ export function PageSearchArea({ children }: PageSearchAreaProps) {
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
-          alignItems: 'flex-end',
+          alignItems: 'stretch',
           gap: 1.5,
         }}
       >

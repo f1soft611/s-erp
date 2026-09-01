@@ -24,18 +24,30 @@ export function PageHeader({
   const breadcrumbText = breadcrumbItems.join(' > ');
 
   const breadcrumbBlock = (
-    <Box>
+    <Box
+      sx={{
+        width: { xs: '100%', sm: 'auto' },
+        minWidth: 0,
+        maxWidth: '100%',
+      }}
+    >
       <Typography
         variant="overline"
-        sx={{ color: '#64748b', letterSpacing: 1.4, display: 'block' }}
+        sx={{
+          color: '#64748b',
+          letterSpacing: 1.4,
+          display: 'block',
+          maxWidth: '100%',
+          overflowWrap: 'anywhere',
+        }}
       >
         <Box
           component="span"
           aria-hidden="true"
           sx={{
             position: 'absolute',
-            width: 1,
-            height: 1,
+            width: '1px',
+            height: '1px',
             p: 0,
             m: 0,
             overflow: 'hidden',
