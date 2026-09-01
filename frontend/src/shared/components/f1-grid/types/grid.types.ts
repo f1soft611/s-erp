@@ -134,10 +134,12 @@ export type F1TreeProps<T extends object> = Omit<
 > & {
   parentKey: keyof T;
   treeColumn: keyof T;
+  treeCheckbox?: boolean;
   defaultExpandAll?: boolean;
   defaultExpanded?: 'all' | 'root' | F1GridRowId[];
   getRowOrder?: (row: T) => number;
   onDeleteBlocked?: (rowIds: F1GridRowId[]) => void;
+  onTreeCheckboxChange?: (rowIds: F1GridRowId[]) => void;
 };
 
 export type F1TreeRef<T extends object> = F1GridRef<T> & {

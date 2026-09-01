@@ -1,6 +1,6 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { Box, IconButton } from '@mui/material';
+import { Box, Checkbox, IconButton } from '@mui/material';
 import {
   forwardRef,
   useEffect,
@@ -26,10 +26,12 @@ function F1TreeInner<T extends object>(
   {
     parentKey,
     treeColumn,
+    treeCheckbox = false,
     defaultExpandAll,
     defaultExpanded = 'all',
     getRowOrder,
     onDeleteBlocked,
+    onTreeCheckboxChange,
     rows,
     rowKey,
     ...gridProps
@@ -67,6 +69,70 @@ function F1TreeInner<T extends object>(
             : defaultExpanded,
       ),
   );
+  const [treeCheckedIds, setTreeCheckedIds] = useState<Set<F1GridRowId>>(
+    () => new Set(),
+  );
+
+  const childIdsByParent = useMemo(() => {
+    const map = new Map<F1GridRowId, F1GridRowId[]>();
+    rows.forEach((row) => {
+      const rowId = getGridRowId(row, rowKey);
+      const parentRowId = row[parentKey];
+      const parentKeyValue =
+        typeof parentRowId === 'string' || typeof parentRowId === 'number'
+          ? parentRowId
+          : null;
+      if (parentKeyValue == null) return;
+      const next = map.get(parentKeyValue) ?? [];
+      next.push(rowId);
+      map.set(parentKeyValue, next);
+    });
+    return map;
+  }, [parentKey, rowKey, rows]);
+
+  function getDescendantIds(rowId: F1GridRowId): F1GridRowId[] {
+    const descendants: F1GridRowId[] = [];
+    const visit = (current: F1GridRowId) => {
+      const children = childIdsByParent.get(current) ?? [];
+      children.forEach((child) => {
+        descendants.push(child);
+        visit(child);
+      });
+    };
+    visit(rowId);
+    return descendants;
+  }
+
+  function getTreeCheckboxState(rowId: F1GridRowId) {
+    const targetIds = [rowId, ...getDescendantIds(rowId)];
+    const checkedCount = targetIds.filter((id) =>
+      treeCheckedIds.has(id),
+    ).length;
+    if (checkedCount === 0) {
+      return { checked: false, indeterminate: false };
+    }
+    if (checkedCount === targetIds.length) {
+      return { checked: true, indeterminate: false };
+    }
+    return { checked: false, indeterminate: true };
+  }
+
+  function toggleTreeCheckbox(rowId: F1GridRowId, nextChecked: boolean) {
+    setTreeCheckedIds((current) => {
+      const next = new Set(current);
+      const targetIds = [rowId, ...getDescendantIds(rowId)];
+      if (nextChecked) {
+        targetIds.forEach((id) => next.add(id));
+      } else {
+        targetIds.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    onTreeCheckboxChange?.([...treeCheckedIds]);
+  }, [onTreeCheckboxChange, treeCheckedIds]);
 
   useEffect(() => {
     if (!defaultExpandAll || allParentIds.length === 0) return;
@@ -189,10 +255,25 @@ function F1TreeInner<T extends object>(
         if (!meta) return undefined;
         const expanded = expandedIds.has(rowId);
         const label = String(row[treeColumn] ?? '');
+        const treeCheckboxState = treeCheckbox
+          ? getTreeCheckboxState(rowId)
+          : undefined;
         return (
           <Box
             sx={{ display: 'flex', alignItems: 'center', pl: meta.depth * 2 }}
           >
+            {treeCheckbox ? (
+              <Checkbox
+                size="small"
+                checked={treeCheckboxState?.checked ?? false}
+                indeterminate={treeCheckboxState?.indeterminate ?? false}
+                inputProps={{ 'aria-label': undefined, 'aria-hidden': true }}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  toggleTreeCheckbox(rowId, event.target.checked);
+                }}
+              />
+            ) : null}
             {meta.hasChildren ? (
               <IconButton
                 size="small"

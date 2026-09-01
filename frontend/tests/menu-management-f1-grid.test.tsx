@@ -26,7 +26,7 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../src/shared/services/apiClient', () => apiMocks);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 const modules: MenuModuleOption[] = [

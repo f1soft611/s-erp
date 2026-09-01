@@ -10,6 +10,7 @@ import {
   InputAdornment,
   Stack,
   Typography,
+  useTheme,
 } from '@mui/material';
 import LoginFormField from '../../../shared/components/LoginFormField';
 import type {
@@ -42,15 +43,22 @@ export function LoginForm({
   onTogglePassword,
   onSubmit,
 }: LoginFormProps) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   return (
     <Card
       sx={{
         width: '100%',
         maxWidth: 450,
         borderRadius: 2.5,
-        border: '1px solid rgba(148, 163, 184, 0.18)',
-        boxShadow: '0 16px 28px rgba(15, 23, 42, 0.08)',
-        background: 'rgba(255,255,255,0.96)',
+        border: isDark
+          ? '1px solid rgba(96,165,250,0.28)'
+          : '1px solid rgba(148, 163, 184, 0.18)',
+        boxShadow: isDark
+          ? '0 16px 28px rgba(2, 6, 23, 0.62)'
+          : '0 16px 28px rgba(15, 23, 42, 0.08)',
+        background: isDark ? '#111827' : 'rgba(255,255,255,0.96)',
       }}
     >
       <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
@@ -58,18 +66,25 @@ export function LoginForm({
           <Box sx={{ pb: 0.25 }}>
             <Typography
               variant="overline"
-              color="primary.main"
+              color={isDark ? 'primary.light' : 'primary.main'}
               sx={{ letterSpacing: 1.5, fontWeight: 800 }}
             >
               S-ERP
             </Typography>
-            <Typography variant="h4" sx={{ mt: 0.75, fontSize: '1.7rem' }}>
+            <Typography
+              variant="h4"
+              sx={{
+                mt: 0.75,
+                fontSize: '1.7rem',
+                color: isDark ? '#e2e8f0' : '#0f172a',
+              }}
+            >
               통합 ERP 시스템 로그인
             </Typography>
             <Typography
               variant="body2"
-              color="text.secondary"
-              sx={{ mt: 0.75 }}
+              color={isDark ? 'text.secondary' : 'text.secondary'}
+              sx={{ mt: 0.75, color: isDark ? '#cbd5e1' : '#475569' }}
             >
               기업 운영 정보를 안전하게 관리하기 위한 로그인 페이지입니다.
             </Typography>
@@ -107,6 +122,9 @@ export function LoginForm({
                   aria-label="toggle password visibility"
                   onClick={onTogglePassword}
                   edge="end"
+                  sx={{
+                    color: isDark ? '#cbd5e1' : '#475569',
+                  }}
                 >
                   {showPassword ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
@@ -144,15 +162,19 @@ export function LoginForm({
               sx={{
                 p: 1.5,
                 borderRadius: 1.5,
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                backgroundColor: 'rgba(248, 250, 252, 0.9)',
+                border: isDark
+                  ? '1px solid rgba(148, 163, 184, 0.25)'
+                  : '1px solid rgba(148, 163, 184, 0.3)',
+                backgroundColor: isDark
+                  ? '#0f172a'
+                  : 'rgba(248, 250, 252, 0.9)',
               }}
             >
               <Typography
                 variant="body2"
                 sx={{
                   display: 'block',
-                  color: 'text.secondary',
+                  color: isDark ? '#cbd5e1' : 'text.secondary',
                   fontWeight: 600,
                 }}
               >
@@ -160,7 +182,10 @@ export function LoginForm({
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ display: 'block', color: 'text.secondary' }}
+                sx={{
+                  display: 'block',
+                  color: isDark ? '#cbd5e1' : 'text.secondary',
+                }}
               >
                 (업체코드: T1358606250 / 아이디: admin / 비밀번호: f1soft@611)
               </Typography>
@@ -171,7 +196,7 @@ export function LoginForm({
             variant="caption"
             sx={{
               textAlign: 'center',
-              color: '#9aa4b2',
+              color: isDark ? '#9aa4b2' : '#9aa4b2',
               letterSpacing: '0.02em',
               pt: 0.25,
             }}

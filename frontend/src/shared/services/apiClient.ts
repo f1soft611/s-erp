@@ -1,4 +1,10 @@
-import { getStoredAuth } from './authService';
+import {
+  getStoredAuth,
+  isAccessTokenExpiringSoon,
+  isTokenExpired,
+  logout,
+  refreshAccessToken,
+} from './authService';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
@@ -10,13 +16,37 @@ interface ApiEnvelope<T> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const auth = getStoredAuth();
+  let auth = getStoredAuth();
+
+  if (!auth) {
+    logout();
+    throw new Error('로그인이 필요합니다. 다시 로그인해주세요.');
+  }
+
+  if (isTokenExpired(auth)) {
+    const refreshedAuth = await refreshAccessToken();
+    auth = refreshedAuth ?? getStoredAuth();
+
+    if (!auth) {
+      logout();
+      throw new Error('로그인이 만료되었습니다. 다시 로그인해주세요.');
+    }
+  } else if (isAccessTokenExpiringSoon(auth)) {
+    const refreshedAuth = await refreshAccessToken();
+    auth = refreshedAuth ?? getStoredAuth();
+
+    if (!auth) {
+      logout();
+      throw new Error('세션을 갱신할 수 없어 로그아웃됩니다.');
+    }
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((init?.headers as Record<string, string>) ?? {}),
   };
 
-  if (auth?.accessToken) {
+  if (auth.accessToken) {
     headers.Authorization = `Bearer ${auth.accessToken}`;
   }
 

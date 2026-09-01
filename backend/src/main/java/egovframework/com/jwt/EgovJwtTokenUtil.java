@@ -25,7 +25,7 @@ public class EgovJwtTokenUtil implements Serializable{
 
 	private static final long serialVersionUID = -5180902194184255251L;
 	//public static final long JWT_TOKEN_VALIDITY = 24 * 60 * 60; //하루
-	public static final long JWT_TOKEN_VALIDITY = 3 * 60 * 60; //토큰의 유효시간 설정, 3시간
+	public static final long JWT_TOKEN_VALIDITY = 15 * 60; //액세스 토큰 유효시간, 15분
 	public static final long JWT_REFRESH_TOKEN_VALIDITY = 7 * 24 * 60 * 60; //리프레쉬 토큰 유효시간, 7일
 	
 	public static final String SECRET_KEY = EgovProperties.getProperty("Globals.jwt.secret");

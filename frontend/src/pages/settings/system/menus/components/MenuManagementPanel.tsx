@@ -340,8 +340,9 @@ export function MenuManagementPanel({
             treeColumn="name"
             defaultExpandAll
             showCheckbox
+            treeCheckbox
             getRowOrder={(row) => row.order}
-            columnLine
+            // columnLine
             ariaLabel="F1-TREE 메뉴 관리"
             createRow={createMenuRow}
             onChangesChange={setChanges}

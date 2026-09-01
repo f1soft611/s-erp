@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
+import { apiGet } from '../src/shared/services/apiClient';
 
 describe('Login page', () => {
   it('renders the enterprise login fields', () => {
@@ -20,6 +21,83 @@ describe('Login page', () => {
     expect(screen.getByText(/업체코드를 입력해주세요/i)).toBeInTheDocument();
     expect(screen.getByText(/사용자 ID를 입력해주세요/i)).toBeInTheDocument();
     expect(screen.getByText(/비밀번호를 입력해주세요/i)).toBeInTheDocument();
+  });
+
+  it('applies the dark-theme login styling when the app is in dark mode', () => {
+    window.localStorage.setItem('erp-theme', 'dark');
+
+    render(<App />);
+
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    expect(document.body.style.backgroundColor).toBe('rgb(15, 23, 42)');
+    expect(screen.getByText(/통합 ERP 시스템 로그인/i)).toBeInTheDocument();
+  });
+
+  it('redirects to login when the stored JWT is expired and no refresh token exists', async () => {
+    window.localStorage.setItem(
+      's-erp-auth',
+      JSON.stringify({
+        tenantCode: 'T1358606250',
+        userId: 'admin',
+        accessToken: 'expired-token',
+        refreshToken: '',
+        expiresAt: new Date(Date.now() - 1000).toISOString(),
+      }),
+    );
+    window.history.pushState({}, '', '/dashboard');
+
+    render(<App />);
+
+    expect(await screen.findByLabelText(/업체코드/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /대시보드/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('refreshes an expiring access token before making API requests', async () => {
+    window.localStorage.setItem(
+      's-erp-auth',
+      JSON.stringify({
+        tenantCode: 'T1358606250',
+        userId: 'admin',
+        accessToken: 'expiring-token',
+        refreshToken: 'refresh-token',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url.includes('/auth/refresh')) {
+          return new Response(
+            JSON.stringify({
+              resultCode: '200',
+              resultMessage: '토큰 리프레쉬 성공',
+              jToken: 'refreshed-token',
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            resultCode: '200',
+            resultMessage: '성공',
+            result: { ok: true },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    await expect(apiGet('/api/test')).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/refresh'),
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('navigates to the dashboard after successful login', async () => {

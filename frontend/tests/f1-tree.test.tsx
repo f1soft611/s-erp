@@ -260,6 +260,39 @@ describe('F1Tree interaction', () => {
     );
   });
 
+  it('supports optional tree checkbox selection with parent-child cascade', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 트리 체크박스 테스트"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const rootTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Root 트리 선택',
+    });
+    const childTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Child 트리 선택',
+    });
+
+    expect(rootTreeCheckbox).toBeInTheDocument();
+    expect(childTreeCheckbox).toBeInTheDocument();
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootTreeCheckbox).toBeChecked();
+    expect(childTreeCheckbox).toBeChecked();
+
+    fireEvent.click(childTreeCheckbox);
+    expect(rootTreeCheckbox).not.toBeChecked();
+    expect(childTreeCheckbox).not.toBeChecked();
+  });
+
   it('hides the row selection checkbox column when the checkbox option is disabled', () => {
     render(
       <F1Tree

@@ -14,7 +14,8 @@ const AUTH_STORAGE_KEY = 's-erp-auth';
 const AUTH_CHANGE_EVENT = 's-erp-auth-change';
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
-const ACCESS_TOKEN_VALIDITY_MS = 3 * 60 * 60 * 1000;
+const ACCESS_TOKEN_VALIDITY_MS = 15 * 60 * 1000;
+const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60 * 1000;
 
 const syncBrowserLocation = (nextPath: string): void => {
   if (typeof window === 'undefined') {
@@ -54,7 +55,92 @@ export const getStoredAuth = (): AuthSession | null => {
   }
 };
 
-export const isAuthenticated = (): boolean => Boolean(getStoredAuth());
+export const isTokenExpired = (auth: AuthSession | null): boolean => {
+  if (!auth?.expiresAt) {
+    return true;
+  }
+
+  const expiresAt = Date.parse(auth.expiresAt);
+  return Number.isNaN(expiresAt) || Date.now() >= expiresAt;
+};
+
+export const isAccessTokenExpiringSoon = (
+  auth: AuthSession | null,
+  bufferMs: number = ACCESS_TOKEN_REFRESH_BUFFER_MS,
+): boolean => {
+  if (!auth?.expiresAt) {
+    return true;
+  }
+
+  const expiresAt = Date.parse(auth.expiresAt);
+  if (Number.isNaN(expiresAt)) {
+    return true;
+  }
+
+  return Date.now() + bufferMs >= expiresAt;
+};
+
+export const refreshAccessToken = async (): Promise<AuthSession | null> => {
+  const auth = getStoredAuth();
+
+  if (!auth?.refreshToken) {
+    logout();
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: auth.refreshToken }),
+    });
+
+    const body = (await response.json()) as {
+      resultCode?: number | string;
+      resultMessage?: string;
+      jToken?: string;
+      refreshToken?: string;
+    };
+
+    if (!response.ok || String(body.resultCode) !== '200' || !body.jToken) {
+      logout();
+      return null;
+    }
+
+    const nextSession: AuthSession = {
+      ...auth,
+      accessToken: body.jToken,
+      refreshToken: body.refreshToken ?? auth.refreshToken,
+      expiresAt: new Date(Date.now() + ACCESS_TOKEN_VALIDITY_MS).toISOString(),
+    };
+
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+    notifyAuthChange();
+    return nextSession;
+  } catch {
+    logout();
+    return null;
+  }
+};
+
+export const isAuthenticated = (): boolean => {
+  const auth = getStoredAuth();
+
+  if (!auth) {
+    return false;
+  }
+
+  if (isTokenExpired(auth)) {
+    if (!auth.refreshToken) {
+      logout();
+      return false;
+    }
+
+    return true;
+  }
+
+  return true;
+};
 
 interface LoginJwtResponse {
   resultCode: string;
@@ -106,6 +192,7 @@ export const login = async (
 
 export const logout = (): void => {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  syncBrowserLocation('/login');
   notifyAuthChange();
 };
 

@@ -78,6 +78,12 @@ export function MenuManagementPage({
           : Promise.resolve(undefined),
       ]);
       if (requestId !== menuLoadRequestIdRef.current) return;
+      console.log(
+        'loadMenus resolved',
+        moduleId,
+        nextMenus.length,
+        nextPermissions,
+      );
       setMenus(nextMenus);
       if (nextPermissions) setPermissions(nextPermissions);
       setDirty(false);
@@ -88,7 +94,7 @@ export function MenuManagementPage({
           ? requestError.message
           : '메뉴 목록을 불러오지 못했습니다.',
       );
-      throw requestError;
+      return undefined;
     } finally {
       if (requestId === menuLoadRequestIdRef.current) setLoading(false);
     }
@@ -103,6 +109,7 @@ export function MenuManagementPage({
           fetchModules(),
           fetchActivePermissions(),
         ]);
+        console.log('init modules', nextModules, nextPermissions);
         setModules(nextModules);
         setPermissions(nextPermissions);
         const firstModule = nextModules[0];

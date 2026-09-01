@@ -53,6 +53,19 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 
 ---
 
+## 체크박스 옵션 정리
+
+현재 구현 기준으로 체크박스 관련 옵션은 의도가 다르므로 중복으로 보지 않는 것이 맞다.
+
+- `F1GridProps.showCheckbox`: 행 선택용 체크박스 컬럼 전체 표시 여부
+- `F1GridColumn.headerCheckbox`: `type: 'checkbox'` 컬럼에서 헤더 전체 선택 토글 허용
+- `F1TreeProps.treeCheckbox`: 트리 노드용 체크박스 선택 토글
+
+즉, `showCheckbox`는 Row Selector를 제어하고, `headerCheckbox`는 데이터 셀의 boolean 값을 편집하는 컬럼 동작을 제어한다.
+이 둘을 혼동하면 동일한 "체크박스" 이름 때문에 문서가 헷갈리기 쉽다.
+
+---
+
 # 3. 최우선 개발 원칙
 
 ERP Grid는 다음 우선순위를 기준으로 개발한다.
@@ -200,8 +213,28 @@ type F1GridColumnType =
   | 'checkbox'
   | 'select'
   | 'autocomplete'
-  | 'code'
-  | 'button';
+  | 'code';
+
+interface F1GridColumn<T> {
+  field: keyof T;
+  headerName: string;
+  width?: number;
+  flex?: number;
+  editable?: boolean | ((row: T) => boolean);
+  type?: F1GridEditorType;
+  options?: { value: string | number | boolean; label: string }[];
+  required?: boolean;
+  min?: number;
+  max?: number;
+  validate?: (value: T[keyof T], row: T) => string | boolean;
+  align?: 'left' | 'center' | 'right';
+  headerAlign?: 'left' | 'center' | 'right';
+  wrapText?: boolean;
+  mergeRows?: boolean;
+  headerCheckbox?: boolean;
+  hidden?: boolean;
+  pinned?: 'left' | 'right';
+}
 ```
 
 Row Merge 설정:
@@ -279,6 +312,25 @@ const columns: F1GridColumn<PurchaseLine>[] = [
 - Current Page Select All
 - Shift Range Selection
 - Ctrl Multi Selection
+
+Grid-level checkbox column visibility is controlled by `showCheckbox` on `F1Grid`.
+This is different from a data column whose type is `checkbox` and may optionally enable `headerCheckbox` for header select-all.
+
+```tsx
+<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox={false} />;
+
+const columns: F1GridColumn<Item>[] = [
+  {
+    field: 'useYn',
+    headerName: '사용여부',
+    type: 'checkbox',
+    headerCheckbox: true,
+  },
+];
+```
+
+`showCheckbox={false}` hides the row-selection checkbox column entirely.
+`column.type === 'checkbox'` and `headerCheckbox: true` are for data editing inside the grid cell, not for toggling the row selector.
 
 API:
 
