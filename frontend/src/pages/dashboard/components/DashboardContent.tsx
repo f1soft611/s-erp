@@ -14,12 +14,20 @@ import { OverviewPage } from '../../groupware/OverviewPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
-import type { ModuleItem, PageContent } from '../types/dashboard';
+import { PageHeader } from '../../../shared/components/PageHeader';
+import type {
+  MenuPermission,
+  ModuleItem,
+  PageContent,
+} from '../types/dashboard';
 
 type DashboardContentProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
+  currentPageKey: string;
+  breadcrumbItems: string[];
   content: PageContent;
+  selectedMenuPermissions?: MenuPermission;
 };
 
 function TrendIcon() {
@@ -43,12 +51,15 @@ function TrendIcon() {
 export function DashboardContent({
   selectedModule,
   currentMenuName,
+  currentPageKey,
+  breadcrumbItems,
   content,
+  selectedMenuPermissions,
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
-  if (selectedModule.id === 'groupware' && currentMenuName === '종합현황') {
+  if (selectedModule.id === 'groupware' && currentPageKey === 'overview') {
     return (
       <OverviewPage
         selectedModule={selectedModule}
@@ -58,7 +69,7 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'groupware' && currentMenuName === '문서관리') {
+  if (selectedModule.id === 'groupware' && currentPageKey === 'documents') {
     return (
       <DocumentsPage
         selectedModule={selectedModule}
@@ -68,7 +79,7 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'settings' && currentMenuName === '권한관리') {
+  if (selectedModule.id === 'settings' && currentPageKey === 'roles') {
     return (
       <RoleManagementPage
         selectedModule={selectedModule}
@@ -78,20 +89,19 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'settings' && currentMenuName === '메뉴관리') {
+  if (selectedModule.id === 'settings' && currentPageKey === 'menus') {
     return (
       <MenuManagementPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }
 
-  if (
-    selectedModule.id === 'settings' &&
-    currentMenuName === 'F1 Grid 테스트'
-  ) {
+  if (selectedModule.id === 'settings' && currentPageKey === 'f1-grid-test') {
     return (
       <F1GridTestPage
         selectedModule={selectedModule}
@@ -103,34 +113,10 @@ export function DashboardContent({
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: '1px solid rgba(148,163,184,0.18)',
-          bgcolor: isDark
-            ? 'rgba(15, 23, 42, 0.75)'
-            : 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <Typography
-          variant="overline"
-          sx={{ color: '#64748b', letterSpacing: 1.4 }}
-        >
-          {selectedModule.name} / {currentMenuName}
-        </Typography>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ mt: 0.5, fontWeight: 800 }}
-        >
-          {content.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {content.description}
-        </Typography>
-      </Box>
+      <PageHeader
+        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        description={content.description}
+      />
 
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

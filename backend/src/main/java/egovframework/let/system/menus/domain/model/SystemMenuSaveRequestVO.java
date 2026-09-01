@@ -31,6 +31,9 @@ public class SystemMenuSaveRequestVO implements Serializable {
     @Schema(description = "메뉴명")
     private String menuNm;
 
+    @Schema(description = "메뉴설명")
+    private String menuDc;
+
     @Schema(description = "메뉴 URL")
     private String menuUrl;
 

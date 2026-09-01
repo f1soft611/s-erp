@@ -141,24 +141,26 @@
 
 ### 2-10. tb_menu
 
-| 컬럼           | 타입      | 설명                      |
-| -------------- | --------- | ------------------------- |
-| menu_id        | bigint    | 메뉴 PK                   |
-| tenant_id      | bigint    | 소속 테넌트               |
-| module_id      | bigint    | 소속 모듈 FK              |
-| parent_menu_id | bigint    | 상위 메뉴 FK(자기참조)    |
-| menu_code      | varchar   | 메뉴 코드(테넌트 내 유일) |
-| menu_nm        | varchar   | 메뉴명                    |
-| menu_url       | varchar   | 라우팅 경로               |
-| icon_nm        | varchar   | 아이콘명                  |
-| sort_order     | int       | 정렬 순서                 |
-| use_at         | char      | 사용 여부                 |
-| created_at     | timestamp | 생성 일시                 |
-| updated_at     | timestamp | 수정 일시                 |
+| 컬럼           | 타입      | 설명                               |
+| -------------- | --------- | ---------------------------------- |
+| menu_id        | bigint    | 메뉴 PK                            |
+| tenant_id      | bigint    | 소속 테넌트                        |
+| module_id      | bigint    | 소속 모듈 FK                       |
+| parent_menu_id | bigint    | 상위 메뉴 FK(자기참조)             |
+| menu_code      | varchar   | 메뉴 코드(테넌트 내 유일)          |
+| menu_nm        | varchar   | 메뉴명                             |
+| menu_dc        | varchar   | 메뉴 설명(페이지 헤더/설명 표시용) |
+| menu_url       | varchar   | 라우팅 경로                        |
+| icon_nm        | varchar   | 아이콘명                           |
+| sort_order     | int       | 정렬 순서                          |
+| use_at         | char      | 사용 여부                          |
+| created_at     | timestamp | 생성 일시                          |
+| updated_at     | timestamp | 수정 일시                          |
 
 역할:
 
 - 모듈 하위 메뉴 트리 구성(다단계, `parent_menu_id`로 자기참조)
+- 메뉴명, 설명, 경로를 함께 관리해 실제 페이지 제목/설명과 대시보드 메뉴를 일관되게 표시
 - `/api/v1/menus/my` 응답의 원천 데이터, `role_code` 기준 기본 권한 정책과 결합해 대시보드 좌측 메뉴 생성
 
 ### 2-11. tb_permission
@@ -202,6 +204,7 @@
 
 ## 변경 이력
 
+- 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈별 메뉴 버튼 권한 관리 작업으로 `tb_permission`, `tb_menu_permission` 2개 테이블과 `READ`/`CREATE`/`UPDATE`/`DELETE`/`EXCEL` 초기 권한을 추가. 적용 스크립트는 [20260831_004_create_menu_permission_schema.sql](../../backend/DATABASE/20260831/20260831_004_create_menu_permission_schema.sql) 참고.

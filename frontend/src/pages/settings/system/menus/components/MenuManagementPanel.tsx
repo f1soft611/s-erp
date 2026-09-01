@@ -6,15 +6,28 @@ import {
   IconButton,
   Typography,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
-import { useEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
   F1Tree,
   type F1GridChanges,
   type F1GridColumn,
   type F1TreeRef,
 } from '../../../../../shared/components/f1-grid';
+import {
+  DEFAULT_PERMISSION_GROUPS,
+  hasPermissionGroup,
+  togglePermissionGroup,
+} from '../../../../../shared/components/PermissionGroup';
 import {
   createMenuSaveCheckpoint,
   replaceMenuPermissions,
@@ -41,16 +54,27 @@ type MenuManagementPanelProps = {
   onError?: (message: string) => void;
 };
 
-export function MenuManagementPanel({
-  menus,
-  selectedModule,
-  permissions,
-  onRefresh,
-  onDirtyChange,
-  onSavingChange,
-  onSaveSuccess,
-  onError,
-}: MenuManagementPanelProps) {
+export type MenuManagementPanelHandle = {
+  saveCurrentChanges: () => Promise<void>;
+  deleteSelectedRows: () => void;
+  exportCurrentRows: () => void;
+};
+
+export const MenuManagementPanel = forwardRef<
+  MenuManagementPanelHandle,
+  MenuManagementPanelProps
+>(function MenuManagementPanel(
+  {
+    menus,
+    selectedModule,
+    onRefresh,
+    onDirtyChange,
+    onSavingChange,
+    onSaveSuccess,
+    onError,
+  },
+  ref,
+) {
   const treeRef = useRef<F1TreeRef<MenuManagementRow>>(null);
   const saveCheckpointRef = useRef<MenuSaveCheckpoint | undefined>(undefined);
   const completedPermissionRowIdsRef = useRef(new Set<string>());
@@ -64,6 +88,42 @@ export function MenuManagementPanel({
   const [message, setMessage] = useState('');
   const [hasSelectedTreeRow, setHasSelectedTreeRow] = useState(false);
   const [treeKey, setTreeKey] = useState(0);
+
+  useImperativeHandle(ref, () => ({
+    saveCurrentChanges: handleSave,
+    deleteSelectedRows: () => {
+      treeRef.current?.deleteSelectedRows();
+    },
+    exportCurrentRows: () => {
+      const rows = treeRef.current?.getActiveRows() ?? [];
+      if (rows.length === 0) return;
+      const headers = columns.map((column) => column.headerName);
+      const csvRows = rows.map((row) =>
+        columns
+          .map((column) => {
+            const value = row[column.field as keyof MenuManagementRow];
+            const stringValue = Array.isArray(value)
+              ? value.join(';')
+              : value == null
+                ? ''
+                : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
+          .join(','),
+      );
+      const content = [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${selectedModule?.moduleName ?? 'menu'}-export.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    },
+  }));
+
   useEffect(() => {
     onDirtyChange?.(
       changes.insertedRows.length > 0 ||
@@ -88,6 +148,28 @@ export function MenuManagementPanel({
     setMessage(nextMessage);
   }
 
+  const permissionColumns = DEFAULT_PERMISSION_GROUPS.map(
+    ({ key, label, codes }) => ({
+      field: `${key}Permission` as keyof MenuManagementRow,
+      headerName: label,
+      headerGroup: '기본기능',
+      width: 100,
+      type: 'checkbox' as const,
+      editable: (row: MenuManagementRow) => !row.hasChildren,
+      getValue: (row: MenuManagementRow) =>
+        hasPermissionGroup(row.permissionCodes, codes),
+      onValueChange: (row: MenuManagementRow, checked: unknown) => ({
+        permissionCodes: togglePermissionGroup(
+          row.permissionCodes,
+          codes,
+          Boolean(checked),
+        ),
+      }),
+      headerAlign: 'center' as const,
+      align: 'center' as const,
+    }),
+  ) as F1GridColumn<MenuManagementRow>[];
+
   const columns: F1GridColumn<MenuManagementRow>[] = [
     {
       field: 'name',
@@ -98,8 +180,8 @@ export function MenuManagementPanel({
     },
     {
       field: 'code',
-      headerName: '코드',
-      width: 90,
+      headerName: '메뉴코드',
+      width: 140,
       editable: true,
       mergeRows: true,
     },
@@ -108,6 +190,13 @@ export function MenuManagementPanel({
       headerName: '경로',
       width: 220,
       editable: true,
+    },
+    {
+      field: 'description',
+      headerName: '메뉴설명',
+      width: 260,
+      editable: true,
+      wrapText: true,
     },
     {
       field: 'order',
@@ -128,24 +217,7 @@ export function MenuManagementPanel({
       headerAlign: 'center',
       align: 'center',
     },
-    ...permissions.map((permission) => ({
-      field: permission.permissionCode as keyof MenuManagementRow,
-      headerName: permission.permissionName,
-      width: 88,
-      type: 'checkbox' as const,
-      editable: (row: MenuManagementRow) => !row.hasChildren,
-      getValue: (row: MenuManagementRow) =>
-        row.permissionCodes.includes(permission.permissionCode),
-      onValueChange: (row: MenuManagementRow, checked: unknown) => ({
-        permissionCodes: Boolean(checked)
-          ? [...new Set([...row.permissionCodes, permission.permissionCode])]
-          : row.permissionCodes.filter(
-              (code) => code !== permission.permissionCode,
-            ),
-      }),
-      headerAlign: 'center' as const,
-      align: 'center' as const,
-    })),
+    ...permissionColumns,
   ];
 
   function createMenuRow(): MenuManagementRow {
@@ -236,19 +308,6 @@ export function MenuManagementPanel({
     }
   }
 
-  function handleRefresh() {
-    if (!selectedModule) return;
-    notifyError('');
-    const refresh = onRefresh?.(selectedModule.moduleId);
-    void refresh?.catch((error) => {
-      notifyError(
-        error instanceof Error
-          ? error.message
-          : '메뉴 목록을 불러오지 못했습니다.',
-      );
-    });
-  }
-
   return (
     <Box sx={{ p: { xs: 1.5, sm: 3 }, minWidth: 0 }}>
       <Card
@@ -263,7 +322,7 @@ export function MenuManagementPanel({
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
+              alignItems: { xs: 'stretch', sm: 'center' },
               flexWrap: 'wrap',
               gap: 1,
               mb: 2,
@@ -272,9 +331,20 @@ export function MenuManagementPanel({
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               메뉴 관리
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Box
+              role="toolbar"
+              aria-label="메뉴 업무 액션"
+              sx={{
+                display: 'flex',
+                justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                gap: 1,
+                flexWrap: 'wrap',
+                minWidth: 0,
+              }}
+            >
               <Button
                 size="small"
+                startIcon={<AddIcon fontSize="small" />}
                 disabled={!selectedModule || saving}
                 onClick={() => {
                   treeRef.current?.addRow();
@@ -285,50 +355,40 @@ export function MenuManagementPanel({
               </Button>
               <Button
                 size="small"
+                startIcon={<PlaylistAddIcon fontSize="small" />}
                 disabled={!selectedModule || !hasSelectedTreeRow || saving}
                 onClick={addChildMenu}
               >
                 하위 메뉴 추가
               </Button>
-              <Button
-                size="small"
-                disabled={!selectedModule || saving}
-                onClick={() => treeRef.current?.deleteSelectedRows()}
-              >
-                삭제
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                disabled={!selectedModule || saving}
-                onClick={handleSave}
-              >
-                저장
-              </Button>
-              <Button
-                size="small"
-                disabled={!selectedModule || saving}
-                onClick={handleRefresh}
-              >
-                새로고침
-              </Button>
-              <IconButton
-                size="small"
-                aria-label="전체 펼치기"
-                disabled={!selectedModule || saving}
-                onClick={() => treeRef.current?.expandAll()}
-              >
-                <UnfoldMoreIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                size="small"
-                aria-label="전체 접기"
-                disabled={!selectedModule || saving}
-                onClick={() => treeRef.current?.collapseAll()}
-              >
-                <UnfoldLessIcon fontSize="small" />
-              </IconButton>
             </Box>
+          </Box>
+          <Box
+            role="toolbar"
+            aria-label="메뉴 그리드 제어"
+            sx={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 0.5,
+              mb: 1.5,
+            }}
+          >
+            <IconButton
+              size="small"
+              aria-label="전체 펼치기"
+              disabled={!selectedModule || saving}
+              onClick={() => treeRef.current?.expandAll()}
+            >
+              <UnfoldMoreIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="전체 접기"
+              disabled={!selectedModule || saving}
+              onClick={() => treeRef.current?.collapseAll()}
+            >
+              <UnfoldLessIcon fontSize="small" />
+            </IconButton>
           </Box>
           <F1Tree
             key={treeKey}
@@ -370,4 +430,4 @@ export function MenuManagementPanel({
       </Card>
     </Box>
   );
-}
+});

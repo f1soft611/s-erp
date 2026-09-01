@@ -766,6 +766,124 @@ describe('F1-GRID interaction', () => {
     });
   });
 
+  it('renders grouped headers as a two-row header and respects grouped headers', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { field: 'code', headerName: '코드', headerGroup: '기본정보' },
+          { field: 'status', headerName: '상태', headerGroup: '기본정보' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const groupHeader = screen.getByText('기본정보');
+    expect(groupHeader).toBeInTheDocument();
+    expect(groupHeader.closest('[role="columnheader"]')).toBeTruthy();
+    expect(getComputedStyle(groupHeader).backgroundColor).toBe(
+      'rgba(0, 0, 0, 0)',
+    );
+    expect(screen.getByRole('gridcell', { name: 'DASH' })).toBeVisible();
+    expect(screen.getAllByRole('columnheader')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ textContent: '기본정보' }),
+        expect.objectContaining({ textContent: '코드' }),
+        expect.objectContaining({ textContent: '상태' }),
+      ]),
+    );
+
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    fireEvent.focus(codeCell);
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: { setData: vi.fn() },
+    });
+  });
+
+  it('keeps the default cursor outside edit mode and switches to a text cursor while editing', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목' }]}
+        columns={[
+          { field: 'itemCode', headerName: '품목코드', editable: true },
+          { field: 'itemName', headerName: '품목명', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const itemCodeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    expect(itemCodeCell).toHaveStyle({ cursor: 'default' });
+
+    fireEvent.doubleClick(itemCodeCell);
+    const input = screen.getByDisplayValue('ITEM-001');
+    expect(input).toHaveStyle({ cursor: 'text' });
+  });
+
+  it('supports cell-range drag selection across adjacent cells', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(start);
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    expect(start).toHaveAttribute('data-grid-selected', 'true');
+    expect(end).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('keeps drag selection plain and only shows the dashed copy range after copy, then clears on Escape', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(start);
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    expect(window.getComputedStyle(start).border).not.toContain('dashed');
+    expect(window.getComputedStyle(end).border).not.toContain('dashed');
+
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: {
+        getData: vi.fn(() => 'A\tAlpha\nB\tBeta'),
+        setData: vi.fn(),
+      },
+    });
+
+    expect(window.getComputedStyle(start).border).toContain('dashed');
+    expect(window.getComputedStyle(end).border).toContain('dashed');
+
+    fireEvent.keyDown(start, { key: 'Escape' });
+    expect(window.getComputedStyle(start).border).not.toContain('dashed');
+    expect(window.getComputedStyle(end).border).not.toContain('dashed');
+  });
+
   it('rebases external rows when the grid has no pending changes', () => {
     const { rerender } = render(
       <F1Grid rows={rows} columns={columns} rowKey="id" />,

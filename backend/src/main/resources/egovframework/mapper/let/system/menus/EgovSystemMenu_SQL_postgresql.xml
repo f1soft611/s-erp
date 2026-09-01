@@ -11,6 +11,7 @@
         <result property="parentMenuNm" column="parent_menu_nm"/>
         <result property="menuCode" column="menu_code"/>
         <result property="menuNm" column="menu_nm"/>
+        <result property="menuDc" column="menu_dc"/>
         <result property="menuUrl" column="menu_url"/>
         <result property="iconNm" column="icon_nm"/>
         <result property="sortOrder" column="sort_order"/>
@@ -30,6 +31,7 @@
             pmn.menu_nm AS parent_menu_nm,
             mn.menu_code,
             mn.menu_nm,
+            mn.menu_dc,
             mn.menu_url,
             mn.icon_nm,
             mn.sort_order,
@@ -71,6 +73,7 @@
             NULL AS parent_menu_nm,
             mn.menu_code,
             mn.menu_nm,
+            mn.menu_dc,
             mn.menu_url,
             mn.icon_nm,
             mn.sort_order,
@@ -106,6 +109,7 @@
             pmn.menu_nm AS parent_menu_nm,
             mn.menu_code,
             mn.menu_nm,
+            mn.menu_dc,
             mn.menu_url,
             mn.icon_nm,
             mn.sort_order,
@@ -142,6 +146,7 @@
             parent_menu_id,
             menu_code,
             menu_nm,
+            menu_dc,
             menu_url,
             icon_nm,
             sort_order,
@@ -153,6 +158,7 @@
             #{parentMenuId},
             #{menuCode},
             #{menuNm},
+            #{menuDc},
             #{menuUrl},
             #{iconNm},
             #{sortOrder},
@@ -165,6 +171,7 @@
         UPDATE tb_menu
         SET parent_menu_id = #{parentMenuId},
             menu_nm = #{menuNm},
+            menu_dc = #{menuDc},
             menu_url = #{menuUrl},
             icon_nm = #{iconNm},
             sort_order = #{sortOrder},

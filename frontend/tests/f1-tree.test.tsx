@@ -382,4 +382,63 @@ describe('F1Tree interaction', () => {
     });
     expect(onDeleteBlocked).toHaveBeenCalledWith(['root']);
   });
+
+  it('wraps long tree cell text after row height is increased', () => {
+    const longText = '트리 셀 안에서 여러 줄로 보이는 매우 긴 메뉴 이름입니다.';
+    render(
+      <F1Tree
+        rows={[{ ...rows[0], name: longText }]}
+        columns={[
+          {
+            field: 'name',
+            headerName: '메뉴명',
+            editable: true,
+            wrapText: true,
+          },
+        ]}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 줄바꿈 테스트"
+        defaultExpanded="all"
+      />,
+    );
+
+    const text = screen.getByText(longText);
+    expect(text).toHaveStyle({ whiteSpace: 'nowrap' });
+
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: /root 행 높이 조절/ }),
+      { key: 'ArrowDown' },
+    );
+
+    expect(text).toHaveStyle({ whiteSpace: 'normal' });
+  });
+
+  it('allows paste while a tree cell editor is active', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 붙여넣기 허용 테스트"
+        defaultExpanded="all"
+      />,
+    );
+
+    const rootCell = screen.getByRole('gridcell', { name: 'Root' });
+    fireEvent.doubleClick(rootCell);
+    const input = screen.getByDisplayValue('Root');
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: { getData: () => '새 이름' },
+    });
+    input.dispatchEvent(pasteEvent);
+
+    expect(input).toBeInTheDocument();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
 });

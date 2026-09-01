@@ -27,6 +27,7 @@ import {
 } from '../../../../shared/components/f1-grid';
 import { DateEditor } from '../../../../shared/components/f1-grid/editing/DateEditor';
 import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { PageHeader } from '../../../../shared/components/PageHeader';
 import type {
   ModuleItem,
   PageContent,
@@ -291,21 +292,10 @@ export function F1GridTestPage({
     <Box
       sx={{ flex: 1, p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}
     >
-      <Box>
-        <Typography variant="overline" color="text.secondary">
-          {selectedModule.name} / {currentMenuName}
-        </Typography>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ fontWeight: 800, mb: 0.5 }}
-        >
-          {content.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {content.description}
-        </Typography>
-      </Box>
+      <PageHeader
+        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        description={content.description}
+      />
 
       <Paper
         variant="outlined"

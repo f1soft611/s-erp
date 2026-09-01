@@ -4,6 +4,8 @@ export type MenuItem = {
   id: string;
   name: string;
   pageKey: string;
+  description?: string;
+  permissions?: MenuPermission;
 };
 
 export type MenuPermission = {
@@ -11,12 +13,14 @@ export type MenuPermission = {
   create: boolean;
   update: boolean;
   delete: boolean;
+  excel?: boolean;
 };
 
 export type MenuNode = {
   menuId: number;
   parentMenuId: number | null;
   name: string;
+  description?: string;
   icon?: string;
   path?: string;
   permissions?: MenuPermission;
@@ -34,6 +38,8 @@ export type UserMenuResponse = {
 export type MenuTreeNode = {
   id: string;
   name: string;
+  description?: string;
+  path?: string;
   menuId?: number;
   pageKey?: string;
   permissions?: MenuPermission;

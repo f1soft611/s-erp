@@ -35,6 +35,8 @@ const toTreeNode = (node: MenuNode): MenuTreeNode => {
     id,
     menuId: node.menuId,
     name: node.name,
+    ...(node.description ? { description: node.description } : {}),
+    ...(node.path ? { path: node.path } : {}),
     ...(children?.length ? { children } : { pageKey: id }),
     ...(node.permissions ? { permissions: node.permissions } : {}),
   };
@@ -47,7 +49,14 @@ const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
     }
 
     return node.pageKey
-      ? [{ id: node.id, name: node.name, pageKey: node.pageKey }]
+      ? [
+          {
+            id: node.id,
+            name: node.name,
+            pageKey: node.pageKey,
+            ...(node.description ? { description: node.description } : {}),
+          },
+        ]
       : [];
   });
 

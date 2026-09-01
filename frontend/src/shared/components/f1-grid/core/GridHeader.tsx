@@ -211,6 +211,65 @@ export function GridHeader<T extends object>({
     activeOperator !== 'isEmpty' && activeOperator !== 'isNotEmpty';
   const needsSecondValue = activeOperator === 'between';
 
+  // pin된 컬럼은 그룹 라벨에서 제외한다. 나머지 컬럼은 그룹이 없으면 위/아래가
+  // 한 셀로 세로 병합되고, 그룹이 있으면 그룹 라벨(1행) + 컬럼명(2행)으로 나뉜다.
+  type GroupLabelSegment = { label: string; startIndex: number; span: number };
+
+  const groupLabelSegments: GroupLabelSegment[] = [];
+  for (let i = 0; i < columns.length; ) {
+    const column = columns[i];
+    if (!column.headerGroup || pinnedFields.has(String(column.field))) {
+      i += 1;
+      continue;
+    }
+    const label = column.headerGroup;
+    const startIndex = i;
+    let span = 0;
+    while (
+      i < columns.length &&
+      columns[i].headerGroup === label &&
+      !pinnedFields.has(String(columns[i].field))
+    ) {
+      span += 1;
+      i += 1;
+    }
+    groupLabelSegments.push({ label, startIndex, span });
+  }
+
+  const hasGroups = groupLabelSegments.length > 0;
+
+  function isGroupedColumn(column: F1GridColumn<T>): boolean {
+    return (
+      Boolean(column.headerGroup) && !pinnedFields.has(String(column.field))
+    );
+  }
+
+  const groupLabelNodes = groupLabelSegments.map((segment) => (
+    <Box
+      key={`group-${segment.label}-${segment.startIndex}`}
+      role="columnheader"
+      sx={{
+        gridColumn: `${(showCheckbox ? 2 : 1) + segment.startIndex} / span ${segment.span}`,
+        gridRow: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        px: 1,
+        py: 0.75,
+        borderRight: 1,
+        borderRightColor: 'divider',
+        borderLeft: 0,
+        color: 'text.primary',
+        fontSize: 'inherit',
+        fontWeight: 700,
+        lineHeight: 1.2,
+        minHeight: 36,
+      }}
+    >
+      {segment.label}
+    </Box>
+  ));
+
   return (
     <>
       <Box
@@ -222,6 +281,7 @@ export function GridHeader<T extends object>({
               getGridColumnTrack(column, columnWidths[String(column.field)]),
             )
             .join(' ')}`,
+          gridTemplateRows: hasGroups ? 'auto auto' : undefined,
           minWidth: 'max-content',
           bgcolor: 'action.hover',
           fontWeight: 700,
@@ -232,8 +292,11 @@ export function GridHeader<T extends object>({
           <Box
             role="columnheader"
             sx={{
+              gridColumn: 1,
+              gridRow: hasGroups ? '1 / span 2' : undefined,
               display: 'flex',
               justifyContent: 'center',
+              alignItems: 'center',
               position: 'sticky',
               left: 0,
               zIndex: 4,
@@ -252,7 +315,8 @@ export function GridHeader<T extends object>({
             />
           </Box>
         ) : null}
-        {columns.map((column) => {
+        {groupLabelNodes}
+        {columns.map((column, columnIndex) => {
           const checkboxState = getColumnCheckboxState(column);
           const pinSide = getGridColumnPinSide(pinnedFields, column);
           const sortIndicator = getGridSortIndicator(sorts, column.field);
@@ -262,12 +326,15 @@ export function GridHeader<T extends object>({
           const isMenuOpen =
             menuColumn?.field === column.field &&
             Boolean(menuAnchor || columnListAnchor || filterAnchor);
+          const grouped = isGroupedColumn(column);
 
           return (
             <Box
               key={String(column.field)}
               role="columnheader"
               sx={{
+                gridColumn: (showCheckbox ? 2 : 1) + columnIndex,
+                gridRow: hasGroups ? (grouped ? 2 : '1 / span 2') : undefined,
                 p: 1,
                 display: 'flex',
                 alignItems: 'center',
@@ -279,6 +346,8 @@ export function GridHeader<T extends object>({
                       ? 'flex-start'
                       : 'center',
                 textAlign: column.headerAlign ?? 'left',
+                borderTop: grouped ? 1 : 0,
+                borderTopColor: 'divider',
                 borderRight: 1,
                 borderRightColor: 'divider',
                 borderLeft: columnLine ? 1 : 0,

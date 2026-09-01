@@ -12,6 +12,8 @@ type GridCellProps<T extends object> = {
   columnLine: boolean;
   focused: boolean;
   editing: boolean;
+  selected: boolean;
+  copied?: boolean;
   merged: boolean;
   mergeInfo?: { isStart: boolean; span: number };
   rowHeight: number;
@@ -19,6 +21,10 @@ type GridCellProps<T extends object> = {
   rowIndex: number;
   draftValue: string;
   onFocus: () => void;
+  onMouseDown: () => void;
+  onMouseEnter: () => void;
+  onMouseUp: () => void;
+  onBlur?: () => void;
   onDoubleClick: () => void;
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -45,6 +51,8 @@ export function GridCell<T extends object>({
   columnLine,
   focused,
   editing,
+  selected,
+  copied,
   merged,
   mergeInfo,
   rowHeight,
@@ -52,6 +60,10 @@ export function GridCell<T extends object>({
   rowIndex,
   draftValue,
   onFocus,
+  onMouseDown,
+  onMouseEnter,
+  onMouseUp,
+  onBlur,
   onDoubleClick,
   onDraftChange,
   onKeyDown,
@@ -65,18 +77,40 @@ export function GridCell<T extends object>({
 }: GridCellProps<T>) {
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
+  const displayValue = getCellDisplayValue(column, value as T[keyof T]);
 
   return (
     <Box
       key={String(column.field)}
       role="gridcell"
+      aria-label={adornment && !merged ? displayValue : undefined}
       data-grid-error={errorMessage}
       title={errorMessage}
       tabIndex={focused ? 0 : -1}
       ref={onCellRef}
       onClick={onFocus}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseUp={onMouseUp}
+      onBlurCapture={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (
+          nextTarget instanceof Node &&
+          event.currentTarget.contains(nextTarget)
+        ) {
+          return;
+        }
+        const hasOpenEditorPopup = Boolean(
+          document.querySelector(
+            '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
+          ),
+        );
+        if (hasOpenEditorPopup) return;
+        onBlur?.();
+      }}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
+      data-grid-selected={selected ? 'true' : 'false'}
       sx={{
         gridColumn: columnIndex + 2,
         minHeight: 40,
@@ -90,6 +124,9 @@ export function GridCell<T extends object>({
         justifyContent: toJustifyContent(
           column.align ?? (column.type === 'number' ? 'right' : 'left'),
         ),
+        cursor: editing ? 'text' : 'default',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
         borderLeft: columnLine ? 1 : 0,
         borderLeftColor: 'divider',
         gridRow: mergeInfo?.isStart
@@ -106,15 +143,38 @@ export function GridCell<T extends object>({
           : errorMessage
             ? 'error.lighter'
             : undefined,
+        border:
+          copied && !editing
+            ? (theme) => `1px dashed ${theme.palette.primary.main}`
+            : undefined,
         boxShadow: pinOffset
           ? pinOffset.side === 'left'
             ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
             : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
-          : errorMessage
-            ? 'inset 0 0 0 1px'
-            : undefined,
+          : copied && !editing
+            ? (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'inset 0 0 0 1px rgba(144, 202, 249, 0.95), 0 0 0 1px rgba(144, 202, 249, 0.3) dashed'
+                  : 'inset 0 0 0 1px rgba(25, 118, 210, 0.95), 0 0 0 1px rgba(25, 118, 210, 0.3) dashed'
+            : selected && !focused && !editing
+              ? 'inset 0 0 0 1px rgba(25, 118, 210, 0.7)'
+              : errorMessage
+                ? 'inset 0 0 0 1px'
+                : undefined,
+        backgroundColor:
+          selected && !focused && !editing
+            ? 'rgba(25, 118, 210, 0.05)'
+            : copied && !editing
+              ? (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(144, 202, 249, 0.12)'
+                    : 'rgba(25, 118, 210, 0.08)'
+              : undefined,
         color: errorMessage ? 'error.main' : undefined,
-        outline: focused && !editing ? '2px solid' : 'none',
+        outline:
+          (focused && !editing) || (editing && column.type !== 'date')
+            ? '2px solid'
+            : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -2,
         textAlign:
@@ -151,13 +211,18 @@ export function GridCell<T extends object>({
           {adornment}
           <Box
             component="span"
-            title={getCellDisplayValue(column, value as T[keyof T])}
+            title={displayValue}
             sx={{
               display: 'block',
+              flex: '1 1 auto',
               width: '100%',
+              maxWidth: '100%',
               minWidth: 0,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              cursor: 'inherit',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
               whiteSpace:
                 column.wrapText && rowHeight > defaultRowHeight
                   ? 'normal'
@@ -166,9 +231,13 @@ export function GridCell<T extends object>({
                 column.wrapText && rowHeight > defaultRowHeight
                   ? 'anywhere'
                   : 'normal',
+              wordBreak:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'break-word'
+                  : 'normal',
             }}
           >
-            {getCellDisplayValue(column, value as T[keyof T])}
+            {displayValue}
           </Box>
         </>
       )}

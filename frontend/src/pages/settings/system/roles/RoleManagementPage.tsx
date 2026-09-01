@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box } from '@mui/material';
+import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import type {
@@ -25,9 +26,7 @@ export function RoleManagementPage({
   currentMenuName,
   content,
 }: RoleManagementPageProps) {
-  const theme = useTheme();
   const { showSuccess } = useNotification();
-  const isDark = theme.palette.mode === 'dark';
   const [roles, setRoles] = useState<RoleManagementRow[]>([]);
   const [error, setError] = useState('');
 
@@ -68,34 +67,10 @@ export function RoleManagementPage({
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: '1px solid rgba(148,163,184,0.18)',
-          bgcolor: isDark
-            ? 'rgba(15, 23, 42, 0.75)'
-            : 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <Typography
-          variant="overline"
-          sx={{ color: '#64748b', letterSpacing: 1.4 }}
-        >
-          {selectedModule.name} / {currentMenuName}
-        </Typography>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ mt: 0.5, fontWeight: 800 }}
-        >
-          {content.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {content.description}
-        </Typography>
-      </Box>
+      <PageHeader
+        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        description={content.description}
+      />
       <PageMessageArea message={error} onClose={() => setError('')} />
       <RoleManagementPanel roles={roles} onCreateRole={handleCreateRole} />
     </Box>

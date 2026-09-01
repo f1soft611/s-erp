@@ -2,6 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { apiGet } from '../src/shared/services/apiClient';
+import {
+  getSessionRemainingLabel,
+  isAccessTokenExpiringSoon,
+  readSessionNotice,
+  setSessionNotice,
+} from '../src/shared/services/authService';
 
 describe('Login page', () => {
   it('renders the enterprise login fields', () => {
@@ -50,8 +56,27 @@ describe('Login page', () => {
 
     expect(await screen.findByLabelText(/업체코드/i)).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: /대시보드/i }),
+      screen.queryByRole('heading', { name: /^종합현황$/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows an expiring warning when the session is within one minute', () => {
+    const auth = {
+      tenantCode: 'T1358606250',
+      userId: 'admin',
+      accessToken: 'expiring-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date(Date.now() + 30_000).toISOString(),
+    };
+
+    expect(isAccessTokenExpiringSoon(auth, 60_000)).toBe(true);
+    expect(getSessionRemainingLabel(auth)).toBe('00:30');
+  });
+
+  it('stores the refresh-failure message for the next login screen', () => {
+    setSessionNotice('세션이 만료되어 다시 로그인해야 합니다.');
+
+    expect(readSessionNotice()).toBe('세션이 만료되어 다시 로그인해야 합니다.');
   });
 
   it('refreshes an expiring access token before making API requests', async () => {
@@ -68,7 +93,7 @@ describe('Login page', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
 
         if (url.includes('/auth/refresh')) {
@@ -116,7 +141,7 @@ describe('Login page', () => {
     fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
 
     expect(
-      await screen.findByRole('heading', { name: /대시보드/i }),
+      await screen.findByRole('heading', { name: /^종합현황$/i }),
     ).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/auth/login-jwt'),

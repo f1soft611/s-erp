@@ -23,8 +23,11 @@ import org.mockito.InOrder;
 import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
+import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
 import egovframework.let.system.menus.domain.repository.SystemMenuDAO;
 import egovframework.let.system.menus.service.impl.SystemMenuServiceImpl;
+import egovframework.let.system.modules.domain.model.SystemModuleVO;
 import egovframework.let.system.modules.service.SystemModuleService;
 
 class SystemMenuPermissionServiceTest {
@@ -115,6 +118,42 @@ class SystemMenuPermissionServiceTest {
         verify(systemMenuDAO, never()).selectMenuPermissionCodes(org.mockito.ArgumentMatchers.anyLong());
         assertEquals(Arrays.asList("READ", "EXCEL"), result.get(0).getPermissionCodes());
         assertEquals(Collections.singletonList("CREATE"), result.get(1).getPermissionCodes());
+    }
+
+    @Test
+    void myMenuTreeUsesSavedMenuPermissionsAndDescription() throws Exception {
+        SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
+        SystemModuleService systemModuleService = mock(SystemModuleService.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, systemModuleService);
+        SystemModuleVO module = new SystemModuleVO();
+        module.setModuleId(2L);
+        module.setModuleNm("환경설정");
+        module.setModuleUrl("/settings");
+        module.setUseAt("Y");
+        SystemMenuVO menu = menu(menuId);
+        menu.setModuleId(2L);
+        menu.setMenuNm("메뉴관리");
+        menu.setMenuDc("저장된 메뉴 설명");
+        menu.setMenuUrl("/settings/system/menus");
+        when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
+        when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Collections.singletonList(menu));
+        when(systemMenuDAO.selectMenuPermissionCodeRows(
+                org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                .thenReturn(Arrays.asList(
+                    permissionCodeRow(menuId, "READ"),
+                    permissionCodeRow(menuId, "CREATE"),
+                    permissionCodeRow(menuId, "UPDATE"),
+                    permissionCodeRow(menuId, "DELETE")));
+
+        MyMenuResponseVO response = service.getMyMenuTree(tenantId, "admin", "TENANT_ADMIN");
+        MenuTreeNodeVO node = response.getMenus().get(0).getChildren().get(0);
+
+        assertEquals("저장된 메뉴 설명", node.getDescription());
+        assertEquals(true, node.getPermissions().isRead());
+        assertEquals(true, node.getPermissions().isCreate());
+        assertEquals(true, node.getPermissions().isUpdate());
+        assertEquals(true, node.getPermissions().isDelete());
+        assertEquals(false, node.getPermissions().isExcel());
     }
 
     @Test

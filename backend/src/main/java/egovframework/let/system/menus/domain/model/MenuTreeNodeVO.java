@@ -30,6 +30,9 @@ public class MenuTreeNodeVO implements Serializable {
     @Schema(description = "메뉴명")
     private String name;
 
+    @Schema(description = "메뉴설명")
+    private String description;
+
     @Schema(description = "아이콘명")
     private String icon;
 

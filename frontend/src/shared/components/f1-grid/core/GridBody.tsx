@@ -18,6 +18,14 @@ type GridBodyProps<T extends object> = {
   selectedIds: F1GridRowId[];
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
+  selectedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
+  copiedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
   draftValue: string;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -26,6 +34,16 @@ type GridBodyProps<T extends object> = {
   onSelectRow: (rowId: F1GridRowId, event: MouseEvent<HTMLElement>) => void;
   onSetRowSelection: (rowId: F1GridRowId, checked: boolean) => void;
   onSetFocusedCell: (cell: { rowId: F1GridRowId; columnIndex: number }) => void;
+  onCellSelectionStart: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionDrag: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionEnd: () => void;
+  onCommitEdit: () => void;
   onStartEdit: (rowId: F1GridRowId, columnIndex: number) => void;
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -80,12 +98,18 @@ export function GridBody<T extends object>({
   selectedIds,
   focusedCell,
   editingCell,
+  selectedCellRange,
+  copiedCellRange,
   draftValue,
   mergeInfoByColumn,
   getRowId,
   onSelectRow,
   onSetRowSelection,
   onSetFocusedCell,
+  onCellSelectionStart,
+  onCellSelectionDrag,
+  onCellSelectionEnd,
+  onCommitEdit,
   onStartEdit,
   onDraftChange,
   onKeyDown,
@@ -176,6 +200,8 @@ export function GridBody<T extends object>({
             isSelected={isSelected}
             focusedCell={focusedCell}
             editingCell={editingCell}
+            selectedCellRange={selectedCellRange}
+            copiedCellRange={copiedCellRange}
             draftValue={draftValue}
             mergeInfoByColumn={mergeInfoByColumn}
             visibleRows={visibleRows}
@@ -183,6 +209,10 @@ export function GridBody<T extends object>({
             onSelectRow={onSelectRow}
             onSetRowSelection={onSetRowSelection}
             onSetFocusedCell={onSetFocusedCell}
+            onCellSelectionStart={onCellSelectionStart}
+            onCellSelectionDrag={onCellSelectionDrag}
+            onCellSelectionEnd={onCellSelectionEnd}
+            onCommitEdit={onCommitEdit}
             onStartEdit={onStartEdit}
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}

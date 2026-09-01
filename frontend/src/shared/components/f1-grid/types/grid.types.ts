@@ -25,6 +25,7 @@ export type F1GridOption = {
 export type F1GridColumn<T extends object> = {
   field: keyof T;
   headerName: string;
+  headerGroup?: string;
   getValue?: (row: T) => unknown;
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;

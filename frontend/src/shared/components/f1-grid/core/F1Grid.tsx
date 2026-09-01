@@ -95,6 +95,18 @@ function F1GridInner<T extends object>(
   const [lastSelectedRowId, setLastSelectedRowId] = useState<F1GridRowId>();
   const [focusedCell, setFocusedCell] = useState<F1GridCell>();
   const [editingCell, setEditingCell] = useState<F1GridCell>();
+  const [cellSelection, setCellSelection] = useState<
+    { start: F1GridCell; end: F1GridCell } | undefined
+  >();
+  const [copiedCellRange, setCopiedCellRange] = useState<
+    { start: F1GridCell; end: F1GridCell } | undefined
+  >();
+  const cellSelectionRef = useRef(cellSelection);
+  const copiedCellRangeRef = useRef(copiedCellRange);
+  const cellRangeDragRef = useRef<{
+    start: F1GridCell;
+    current: F1GridCell;
+  } | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const normalizedMinRowHeight = Math.max(1, minRowHeight);
@@ -245,6 +257,14 @@ function F1GridInner<T extends object>(
     onSelectionChange?.(selectedIds);
   }, [onSelectionChange, selectedIds]);
 
+  useEffect(() => {
+    cellSelectionRef.current = cellSelection;
+  }, [cellSelection]);
+
+  useEffect(() => {
+    copiedCellRangeRef.current = copiedCellRange;
+  }, [copiedCellRange]);
+
   function getCell(rowId: F1GridRowId, columnIndex: number): F1GridCell {
     return { rowId, columnIndex };
   }
@@ -279,10 +299,51 @@ function F1GridInner<T extends object>(
   }
 
   function handleCopy(event: ClipboardEvent<HTMLElement>) {
+    const range =
+      cellSelectionRef.current ??
+      (focusedCell ? { start: focusedCell, end: focusedCell } : undefined);
+    if (range) {
+      const startRowIndex = visibleRows.findIndex(
+        (row) => getGridRowId(row, rowKey) === range.start.rowId,
+      );
+      const endRowIndex = visibleRows.findIndex(
+        (row) => getGridRowId(row, rowKey) === range.end.rowId,
+      );
+      const startColIndex = Math.min(
+        range.start.columnIndex,
+        range.end.columnIndex,
+      );
+      const endColIndex = Math.max(
+        range.start.columnIndex,
+        range.end.columnIndex,
+      );
+      const selectedRows = visibleRows.slice(
+        Math.min(startRowIndex, endRowIndex),
+        Math.max(startRowIndex, endRowIndex) + 1,
+      );
+      const selectedColumns = visibleColumns.slice(
+        startColIndex,
+        endColIndex + 1,
+      );
+      const value = selectedRows
+        .map((row) =>
+          selectedColumns
+            .map((column) => String(row[column.field] ?? ''))
+            .join('\t'),
+        )
+        .join('\n');
+      if (value) {
+        event.preventDefault();
+        event.clipboardData.setData('text/plain', value);
+        setCopiedCellRange(range);
+        return;
+      }
+    }
+
     const selectedRows = visibleRows.filter((row) =>
       selectedIds.includes(getGridRowId(row, rowKey)),
     );
-    const value =
+    const rowValue =
       selectedRows.length > 0
         ? toGridTsv(selectedRows, visibleColumns)
         : focusedCell
@@ -292,12 +353,16 @@ function F1GridInner<T extends object>(
               )?.[visibleColumns[focusedCell.columnIndex]?.field] ?? '',
             )
           : '';
-    if (!value) return;
+    if (!rowValue) return;
     event.preventDefault();
-    event.clipboardData.setData('text/plain', value);
+    event.clipboardData.setData('text/plain', rowValue);
+    setCopiedCellRange(
+      focusedCell ? { start: focusedCell, end: focusedCell } : copiedCellRange,
+    );
   }
 
   function handlePaste(event: ClipboardEvent<HTMLElement>) {
+    if (editingCell) return;
     if (!focusedCell) return;
     const text = event.clipboardData.getData('text/plain');
     if (!text) return;
@@ -589,9 +654,15 @@ function F1GridInner<T extends object>(
       return;
     }
 
-    if (event.key === 'Escape' && editingCell) {
+    if (event.key === 'Escape') {
       event.preventDefault();
-      stopEdit();
+      setCopiedCellRange(undefined);
+      copiedCellRangeRef.current = undefined;
+      setCellSelection(undefined);
+      cellSelectionRef.current = undefined;
+      if (editingCell) {
+        stopEdit();
+      }
       return;
     }
 
@@ -669,6 +740,26 @@ function F1GridInner<T extends object>(
     if (firstEditableCol >= 0) {
       setFocusedCell(getCell(newRowId, firstEditableCol));
     }
+  }
+
+  function setCellSelectionRange(start: F1GridCell, end: F1GridCell) {
+    const next = { start, end };
+    setCellSelection(next);
+    cellSelectionRef.current = next;
+    setCopiedCellRange(undefined);
+    copiedCellRangeRef.current = undefined;
+  }
+
+  function updateCellSelectionRange(cell: F1GridCell) {
+    if (!cellRangeDragRef.current) return;
+    setCellSelection({
+      start: cellRangeDragRef.current.start,
+      end: cell,
+    });
+  }
+
+  function finishCellSelectionRange() {
+    cellRangeDragRef.current = null;
   }
 
   function handleDeleteSelectedRows() {
@@ -802,13 +893,28 @@ function F1GridInner<T extends object>(
         selectedIds={selectedIds}
         focusedCell={focusedCell}
         editingCell={editingCell}
+        selectedCellRange={cellSelection}
+        copiedCellRange={copiedCellRange}
         draftValue={draftValue}
         mergeInfoByColumn={mergeInfoByColumn}
         getRowId={(row) => getGridRowId(row, rowKey)}
         onSelectRow={selectRow}
         onSetRowSelection={setRowSelection}
-        onSetFocusedCell={setFocusedCell}
+        onSetFocusedCell={(cell) => {
+          setFocusedCell(cell);
+          setCopiedCellRange(undefined);
+          setCellSelectionRange(cell, cell);
+        }}
         onStartEdit={startEdit}
+        onCellSelectionStart={(cell) => {
+          cellRangeDragRef.current = { start: cell, current: cell };
+          setCellSelectionRange(cell, cell);
+        }}
+        onCellSelectionDrag={(cell) => {
+          updateCellSelectionRange(cell);
+        }}
+        onCellSelectionEnd={finishCellSelectionRange}
+        onCommitEdit={() => commitEditRef.current()}
         onDraftChange={setDraftValue}
         onKeyDown={handleKeyDown}
         onUpdateRow={(rowId, field, value) => {

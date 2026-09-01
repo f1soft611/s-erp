@@ -8,17 +8,29 @@ import {
 
 type NotificationContextValue = {
   showSuccess: (message: string) => void;
+  showWarning: (message: string) => void;
+  showError: (message: string) => void;
 };
 
 const NotificationContext = createContext<NotificationContextValue>({
   showSuccess: () => undefined,
+  showWarning: () => undefined,
+  showError: () => undefined,
 });
 
 export function NotificationProvider({ children }: PropsWithChildren) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const value = {
+    showSuccess: setSuccessMessage,
+    showWarning: setWarningMessage,
+    showError: setErrorMessage,
+  };
 
   return (
-    <NotificationContext.Provider value={{ showSuccess: setSuccessMessage }}>
+    <NotificationContext.Provider value={value}>
       {children}
       <Snackbar
         open={Boolean(successMessage)}
@@ -32,6 +44,34 @@ export function NotificationProvider({ children }: PropsWithChildren) {
           onClose={() => setSuccessMessage(null)}
         >
           {successMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={Boolean(warningMessage)}
+        autoHideDuration={6000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={() => setWarningMessage(null)}
+      >
+        <Alert
+          severity="warning"
+          variant="filled"
+          onClose={() => setWarningMessage(null)}
+        >
+          {warningMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={Boolean(errorMessage)}
+        autoHideDuration={6000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={() => setErrorMessage(null)}
+      >
+        <Alert
+          severity="error"
+          variant="filled"
+          onClose={() => setErrorMessage(null)}
+        >
+          {errorMessage}
         </Alert>
       </Snackbar>
     </NotificationContext.Provider>

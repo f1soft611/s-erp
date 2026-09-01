@@ -31,13 +31,21 @@ public class MenuPermissionVO implements Serializable {
     @Schema(description = "삭제 가능 여부")
     private boolean delete;
 
+    @Schema(description = "엑셀 가능 여부")
+    private boolean excel;
+
     public MenuPermissionVO() {
     }
 
     public MenuPermissionVO(boolean read, boolean create, boolean update, boolean delete) {
+        this(read, create, update, delete, false);
+    }
+
+    public MenuPermissionVO(boolean read, boolean create, boolean update, boolean delete, boolean excel) {
         this.read = read;
         this.create = create;
         this.update = update;
         this.delete = delete;
+        this.excel = excel;
     }
 }

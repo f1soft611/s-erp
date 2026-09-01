@@ -9,6 +9,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { PageHeader } from '../../shared/components/PageHeader';
 import type { ModuleItem, PageContent } from '../dashboard/types/dashboard';
 
 type OverviewPageProps = {
@@ -45,34 +46,10 @@ export function OverviewPage({
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: '1px solid rgba(148,163,184,0.18)',
-          bgcolor: isDark
-            ? 'rgba(15, 23, 42, 0.75)'
-            : 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <Typography
-          variant="overline"
-          sx={{ color: '#64748b', letterSpacing: 1.4 }}
-        >
-          {selectedModule.name} / {currentMenuName}
-        </Typography>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ mt: 0.5, fontWeight: 800 }}
-        >
-          {content.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {content.description}
-        </Typography>
-      </Box>
+      <PageHeader
+        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        description={content.description}
+      />
 
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

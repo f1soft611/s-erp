@@ -26,6 +26,15 @@ export const buildModuleItems = (
 
 export const moduleItems: ModuleItem[] = buildModuleItems(moduleDescriptors);
 
+export const buildPageContent = (
+  baseContent: PageContent,
+  menu: { name: string; description?: string },
+): PageContent => ({
+  ...baseContent,
+  title: menu.name,
+  description: menu.description ?? baseContent.description,
+});
+
 export const defaultPage: PageContent = {
   title: '업무 현황',
   description:

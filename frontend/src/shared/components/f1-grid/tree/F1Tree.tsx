@@ -267,7 +267,9 @@ function F1TreeInner<T extends object>(
                 size="small"
                 checked={treeCheckboxState?.checked ?? false}
                 indeterminate={treeCheckboxState?.indeterminate ?? false}
-                inputProps={{ 'aria-label': undefined, 'aria-hidden': true }}
+                slotProps={{
+                  input: { 'aria-label': `${label} 트리 선택` },
+                }}
                 onChange={(event) => {
                   event.stopPropagation();
                   toggleTreeCheckbox(rowId, event.target.checked);

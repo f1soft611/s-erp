@@ -23,6 +23,14 @@ type GridRowProps<T extends object> = {
   resizableRows: boolean;
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
+  selectedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
+  copiedCellRange?: {
+    start: { rowId: F1GridRowId; columnIndex: number };
+    end: { rowId: F1GridRowId; columnIndex: number };
+  };
   draftValue: string;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -32,6 +40,16 @@ type GridRowProps<T extends object> = {
   onSelectRow: (rowId: F1GridRowId, event: MouseEvent<HTMLElement>) => void;
   onSetRowSelection: (rowId: F1GridRowId, checked: boolean) => void;
   onSetFocusedCell: (cell: { rowId: F1GridRowId; columnIndex: number }) => void;
+  onCellSelectionStart: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionDrag: (cell: {
+    rowId: F1GridRowId;
+    columnIndex: number;
+  }) => void;
+  onCellSelectionEnd: () => void;
+  onCommitEdit: () => void;
   onStartEdit: (rowId: F1GridRowId, columnIndex: number) => void;
   onDraftChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -73,11 +91,19 @@ export function GridRow<T extends object>({
   resizableRows,
   focusedCell,
   editingCell,
+  selectedCellRange,
+  copiedCellRange,
   draftValue,
   mergeInfoByColumn,
+  visibleRows,
+  rowKey,
   onSelectRow,
   onSetRowSelection,
   onSetFocusedCell,
+  onCellSelectionStart,
+  onCellSelectionDrag,
+  onCellSelectionEnd,
+  onCommitEdit,
   onStartEdit,
   onDraftChange,
   onKeyDown,
@@ -185,6 +211,54 @@ export function GridRow<T extends object>({
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);
         const focused = isSameCell(focusedCell, cell);
+        const dragRowStartIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(selectedCellRange?.start.rowId ?? rowId),
+        );
+        const dragRowEndIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(selectedCellRange?.end.rowId ?? rowId),
+        );
+        const copyRowStartIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(copiedCellRange?.start.rowId ?? rowId),
+        );
+        const copyRowEndIndex = visibleRows.findIndex(
+          (item) =>
+            String(item[rowKey]) ===
+            String(copiedCellRange?.end.rowId ?? rowId),
+        );
+        const selected =
+          !!selectedCellRange &&
+          rowIndex >= Math.min(dragRowStartIndex, dragRowEndIndex) &&
+          rowIndex <= Math.max(dragRowStartIndex, dragRowEndIndex) &&
+          columnIndex >=
+            Math.min(
+              selectedCellRange.start.columnIndex,
+              selectedCellRange.end.columnIndex,
+            ) &&
+          columnIndex <=
+            Math.max(
+              selectedCellRange.start.columnIndex,
+              selectedCellRange.end.columnIndex,
+            );
+        const copied =
+          !!copiedCellRange &&
+          rowIndex >= Math.min(copyRowStartIndex, copyRowEndIndex) &&
+          rowIndex <= Math.max(copyRowStartIndex, copyRowEndIndex) &&
+          columnIndex >=
+            Math.min(
+              copiedCellRange.start.columnIndex,
+              copiedCellRange.end.columnIndex,
+            ) &&
+          columnIndex <=
+            Math.max(
+              copiedCellRange.start.columnIndex,
+              copiedCellRange.end.columnIndex,
+            );
         const value = column.getValue?.(row) ?? row[column.field];
         const mergeEditing = getMergeEditing(columnIndex);
         const mergeInfo = mergeEditing
@@ -202,6 +276,8 @@ export function GridRow<T extends object>({
             columnLine={columnLine}
             focused={focused}
             editing={editing}
+            selected={Boolean(selected || copied)}
+            copied={Boolean(copied)}
             merged={merged}
             mergeInfo={mergeInfo}
             rowHeight={rowHeight}
@@ -212,6 +288,15 @@ export function GridRow<T extends object>({
               onSetFocusedCell(cell);
               onSelectRow(rowId, {} as MouseEvent<HTMLElement>);
             }}
+            onMouseDown={() => {
+              onSetFocusedCell(cell);
+              onCellSelectionStart(cell);
+            }}
+            onMouseEnter={() => {
+              if (selectedCellRange) onCellSelectionDrag(cell);
+            }}
+            onMouseUp={onCellSelectionEnd}
+            onBlur={onCommitEdit}
             onDoubleClick={() => onStartEdit(rowId, columnIndex)}
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}

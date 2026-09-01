@@ -19,6 +19,7 @@ interface SystemMenuVO {
   parentMenuNm: string | null;
   menuCode: string;
   menuNm: string;
+  menuDc: string | null;
   menuUrl: string | null;
   iconNm: string | null;
   sortOrder: number;
@@ -87,7 +88,7 @@ const toRow = (menu: SystemMenuVO): MenuManagementRow => ({
   order: menu.sortOrder,
   enabled: menu.useAt === 'Y',
   status: 'confirmed',
-  description: menu.menuUrl ?? '',
+  description: menu.menuDc ?? '',
   permissionGroup: String(menu.moduleNm ?? ''),
   permissionCodes: toPermissionCodes(menu.permissionCodes),
 });
@@ -151,7 +152,8 @@ function toSaveRequest(
     parentMenuId: parentMenuId ? Number(parentMenuId) : null,
     menuCode: row.code.trim(),
     menuNm: row.name.trim(),
-    menuUrl: row.path || row.description || null,
+    menuDc: row.description.trim() || null,
+    menuUrl: row.path || null,
     iconNm: row.iconName,
     sortOrder: row.order,
     useAt: row.enabled ? 'Y' : 'N',
