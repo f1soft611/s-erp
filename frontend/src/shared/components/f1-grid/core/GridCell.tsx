@@ -19,6 +19,7 @@ type GridCellProps<T extends object> = {
   rowHeight: number;
   defaultRowHeight: number;
   rowIndex: number;
+  isLastRow?: boolean;
   draftValue: string;
   onFocus: () => void;
   onMouseDown: () => void;
@@ -58,6 +59,7 @@ export function GridCell<T extends object>({
   rowHeight,
   defaultRowHeight,
   rowIndex,
+  isLastRow,
   draftValue,
   onFocus,
   onMouseDown,
@@ -141,6 +143,7 @@ export function GridCell<T extends object>({
           ? `${rowIndex + 1} / span ${mergeInfo.span}`
           : rowIndex + 1,
         borderTop: merged ? 0 : 1,
+        borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
         borderColor: 'divider',
         position: pinOffset ? 'sticky' : undefined,
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,

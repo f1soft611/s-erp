@@ -81,7 +81,11 @@ type GridHeaderProps<T extends object> = {
   ) => void;
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
-  onReorderColumn?: (sourceField: string, targetField: string) => void;
+  onReorderColumn?: (
+    sourceField: string,
+    targetField: string,
+    position?: 'before' | 'after',
+  ) => void;
 };
 
 export function GridHeader<T extends object>({
@@ -118,6 +122,13 @@ export function GridHeader<T extends object>({
     null,
   );
   const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
+  const [draggedColumnField, setDraggedColumnField] = useState<string | null>(
+    null,
+  );
+  const [dropTargetField, setDropTargetField] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(
+    null,
+  );
   const [filterDraft, setFilterDraft] = useState<{
     operator: F1GridFilterOperator;
     value: string;
@@ -341,27 +352,77 @@ export function GridHeader<T extends object>({
             menuColumn?.field === column.field &&
             Boolean(menuAnchor || columnListAnchor || filterAnchor);
           const grouped = isGroupedColumn(column);
+          const isDraggingColumn = draggedColumnField === String(column.field);
+          const isDropTarget = dropTargetField === String(column.field);
+          const isBeforeDrop = isDropTarget && dropPosition === 'before';
+          const isAfterDrop = isDropTarget && dropPosition === 'after';
 
           return (
             <Box
               key={String(column.field)}
               role="columnheader"
               draggable={Boolean(onReorderColumn) && !pinSide}
+              data-drop-target={isDropTarget ? 'true' : undefined}
+              data-drop-position={
+                isDropTarget ? (dropPosition ?? 'before') : undefined
+              }
+              aria-grabbed={isDraggingColumn || undefined}
               onDragStart={(event) => {
                 if (!onReorderColumn || pinSide) return;
+                setDraggedColumnField(String(column.field));
+                setDropTargetField(null);
+                setDropPosition(null);
                 event.dataTransfer.setData('text/plain', String(column.field));
                 event.dataTransfer.effectAllowed = 'move';
               }}
               onDragOver={(event) => {
                 if (!onReorderColumn || pinSide) return;
                 event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                if (
+                  draggedColumnField &&
+                  draggedColumnField !== String(column.field)
+                ) {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const hasPointerPosition =
+                    Number.isFinite(event.clientX) && rect.width > 0;
+                  const nextPosition =
+                    hasPointerPosition &&
+                    event.clientX - rect.left < rect.width / 2
+                      ? 'before'
+                      : hasPointerPosition
+                        ? 'after'
+                        : 'before';
+                  setDropTargetField(String(column.field));
+                  setDropPosition(nextPosition);
+                }
+              }}
+              onDragLeave={(event) => {
+                if (!onReorderColumn || pinSide || !dropTargetField) return;
+                const nextTarget = event.relatedTarget as Node | null;
+                if (nextTarget && event.currentTarget.contains(nextTarget))
+                  return;
+                setDropTargetField(null);
+                setDropPosition(null);
               }}
               onDrop={(event) => {
                 if (!onReorderColumn || pinSide) return;
                 event.preventDefault();
                 const sourceField = event.dataTransfer.getData('text/plain');
                 if (!sourceField) return;
-                onReorderColumn(sourceField, String(column.field));
+                onReorderColumn(
+                  sourceField,
+                  String(column.field),
+                  dropPosition ?? 'before',
+                );
+                setDropTargetField(null);
+                setDropPosition(null);
+                setDraggedColumnField(null);
+              }}
+              onDragEnd={() => {
+                setDraggedColumnField(null);
+                setDropTargetField(null);
+                setDropPosition(null);
               }}
               sx={{
                 gridColumn: (showCheckbox ? 2 : 1) + columnIndex,
@@ -396,18 +457,48 @@ export function GridHeader<T extends object>({
                     ? rightOffsets[String(column.field)]
                     : undefined,
                 zIndex: pinSide ? 3 : undefined,
-                backgroundColor: pinSide
-                  ? (theme) =>
-                      theme.palette.mode === 'dark'
-                        ? 'rgb(28, 36, 50)'
-                        : 'rgb(232, 236, 244)'
-                  : undefined,
-                boxShadow:
-                  pinSide === 'left'
+                backgroundColor: isDropTarget
+                  ? 'rgba(25, 118, 210, 0.08)'
+                  : pinSide
+                    ? (theme) =>
+                        theme.palette.mode === 'dark'
+                          ? 'rgb(28, 36, 50)'
+                          : 'rgb(232, 236, 244)'
+                    : undefined,
+                border: isDropTarget ? 2 : undefined,
+                borderColor: isDropTarget ? 'primary.main' : undefined,
+                boxShadow: isDropTarget
+                  ? 'inset 0 0 0 1px rgba(25, 118, 210, 0.35), 0 0 0 1px rgba(25, 118, 210, 0.15)'
+                  : pinSide === 'left'
                     ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                     : pinSide === 'right'
                       ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                       : undefined,
+                opacity: isDraggingColumn ? 0.78 : 1,
+                '&::before': isBeforeDrop
+                  ? {
+                      content: '""',
+                      position: 'absolute',
+                      left: 4,
+                      top: 4,
+                      bottom: 4,
+                      width: 3,
+                      borderRadius: 999,
+                      backgroundColor: 'primary.main',
+                    }
+                  : undefined,
+                '&::after': isAfterDrop
+                  ? {
+                      content: '""',
+                      position: 'absolute',
+                      right: 4,
+                      top: 4,
+                      bottom: 4,
+                      width: 3,
+                      borderRadius: 999,
+                      backgroundColor: 'primary.main',
+                    }
+                  : undefined,
                 '& .f1-grid-col-menu-btn': {
                   opacity: isMenuOpen ? 1 : 0,
                   transition: 'opacity 0.15s ease-in-out',

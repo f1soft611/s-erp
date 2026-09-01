@@ -1787,6 +1787,19 @@ describe('F1-GRID column drag reorder', () => {
     ]);
   });
 
+  it('marks the drop target header while dragging a column', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const dataTransfer = createDataTransfer();
+
+    fireEvent.dragStart(codeHeader, { dataTransfer });
+    fireEvent.dragOver(statusHeader, { dataTransfer });
+
+    expect(statusHeader).toHaveAttribute('data-drop-target', 'true');
+  });
+
   it('excludes pinned columns from drag reorder targets', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
@@ -1816,7 +1829,8 @@ describe('F1-GRID column drag reorder', () => {
 
     const stored = window.localStorage.getItem('test-grid-column-order');
     expect(stored).not.toBeNull();
-    expect(JSON.parse(stored ?? '[]')).toContain('status');
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.order).toContain('status');
     unmount();
 
     render(
@@ -1838,5 +1852,120 @@ describe('F1-GRID column drag reorder', () => {
       '코드',
       '상태',
     ]);
+  });
+
+  it('persists column width to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-width"
+        resizableColumns={true}
+        minColumnWidth={40}
+      />,
+    );
+
+    const resizeHandle = screen.getByRole('separator', {
+      name: '코드 컬럼 너비 조절',
+    });
+    fireEvent.mouseDown(resizeHandle, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 220 });
+    fireEvent.mouseUp(window);
+
+    const stored = window.localStorage.getItem('test-grid-column-width');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.widths.code).toBeGreaterThan(0);
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-width"
+        resizableColumns={true}
+        minColumnWidth={40}
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toBeInTheDocument();
+    const headerRow = screen.getAllByRole('row')[0];
+    expect(getComputedStyle(headerRow).gridTemplateColumns).toContain(
+      `${parsed.widths.code}px`,
+    );
+  });
+
+  it('persists hidden column list to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-hidden"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '코드 표시' }));
+
+    const stored = window.localStorage.getItem('test-grid-column-hidden');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.hidden).toContain('code');
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-hidden"
+      />,
+    );
+
+    expect(
+      screen.queryByRole('columnheader', { name: /^코드$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('persists pinned column state to localStorage and restores it on remount', () => {
+    const { unmount } = render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-pinned"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+
+    const stored = window.localStorage.getItem('test-grid-column-pinned');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored ?? '{}');
+    expect(parsed.pinned.code).toBe('left');
+    unmount();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        storageKey="test-grid-column-pinned"
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).not.toHaveAttribute('draggable', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    expect(
+      screen.getByRole('menuitem', { name: '고정 해제' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 });

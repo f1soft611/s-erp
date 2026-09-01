@@ -49,6 +49,7 @@ import {
   canHideGridColumn,
   getVisibleGridColumns,
   moveGridColumnOrder,
+  parseGridColumnStorageState,
   reorderGridColumns,
 } from '../columns/GridColumnManagement';
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
@@ -73,6 +74,8 @@ function F1GridInner<T extends object>(
     ariaLabel = 'F1-GRID',
     columnLine = false,
     storageKey,
+    height,
+    maxHeight,
     rowHeight = 40,
     minRowHeight = 40,
     maxRowHeight = 300,
@@ -125,36 +128,55 @@ function F1GridInner<T extends object>(
     normalizedMaxRowHeight,
   );
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
+    () => {
+      if (storageKey) {
+        const stored = parseGridColumnStorageState(
+          window.localStorage.getItem(storageKey),
+        );
+        if (stored?.widths) return stored.widths;
+      }
+      return {};
+    },
+  );
   const [hiddenColumnFields, setHiddenColumnFields] = useState<Set<string>>(
-    () =>
-      new Set(
+    () => {
+      if (storageKey) {
+        const stored = parseGridColumnStorageState(
+          window.localStorage.getItem(storageKey),
+        );
+        if (stored?.hidden) return new Set(stored.hidden);
+      }
+      return new Set(
         columns
           .filter((column) => column.hidden)
           .map((column) => String(column.field)),
-      ),
+      );
+    },
   );
   const [sortState, setSortState] = useState<F1GridSort<T>[]>([]);
   const [filterState, setFilterState] = useState<F1GridFilter<T>[]>([]);
   const [pinnedFields, setPinnedFields] = useState<Map<string, F1GridPinSide>>(
-    () =>
-      new Map(
+    () => {
+      if (storageKey) {
+        const stored = parseGridColumnStorageState(
+          window.localStorage.getItem(storageKey),
+        );
+        if (stored?.pinned) return new Map(Object.entries(stored.pinned));
+      }
+      return new Map(
         columns
           .filter((column) => column.pinned)
           .map((column) => [String(column.field), column.pinned!]),
-      ),
+      );
+    },
   );
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
     if (storageKey) {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) return parsed;
-        } catch {
-          // ignore malformed storage value and fall back to default order
-        }
-      }
+      const stored = parseGridColumnStorageState(
+        window.localStorage.getItem(storageKey),
+      );
+      if (stored?.order) return stored.order;
     }
     return columns.map((column) => String(column.field));
   });
@@ -163,12 +185,24 @@ function F1GridInner<T extends object>(
 
   useEffect(() => {
     if (!storageKey) return;
-    window.localStorage.setItem(storageKey, JSON.stringify(columnOrder));
-  }, [columnOrder, storageKey]);
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        order: columnOrder,
+        widths: columnWidths,
+        hidden: Array.from(hiddenColumnFields),
+        pinned: Object.fromEntries(pinnedFields),
+      }),
+    );
+  }, [columnOrder, columnWidths, hiddenColumnFields, pinnedFields, storageKey]);
 
-  function reorderColumn(sourceField: string, targetField: string) {
+  function reorderColumn(
+    sourceField: string,
+    targetField: string,
+    position: 'before' | 'after' = 'before',
+  ) {
     setColumnOrder((current) =>
-      moveGridColumnOrder(current, sourceField, targetField),
+      moveGridColumnOrder(current, sourceField, targetField, position),
     );
   }
 
@@ -871,6 +905,39 @@ function F1GridInner<T extends object>(
   const selectedAll =
     visibleRows.length > 0 && selectedIds.length === visibleRows.length;
 
+  const resolvedHeight =
+    typeof height === 'number' ? `${height}px` : (height ?? 'auto');
+  const resolvedMaxHeight =
+    typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const headerScroll = headerScrollRef.current;
+    const bodyScroll = bodyScrollRef.current;
+    if (!headerScroll || !bodyScroll) return;
+
+    const syncHeaderScroll = () => {
+      if (headerScroll.scrollLeft !== bodyScroll.scrollLeft) {
+        headerScroll.scrollLeft = bodyScroll.scrollLeft;
+      }
+    };
+
+    const syncBodyScroll = () => {
+      if (bodyScroll.scrollLeft !== headerScroll.scrollLeft) {
+        bodyScroll.scrollLeft = headerScroll.scrollLeft;
+      }
+    };
+
+    bodyScroll.addEventListener('scroll', syncHeaderScroll, { passive: true });
+    headerScroll.addEventListener('scroll', syncBodyScroll, { passive: true });
+
+    return () => {
+      bodyScroll.removeEventListener('scroll', syncHeaderScroll);
+      headerScroll.removeEventListener('scroll', syncBodyScroll);
+    };
+  }, []);
+
   return (
     <Box
       role="grid"
@@ -883,112 +950,141 @@ function F1GridInner<T extends object>(
         maxWidth: '100%',
         overflowX: 'auto',
         overflowY: 'hidden',
+        height: resolvedHeight,
+        maxHeight: resolvedMaxHeight,
+        minHeight: 0,
         border: 1,
         borderColor: 'divider',
         borderRadius: 1,
         bgcolor: 'background.paper',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      <GridHeader
-        columns={visibleColumns}
-        allColumns={columns}
-        rows={visibleRows}
-        columnLine={columnLine}
-        selectedAll={selectedAll}
-        selectedIds={selectedIds}
-        columnWidths={columnWidths}
-        resizableColumns={resizableColumns}
-        minColumnWidth={minColumnWidth}
-        showCheckbox={showCheckbox}
-        onResizeColumn={handleResizeColumn}
-        getColumnCheckboxState={getColumnCheckboxState}
-        onToggleAllRows={() => {
-          setSelectedIds(
-            selectedAll
-              ? []
-              : visibleRows.map((row) => getGridRowId(row, rowKey)),
-          );
+      <Box
+        ref={headerScrollRef}
+        sx={{
+          width: '100%',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          flex: '0 0 auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
-        onToggleColumnCheckbox={toggleColumnCheckbox}
-        onToggleColumnVisibility={toggleColumnVisibility}
-        sorts={sortState}
-        onToggleSort={toggleSortColumn}
-        disableSorting={disableSorting}
-        filters={filterState}
-        onApplyFilter={applyColumnFilter}
-        disableFiltering={disableFiltering}
-        pinnedFields={pinnedFields}
-        onPinColumn={pinColumn}
-        leftOffsets={leftOffsets}
-        rightOffsets={rightOffsets}
-        onReorderColumn={reorderColumn}
-      />
-      <GridBody
-        visibleRows={visibleRows}
-        columns={visibleColumns}
-        rowKey={rowKey}
-        columnLine={columnLine}
-        columnWidths={columnWidths}
-        defaultRowHeight={defaultRowHeight}
-        minRowHeight={normalizedMinRowHeight}
-        maxRowHeight={normalizedMaxRowHeight}
-        rowHeights={rowHeights}
-        resizableRows={resizableRows}
-        selectedIds={selectedIds}
-        focusedCell={focusedCell}
-        editingCell={editingCell}
-        selectedCellRange={cellSelection}
-        copiedCellRange={copiedCellRange}
-        draftValue={draftValue}
-        mergeInfoByColumn={mergeInfoByColumn}
-        getRowId={(row) => getGridRowId(row, rowKey)}
-        onSelectRow={selectRow}
-        onSetRowSelection={setRowSelection}
-        onSetFocusedCell={(cell) => {
-          setFocusedCell(cell);
-          setCopiedCellRange(undefined);
-          setCellSelectionRange(cell, cell);
+      >
+        <GridHeader
+          columns={visibleColumns}
+          allColumns={columns}
+          rows={visibleRows}
+          columnLine={columnLine}
+          selectedAll={selectedAll}
+          selectedIds={selectedIds}
+          columnWidths={columnWidths}
+          resizableColumns={resizableColumns}
+          minColumnWidth={minColumnWidth}
+          showCheckbox={showCheckbox}
+          onResizeColumn={handleResizeColumn}
+          getColumnCheckboxState={getColumnCheckboxState}
+          onToggleAllRows={() => {
+            setSelectedIds(
+              selectedAll
+                ? []
+                : visibleRows.map((row) => getGridRowId(row, rowKey)),
+            );
+          }}
+          onToggleColumnCheckbox={toggleColumnCheckbox}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          sorts={sortState}
+          onToggleSort={toggleSortColumn}
+          disableSorting={disableSorting}
+          filters={filterState}
+          onApplyFilter={applyColumnFilter}
+          disableFiltering={disableFiltering}
+          pinnedFields={pinnedFields}
+          onPinColumn={pinColumn}
+          leftOffsets={leftOffsets}
+          rightOffsets={rightOffsets}
+          onReorderColumn={reorderColumn}
+        />
+      </Box>
+      <Box
+        ref={bodyScrollRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'auto',
         }}
-        onStartEdit={startEdit}
-        onCellSelectionStart={(cell) => {
-          cellRangeDragRef.current = { start: cell, current: cell };
-          setCellSelectionRange(cell, cell);
-        }}
-        onCellSelectionDrag={(cell) => {
-          updateCellSelectionRange(cell);
-        }}
-        onCellSelectionEnd={finishCellSelectionRange}
-        onCommitEdit={() => commitEditRef.current()}
-        onDraftChange={setDraftValue}
-        onKeyDown={handleKeyDown}
-        onUpdateRow={(rowId, field, value) => {
-          setData((current) =>
-            updateGridRow(current, rowKey, rowId, {
-              [field]: value,
-            } as Partial<T>),
-          );
-        }}
-        onPatchRow={(rowId, changes) => {
-          setData((current) => updateGridRow(current, rowKey, rowId, changes));
-        }}
-        getCellError={(rowId, field) => cellErrors[getErrorKey(rowId, field)]}
-        onStopEdit={stopEdit}
-        onCellRef={(rowId, columnIndex, node) => {
-          const key = `${String(rowId)}:${columnIndex}`;
-          if (node) {
-            cellNodeRefs.current.set(key, node);
-          } else {
-            cellNodeRefs.current.delete(key);
-          }
-        }}
-        onEditingCellRef={(node) => {
-          editingCellNodeRef.current = node;
-        }}
-        onUpdateRowHeight={updateRowHeight}
-        getPinOffset={getPinOffset}
-        cellAdornment={cellAdornment}
-        showCheckbox={showCheckbox}
-      />
+      >
+        <GridBody
+          visibleRows={visibleRows}
+          columns={visibleColumns}
+          rowKey={rowKey}
+          columnLine={columnLine}
+          columnWidths={columnWidths}
+          defaultRowHeight={defaultRowHeight}
+          minRowHeight={normalizedMinRowHeight}
+          maxRowHeight={normalizedMaxRowHeight}
+          rowHeights={rowHeights}
+          resizableRows={resizableRows}
+          selectedIds={selectedIds}
+          focusedCell={focusedCell}
+          editingCell={editingCell}
+          selectedCellRange={cellSelection}
+          copiedCellRange={copiedCellRange}
+          draftValue={draftValue}
+          mergeInfoByColumn={mergeInfoByColumn}
+          getRowId={(row) => getGridRowId(row, rowKey)}
+          onSelectRow={selectRow}
+          onSetRowSelection={setRowSelection}
+          onSetFocusedCell={(cell) => {
+            setFocusedCell(cell);
+            setCopiedCellRange(undefined);
+            setCellSelectionRange(cell, cell);
+          }}
+          onStartEdit={startEdit}
+          onCellSelectionStart={(cell) => {
+            cellRangeDragRef.current = { start: cell, current: cell };
+            setCellSelectionRange(cell, cell);
+          }}
+          onCellSelectionDrag={(cell) => {
+            updateCellSelectionRange(cell);
+          }}
+          onCellSelectionEnd={finishCellSelectionRange}
+          onCommitEdit={() => commitEditRef.current()}
+          onDraftChange={setDraftValue}
+          onKeyDown={handleKeyDown}
+          onUpdateRow={(rowId, field, value) => {
+            setData((current) =>
+              updateGridRow(current, rowKey, rowId, {
+                [field]: value,
+              } as Partial<T>),
+            );
+          }}
+          onPatchRow={(rowId, changes) => {
+            setData((current) =>
+              updateGridRow(current, rowKey, rowId, changes),
+            );
+          }}
+          getCellError={(rowId, field) => cellErrors[getErrorKey(rowId, field)]}
+          onStopEdit={stopEdit}
+          onCellRef={(rowId, columnIndex, node) => {
+            const key = `${String(rowId)}:${columnIndex}`;
+            if (node) {
+              cellNodeRefs.current.set(key, node);
+            } else {
+              cellNodeRefs.current.delete(key);
+            }
+          }}
+          onEditingCellRef={(node) => {
+            editingCellNodeRef.current = node;
+          }}
+          onUpdateRowHeight={updateRowHeight}
+          getPinOffset={getPinOffset}
+          cellAdornment={cellAdornment}
+          showCheckbox={showCheckbox}
+        />
+      </Box>
     </Box>
   );
 }

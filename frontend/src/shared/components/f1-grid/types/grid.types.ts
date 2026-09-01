@@ -100,6 +100,8 @@ export type F1GridProps<T extends object> = {
   ariaLabel?: string;
   columnLine?: boolean;
   storageKey?: string;
+  height?: number | string;
+  maxHeight?: number | string;
   rowHeight?: number;
   minRowHeight?: number;
   maxRowHeight?: number;

@@ -7,6 +7,7 @@ import {
 } from '../src/pages/settings/system/menus/components/MenuManagementPanel';
 import { MenuManagementPage } from '../src/pages/settings/system/menus/MenuManagementPage';
 import { menuRows } from '../src/pages/settings/system/menus/data/menuManagement.data';
+import { F1Grid } from '../src/shared/components/f1-grid';
 import {
   fetchActivePermissions,
   fetchMenuRows,
@@ -145,6 +146,37 @@ const moduleTwoRows: MenuManagementRow[] = [
 ];
 
 describe('MenuManagementPanel F1Tree integration', () => {
+  it('allows the shared grid to fill its container height and scroll rows vertically', () => {
+    render(
+      <div style={{ width: 900, height: 320 }}>
+        <F1Grid
+          rows={Array.from({ length: 40 }, (_, index) => ({
+            id: String(index + 1),
+            name: `메뉴 ${index + 1}`,
+          }))}
+          columns={[
+            { field: 'id', headerName: 'ID', width: 80 },
+            { field: 'name', headerName: '메뉴명', width: 200 },
+          ]}
+          rowKey="id"
+          height={320}
+          maxHeight={320}
+          ariaLabel="테스트 그리드"
+        />
+      </div>,
+    );
+
+    const grid = screen.getByRole('grid', { name: '테스트 그리드' });
+    const body = grid.lastElementChild as HTMLElement;
+
+    expect(grid).toHaveStyle({
+      height: '320px',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+    });
+    expect(body).toHaveStyle({ overflowY: 'auto', overflowX: 'auto' });
+  });
+
   it('shows the menu description returned by the API as an editable column', () => {
     render(
       <MenuManagementPanel

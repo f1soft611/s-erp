@@ -35,14 +35,38 @@ export function moveGridColumnOrder(
   order: string[],
   sourceField: string,
   targetField: string,
+  position: 'before' | 'after' = 'before',
 ): string[] {
   if (sourceField === targetField) return order;
   const withoutSource = order.filter((field) => field !== sourceField);
   const targetIndex = withoutSource.indexOf(targetField);
   if (targetIndex < 0) return order;
+  const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
   return [
-    ...withoutSource.slice(0, targetIndex),
+    ...withoutSource.slice(0, insertIndex),
     sourceField,
-    ...withoutSource.slice(targetIndex),
+    ...withoutSource.slice(insertIndex),
   ];
+}
+
+export type F1GridColumnStorageState = {
+  order?: string[];
+  widths?: Record<string, number>;
+  hidden?: string[];
+  pinned?: Record<string, 'left' | 'right'>;
+};
+
+export function parseGridColumnStorageState(
+  raw: string | null,
+): F1GridColumnStorageState | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as F1GridColumnStorageState;
+    }
+  } catch {
+    // ignore malformed storage value
+  }
+  return null;
 }

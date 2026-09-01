@@ -319,15 +319,36 @@ export const MenuManagementPanel = forwardRef<
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 3 }, minWidth: 0 }}>
+    <Box
+      sx={{
+        p: { xs: 1.5, sm: 3 },
+        minWidth: 0,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}
+    >
       <Card
         sx={{
           borderRadius: 1,
           border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
         }}
       >
-        <CardContent sx={{ p: 2.5 }}>
+        <CardContent
+          sx={{
+            p: 2.5,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
@@ -400,29 +421,34 @@ export const MenuManagementPanel = forwardRef<
               <UnfoldLessIcon fontSize="small" />
             </IconButton>
           </Box>
-          <F1Tree
-            key={treeKey}
-            ref={treeRef}
-            rows={menus}
-            columns={columns}
-            rowKey="id"
-            parentKey="parentMenuId"
-            treeColumn="name"
-            defaultExpandAll
-            showCheckbox
-            treeCheckbox
-            getRowOrder={(row) => row.order}
-            columnLine
-            ariaLabel="F1-TREE 메뉴 관리"
-            createRow={createMenuRow}
-            onChangesChange={setChanges}
-            onSelectionChange={(rowIds) =>
-              setHasSelectedTreeRow(rowIds.length > 0)
-            }
-            onDeleteBlocked={() =>
-              notifyError('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
-            }
-          />
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <F1Tree
+              key={treeKey}
+              ref={treeRef}
+              rows={menus}
+              columns={columns}
+              rowKey="id"
+              parentKey="parentMenuId"
+              treeColumn="name"
+              storageKey="menu-management-tree"
+              defaultExpandAll
+              showCheckbox
+              treeCheckbox
+              height="100%"
+              maxHeight="100%"
+              getRowOrder={(row) => row.order}
+              columnLine
+              ariaLabel="F1-TREE 메뉴 관리"
+              createRow={createMenuRow}
+              onChangesChange={setChanges}
+              onSelectionChange={(rowIds) =>
+                setHasSelectedTreeRow(rowIds.length > 0)
+              }
+              onDeleteBlocked={() =>
+                notifyError('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
+              }
+            />
+          </Box>
           <Typography
             variant="caption"
             color="text.secondary"

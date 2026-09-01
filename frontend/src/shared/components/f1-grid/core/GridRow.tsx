@@ -184,6 +184,7 @@ export function GridRow<T extends object>({
             display: 'flex',
             justifyContent: 'center',
             borderTop: 1,
+            borderBottom: rowIndex === visibleRows.length - 1 ? 1 : 0,
             borderColor: 'divider',
             position: 'sticky',
             left: 0,
@@ -211,6 +212,7 @@ export function GridRow<T extends object>({
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);
         const focused = isSameCell(focusedCell, cell);
+        const isLastRow = rowIndex === visibleRows.length - 1;
         const dragRowStartIndex = visibleRows.findIndex(
           (item) =>
             String(item[rowKey]) ===
@@ -283,6 +285,7 @@ export function GridRow<T extends object>({
             rowHeight={rowHeight}
             defaultRowHeight={defaultRowHeight}
             rowIndex={rowIndex}
+            isLastRow={isLastRow}
             draftValue={draftValue}
             onFocus={() => {
               onSetFocusedCell(cell);
