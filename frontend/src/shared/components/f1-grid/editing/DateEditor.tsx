@@ -86,6 +86,7 @@ export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
       <TextField
         autoFocus
         fullWidth
+        margin="none"
         variant="standard"
         value={draftValue}
         onChange={(event) => {
@@ -115,16 +116,31 @@ export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
         sx={{
           width: '100%',
           height: '100%',
+          minHeight: 0,
           fontSize: 'inherit',
           bgcolor: 'background.paper',
           '& .MuiInputBase-root': {
             height: '100%',
+            minHeight: 0,
+            display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
+            border: '0 !important',
+            padding: 0,
+            '&:before, &:after': {
+              borderBottom: '0 !important',
+            },
           },
           '& .MuiInputBase-input': {
-            paddingTop: 0,
-            paddingBottom: 0,
-            lineHeight: 1.25,
+            padding: '0 4px',
+            lineHeight: 'normal',
+            height: 'auto',
+            minHeight: 0,
+            boxSizing: 'border-box',
+            textAlign: 'center',
+          },
+          '& .MuiInputAdornment-root': {
+            marginLeft: 0,
           },
         }}
       />

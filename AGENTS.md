@@ -133,19 +133,37 @@ mvn spring-boot:run
 ```text
 docs/
   database/
-    2026-08-26/
-      20260826_001_create_login_history.sql
-      20260826_001_change_login_history_schema.md
-      20260826_001_rollback.sql
+    db-schema.md                # 전체 테이블 누적 스키마 문서(단일 파일)
+    20260831/
+      20260831_001_create_login_schema.sql
+      20260831_001_change_login_schema.md
+      20260831_001_rollback.sql
+      20260831_002_seed_admin_tenant.sql
+      20260831_003_create_module_menu_schema.sql
+      20260831_003_change_module_menu_schema.md
+      20260831_003_rollback.sql
+    20260901/
+      20260901_001_add_menu_description.sql
+      20260901_001_change_menu_description_schema.md
+      20260901_001_rollback.sql
 
 backend/
   DATABASE/
-    2026-08-26/
-      20260826_001_create_login_history.sql
-      20260826_001_change_login_history_schema.md
+    20260831/
+      20260831_001_create_login_schema.sql
+      20260831_001_change_login_schema.md
+      20260831_001_rollback.sql
+    20260901/
+      20260901_001_add_menu_description.sql
+      20260901_001_change_menu_description_schema.md
+      20260901_001_rollback.sql
 ```
 
 규칙:
+
+- 날짜 폴더명은 `YYYYMMDD` 형식(하이픈 없이)으로 통일합니다.
+- `docs/database`와 `backend/DATABASE`에 동일한 날짜 폴더와 파일을 동일하게 유지합니다.
+- 같은 작업 번호(`NNN`)로 SQL, 변경 이력 문서(`.md`), 롤백 스크립트를 함께 남기고, seed 등 추가 스크립트가 있으면 같은 `NNN`을 재사용합니다.
 
 - 날짜별 폴더를 만들고 수정 내역을 별도 파일로 남깁니다.
 - SQL 스크립트와 변경 이력 문서를 함께 보관합니다.

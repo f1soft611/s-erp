@@ -9,7 +9,6 @@ import {
 } from '@mui/material';
 import CloseOutlined from '@mui/icons-material/CloseOutlined';
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
-import { useEffect, useState } from 'react';
 import type { MenuTreeNode, ModuleItem } from '../types/dashboard';
 
 type DashboardMenuTreeProps = {
@@ -31,12 +30,8 @@ export function DashboardMenuTree({
   const isDark = theme.palette.mode === 'dark';
   const panelBg = isDark ? '#111827' : '#f7f9fc';
   const softBg = isDark ? '#0f172a' : '#f1f5f9';
-  const [expandedItems, setExpandedItems] = useState(expandedItemIds);
   const expandedItemKey = expandedItemIds.join(',');
-
-  useEffect(() => {
-    setExpandedItems(expandedItemIds);
-  }, [expandedItemKey]);
+  const treeStateKey = `${selectedModule.id}:${expandedItemKey}:${selectedMenuId}`;
 
   const renderMenuNode = (node: MenuTreeNode) => {
     const hasChildren = Boolean(node.children?.length);
@@ -162,10 +157,10 @@ export function DashboardMenuTree({
         }}
       >
         <SimpleTreeView
-          expandedItems={expandedItems}
-          selectedItems={selectedMenuId}
+          key={treeStateKey}
+          defaultExpandedItems={expandedItemIds}
+          defaultSelectedItems={selectedMenuId}
           expansionTrigger="content"
-          onExpandedItemsChange={(_event, itemIds) => setExpandedItems(itemIds)}
           sx={{ flex: 1, overflow: 'auto' }}
         >
           {selectedModule.tree.map(renderMenuNode)}

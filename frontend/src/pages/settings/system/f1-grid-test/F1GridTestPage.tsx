@@ -195,6 +195,7 @@ export function F1GridTestPage({
       field: 'category',
       headerName: '품목분류',
       type: 'select',
+      width: 100,
       flex: 1,
       headerAlign: 'center',
       editable: true,
@@ -515,9 +516,11 @@ export function F1GridTestPage({
         rowKey="id"
         ariaLabel="F1-GRID 기능 테스트"
         columnLine={columnLine}
-        rowHeight={40}
-        minRowHeight={40}
+        rowHeight={32}
+        minRowHeight={32}
         maxRowHeight={300}
+        height="100%"
+        maxHeight="100%"
         resizableRows={resizableRows}
         resizableColumns={resizableColumns}
         minColumnWidth={50}

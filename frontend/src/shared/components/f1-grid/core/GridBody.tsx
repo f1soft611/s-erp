@@ -2,14 +2,13 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { GridRow } from './GridRow';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
-import { getGridColumnTrack } from '../utils/grid.utils';
 
 type GridBodyProps<T extends object> = {
   visibleRows: T[];
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
   columnLine: boolean;
-  columnWidths?: Record<string, number>;
+  columnTracks: string;
   defaultRowHeight: number;
   minRowHeight: number;
   maxRowHeight: number;
@@ -89,7 +88,7 @@ export function GridBody<T extends object>({
   columns,
   rowKey,
   columnLine,
-  columnWidths,
+  columnTracks,
   defaultRowHeight,
   minRowHeight,
   maxRowHeight,
@@ -166,15 +165,29 @@ export function GridBody<T extends object>({
     );
   }
 
+  if (visibleRows.length === 0) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: Math.max(defaultRowHeight * 4, 120),
+          color: 'text.secondary',
+          fontSize: '0.8125rem',
+          backgroundColor: 'background.paper',
+        }}
+      >
+        데이터가 없습니다
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: `${showCheckbox ? '44px ' : ''}${columns
-          .map((column) =>
-            getGridColumnTrack(column, columnWidths?.[String(column.field)]),
-          )
-          .join(' ')}`,
+        gridTemplateColumns: columnTracks,
         gridTemplateRows: visibleRows
           .map(
             (row) =>

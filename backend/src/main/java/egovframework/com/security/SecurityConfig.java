@@ -72,7 +72,7 @@ public class SecurityConfig {
             "http://localhost:*",
             "http://127.0.0.1:*",
             "https://s-erp.vercel.app",
-            "https://s-erp-chi.vercel.app'",
+            "https://s-erp-chi.vercel.app",
         };
 
     @Bean

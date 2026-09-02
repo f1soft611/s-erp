@@ -313,7 +313,14 @@ export function MenuManagementPage({
   }
 
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}
+    >
       <PageHeader
         breadcrumbItems={
           breadcrumbItems && breadcrumbItems.length > 0
@@ -326,7 +333,7 @@ export function MenuManagementPage({
       <PageSearchArea>
         <FormControl
           size="small"
-          sx={{
+          sx={(theme) => ({
             width: { xs: '100%', sm: 'auto' },
             minWidth: { sm: 220 },
             maxWidth: '100%',
@@ -336,9 +343,12 @@ export function MenuManagementPage({
             '& .MuiOutlinedInput-root': {
               height: '100%',
               borderRadius: 2,
-              backgroundColor: 'rgba(255,255,255,0.72)',
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(15, 23, 42, 0.72)'
+                  : 'rgba(255,255,255,0.72)',
             },
-          }}
+          })}
         >
           <Select
             value={selectedModuleId ?? ''}
@@ -407,7 +417,7 @@ export function MenuManagementPage({
               ) : null,
             },
           }}
-          sx={{
+          sx={(theme) => ({
             flex: '1 1 220px',
             minWidth: { xs: '100%', sm: 220 },
             maxWidth: 360,
@@ -415,24 +425,37 @@ export function MenuManagementPage({
             '& .MuiOutlinedInput-root': {
               height: '100%',
               borderRadius: 2,
-              backgroundColor: 'rgba(255,255,255,0.72)',
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(15, 23, 42, 0.72)'
+                  : 'rgba(255,255,255,0.72)',
             },
-          }}
+          })}
         />
       </PageSearchArea>
       <PageMessageArea message={error} onClose={() => setError('')} />
-      <MenuManagementPanel
-        ref={menuPanelRef}
-        key={selectedModuleId ?? 'none'}
-        menus={menus}
-        selectedModule={selectedModule}
-        permissions={permissions}
-        onRefresh={requestRefresh}
-        onDirtyChange={setDirty}
-        onSavingChange={setSaving}
-        onSaveSuccess={showSuccess}
-        onError={setError}
-      />
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          pt: 1,
+        }}
+      >
+        <MenuManagementPanel
+          ref={menuPanelRef}
+          key={selectedModuleId ?? 'none'}
+          menus={menus}
+          selectedModule={selectedModule}
+          permissions={permissions}
+          onRefresh={requestRefresh}
+          onDirtyChange={setDirty}
+          onSavingChange={setSaving}
+          onSaveSuccess={showSuccess}
+          onError={setError}
+        />
+      </Box>
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>저장하지 않은 변경사항</DialogTitle>
         <DialogContent>

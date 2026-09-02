@@ -20,7 +20,7 @@ import { canHideGridColumn } from '../columns/GridColumnManagement';
 import { getGridColumnPinSide } from '../columns/GridColumnPin';
 import { getGridFilterOperators } from '../filter/GridFilter';
 import { getGridSortIndicator } from '../sorting/GridSort';
-import { getAutoFitColumnWidth, getGridColumnTrack } from '../utils/grid.utils';
+import { getAutoFitColumnWidth } from '../utils/grid.utils';
 import type {
   F1GridColumn,
   F1GridFilter,
@@ -53,6 +53,7 @@ type GridHeaderProps<T extends object> = {
   selectedAll: boolean;
   selectedIds: F1GridRowId[];
   columnWidths: Record<string, number>;
+  columnTracks: string;
   resizableColumns?: boolean;
   minColumnWidth?: number;
   showCheckbox?: boolean;
@@ -96,6 +97,7 @@ export function GridHeader<T extends object>({
   selectedAll,
   selectedIds,
   columnWidths,
+  columnTracks,
   resizableColumns = true,
   minColumnWidth = 50,
   showCheckbox = true,
@@ -277,7 +279,7 @@ export function GridHeader<T extends object>({
         alignItems: 'center',
         justifyContent: 'center',
         px: 1,
-        py: 0.75,
+        py: 0.5,
         borderRight: 1,
         borderRightColor: 'divider',
         borderLeft: columnLine ? 1 : 0,
@@ -286,7 +288,7 @@ export function GridHeader<T extends object>({
         fontSize: 'inherit',
         fontWeight: 700,
         lineHeight: 1.2,
-        minHeight: 36,
+        minHeight: 28,
         width: '100%',
         boxSizing: 'border-box',
       }}
@@ -301,11 +303,7 @@ export function GridHeader<T extends object>({
         role="row"
         sx={{
           display: 'grid',
-          gridTemplateColumns: `${showCheckbox ? '44px ' : ''}${columns
-            .map((column) =>
-              getGridColumnTrack(column, columnWidths[String(column.field)]),
-            )
-            .join(' ')}`,
+          gridTemplateColumns: columnTracks,
           gridTemplateRows: hasGroups ? 'auto auto' : undefined,
           minWidth: 'max-content',
           bgcolor: 'action.hover',
@@ -427,7 +425,9 @@ export function GridHeader<T extends object>({
               sx={{
                 gridColumn: (showCheckbox ? 2 : 1) + columnIndex,
                 gridRow: hasGroups ? (grouped ? 2 : '1 / span 2') : undefined,
-                p: 1,
+                px: 1,
+                py: 0.5,
+                minHeight: 28,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 0.5,

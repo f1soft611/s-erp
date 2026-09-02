@@ -39,30 +39,58 @@
 ```text
 src/
   pages/
-    Sales/
-      CustomerManagementPage.tsx
-      useCustomerManagement.ts
-      customerManagement.service.ts
-      customerManagement.types.ts
-  components/
-    sales/
-      CustomerTable.tsx
-      CustomerFilterBar.tsx
-  hooks/
-    usePagination.ts
-    useDebouncedSearch.ts
-  services/
-    sales/customerManagementApi.ts
-  types/
-    sales/customerManagement.ts
+    settings/
+      system/
+        menus/
+          MenuManagementPage.tsx
+          components/
+          hooks/
+          services/
+          types/
+          constants/
+          data/
+        roles/
+          RoleManagementPage.tsx
+          components/
+          hooks/
+          services/
+          types/
+          data/
+    dashboard/
+      DashboardPage.tsx
+      components/
+      hooks/
+      services/
+      types/
+      data/
+    groupware/
+      DocumentsPage.tsx
+      OverviewPage.tsx
+  shared/
+    components/
+      f1-grid/
+      layout/
+      PageHeader.tsx
+      PageSearchArea.tsx
+    hooks/
+      usePagination.ts
+      useDebouncedSearch.ts
+    services/
+      apiClient.ts
+      authService.ts
+    context/
+    types/
+  routes/
+  theme/
 ```
 
 원칙:
 
-- 페이지 파일은 화면 조립과 주요 흐름을 담당합니다.
-- 반복되는 UI 조각은 `components`로 분리합니다.
-- API 호출, 데이터 변환, 상태 관리 로직은 `service` 또는 `hook`으로 분리합니다.
-- 한 페이지 안에서 단순한 UI만 있는 경우, `components`를 과도하게 만드는 대신 같은 파일에 두는 것이 더 적절할 수 있습니다.
+- 페이지 파일(`XxxPage.tsx`)은 화면 조립과 주요 흐름을 담당하고, `pages/<도메인>/<기능>/` 폴더 바로 아래에 둡니다.
+- 해당 기능 안에서만 쓰이는 UI, 훅, API 호출, 타입은 같은 기능 폴더 하위의 `components/`, `hooks/`, `services/`, `types/`로 분리합니다.
+- 정적 목록, 옵션 데이터 등은 필요할 때 같은 위치에 `data/` 또는 `constants/`로 분리합니다.
+- 여러 페이지/도메인에서 공통으로 재사용되는 컴포넌트, 훅, 서비스, 컨텍스트, 타입만 `src/shared` 아래로 승격합니다. 한 기능에서만 쓰이는 코드를 `shared`로 옮기지 않습니다.
+- 한 페이지 안에서 단순한 UI만 있는 경우, 하위 폴더를 과도하게 만드는 대신 같은 파일에 두는 것이 더 적절할 수 있습니다.
 - 너무 작은 파일 단위로 쪼개지 말고, 재사용 여부와 복잡도 기준으로 분리합니다.
 - `hook`은 여러 컴포넌트에서 재사용되거나 로직이 복잡할 때만 만들고, 페이지 한 곳에서만 쓰이면 오히려 같은 파일에 두는 것을 우선합니다.
 

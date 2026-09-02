@@ -9,11 +9,12 @@ type GridCellProps<T extends object> = {
   rowId: F1GridRowId;
   column: F1GridColumn<T>;
   columnIndex: number;
+  showCheckbox?: boolean;
   columnLine: boolean;
   focused: boolean;
   editing: boolean;
   selected: boolean;
-  copied?: boolean;
+  rangeStart?: boolean;
   merged: boolean;
   mergeInfo?: { isStart: boolean; span: number };
   rowHeight: number;
@@ -49,11 +50,12 @@ export function GridCell<T extends object>({
   rowId,
   column,
   columnIndex,
+  showCheckbox = true,
   columnLine,
   focused,
   editing,
   selected,
-  copied,
+  rangeStart = false,
   merged,
   mergeInfo,
   rowHeight,
@@ -83,6 +85,9 @@ export function GridCell<T extends object>({
     column.type === 'rownumber'
       ? String(rowIndex + 1)
       : getCellDisplayValue(column, value as T[keyof T]);
+  const hideRangeStartBorder = rangeStart && !editing;
+  const activeHighlight =
+    (focused || editing) && !(selected && !editing && (rangeStart || !focused));
 
   return (
     <Box
@@ -117,17 +122,18 @@ export function GridCell<T extends object>({
       onKeyDown={onKeyDown}
       data-grid-selected={selected ? 'true' : 'false'}
       sx={{
-        gridColumn: columnIndex + 2,
+        gridColumn: columnIndex + (showCheckbox ? 2 : 1),
         minHeight: 0,
         minWidth: 0,
         width: '100%',
         maxWidth: '100%',
-        overflow: 'hidden',
+        overflow: activeHighlight ? 'visible' : 'hidden',
         boxSizing: 'border-box',
-        p: column.type === 'checkbox' ? 0.25 : 1,
+        p: column.type === 'checkbox' ? 0.25 : 0.5,
         display: 'flex',
         alignItems: 'center',
         alignSelf: 'stretch',
+        height: '100%',
         justifyContent: toJustifyContent(
           column.align ??
             (column.type === 'number' || column.type === 'rownumber'
@@ -137,14 +143,20 @@ export function GridCell<T extends object>({
         cursor: editing ? 'text' : 'default',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
-        borderLeftColor: 'divider',
+        borderLeft: hideRangeStartBorder
+          ? 0
+          : columnLine && columnIndex > 0
+            ? 1
+            : 0,
+        borderLeftColor:
+          hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
         gridRow: mergeInfo?.isStart
           ? `${rowIndex + 1} / span ${mergeInfo.span}`
           : rowIndex + 1,
-        borderTop: merged ? 0 : 1,
+        borderTop: hideRangeStartBorder ? 0 : merged ? 0 : 1,
         borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
-        borderColor: 'divider',
+        borderColor:
+          hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
         position: pinOffset ? 'sticky' : undefined,
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
@@ -154,38 +166,19 @@ export function GridCell<T extends object>({
           : errorMessage
             ? 'error.lighter'
             : undefined,
-        border:
-          copied && !editing
-            ? (theme) => `1px dashed ${theme.palette.primary.main}`
-            : undefined,
         boxShadow: pinOffset
           ? pinOffset.side === 'left'
             ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
             : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
-          : copied && !editing
-            ? (theme) =>
-                theme.palette.mode === 'dark'
-                  ? 'inset 0 0 0 1px rgba(144, 202, 249, 0.95), 0 0 0 1px rgba(144, 202, 249, 0.3) dashed'
-                  : 'inset 0 0 0 1px rgba(25, 118, 210, 0.95), 0 0 0 1px rgba(25, 118, 210, 0.3) dashed'
-            : selected && !focused && !editing
-              ? 'inset 0 0 0 1px rgba(25, 118, 210, 0.7)'
-              : errorMessage
-                ? 'inset 0 0 0 1px'
-                : undefined,
+          : errorMessage
+            ? 'inset 0 0 0 1px'
+            : undefined,
         backgroundColor:
           selected && !focused && !editing
-            ? 'rgba(25, 118, 210, 0.05)'
-            : copied && !editing
-              ? (theme) =>
-                  theme.palette.mode === 'dark'
-                    ? 'rgba(144, 202, 249, 0.12)'
-                    : 'rgba(25, 118, 210, 0.08)'
-              : undefined,
+            ? 'rgba(25, 118, 210, 0.045)'
+            : undefined,
         color: errorMessage ? 'error.main' : undefined,
-        outline:
-          (focused && !editing) || (editing && column.type !== 'date')
-            ? '2px solid'
-            : 'none',
+        outline: activeHighlight ? '2px solid' : 'none',
         outlineColor: 'primary.main',
         outlineOffset: -2,
         textAlign:

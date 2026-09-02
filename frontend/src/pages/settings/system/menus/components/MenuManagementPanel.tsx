@@ -432,7 +432,7 @@ export const MenuManagementPanel = forwardRef<
               treeColumn="name"
               storageKey="menu-management-tree"
               defaultExpandAll
-              showCheckbox
+              showCheckbox={false}
               treeCheckbox
               height="100%"
               maxHeight="100%"

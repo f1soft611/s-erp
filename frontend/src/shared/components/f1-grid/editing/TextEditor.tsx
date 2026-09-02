@@ -17,8 +17,17 @@ export function TextEditor({ value, onChange, onKeyDown }: TextEditorProps) {
       onKeyDown={onKeyDown}
       sx={{
         width: '100%',
+        height: '100%',
+        minHeight: 0,
         fontSize: 'inherit',
         bgcolor: 'background.paper',
+        '& .MuiInputBase-input': {
+          height: '100%',
+          minHeight: 0,
+          boxSizing: 'border-box',
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
       }}
     />
   );

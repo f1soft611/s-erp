@@ -86,6 +86,39 @@ describe('F1Tree interaction', () => {
     { field: 'name' as const, headerName: '메뉴명', editable: true },
   ];
 
+  it('uses fixed-width tracks for pinned flex columns inherited from F1Grid', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={[
+          {
+            field: 'name' as const,
+            headerName: '메뉴명',
+            width: 180,
+            flex: 1,
+            pinned: 'left',
+          },
+          {
+            field: 'allowed' as const,
+            headerName: '허용',
+            type: 'checkbox',
+            width: 100,
+            pinned: 'left',
+          },
+        ]}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 핀 고정 정렬 테스트"
+        defaultExpanded="all"
+      />,
+    );
+
+    expect(
+      getComputedStyle(screen.getAllByRole('row')[0]).gridTemplateColumns,
+    ).toContain('44px 180px 100px');
+  });
+
   it('expands every parent on first render when defaultExpandAll is enabled', () => {
     render(
       <F1Tree
@@ -368,6 +401,86 @@ describe('F1Tree interaction', () => {
 
     fireEvent.click(rootTreeCheckbox);
     expect(rootAllowedCheckbox).not.toBeChecked();
+  });
+
+  it('syncs computed checkbox columns through onValueChange when treeCheckbox is toggled', () => {
+    const permissionColumns = [
+      { field: 'name' as const, headerName: '메뉴명', editable: true },
+      {
+        field: 'allowed' as const,
+        headerName: '허용',
+        type: 'checkbox' as const,
+        getValue: (row: TreeRow) => row.allowed,
+        onValueChange: (row: TreeRow, checked: unknown) => ({
+          allowed: Boolean(checked),
+        }),
+      },
+    ];
+    render(
+      <F1Tree
+        rows={rows}
+        columns={permissionColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 계산형 체크박스 동기화 테스트"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const rootTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Root 트리 선택',
+    });
+    const rootAllowedCheckbox = screen.getByRole('checkbox', {
+      name: '허용 root',
+    });
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootAllowedCheckbox).toBeChecked();
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(rootAllowedCheckbox).not.toBeChecked();
+  });
+
+  it('does not sync tree checkbox into disabled checkbox cells', () => {
+    const rowsWithDisabled = [
+      { ...rows[0], allowed: false },
+      { ...rows[1], allowed: false },
+    ];
+    const columnsWithDisabledCheckbox = [
+      { field: 'name' as const, headerName: '메뉴명', editable: true },
+      {
+        field: 'allowed' as const,
+        headerName: '허용',
+        type: 'checkbox' as const,
+        editable: (row: TreeRow) => (row.id === 'child' ? false : true),
+        getValue: (row: TreeRow) => row.allowed,
+      },
+    ];
+
+    render(
+      <F1Tree
+        rows={rowsWithDisabled}
+        columns={columnsWithDisabledCheckbox}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 비활성 체크박스 동기화 방지 테스트"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const rootTreeCheckbox = screen.getByRole('checkbox', {
+      name: 'Root 트리 선택',
+    });
+    const childAllowedCheckbox = screen.getByRole('checkbox', {
+      name: '허용 child',
+    });
+
+    fireEvent.click(rootTreeCheckbox);
+    expect(childAllowedCheckbox).not.toBeChecked();
   });
 
   it('hides the row selection checkbox column when the checkbox option is disabled', () => {
