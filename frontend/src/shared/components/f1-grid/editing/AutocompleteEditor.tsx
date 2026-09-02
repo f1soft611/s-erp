@@ -41,7 +41,20 @@ export function AutocompleteEditor({
           onKeyDown(event);
         }}
         inputProps={{ list: 'f1-grid-autocomplete-options' }}
-        sx={{ width: '100%', fontSize: 'inherit', bgcolor: 'background.paper' }}
+        sx={{
+          width: '100%',
+          height: '100%',
+          minHeight: 0,
+          fontSize: 'inherit',
+          bgcolor: 'background.paper',
+          '& .MuiInputBase-input': {
+            height: '100%',
+            minHeight: 0,
+            boxSizing: 'border-box',
+            paddingTop: 0,
+            paddingBottom: 0,
+          },
+        }}
       />
       <datalist id="f1-grid-autocomplete-options">
         {options.map((option) => (

@@ -223,16 +223,16 @@ export function GridRow<T extends object>({
             String(item[rowKey]) ===
             String(selectedCellRange?.end.rowId ?? rowId),
         );
-        const copyRowStartIndex = visibleRows.findIndex(
-          (item) =>
-            String(item[rowKey]) ===
-            String(copiedCellRange?.start.rowId ?? rowId),
-        );
-        const copyRowEndIndex = visibleRows.findIndex(
-          (item) =>
-            String(item[rowKey]) ===
-            String(copiedCellRange?.end.rowId ?? rowId),
-        );
+        const selectedRangeHasMultipleCells =
+          !!selectedCellRange &&
+          (selectedCellRange.start.rowId !== selectedCellRange.end.rowId ||
+            selectedCellRange.start.columnIndex !==
+              selectedCellRange.end.columnIndex);
+        const copiedRangeHasMultipleCells =
+          !!copiedCellRange &&
+          (copiedCellRange.start.rowId !== copiedCellRange.end.rowId ||
+            copiedCellRange.start.columnIndex !==
+              copiedCellRange.end.columnIndex);
         const selected =
           !!selectedCellRange &&
           rowIndex >= Math.min(dragRowStartIndex, dragRowEndIndex) &&
@@ -247,20 +247,14 @@ export function GridRow<T extends object>({
               selectedCellRange.start.columnIndex,
               selectedCellRange.end.columnIndex,
             );
-        const copied =
-          !!copiedCellRange &&
-          rowIndex >= Math.min(copyRowStartIndex, copyRowEndIndex) &&
-          rowIndex <= Math.max(copyRowStartIndex, copyRowEndIndex) &&
-          columnIndex >=
-            Math.min(
-              copiedCellRange.start.columnIndex,
-              copiedCellRange.end.columnIndex,
-            ) &&
-          columnIndex <=
-            Math.max(
-              copiedCellRange.start.columnIndex,
-              copiedCellRange.end.columnIndex,
-            );
+        const isSelectedRangeStart =
+          selectedRangeHasMultipleCells &&
+          String(rowId) === String(selectedCellRange.start.rowId) &&
+          columnIndex === selectedCellRange.start.columnIndex;
+        const isCopiedRangeStart =
+          copiedRangeHasMultipleCells &&
+          String(rowId) === String(copiedCellRange.start.rowId) &&
+          columnIndex === copiedCellRange.start.columnIndex;
         const value = column.getValue?.(row) ?? row[column.field];
         const mergeEditing = getMergeEditing(columnIndex);
         const mergeInfo = mergeEditing
@@ -275,11 +269,12 @@ export function GridRow<T extends object>({
             rowId={rowId}
             column={column}
             columnIndex={columnIndex}
+            showCheckbox={showCheckbox}
             columnLine={columnLine}
             focused={focused}
             editing={editing}
-            selected={Boolean(selected || copied)}
-            copied={Boolean(copied)}
+            selected={Boolean(selected)}
+            rangeStart={isSelectedRangeStart || isCopiedRangeStart}
             merged={merged}
             mergeInfo={mergeInfo}
             rowHeight={rowHeight}

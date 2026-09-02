@@ -23,7 +23,6 @@ import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { useNotification } from '../../shared/context/NotificationContext';
 import {
   SESSION_WARNING_MESSAGE,
-  getSessionRemainingLabel,
   getStoredAuth,
   isAccessTokenExpiringSoon,
   logout,
@@ -38,6 +37,7 @@ import {
 import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
+import { SessionCountdownLabel } from './components/SessionCountdownLabel';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
 import type { MenuTreeNode } from './types/dashboard';
 
@@ -94,7 +94,6 @@ function DashboardPage() {
   const navigate = useNavigate();
   const { showWarning } = useNotification();
   const [moduleItems, setModuleItems] = useState(staticModuleItems);
-  const [sessionRemainingLabel, setSessionRemainingLabel] = useState('00:00');
   const warningShownRef = useRef(false);
   const defaultModule = moduleItems[0];
   const defaultMenuId = defaultModule.menus[0]?.id ?? '';
@@ -179,7 +178,6 @@ function DashboardPage() {
   useEffect(() => {
     const updateSessionState = () => {
       const auth = getStoredAuth();
-      setSessionRemainingLabel(getSessionRemainingLabel(auth));
 
       if (auth && isAccessTokenExpiringSoon(auth, 60_000)) {
         if (!warningShownRef.current) {
@@ -330,19 +328,7 @@ function DashboardPage() {
                 justifyContent: 'flex-end',
               }}
             >
-              <Typography
-                variant="caption"
-                sx={{
-                  px: 1,
-                  py: 0.5,
-                  borderRadius: 1,
-                  bgcolor: theme.palette.action.hover,
-                  color: theme.palette.text.secondary,
-                  fontWeight: 700,
-                }}
-              >
-                로그인 유지 시간 {sessionRemainingLabel}
-              </Typography>
+              <SessionCountdownLabel />
               <Tooltip title="테마 설정">
                 <IconButton
                   aria-label="테마 설정"

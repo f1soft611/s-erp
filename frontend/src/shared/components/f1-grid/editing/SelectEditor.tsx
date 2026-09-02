@@ -23,8 +23,12 @@ export function SelectEditor({ value, options, onChange }: SelectEditorProps) {
       }
       sx={{
         width: '100%',
+        height: '100%',
+        minHeight: 0,
         fontSize: 'inherit',
         '& .MuiSelect-select': {
+          height: '100%',
+          boxSizing: 'border-box',
           display: 'flex',
           alignItems: 'center',
           py: 0,

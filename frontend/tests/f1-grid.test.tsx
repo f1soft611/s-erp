@@ -23,6 +23,7 @@ import {
   clampGridRowHeight,
   getGridRowHeightByKey,
   getGridColumnTrack,
+  getGridColumnTracks,
   getNextEditableCell,
   getSelectedRowIds,
   hasGridRowId,
@@ -148,6 +149,32 @@ describe('F1-GRID column management', () => {
     ).toBe('140px');
   });
 
+  it('uses the configured width for a pinned flex column', () => {
+    expect(
+      getGridColumnTrack(
+        { field: 'code', headerName: '코드', flex: 1, width: 130 },
+        undefined,
+        true,
+      ),
+    ).toBe('130px');
+  });
+
+  it('resolves flex columns into shared pixel tracks for the header and body', () => {
+    expect(
+      getGridColumnTracks(
+        [
+          { field: 'code', headerName: '코드', width: 100 },
+          { field: 'order', headerName: '정렬', width: 120, flex: 2 },
+          { field: 'status', headerName: '상태', width: 60, flex: 1 },
+        ],
+        {},
+        new Map(),
+        600,
+        44,
+      ),
+    ).toBe('44px 100px 304px 152px');
+  });
+
   it('filters hidden columns while preserving the configured order', () => {
     const configuredColumns = [
       { field: 'code', headerName: '코드' },
@@ -223,6 +250,50 @@ describe('F1-GRID column management', () => {
   });
 });
 
+describe('F1-GRID cell range selection', () => {
+  it('keeps the drag overlay within the selected cell bounds', async () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme()}>
+        <AppSettingsProvider>
+          <F1Grid
+            rows={rows}
+            columns={columns}
+            rowKey="id"
+            showCheckbox={false}
+          />
+        </AppSettingsProvider>
+      </ThemeProvider>,
+    );
+
+    const cells = Array.from(container.querySelectorAll('[role="gridcell"]'));
+    expect(cells.length).toBeGreaterThanOrEqual(4);
+
+    const startCell = cells[0] as HTMLElement;
+    const endCell = cells[1] as HTMLElement;
+
+    fireEvent.mouseDown(startCell);
+    fireEvent.mouseEnter(endCell);
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-range-overlay]')).not.toBeNull();
+    });
+
+    const overlay = document.querySelector(
+      '[data-range-overlay]',
+    ) as HTMLElement;
+    const startRect = startCell.getBoundingClientRect();
+    const endRect = endCell.getBoundingClientRect();
+    const overlayRect = overlay.getBoundingClientRect();
+
+    expect(overlayRect.width).toBeLessThanOrEqual(
+      endRect.right - startRect.left + 2,
+    );
+    expect(overlayRect.height).toBeLessThanOrEqual(
+      endRect.bottom - startRect.top + 2,
+    );
+  });
+});
+
 describe('F1-GRID validation', () => {
   it('returns field errors for required, bounds, and custom validation', () => {
     const errors = validateGridRow(
@@ -244,6 +315,12 @@ describe('F1-GRID validation', () => {
       qty: '수량은(는) 1 이상이어야 합니다.',
       name: '등록할 수 없는 품목입니다.',
     });
+  });
+
+  it('renders an empty-state message when there are no rows', () => {
+    render(<F1Grid rows={[]} columns={columns} rowKey="id" />);
+
+    expect(screen.getByText('데이터가 없습니다')).toBeInTheDocument();
   });
 });
 
@@ -885,6 +962,65 @@ describe('F1-GRID interaction', () => {
     expect(input).toHaveStyle({ cursor: 'text' });
   });
 
+  it('keeps the edit focus border visible without clipping at the bottom edge', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
+        columns={[
+          { field: 'itemCode', headerName: '품목코드', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const itemCodeCell = screen.getByRole('gridcell', { name: 'ITEM-001' });
+    fireEvent.doubleClick(itemCodeCell);
+
+    expect(itemCodeCell).not.toHaveStyle({ overflow: 'hidden' });
+    expect(itemCodeCell).toHaveStyle({ overflow: 'visible' });
+  });
+
+  it('sizes a text editor to the full height of its compact grid cell', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
+        columns={[
+          { field: 'itemCode', headerName: '품목코드', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
+
+    const input = screen.getByDisplayValue('ITEM-001');
+    expect(input.closest('.MuiInputBase-root')).toHaveStyle({ height: '100%' });
+    expect(input).toHaveStyle({ height: '100%' });
+  });
+
+  it('sizes number editors to the full height of their compact grid cells', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', quantity: 12 }]}
+        columns={[
+          {
+            field: 'quantity',
+            headerName: '수량',
+            type: 'number',
+            editable: true,
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '12' }));
+
+    const input = screen.getByDisplayValue('12');
+    expect(input.closest('.MuiInputBase-root')).toHaveStyle({ height: '100%' });
+    expect(input).toHaveStyle({ height: '100%' });
+  });
+
   it('supports cell-range drag selection across adjacent cells', () => {
     render(
       <F1Grid
@@ -908,9 +1044,48 @@ describe('F1-GRID interaction', () => {
 
     expect(start).toHaveAttribute('data-grid-selected', 'true');
     expect(end).toHaveAttribute('data-grid-selected', 'true');
+    expect(
+      document.querySelector('[data-range-overlay="drag"]'),
+    ).toBeInTheDocument();
+    expect(
+      window.getComputedStyle(
+        document.querySelector('[data-range-overlay="drag"]') as HTMLElement,
+      ).borderTopStyle,
+    ).toBe('solid');
   });
 
-  it('keeps drag selection plain and only shows the dashed copy range after copy, then clears on Escape', () => {
+  it('keeps the top border visible when a multi-cell selection starts on the first row', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Alpha' });
+    fireEvent.mouseDown(start);
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    const overlay = document.querySelector('[data-range-overlay="drag"]');
+    expect(overlay).toBeInTheDocument();
+    expect(
+      parseFloat((overlay as HTMLElement).style.top || '0'),
+    ).toBeGreaterThanOrEqual(0);
+    expect(window.getComputedStyle(overlay as HTMLElement).borderTopStyle).toBe(
+      'solid',
+    );
+  });
+
+  it('keeps drag selection plain and only draws a single outer rectangle around the copied range, then clears on Escape', () => {
     render(
       <F1Grid
         rows={[
@@ -931,8 +1106,10 @@ describe('F1-GRID interaction', () => {
     fireEvent.mouseEnter(end);
     fireEvent.mouseUp(end);
 
-    expect(window.getComputedStyle(start).border).not.toContain('dashed');
-    expect(window.getComputedStyle(end).border).not.toContain('dashed');
+    expect(start).not.toHaveStyle({ outline: '2px solid' });
+    expect(window.getComputedStyle(start).border).not.toContain('solid');
+    expect(window.getComputedStyle(end).border).not.toContain('solid');
+    expect(start).not.toHaveStyle({ outline: '1px solid' });
 
     fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
       clipboardData: {
@@ -941,12 +1118,24 @@ describe('F1-GRID interaction', () => {
       },
     });
 
-    expect(window.getComputedStyle(start).border).toContain('dashed');
-    expect(window.getComputedStyle(end).border).toContain('dashed');
+    const copiedOverlay = screen
+      .getByRole('grid', { name: 'F1-GRID' })
+      .querySelector('[data-range-overlay="copy"]');
+    expect(copiedOverlay).toBeInTheDocument();
+    expect(
+      window.getComputedStyle(copiedOverlay as HTMLElement).borderStyle,
+    ).toBe('dashed');
+    expect(window.getComputedStyle(start).border).not.toContain('solid');
+    expect(window.getComputedStyle(end).border).not.toContain('solid');
 
     fireEvent.keyDown(start, { key: 'Escape' });
-    expect(window.getComputedStyle(start).border).not.toContain('dashed');
-    expect(window.getComputedStyle(end).border).not.toContain('dashed');
+    expect(
+      screen
+        .getByRole('grid', { name: 'F1-GRID' })
+        .querySelector('[data-range-overlay="copy"]'),
+    ).not.toBeInTheDocument();
+    expect(window.getComputedStyle(start).border).not.toContain('solid');
+    expect(window.getComputedStyle(end).border).not.toContain('solid');
   });
 
   it('rebases external rows when the grid has no pending changes', () => {
@@ -1089,13 +1278,99 @@ describe('F1-GRID interaction', () => {
     expect(screen.getByDisplayValue('0605')).toBeInTheDocument();
   });
 
-  it('does not draw the cell focus outline over a date editor', () => {
-    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+  it('keeps the active edit border visible for date and time editors', () => {
+    render(
+      <F1Grid
+        rows={[
+          {
+            id: 'dashboard',
+            code: 'DASH',
+            order: 1,
+            enabled: true,
+            startDate: '2026-08-27',
+            status: '09:30',
+          },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드', editable: true },
+          {
+            field: 'startDate',
+            headerName: '시작일',
+            editable: true,
+            type: 'date',
+          },
+          {
+            field: 'status',
+            headerName: '상태',
+            editable: true,
+            type: 'time',
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
 
     const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
     fireEvent.doubleClick(dateCell);
+    expect(dateCell).toHaveStyle({ outline: '2px solid' });
 
-    expect(dateCell).toHaveStyle({ outline: 'none' });
+    const timeCell = screen.getByRole('gridcell', { name: '09:30' });
+    fireEvent.doubleClick(timeCell);
+    expect(timeCell).toHaveStyle({ outline: '2px solid' });
+  });
+
+  it('does not apply the theme default TextField margin to date/time editors', () => {
+    render(
+      <F1Grid
+        rows={[
+          {
+            id: 'dashboard',
+            code: 'DASH',
+            order: 1,
+            enabled: true,
+            startDate: '2026-08-27',
+            status: '09:30',
+          },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드', editable: true },
+          {
+            field: 'startDate',
+            headerName: '시작일',
+            editable: true,
+            type: 'date',
+          },
+          {
+            field: 'status',
+            headerName: '상태',
+            editable: true,
+            type: 'time',
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '2026-08-27' }));
+    const dateInput = screen.getByDisplayValue('2026-08-27');
+    expect(dateInput.closest('.MuiFormControl-root')).not.toHaveClass(
+      'MuiFormControl-marginNormal',
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '09:30' }));
+    const timeInput = screen.getByDisplayValue('09:30');
+    expect(timeInput.closest('.MuiFormControl-root')).not.toHaveClass(
+      'MuiFormControl-marginNormal',
+    );
+  });
+
+  it('keeps cell padding while editing so the editor is not flush with the cell edge', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    fireEvent.doubleClick(codeCell);
+
+    expect(getComputedStyle(codeCell).padding).not.toBe('0px');
   });
 
   it('keeps predicate-disabled rows read-only', () => {

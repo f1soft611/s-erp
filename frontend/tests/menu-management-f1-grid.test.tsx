@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
 import { useRef, type ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -20,6 +21,7 @@ import type {
   MenuModuleOption,
   MenuPermissionDefinition,
 } from '../src/pages/settings/system/menus/types/menuManagement.types';
+import { createAppTheme } from '../src/theme/theme';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -175,6 +177,61 @@ describe('MenuManagementPanel F1Tree integration', () => {
       overflowY: 'hidden',
     });
     expect(body).toHaveStyle({ overflowY: 'auto', overflowX: 'auto' });
+  });
+
+  it('uses dark-theme surfaces for the menu search controls', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <MenuManagementPage
+          selectedModule={pageProps.selectedModule}
+          selectedModuleId={2}
+          modules={modules}
+          menus={moduleTwoRows}
+          permissions={permissions}
+          selectedMenuId={null}
+          loading={false}
+          saving={false}
+          dirty={false}
+          searchQuery=""
+          setSearchQuery={() => undefined}
+          onRefresh={() => undefined}
+          onSave={async () => undefined}
+          onDelete={async () => undefined}
+          onModuleChange={() => undefined}
+          statusMessage=""
+          error=""
+          setError={() => undefined}
+          setDirty={() => undefined}
+          setSaving={() => undefined}
+          setSelectedModuleId={() => undefined}
+          setSelectedMenuId={() => undefined}
+          loadMenus={async () => undefined}
+          requestRefresh={async () => undefined}
+          requestChangeModule={async () => undefined}
+          currentMenuName={pageProps.currentMenuName}
+          content={pageProps.content}
+          dashboardModule={{ id: 'dashboard', name: '대시보드' }}
+          breadcrumbItems={[]}
+          pageActionGroups={[]}
+        />
+      </ThemeProvider>,
+    );
+
+    const moduleSelect = screen.getByRole('combobox', { name: '모듈 선택' });
+    const searchInput = screen.getByRole('textbox', { name: '메뉴 검색' });
+
+    expect(moduleSelect).not.toHaveStyle({
+      backgroundColor: 'rgba(255,255,255,0.72)',
+    });
+    expect(searchInput).not.toHaveStyle({
+      backgroundColor: 'rgba(255,255,255,0.72)',
+    });
+    expect(moduleSelect.closest('.MuiOutlinedInput-root')).toHaveStyle({
+      backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    });
+    expect(searchInput.closest('.MuiOutlinedInput-root')).toHaveStyle({
+      backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    });
   });
 
   it('shows the menu description returned by the API as an editable column', () => {
@@ -571,7 +628,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('system 행 선택'));
+    fireEvent.click(screen.getByRole('gridcell', { name: 'SYS' }));
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
     expect(
       screen.getByText('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.'),
@@ -700,7 +757,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('10 행 선택'));
+    fireEvent.click(screen.getByRole('gridcell', { name: 'MENU' }));
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 

@@ -1,4 +1,8 @@
-import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridColumn,
+  F1GridPinSide,
+  F1GridRowId,
+} from '../types/grid.types';
 
 export function getStateKey(rowId: F1GridRowId): string {
   return String(rowId);
@@ -30,6 +34,9 @@ export function isCellEditable<T extends object>(
   row: T,
 ): boolean {
   if (column.type === 'rownumber') return false;
+  if (column.type === 'checkbox' && column.editable === undefined) {
+    return true;
+  }
   return typeof column.editable === 'function'
     ? column.editable(row)
     : Boolean(column.editable);
@@ -38,12 +45,59 @@ export function isCellEditable<T extends object>(
 export function getGridColumnTrack<T extends object>(
   column: F1GridColumn<T>,
   resizedWidth?: number,
+  pinned = false,
 ): string {
   if (resizedWidth !== undefined) return `${resizedWidth}px`;
+  if (pinned) return `${column.width ?? 140}px`;
   if (column.flex !== undefined && column.flex > 0) {
     return `minmax(${column.width ?? 0}px, ${column.flex}fr)`;
   }
   return `${column.width ?? 140}px`;
+}
+
+function formatGridTrackWidth(width: number): string {
+  const roundedWidth = Math.round(width * 1000) / 1000;
+  return `${roundedWidth}px`;
+}
+
+export function getGridColumnTracks<T extends object>(
+  columns: F1GridColumn<T>[],
+  columnWidths: Record<string, number>,
+  pinnedFields: Map<string, F1GridPinSide>,
+  containerWidth: number,
+  checkboxWidth = 44,
+): string {
+  const baseWidths = columns.map((column) => {
+    const field = String(column.field);
+    const resizedWidth = columnWidths[field];
+    const pinned = pinnedFields.has(field);
+    return resizedWidth ?? column.width ?? (pinned || !column.flex ? 140 : 0);
+  });
+  const flexTotal = columns.reduce((total, column) => {
+    const field = String(column.field);
+    const resized = columnWidths[field] !== undefined;
+    const pinned = pinnedFields.has(field);
+    return !resized && !pinned && column.flex && column.flex > 0
+      ? total + column.flex
+      : total;
+  }, 0);
+  const minimumWidth = baseWidths.reduce((total, width) => total + width, 0);
+  const availableWidth = Math.max(0, containerWidth - checkboxWidth);
+  const remainingWidth = Math.max(0, availableWidth - minimumWidth);
+
+  const tracks = columns.map((column, index) => {
+    const field = String(column.field);
+    const canFlex =
+      columnWidths[field] === undefined &&
+      !pinnedFields.has(field) &&
+      Boolean(column.flex && column.flex > 0);
+    const width = canFlex
+      ? baseWidths[index] + (remainingWidth * (column.flex ?? 0)) / flexTotal
+      : baseWidths[index];
+    return formatGridTrackWidth(width);
+  });
+
+  return `${checkboxWidth > 0 ? `${checkboxWidth}px ` : ''}${tracks.join(' ')}`;
 }
 
 export function getCellDisplayValue<T extends object>(

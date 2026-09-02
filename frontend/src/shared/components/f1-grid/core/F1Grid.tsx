@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type ForwardedRef,
@@ -37,7 +38,12 @@ import type {
 import { getNextEditableCell } from '../keyboard/GridKeyboard';
 import { getSelectedRowIds as resolveSelectedRowIds } from '../selection/GridSelection';
 import { getGridMergeInfo } from '../merge/GridRowMerge';
-import { getGridRowId, getStateKey, isCellEditable } from '../utils/grid.utils';
+import {
+  getGridColumnTracks,
+  getGridRowId,
+  getStateKey,
+  isCellEditable,
+} from '../utils/grid.utils';
 import {
   coerceClipboardValue,
   parseGridTsv,
@@ -76,8 +82,8 @@ function F1GridInner<T extends object>(
     storageKey,
     height,
     maxHeight,
-    rowHeight = 40,
-    minRowHeight = 40,
+    rowHeight = 32,
+    minRowHeight = 32,
     maxRowHeight = 300,
     resizableRows = true,
     resizableColumns = true,
@@ -108,6 +114,12 @@ function F1GridInner<T extends object>(
   const [copiedCellRange, setCopiedCellRange] = useState<
     { start: F1GridCell; end: F1GridCell } | undefined
   >();
+  const [rangeOverlay, setRangeOverlay] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
   const cellRangeDragRef = useRef<{
@@ -128,6 +140,8 @@ function F1GridInner<T extends object>(
     normalizedMaxRowHeight,
   );
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
     () => {
       if (storageKey) {
@@ -215,7 +229,36 @@ function F1GridInner<T extends object>(
     visibleColumns,
     pinnedFields,
     columnWidths,
+    showCheckbox ? 44 : 0,
   );
+  const columnTracks = getGridColumnTracks(
+    visibleColumns,
+    columnWidths,
+    pinnedFields,
+    gridContainerWidth,
+    showCheckbox ? 44 : 0,
+  );
+
+  useLayoutEffect(() => {
+    const container = gridContainerRef.current;
+    if (!container) return;
+    const updateWidth = () => {
+      const nextWidth = container.clientWidth;
+      setGridContainerWidth((current) =>
+        current === nextWidth ? current : nextWidth,
+      );
+    };
+
+    updateWidth();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const activeRows = data.rows.filter(
     (row) =>
@@ -894,11 +937,20 @@ function F1GridInner<T extends object>(
       stopEdit();
     },
     setCellValue(rowId: F1GridRowId, field: keyof T, value: unknown) {
-      setData((current) =>
-        updateGridRow(current, rowKey, rowId, {
+      const column = visibleColumns.find((item) => item.field === field);
+
+      setData((current) => {
+        const row = current.rows.find(
+          (item) => getGridRowId(item, rowKey) === rowId,
+        );
+        if (!row || !column || !isCellEditable(column, row)) return current;
+
+        const patch = column.onValueChange?.(row, value) ?? {
           [field]: value,
-        } as Partial<T>),
-      );
+        };
+
+        return updateGridRow(current, rowKey, rowId, patch as Partial<T>);
+      });
     },
   }));
 
@@ -911,6 +963,104 @@ function F1GridInner<T extends object>(
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+
+  function updateRangeOverlay() {
+    const range = copiedCellRange ?? cellSelection;
+    if (!range || !bodyScrollRef.current) {
+      setRangeOverlay((current) => (current ? null : current));
+      return;
+    }
+
+    const isSingleCellRange =
+      range.start.rowId === range.end.rowId &&
+      range.start.columnIndex === range.end.columnIndex;
+    if (isSingleCellRange) {
+      setRangeOverlay(null);
+      return;
+    }
+
+    const startRowIndex = visibleRows.findIndex(
+      (row) => getGridRowId(row, rowKey) === range.start.rowId,
+    );
+    const endRowIndex = visibleRows.findIndex(
+      (row) => getGridRowId(row, rowKey) === range.end.rowId,
+    );
+    if (startRowIndex < 0 || endRowIndex < 0) {
+      setRangeOverlay((current) => (current ? null : current));
+      return;
+    }
+
+    const minRowIndex = Math.min(startRowIndex, endRowIndex);
+    const maxRowIndex = Math.max(startRowIndex, endRowIndex);
+    const minColumnIndex = Math.min(
+      range.start.columnIndex,
+      range.end.columnIndex,
+    );
+    const maxColumnIndex = Math.max(
+      range.start.columnIndex,
+      range.end.columnIndex,
+    );
+
+    const topLeftRow = visibleRows[minRowIndex];
+    const bottomRightRow = visibleRows[maxRowIndex];
+    const topLeftNode = cellNodeRefs.current.get(
+      `${String(getGridRowId(topLeftRow, rowKey))}:${minColumnIndex}`,
+    );
+    const bottomRightNode = cellNodeRefs.current.get(
+      `${String(getGridRowId(bottomRightRow, rowKey))}:${maxColumnIndex}`,
+    );
+    if (!topLeftNode || !bottomRightNode) {
+      setRangeOverlay((current) => (current ? null : current));
+      return;
+    }
+
+    const containerRect = bodyScrollRef.current.getBoundingClientRect();
+    const topLeftRect = topLeftNode.getBoundingClientRect();
+    const bottomRightRect = bottomRightNode.getBoundingClientRect();
+    const next = {
+      left: Math.max(0, topLeftRect.left - containerRect.left - 2),
+      top: Math.max(0, topLeftRect.top - containerRect.top - 2),
+      width: Math.max(0, bottomRightRect.right - topLeftRect.left + 5),
+      height: Math.max(0, bottomRightRect.bottom - topLeftRect.top + 5),
+    };
+
+    setRangeOverlay((current) => {
+      if (
+        current &&
+        current.left === next.left &&
+        current.top === next.top &&
+        current.width === next.width &&
+        current.height === next.height
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!copiedCellRange && !cellSelection) {
+      setRangeOverlay(null);
+      return;
+    }
+    updateRangeOverlay();
+  }, [copiedCellRange, cellSelection, rowKey]);
+
+  useEffect(() => {
+    const bodyScroll = bodyScrollRef.current;
+    if (!bodyScroll || (!copiedCellRange && !cellSelection)) return;
+
+    const handleScrollOrResize = () => updateRangeOverlay();
+    bodyScroll.addEventListener('scroll', handleScrollOrResize, {
+      passive: true,
+    });
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      bodyScroll.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [copiedCellRange, cellSelection, rowKey]);
 
   useEffect(() => {
     const headerScroll = headerScrollRef.current;
@@ -940,11 +1090,13 @@ function F1GridInner<T extends object>(
 
   return (
     <Box
+      ref={gridContainerRef}
       role="grid"
       aria-label={ariaLabel}
       onCopy={handleCopy}
       onPaste={handlePaste}
       sx={{
+        position: 'relative',
         width: '100%',
         minWidth: 0,
         maxWidth: '100%',
@@ -959,6 +1111,7 @@ function F1GridInner<T extends object>(
         bgcolor: 'background.paper',
         display: 'flex',
         flexDirection: 'column',
+        fontSize: '0.8125rem',
       }}
     >
       <Box
@@ -980,6 +1133,7 @@ function F1GridInner<T extends object>(
           selectedAll={selectedAll}
           selectedIds={selectedIds}
           columnWidths={columnWidths}
+          columnTracks={columnTracks}
           resizableColumns={resizableColumns}
           minColumnWidth={minColumnWidth}
           showCheckbox={showCheckbox}
@@ -1010,6 +1164,7 @@ function F1GridInner<T extends object>(
       <Box
         ref={bodyScrollRef}
         sx={{
+          position: 'relative',
           flex: 1,
           minHeight: 0,
           overflowY: 'auto',
@@ -1021,7 +1176,7 @@ function F1GridInner<T extends object>(
           columns={visibleColumns}
           rowKey={rowKey}
           columnLine={columnLine}
-          columnWidths={columnWidths}
+          columnTracks={columnTracks}
           defaultRowHeight={defaultRowHeight}
           minRowHeight={normalizedMinRowHeight}
           maxRowHeight={normalizedMaxRowHeight}
@@ -1084,6 +1239,30 @@ function F1GridInner<T extends object>(
           cellAdornment={cellAdornment}
           showCheckbox={showCheckbox}
         />
+        {rangeOverlay ? (
+          <Box
+            data-range-overlay={copiedCellRange ? 'copy' : 'drag'}
+            sx={{
+              position: 'absolute',
+              left: rangeOverlay.left,
+              top: rangeOverlay.top,
+              width: rangeOverlay.width,
+              height: rangeOverlay.height,
+              border: copiedCellRange ? '2px dashed' : '2px solid',
+              borderColor: 'primary.main',
+              borderRadius: 0,
+              pointerEvents: 'none',
+              boxSizing: 'border-box',
+              backgroundColor: copiedCellRange
+                ? 'rgba(25, 118, 210, 0.02)'
+                : 'rgba(25, 118, 210, 0.04)',
+              boxShadow: copiedCellRange
+                ? 'inset 0 0 0 1px rgba(25, 118, 210, 0.10)'
+                : 'inset 0 0 0 1px rgba(25, 118, 210, 0.14)',
+              zIndex: 8,
+            }}
+          />
+        ) : null}
       </Box>
     </Box>
   );

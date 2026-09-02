@@ -47,6 +47,27 @@ describe('F1 Grid test page', () => {
     expect(screen.getByText(/삭제: 0건/)).toBeVisible();
   });
 
+  it('moves the default pinned item code column before unpinned columns', () => {
+    render(
+      <F1GridTestPage
+        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        currentMenuName="F1 Grid 테스트"
+        content={pageContentMap['f1-grid-test']}
+      />,
+    );
+
+    const headerLabels = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent?.trim())
+      .filter((label): label is string => Boolean(label));
+
+    expect(headerLabels.slice(0, 3)).toEqual([
+      '품목코드',
+      '사용여부',
+      '품목명 (Row Merge)',
+    ]);
+  });
+
   it('renders a standalone date editor for shortcut input testing', () => {
     render(
       <F1GridTestPage
@@ -139,11 +160,11 @@ describe('F1 Grid test page', () => {
       name: /행 높이 조절/,
     });
 
-    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '40');
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '32');
 
     fireEvent.keyDown(rowHeightHandles[0], { key: 'ArrowDown' });
 
-    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '44');
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '36');
   });
 
   it('provides column resize handles on all column headers', () => {
