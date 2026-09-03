@@ -722,6 +722,145 @@ describe('F1-GRID extended editors', () => {
   });
 });
 
+describe('F1-GRID dirty indicator across column types', () => {
+  type MixedRow = {
+    id: string;
+    name: string;
+    qty: number;
+    active: boolean;
+    startDate: string;
+    workTime: string;
+  };
+  const mixedColumns: F1GridColumn<MixedRow>[] = [
+    { field: 'name', headerName: '이름', editable: true },
+    { field: 'qty', headerName: '수량', type: 'number', editable: true },
+    {
+      field: 'active',
+      headerName: '사용',
+      type: 'checkbox',
+      editable: true,
+    },
+    {
+      field: 'startDate',
+      headerName: '시작일',
+      type: 'date',
+      editable: true,
+    },
+    { field: 'workTime', headerName: '작업시각', type: 'time', editable: true },
+  ];
+  const mixedRows: MixedRow[] = [
+    {
+      id: 'line-1',
+      name: 'Item',
+      qty: 5,
+      active: false,
+      startDate: '2026-08-27',
+      workTime: '09:30',
+    },
+  ];
+
+  it('marks a text cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: 'Item' });
+    fireEvent.doubleClick(nameCell);
+    fireEvent.change(screen.getByDisplayValue('Item'), {
+      target: { value: 'Item-2' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('Item-2'), { key: 'Enter' });
+
+    expect(nameCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a number cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const qtyCell = screen.getByRole('gridcell', { name: '5' });
+    fireEvent.doubleClick(qtyCell);
+    fireEvent.change(screen.getByDisplayValue('5'), {
+      target: { value: '9' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('9'), { key: 'Enter' });
+
+    expect(qtyCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a checkbox cell dirty after a toggle', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const checkbox = screen.getByRole('checkbox', { name: '사용 line-1' });
+    fireEvent.click(checkbox);
+
+    expect(checkbox.closest('[role="gridcell"]')).toHaveAttribute(
+      'data-dirty-cell',
+      'true',
+    );
+  });
+
+  it('marks a date cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
+    fireEvent.doubleClick(dateCell);
+    fireEvent.change(screen.getByDisplayValue('2026-08-27'), {
+      target: { value: '2026-09-01' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('2026-09-01'), {
+      key: 'Enter',
+    });
+
+    expect(dateCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a time cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const timeCell = screen.getByRole('gridcell', { name: '09:30' });
+    fireEvent.doubleClick(timeCell);
+    fireEvent.change(screen.getByDisplayValue('09:30'), {
+      target: { value: '14:15' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('14:15'), { key: 'Enter' });
+
+    expect(timeCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+});
+
 describe('F1-GRID clipboard, validation, and keyboard commands', () => {
   type ItemRow = {
     id: string;

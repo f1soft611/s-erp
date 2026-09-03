@@ -334,14 +334,21 @@ function F1GridInner<T extends object>(
     (row) =>
       data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
   );
-  const dirtyCellMap = Object.fromEntries(
-    Object.entries(data.dirtyFieldsById).flatMap(([stateKey, fields]) =>
-      Object.entries(fields).map(([field, isDirty]) => [
-        `${stateKey}:${field}`,
-        Boolean(isDirty),
-      ]),
-    ),
-  );
+  const dirtyCellMap: Record<string, boolean> = {};
+  activeRows.forEach((row) => {
+    const stateKey = getStateKey(getGridRowId(row, rowKey));
+    const originalRow = data.originalRowsById[stateKey];
+    const rowDirtyFields = data.dirtyFieldsById[stateKey] ?? {};
+    visibleColumns.forEach((column) => {
+      const field = String(column.field);
+      const isDirty = !originalRow
+        ? true
+        : column.getValue
+          ? !Object.is(column.getValue(row), column.getValue(originalRow))
+          : Boolean(rowDirtyFields[field]);
+      dirtyCellMap[`${stateKey}:${field}`] = isDirty;
+    });
+  });
   const projectedRows = rowProjection?.(activeRows).rows ?? activeRows;
   const filteredRows = disableFiltering
     ? projectedRows

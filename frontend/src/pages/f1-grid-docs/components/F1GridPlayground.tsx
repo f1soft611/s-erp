@@ -144,6 +144,7 @@ const columns: F1GridColumn<DemoRow>[] = [
     type: 'number',
     editable: true,
     align: 'right',
+    decimalPlaces: 1,
   },
 ];
 

@@ -261,6 +261,22 @@ describe('MenuManagementPanel F1Tree integration', () => {
     });
   });
 
+  it('shows a red marker on a permission checkbox cell after a toggle', () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const writeCheckbox = screen.getByRole('checkbox', { name: '쓰기 1' });
+    fireEvent.click(writeCheckbox);
+
+    const writeCell = writeCheckbox.closest('[role="gridcell"]');
+    expect(writeCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
   it('clears the dirty marker when an edited cell is reverted back to its original value', async () => {
     render(
       <MenuManagementPanel
