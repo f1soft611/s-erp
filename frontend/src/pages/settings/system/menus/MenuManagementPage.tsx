@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -65,10 +65,23 @@ export function MenuManagementPage({
   );
   const [selectedModuleId, setSelectedModuleId] = useState<number>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
+  const filteredMenus = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return menus;
+
+    return menus.filter((row) => {
+      const haystack = [row.name, row.code, row.path, row.description]
+        .map((value) => String(value ?? '').trim())
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [menus, searchQuery]);
   const [pendingModuleId, setPendingModuleId] = useState<number>();
   const [pendingPermissionReload, setPendingPermissionReload] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -283,6 +296,7 @@ export function MenuManagementPage({
       setConfirmOpen(true);
       return;
     }
+    setReloadToken((current) => current + 1);
     setSelectedModuleId(moduleId);
     void loadMenus(moduleId, true, true).catch(() => undefined);
   }
@@ -295,6 +309,7 @@ export function MenuManagementPage({
       setConfirmOpen(true);
       return Promise.resolve();
     }
+    setReloadToken((current) => current + 1);
     return loadMenus(moduleId);
   }
 
@@ -307,6 +322,7 @@ export function MenuManagementPage({
     if (nextModuleId === undefined) return;
     const moduleChanged = nextModuleId !== selectedModuleId;
     if (moduleChanged) setSelectedModuleId(nextModuleId);
+    setReloadToken((current) => current + 1);
     void loadMenus(nextModuleId, reloadPermissions, moduleChanged).catch(
       () => undefined,
     );
@@ -445,8 +461,8 @@ export function MenuManagementPage({
       >
         <MenuManagementPanel
           ref={menuPanelRef}
-          key={selectedModuleId ?? 'none'}
-          menus={menus}
+          key={`${selectedModuleId ?? 'none'}-${reloadToken}`}
+          menus={filteredMenus}
           selectedModule={selectedModule}
           permissions={permissions}
           onRefresh={requestRefresh}

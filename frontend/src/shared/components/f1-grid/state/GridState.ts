@@ -9,6 +9,7 @@ export type F1GridData<T extends object> = {
   rows: T[];
   stateById: Record<string, F1GridRowState>;
   previousStateById: Record<string, F1GridRowState>;
+  dirtyFieldsById: Record<string, Record<string, boolean>>;
 };
 
 export function createGridData<T extends object>(
@@ -21,7 +22,12 @@ export function createGridData<T extends object>(
     stateById[getStateKey(getGridRowId(row, rowKey))] = 'normal';
   });
 
-  return { rows: [...rows], stateById, previousStateById: {} };
+  return {
+    rows: [...rows],
+    stateById,
+    previousStateById: {},
+    dirtyFieldsById: {},
+  };
 }
 
 export function addGridRow<T extends object>(
@@ -37,6 +43,12 @@ export function addGridRow<T extends object>(
     ...data,
     rows: [...data.rows, row],
     stateById: { ...data.stateById, [stateKey]: 'inserted' },
+    dirtyFieldsById: {
+      ...data.dirtyFieldsById,
+      [stateKey]: Object.fromEntries(
+        Object.keys(row).map((field) => [String(field), true]),
+      ),
+    },
   };
 }
 
@@ -53,6 +65,17 @@ export function updateGridRow<T extends object>(
     return data;
   }
 
+  const nextDirtyFields = {
+    ...data.dirtyFieldsById,
+    [stateKey]: {
+      ...(data.dirtyFieldsById[stateKey] ?? {}),
+    },
+  };
+
+  Object.keys(changes).forEach((field) => {
+    nextDirtyFields[stateKey][field] = true;
+  });
+
   return {
     ...data,
     rows: data.rows.map((row) =>
@@ -62,6 +85,7 @@ export function updateGridRow<T extends object>(
       ...data.stateById,
       [stateKey]: currentState === 'inserted' ? 'inserted' : 'updated',
     },
+    dirtyFieldsById: nextDirtyFields,
   };
 }
 
@@ -72,6 +96,7 @@ export function markRowsDeleted<T extends object>(
 ): F1GridData<T> {
   const stateById = { ...data.stateById };
   const previousStateById = { ...data.previousStateById };
+  const dirtyFieldsById = { ...data.dirtyFieldsById };
   const rowIdSet = new Set(rowIds.map(getStateKey));
 
   data.rows.forEach((row) => {
@@ -81,24 +106,27 @@ export function markRowsDeleted<T extends object>(
     if (rowIdSet.has(stateKey) && currentState && currentState !== 'deleted') {
       previousStateById[stateKey] = currentState;
       stateById[stateKey] = 'deleted';
+      dirtyFieldsById[stateKey] = {};
     }
   });
 
-  return { ...data, stateById, previousStateById };
+  return { ...data, stateById, previousStateById, dirtyFieldsById };
 }
 
 export function restoreGridRows<T extends object>(
   data: F1GridData<T>,
 ): F1GridData<T> {
   const stateById = { ...data.stateById };
+  const dirtyFieldsById = { ...data.dirtyFieldsById };
 
   Object.entries(stateById).forEach(([stateKey, state]) => {
     if (state === 'deleted') {
       stateById[stateKey] = data.previousStateById[stateKey] ?? 'normal';
+      delete dirtyFieldsById[stateKey];
     }
   });
 
-  return { ...data, stateById, previousStateById: {} };
+  return { ...data, stateById, previousStateById: {}, dirtyFieldsById };
 }
 
 export function duplicateGridRows<T extends object>(

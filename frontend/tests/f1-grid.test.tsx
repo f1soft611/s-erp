@@ -1708,6 +1708,23 @@ describe('F1-GRID interaction', () => {
     ).toBe('3/span 2');
   });
 
+  it('keeps merged values working on pinned left columns', () => {
+    const mergeColumns: F1GridColumn<MenuRow>[] = [
+      { field: 'status', headerName: '상태', editable: true, mergeRows: true, pinned: 'left' },
+      { field: 'code', headerName: '코드', editable: true },
+    ];
+    const mergeRows = [
+      { ...rows[0], status: 'draft', code: 'DASH' },
+      { ...rows[1], id: 'reports', status: 'draft', code: 'REPORTS' },
+    ];
+
+    render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
+
+    expect(screen.getAllByRole('gridcell', { name: 'draft' })).toHaveLength(1);
+    expect(getComputedStyle(screen.getAllByRole('gridcell', { name: 'draft' })[0]).gridRow).toBe('1/span 2');
+    expect(getComputedStyle(screen.getByRole('columnheader', { name: '상태' })).left).toBe('44px');
+  });
+
   it('does not create an updated row when an edit is committed without a value change', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
 

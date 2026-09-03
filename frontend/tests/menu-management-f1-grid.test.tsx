@@ -184,6 +184,41 @@ describe('MenuManagementPanel F1Tree integration', () => {
   });
 
   it('filters visible menu rows by the entered search text', async () => {
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
+      if (path === '/api/v1/system/menus?moduleId=1') {
+        return Promise.resolve({
+          resultList: moduleOneRows.map((row) => ({
+            menuId: Number(row.id),
+            moduleId: row.moduleId,
+            moduleNm: row.moduleName,
+            parentMenuId: row.parentMenuId,
+            parentMenuNm: row.parent,
+            menuCode: row.code,
+            menuNm: row.name,
+            menuUrl: row.path,
+            iconNm: row.iconName,
+            sortOrder: row.order,
+            useAt: 'Y',
+            hasChildren: row.hasChildren,
+            permissionCodes: row.permissionCodes,
+          })),
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
     render(
       <MenuManagementPage
         selectedModule={pageProps.selectedModule}
@@ -193,10 +228,14 @@ describe('MenuManagementPanel F1Tree integration', () => {
       />,
     );
 
-    const searchInput = await screen.findByRole('textbox', { name: '메뉴 검색' });
-    fireEvent.change(searchInput, { target: { value: '대시' } });
+    const searchInput = await screen.findByRole('textbox', {
+      name: '메뉴 검색',
+    });
+    fireEvent.change(searchInput, { target: { value: 'DASH' } });
 
-    expect(screen.getByRole('gridcell', { name: '대시보드' })).toBeVisible();
+    expect(
+      await screen.findByRole('gridcell', { name: '대시보드' }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('gridcell', { name: '시스템 관리' }),
     ).not.toBeInTheDocument();
@@ -219,6 +258,95 @@ describe('MenuManagementPanel F1Tree integration', () => {
 
     await waitFor(() => {
       expect(document.querySelector('[data-dirty-cell="true"]')).not.toBeNull();
+    });
+  });
+
+  it('resets dirty cell state and removes unsaved rows when the module is reloaded', async () => {
+    let menuCallCount = 0;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
+      if (path === '/api/v1/system/menus?moduleId=1') {
+        menuCallCount += 1;
+        if (menuCallCount === 1) {
+          return Promise.resolve({
+            resultList: moduleOneRows.map((row) => ({
+              menuId: Number(row.id),
+              moduleId: row.moduleId,
+              moduleNm: row.moduleName,
+              parentMenuId: row.parentMenuId,
+              parentMenuNm: row.parent,
+              menuCode: row.code,
+              menuNm: row.name,
+              menuUrl: row.path,
+              iconNm: row.iconName,
+              sortOrder: row.order,
+              useAt: 'Y',
+              hasChildren: row.hasChildren,
+              permissionCodes: row.permissionCodes,
+            })),
+          });
+        }
+        return Promise.resolve({
+          resultList: [
+            {
+              menuId: 1,
+              moduleId: 1,
+              moduleNm: '기본',
+              parentMenuId: null,
+              parentMenuNm: null,
+              menuCode: 'DASH',
+              menuNm: '대시보드',
+              menuUrl: '/dashboard',
+              iconNm: 'Dashboard',
+              sortOrder: 1,
+              useAt: 'Y',
+              hasChildren: false,
+              permissionCodes: ['READ'],
+            },
+          ],
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(
+      <MenuManagementPage
+        selectedModule={pageProps.selectedModule}
+        currentMenuName={pageProps.currentMenuName}
+        content={pageProps.content}
+        breadcrumbItems={['환경설정', '시스템관리', '메뉴관리']}
+      />,
+    );
+
+    const nameCell = await screen.findByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).not.toBeNull();
+    });
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '메뉴 검색' }), {
+      key: 'Enter',
+      code: 'Enter',
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).toBeNull();
+      expect(screen.getByRole('gridcell', { name: '대시보드' })).toBeVisible();
     });
   });
 

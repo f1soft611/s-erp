@@ -47,7 +47,7 @@ describe('F1-Grid docs portal', () => {
   it('opens an inline editor on the cell editing playground', () => {
     render(<F1GridDocsPage initialDocumentId="editing" />);
 
-    fireEvent.doubleClick(screen.getAllByRole('gridcell')[1]);
+    fireEvent.doubleClick(screen.getAllByRole('gridcell')[0]);
 
     expect(screen.getByDisplayValue('ITEM-001')).toBeInTheDocument();
   });

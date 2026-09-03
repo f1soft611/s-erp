@@ -334,6 +334,14 @@ function F1GridInner<T extends object>(
     (row) =>
       data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
   );
+  const dirtyCellMap = Object.fromEntries(
+    Object.entries(data.dirtyFieldsById).flatMap(([stateKey, fields]) =>
+      Object.entries(fields).map(([field, isDirty]) => [
+        `${stateKey}:${field}`,
+        Boolean(isDirty),
+      ]),
+    ),
+  );
   const projectedRows = rowProjection?.(activeRows).rows ?? activeRows;
   const filteredRows = disableFiltering
     ? projectedRows
@@ -632,7 +640,8 @@ function F1GridInner<T extends object>(
   function startEdit(rowId: F1GridRowId, columnIndex: number) {
     const column = visibleColumns[columnIndex];
     const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
-    const context = column && row ? resolveEditContext(rowId, columnIndex) : undefined;
+    const context =
+      column && row ? resolveEditContext(rowId, columnIndex) : undefined;
 
     if (
       !column ||
@@ -659,7 +668,10 @@ function F1GridInner<T extends object>(
 
   function stopEdit() {
     if (editingCell) {
-      const context = resolveEditContext(editingCell.rowId, editingCell.columnIndex);
+      const context = resolveEditContext(
+        editingCell.rowId,
+        editingCell.columnIndex,
+      );
       if (context) {
         activeEditorPlugins.forEach((plugin) => {
           if (plugin.endEdit) plugin.endEdit(context);
@@ -1277,6 +1289,7 @@ function F1GridInner<T extends object>(
           selectedCellRange={cellSelection}
           copiedCellRange={copiedCellRange}
           draftValue={draftValue}
+          dirtyCellMap={dirtyCellMap}
           mergeInfoByColumn={mergeInfoByColumn}
           getRowId={(row) => getGridRowId(row, rowKey)}
           onSelectRow={selectRow}

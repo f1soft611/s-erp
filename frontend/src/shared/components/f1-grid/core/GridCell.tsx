@@ -22,6 +22,7 @@ type GridCellProps<T extends object> = {
   rowIndex: number;
   isLastRow?: boolean;
   draftValue: string;
+  dirtyCell?: boolean;
   onFocus: () => void;
   onMouseDown: () => void;
   onMouseEnter: () => void;
@@ -63,6 +64,7 @@ export function GridCell<T extends object>({
   rowIndex,
   isLastRow,
   draftValue,
+  dirtyCell = false,
   onFocus,
   onMouseDown,
   onMouseEnter,
@@ -88,6 +90,7 @@ export function GridCell<T extends object>({
   const hideRangeStartBorder = rangeStart && !editing;
   const activeHighlight =
     (focused || editing) && !(selected && !editing && (rangeStart || !focused));
+  const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
 
   return (
     <Box
@@ -95,6 +98,7 @@ export function GridCell<T extends object>({
       role="gridcell"
       aria-label={adornment && !merged ? displayValue : undefined}
       data-grid-error={errorMessage}
+      data-dirty-cell={dirtyCell ? 'true' : 'false'}
       title={errorMessage}
       tabIndex={focused ? 0 : -1}
       ref={onCellRef}
@@ -134,6 +138,7 @@ export function GridCell<T extends object>({
         alignItems: 'center',
         alignSelf: 'stretch',
         height: '100%',
+        position: 'relative',
         justifyContent: toJustifyContent(
           column.align ??
             (column.type === 'number' || column.type === 'rownumber'
@@ -157,6 +162,8 @@ export function GridCell<T extends object>({
         borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
+        visibility: mergedCellHidden ? 'hidden' : 'visible',
+        pointerEvents: mergedCellHidden ? 'none' : 'auto',
         position: pinOffset ? 'sticky' : undefined,
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
@@ -185,6 +192,23 @@ export function GridCell<T extends object>({
           column.align ?? (column.type === 'number' ? 'right' : 'left'),
       }}
     >
+      {dirtyCell && !editing ? (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            left: 3,
+            top: 3,
+            width: 7,
+            height: 7,
+            borderRadius: '0 0 2px 0',
+            backgroundColor: 'error.main',
+            boxShadow: '0 0 0 1px rgba(255,255,255,0.65)',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      ) : null}
       {merged ? null : column.type === 'checkbox' ? (
         <Checkbox
           size="small"
