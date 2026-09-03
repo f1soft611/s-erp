@@ -49,6 +49,23 @@ function MenuManagementPanel(
   );
 }
 
+function getTreeGridBody(name = 'F1-TREE 메뉴 관리') {
+  const grid = screen.getByRole('grid', { name });
+  return grid.lastElementChild as HTMLElement;
+}
+
+/** 그리드 빈 영역을 우클릭한 뒤 컨텍스트 메뉴의 "루트 추가"를 클릭한다. */
+function addRootMenuViaContextMenu(name?: string) {
+  fireEvent.contextMenu(getTreeGridBody(name));
+  fireEvent.click(screen.getByRole('menuitem', { name: '루트 추가' }));
+}
+
+/** 특정 행을 우클릭한 뒤 컨텍스트 메뉴의 "행 추가"를 클릭해 그 행의 자식으로 추가한다. */
+function addChildMenuViaContextMenu(targetCell: HTMLElement) {
+  fireEvent.contextMenu(targetCell);
+  fireEvent.click(screen.getByRole('menuitem', { name: '행 추가' }));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -172,7 +189,7 @@ describe('MenuManagementPanel F1Tree integration', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
 
     await waitFor(() => {
       expect(screen.getByText('새 메뉴')).toBeInTheDocument();
@@ -338,6 +355,38 @@ describe('MenuManagementPanel F1Tree integration', () => {
 
     await waitFor(() => {
       expect(descriptionCell).toHaveAttribute('data-dirty-cell', 'false');
+    });
+  });
+
+  it('disables the save button when the edited value is reverted back to the original value', async () => {
+    render(
+      <MenuManagementPage
+        selectedModule={pageProps.selectedModule}
+        currentMenuName={pageProps.currentMenuName}
+        content={pageProps.content}
+        breadcrumbItems={['환경설정', '시스템관리', '메뉴관리']}
+      />,
+    );
+
+    const saveButton = await screen.findByRole('button', { name: '저장' });
+    const nameCell = await screen.findByRole('gridcell', { name: '대시보드' });
+
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(saveButton).not.toBeDisabled();
+    });
+
+    fireEvent.doubleClick(nameCell);
+    const revertEditor = await screen.findByDisplayValue('대시보드 수정');
+    fireEvent.change(revertEditor, { target: { value: '대시보드' } });
+    fireEvent.keyDown(revertEditor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(saveButton).toBeDisabled();
     });
   });
 
@@ -591,28 +640,32 @@ describe('MenuManagementPanel F1Tree integration', () => {
       screen.getByRole('grid', { name: 'F1-TREE 메뉴 관리' }),
     ).toBeVisible();
     expect(screen.getByRole('gridcell', { name: 'DASH' })).toBeVisible();
-    const serviceActions = screen.getByRole('toolbar', {
-      name: '메뉴 업무 액션',
-    });
-    const gridControls = screen.getByRole('toolbar', {
-      name: '메뉴 그리드 제어',
-    });
     expect(
-      serviceActions.querySelector('[aria-label="메뉴 그리드 제어"]'),
-    ).not.toBeInTheDocument();
-    expect(
-      gridControls.querySelector('[aria-label="메뉴 업무 액션"]'),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: '루트 메뉴 추가' }),
+      screen.getByRole('toolbar', { name: '메뉴 그리드 제어' }),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: '하위 메뉴 추가' }),
-    ).toBeVisible();
+      screen.queryByRole('toolbar', { name: '메뉴 업무 액션' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '루트 메뉴 추가' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '하위 메뉴 추가' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '삭제' })).toBeVisible();
     expect(screen.getByRole('button', { name: '저장' })).toBeVisible();
     expect(screen.getByRole('button', { name: '전체 펼치기' })).toBeVisible();
     expect(screen.getByRole('button', { name: '전체 접기' })).toBeVisible();
+
+    const title = screen.getByRole('heading', { name: '메뉴 관리' });
+    const headerRow = title.parentElement;
+    expect(headerRow).toContainElement(
+      screen.getByRole('toolbar', { name: '메뉴 그리드 제어' }),
+    );
+
+    fireEvent.contextMenu(getTreeGridBody());
+    expect(screen.getByRole('menuitem', { name: '루트 추가' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
   });
 
   it('adds a root menu and updates the inserted count', () => {
@@ -624,7 +677,7 @@ describe('MenuManagementPanel F1Tree integration', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
 
     expect(screen.getByRole('gridcell', { name: 'NEW1' })).toBeVisible();
     expect(screen.getByText(/신규 1건/)).toBeVisible();
@@ -659,7 +712,7 @@ describe('MenuManagementPanel F1Tree integration', () => {
     expect(screen.getByLabelText('쓰기 10')).toBeChecked();
     expect(screen.getByText(/수정 1건/)).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     expect(screen.getByLabelText('읽기 new-menu-1')).not.toBeChecked();
     expect(screen.getByLabelText('쓰기 new-menu-1')).not.toBeChecked();
   });
@@ -899,7 +952,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByLabelText('읽기 new-menu-1'));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('권한 저장 실패')).toBeVisible();
@@ -931,7 +984,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByLabelText('읽기 new-menu-1'));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('메뉴 목록 요청 실패')).toBeVisible();
@@ -961,7 +1014,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       screen.getByText('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.'),
     ).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: '하위 메뉴 추가' }));
+    addChildMenuViaContextMenu(screen.getByRole('gridcell', { name: 'SYS' }));
     expect(screen.getByRole('gridcell', { name: '새 메뉴' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
@@ -981,7 +1034,7 @@ describe('MenuManagementPanel F1Tree workflow', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByLabelText('읽기 new-menu-1'));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
@@ -1324,11 +1377,11 @@ describe('MenuManagementPage module selection', () => {
     expect(screen.getByRole('button', { name: '삭제' })).toBeVisible();
     expect(screen.getByRole('button', { name: '저장' })).toBeVisible();
     expect(
-      screen.getByRole('button', { name: '루트 메뉴 추가' }),
-    ).toBeVisible();
+      screen.queryByRole('button', { name: '루트 메뉴 추가' }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '하위 메뉴 추가' }),
-    ).toBeVisible();
+      screen.queryByRole('button', { name: '하위 메뉴 추가' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '전체 펼치기' })).toBeVisible();
     expect(screen.getByRole('button', { name: '전체 접기' })).toBeVisible();
   });
@@ -1344,7 +1397,7 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByRole('gridcell', { name: '대시보드' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByLabelText('읽기 new-menu-1'));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('권한 저장 실패')).toBeVisible();
@@ -1487,7 +1540,7 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByRole('gridcell', { name: '대시보드' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledOnce());
@@ -1564,7 +1617,7 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByRole('gridcell', { name: '대시보드' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '모듈 선택' }));
     fireEvent.click(screen.getByRole('option', { name: '환경설정' }));
 
@@ -1621,7 +1674,7 @@ describe('MenuManagementPage module selection', () => {
     render(<MenuManagementPage {...pageProps} />);
 
     await screen.findByRole('columnheader', { name: /읽기/ });
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '모듈 선택' }));
     fireEvent.click(screen.getByRole('option', { name: '환경설정' }));
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
@@ -1652,7 +1705,7 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByRole('gridcell', { name: '대시보드' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
 
     expect(screen.getByRole('dialog')).toBeVisible();
@@ -1677,7 +1730,7 @@ describe('MenuManagementPage module selection', () => {
     expect(
       await screen.findByRole('gridcell', { name: '대시보드' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+    addRootMenuViaContextMenu();
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
     fireEvent.click(screen.getByRole('button', { name: '계속' }));
 

@@ -19,8 +19,8 @@ F1-Grid는 헤더 메뉴(정렬/필터/고정/숨김)만 제공하고, 바디 �
    - `F1GridContextMenuTreeConfig<T>` 타입 신설(트리 전용 내부 확장 포인트): `{ onAddRoot: () => void; onAddChild: (targetRowId?: F1GridRowId) => void }`.
    - `F1GridProps`(또는 별도 내부 전용 prop)에 `treeContextMenu?: F1GridContextMenuTreeConfig<T>` 추가. 일반 사용자는 이 prop을 직접 넘기지 않고, `F1Tree`가 내부적으로만 주입한다.
 2. **엑셀 내보내기 유틸 신설** (`export/GridExcelExport.ts`)
-   - `xlsx`(SheetJS) 패키지를 신규 의존성으로 추가한다.
-   - `exportGridRowsToExcel(columns, rows, fileName)` 형태의 순수 함수로 구현하고, 화면에 보이는 컬럼(`visibleColumns`)과 필터/정렬 반영된 행(`visibleRows`)만 대상으로 한다.
+   - npm `xlsx`(SheetJS) 패키지는 High 심각도 Prototype Pollution/ReDoS 취약점이 미패치 상태로 남아 있어 채택하지 않고, 대신 해당 취약점이 없는 `exceljs`를 신규 의존성으로 추가한다.
+   - `exportGridRowsToExcel(columns, rows, fileName)` 형태의 함수로 구현하고, 화면에 보이는 컬럼(`visibleColumns`)과 필터/정렬 반영된 행(`visibleRows`)만 대상으로 한다.
 3. **컨텍스트 메뉴 UI/로직 신설** (`core/GridContextMenu.tsx` 신규 또는 `F1Grid.tsx` 내부 인라인 MUI `Menu`)
    - 바디 스크롤 컨테이너에 `onContextMenu` 핸들러를 추가해 브라우저 기본 메뉴를 막고 커서 위치에 MUI `Menu`(`anchorReference="anchorPosition"`)를 표시한다.
    - 행 영역(`GridRow.tsx`에 `data-f1-grid-row-id` 속성 추가)에서 우클릭 시 대상 rowId를 함께 저장하고, 빈 영역 우클릭 시 rowId 없이 메뉴를 연다.
@@ -53,7 +53,7 @@ F1-Grid는 헤더 메뉴(정렬/필터/고정/숨김)만 제공하고, 바디 �
 - `F1Grid.tsx`는 이미 필터/정렬/컬럼 상태(state)를 내부에서 관리하므로 컨텍스트 메뉴는 기존 상태 setter를 재사용하며 별도 상태 중복을 만들지 않는다.
 - `F1Tree.tsx`는 `F1Grid`를 감싸는 얇은 래퍼 구조이므로 `treeContextMenu` prop 주입만으로 트리 전용 동작을 확장할 수 있다.
 - 컨텍스트 메뉴는 기본적으로 항상 켜져 있는 동작으로 설계하며(별도 opt-in prop 없이 F1Grid를 사용하는 모든 화면에 자동 적용), 기존 화면에 미치는 영향은 "우클릭 시 메뉴가 새로 뜬다"는 추가 동작뿐이고 기존 클릭/편집/헤더 메뉴 동작에는 영향이 없다.
-- `xlsx` 패키지 신규 추가로 번들 크기가 늘어나므로, 가능하면 동적 `import()`로 지연 로딩해 초기 번들에 영향이 없도록 한다.
+- `exceljs` 패키지 신규 추가로 번들 크기가 늘어나므로, 가능하면 동적 `import()`로 지연 로딩해 초기 번들에 영향이 없도록 한다.
 
 ## 검증 계획
 

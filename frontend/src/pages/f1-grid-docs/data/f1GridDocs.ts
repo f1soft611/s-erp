@@ -382,6 +382,39 @@ export const f1GridDocs: F1GridDoc[] = [
     playground: 'row-merge',
   },
   {
+    id: 'context-menu',
+    title: 'Context Menu',
+    category: 'feature',
+    description:
+      '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행합니다.',
+    sections: [
+      {
+        type: 'prose',
+        heading: 'Fast actions at the cursor',
+        body: 'F1-Grid 바디 영역을 우클릭하면 커서 위치에 컨텍스트 메뉴가 열립니다. 헤더 영역은 기존 정렬/필터/고정/숨김 메뉴를 유지하고, 바디 메뉴는 행 추가, 복사, 삭제, 컬럼 자동 맞춤, 엑셀 내보내기처럼 작업 성격이 강한 액션을 한 곳에 모아줍니다.',
+      },
+      {
+        type: 'api',
+        heading: 'Context menu props',
+        rows: [
+          ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
+          ['excelFileName', 'string', '다운로드 파일명 기본값'],
+          [
+            'treeContextMenu',
+            'F1GridContextMenuTreeConfig',
+            'F1Tree가 내부적으로 주입하는 트리 전용 콜백',
+          ],
+        ],
+      },
+      {
+        type: 'code',
+        heading: 'Enable the export menu',
+        code: '<F1Tree rows={rows} rowKey="id" parentKey="parentId" treeColumn="name" canExportExcel={hasExcelPermission} excelFileName="menu-export" />',
+      },
+    ],
+    playground: 'tree',
+  },
+  {
     id: 'tree-grid',
     title: 'Tree Grid',
     category: 'feature',
@@ -479,6 +512,8 @@ export const f1GridDocs: F1GridDoc[] = [
             '() => T | (row: T) => T',
             '행 추가/복제 시 생성 로직',
           ],
+          ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
+          ['excelFileName', 'string', '기본 다운로드 파일명'],
           [
             'editorPlugins / editors',
             'F1GridEditorPlugin<T>[]',

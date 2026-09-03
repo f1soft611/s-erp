@@ -50,6 +50,7 @@ F1Tree(트리 그리드):
 ```
 
 - "그룹 해제"는 이번 범위에서 제외한다(F1-Grid 미구현 기능).
+- 필터 해제/정렬 해제 항목은 그리드의 `disableFiltering`/`disableSorting`이 각각 `true`이면 표시하지 않는다. `F1Tree`는 트리 계층 구조를 유지하기 위해 항상 `disableSorting`/`disableFiltering`을 `true`로 강제하는 기존 구현을 그대로 유지하므로, 실제로는 F1Tree 컨텍스트 메뉴에 필터 해제/정렬 해제 항목이 표시되지 않는다(일반 F1Grid에서만 표시).
 - 각 메뉴 항목의 접근성 라벨(`aria-label` 또는 텍스트)은 화면에 보이는 한글 텍스트와 동일하게 노출해 테스트에서 `getByRole('menuitem', { name: '...' })`로 조회 가능해야 한다.
 
 ## 2. Props / 타입 계약
@@ -63,13 +64,13 @@ export type F1GridProps<T extends object> = {
   excelFileName?: string;
 };
 
-export type F1GridContextMenuTreeConfig<T extends object> = {
+export type F1GridContextMenuTreeConfig = {
   onAddRoot: () => void;
   onAddChild: (targetRowId?: F1GridRowId) => void;
 };
 ```
 
-- `F1GridProps`에 `treeContextMenu?: F1GridContextMenuTreeConfig<T>`를 추가하되, 공개 문서(F1-GRID.md)에는 "내부적으로 `F1Tree`가 주입하는 값이며 `F1Grid`를 직접 사용하는 화면에서는 지정하지 않는다"고 명시한다.
+- `F1GridProps`에 `treeContextMenu?: F1GridContextMenuTreeConfig`를 추가하되, 공개 문서(F1-GRID.md)에는 "내부적으로 `F1Tree`가 주입하는 값이며 `F1Grid`를 직접 사용하는 화면에서는 지정하지 않는다"고 명시한다.
 - `canExportExcel` 기본값은 `false`(미지정 시 엑셀 메뉴 숨김).
 - `excelFileName` 기본값은 `${ariaLabel ?? 'f1-grid'}-export`로 하고 확장자 `.xlsx`는 내보내기 유틸에서 자동으로 붙인다.
 
@@ -79,7 +80,7 @@ export type F1GridContextMenuTreeConfig<T extends object> = {
 - `F1Tree` 내부에서 `F1Grid`에 전달할 `treeContextMenu`를 다음과 같이 구성한다.
 
 ```typescript
-const treeContextMenu: F1GridContextMenuTreeConfig<T> = {
+const treeContextMenu: F1GridContextMenuTreeConfig = {
   onAddRoot: () => gridRef.current?.addRow(),
   onAddChild: (targetRowId) => {
     if (targetRowId === undefined) {
@@ -101,8 +102,8 @@ const treeContextMenu: F1GridContextMenuTreeConfig<T> = {
   - `visibleRows`: 현재 필터/정렬이 반영된 행 목록(화면에 보이는 순서 그대로).
   - 각 셀 값은 `column.getValue?.(row) ?? row[column.field]`를 우선 사용하고, 필요한 표시 포맷은 `getCellDisplayValue` 유틸을 재사용해 화면 표시값과 최대한 일치시킨다.
   - 파일명은 `${excelFileName ?? defaultFileName}.xlsx`, 시트명은 `Sheet1` 또는 `ariaLabel`을 정리한 값을 사용한다.
-- `xlsx` 패키지의 `utils.aoa_to_sheet`/`utils.book_new`/`writeFile`(또는 동등 API)을 사용해 브라우저에서 즉시 다운로드한다.
-- 번들 크기 영향을 줄이기 위해 `xlsx`는 클릭 시점에 `await import('xlsx')`로 동적 로딩한다.
+- npm `xlsx`(SheetJS)는 High 심각도 Prototype Pollution/ReDoS 취약점이 미패치 상태라 채택하지 않고, `exceljs`의 `Workbook`/`addWorksheet`/`xlsx.writeBuffer()` API로 워크북을 만든 뒤 `Blob` + 익명 `<a download>` 링크로 브라우저에서 즉시 다운로드한다.
+- 번들 크기 영향을 줄이기 위해 `exceljs`는 클릭 시점에 `await import('exceljs')`로 동적 로딩한다.
 
 ### 3.2 컬럼 길이 자동 조정
 
@@ -161,8 +162,8 @@ const treeContextMenu: F1GridContextMenuTreeConfig<T> = {
 ## 6. 예외/에지 케이스
 
 - 편집 중인 셀이 있을 때 우클릭하면, 기존 편집을 커밋(또는 취소)한 뒤 컨텍스트 메뉴를 연다(기존 셀 포커스 이동/편집 종료 로직 재사용).
-- 컨텍스트 메뉴가 열려 있는 상태에서 그리드 rows/columns props가 변경되면 메뉴를 닫는다(참조하던 rowId가 사라지는 문제 방지).
-- `xlsx` 동적 로딩 실패(네트워크 오류 등) 시 콘솔 오류를 남기고 사용자에게 알리는 최소한의 실패 처리(예: `window.alert` 대신 콘솔 로그 + 상위 콜백이 있다면 호출)만 수행한다. 별도의 토스트 알림 시스템을 새로 만들지 않는다.
+- 컨텍스트 메뉴가 열려 있는 상태에서 그리드 `rows` props가 변경되면 메뉴를 닫는다(참조하던 rowId가 사라지는 문제 방지). `columns`는 화면단에서 매 렌더마다 새 배열로 생성되는 경우가 많아 의존성에 포함하지 않는다(포함 시 메뉴가 열리자마자 닫히는 회귀가 발생한다).
+- `exceljs` 동적 로딩/워크북 생성 실패(네트워크 오류 등) 시 콘솔 오류를 남기고 사용자에게 알리는 최소한의 실패 처리(예: `window.alert` 대신 콘솔 로그 + 상위 콜백이 있다면 호출)만 수행한다. 별도의 토스트 알림 시스템을 새로 만들지 않는다.
 
 ## 7. 테스트 항목 (Vitest, RTL)
 

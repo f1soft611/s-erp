@@ -615,6 +615,7 @@ describe('F1Tree interaction', () => {
         treeColumn="name"
         ariaLabel="F1-TREE 붙여넣기 허용 테스트"
         defaultExpanded="all"
+        editorPlugins={[{ canEdit: () => true, startEdit: () => true }]}
       />,
     );
 

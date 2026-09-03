@@ -265,6 +265,19 @@ function F1TreeInner<T extends object>(
       rows={rows}
       rowKey={rowKey}
       rowProjection={(gridRows) => projectRows(gridRows)}
+      treeContextMenu={{
+        onAddRoot: () => gridRef.current?.addRow(),
+        onAddChild: (targetRowId) => {
+          if (targetRowId === undefined) {
+            gridRef.current?.addRow();
+            return;
+          }
+          addExpanded(targetRowId);
+          gridRef.current?.addRow({
+            [parentKey]: targetRowId,
+          } as Partial<T>);
+        },
+      }}
       cellAdornment={(row, column) => {
         if (column.field !== treeColumn) return undefined;
         const rowId = getGridRowId(row, rowKey);

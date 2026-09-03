@@ -94,7 +94,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 이 문서는 최초 설계 목표 전체를 담고 있어, 아직 구현되지 않은 로드맵 항목과 실제 구현된 계약이 함께 섞여 있다. 아래 기준으로 구분해서 읽는다.
 
 - **현재 구현됨**: `체크박스 옵션 정리`, `추가 반영 기능 요약`(위 두 섹션)과 이 섹션에서 별도로 `⚠️ 아직 미구현`으로 표시하지 않은 코드/UX 설명.
-- **아직 미구현(설계 목표)**: `aggregate`, `enableRowMerge`, `mergeKey`, `mergeWhen`, `grid.refreshRowMerge()`, `grid.getRowMergeRanges()`, `addRows`, `gridId`/`editable`/`selectable`/`pagination`/`sortable`/`filterable` 형태의 Props, `F1GridToolbar`, Context Menu, Aggregation Footer, Grouping, 서버사이드 Pagination/Query, Virtual Scrolling, Excel Export API. 이 항목들은 아래 관련 섹션에 `⚠️ 아직 미구현` 표시를 추가했다.
+- **아직 미구현(설계 목표)**: `aggregate`, `enableRowMerge`, `mergeKey`, `mergeWhen`, `grid.refreshRowMerge()`, `grid.getRowMergeRanges()`, `addRows`, `gridId`/`editable`/`selectable`/`pagination`/`sortable`/`filterable` 형태의 Props, `F1GridToolbar`, 화면별 Context Menu Custom 확장, Aggregation Footer, Grouping, 서버사이드 Pagination/Query, Virtual Scrolling. Context Menu 기본 동작과 Excel Export(우클릭 메뉴의 `엑셀 내보내기`)는 구현되었다. 이 항목들은 아래 관련 섹션에 `⚠️ 아직 미구현` 표시를 추가했다.
 - 실제 공개 계약의 최종 근거는 `frontend/src/shared/components/f1-grid/types/grid.types.ts`와 F1-Grid 문서 포털(`/f1-grid-docs`)의 API Reference이다. 이 문서와 소스가 다르면 소스를 기준으로 문서를 갱신한다.
 
 ---
@@ -1188,28 +1188,45 @@ interface GridDataState<T> {
 
 ---
 
-# 25. Grid Context Menu (⚠️ 아직 미구현)
+# 25. Grid Context Menu
 
-우클릭 메뉴를 목표로 한다. 현재 F1-Grid는 Context Menu를 제공하지 않는다.
+F1-Grid 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)를 그대로 사용한다.
 
-목표로 하는 기본 메뉴:
+일반 F1Grid의 메뉴 구성:
 
 ```text
+엑셀 내보내기            (canExportExcel=true 일 때만 표시)
+컬럼 길이 자동 조정
+──────────────
 행 추가
-행 복제
-행 삭제
-────────────
-복사
-붙여넣기
-────────────
-컬럼 고정
-컬럼 숨김
-컬럼 설정
-────────────
-Excel 다운로드
+행 복사                  (선택/대상 행이 없으면 비활성화)
+행 삭제                  (선택/대상 행이 없으면 비활성화)
+──────────────
+필터 해제                (적용된 필터가 없으면 비활성화, disableFiltering이면 미표시)
+정렬 해제                (적용된 정렬이 없으면 비활성화, disableSorting이면 미표시)
+──────────────
+설정을 기본값으로 복원
 ```
 
-화면별 Custom Menu를 추가할 수 있어야 한다.
+F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. F1Tree는 내부적으로 `disableSorting`/`disableFiltering`을 항상 `true`로 강제하므로 필터 해제/정렬 해제 항목은 실질적으로 F1Tree에는 표시되지 않는다.
+
+관련 Props:
+
+- `canExportExcel?: boolean` — 엑셀 내보내기 메뉴 노출 여부. 기본값 `false`(미표시). 페이지별 엑셀 권한과 연동해서 사용한다(예: 메뉴관리 화면).
+- `excelFileName?: string` — 내보낼 파일명(확장자 `.xlsx`는 자동 부여). 기본값은 `${ariaLabel}-export`.
+- `treeContextMenu` — `F1Tree`가 내부적으로만 주입하는 트리 전용 확장 포인트(`onAddRoot`, `onAddChild`). `F1Grid`를 직접 사용하는 화면에서는 지정하지 않는다.
+
+동작 요약:
+
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
+- **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
+- **행 추가**: F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가), 일반 F1Grid에서는 항상 새 행을 추가한다.
+- **행 복사 / 행 삭제**: 우클릭한 행이 현재 선택에 없으면 그 행만 단일 선택으로 교체한 뒤 기존 복제/삭제 로직을 재사용한다. 대상 행도 선택도 없으면 비활성화된다.
+- **필터 해제 / 정렬 해제**: 각각 `setFilterState([])` / `setSortState([])`.
+- **설정을 기본값으로 복원**: 컬럼 순서/폭/숨김/고정을 컬럼 정의 기준 초기값으로 되돌리고 `storageKey` 로컬 스토리지 값을 제거한다.
+
+화면별 Custom Menu 확장은 아직 지원하지 않는다(⚠️ 아직 미구현).
 
 ---
 

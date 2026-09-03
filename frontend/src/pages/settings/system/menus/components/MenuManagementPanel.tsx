@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  IconButton,
-  Typography,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
+import { Box, Card, CardContent, IconButton, Typography } from '@mui/material';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import {
@@ -44,6 +35,7 @@ type MenuManagementPanelProps = {
   menus: MenuManagementRow[];
   selectedModule?: MenuModuleOption;
   permissions: MenuPermissionDefinition[];
+  canExportExcel?: boolean;
   onRefresh?: (
     moduleId: number,
     bypassDirtyConfirmation?: boolean,
@@ -67,6 +59,7 @@ export const MenuManagementPanel = forwardRef<
   {
     menus,
     selectedModule,
+    canExportExcel = false,
     onRefresh,
     onDirtyChange,
     onSavingChange,
@@ -86,7 +79,6 @@ export const MenuManagementPanel = forwardRef<
   const [newMenuSequence, setNewMenuSequence] = useState(1);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [hasSelectedTreeRow, setHasSelectedTreeRow] = useState(false);
   const [treeKey, setTreeKey] = useState(0);
 
   useImperativeHandle(ref, () => ({
@@ -273,16 +265,6 @@ export const MenuManagementPanel = forwardRef<
     };
   }
 
-  function addChildMenu() {
-    const parent = treeRef.current?.getSelectedRows()[0];
-    if (!parent) return;
-    treeRef.current?.addChildRow(parent.id, {
-      moduleId: parent.moduleId,
-      moduleName: parent.moduleName,
-      parent: parent.name,
-    });
-  }
-
   async function handleSave() {
     if (!selectedModule || !treeRef.current?.validate() || saving) return;
     setSaving(true);
@@ -373,7 +355,7 @@ export const MenuManagementPanel = forwardRef<
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: { xs: 'stretch', sm: 'center' },
+              alignItems: { xs: 'flex-start', sm: 'center' },
               flexWrap: 'wrap',
               gap: 1,
               mb: 2,
@@ -384,62 +366,32 @@ export const MenuManagementPanel = forwardRef<
             </Typography>
             <Box
               role="toolbar"
-              aria-label="메뉴 업무 액션"
+              aria-label="메뉴 그리드 제어"
               sx={{
                 display: 'flex',
-                justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-                gap: 1,
-                flexWrap: 'wrap',
-                minWidth: 0,
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 0.5,
+                ml: 'auto',
               }}
             >
-              <Button
+              <IconButton
                 size="small"
-                startIcon={<AddIcon fontSize="small" />}
+                aria-label="전체 펼치기"
                 disabled={!selectedModule || saving}
-                onClick={() => {
-                  treeRef.current?.addRow();
-                  setHasSelectedTreeRow(true);
-                }}
+                onClick={() => treeRef.current?.expandAll()}
               >
-                루트 메뉴 추가
-              </Button>
-              <Button
+                <UnfoldMoreIcon fontSize="small" />
+              </IconButton>
+              <IconButton
                 size="small"
-                startIcon={<PlaylistAddIcon fontSize="small" />}
-                disabled={!selectedModule || !hasSelectedTreeRow || saving}
-                onClick={addChildMenu}
+                aria-label="전체 접기"
+                disabled={!selectedModule || saving}
+                onClick={() => treeRef.current?.collapseAll()}
               >
-                하위 메뉴 추가
-              </Button>
+                <UnfoldLessIcon fontSize="small" />
+              </IconButton>
             </Box>
-          </Box>
-          <Box
-            role="toolbar"
-            aria-label="메뉴 그리드 제어"
-            sx={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 0.5,
-              mb: 1.5,
-            }}
-          >
-            <IconButton
-              size="small"
-              aria-label="전체 펼치기"
-              disabled={!selectedModule || saving}
-              onClick={() => treeRef.current?.expandAll()}
-            >
-              <UnfoldMoreIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label="전체 접기"
-              disabled={!selectedModule || saving}
-              onClick={() => treeRef.current?.collapseAll()}
-            >
-              <UnfoldLessIcon fontSize="small" />
-            </IconButton>
           </Box>
           <Box sx={{ flex: 1, minHeight: 0 }}>
             <F1Tree
@@ -459,6 +411,8 @@ export const MenuManagementPanel = forwardRef<
               getRowOrder={(row) => row.order}
               columnLine
               ariaLabel="F1-TREE 메뉴 관리"
+              canExportExcel={canExportExcel}
+              excelFileName={`${selectedModule?.moduleName ?? 'menu'}-export`}
               createRow={createMenuRow}
               editorPlugins={[menuEditorPlugin]}
               beforeEdit={({ row, field }) => {
@@ -468,9 +422,6 @@ export const MenuManagementPanel = forwardRef<
                 return true;
               }}
               onChangesChange={setChanges}
-              onSelectionChange={(rowIds) =>
-                setHasSelectedTreeRow(rowIds.length > 0)
-              }
               onDeleteBlocked={() =>
                 notifyError('하위 메뉴가 존재하는 메뉴는 삭제할 수 없습니다.')
               }
