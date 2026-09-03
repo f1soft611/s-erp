@@ -170,6 +170,26 @@ export const MenuManagementPanel = forwardRef<
     }),
   ) as F1GridColumn<MenuManagementRow>[];
 
+  const isNewMenuRow = (rowId: string | number) =>
+    String(rowId).startsWith('new-menu-');
+
+  const menuEditorPlugin = {
+    id: 'menu-editor-plugin',
+    enabled: true,
+    canEdit: ({
+      row,
+      field,
+    }: {
+      row: MenuManagementRow;
+      field: keyof MenuManagementRow;
+    }) => {
+      if (field === 'code') {
+        return isNewMenuRow(row.id);
+      }
+      return ['name', 'path', 'description'].includes(String(field));
+    },
+  };
+
   const columns: F1GridColumn<MenuManagementRow>[] = [
     {
       field: 'id',
@@ -191,7 +211,7 @@ export const MenuManagementPanel = forwardRef<
       field: 'code',
       headerName: '메뉴코드',
       width: 140,
-      editable: true,
+      editable: (row: MenuManagementRow) => isNewMenuRow(row.id),
       mergeRows: true,
     },
     {
@@ -440,6 +460,13 @@ export const MenuManagementPanel = forwardRef<
               columnLine
               ariaLabel="F1-TREE 메뉴 관리"
               createRow={createMenuRow}
+              editorPlugins={[menuEditorPlugin]}
+              beforeEdit={({ row, field }) => {
+                if (field === 'code' && !isNewMenuRow(row.id)) {
+                  return false;
+                }
+                return true;
+              }}
               onChangesChange={setChanges}
               onSelectionChange={(rowIds) =>
                 setHasSelectedTreeRow(rowIds.length > 0)

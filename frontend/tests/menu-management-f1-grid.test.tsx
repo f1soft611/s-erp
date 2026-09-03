@@ -148,6 +148,333 @@ const moduleTwoRows: MenuManagementRow[] = [
 ];
 
 describe('MenuManagementPanel F1Tree integration', () => {
+  it('blocks editing of persisted menu codes through the beforeEdit hook', () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+
+  it('allows editing of newly created menu codes while keeping saved rows read-only', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('새 메뉴')).toBeInTheDocument();
+    });
+
+    fireEvent.doubleClick(screen.getByText('NEW1'));
+
+    expect(screen.getByDisplayValue('NEW1')).toBeInTheDocument();
+  });
+
+  it('filters visible menu rows by the entered search text', async () => {
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
+      if (path === '/api/v1/system/menus?moduleId=1') {
+        return Promise.resolve({
+          resultList: moduleOneRows.map((row) => ({
+            menuId: Number(row.id),
+            moduleId: row.moduleId,
+            moduleNm: row.moduleName,
+            parentMenuId: row.parentMenuId,
+            parentMenuNm: row.parent,
+            menuCode: row.code,
+            menuNm: row.name,
+            menuUrl: row.path,
+            iconNm: row.iconName,
+            sortOrder: row.order,
+            useAt: 'Y',
+            hasChildren: row.hasChildren,
+            permissionCodes: row.permissionCodes,
+          })),
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(
+      <MenuManagementPage
+        selectedModule={pageProps.selectedModule}
+        currentMenuName={pageProps.currentMenuName}
+        content={pageProps.content}
+        breadcrumbItems={['환경설정', '시스템관리', '메뉴관리']}
+      />,
+    );
+
+    const searchInput = await screen.findByRole('textbox', {
+      name: '메뉴 검색',
+    });
+    fireEvent.change(searchInput, { target: { value: 'DASH' } });
+
+    expect(
+      await screen.findByRole('gridcell', { name: '대시보드' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('gridcell', { name: '시스템 관리' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a red marker on changed cells after an edit', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).not.toBeNull();
+    });
+  });
+
+  it('shows a red marker on a permission checkbox cell after a toggle', () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const writeCheckbox = screen.getByRole('checkbox', { name: '쓰기 1' });
+    fireEvent.click(writeCheckbox);
+
+    const writeCell = writeCheckbox.closest('[role="gridcell"]');
+    expect(writeCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('clears the dirty marker when an edited cell is reverted back to its original value', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(nameCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    fireEvent.doubleClick(nameCell);
+    const revertEditor = await screen.findByDisplayValue('대시보드 수정');
+    fireEvent.change(revertEditor, { target: { value: '대시보드' } });
+    fireEvent.keyDown(revertEditor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(nameCell).toHaveAttribute('data-dirty-cell', 'false');
+    });
+  });
+
+  it('clears the dirty marker when an edited empty-able cell is reverted to empty', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const descriptionCell = screen.getByRole('gridcell', {
+      name: moduleOneRows[0].description,
+    });
+    fireEvent.doubleClick(descriptionCell);
+    const editor = await screen.findByDisplayValue(
+      moduleOneRows[0].description,
+    );
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(descriptionCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    fireEvent.doubleClick(descriptionCell);
+    const revertEditor = await screen.findByDisplayValue('');
+    fireEvent.change(revertEditor, {
+      target: { value: moduleOneRows[0].description },
+    });
+    fireEvent.keyDown(revertEditor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(descriptionCell).toHaveAttribute('data-dirty-cell', 'false');
+    });
+  });
+
+  it('shows a red marker on a non-tree text column after an edit', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const pathCell = screen.getByRole('gridcell', { name: '/dashboard' });
+    fireEvent.doubleClick(pathCell);
+    const editor = await screen.findByDisplayValue('/dashboard');
+    fireEvent.change(editor, { target: { value: '/dashboard-updated' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(pathCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+  });
+
+  it('shows a red marker on a non-tree text column after editing and clicking away (blur)', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const pathCell = screen.getByRole('gridcell', { name: '/dashboard' });
+    fireEvent.doubleClick(pathCell);
+    const editor = await screen.findByDisplayValue('/dashboard');
+    fireEvent.change(editor, { target: { value: '/groupware/documents222' } });
+    fireEvent.blur(editor);
+
+    await waitFor(() => {
+      expect(pathCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    // The dirty marker is absolutely positioned and only renders visibly
+    // when the cell itself establishes a positioning context. A non-pinned
+    // cell must not fall back to the browser default 'static' position.
+    expect(getComputedStyle(pathCell).position).not.toBe('static');
+  });
+
+  it('resets dirty cell state and removes unsaved rows when the module is reloaded', async () => {
+    let menuCallCount = 0;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
+      if (path === '/api/v1/system/menus?moduleId=1') {
+        menuCallCount += 1;
+        if (menuCallCount === 1) {
+          return Promise.resolve({
+            resultList: moduleOneRows.map((row) => ({
+              menuId: Number(row.id),
+              moduleId: row.moduleId,
+              moduleNm: row.moduleName,
+              parentMenuId: row.parentMenuId,
+              parentMenuNm: row.parent,
+              menuCode: row.code,
+              menuNm: row.name,
+              menuUrl: row.path,
+              iconNm: row.iconName,
+              sortOrder: row.order,
+              useAt: 'Y',
+              hasChildren: row.hasChildren,
+              permissionCodes: row.permissionCodes,
+            })),
+          });
+        }
+        return Promise.resolve({
+          resultList: [
+            {
+              menuId: 1,
+              moduleId: 1,
+              moduleNm: '기본',
+              parentMenuId: null,
+              parentMenuNm: null,
+              menuCode: 'DASH',
+              menuNm: '대시보드',
+              menuUrl: '/dashboard',
+              iconNm: 'Dashboard',
+              sortOrder: 1,
+              useAt: 'Y',
+              hasChildren: false,
+              permissionCodes: ['READ'],
+            },
+          ],
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(
+      <MenuManagementPage
+        selectedModule={pageProps.selectedModule}
+        currentMenuName={pageProps.currentMenuName}
+        content={pageProps.content}
+        breadcrumbItems={['환경설정', '시스템관리', '메뉴관리']}
+      />,
+    );
+
+    const nameCell = await screen.findByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).not.toBeNull();
+    });
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '메뉴 검색' }), {
+      key: 'Enter',
+      code: 'Enter',
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).toBeNull();
+      expect(screen.getByRole('gridcell', { name: '대시보드' })).toBeVisible();
+    });
+  });
+
   it('allows the shared grid to fill its container height and scroll rows vertically', () => {
     render(
       <div style={{ width: 900, height: 320 }}>

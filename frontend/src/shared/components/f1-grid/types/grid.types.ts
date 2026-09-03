@@ -23,6 +23,31 @@ export type F1GridOption = {
   label: string;
 };
 
+export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
+
+export type F1GridEditContext<T extends object> = {
+  row: T;
+  rowId: F1GridRowId;
+  column: F1GridColumn<T>;
+  field: keyof T;
+  value: unknown;
+  defaultValue: string;
+};
+
+export type F1GridEditLifecycle<T extends object> = (
+  context: F1GridEditContext<T>,
+) => boolean | void;
+
+export type F1GridEditorPlugin<T extends object> = {
+  id?: string;
+  name?: string;
+  enabled?: boolean;
+  canEdit?: (context: F1GridEditContext<T>) => boolean;
+  createEditor?: (context: F1GridEditContext<T>) => ReactNode;
+  startEdit?: (context: F1GridEditContext<T>) => boolean | void;
+  endEdit?: (context: F1GridEditContext<T>) => boolean | void;
+};
+
 export type F1GridColumn<T extends object> = {
   field: keyof T;
   headerName: string;
@@ -34,6 +59,8 @@ export type F1GridColumn<T extends object> = {
   maxWidth?: number;
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
+  format?: F1GridNumberFormat;
+  decimalPlaces?: number;
   options?: F1GridOption[];
   required?: boolean;
   min?: number;
@@ -50,6 +77,7 @@ export type F1GridColumn<T extends object> = {
   headerCheckbox?: boolean;
   hidden?: boolean;
   pinned?: F1GridPinSide;
+  selectOnFocus?: boolean;
   syncWithTreeCheckbox?: boolean;
 };
 
@@ -111,6 +139,12 @@ export type F1GridProps<T extends object> = {
   showCheckbox?: boolean;
   createRow?: () => T;
   createDuplicate?: (row: T) => T;
+  editorPlugins?: F1GridEditorPlugin<T>[];
+  editors?: F1GridEditorPlugin<T>[];
+  onBeforeEdit?: F1GridEditLifecycle<T>;
+  beforeEdit?: F1GridEditLifecycle<T>;
+  onAfterEdit?: F1GridEditLifecycle<T>;
+  afterEdit?: F1GridEditLifecycle<T>;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
   onSelectionChange?: (rowIds: F1GridRowId[]) => void;
   rowProjection?: (rows: T[]) => F1GridRowProjection<T>;

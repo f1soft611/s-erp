@@ -17,16 +17,10 @@ import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
 import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
-import { useNotification } from '../../shared/context/NotificationContext';
-import {
-  SESSION_WARNING_MESSAGE,
-  getStoredAuth,
-  isAccessTokenExpiringSoon,
-  logout,
-} from '../../shared/services/authService';
+import { logout } from '../../shared/services/authService';
 import {
   buildPageContent,
   buildModuleItems,
@@ -37,7 +31,6 @@ import {
 import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
-import { SessionCountdownLabel } from './components/SessionCountdownLabel';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
 import type { MenuTreeNode } from './types/dashboard';
 
@@ -92,9 +85,7 @@ function findMenuPath(
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
-  const { showWarning } = useNotification();
   const [moduleItems, setModuleItems] = useState(staticModuleItems);
-  const warningShownRef = useRef(false);
   const defaultModule = moduleItems[0];
   const defaultMenuId = defaultModule.menus[0]?.id ?? '';
 
@@ -174,26 +165,6 @@ function DashboardPage() {
       });
     }
   }, [location.pathname, navigate]);
-
-  useEffect(() => {
-    const updateSessionState = () => {
-      const auth = getStoredAuth();
-
-      if (auth && isAccessTokenExpiringSoon(auth, 60_000)) {
-        if (!warningShownRef.current) {
-          showWarning(SESSION_WARNING_MESSAGE);
-          warningShownRef.current = true;
-        }
-        return;
-      }
-
-      warningShownRef.current = false;
-    };
-
-    updateSessionState();
-    const intervalId = window.setInterval(updateSessionState, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [showWarning]);
 
   const isDarkTheme = themeMode === 'dark';
 
@@ -328,7 +299,6 @@ function DashboardPage() {
                 justifyContent: 'flex-end',
               }}
             >
-              <SessionCountdownLabel />
               <Tooltip title="테마 설정">
                 <IconButton
                   aria-label="테마 설정"

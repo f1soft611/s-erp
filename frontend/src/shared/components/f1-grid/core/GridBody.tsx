@@ -26,6 +26,7 @@ type GridBodyProps<T extends object> = {
     end: { rowId: F1GridRowId; columnIndex: number };
   };
   draftValue: string;
+  dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
   >;
@@ -100,6 +101,7 @@ export function GridBody<T extends object>({
   selectedCellRange,
   copiedCellRange,
   draftValue,
+  dirtyCellMap = {},
   mergeInfoByColumn,
   getRowId,
   onSelectRow,
@@ -216,6 +218,7 @@ export function GridBody<T extends object>({
             selectedCellRange={selectedCellRange}
             copiedCellRange={copiedCellRange}
             draftValue={draftValue}
+            dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
             visibleRows={visibleRows}
             rowKey={rowKey}

@@ -32,6 +32,7 @@ type GridRowProps<T extends object> = {
     end: { rowId: F1GridRowId; columnIndex: number };
   };
   draftValue: string;
+  dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
   >;
@@ -94,6 +95,7 @@ export function GridRow<T extends object>({
   selectedCellRange,
   copiedCellRange,
   draftValue,
+  dirtyCellMap = {},
   mergeInfoByColumn,
   visibleRows,
   rowKey,
@@ -282,6 +284,9 @@ export function GridRow<T extends object>({
             rowIndex={rowIndex}
             isLastRow={isLastRow}
             draftValue={draftValue}
+            dirtyCell={Boolean(
+              dirtyCellMap[`${String(rowId)}:${String(column.field)}`],
+            )}
             onFocus={() => {
               onSetFocusedCell(cell);
               onSelectRow(rowId, {} as MouseEvent<HTMLElement>);

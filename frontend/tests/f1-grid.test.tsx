@@ -51,6 +51,8 @@ import {
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
+import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
+import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
 
 type MenuRow = {
   id: string;
@@ -109,6 +111,137 @@ const columns: F1GridColumn<MenuRow>[] = [
     ],
   },
 ];
+
+describe('F1-GRID editor behavior', () => {
+  it('selects the current value when the editor receives focus by default', () => {
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <TextEditor
+          value="HELLO"
+          onChange={() => undefined}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    const input = screen.getByDisplayValue('HELLO') as HTMLInputElement;
+    input.setSelectionRange(1, 3);
+
+    fireEvent.focus(input);
+
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(5);
+  });
+
+  it('selects the current value for number editors when focused', () => {
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12345"
+          onChange={() => undefined}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    const input = screen.getByDisplayValue('12345') as HTMLInputElement;
+    fireEvent.focus(input);
+
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(5);
+  });
+});
+
+describe('F1-GRID number formatting', () => {
+  it('formats numeric values with a custom decimal precision', () => {
+    const column: F1GridColumn<{ amount: number }>[][0] = {
+      field: 'amount',
+      headerName: '금액',
+      type: 'number',
+      format: 'number',
+      decimalPlaces: 2,
+    };
+
+    expect(getCellDisplayValue(column, 12345.6)).toBe('12,345.60');
+  });
+
+  it('formats currency values when a custom number format is specified', () => {
+    const column: F1GridColumn<{ amount: number }>[][0] = {
+      field: 'amount',
+      headerName: '금액',
+      type: 'currency',
+      format: 'currency',
+      decimalPlaces: 0,
+    };
+
+    expect(getCellDisplayValue(column, 12345.6)).toBe('₩12,346');
+  });
+});
+
+describe('F1-GRID editor plugins', () => {
+  it('does not start editing by default unless an editor plugin is registered', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid without editor plugin"
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+
+  it('invokes before/after edit hooks only when an editor plugin allows editing', () => {
+    const onBeforeEdit = vi.fn(() => true);
+    const onAfterEdit = vi.fn();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with editor plugin"
+        editorPlugins={[
+          {
+            canEdit: () => true,
+          },
+        ]}
+        onBeforeEdit={onBeforeEdit}
+        onAfterEdit={onAfterEdit}
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(onBeforeEdit).toHaveBeenCalled();
+    expect(onAfterEdit).toHaveBeenCalled();
+    expect(screen.getByDisplayValue('DASH')).toBeInTheDocument();
+  });
+
+  it('does not enable editing from a plugin when the column is not explicitly editable', () => {
+    const columnsWithoutEditableFlag: F1GridColumn<MenuRow>[] = [
+      { field: 'code', headerName: '코드', editable: false },
+    ];
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columnsWithoutEditableFlag}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByText('DASH'));
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+});
 
 describe('F1-GRID clipboard', () => {
   it('serializes rows to tab-separated values in column order', () => {
@@ -270,6 +403,63 @@ describe('F1-GRID cell range selection', () => {
 
     const startCell = cells[0] as HTMLElement;
     const endCell = cells[1] as HTMLElement;
+    const bodyScroll = container.querySelector(
+      '[role="grid"] > div:last-child',
+    );
+    const mockGetBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function () {
+        if (this === startCell) {
+          return {
+            left: 100,
+            top: 40,
+            right: 180,
+            bottom: 90,
+            width: 80,
+            height: 50,
+            x: 100,
+            y: 40,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === endCell) {
+          return {
+            left: 100,
+            top: 90,
+            right: 180,
+            bottom: 160,
+            width: 80,
+            height: 70,
+            x: 100,
+            y: 90,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === bodyScroll) {
+          return {
+            left: 0,
+            top: 0,
+            right: 400,
+            bottom: 220,
+            width: 400,
+            height: 220,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return {
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
 
     fireEvent.mouseDown(startCell);
     fireEvent.mouseEnter(endCell);
@@ -281,16 +471,16 @@ describe('F1-GRID cell range selection', () => {
     const overlay = document.querySelector(
       '[data-range-overlay]',
     ) as HTMLElement;
-    const startRect = startCell.getBoundingClientRect();
-    const endRect = endCell.getBoundingClientRect();
-    const overlayRect = overlay.getBoundingClientRect();
+    const overlayStyle = window.getComputedStyle(overlay);
 
-    expect(overlayRect.width).toBeLessThanOrEqual(
-      endRect.right - startRect.left + 2,
-    );
-    expect(overlayRect.height).toBeLessThanOrEqual(
-      endRect.bottom - startRect.top + 2,
-    );
+    expect(parseFloat(overlayStyle.width)).toBeLessThanOrEqual(80);
+    expect(parseFloat(overlayStyle.height)).toBeLessThanOrEqual(120);
+    expect(parseFloat(overlayStyle.left)).toBeGreaterThanOrEqual(100);
+    expect(parseFloat(overlayStyle.top)).toBeGreaterThanOrEqual(40);
+    expect(parseFloat(overlayStyle.width)).toBeLessThanOrEqual(80 - 2);
+    expect(parseFloat(overlayStyle.height)).toBeLessThanOrEqual(120 - 2);
+
+    mockGetBoundingClientRect.mockRestore();
   });
 });
 
@@ -529,6 +719,145 @@ describe('F1-GRID extended editors', () => {
     fireEvent.click(screen.getByRole('button', { name: /Choose time/ }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('F1-GRID dirty indicator across column types', () => {
+  type MixedRow = {
+    id: string;
+    name: string;
+    qty: number;
+    active: boolean;
+    startDate: string;
+    workTime: string;
+  };
+  const mixedColumns: F1GridColumn<MixedRow>[] = [
+    { field: 'name', headerName: '이름', editable: true },
+    { field: 'qty', headerName: '수량', type: 'number', editable: true },
+    {
+      field: 'active',
+      headerName: '사용',
+      type: 'checkbox',
+      editable: true,
+    },
+    {
+      field: 'startDate',
+      headerName: '시작일',
+      type: 'date',
+      editable: true,
+    },
+    { field: 'workTime', headerName: '작업시각', type: 'time', editable: true },
+  ];
+  const mixedRows: MixedRow[] = [
+    {
+      id: 'line-1',
+      name: 'Item',
+      qty: 5,
+      active: false,
+      startDate: '2026-08-27',
+      workTime: '09:30',
+    },
+  ];
+
+  it('marks a text cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: 'Item' });
+    fireEvent.doubleClick(nameCell);
+    fireEvent.change(screen.getByDisplayValue('Item'), {
+      target: { value: 'Item-2' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('Item-2'), { key: 'Enter' });
+
+    expect(nameCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a number cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const qtyCell = screen.getByRole('gridcell', { name: '5' });
+    fireEvent.doubleClick(qtyCell);
+    fireEvent.change(screen.getByDisplayValue('5'), {
+      target: { value: '9' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('9'), { key: 'Enter' });
+
+    expect(qtyCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a checkbox cell dirty after a toggle', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const checkbox = screen.getByRole('checkbox', { name: '사용 line-1' });
+    fireEvent.click(checkbox);
+
+    expect(checkbox.closest('[role="gridcell"]')).toHaveAttribute(
+      'data-dirty-cell',
+      'true',
+    );
+  });
+
+  it('marks a date cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const dateCell = screen.getByRole('gridcell', { name: '2026-08-27' });
+    fireEvent.doubleClick(dateCell);
+    fireEvent.change(screen.getByDisplayValue('2026-08-27'), {
+      target: { value: '2026-09-01' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('2026-09-01'), {
+      key: 'Enter',
+    });
+
+    expect(dateCell).toHaveAttribute('data-dirty-cell', 'true');
+  });
+
+  it('marks a time cell dirty after an edit', () => {
+    render(
+      <F1Grid
+        rows={mixedRows}
+        columns={mixedColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    const timeCell = screen.getByRole('gridcell', { name: '09:30' });
+    fireEvent.doubleClick(timeCell);
+    fireEvent.change(screen.getByDisplayValue('09:30'), {
+      target: { value: '14:15' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('14:15'), { key: 'Enter' });
+
+    expect(timeCell).toHaveAttribute('data-dirty-cell', 'true');
   });
 });
 
@@ -1054,6 +1383,61 @@ describe('F1-GRID interaction', () => {
     ).toBe('solid');
   });
 
+  it('supports cell-range drag selection across merged rows', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'A', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드', mergeRows: true },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const cells = screen.getAllByRole('gridcell');
+    fireEvent.mouseDown(cells[0]);
+    fireEvent.mouseEnter(cells[2]);
+    fireEvent.mouseUp(cells[2]);
+
+    expect(cells[0]).toHaveAttribute('data-grid-selected', 'true');
+    expect(cells[2]).toHaveAttribute('data-grid-selected', 'true');
+    expect(window.getComputedStyle(cells[2]).pointerEvents).toBe('auto');
+  });
+
+  it('supports cell-range drag selection on pinned merged columns', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'A', name: 'Beta' },
+        ]}
+        columns={[
+          {
+            field: 'code',
+            headerName: '코드',
+            mergeRows: true,
+            pinned: 'left',
+          },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const cells = screen.getAllByRole('gridcell');
+    fireEvent.mouseDown(cells[0]);
+    fireEvent.mouseEnter(cells[2]);
+    fireEvent.mouseUp(cells[2]);
+
+    expect(cells[0]).toHaveAttribute('data-grid-selected', 'true');
+    expect(cells[2]).toHaveAttribute('data-grid-selected', 'true');
+    expect(window.getComputedStyle(cells[2]).pointerEvents).toBe('auto');
+  });
+
   it('keeps the top border visible when a multi-cell selection starts on the first row', () => {
     render(
       <F1Grid
@@ -1474,6 +1858,7 @@ describe('F1-GRID interaction', () => {
         rows={mergeRows}
         columns={mergeColumns}
         rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
       />,
     );
 
@@ -1507,7 +1892,14 @@ describe('F1-GRID interaction', () => {
       { ...rows[1], id: 'confirmed-2', status: 'confirmed' },
     ];
 
-    render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
+    render(
+      <F1Grid
+        rows={mergeRows}
+        columns={mergeColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
 
     fireEvent.doubleClick(screen.getAllByRole('gridcell')[1]);
 
@@ -1516,6 +1908,34 @@ describe('F1-GRID interaction', () => {
         screen.getAllByRole('gridcell', { name: 'confirmed' })[0],
       ).gridRow,
     ).toBe('3/span 2');
+  });
+
+  it('keeps merged values working on pinned left columns', () => {
+    const mergeColumns: F1GridColumn<MenuRow>[] = [
+      {
+        field: 'status',
+        headerName: '상태',
+        editable: true,
+        mergeRows: true,
+        pinned: 'left',
+      },
+      { field: 'code', headerName: '코드', editable: true },
+    ];
+    const mergeRows = [
+      { ...rows[0], status: 'draft', code: 'DASH' },
+      { ...rows[1], id: 'reports', status: 'draft', code: 'REPORTS' },
+    ];
+
+    render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
+
+    expect(screen.getAllByRole('gridcell', { name: 'draft' })).toHaveLength(1);
+    expect(
+      getComputedStyle(screen.getAllByRole('gridcell', { name: 'draft' })[0])
+        .gridRow,
+    ).toBe('1/span 2');
+    expect(
+      getComputedStyle(screen.getByRole('columnheader', { name: /상태/ })).left,
+    ).toBe('44px');
   });
 
   it('does not create an updated row when an edit is committed without a value change', () => {

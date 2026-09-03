@@ -34,9 +34,7 @@ export function isCellEditable<T extends object>(
   row: T,
 ): boolean {
   if (column.type === 'rownumber') return false;
-  if (column.type === 'checkbox' && column.editable === undefined) {
-    return true;
-  }
+  if (column.editable === undefined) return false;
   return typeof column.editable === 'function'
     ? column.editable(row)
     : Boolean(column.editable);
@@ -100,6 +98,49 @@ export function getGridColumnTracks<T extends object>(
   return `${checkboxWidth > 0 ? `${checkboxWidth}px ` : ''}${tracks.join(' ')}`;
 }
 
+function formatNumericValue(
+  value: unknown,
+  options?: {
+    type?: F1GridColumn<object>['type'];
+    format?: F1GridColumn<object>['format'];
+    decimalPlaces?: number;
+  },
+): string {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return String(value ?? '');
+  }
+
+  const decimalPlaces =
+    options?.decimalPlaces !== undefined &&
+    Number.isInteger(options.decimalPlaces)
+      ? Math.max(0, options.decimalPlaces)
+      : undefined;
+
+  const resolvedFormat = options?.format ?? options?.type;
+
+  if (resolvedFormat === 'currency' && options?.format === 'currency') {
+    return new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW',
+      maximumFractionDigits: decimalPlaces ?? 0,
+      minimumFractionDigits: decimalPlaces ?? 0,
+    }).format(numericValue);
+  }
+
+  if (resolvedFormat === 'number' || resolvedFormat === 'decimal') {
+    return new Intl.NumberFormat('ko-KR', {
+      minimumFractionDigits: decimalPlaces ?? 0,
+      maximumFractionDigits: decimalPlaces ?? 3,
+    }).format(numericValue);
+  }
+
+  return new Intl.NumberFormat('ko-KR', {
+    minimumFractionDigits: decimalPlaces ?? 0,
+    maximumFractionDigits: decimalPlaces ?? 3,
+  }).format(numericValue);
+}
+
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: T[keyof T],
@@ -111,11 +152,16 @@ export function getCellDisplayValue<T extends object>(
     );
   }
 
-  if (column.type === 'currency') {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue)
-      ? new Intl.NumberFormat('ko-KR').format(numericValue)
-      : String(value ?? '');
+  if (
+    column.type === 'number' ||
+    column.type === 'decimal' ||
+    column.type === 'currency'
+  ) {
+    return formatNumericValue(value, {
+      type: column.type,
+      format: column.format,
+      decimalPlaces: column.decimalPlaces,
+    });
   }
 
   return String(value ?? '');

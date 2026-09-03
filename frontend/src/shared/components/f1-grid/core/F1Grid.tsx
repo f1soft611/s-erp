@@ -28,6 +28,8 @@ import {
 } from '../state/GridState';
 import type {
   F1GridColumn,
+  F1GridEditContext,
+  F1GridEditLifecycle,
   F1GridFilter,
   F1GridPinSide,
   F1GridProps,
@@ -91,6 +93,12 @@ function F1GridInner<T extends object>(
     showCheckbox = true,
     createRow,
     createDuplicate,
+    editorPlugins,
+    editors,
+    onBeforeEdit,
+    beforeEdit,
+    onAfterEdit,
+    afterEdit,
     onChangesChange,
     onSelectionChange,
     rowProjection,
@@ -196,6 +204,68 @@ function F1GridInner<T extends object>(
   });
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
+  const activeEditorPlugins = (editorPlugins ?? editors ?? []).filter(
+    (plugin) => plugin && (plugin.enabled ?? true),
+  );
+
+  function resolveEditContext(
+    rowId: F1GridRowId,
+    columnIndex: number,
+  ): F1GridEditContext<T> | undefined {
+    const column = visibleColumns[columnIndex];
+    const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
+    if (!column || !row) return undefined;
+
+    return {
+      row,
+      rowId,
+      column,
+      field: column.field,
+      value: row[column.field],
+      defaultValue: String(row[column.field] ?? ''),
+    };
+  }
+
+  function canStartEditor(rowId: F1GridRowId, columnIndex: number) {
+    if (activeEditorPlugins.length === 0) return false;
+    const context = resolveEditContext(rowId, columnIndex);
+    if (!context) return false;
+    if (!isCellEditable(context.column, context.row)) return false;
+
+    const pluginEnabled = activeEditorPlugins.some((plugin) => {
+      if (plugin.canEdit && !plugin.canEdit(context)) return false;
+      return true;
+    });
+    if (!pluginEnabled) return false;
+
+    const onBefore = onBeforeEdit ?? beforeEdit;
+    if (onBefore) {
+      const result = onBefore(context);
+      if (result === false) return false;
+    }
+
+    const pluginStartResult = activeEditorPlugins.some((plugin) => {
+      if (!plugin.startEdit) return true;
+      const result = plugin.startEdit(context);
+      return result !== false;
+    });
+    if (!pluginStartResult) return false;
+
+    return true;
+  }
+
+  function finishEditLifecycle(nextContext?: F1GridEditContext<T>) {
+    const context =
+      nextContext ??
+      (editingCell
+        ? resolveEditContext(editingCell.rowId, editingCell.columnIndex)
+        : undefined);
+    if (!context) return;
+    const hooks = [onAfterEdit ?? afterEdit].filter(Boolean) as Array<
+      F1GridEditLifecycle<T>
+    >;
+    hooks.forEach((hook) => hook(context));
+  }
 
   useEffect(() => {
     if (!storageKey) return;
@@ -264,6 +334,21 @@ function F1GridInner<T extends object>(
     (row) =>
       data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
   );
+  const dirtyCellMap: Record<string, boolean> = {};
+  activeRows.forEach((row) => {
+    const stateKey = getStateKey(getGridRowId(row, rowKey));
+    const originalRow = data.originalRowsById[stateKey];
+    const rowDirtyFields = data.dirtyFieldsById[stateKey] ?? {};
+    visibleColumns.forEach((column) => {
+      const field = String(column.field);
+      const isDirty = !originalRow
+        ? true
+        : column.getValue
+          ? !Object.is(column.getValue(row), column.getValue(originalRow))
+          : Boolean(rowDirtyFields[field]);
+      dirtyCellMap[`${stateKey}:${field}`] = isDirty;
+    });
+  });
   const projectedRows = rowProjection?.(activeRows).rows ?? activeRows;
   const filteredRows = disableFiltering
     ? projectedRows
@@ -562,21 +647,44 @@ function F1GridInner<T extends object>(
   function startEdit(rowId: F1GridRowId, columnIndex: number) {
     const column = visibleColumns[columnIndex];
     const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
+    const context =
+      column && row ? resolveEditContext(rowId, columnIndex) : undefined;
 
     if (
       !column ||
       !row ||
       !isCellEditable(column, row) ||
-      column.type === 'checkbox'
+      column.type === 'checkbox' ||
+      !context ||
+      !canStartEditor(rowId, columnIndex)
     )
       return;
+
+    const pluginStartResult = activeEditorPlugins.every((plugin) => {
+      if (!plugin.startEdit) return true;
+      const result = plugin.startEdit(context);
+      return result !== false;
+    });
+    if (!pluginStartResult) return;
 
     setFocusedCell(getCell(rowId, columnIndex));
     setEditingCell(getCell(rowId, columnIndex));
     setDraftValue(String(row[column.field] ?? ''));
+    finishEditLifecycle(context);
   }
 
   function stopEdit() {
+    if (editingCell) {
+      const context = resolveEditContext(
+        editingCell.rowId,
+        editingCell.columnIndex,
+      );
+      if (context) {
+        activeEditorPlugins.forEach((plugin) => {
+          if (plugin.endEdit) plugin.endEdit(context);
+        });
+      }
+    }
     setEditingCell(undefined);
     setDraftValue('');
   }
@@ -1018,10 +1126,10 @@ function F1GridInner<T extends object>(
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
     const next = {
-      left: Math.max(0, topLeftRect.left - containerRect.left - 2),
-      top: Math.max(0, topLeftRect.top - containerRect.top - 2),
-      width: Math.max(0, bottomRightRect.right - topLeftRect.left + 5),
-      height: Math.max(0, bottomRightRect.bottom - topLeftRect.top + 5),
+      left: Math.max(0, topLeftRect.left - containerRect.left + 1),
+      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
+      width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
+      height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
 
     setRangeOverlay((current) => {
@@ -1188,6 +1296,7 @@ function F1GridInner<T extends object>(
           selectedCellRange={cellSelection}
           copiedCellRange={copiedCellRange}
           draftValue={draftValue}
+          dirtyCellMap={dirtyCellMap}
           mergeInfoByColumn={mergeInfoByColumn}
           getRowId={(row) => getGridRowId(row, rowKey)}
           onSelectRow={selectRow}

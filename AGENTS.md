@@ -180,6 +180,15 @@ backend/
 - 문서가 없는 경우에는 기존 코드 패턴을 참고하되, 요구사항을 임의로 추가하지 않습니다.
 - 구현 단계에 들어가기 전에 [docs/plan](docs/plan) 와 [docs/spec](docs/spec) 에서 정리된 내용을 우선 반영합니다.
 - 작업지시서의 순서와 완료 기준을 무시하고 바로 코딩하는 행위를 금지합니다.
+- F1-Grid 관련 기능 수정/변경/버그 수정/추가 작업은 반드시 문서 갱신을 같은 작업으로 포함해야 합니다.
+  - 문서와 코드가 같이 변경되지 않으면 작업을 완료로 간주하지 않습니다.
+  - 관련 문서 예시: [docs/guide/F1-GRID.md](docs/guide/F1-GRID.md), [docs/superpowers](docs/superpowers), [docs/result](docs/result)
+  - 변경 항목이 UI 동작, 컬럼/행 동작, 편집 모드, 이벤트, 옵션, 검증 기준, 기대 동작 중 하나라도 포함되면 문서도 동일 범위에서 반영해야 합니다.
+- F1-Grid 문서 갱신 기준:
+  - 화면 동작 변경 시 사용자 흐름/동작 설명 업데이트
+  - API 또는 데이터 구조 변경 시 예시값, 필드 설명, 검증 기준 업데이트
+  - 버그 수정 시 재현 조건, 원인, 해결 방법, 회귀 검증 항목을 결과 문서에 추가
+  - 기능 추가/삭제 시 해당 문서와 결과 문서 모두 최신 상태로 유지
 
 ## 안전한 작업 습관
 
@@ -200,6 +209,7 @@ backend/
 
 ## 유용한 참고 경로
 
+- [.github/f1workflow/README.md](.github/f1workflow/README.md) - Superpowers 기반 F1Workflow 지능형 워크플로우 가이드 (`/f1workflow`)
 - [backend/README.md](backend/README.md)
 - [frontend/README.md](frontend/README.md)
 - [frontend/package.json](frontend/package.json)

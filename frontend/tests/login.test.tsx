@@ -60,17 +60,28 @@ describe('Login page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows an expiring warning when the session is within one minute', () => {
-    const auth = {
-      tenantCode: 'T1358606250',
-      userId: 'admin',
-      accessToken: 'expiring-token',
-      refreshToken: 'refresh-token',
-      expiresAt: new Date(Date.now() + 30_000).toISOString(),
-    };
+  it('does not render the misleading session countdown or one-minute warning in the dashboard', async () => {
+    window.localStorage.setItem(
+      's-erp-auth',
+      JSON.stringify({
+        tenantCode: 'T1358606250',
+        userId: 'admin',
+        accessToken: 'expiring-token',
+        refreshToken: 'refresh-token',
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      }),
+    );
+    window.history.pushState({}, '', '/dashboard');
 
-    expect(isAccessTokenExpiringSoon(auth, 60_000)).toBe(true);
-    expect(getSessionRemainingLabel(auth)).toBe('00:30');
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: /^종합현황$/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/로그인 유지 시간/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/세션이 1분 후에 만료됩니다/i),
+    ).not.toBeInTheDocument();
   });
 
   it('stores the refresh-failure message for the next login screen', () => {

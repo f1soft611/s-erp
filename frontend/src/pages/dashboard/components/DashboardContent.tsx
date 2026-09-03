@@ -14,6 +14,7 @@ import { OverviewPage } from '../../groupware/OverviewPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
+import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
 import type {
   MenuPermission,
@@ -109,6 +110,10 @@ export function DashboardContent({
         content={content}
       />
     );
+  }
+
+  if (selectedModule.id === 'settings' && currentPageKey === 'f1-grid-docs') {
+    return <F1GridDocsPage />;
   }
 
   return (

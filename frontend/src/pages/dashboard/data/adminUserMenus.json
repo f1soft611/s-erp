@@ -85,6 +85,18 @@
                 "update": true,
                 "delete": true
               }
+            },
+            {
+              "menuId": 214,
+              "parentMenuId": 210,
+              "name": "F1-Grid 문서",
+              "path": "/settings/system/f1-grid-docs",
+              "permissions": {
+                "read": true,
+                "create": false,
+                "update": false,
+                "delete": false
+              }
             }
           ]
         }

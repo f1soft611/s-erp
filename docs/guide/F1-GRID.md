@@ -80,8 +80,22 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+- 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
+- dirty 판정은 최초 로드 시점의 원본 값(`originalRowsById`)과 비교하며, 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드의 dirty 마크가 사라지고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
+- dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
+- `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
+
+---
+
+## 문서 사용 안내: 구현 상태 표기 (2026-09-03 갱신)
+
+이 문서는 최초 설계 목표 전체를 담고 있어, 아직 구현되지 않은 로드맵 항목과 실제 구현된 계약이 함께 섞여 있다. 아래 기준으로 구분해서 읽는다.
+
+- **현재 구현됨**: `체크박스 옵션 정리`, `추가 반영 기능 요약`(위 두 섹션)과 이 섹션에서 별도로 `⚠️ 아직 미구현`으로 표시하지 않은 코드/UX 설명.
+- **아직 미구현(설계 목표)**: `aggregate`, `enableRowMerge`, `mergeKey`, `mergeWhen`, `grid.refreshRowMerge()`, `grid.getRowMergeRanges()`, `addRows`, `gridId`/`editable`/`selectable`/`pagination`/`sortable`/`filterable` 형태의 Props, `F1GridToolbar`, Context Menu, Aggregation Footer, Grouping, 서버사이드 Pagination/Query, Virtual Scrolling, Excel Export API. 이 항목들은 아래 관련 섹션에 `⚠️ 아직 미구현` 표시를 추가했다.
+- 실제 공개 계약의 최종 근거는 `frontend/src/shared/components/f1-grid/types/grid.types.ts`와 F1-Grid 문서 포털(`/f1-grid-docs`)의 API Reference이다. 이 문서와 소스가 다르면 소스를 기준으로 문서를 갱신한다.
 
 ---
 
@@ -256,6 +270,8 @@ interface F1GridColumn<T> {
 }
 ```
 
+> ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
+
 Row Merge 설정:
 
 ```typescript
@@ -272,6 +288,8 @@ interface F1GridColumn<T> {
 기본 사용은 `mergeRows: true`만 지정하면 같은 컬럼의 연속 동일 값을 자동 병합한다.
 
 복합 기준이 필요한 경우 `mergeKey` 또는 `mergeWhen`을 사용한다.
+
+> ⚠️ 아직 미구현: `mergeKey`, `mergeWhen`, `enableRowMerge`, `grid.refreshRowMerge()`, `grid.getRowMergeRanges()`는 현재 타입/구현에 없는 설계 목표다. 현재 실제로 지원하는 계약은 컬럼별 `mergeRows: boolean`뿐이며, 핀 고정(pinned) 컬럼 및 셀 드래그 범위 선택과의 상호작용은 이미 구현되어 있다.
 
 예:
 
@@ -599,6 +617,7 @@ ERP 전표, 발주, 생산지시, BOM, 재고조회 화면에서 같은 값이 �
 - 실제 Row 데이터는 합치지 않고 화면 표시만 병합한다.
 - 편집, 선택, 복사, 붙여넣기, Validation은 원본 Row 단위로 동작한다.
 - 병합된 셀을 클릭하면 병합 범위의 첫 번째 Row Cell에 Focus를 둔다.
+- 병합된 영역 안에서도 마우스 드래그를 이용한 셀 범위 선택(Drag Cell Range Selection) 및 핀 고정(pinned) 컬럼과의 병합 동작을 지원한다.
 - 병합된 영역 안에서도 행 선택과 체크박스 선택은 개별 Row 기준으로 유지한다.
 
 지원 모드:
@@ -935,9 +954,9 @@ interface GridQuery {
 
 ---
 
-# 19. Aggregation
+# 19. Aggregation (⚠️ 아직 미구현)
 
-Footer에서 다음 집계를 지원한다.
+Footer에서 다음 집계를 지원하는 것을 목표로 한다. 현재 `F1GridColumn`/`F1GridProps`에는 관련 옵션이 없다.
 
 ```text
 SUM
@@ -1141,9 +1160,9 @@ interface GridDataState<T> {
 
 ---
 
-# 24. Grid Toolbar
+# 24. Grid Toolbar (⚠️ 아직 미구현)
 
-기본 Toolbar:
+목표로 하는 기본 Toolbar는 다음과 같다. `F1GridToolbar` 컴포넌트는 현재 구현되지 않았다.
 
 ```text
 [조회] [추가] [삭제] [복제] [저장] [엑셀] [컬럼설정]
@@ -1169,11 +1188,11 @@ interface GridDataState<T> {
 
 ---
 
-# 25. Grid Context Menu
+# 25. Grid Context Menu (⚠️ 아직 미구현)
 
-우클릭 메뉴를 지원한다.
+우클릭 메뉴를 목표로 한다. 현재 F1-Grid는 Context Menu를 제공하지 않는다.
 
-기본 메뉴:
+목표로 하는 기본 메뉴:
 
 ```text
 행 추가
@@ -1265,9 +1284,9 @@ F1GridColumn<T>;
 
 ---
 
-# 29. Public API
+# 29. Public API (⚠️ 목표 API, 현재 구현과 다름)
 
-최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다.
+최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다. 아래 인터페이스는 설계 목표이며, `addRows`, `setRows`, `clearChanges`, `getQuery`, `copy`/`paste`, `refreshRowMerge`/`getRowMergeRanges`, `getLayout`/`setLayout`/`resetLayout`는 현재 `F1GridRef`에 없다. 현재 구현된 실제 `F1GridRef`/`F1TreeRef` 계약은 F1-Grid 문서 포털의 API Reference 또는 `grid.types.ts`를 따른다.
 
 ```typescript
 interface F1GridRef<T> {
@@ -1317,9 +1336,9 @@ interface F1GridRef<T> {
 
 ---
 
-# 30. Component 사용 예
+# 30. Component 사용 예 (⚠️ 목표 예시, 현재 구현과 다름)
 
-최종 사용 형태는 다음과 같이 단순해야 한다.
+최종 사용 형태는 다음과 같이 단순해야 한다. 아래 예시의 `gridId`, `editable`, `selectable`, `pagination`, `sortable`, `filterable`, `aggregate`, `enableRowMerge`, `mergeKey`는 현재 `F1GridProps`/`F1GridColumn`에 없는 설계 목표 표기다. 실제 현재 사용법은 이 문서 상단의 `F1Grid rows={rows} columns={columns} rowKey="id"` 형태와 F1-Grid 문서 포털 예제를 따른다.
 
 ```tsx
 const columns: F1GridColumn<Item>[] = [

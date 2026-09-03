@@ -22,6 +22,7 @@ type GridCellProps<T extends object> = {
   rowIndex: number;
   isLastRow?: boolean;
   draftValue: string;
+  dirtyCell?: boolean;
   onFocus: () => void;
   onMouseDown: () => void;
   onMouseEnter: () => void;
@@ -63,6 +64,7 @@ export function GridCell<T extends object>({
   rowIndex,
   isLastRow,
   draftValue,
+  dirtyCell = false,
   onFocus,
   onMouseDown,
   onMouseEnter,
@@ -88,6 +90,7 @@ export function GridCell<T extends object>({
   const hideRangeStartBorder = rangeStart && !editing;
   const activeHighlight =
     (focused || editing) && !(selected && !editing && (rangeStart || !focused));
+  const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
 
   return (
     <Box
@@ -95,6 +98,7 @@ export function GridCell<T extends object>({
       role="gridcell"
       aria-label={adornment && !merged ? displayValue : undefined}
       data-grid-error={errorMessage}
+      data-dirty-cell={dirtyCell ? 'true' : 'false'}
       title={errorMessage}
       tabIndex={focused ? 0 : -1}
       ref={onCellRef}
@@ -157,7 +161,9 @@ export function GridCell<T extends object>({
         borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
-        position: pinOffset ? 'sticky' : undefined,
+        opacity: mergedCellHidden ? 0 : 1,
+        pointerEvents: 'auto',
+        position: pinOffset ? 'sticky' : 'relative',
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
         zIndex: pinOffset ? 2 : undefined,
@@ -185,6 +191,23 @@ export function GridCell<T extends object>({
           column.align ?? (column.type === 'number' ? 'right' : 'left'),
       }}
     >
+      {dirtyCell && !editing ? (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            borderTop: '8px solid',
+            borderTopColor: 'error.main',
+            borderRight: '8px solid transparent',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      ) : null}
       {merged ? null : column.type === 'checkbox' ? (
         <Checkbox
           size="small"

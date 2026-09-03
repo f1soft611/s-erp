@@ -8,6 +8,7 @@ type AutocompleteEditorProps = {
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onSelectChange: (value: F1GridOption['value']) => void;
+  selectOnFocus?: boolean;
 };
 
 export function AutocompleteEditor({
@@ -16,6 +17,7 @@ export function AutocompleteEditor({
   onChange,
   onKeyDown,
   onSelectChange,
+  selectOnFocus = true,
 }: AutocompleteEditorProps) {
   return (
     <>
@@ -25,6 +27,20 @@ export function AutocompleteEditor({
         role="combobox"
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={(event) => {
+          if (!selectOnFocus) return;
+          const input =
+            (event.currentTarget as HTMLElement | null)?.querySelector('input') ??
+            (event.target instanceof HTMLInputElement ? event.target : null);
+          if (!(input instanceof HTMLInputElement) || input.value.length === 0) {
+            return;
+          }
+          try {
+            input.setSelectionRange(0, input.value.length);
+          } catch {
+            // Ignore invalid state on wrapped MUI inputs.
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             const option = options.find(
@@ -53,6 +69,7 @@ export function AutocompleteEditor({
             boxSizing: 'border-box',
             paddingTop: 0,
             paddingBottom: 0,
+            font: 'inherit',
           },
         }}
       />
