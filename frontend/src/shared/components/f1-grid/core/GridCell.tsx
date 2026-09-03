@@ -138,7 +138,6 @@ export function GridCell<T extends object>({
         alignItems: 'center',
         alignSelf: 'stretch',
         height: '100%',
-        position: 'relative',
         justifyContent: toJustifyContent(
           column.align ??
             (column.type === 'number' || column.type === 'rownumber'
@@ -162,9 +161,9 @@ export function GridCell<T extends object>({
         borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
-        visibility: mergedCellHidden ? 'hidden' : 'visible',
-        pointerEvents: mergedCellHidden ? 'none' : 'auto',
-        position: pinOffset ? 'sticky' : undefined,
+        opacity: mergedCellHidden ? 0 : 1,
+        pointerEvents: 'auto',
+        position: pinOffset ? 'sticky' : 'relative',
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
         zIndex: pinOffset ? 2 : undefined,
@@ -197,13 +196,13 @@ export function GridCell<T extends object>({
           aria-hidden
           sx={{
             position: 'absolute',
-            left: 3,
-            top: 3,
-            width: 7,
-            height: 7,
-            borderRadius: '0 0 2px 0',
-            backgroundColor: 'error.main',
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.65)',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            borderTop: '8px solid',
+            borderTopColor: 'error.main',
+            borderRight: '8px solid transparent',
             pointerEvents: 'none',
             zIndex: 1,
           }}

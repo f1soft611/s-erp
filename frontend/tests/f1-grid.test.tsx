@@ -1244,6 +1244,61 @@ describe('F1-GRID interaction', () => {
     ).toBe('solid');
   });
 
+  it('supports cell-range drag selection across merged rows', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'A', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드', mergeRows: true },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const cells = screen.getAllByRole('gridcell');
+    fireEvent.mouseDown(cells[0]);
+    fireEvent.mouseEnter(cells[2]);
+    fireEvent.mouseUp(cells[2]);
+
+    expect(cells[0]).toHaveAttribute('data-grid-selected', 'true');
+    expect(cells[2]).toHaveAttribute('data-grid-selected', 'true');
+    expect(window.getComputedStyle(cells[2]).pointerEvents).toBe('auto');
+  });
+
+  it('supports cell-range drag selection on pinned merged columns', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'A', name: 'Beta' },
+        ]}
+        columns={[
+          {
+            field: 'code',
+            headerName: '코드',
+            mergeRows: true,
+            pinned: 'left',
+          },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const cells = screen.getAllByRole('gridcell');
+    fireEvent.mouseDown(cells[0]);
+    fireEvent.mouseEnter(cells[2]);
+    fireEvent.mouseUp(cells[2]);
+
+    expect(cells[0]).toHaveAttribute('data-grid-selected', 'true');
+    expect(cells[2]).toHaveAttribute('data-grid-selected', 'true');
+    expect(window.getComputedStyle(cells[2]).pointerEvents).toBe('auto');
+  });
+
   it('keeps the top border visible when a multi-cell selection starts on the first row', () => {
     render(
       <F1Grid
@@ -1664,6 +1719,7 @@ describe('F1-GRID interaction', () => {
         rows={mergeRows}
         columns={mergeColumns}
         rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
       />,
     );
 
@@ -1697,7 +1753,14 @@ describe('F1-GRID interaction', () => {
       { ...rows[1], id: 'confirmed-2', status: 'confirmed' },
     ];
 
-    render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
+    render(
+      <F1Grid
+        rows={mergeRows}
+        columns={mergeColumns}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
 
     fireEvent.doubleClick(screen.getAllByRole('gridcell')[1]);
 
@@ -1710,7 +1773,13 @@ describe('F1-GRID interaction', () => {
 
   it('keeps merged values working on pinned left columns', () => {
     const mergeColumns: F1GridColumn<MenuRow>[] = [
-      { field: 'status', headerName: '상태', editable: true, mergeRows: true, pinned: 'left' },
+      {
+        field: 'status',
+        headerName: '상태',
+        editable: true,
+        mergeRows: true,
+        pinned: 'left',
+      },
       { field: 'code', headerName: '코드', editable: true },
     ];
     const mergeRows = [
@@ -1721,8 +1790,13 @@ describe('F1-GRID interaction', () => {
     render(<F1Grid rows={mergeRows} columns={mergeColumns} rowKey="id" />);
 
     expect(screen.getAllByRole('gridcell', { name: 'draft' })).toHaveLength(1);
-    expect(getComputedStyle(screen.getAllByRole('gridcell', { name: 'draft' })[0]).gridRow).toBe('1/span 2');
-    expect(getComputedStyle(screen.getByRole('columnheader', { name: '상태' })).left).toBe('44px');
+    expect(
+      getComputedStyle(screen.getAllByRole('gridcell', { name: 'draft' })[0])
+        .gridRow,
+    ).toBe('1/span 2');
+    expect(
+      getComputedStyle(screen.getByRole('columnheader', { name: /상태/ })).left,
+    ).toBe('44px');
   });
 
   it('does not create an updated row when an edit is committed without a value change', () => {

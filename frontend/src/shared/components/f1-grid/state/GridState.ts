@@ -10,6 +10,7 @@ export type F1GridData<T extends object> = {
   stateById: Record<string, F1GridRowState>;
   previousStateById: Record<string, F1GridRowState>;
   dirtyFieldsById: Record<string, Record<string, boolean>>;
+  originalRowsById: Record<string, T>;
 };
 
 export function createGridData<T extends object>(
@@ -17,9 +18,12 @@ export function createGridData<T extends object>(
   rowKey: keyof T,
 ): F1GridData<T> {
   const stateById: Record<string, F1GridRowState> = {};
+  const originalRowsById: Record<string, T> = {};
 
   rows.forEach((row) => {
-    stateById[getStateKey(getGridRowId(row, rowKey))] = 'normal';
+    const stateKey = getStateKey(getGridRowId(row, rowKey));
+    stateById[stateKey] = 'normal';
+    originalRowsById[stateKey] = { ...row };
   });
 
   return {
@@ -27,6 +31,7 @@ export function createGridData<T extends object>(
     stateById,
     previousStateById: {},
     dirtyFieldsById: {},
+    originalRowsById,
   };
 }
 
@@ -71,10 +76,18 @@ export function updateGridRow<T extends object>(
       ...(data.dirtyFieldsById[stateKey] ?? {}),
     },
   };
+  const originalRow = data.originalRowsById[stateKey];
 
   Object.keys(changes).forEach((field) => {
-    nextDirtyFields[stateKey][field] = true;
+    const nextValue = (changes as Record<string, unknown>)[field];
+    if (originalRow && Object.is(originalRow[field as keyof T], nextValue)) {
+      delete nextDirtyFields[stateKey][field];
+    } else {
+      nextDirtyFields[stateKey][field] = true;
+    }
   });
+
+  const isRowClean = Object.keys(nextDirtyFields[stateKey]).length === 0;
 
   return {
     ...data,
@@ -83,7 +96,12 @@ export function updateGridRow<T extends object>(
     ),
     stateById: {
       ...data.stateById,
-      [stateKey]: currentState === 'inserted' ? 'inserted' : 'updated',
+      [stateKey]:
+        currentState === 'inserted'
+          ? 'inserted'
+          : isRowClean
+            ? 'normal'
+            : 'updated',
     },
     dirtyFieldsById: nextDirtyFields,
   };

@@ -80,6 +80,8 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+- 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
+- dirty 판정은 최초 로드 시점의 원본 값(`originalRowsById`)과 비교하며, 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드의 dirty 마크가 사라지고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
 
@@ -599,6 +601,7 @@ ERP 전표, 발주, 생산지시, BOM, 재고조회 화면에서 같은 값이 �
 - 실제 Row 데이터는 합치지 않고 화면 표시만 병합한다.
 - 편집, 선택, 복사, 붙여넣기, Validation은 원본 Row 단위로 동작한다.
 - 병합된 셀을 클릭하면 병합 범위의 첫 번째 Row Cell에 Focus를 둔다.
+- 병합된 영역 안에서도 마우스 드래그를 이용한 셀 범위 선택(Drag Cell Range Selection) 및 핀 고정(pinned) 컬럼과의 병합 동작을 지원한다.
 - 병합된 영역 안에서도 행 선택과 체크박스 선택은 개별 Row 기준으로 유지한다.
 
 지원 모드:

@@ -7,12 +7,16 @@
   --f1-doc-space-6: 40px;
   --f1-doc-space-7: 56px;
   --f1-doc-letter-spacing: 0.04em;
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f5f7f9;
   color: #17202a;
 }
 
 .f1-docs-header {
+  flex-shrink: 0;
   height: 76px;
   padding: 14px 32px;
   display: flex;
@@ -37,13 +41,15 @@
 .f1-docs-layout {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
-  min-height: calc(100vh - 76px);
+  flex: 1;
+  min-height: 0;
 }
 
 .f1-docs-sidebar {
   padding: 28px 18px;
   background: #ffffff;
   border-right: 1px solid #dde4ea;
+  overflow-y: auto;
 }
 
 .f1-docs-nav-label {
@@ -70,8 +76,9 @@
 }
 
 .f1-docs-main {
-  width: min(1120px, 100%);
+  width: 100%;
   padding: 38px clamp(24px, 4.5vw, 72px) 56px;
+  overflow-y: auto;
 }
 
 .f1-docs-breadcrumb {
@@ -191,6 +198,8 @@
   .f1-docs-layout {
     display: block;
     position: relative;
+    height: 100%;
+    overflow: hidden;
   }
 
   .f1-docs-sidebar {
@@ -199,6 +208,7 @@
     z-index: 2;
     inset: 0 auto auto 0;
     width: min(280px, 90vw);
+    max-height: 100%;
     box-shadow: 8px 10px 22px #102b3f33;
   }
 
@@ -207,6 +217,7 @@
   }
 
   .f1-docs-main {
+    height: 100%;
     padding: 28px 18px;
   }
 

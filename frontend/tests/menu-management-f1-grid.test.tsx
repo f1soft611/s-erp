@@ -261,6 +261,115 @@ describe('MenuManagementPanel F1Tree integration', () => {
     });
   });
 
+  it('clears the dirty marker when an edited cell is reverted back to its original value', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(nameCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    fireEvent.doubleClick(nameCell);
+    const revertEditor = await screen.findByDisplayValue('대시보드 수정');
+    fireEvent.change(revertEditor, { target: { value: '대시보드' } });
+    fireEvent.keyDown(revertEditor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(nameCell).toHaveAttribute('data-dirty-cell', 'false');
+    });
+  });
+
+  it('clears the dirty marker when an edited empty-able cell is reverted to empty', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const descriptionCell = screen.getByRole('gridcell', {
+      name: moduleOneRows[0].description,
+    });
+    fireEvent.doubleClick(descriptionCell);
+    const editor = await screen.findByDisplayValue(
+      moduleOneRows[0].description,
+    );
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(descriptionCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    fireEvent.doubleClick(descriptionCell);
+    const revertEditor = await screen.findByDisplayValue('');
+    fireEvent.change(revertEditor, {
+      target: { value: moduleOneRows[0].description },
+    });
+    fireEvent.keyDown(revertEditor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(descriptionCell).toHaveAttribute('data-dirty-cell', 'false');
+    });
+  });
+
+  it('shows a red marker on a non-tree text column after an edit', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const pathCell = screen.getByRole('gridcell', { name: '/dashboard' });
+    fireEvent.doubleClick(pathCell);
+    const editor = await screen.findByDisplayValue('/dashboard');
+    fireEvent.change(editor, { target: { value: '/dashboard-updated' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(pathCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+  });
+
+  it('shows a red marker on a non-tree text column after editing and clicking away (blur)', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const pathCell = screen.getByRole('gridcell', { name: '/dashboard' });
+    fireEvent.doubleClick(pathCell);
+    const editor = await screen.findByDisplayValue('/dashboard');
+    fireEvent.change(editor, { target: { value: '/groupware/documents222' } });
+    fireEvent.blur(editor);
+
+    await waitFor(() => {
+      expect(pathCell).toHaveAttribute('data-dirty-cell', 'true');
+    });
+
+    // The dirty marker is absolutely positioned and only renders visibly
+    // when the cell itself establishes a positioning context. A non-pinned
+    // cell must not fall back to the browser default 'static' position.
+    expect(getComputedStyle(pathCell).position).not.toBe('static');
+  });
+
   it('resets dirty cell state and removes unsaved rows when the module is reloaded', async () => {
     let menuCallCount = 0;
     apiMocks.apiGet.mockImplementation((path: string) => {
