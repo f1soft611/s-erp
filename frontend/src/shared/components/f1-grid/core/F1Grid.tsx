@@ -19,6 +19,7 @@ import { GridBody } from './GridBody';
 import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
+  areGridValuesEqual,
   createGridData,
   duplicateGridRows,
   getGridChanges,
@@ -352,7 +353,10 @@ function F1GridInner<T extends object>(
       const isDirty = !originalRow
         ? true
         : column.getValue
-          ? !Object.is(column.getValue(row), column.getValue(originalRow))
+          ? !areGridValuesEqual(
+              column.getValue(row),
+              column.getValue(originalRow),
+            )
           : Boolean(rowDirtyFields[field]);
       dirtyCellMap[`${stateKey}:${field}`] = isDirty;
     });

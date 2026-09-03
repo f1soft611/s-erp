@@ -13,6 +13,32 @@ export type F1GridData<T extends object> = {
   originalRowsById: Record<string, T>;
 };
 
+export function areGridValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (left == null || right == null) return left === right;
+
+  if (left instanceof Date && right instanceof Date) {
+    return left.getTime() === right.getTime();
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) return false;
+    return left.every((item, index) => areGridValuesEqual(item, right[index]));
+  }
+
+  if (typeof left === 'object' && typeof right === 'object') {
+    const leftEntries = Object.entries(left as Record<string, unknown>);
+    const rightEntries = Object.entries(right as Record<string, unknown>);
+    if (leftEntries.length !== rightEntries.length) return false;
+
+    return leftEntries.every(([key, value]) =>
+      areGridValuesEqual(value, (right as Record<string, unknown>)[key]),
+    );
+  }
+
+  return false;
+}
+
 export function createGridData<T extends object>(
   rows: T[],
   rowKey: keyof T,
@@ -80,7 +106,10 @@ export function updateGridRow<T extends object>(
 
   Object.keys(changes).forEach((field) => {
     const nextValue = (changes as Record<string, unknown>)[field];
-    if (originalRow && Object.is(originalRow[field as keyof T], nextValue)) {
+    if (
+      originalRow &&
+      areGridValuesEqual(originalRow[field as keyof T], nextValue)
+    ) {
       delete nextDirtyFields[stateKey][field];
     } else {
       nextDirtyFields[stateKey][field] = true;

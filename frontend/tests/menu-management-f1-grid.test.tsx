@@ -294,6 +294,27 @@ describe('MenuManagementPanel F1Tree integration', () => {
     expect(writeCell).toHaveAttribute('data-dirty-cell', 'true');
   });
 
+  it('clears the dirty marker and change count when a permission checkbox is reverted to its original value', () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const writeCheckbox = screen.getByRole('checkbox', { name: '쓰기 1' });
+    const writeCell = writeCheckbox.closest('[role="gridcell"]');
+
+    fireEvent.click(writeCheckbox);
+    expect(writeCell).toHaveAttribute('data-dirty-cell', 'true');
+    expect(screen.getByText(/수정 1건/)).toBeVisible();
+
+    fireEvent.click(writeCheckbox);
+    expect(writeCell).toHaveAttribute('data-dirty-cell', 'false');
+    expect(screen.getByText(/수정 0건/)).toBeVisible();
+  });
+
   it('clears the dirty marker when an edited cell is reverted back to its original value', async () => {
     render(
       <MenuManagementPanel
