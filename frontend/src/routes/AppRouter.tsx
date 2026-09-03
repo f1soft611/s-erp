@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
+import { F1GridDocsPage } from '../pages/f1-grid-docs/F1GridDocsPage';
 import {
   isAuthenticated,
   subscribeAuthChange,
@@ -51,6 +52,7 @@ function AppRouter() {
           </PublicRoute>
         }
       />
+      <Route path="/f1-grid-docs" element={<F1GridDocsPage />} />
       <Route
         path="/dashboard/*"
         element={

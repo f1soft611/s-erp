@@ -148,6 +148,80 @@ const moduleTwoRows: MenuManagementRow[] = [
 ];
 
 describe('MenuManagementPanel F1Tree integration', () => {
+  it('blocks editing of persisted menu codes through the beforeEdit hook', () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+
+  it('allows editing of newly created menu codes while keeping saved rows read-only', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '루트 메뉴 추가' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('새 메뉴')).toBeInTheDocument();
+    });
+
+    fireEvent.doubleClick(screen.getByText('NEW1'));
+
+    expect(screen.getByDisplayValue('NEW1')).toBeInTheDocument();
+  });
+
+  it('filters visible menu rows by the entered search text', async () => {
+    render(
+      <MenuManagementPage
+        selectedModule={pageProps.selectedModule}
+        currentMenuName={pageProps.currentMenuName}
+        content={pageProps.content}
+        breadcrumbItems={['환경설정', '시스템관리', '메뉴관리']}
+      />,
+    );
+
+    const searchInput = await screen.findByRole('textbox', { name: '메뉴 검색' });
+    fireEvent.change(searchInput, { target: { value: '대시' } });
+
+    expect(screen.getByRole('gridcell', { name: '대시보드' })).toBeVisible();
+    expect(
+      screen.queryByRole('gridcell', { name: '시스템 관리' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a red marker on changed cells after an edit', async () => {
+    render(
+      <MenuManagementPanel
+        menus={moduleOneRows}
+        selectedModule={{ moduleId: 1, moduleName: '기본' }}
+        permissions={permissions}
+      />,
+    );
+
+    const nameCell = screen.getByRole('gridcell', { name: '대시보드' });
+    fireEvent.doubleClick(nameCell);
+    const editor = await screen.findByDisplayValue('대시보드');
+    fireEvent.change(editor, { target: { value: '대시보드 수정' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-dirty-cell="true"]')).not.toBeNull();
+    });
+  });
+
   it('allows the shared grid to fill its container height and scroll rows vertically', () => {
     render(
       <div style={{ width: 900, height: 320 }}>

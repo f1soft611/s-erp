@@ -10,6 +10,7 @@ type DateEditorProps = {
   value: string;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  selectOnFocus?: boolean;
 };
 
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -66,7 +67,12 @@ export function normalizeDateInput(input: string, now = dayjs()): string {
   return isIsoDateString(candidate) ? candidate : '';
 }
 
-export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
+export function DateEditor({
+  value,
+  onChange,
+  onKeyDown,
+  selectOnFocus = true,
+}: DateEditorProps) {
   const [draftValue, setDraftValue] = useState(value);
   const [calendarAnchor, setCalendarAnchor] =
     useState<HTMLButtonElement | null>(null);
@@ -95,6 +101,20 @@ export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
             .slice(0, 10);
           setDraftValue(nextValue);
           onChange(nextValue);
+        }}
+        onFocus={(event) => {
+          if (!selectOnFocus) return;
+          const input =
+            (event.currentTarget as HTMLElement | null)?.querySelector('input') ??
+            (event.target instanceof HTMLInputElement ? event.target : null);
+          if (!(input instanceof HTMLInputElement) || input.value.length === 0) {
+            return;
+          }
+          try {
+            input.setSelectionRange(0, input.value.length);
+          } catch {
+            // Ignore invalid state on wrapped MUI inputs.
+          }
         }}
         onKeyDown={onKeyDown}
         slotProps={{
@@ -127,6 +147,7 @@ export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
             justifyContent: 'center',
             border: '0 !important',
             padding: 0,
+            fontSize: 'inherit',
             '&:before, &:after': {
               borderBottom: '0 !important',
             },
@@ -138,6 +159,8 @@ export function DateEditor({ value, onChange, onKeyDown }: DateEditorProps) {
             minHeight: 0,
             boxSizing: 'border-box',
             textAlign: 'center',
+            font: 'inherit',
+            fontSize: 'inherit',
           },
           '& .MuiInputAdornment-root': {
             marginLeft: 0,

@@ -28,6 +28,8 @@ export function CellEditor<T extends object>({
   onSelectChange,
   onCodePick,
 }: CellEditorProps<T>) {
+  const selectOnFocus = column.selectOnFocus ?? true;
+
   if (column.type === 'code') return <CodePickerEditor onPick={onCodePick} />;
   if (column.type === 'autocomplete')
     return (
@@ -37,31 +39,62 @@ export function CellEditor<T extends object>({
         onChange={onChange}
         onKeyDown={onKeyDown}
         onSelectChange={onSelectChange}
+        selectOnFocus={selectOnFocus}
       />
     );
   if (column.type === 'currency')
     return (
-      <CurrencyEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <CurrencyEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'decimal')
     return (
-      <DecimalEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <DecimalEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'datetime')
     return (
-      <DateTimeEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <DateTimeEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'time')
     return (
-      <TimeEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <TimeEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'date')
     return (
-      <DateEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <DateEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'number')
     return (
-      <NumberEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />
+      <NumberEditor
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        selectOnFocus={selectOnFocus}
+      />
     );
   if (column.type === 'select')
     return (
@@ -71,5 +104,12 @@ export function CellEditor<T extends object>({
         onChange={onSelectChange}
       />
     );
-  return <TextEditor value={value} onChange={onChange} onKeyDown={onKeyDown} />;
+  return (
+    <TextEditor
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      selectOnFocus={selectOnFocus}
+    />
+  );
 }

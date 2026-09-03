@@ -51,6 +51,8 @@ import {
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
+import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
+import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
 
 type MenuRow = {
   id: string;
@@ -109,6 +111,137 @@ const columns: F1GridColumn<MenuRow>[] = [
     ],
   },
 ];
+
+describe('F1-GRID editor behavior', () => {
+  it('selects the current value when the editor receives focus by default', () => {
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <TextEditor
+          value="HELLO"
+          onChange={() => undefined}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    const input = screen.getByDisplayValue('HELLO') as HTMLInputElement;
+    input.setSelectionRange(1, 3);
+
+    fireEvent.focus(input);
+
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(5);
+  });
+
+  it('selects the current value for number editors when focused', () => {
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12345"
+          onChange={() => undefined}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    const input = screen.getByDisplayValue('12345') as HTMLInputElement;
+    fireEvent.focus(input);
+
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(5);
+  });
+});
+
+describe('F1-GRID number formatting', () => {
+  it('formats numeric values with a custom decimal precision', () => {
+    const column: F1GridColumn<{ amount: number }>[][0] = {
+      field: 'amount',
+      headerName: '금액',
+      type: 'number',
+      format: 'number',
+      decimalPlaces: 2,
+    };
+
+    expect(getCellDisplayValue(column, 12345.6)).toBe('12,345.60');
+  });
+
+  it('formats currency values when a custom number format is specified', () => {
+    const column: F1GridColumn<{ amount: number }>[][0] = {
+      field: 'amount',
+      headerName: '금액',
+      type: 'currency',
+      format: 'currency',
+      decimalPlaces: 0,
+    };
+
+    expect(getCellDisplayValue(column, 12345.6)).toBe('₩12,346');
+  });
+});
+
+describe('F1-GRID editor plugins', () => {
+  it('does not start editing by default unless an editor plugin is registered', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid without editor plugin"
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+
+  it('invokes before/after edit hooks only when an editor plugin allows editing', () => {
+    const onBeforeEdit = vi.fn(() => true);
+    const onAfterEdit = vi.fn();
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with editor plugin"
+        editorPlugins={[
+          {
+            canEdit: () => true,
+          },
+        ]}
+        onBeforeEdit={onBeforeEdit}
+        onAfterEdit={onAfterEdit}
+      />,
+    );
+
+    const codeCell = screen.getByText('DASH');
+    fireEvent.doubleClick(codeCell);
+
+    expect(onBeforeEdit).toHaveBeenCalled();
+    expect(onAfterEdit).toHaveBeenCalled();
+    expect(screen.getByDisplayValue('DASH')).toBeInTheDocument();
+  });
+
+  it('does not enable editing from a plugin when the column is not explicitly editable', () => {
+    const columnsWithoutEditableFlag: F1GridColumn<MenuRow>[] = [
+      { field: 'code', headerName: '코드', editable: false },
+    ];
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columnsWithoutEditableFlag}
+        rowKey="id"
+        editorPlugins={[{ canEdit: () => true }]}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByText('DASH'));
+
+    expect(screen.queryByDisplayValue('DASH')).not.toBeInTheDocument();
+  });
+});
 
 describe('F1-GRID clipboard', () => {
   it('serializes rows to tab-separated values in column order', () => {
@@ -270,6 +403,63 @@ describe('F1-GRID cell range selection', () => {
 
     const startCell = cells[0] as HTMLElement;
     const endCell = cells[1] as HTMLElement;
+    const bodyScroll = container.querySelector(
+      '[role="grid"] > div:last-child',
+    );
+    const mockGetBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function () {
+        if (this === startCell) {
+          return {
+            left: 100,
+            top: 40,
+            right: 180,
+            bottom: 90,
+            width: 80,
+            height: 50,
+            x: 100,
+            y: 40,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === endCell) {
+          return {
+            left: 100,
+            top: 90,
+            right: 180,
+            bottom: 160,
+            width: 80,
+            height: 70,
+            x: 100,
+            y: 90,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === bodyScroll) {
+          return {
+            left: 0,
+            top: 0,
+            right: 400,
+            bottom: 220,
+            width: 400,
+            height: 220,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return {
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
 
     fireEvent.mouseDown(startCell);
     fireEvent.mouseEnter(endCell);
@@ -281,16 +471,16 @@ describe('F1-GRID cell range selection', () => {
     const overlay = document.querySelector(
       '[data-range-overlay]',
     ) as HTMLElement;
-    const startRect = startCell.getBoundingClientRect();
-    const endRect = endCell.getBoundingClientRect();
-    const overlayRect = overlay.getBoundingClientRect();
+    const overlayStyle = window.getComputedStyle(overlay);
 
-    expect(overlayRect.width).toBeLessThanOrEqual(
-      endRect.right - startRect.left + 2,
-    );
-    expect(overlayRect.height).toBeLessThanOrEqual(
-      endRect.bottom - startRect.top + 2,
-    );
+    expect(parseFloat(overlayStyle.width)).toBeLessThanOrEqual(80);
+    expect(parseFloat(overlayStyle.height)).toBeLessThanOrEqual(120);
+    expect(parseFloat(overlayStyle.left)).toBeGreaterThanOrEqual(100);
+    expect(parseFloat(overlayStyle.top)).toBeGreaterThanOrEqual(40);
+    expect(parseFloat(overlayStyle.width)).toBeLessThanOrEqual(80 - 2);
+    expect(parseFloat(overlayStyle.height)).toBeLessThanOrEqual(120 - 2);
+
+    mockGetBoundingClientRect.mockRestore();
   });
 });
 

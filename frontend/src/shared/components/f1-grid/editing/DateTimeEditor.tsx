@@ -8,6 +8,7 @@ type DateTimeEditorProps = {
   value: string;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  selectOnFocus?: boolean;
 };
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD[T]HH:mm';
@@ -16,6 +17,7 @@ export function DateTimeEditor({
   value,
   onChange,
   onKeyDown,
+  selectOnFocus = true,
 }: DateTimeEditorProps) {
   const parsedValue = value ? dayjs(value, DATE_TIME_FORMAT) : null;
 
@@ -35,6 +37,20 @@ export function DateTimeEditor({
             fullWidth: true,
             margin: 'none',
             variant: 'standard',
+            onFocus: (event) => {
+              if (!selectOnFocus) return;
+              const input =
+                (event.currentTarget as HTMLElement | null)?.querySelector('input') ??
+                (event.target instanceof HTMLInputElement ? event.target : null);
+              if (!(input instanceof HTMLInputElement) || input.value.length === 0) {
+                return;
+              }
+              try {
+                input.setSelectionRange(0, input.value.length);
+              } catch {
+                // Ignore invalid state on wrapped MUI inputs.
+              }
+            },
             onKeyDown,
             slotProps: { input: { disableUnderline: true } },
             sx: {
@@ -51,6 +67,7 @@ export function DateTimeEditor({
                 justifyContent: 'center',
                 border: '0 !important',
                 padding: 0,
+                fontSize: 'inherit',
                 '&:before, &:after': {
                   borderBottom: '0 !important',
                 },
@@ -62,6 +79,8 @@ export function DateTimeEditor({
                 minHeight: 0,
                 boxSizing: 'border-box',
                 textAlign: 'center',
+                font: 'inherit',
+                fontSize: 'inherit',
               },
             },
           },
