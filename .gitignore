@@ -18,6 +18,7 @@ backend/backend-prod
 # Build output and dependencies
 frontend/dist/
 frontend/node_modules/
+node_modules
 
 # Private keys, certificates, and credential exports
 *.pem

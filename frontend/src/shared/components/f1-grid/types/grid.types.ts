@@ -121,6 +121,12 @@ export type F1GridRowProjection<T extends object> = {
   rows: T[];
 };
 
+/** F1Tree가 내부적으로 주입하는 트리 전용 컨텍스트 메뉴 확장 포인트. 일반 F1Grid 사용 화면에서는 지정하지 않는다. */
+export type F1GridContextMenuTreeConfig = {
+  onAddRoot: () => void;
+  onAddChild: (targetRowId?: F1GridRowId) => void;
+};
+
 export type F1GridProps<T extends object> = {
   rows: T[];
   columns: F1GridColumn<T>[];
@@ -151,6 +157,9 @@ export type F1GridProps<T extends object> = {
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   disableSorting?: boolean;
   disableFiltering?: boolean;
+  canExportExcel?: boolean;
+  excelFileName?: string;
+  treeContextMenu?: F1GridContextMenuTreeConfig;
 };
 
 export type F1GridRef<T extends object> = {

@@ -12,12 +12,14 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box } from '@mui/material';
+import { Box, Divider, Menu, MenuItem } from '@mui/material';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
+import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
+  areGridValuesEqual,
   createGridData,
   duplicateGridRows,
   getGridChanges,
@@ -41,6 +43,7 @@ import { getNextEditableCell } from '../keyboard/GridKeyboard';
 import { getSelectedRowIds as resolveSelectedRowIds } from '../selection/GridSelection';
 import { getGridMergeInfo } from '../merge/GridRowMerge';
 import {
+  getAutoFitColumnWidth,
   getGridColumnTracks,
   getGridRowId,
   getStateKey,
@@ -105,6 +108,9 @@ function F1GridInner<T extends object>(
     cellAdornment,
     disableSorting = false,
     disableFiltering = false,
+    canExportExcel = false,
+    excelFileName,
+    treeContextMenu,
   }: F1GridProps<T>,
   ref: ForwardedRef<F1GridRef<T>>,
 ) {
@@ -148,6 +154,9 @@ function F1GridInner<T extends object>(
     normalizedMaxRowHeight,
   );
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const [contextMenu, setContextMenu] = useState<
+    { mouseX: number; mouseY: number; rowId?: F1GridRowId } | undefined
+  >(undefined);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
@@ -344,7 +353,10 @@ function F1GridInner<T extends object>(
       const isDirty = !originalRow
         ? true
         : column.getValue
-          ? !Object.is(column.getValue(row), column.getValue(originalRow))
+          ? !areGridValuesEqual(
+              column.getValue(row),
+              column.getValue(originalRow),
+            )
           : Boolean(rowDirtyFields[field]);
       dirtyCellMap[`${stateKey}:${field}`] = isDirty;
     });
@@ -1000,6 +1012,119 @@ function F1GridInner<T extends object>(
     );
   }
 
+  function openContextMenu(event: MouseEvent<HTMLElement>) {
+    event.preventDefault();
+    const target = event.target as HTMLElement;
+    const rowNode = target.closest('[data-f1-grid-row-id]');
+    const rowIdAttr = rowNode?.getAttribute('data-f1-grid-row-id');
+    const targetRow =
+      rowIdAttr !== undefined && rowIdAttr !== null
+        ? visibleRows.find(
+            (row) => String(getGridRowId(row, rowKey)) === rowIdAttr,
+          )
+        : undefined;
+    const targetRowId = targetRow ? getGridRowId(targetRow, rowKey) : undefined;
+
+    if (targetRowId !== undefined && !selectedIds.includes(targetRowId)) {
+      setSelectedIds([targetRowId]);
+    }
+    setContextMenu({
+      mouseX: event.clientX,
+      mouseY: event.clientY,
+      rowId: targetRowId,
+    });
+  }
+
+  function closeContextMenu() {
+    setContextMenu(undefined);
+  }
+
+  async function handleExportExcelClick() {
+    closeContextMenu();
+    const fileName = excelFileName ?? `${ariaLabel}-export`;
+    await exportGridRowsToExcel(visibleColumns, visibleRows, fileName);
+  }
+
+  function handleAutoFitColumnsClick() {
+    closeContextMenu();
+    setColumnWidths((current) => {
+      const next = { ...current };
+      visibleColumns.forEach((column) => {
+        next[String(column.field)] = getAutoFitColumnWidth(
+          column,
+          visibleRows,
+          {
+            minWidth: minColumnWidth,
+          },
+        );
+      });
+      return next;
+    });
+  }
+
+  function handleAddRootClick() {
+    closeContextMenu();
+    treeContextMenu?.onAddRoot();
+  }
+
+  function handleAddRowContextClick() {
+    const targetRowId = contextMenu?.rowId;
+    closeContextMenu();
+    if (treeContextMenu) {
+      treeContextMenu.onAddChild(targetRowId);
+    } else {
+      handleAddRow();
+    }
+  }
+
+  function handleDuplicateContextClick() {
+    closeContextMenu();
+    handleDuplicateSelectedRows();
+  }
+
+  function handleDeleteContextClick() {
+    closeContextMenu();
+    handleDeleteSelectedRows();
+  }
+
+  function handleClearFiltersClick() {
+    closeContextMenu();
+    setFilterState([]);
+  }
+
+  function handleClearSortClick() {
+    closeContextMenu();
+    setSortState([]);
+  }
+
+  function handleResetColumnSettingsClick() {
+    closeContextMenu();
+    setColumnOrder(columns.map((column) => String(column.field)));
+    setColumnWidths({});
+    setHiddenColumnFields(
+      new Set(
+        columns
+          .filter((column) => column.hidden)
+          .map((column) => String(column.field)),
+      ),
+    );
+    setPinnedFields(
+      new Map(
+        columns
+          .filter((column) => column.pinned)
+          .map((column) => [String(column.field), column.pinned!]),
+      ),
+    );
+    if (storageKey) {
+      window.localStorage.removeItem(storageKey);
+    }
+  }
+
+  useEffect(() => {
+    closeContextMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
   useImperativeHandle(ref, () => ({
     getSelectedRows() {
       const selectedSet = new Set(selectedIds);
@@ -1271,6 +1396,7 @@ function F1GridInner<T extends object>(
       </Box>
       <Box
         ref={bodyScrollRef}
+        onContextMenu={openContextMenu}
         sx={{
           position: 'relative',
           flex: 1,
@@ -1373,6 +1499,61 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
+      <Menu
+        open={Boolean(contextMenu)}
+        onClose={closeContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        {canExportExcel ? (
+          <MenuItem onClick={handleExportExcelClick}>엑셀 내보내기</MenuItem>
+        ) : null}
+        <MenuItem onClick={handleAutoFitColumnsClick}>
+          컬럼 길이 자동 조정
+        </MenuItem>
+        <Divider />
+        {treeContextMenu ? (
+          <MenuItem onClick={handleAddRootClick}>루트 추가</MenuItem>
+        ) : null}
+        <MenuItem onClick={handleAddRowContextClick}>행 추가</MenuItem>
+        <MenuItem
+          disabled={!createDuplicate || selectedIds.length === 0}
+          onClick={handleDuplicateContextClick}
+        >
+          행 복사
+        </MenuItem>
+        <MenuItem
+          disabled={selectedIds.length === 0}
+          onClick={handleDeleteContextClick}
+        >
+          행 삭제
+        </MenuItem>
+        <Divider />
+        {!disableFiltering ? (
+          <MenuItem
+            disabled={filterState.length === 0}
+            onClick={handleClearFiltersClick}
+          >
+            필터 해제
+          </MenuItem>
+        ) : null}
+        {!disableSorting ? (
+          <MenuItem
+            disabled={sortState.length === 0}
+            onClick={handleClearSortClick}
+          >
+            정렬 해제
+          </MenuItem>
+        ) : null}
+        <Divider />
+        <MenuItem onClick={handleResetColumnSettingsClick}>
+          설정을 기본값으로 복원
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

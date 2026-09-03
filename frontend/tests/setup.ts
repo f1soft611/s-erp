@@ -14,6 +14,10 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   ),
 });
 
+// jsdom은 URL.createObjectURL/revokeObjectURL을 구현하지 않는다. 엑셀/CSV 다운로드 코드가 사용한다.
+URL.createObjectURL = vi.fn(() => 'blob:test-url');
+URL.revokeObjectURL = vi.fn();
+
 beforeEach(() => {
   window.localStorage.clear();
   window.history.pushState({}, '', '/login');

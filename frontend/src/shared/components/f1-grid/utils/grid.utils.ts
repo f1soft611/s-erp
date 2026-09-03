@@ -34,6 +34,9 @@ export function isCellEditable<T extends object>(
   row: T,
 ): boolean {
   if (column.type === 'rownumber') return false;
+  if (column.type === 'checkbox' && column.editable === undefined) {
+    return true;
+  }
   if (column.editable === undefined) return false;
   return typeof column.editable === 'function'
     ? column.editable(row)

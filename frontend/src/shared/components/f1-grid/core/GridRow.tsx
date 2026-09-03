@@ -176,6 +176,7 @@ export function GridRow<T extends object>({
       key={getStateKey(rowId)}
       role="row"
       aria-selected={isSelected}
+      data-f1-grid-row-id={String(rowId)}
       sx={{ display: 'contents' }}
     >
       {showCheckbox ? (

@@ -231,24 +231,19 @@ export function MenuManagementPage({
           ? fetchActivePermissions()
           : Promise.resolve(undefined),
       ]);
-      if (requestId !== menuLoadRequestIdRef.current) return;
-      console.log(
-        'loadMenus resolved',
-        moduleId,
-        nextMenus.length,
-        nextPermissions,
-      );
+      if (requestId !== menuLoadRequestIdRef.current) return false;
       setMenus(nextMenus);
       if (nextPermissions) setPermissions(nextPermissions);
       setDirty(false);
+      return true;
     } catch (requestError) {
-      if (requestId !== menuLoadRequestIdRef.current) return;
+      if (requestId !== menuLoadRequestIdRef.current) return false;
       setError(
         requestError instanceof Error
           ? requestError.message
           : '메뉴 목록을 불러오지 못했습니다.',
       );
-      return undefined;
+      return false;
     } finally {
       if (requestId === menuLoadRequestIdRef.current) setLoading(false);
     }
@@ -296,9 +291,12 @@ export function MenuManagementPage({
       setConfirmOpen(true);
       return;
     }
-    setReloadToken((current) => current + 1);
     setSelectedModuleId(moduleId);
-    void loadMenus(moduleId, true, true).catch(() => undefined);
+    void loadMenus(moduleId, true, true).then((didLoad) => {
+      if (didLoad) {
+        setReloadToken((current) => current + 1);
+      }
+    });
   }
 
   function requestRefresh(moduleId: number, bypassDirtyConfirmation = false) {
@@ -309,8 +307,11 @@ export function MenuManagementPage({
       setConfirmOpen(true);
       return Promise.resolve();
     }
-    setReloadToken((current) => current + 1);
-    return loadMenus(moduleId);
+    return loadMenus(moduleId).then((didLoad) => {
+      if (didLoad) {
+        setReloadToken((current) => current + 1);
+      }
+    });
   }
 
   function confirmDiscardChanges() {
@@ -322,9 +323,12 @@ export function MenuManagementPage({
     if (nextModuleId === undefined) return;
     const moduleChanged = nextModuleId !== selectedModuleId;
     if (moduleChanged) setSelectedModuleId(nextModuleId);
-    setReloadToken((current) => current + 1);
-    void loadMenus(nextModuleId, reloadPermissions, moduleChanged).catch(
-      () => undefined,
+    void loadMenus(nextModuleId, reloadPermissions, moduleChanged).then(
+      (didLoad) => {
+        if (didLoad) {
+          setReloadToken((current) => current + 1);
+        }
+      },
     );
   }
 
@@ -465,6 +469,7 @@ export function MenuManagementPage({
           menus={filteredMenus}
           selectedModule={selectedModule}
           permissions={permissions}
+          canExportExcel={pageActionPermissions.excel}
           onRefresh={requestRefresh}
           onDirtyChange={setDirty}
           onSavingChange={setSaving}
