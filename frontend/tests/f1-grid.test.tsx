@@ -1144,6 +1144,34 @@ describe('F1-GRID row merge', () => {
       { isStart: true, span: 1 },
     ]);
   });
+
+  it('keeps a lower merge inside the active parent merge group', () => {
+    const rows = [
+      { id: '1', itemName: '품목 A', category: 'RAW' },
+      { id: '2', itemName: '품목 A', category: 'RAW' },
+      { id: '3', itemName: '품목 B', category: 'RAW' },
+      { id: '4', itemName: '품목 B', category: 'RAW' },
+    ];
+    const itemNameInfo = getGridMergeInfo(rows, 'itemName');
+    const parentGroupByRow: number[] = [];
+
+    itemNameInfo.forEach((info, rowIndex) => {
+      parentGroupByRow[rowIndex] = info.isStart
+        ? rowIndex
+        : rowIndex > 0
+          ? parentGroupByRow[rowIndex - 1]
+          : rowIndex;
+    });
+
+    const categoryInfo = getGridMergeInfo(rows, 'category', parentGroupByRow);
+
+    expect(categoryInfo).toEqual([
+      { isStart: true, span: 2 },
+      { isStart: false, span: 0 },
+      { isStart: true, span: 2 },
+      { isStart: false, span: 0 },
+    ]);
+  });
 });
 
 describe('F1-GRID row height', () => {
@@ -1370,6 +1398,32 @@ describe('F1-GRID interaction', () => {
     const input = screen.getByDisplayValue('12');
     expect(input.closest('.MuiInputBase-root')).toHaveStyle({ height: '100%' });
     expect(input).toHaveStyle({ height: '100%' });
+  });
+
+  it('moves focus to the newly dragged cell immediately so the prior selection is cleared', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+          { id: '3', code: 'C', name: 'Gamma' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '코드' },
+          { field: 'name', headerName: '이름' },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const firstCell = screen.getByRole('gridcell', { name: 'A' });
+    const secondCell = screen.getByRole('gridcell', { name: 'Gamma' });
+
+    fireEvent.mouseDown(firstCell);
+    fireEvent.mouseDown(secondCell);
+
+    expect(secondCell).toHaveAttribute('tabindex', '0');
+    expect(firstCell).toHaveAttribute('tabindex', '-1');
   });
 
   it('supports cell-range drag selection across adjacent cells', () => {

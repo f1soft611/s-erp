@@ -288,6 +288,8 @@ interface F1GridColumn<T> {
 
 기본 사용은 `mergeRows: true`만 지정하면 같은 컬럼의 연속 동일 값을 자동 병합한다.
 
+실제 구현은 상위 merge 구간과 하위 merge 구간의 경계를 함께 고려한다. 즉, 이전 컬럼이 서로 다른 merge 그룹인 경우에는 값이 같아도 하위 컬럼의 병합을 이어가지 않는다. 하위 컬럼 merge span도 상위 그룹을 넘어서 확장되지 않는다.
+
 복합 기준이 필요한 경우 `mergeKey` 또는 `mergeWhen`을 사용한다.
 
 > ⚠️ 아직 미구현: `mergeKey`, `mergeWhen`, `enableRowMerge`, `grid.refreshRowMerge()`, `grid.getRowMergeRanges()`는 현재 타입/구현에 없는 설계 목표다. 현재 실제로 지원하는 계약은 컬럼별 `mergeRows: boolean`뿐이며, 핀 고정(pinned) 컬럼 및 셀 드래그 범위 선택과의 상호작용은 이미 구현되어 있다.

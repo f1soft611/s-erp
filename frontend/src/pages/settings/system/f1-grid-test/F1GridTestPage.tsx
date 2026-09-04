@@ -193,12 +193,13 @@ export function F1GridTestPage({
     },
     {
       field: 'category',
-      headerName: '품목분류',
+      headerName: '품목분류 (Row Merge)',
       type: 'select',
       width: 100,
       flex: 1,
       headerAlign: 'center',
       editable: true,
+      mergeRows: true,
       options: [
         { value: 'RAW', label: '원자재' },
         { value: 'SUB', label: '부자재' },
@@ -523,6 +524,13 @@ export function F1GridTestPage({
         maxHeight="100%"
         resizableRows={resizableRows}
         resizableColumns={resizableColumns}
+        editorPlugins={[
+          {
+            id: 'role-user-grid-editor',
+            enabled: true,
+            canEdit: () => true,
+          },
+        ]}
         minColumnWidth={50}
         createRow={createSampleRow}
         createDuplicate={createSampleDuplicate}

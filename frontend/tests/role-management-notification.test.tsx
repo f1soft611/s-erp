@@ -850,6 +850,51 @@ describe('RoleManagementPage notifications', () => {
     expect(screen.getByText('선택 역할: 검토자')).toBeVisible();
   });
 
+  it('preserves the user-mapping column layout across a role switch remount', async () => {
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/roles') {
+        return Promise.resolve({
+          resultList: [createRole(7, '운영자'), createRole(8, '검토자')],
+        });
+      }
+      if (path === '/api/v1/system/roles/7/users') {
+        return Promise.resolve({
+          assignedUsers: [],
+          unassignedUsers: [
+            createMapping(12, '미할당 사용자'),
+            createMapping(13, '다른 사용자'),
+          ],
+        });
+      }
+      if (path === '/api/v1/system/roles/8/users') {
+        return Promise.resolve({ assignedUsers: [], unassignedUsers: [] });
+      }
+      return Promise.reject(new Error(`Unexpected GET request: ${path}`));
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '로그인 ID 컬럼 메뉴' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '로그인 ID 표시' }));
+
+    expect(
+      screen.queryByRole('columnheader', { name: /^로그인 ID$/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('선택 역할: 검토자')).toBeVisible();
+    });
+
+    expect(
+      screen.queryByRole('columnheader', { name: /^로그인 ID$/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('does not duplicate a successful mapping operation when a later mapping save fails and retries', async () => {
     let postCount = 0;
     apiMocks.apiGet.mockImplementation((path: string) => {

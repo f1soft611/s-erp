@@ -157,12 +157,16 @@ export function GridBody<T extends object>({
     const editing =
       editingCell?.rowId === getRowId(visibleRows[rowIndex]) &&
       editingCell?.columnIndex === columnIndex;
+    const mergeInfo = mergeEditing
+      ? undefined
+      : mergeInfoByColumn[columnIndex]?.[rowIndex];
 
     return Boolean(
       column.mergeRows &&
       rowIndex > 0 &&
       !mergeEditing &&
       !editing &&
+      !mergeInfo?.isStart &&
       Object.is(visibleRows[rowIndex - 1][column.field], value),
     );
   }

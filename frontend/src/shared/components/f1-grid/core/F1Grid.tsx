@@ -374,9 +374,49 @@ function F1GridInner<T extends object>(
   const visibleRows = disableSorting
     ? filteredRows
     : sortGridRows(filteredRows, sortState);
-  const mergeInfoByColumn = visibleColumns.map((column) =>
-    column.mergeRows ? getGridMergeInfo(visibleRows, column.field) : [],
-  );
+
+  const mergeInfoByColumn: Array<
+    Array<{ isStart: boolean; span: number } | undefined>
+  > = [];
+  visibleColumns.forEach((column, columnIndex) => {
+    if (!column.mergeRows) {
+      mergeInfoByColumn[columnIndex] = [];
+      return;
+    }
+
+    const previousMergeColumnIndex = (() => {
+      for (let index = columnIndex - 1; index >= 0; index -= 1) {
+        if (visibleColumns[index].mergeRows) {
+          return index;
+        }
+      }
+      return undefined;
+    })();
+
+    const previousMergeInfo =
+      previousMergeColumnIndex === undefined
+        ? undefined
+        : mergeInfoByColumn[previousMergeColumnIndex];
+
+    let parentGroupByRow: number[] | undefined;
+    if (previousMergeInfo) {
+      parentGroupByRow = [];
+      previousMergeInfo.forEach((info, rowIndex) => {
+        parentGroupByRow![rowIndex] =
+          info?.isStart === true
+            ? rowIndex
+            : rowIndex > 0
+              ? parentGroupByRow![rowIndex - 1]
+              : rowIndex;
+      });
+    }
+
+    mergeInfoByColumn[columnIndex] = getGridMergeInfo(
+      visibleRows,
+      column.field,
+      parentGroupByRow,
+    );
+  });
 
   function toggleSortColumn(
     column: F1GridColumn<T>,
@@ -1585,6 +1625,7 @@ function F1GridInner<T extends object>(
             }}
             onStartEdit={startEdit}
             onCellSelectionStart={(cell) => {
+              setFocusedCell(cell);
               cellRangeDragRef.current = { start: cell, current: cell };
               setCellSelectionRange(cell, cell);
             }}
