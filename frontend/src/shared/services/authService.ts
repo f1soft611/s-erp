@@ -13,8 +13,30 @@ export interface AuthSession {
 const AUTH_STORAGE_KEY = 's-erp-auth';
 const AUTH_CHANGE_EVENT = 's-erp-auth-change';
 const SESSION_NOTICE_KEY = 's-erp-session-notice';
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+
+export const resolveApiBaseUrl = (
+  hostname: string = typeof window === 'undefined'
+    ? 'localhost'
+    : window.location.hostname,
+  configuredBaseUrl: string | undefined = import.meta.env.VITE_API_BASE_URL,
+): string => {
+  const normalized = configuredBaseUrl?.trim();
+  if (normalized) {
+    return normalized.replace(/\/$/, '');
+  }
+
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]'
+  ) {
+    return 'http://localhost:8080';
+  }
+
+  return '';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 const ACCESS_TOKEN_VALIDITY_MS = 15 * 60 * 1000;
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60 * 1000;
 const SESSION_WARNING_MESSAGE =
