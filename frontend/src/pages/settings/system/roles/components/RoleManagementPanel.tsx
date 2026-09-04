@@ -87,7 +87,6 @@ export const RoleManagementPanel = forwardRef<
   ref,
 ) {
   const [selectedRoleId, setSelectedRoleId] = useState('');
-  const [hasSelectedRoleRow, setHasSelectedRoleRow] = useState(false);
   const [userRows, setUserRows] = useState<RoleUserRow[]>([]);
   const [unassignedUsers, setUnassignedUsers] = useState<RoleUserRow[]>([]);
   const [userLoading, setUserLoading] = useState(false);
@@ -129,7 +128,6 @@ export const RoleManagementPanel = forwardRef<
   useEffect(() => {
     if (!filteredRoles.length) {
       setSelectedRoleId('');
-      setHasSelectedRoleRow(false);
       return;
     }
     if (!filteredRoles.some((role) => role.id === selectedRoleId)) {
@@ -194,7 +192,6 @@ export const RoleManagementPanel = forwardRef<
 
   const handleRoleSelection = useCallback((rowIds: Array<string | number>) => {
     const nextRoleId = rowIds[0] == null ? '' : String(rowIds[0]);
-    setHasSelectedRoleRow(rowIds.length > 0);
     if (!nextRoleId || nextRoleId === selectedRoleIdRef.current) return;
     if (userGridDirtyRef.current) {
       setPendingRoleId(nextRoleId);
@@ -490,13 +487,6 @@ export const RoleManagementPanel = forwardRef<
     setSelectedRoleId(nextRoleId);
   }, [closeRoleSwitchDialog, pendingRoleId]);
 
-  const openUserDialog = useCallback(() => {
-    if (!selectedRoleId || selectedRoleId.startsWith('new-role-')) return;
-    setUserSearchQuery('');
-    setCandidateLoginId('');
-    setUserDialogOpen(true);
-  }, [selectedRoleId]);
-
   const filteredCandidates = useMemo(() => {
     const query = userSearchQuery.trim().toLowerCase();
     if (!query) return unassignedUsers;
@@ -514,7 +504,6 @@ export const RoleManagementPanel = forwardRef<
       saveCurrentChanges,
       deleteSelectedRows: () => {
         roleGridRef.current?.deleteSelectedRows();
-        setHasSelectedRoleRow(false);
       },
       exportCurrentRows,
     }),

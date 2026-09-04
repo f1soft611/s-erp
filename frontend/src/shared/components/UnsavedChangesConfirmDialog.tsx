@@ -50,7 +50,7 @@ export function UnsavedChangesConfirmDialog({
   dialogTitleId,
   actions,
 }: UnsavedChangesConfirmDialogProps) {
-  const actionItems =
+  const actionItems: UnsavedChangesConfirmDialogAction[] =
     actions && actions.length > 0
       ? actions
       : [
@@ -85,18 +85,25 @@ export function UnsavedChangesConfirmDialog({
         <DialogContentText>{description}</DialogContentText>
       </DialogContent>
       <DialogActions>
-        {actionItems.map((action) => (
-          <Button
-            key={action.label}
-            variant={action.variant ?? 'text'}
-            color={action.color ?? 'primary'}
-            onClick={action.onClick}
-            disabled={action.disabled}
-            autoFocus={action.autoFocus}
-          >
-            {action.label}
-          </Button>
-        ))}
+        {actionItems.map((action) => {
+          const variant = (action.variant ?? 'text') as
+            | 'text'
+            | 'outlined'
+            | 'contained';
+
+          return (
+            <Button
+              key={action.label}
+              variant={variant}
+              color={action.color ?? 'primary'}
+              onClick={action.onClick}
+              disabled={action.disabled}
+              autoFocus={action.autoFocus}
+            >
+              {action.label}
+            </Button>
+          );
+        })}
       </DialogActions>
     </Dialog>
   );

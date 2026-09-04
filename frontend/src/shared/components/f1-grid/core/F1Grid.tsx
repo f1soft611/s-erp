@@ -1161,7 +1161,7 @@ function F1GridInner<T extends object>(
       if (clickedCell) {
         setFocusedCell(clickedCell);
         setCellSelectionRange(clickedCell, clickedCell);
-        setSelectedIds([targetRowId]);
+        setSelectedIds(targetRowId !== undefined ? [targetRowId] : []);
       }
     };
 
@@ -1195,7 +1195,7 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     if (!contextMenu) return;
 
-    function handleDocumentPointerDown(event: MouseEvent) {
+    function handleDocumentPointerDown(event: globalThis.MouseEvent) {
       if (event.button === 2) return;
 
       const target = event.target as Node | null;

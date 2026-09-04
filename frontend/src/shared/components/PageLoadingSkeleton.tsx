@@ -5,7 +5,7 @@ type PageLoadingSkeletonProps = {
 };
 
 type GridColumnLike = {
-  field: string;
+  field: string | number | symbol;
   headerName?: string;
   flex?: number;
   minWidth?: number;
@@ -77,21 +77,24 @@ export function GridLoadingSkeleton({
             borderBottom: '1px solid rgba(148,163,184,0.25)',
           }}
         >
-          {columns.map((column, index) => (
-            <Box
-              key={`grid-loading-header-${String(column.field)}-${index}`}
-              sx={{
-                minHeight: 26,
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                color: 'text.secondary',
-              }}
-            >
-              {column.headerName ?? column.field}
-            </Box>
-          ))}
+          {columns.map((column, index) => {
+            const columnLabel = String(column.headerName ?? column.field ?? '');
+            return (
+              <Box
+                key={`grid-loading-header-${String(column.field)}-${index}`}
+                sx={{
+                  minHeight: 26,
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: 'text.secondary',
+                }}
+              >
+                {columnLabel}
+              </Box>
+            );
+          })}
         </Box>
       ) : null}
       {Array.from({ length: rows }).map((_, index) => (

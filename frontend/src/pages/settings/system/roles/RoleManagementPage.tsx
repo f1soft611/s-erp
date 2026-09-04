@@ -111,7 +111,7 @@ export function RoleManagementPage({
   };
 
   const handleRolesSaved = useCallback(
-    async ({ silent = false }: { silent?: boolean } = {}) => {
+    async (_options?: { silent?: boolean }) => {
       await loadRoles();
       setRoleGridKey((current) => current + 1);
     },
