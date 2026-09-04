@@ -6,6 +6,7 @@ import {
   getSessionRemainingLabel,
   isAccessTokenExpiringSoon,
   readSessionNotice,
+  resolveApiBaseUrl,
   setSessionNotice,
 } from '../src/shared/services/authService';
 
@@ -88,6 +89,11 @@ describe('Login page', () => {
     setSessionNotice('세션이 만료되어 다시 로그인해야 합니다.');
 
     expect(readSessionNotice()).toBe('세션이 만료되어 다시 로그인해야 합니다.');
+  });
+
+  it('does not silently fall back to localhost when the app runs on a Vercel production hostname', () => {
+    expect(resolveApiBaseUrl('s-erp-chi.vercel.app', '')).toBe('');
+    expect(resolveApiBaseUrl('localhost', '')).toBe('http://localhost:8080');
   });
 
   it('refreshes an expiring access token before making API requests', async () => {
