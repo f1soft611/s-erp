@@ -292,8 +292,11 @@ export function GridRow<T extends object>({
               onSetFocusedCell(cell);
               onSelectRow(rowId, {} as MouseEvent<HTMLElement>);
             }}
-            onMouseDown={() => {
-              onSetFocusedCell(cell);
+            onMouseDown={(event) => {
+              if (event.button === 2) {
+                onSetFocusedCell(cell);
+                onSelectRow(rowId, event as unknown as MouseEvent<HTMLElement>);
+              }
               onCellSelectionStart(cell);
             }}
             onMouseEnter={() => {

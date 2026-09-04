@@ -1,12 +1,12 @@
-# F1-Grid 문서 포털 구현 정합성 검토 및 보강 작업지시서
+﻿# F1-Grid 문서 포털 구현 정합성 검토 및 보강 작업지시서
 
 ## 1. 배경
 
-F1-Grid 문서 포털은 12개 문서 항목과 일부 Playground를 제공하지만, 현재 공용 구현의 타입·옵션·Ref API 전체를 설명하지 않는다. 또한 `docs/guide/F1-GRID.md`에는 현재 코드에서 확인되지 않는 집계, 페이지네이션, 가상 스크롤, Excel Export 등의 계획성 API가 현재 지원 기능처럼 섞여 있다.
+F1-Grid 문서 포털은 12개 문서 항목과 일부 Playground를 제공하지만, 현재 공용 구현의 타입·옵션·Ref API 전체를 설명하지 않는다. 또한 `frontend/src/pages/f1-grid-docs/F1-GRID.md`에는 현재 코드에서 확인되지 않는 집계, 페이지네이션, 가상 스크롤, Excel Export 등의 계획성 API가 현재 지원 기능처럼 섞여 있다.
 
 2026-09-03 기준으로 확인한 현재 기준선은 다음과 같다.
 
-- 대상: `frontend` 문서 포털 및 `docs/guide/F1-GRID.md`
+- 대상: `frontend` 문서 포털 및 `frontend/src/pages/f1-grid-docs/F1-GRID.md`
 - `npm run build`: 통과
 - `npm run test -- tests/f1-grid-docs.test.tsx`: 6개 테스트 통과
 - 작업 시작 전부터 존재하는 변경 파일은 보존하고, 이번 작업에서 관련 문서 범위만 별도로 정리한다.
@@ -62,7 +62,7 @@ F1-Grid 문서 포털은 12개 문서 항목과 일부 Playground를 제공하�
 
 - `frontend/src/pages/f1-grid-docs/data/f1GridDocs.ts`의 기능 목록, API 표, 코드 예시, 관련 문서 링크 보강
 - 필요한 경우 `F1GridPlayground`에 현재 지원 기능을 검증할 수 있는 최소 컨트롤 및 표시 추가
-- `docs/guide/F1-GRID.md`의 현재 지원 API와 향후 계획 API 분리 및 잘못된 예시 정정
+- `frontend/src/pages/f1-grid-docs/F1-GRID.md`의 현재 지원 API와 향후 계획 API 분리 및 잘못된 예시 정정
 - 문서 계약, 주요 누락 항목, 체크박스 의미, 최신 회귀 기능을 검증하는 Vitest 테스트 보강
 - 문서 포털 반응형 및 주요 기능의 Playwright 캡처와 결과 문서
 
@@ -86,3 +86,4 @@ F1-Grid 문서 포털은 12개 문서 항목과 일부 Playground를 제공하�
 ## 7. 승인 후 다음 단계
 
 작업지시서 승인 후 `[Step 3/10]`에서 구현 파일별 계획서와 상세 사양서를 작성한다. 계획서·사양서 승인 전에는 코드, 테스트, 워크트리, 구현 파일을 변경하지 않는다.
+

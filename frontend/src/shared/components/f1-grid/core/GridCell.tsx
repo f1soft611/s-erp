@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
@@ -24,7 +24,7 @@ type GridCellProps<T extends object> = {
   draftValue: string;
   dirtyCell?: boolean;
   onFocus: () => void;
-  onMouseDown: () => void;
+  onMouseDown: (event: MouseEvent<HTMLElement>) => void;
   onMouseEnter: () => void;
   onMouseUp: () => void;
   onBlur?: () => void;

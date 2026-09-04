@@ -1,4 +1,4 @@
-# 작업지시서
+﻿# 작업지시서
 
 ## 제목
 
@@ -6,7 +6,7 @@ F1-Grid 우클릭 컨텍스트 메뉴 플러그인 신규 구현 및 F1-Grid Doc
 
 ## 배경
 
-`docs/guide/F1-GRID.md`의 "25. Grid Context Menu"는 아직 미구현 상태로 남아 있다. 이번 작업은 F1-Grid에 추가된 플러그인 형태의 우클릭 메뉴 기능을 구현하고, `f1-grid-docs` 페이지에서 실제 동작과 문서 설명이 함께 반영되도록 정리한다. 현재 메뉴관리 화면(`MenuManagementPanel.tsx`)은 그리드 바깥의 툴바 버튼으로 `루트 메뉴 추가`, `하위 메뉴 추가`를 제공하고 있는데, 이 버튼들을 그리드 내부의 우클릭 컨텍스트 메뉴로 대체하여 F1-Grid/F1-Tree 공통 UX를 정립하고자 한다.
+`frontend/src/pages/f1-grid-docs/F1-GRID.md`의 "25. Grid Context Menu"는 아직 미구현 상태로 남아 있다. 이번 작업은 F1-Grid에 추가된 플러그인 형태의 우클릭 메뉴 기능을 구현하고, `f1-grid-docs` 페이지에서 실제 동작과 문서 설명이 함께 반영되도록 정리한다. 현재 메뉴관리 화면(`MenuManagementPanel.tsx`)은 그리드 바깥의 툴바 버튼으로 `루트 메뉴 추가`, `하위 메뉴 추가`를 제공하고 있는데, 이 버튼들을 그리드 내부의 우클릭 컨텍스트 메뉴로 대체하여 F1-Grid/F1-Tree 공통 UX를 정립하고자 한다.
 
 ## 요구사항
 
@@ -48,7 +48,7 @@ F1-Grid 우클릭 컨텍스트 메뉴 플러그인 신규 구현 및 F1-Grid Doc
 
 ### 4. 문서/테스트
 
-- `docs/guide/F1-GRID.md`의 "25. Grid Context Menu" 섹션을 실제 구현 내용에 맞춰 갱신하고 미구현 표시를 제거한다.
+- `frontend/src/pages/f1-grid-docs/F1-GRID.md`의 "25. Grid Context Menu" 섹션을 실제 구현 내용에 맞춰 갱신하고 미구현 표시를 제거한다.
 - `f1-grid-docs` 페이지에 새 플러그인 우클릭 메뉴 기능의 사용법, 예시, 검증 결과를 반영하고, 구현된 사용 흐름과 문서 설명을 일치시킨다.
 - F1-Grid 관련 기능 변경이므로 `docs/result/20260903/<work-slug>/`에 결과 문서와 스크린샷을 남긴다.
 - 컨텍스트 메뉴 표시/항목 활성화 조건/각 액션 동작에 대한 회귀 테스트를 프론트엔드 테스트(`frontend/tests/`)에 추가한다.
@@ -60,7 +60,7 @@ F1-Grid 우클릭 컨텍스트 메뉴 플러그인 신규 구현 및 F1-Grid Doc
 - 프론트엔드: `frontend/src/pages/settings/system/menus/components/MenuManagementPanel.tsx`
 - 프론트엔드: `frontend/package.json` (엑셀 내보내기 라이브러리 의존성 추가)
 - 테스트: `frontend/tests/**` (신규 컨텍스트 메뉴 테스트, 기존 메뉴관리 테스트 갱신)
-- 문서: `docs/guide/F1-GRID.md`, `docs/result/20260903/<work-slug>/`
+- 문서: `frontend/src/pages/f1-grid-docs/F1-GRID.md`, `docs/result/20260903/<work-slug>/`
 
 ## 제외 범위
 
@@ -76,5 +76,6 @@ F1-Grid 우클릭 컨텍스트 메뉴 플러그인 신규 구현 및 F1-Grid Doc
 - `canExportExcel`이 없거나 `false`인 화면에서는 `엑셀 내보내기` 메뉴가 보이지 않는다.
 - 각 메뉴 항목 클릭 시 정의된 동작(엑셀 내보내기 `.xlsx`, 컬럼 자동 조정, 루트/행 추가, 행 복사/삭제, 필터/정렬 해제, 설정 기본값 복원)이 정상 수행된다.
 - 메뉴관리 화면의 `루트 메뉴 추가`/`하위 메뉴 추가` 버튼이 제거되고, 동일 기능이 컨텍스트 메뉴로 대체되어 정상 동작한다.
-- `docs/guide/F1-GRID.md` 문서가 갱신되고, `docs/result/20260903/<work-slug>/`에 결과 문서/스크린샷이 포함된다.
+- `frontend/src/pages/f1-grid-docs/F1-GRID.md` 문서가 갱신되고, `docs/result/20260903/<work-slug>/`에 결과 문서/스크린샷이 포함된다.
 - 관련 프론트엔드 테스트가 통과한다(`npm run test`).
+

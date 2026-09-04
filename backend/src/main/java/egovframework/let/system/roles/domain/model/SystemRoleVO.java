@@ -41,6 +41,9 @@ public class SystemRoleVO implements Serializable {
     @Schema(description = "시스템 기본 역할 여부")
     private String isSystemRole;
 
+    @Schema(description = "역할에 연결된 사용자 수")
+    private Integer userCount;
+
     @Schema(description = "등록일시")
     private Date createdAt;
 

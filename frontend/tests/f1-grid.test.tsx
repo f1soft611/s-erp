@@ -1035,6 +1035,28 @@ describe('F1-GRID row state', () => {
     ]);
   });
 
+  it('removes newly inserted rows from all changes when deleted', () => {
+    const added = addGridRow(
+      createGridData(rows, 'id'),
+      {
+        id: 'menus',
+        code: 'MENU',
+        order: 3,
+        enabled: true,
+        startDate: '2026-08-29',
+        status: 'draft',
+      },
+      'id',
+    );
+    const deleted = markRowsDeleted(added, 'id', ['menus']);
+
+    expect(getGridChanges(deleted, 'id')).toEqual({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+  });
+
   it('marks edited original rows as updated', () => {
     const updated = updateGridRow(
       createGridData(rows, 'id'),

@@ -1,4 +1,4 @@
-# F1-Grid 체크박스 dirty 마커 미표시 수정 결과 문서
+﻿# F1-Grid 체크박스 dirty 마커 미표시 수정 결과 문서
 
 ## 1. 문제
 
@@ -68,8 +68,9 @@ npx vitest run tests/menu-management-f1-grid.test.tsx tests/f1-grid.test.tsx --r
 
 - [frontend/src/shared/components/f1-grid/core/F1Grid.tsx](../../../../frontend/src/shared/components/f1-grid/core/F1Grid.tsx)
 - [frontend/tests/menu-management-f1-grid.test.tsx](../../../../frontend/tests/menu-management-f1-grid.test.tsx)
-- [docs/guide/F1-GRID.md](../../../guide/F1-GRID.md) (getValue 기반 파생 컬럼의 dirty 판정 방식 반영)
+- [frontend/src/pages/f1-grid-docs/F1-GRID.md](../../../frontend/src/pages/f1-grid-docs/F1-GRID.md) (getValue 기반 파생 컬럼의 dirty 판정 방식 반영)
 
 ## 7. 결론
 
 파생 값(`getValue`)을 사용하는 체크박스 컬럼은 실제로 갱신되는 하위 필드명이 컬럼 필드명과 다를 수 있어, dirty 판정을 필드명 매칭이 아니라 파생 값 비교로 전환해 해결했다. 실제 브라우저 환경에서 시각적으로도 정상 표시됨을 확인했다.
+

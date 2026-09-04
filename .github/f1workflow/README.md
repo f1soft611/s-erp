@@ -38,6 +38,8 @@ F1Workflow는 **Superpowers의 핵심 철학(브레인스토밍 → 설계 → �
 
 ## 🔄 Superpowers 기반 워크플로우
 
+작업을 시작하면 먼저 `spike`, `bounded`, `architectural` 중 작업 경로를 분류합니다. S-ERP의 문서 우선 규칙에 따라 코드/기능 변경은 작업지시서, 계획서, 상세 사양서를 거치며, 각 승인 게이트와 산출물은 `docs/result/YYYYMMDD/<work-slug>/progress.md` 원장에 기록합니다.
+
 ```
 START
   ↓
@@ -277,8 +279,10 @@ mvn clean compile
 
 ### 단계 6: 계획 실행 및 병렬 분산 (subagent-driven / dispatching-parallel)
 
-- 계획서 기반 순차 실행 및 독립 서브에이전트 구동
-- 독립적인 프론트엔드/백엔드 태스크는 병렬 에이전트로 분산 실행
+- `Subagent-Driven` 또는 `Inline Execution` 중 하나를 선택하고 원장에 기록
+- Subagent-Driven에서는 태스크마다 새 구현자와 태스크 리뷰를 사용
+- 같은 파일을 수정하는 구현 태스크는 병렬 실행하지 않음
+- 각 태스크를 구현 -> 테스트 -> 사양 준수 리뷰 -> 코드 품질 리뷰 순으로 완료
 
 ### 단계 7: TDD 및 체계적 디버깅 (test-driven-development / systematic-debugging)
 
@@ -319,12 +323,15 @@ mvn "-Dtest=TenantAuthTokenTest" test
 
 ### 단계 9: 코드 검토 및 반영 (requesting / receiving code review)
 
-- 사양 준수 검증 후 코드 리뷰 요청
-- 피드백 수신 시 기술적 검증을 통해 부작용이 없는지 확인 후 정밀 반영
+- 각 태스크 완료 직후 태스크 리뷰를 수행하고, 모든 태스크 완료 후 전체 브랜치 리뷰를 수행
+- Critical/Important 이슈는 수정 후 재리뷰하며, Minor 이슈와 판정은 원장에 기록
+- 피드백을 맹목적으로 수용하지 않고 사양, 코드, 테스트로 기술적 타당성을 확인
 
 ### 단계 10: 완료 및 정리 (finishing-a-development-branch)
 
-- Feature 브랜치 정리 및 `docs/result/YYYYMMDD/<work-slug>` 문서화 저장
+- 전체 테스트 및 필요한 브라우저 검증을 현재 트리에서 신선하게 실행
+- 사용자에게 로컬 병합, Push/PR, 현재 상태 유지 중 하나를 선택받은 뒤 해당 작업만 수행
+- `docs/result/YYYYMMDD/<work-slug>` 결과 문서와 진행 원장을 저장
 
 ## 💡 기술 스택별 템플릿 예시
 
@@ -473,11 +480,13 @@ VS Code Copilot Chat에서 `/f1workflow` 프롬프트를 사용하여 실행할 
 
 ### 실행 흐름
 
-1. **기술 자동 감지**: S-ERP React (Vite/Vitest) 및 Java (Spring Boot/eGovFrame/MyBatis) 자동 식별
-2. **문서 기반 개발 강제**: 작업지시서(`docs/directions`) -> 계획서(`docs/plan`) -> 상세 사양서(`docs/spec`) 작성
-3. **TDD / 체계적 디버깅**: 실패 테스트 우선 작성 (RED) 및 원인 추적 기반 디버깅
-4. **증거 기반 검증**: 빌드/테스트 성공 로그 및 Playwright 스크린샷 증거 제출 (`verification-before-completion`)
-5. **결과 문서화**: `docs/result/YYYYMMDD/<work-slug>` 저장 및 DB 스키마 이력 업데이트
+1. **경로 분류 및 기술 자동 감지**: 작업 규모와 대상 스택을 확인
+2. **브레인스토밍/설계 승인**: 질문, 대안, 설계를 정제하고 사용자 승인 대기
+3. **문서화**: 작업지시서 -> 계획서 -> 상세 사양서 작성 및 승인 대기
+4. **실행 방식 선택**: Subagent-Driven 또는 Inline Execution을 선택하고 원장 생성
+5. **구현**: 태스크별 TDD, 즉시 검증, 태스크 리뷰 및 수정 루프 수행
+6. **최종 검증/리뷰**: 전체 테스트, 빌드, UI 캡처 및 전체 브랜치 리뷰 수행
+7. **완료 선택/문서화**: 사용자 선택에 따라 병합/PR/유지하고 결과 문서 작성
 
 ## 📊 Superpowers 핵심 스킬 100% 매핑표
 
@@ -495,6 +504,8 @@ VS Code Copilot Chat에서 `/f1workflow` 프롬프트를 사용하여 실행할 
 | `receiving-code-review`          | [9] 코드 검토 및 반영       | 리뷰 피드백 수신 시 비판적 검증 후 정밀 적용          |
 | `finishing-a-development-branch` | [10] 완료 및 브랜치 정리    | 개발 브랜치 병합/정리 및 결과 문서 작성               |
 | `executing-plans`                | [6]~[8] 세션 관리           | 체크포인트 기반 단계별 검증 및 실행                   |
+| `using-superpowers`              | 시작 전 부트스트랩          | 관련 스킬 탐색 및 적용 여부 확인                      |
+| `writing-skills`                 | F1Workflow 유지보수         | 워크플로우 문서 변경 시 압박 시나리오로 검증          |
 
 ## 📊 프로세스 비교표
 

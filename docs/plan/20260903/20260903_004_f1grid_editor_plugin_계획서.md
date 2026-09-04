@@ -1,4 +1,4 @@
-# 계획서
+﻿# 계획서
 
 ## 목적
 
@@ -9,7 +9,7 @@
 ## 범위
 
 - 프론트엔드: `frontend/src/shared/components/f1-grid`, `frontend/src/pages/settings/system/menus`
-- 문서: `docs/guide/F1-GRID.md`, `docs/result/YYYYMMDD/...`
+- 문서: `frontend/src/pages/f1-grid-docs/F1-GRID.md`, `docs/result/YYYYMMDD/...`
 
 ## 구현 단위
 
@@ -38,3 +38,4 @@
 - `cd frontend; npm run test -- tests/menu-management-f1-grid.test.tsx`
 - `cd frontend; npm run test -- tests/f1-grid.test.tsx`
 - 필요 시 `frontend/tests/f1-grid-docs.test.tsx` 추가 확인
+

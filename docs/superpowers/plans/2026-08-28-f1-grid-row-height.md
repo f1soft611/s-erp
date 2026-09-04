@@ -1,4 +1,4 @@
-# F1-GRID Row Height Implementation Plan
+﻿# F1-GRID Row Height Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -20,7 +20,7 @@
 - Modify `frontend/src/shared/components/f1-grid/core/GridCell.tsx`: apply ellipsis/wrapping display policy and title for full text.
 - Modify `frontend/src/shared/components/f1-grid/index.ts`: export layout helpers.
 - Modify `frontend/tests/f1-grid.test.tsx`: add pure helper and interaction regression tests.
-- Modify `docs/guide/F1-GRID.md`: document row-height and text display API.
+- Modify `frontend/src/pages/f1-grid-docs/F1-GRID.md`: document row-height and text display API.
 - Create `docs/result/20260828/f1-grid-row-height/20260828_004_F1-GRID_행높이조절_결과.md`: record validation commands and result evidence.
 
 ### Task 1: Define and test row-height rules
@@ -144,7 +144,7 @@ Expected: PASS with existing editor, merge, alignment, and error tests.
 ### Task 5: Update guide, result record, and validate the slice
 
 **Files:**
-- Modify: `docs/guide/F1-GRID.md`
+- Modify: `frontend/src/pages/f1-grid-docs/F1-GRID.md`
 - Create: `docs/result/20260828/f1-grid-row-height/20260828_004_F1-GRID_행높이조절_결과.md`
 
 - [ ] **Step 1: Document the new API and interaction**
@@ -180,3 +180,4 @@ Write the actual command outcomes, changed files, and any screenshot limitation 
 - Placeholder scan: no implementation step depends on TBD/TODO or unspecified behavior.
 - Type consistency: row IDs are normalized to strings for height maps; all height callbacks use one numeric height contract and the helper uses the same min/max/step values.
 - Scope: no backend, database, external grid library, persistence, or unrelated page changes are included.
+

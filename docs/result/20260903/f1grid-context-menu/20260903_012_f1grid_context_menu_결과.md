@@ -1,11 +1,11 @@
-# F1-Grid 우클릭 컨텍스트 메뉴 플러그인 구현 결과
+﻿# F1-Grid 우클릭 컨텍스트 메뉴 플러그인 구현 결과
 
 ## 관련 문서
 
 - 작업지시서: [20260903*012_f1grid_context_menu*작업지시서.md](../../../directions/20260903/20260903_012_f1grid_context_menu_작업지시서.md)
 - 계획서: [20260903*012_f1grid_context_menu*계획서.md](../../../plan/20260903/20260903_012_f1grid_context_menu_계획서.md)
 - 사양서: [20260903*012_f1grid_context_menu*사양서.md](../../../spec/20260903/20260903_012_f1grid_context_menu_사양서.md)
-- 가이드 문서 갱신: [docs/guide/F1-GRID.md](../../../guide/F1-GRID.md) 25번 섹션
+- 가이드 문서 갱신: [frontend/src/pages/f1-grid-docs/F1-GRID.md](../../../frontend/src/pages/f1-grid-docs/F1-GRID.md) 25번 섹션
 
 ## 요약
 
@@ -29,7 +29,7 @@ F1-Grid 바디 영역 우클릭 시 커서 위치에 컨텍스트 메뉴를 표�
 
 ### 문서
 
-- `docs/guide/F1-GRID.md` 25번 "Grid Context Menu" 섹션을 실제 구현 내용으로 갱신하고 "⚠️ 아직 미구현" 표시를 제거(단, 화면별 Custom Menu 확장은 계속 미구현으로 표시).
+- `frontend/src/pages/f1-grid-docs/F1-GRID.md` 25번 "Grid Context Menu" 섹션을 실제 구현 내용으로 갱신하고 "⚠️ 아직 미구현" 표시를 제거(단, 화면별 Custom Menu 확장은 계속 미구현으로 표시).
 
 ### 보안 관련 의사결정
 
@@ -65,3 +65,4 @@ F1-Grid 바디 영역 우클릭 시 커서 위치에 컨텍스트 메뉴를 표�
 - 화면별 Context Menu Custom 확장(사용자 정의 메뉴 항목 추가)은 이번 범위에서 제외했다(문서에도 `⚠️ 아직 미구현`으로 표시).
 - `그룹 해제`는 F1-Grid에 Grouping 기능이 없어 제외했다.
 - `resets dirty cell state...`, `shows a menu reload error...` 2건의 기존 결함은 이번 작업 범위 밖이므로 별도 작업지시서로 분리해 처리가 필요하다.
+

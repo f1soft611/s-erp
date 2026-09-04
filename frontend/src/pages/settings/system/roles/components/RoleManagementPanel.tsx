@@ -4,114 +4,599 @@ import {
   Card,
   CardContent,
   Checkbox,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
+  List,
+  ListItemButton,
+  ListItemText,
   TextField,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  F1Grid,
+  type F1GridChanges,
+  type F1GridColumn,
+  type F1GridRef,
+} from '../../../../../shared/components/f1-grid';
+import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useNotification } from '../../../../../shared/context/NotificationContext';
 import type { RoleManagementRow } from '../types/roleManagement.types';
-import type { RoleSavePayload } from '../services/roleManagement.service';
+import {
+  assignUserToRole,
+  fetchRoleUserRows,
+  removeUserFromRole,
+  type RoleSavePayload,
+  type RoleUserRow,
+} from '../services/roleManagement.service';
 
 type RoleManagementPanelProps = {
   roles: RoleManagementRow[];
+  searchQuery?: string;
+  canExportExcel?: boolean;
   onCreateRole?: (payload: RoleSavePayload) => Promise<void> | void;
+  onUpdateRole?: (
+    roleId: string,
+    payload: RoleSavePayload,
+  ) => Promise<void> | void;
+  onRolesSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onError?: (message: string) => void;
+  roleGridKey?: number;
+  roleGridLoading?: boolean;
 };
 
-export function RoleManagementPanel({
-  roles,
-  onCreateRole,
-}: RoleManagementPanelProps) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ roleCode: '', roleNm: '', roleDc: '' });
-  const [saving, setSaving] = useState(false);
+export type RoleManagementPanelHandle = {
+  saveCurrentChanges: () => Promise<void>;
+  deleteSelectedRows: () => void;
+  exportCurrentRows: () => void;
+};
 
-  const handleSave = async () => {
-    if (!form.roleCode.trim() || !form.roleNm.trim()) {
+const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
+  insertedRows: [],
+  updatedRows: [],
+  deletedRows: [],
+});
+
+export const RoleManagementPanel = forwardRef<
+  RoleManagementPanelHandle,
+  RoleManagementPanelProps
+>(function RoleManagementPanel(
+  {
+    roles,
+    searchQuery = '',
+    canExportExcel = false,
+    onCreateRole,
+    onUpdateRole,
+    onRolesSaved,
+    onDirtyChange,
+    onError,
+    roleGridKey = 0,
+    roleGridLoading = false,
+  },
+  ref,
+) {
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [hasSelectedRoleRow, setHasSelectedRoleRow] = useState(false);
+  const [userRows, setUserRows] = useState<RoleUserRow[]>([]);
+  const [unassignedUsers, setUnassignedUsers] = useState<RoleUserRow[]>([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userError, setUserError] = useState('');
+  const [userGridKey, setUserGridKey] = useState(0);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [candidateLoginId, setCandidateLoginId] = useState('');
+  const [roleGridDirty, setRoleGridDirty] = useState(false);
+  const [userGridDirty, setUserGridDirty] = useState(false);
+  const [pendingRoleId, setPendingRoleId] = useState<string>();
+  const [roleSwitchDialogOpen, setRoleSwitchDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { showSuccess } = useNotification();
+  const roleGridRef = useRef<F1GridRef<RoleManagementRow>>(null);
+  const userGridRef = useRef<F1GridRef<RoleUserRow>>(null);
+  const userRequestIdRef = useRef(0);
+  const selectedRoleIdRef = useRef(selectedRoleId);
+  const userGridDirtyRef = useRef(false);
+  const saveInFlightRef = useRef<Promise<void> | undefined>(undefined);
+  const completedRoleOperationsRef = useRef(new Set<string>());
+  const completedMappingOperationsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    selectedRoleIdRef.current = selectedRoleId;
+  }, [selectedRoleId]);
+
+  const filteredRoles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return roles;
+    return roles.filter((role) =>
+      [role.name, role.group, role.description]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [roles, searchQuery]);
+
+  useEffect(() => {
+    if (!filteredRoles.length) {
+      setSelectedRoleId('');
+      setHasSelectedRoleRow(false);
       return;
     }
-    setSaving(true);
-    try {
-      await onCreateRole?.(form);
-      setOpen(false);
-      setForm({ roleCode: '', roleNm: '', roleDc: '' });
-    } catch {
-      setOpen(false);
-      setForm({ roleCode: '', roleNm: '', roleDc: '' });
-      return;
-    } finally {
-      setSaving(false);
+    if (!filteredRoles.some((role) => role.id === selectedRoleId)) {
+      setSelectedRoleId(filteredRoles[0].id);
     }
+  }, [filteredRoles, selectedRoleId]);
+
+  const selectedRole = filteredRoles.find((role) => role.id === selectedRoleId);
+
+  const loadUserRows = useCallback(
+    async (roleId: string, options: { silent?: boolean } = {}) => {
+      const requestId = ++userRequestIdRef.current;
+      if (!roleId || roleId.startsWith('new-role-')) {
+        setUserRows([]);
+        setUnassignedUsers([]);
+        setUserError('');
+        userGridDirtyRef.current = false;
+        setUserGridDirty(false);
+        setUserGridKey((current) => current + 1);
+        return;
+      }
+
+      if (!options.silent) {
+        setUserLoading(true);
+      }
+      setUserError('');
+      try {
+        const result = await fetchRoleUserRows(roleId);
+        if (
+          requestId !== userRequestIdRef.current ||
+          selectedRoleIdRef.current !== roleId
+        ) {
+          return;
+        }
+        setUserRows([...result.assignedUsers, ...result.unassignedUsers]);
+        setUnassignedUsers(result.unassignedUsers);
+        userGridDirtyRef.current = false;
+        setUserGridDirty(false);
+        setUserGridKey((current) => current + 1);
+      } catch (error) {
+        if (requestId !== userRequestIdRef.current) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : '사용자 매핑을 불러오지 못했습니다.';
+        setUserRows([]);
+        setUnassignedUsers([]);
+        setUserError(message);
+        onError?.(message);
+      } finally {
+        if (requestId === userRequestIdRef.current && !options.silent) {
+          setUserLoading(false);
+        }
+      }
+    },
+    [onError],
+  );
+
+  useEffect(() => {
+    void loadUserRows(selectedRoleId);
+  }, [loadUserRows, selectedRoleId]);
+
+  const handleRoleSelection = useCallback((rowIds: Array<string | number>) => {
+    const nextRoleId = rowIds[0] == null ? '' : String(rowIds[0]);
+    setHasSelectedRoleRow(rowIds.length > 0);
+    if (!nextRoleId || nextRoleId === selectedRoleIdRef.current) return;
+    if (userGridDirtyRef.current) {
+      setPendingRoleId(nextRoleId);
+      setRoleSwitchDialogOpen(true);
+      return;
+    }
+    setSelectedRoleId(nextRoleId);
+  }, []);
+
+  const handleRoleGridChanges = useCallback(
+    (changes: F1GridChanges<RoleManagementRow>) => {
+      setRoleGridDirty(
+        changes.insertedRows.length > 0 ||
+          changes.updatedRows.length > 0 ||
+          changes.deletedRows.length > 0,
+      );
+    },
+    [],
+  );
+
+  const handleUserGridChanges = useCallback(
+    (changes: F1GridChanges<RoleUserRow>) => {
+      const dirty = changes.updatedRows.length > 0;
+      userGridDirtyRef.current = dirty;
+      setUserGridDirty(dirty);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    onDirtyChange?.(roleGridDirty || userGridDirty);
+  }, [onDirtyChange, roleGridDirty, userGridDirty]);
+
+  const roleEditorPlugin = {
+    id: 'role-grid-editor',
+    enabled: true,
+    canEdit: ({
+      row,
+      field,
+    }: {
+      row: RoleManagementRow;
+      field: keyof RoleManagementRow;
+    }) =>
+      field === 'name' ||
+      field === 'description' ||
+      field === 'active' ||
+      (field === 'group' && row.id.startsWith('new-role-')),
   };
+
+  const roleColumns: F1GridColumn<RoleManagementRow>[] = [
+    {
+      field: 'group',
+      headerName: '역할 코드',
+      flex: 1,
+      editable: (row) => row.id.startsWith('new-role-'),
+      headerAlign: 'center',
+    },
+    {
+      field: 'name',
+      headerName: '역할명',
+      flex: 1,
+      editable: true,
+      headerAlign: 'center',
+    },
+    {
+      field: 'description',
+      headerName: '설명',
+      flex: 2,
+      editable: true,
+      wrapText: true,
+      headerAlign: 'center',
+    },
+    {
+      field: 'menuCount',
+      headerName: '사용자 수',
+      flex: 1,
+      type: 'number',
+      editable: false,
+      align: 'center',
+      headerAlign: 'center',
+    },
+    {
+      field: 'active',
+      headerName: '사용 여부',
+      flex: 1,
+      type: 'checkbox',
+      editable: true,
+      headerCheckbox: true,
+      align: 'center',
+      headerAlign: 'center',
+    },
+  ];
+
+  const userColumns: F1GridColumn<RoleUserRow>[] = [
+    {
+      field: 'loginId',
+      headerName: '로그인 ID',
+      flex: 1,
+      editable: false,
+      headerAlign: 'center',
+    },
+    {
+      field: 'userNm',
+      headerName: '사용자명',
+      flex: 1,
+      editable: false,
+      headerAlign: 'center',
+    },
+    {
+      field: 'departmentNm',
+      headerName: '부서',
+      flex: 1,
+      editable: false,
+      headerAlign: 'center',
+    },
+    {
+      field: 'assigned',
+      headerName: '매핑 여부',
+      flex: 1,
+      editable: true,
+      type: 'checkbox',
+      headerCheckbox: true,
+      align: 'center',
+      headerAlign: 'center',
+      onValueChange: (_row, value) => ({ assigned: Boolean(value) }),
+    },
+    {
+      field: 'lastLoginAt',
+      headerName: '최근 로그인',
+      flex: 1,
+      editable: false,
+      align: 'center',
+      headerAlign: 'center',
+    },
+  ];
+
+  const createRoleRow = useCallback(
+    (): RoleManagementRow => ({
+      id: `new-role-${Date.now()}`,
+      name: '',
+      description: '',
+      group: '',
+      menuCount: 0,
+      active: true,
+      permissions: { read: true, create: true, update: true, delete: true },
+    }),
+    [],
+  );
+
+  const exportCurrentRows = useCallback(() => {
+    const rows = roleGridRef.current?.getActiveRows() ?? [];
+    if (!rows.length) return;
+    const csv = [
+      roleColumns.map((column) => column.headerName).join(','),
+      ...rows.map((row) =>
+        roleColumns
+          .map(
+            (column) =>
+              `"${String(row[column.field] ?? '').replace(/"/g, '""')}"`,
+          )
+          .join(','),
+      ),
+    ].join('\n');
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
+    );
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'roles-export.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, [roleColumns]);
+
+  const saveCurrentChanges = useCallback(() => {
+    if (saveInFlightRef.current) return saveInFlightRef.current;
+
+    const savePromise = (async () => {
+      setSaving(true);
+      const roleChanges =
+        roleGridRef.current?.getChanges() ?? emptyChanges<RoleManagementRow>();
+      const roleId = selectedRoleIdRef.current;
+      const mappingChanges =
+        userGridRef.current?.getChanges() ?? emptyChanges<RoleUserRow>();
+      const mappingBaseline = userRows;
+
+      try {
+        if (roleChanges.deletedRows.length > 0) {
+          throw new Error('기존 역할 삭제는 현재 지원되지 않습니다.');
+        }
+        for (const row of [
+          ...roleChanges.insertedRows,
+          ...roleChanges.updatedRows,
+        ]) {
+          if (!row.group.trim() || !row.name.trim()) {
+            throw new Error('역할 코드와 역할명은 필수입니다.');
+          }
+        }
+        for (const row of roleChanges.insertedRows) {
+          const operationId = `create:${row.id}`;
+          if (completedRoleOperationsRef.current.has(operationId)) continue;
+          await onCreateRole?.({
+            roleCode: row.group.trim(),
+            roleNm: row.name.trim(),
+            roleDc: row.description.trim(),
+            useAt: row.active ? 'Y' : 'N',
+          });
+          completedRoleOperationsRef.current.add(operationId);
+        }
+        for (const row of roleChanges.updatedRows) {
+          const operationId = `update:${row.id}`;
+          if (completedRoleOperationsRef.current.has(operationId)) continue;
+          await onUpdateRole?.(row.id, {
+            roleCode: row.group.trim(),
+            roleNm: row.name.trim(),
+            roleDc: row.description.trim(),
+            useAt: row.active ? 'Y' : 'N',
+          });
+          completedRoleOperationsRef.current.add(operationId);
+        }
+        if (roleChanges.insertedRows.length || roleChanges.updatedRows.length) {
+          await onRolesSaved?.();
+          completedRoleOperationsRef.current.clear();
+        }
+
+        if (!roleId || roleId.startsWith('new-role-')) return;
+        for (const row of mappingChanges.updatedRows) {
+          const originalRow = mappingBaseline.find(
+            (item) => item.id === row.id,
+          );
+          if (!originalRow || originalRow.assigned === row.assigned) continue;
+          const operationId = `${roleId}:${row.id}:${row.assigned ? 'assign' : 'remove'}`;
+          if (completedMappingOperationsRef.current.has(operationId)) continue;
+          if (row.assigned) await assignUserToRole(roleId, row.loginId);
+          else await removeUserFromRole(roleId, row.loginId);
+          completedMappingOperationsRef.current.add(operationId);
+        }
+        if (mappingChanges.updatedRows.length) {
+          await loadUserRows(roleId, { silent: true });
+          await onRolesSaved?.({ silent: true });
+          completedMappingOperationsRef.current.clear();
+        }
+
+        if (
+          roleChanges.insertedRows.length ||
+          roleChanges.updatedRows.length ||
+          mappingChanges.updatedRows.length
+        ) {
+          showSuccess('역할을 저장했습니다.');
+        }
+      } finally {
+        setSaving(false);
+      }
+    })();
+
+    saveInFlightRef.current = savePromise;
+    void savePromise.then(
+      () => {
+        if (saveInFlightRef.current === savePromise) {
+          saveInFlightRef.current = undefined;
+        }
+      },
+      () => {
+        if (saveInFlightRef.current === savePromise) {
+          saveInFlightRef.current = undefined;
+        }
+      },
+    );
+    return savePromise;
+  }, [loadUserRows, onCreateRole, onRolesSaved, onUpdateRole, showSuccess, userRows]);
+
+  const closeRoleSwitchDialog = useCallback(() => {
+    setRoleSwitchDialogOpen(false);
+    setPendingRoleId(undefined);
+  }, []);
+
+  const discardMappingAndMove = useCallback(() => {
+    if (!pendingRoleId) return;
+    ++userRequestIdRef.current;
+    userGridDirtyRef.current = false;
+    setUserGridDirty(false);
+    setUserGridKey((current) => current + 1);
+    const nextRoleId = pendingRoleId;
+    closeRoleSwitchDialog();
+    setSelectedRoleId(nextRoleId);
+  }, [closeRoleSwitchDialog, pendingRoleId]);
+
+  const saveAndMoveRole = useCallback(async () => {
+    if (!pendingRoleId) return;
+    try {
+      await saveCurrentChanges();
+      const nextRoleId = pendingRoleId;
+      closeRoleSwitchDialog();
+      setSelectedRoleId(nextRoleId);
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : '사용자 매핑 저장에 실패했습니다.';
+      onError?.(message);
+    }
+  }, [closeRoleSwitchDialog, onError, pendingRoleId, saveCurrentChanges]);
+
+  const openUserDialog = useCallback(() => {
+    if (!selectedRoleId || selectedRoleId.startsWith('new-role-')) return;
+    setUserSearchQuery('');
+    setCandidateLoginId('');
+    setUserDialogOpen(true);
+  }, [selectedRoleId]);
+
+  const filteredCandidates = useMemo(() => {
+    const query = userSearchQuery.trim().toLowerCase();
+    if (!query) return unassignedUsers;
+    return unassignedUsers.filter((user) =>
+      [user.loginId, user.userNm, user.departmentNm]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [unassignedUsers, userSearchQuery]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      saveCurrentChanges,
+      deleteSelectedRows: () => {
+        roleGridRef.current?.deleteSelectedRows();
+        setHasSelectedRoleRow(false);
+      },
+      exportCurrentRows,
+    }),
+    [exportCurrentRows, saveCurrentChanges],
+  );
 
   return (
     <Box
-      sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 2, p: 3 }}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', lg: '1.2fr 1fr' },
+        gap: 2,
+        p: 3,
+        minHeight: 0,
+        height: '100%',
+        flex: 1,
+      }}
     >
       <Card
         sx={{
           borderRadius: 3,
           border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
         }}
       >
-        <CardContent sx={{ p: 2.5 }}>
+        <CardContent
+          sx={{
+            p: 2.5,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               mb: 2,
+              gap: 1,
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              역할 목록
+              권한 관리
             </Typography>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => setOpen(true)}
-            >
-              권한 등록
-            </Button>
           </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>역할</TableCell>
-                <TableCell>그룹</TableCell>
-                <TableCell>메뉴</TableCell>
-                <TableCell>활성</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {roles.map((role) => (
-                <TableRow key={role.id} hover>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {role.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {role.description}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{role.group}</TableCell>
-                  <TableCell>{role.menuCount}</TableCell>
-                  <TableCell>{role.active ? '사용' : '미사용'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <F1Grid
+              key={roleGridKey}
+              ref={roleGridRef}
+              rows={filteredRoles}
+              columns={roleColumns}
+              rowKey="id"
+              ariaLabel="F1-GRID 권한 관리"
+              height="100%"
+              maxHeight="100%"
+              rowHeight={32}
+              minRowHeight={32}
+              maxRowHeight={320}
+              showCheckbox={false}
+              createRow={createRoleRow}
+              editorPlugins={[roleEditorPlugin]}
+              onSelectionChange={handleRoleSelection}
+              onChangesChange={handleRoleGridChanges}
+              canExportExcel={canExportExcel}
+              excelFileName="role-management-export"
+              loading={roleGridLoading}
+            />
+          </Box>
         </CardContent>
       </Card>
       <Card
@@ -119,93 +604,176 @@ export function RoleManagementPanel({
           borderRadius: 3,
           border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
         }}
       >
-        <CardContent sx={{ p: 2.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-            권한 상세
-          </Typography>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                선택 역할
+        <CardContent
+          sx={{
+            p: 2.5,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              권한별 사용자 매핑
+            </Typography>
+            {selectedRole ? (
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '60%',
+                  textAlign: 'right',
+                }}
+              >
+                선택 역할: {selectedRole.name}
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                {roles[0]?.name ?? 'ADMIN'}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                권한 매핑
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {['READ', 'CREATE', 'UPDATE', 'DELETE'].map((label) => (
-                <Chip key={label} label={label} variant="outlined" />
-              ))}
-            </Box>
-            <Stack direction="row" spacing={2}>
-              <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="조회"
-              />
-              <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="생성"
-              />
-              <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="수정"
-              />
-              <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="삭제"
-              />
-            </Stack>
-          </Stack>
+            ) : null}
+          </Box>
+          {selectedRole || roleGridLoading ? (
+            <>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                {userError ? (
+                  <Typography variant="body2" color="error.main">
+                    {userError}
+                  </Typography>
+                ) : (
+                  <F1Grid
+                    key={userGridKey}
+                    ref={userGridRef}
+                    rows={userRows}
+                    columns={userColumns}
+                    rowKey="id"
+                    ariaLabel="F1-GRID 사용자 매핑"
+                    height="100%"
+                    maxHeight="100%"
+                    rowHeight={32}
+                    minRowHeight={32}
+                    maxRowHeight={320}
+                    showCheckbox={false}
+                    editorPlugins={[
+                      {
+                        id: 'role-user-grid-editor',
+                        enabled: true,
+                        canEdit: () => true,
+                      },
+                    ]}
+                    allowAddRowInContextMenu={false}
+                    allowDuplicateRowInContextMenu={false}
+                    allowDeleteRowInContextMenu={false}
+                    onChangesChange={handleUserGridChanges}
+                    loading={userLoading}
+                  />
+                )}
+              </Box>
+            </>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              선택된 권한이 없습니다.
+            </Typography>
+          )}
         </CardContent>
       </Card>
       <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
+        open={userDialogOpen}
+        onClose={() => setUserDialogOpen(false)}
         fullWidth
-        maxWidth="xs"
+        maxWidth="sm"
+        aria-labelledby="user-add-dialog-title"
       >
-        <DialogTitle>역할 등록</DialogTitle>
-        <DialogContent
-          sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}
-        >
+        <DialogTitle id="user-add-dialog-title">사용자 추가</DialogTitle>
+        <DialogContent>
           <TextField
-            label="역할 코드"
+            margin="none"
+            fullWidth
             size="small"
-            value={form.roleCode}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, roleCode: e.target.value }))
-            }
-            autoFocus
+            label="사용자 검색"
+            value={userSearchQuery}
+            onChange={(event) => setUserSearchQuery(event.target.value)}
+            sx={{ mt: 1 }}
           />
-          <TextField
-            label="역할명"
-            size="small"
-            value={form.roleNm}
-            onChange={(e) => setForm((f) => ({ ...f, roleNm: e.target.value }))}
-          />
-          <TextField
-            label="설명"
-            size="small"
-            multiline
-            minRows={2}
-            value={form.roleDc}
-            onChange={(e) => setForm((f) => ({ ...f, roleDc: e.target.value }))}
-          />
+          <List aria-label="추가할 사용자 목록">
+            {filteredCandidates.map((user) => (
+              <ListItemButton
+                key={user.id}
+                selected={candidateLoginId === user.loginId}
+                onClick={() => setCandidateLoginId(user.loginId)}
+              >
+                <Checkbox
+                  checked={candidateLoginId === user.loginId}
+                  tabIndex={-1}
+                />
+                <ListItemText
+                  primary={`${user.userNm} (${user.loginId})`}
+                  secondary={user.departmentNm}
+                />
+              </ListItemButton>
+            ))}
+          </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>취소</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving}>
-            저장
+          <Button onClick={() => setUserDialogOpen(false)}>취소</Button>
+          <Button
+            variant="contained"
+            disabled={!candidateLoginId}
+            onClick={() => {
+              userGridRef.current?.setCellValue(
+                candidateLoginId,
+                'assigned',
+                true,
+              );
+              setUserDialogOpen(false);
+            }}
+          >
+            추가
           </Button>
         </DialogActions>
       </Dialog>
+      <UnsavedChangesConfirmDialog
+        open={roleSwitchDialogOpen}
+        title="역할 전환 확인"
+        description="저장하지 않은 사용자 매핑 변경사항이 있습니다."
+        dialogTitleId="role-switch-dialog-title"
+        onCancel={closeRoleSwitchDialog}
+        onContinue={discardMappingAndMove}
+        actions={[
+          {
+            label: '계속 편집',
+            onClick: closeRoleSwitchDialog,
+            variant: 'text',
+          },
+          {
+            label: '변경 취소 후 이동',
+            onClick: discardMappingAndMove,
+            variant: 'outlined',
+            disabled: saving || userLoading,
+          },
+          {
+            label: '저장 후 이동',
+            onClick: () => {
+              void saveAndMoveRole();
+            },
+            variant: 'contained',
+            disabled: saving || userLoading,
+          },
+        ]}
+      />
     </Box>
   );
-}
+});

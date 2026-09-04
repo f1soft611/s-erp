@@ -1,4 +1,4 @@
-# F1-Grid dirty cell indicator 결과 문서 (수정 반영)
+﻿# F1-Grid dirty cell indicator 결과 문서 (수정 반영)
 
 ## 1. 문제 재확인
 
@@ -70,8 +70,9 @@ npx vitest run tests/menu-management-f1-grid.test.tsx -t "non-tree text column"
 
 - [frontend/src/shared/components/f1-grid/core/GridCell.tsx](../../../../frontend/src/shared/components/f1-grid/core/GridCell.tsx)
 - [frontend/tests/menu-management-f1-grid.test.tsx](../../../../frontend/tests/menu-management-f1-grid.test.tsx)
-- [docs/guide/F1-GRID.md](../../../guide/F1-GRID.md) (dirty 표시 동작 요약 추가)
+- [frontend/src/pages/f1-grid-docs/F1-GRID.md](../../../frontend/src/pages/f1-grid-docs/F1-GRID.md) (dirty 표시 동작 요약 추가)
 
 ## 7. 결론
 
 dirty cell indicator는 고정 컬럼에서만 우연히 정상 동작했고, 일반(비고정) 컬럼에서는 CSS `position` 중복 선언 버그로 인해 표시되지 않았다. 근본 원인을 제거하고, 시각적 포지셔닝을 검증하는 회귀 테스트를 추가해 재발을 방지했다.
+
