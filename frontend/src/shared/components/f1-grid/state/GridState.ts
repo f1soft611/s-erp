@@ -144,20 +144,40 @@ export function markRowsDeleted<T extends object>(
   const stateById = { ...data.stateById };
   const previousStateById = { ...data.previousStateById };
   const dirtyFieldsById = { ...data.dirtyFieldsById };
+  const originalRowsById = { ...data.originalRowsById };
   const rowIdSet = new Set(rowIds.map(getStateKey));
+  const insertedRowIds = new Set<string>();
 
   data.rows.forEach((row) => {
     const stateKey = getStateKey(getGridRowId(row, rowKey));
     const currentState = stateById[stateKey];
 
     if (rowIdSet.has(stateKey) && currentState && currentState !== 'deleted') {
+      if (currentState === 'inserted') {
+        insertedRowIds.add(stateKey);
+        delete stateById[stateKey];
+        delete previousStateById[stateKey];
+        delete dirtyFieldsById[stateKey];
+        delete originalRowsById[stateKey];
+        return;
+      }
+
       previousStateById[stateKey] = currentState;
       stateById[stateKey] = 'deleted';
       dirtyFieldsById[stateKey] = {};
     }
   });
 
-  return { ...data, stateById, previousStateById, dirtyFieldsById };
+  return {
+    ...data,
+    rows: data.rows.filter(
+      (row) => !insertedRowIds.has(getStateKey(getGridRowId(row, rowKey))),
+    ),
+    stateById,
+    previousStateById,
+    dirtyFieldsById,
+    originalRowsById,
+  };
 }
 
 export function restoreGridRows<T extends object>(

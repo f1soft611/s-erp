@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   F1Grid,
   F1Tree,
@@ -55,6 +55,10 @@ function getGridBody(ariaLabel: string) {
 }
 
 describe('F1-Grid context menu', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('opens the context menu on body right-click but not on header right-click', () => {
     render(
       <F1Grid
@@ -73,6 +77,148 @@ describe('F1-Grid context menu', () => {
 
     fireEvent.contextMenu(getGridBody('테스트 그리드'));
     expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+  });
+
+  it('selects the right-clicked cell before the context menu opens inside the grid body', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        canExportExcel
+      />,
+    );
+
+    const betaCell = screen.getByRole('gridcell', { name: 'Beta' });
+
+    fireEvent.mouseDown(betaCell, { button: 2 });
+    fireEvent.contextMenu(betaCell);
+
+    expect(betaCell).toHaveAttribute('data-grid-selected', 'true');
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
+  });
+
+  it('resolves the right-clicked cell from pointer coordinates when the event target is the grid body container', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        canExportExcel
+      />,
+    );
+
+    const betaCell = screen.getByRole('gridcell', { name: 'Beta' });
+    const body = getGridBody('테스트 그리드');
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn(() => betaCell),
+    });
+
+    fireEvent.contextMenu(body, { clientX: 240, clientY: 180 });
+
+    expect(betaCell).toHaveAttribute('data-grid-selected', 'true');
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
+
+    delete (document as Document & { elementFromPoint?: unknown })
+      .elementFromPoint;
+  });
+
+  it('selects the actual grid cell when a wrapper sits above it in elementsFromPoint', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        canExportExcel
+      />,
+    );
+
+    const betaCell = screen.getByRole('gridcell', { name: 'Beta' });
+    const body = getGridBody('테스트 그리드');
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('role', 'presentation');
+
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn(() => wrapper),
+    });
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: vi.fn(() => [wrapper, betaCell]),
+    });
+
+    fireEvent.contextMenu(body, { clientX: 240, clientY: 180 });
+
+    expect(betaCell).toHaveAttribute('data-grid-selected', 'true');
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
+
+    delete (document as Document & { elementFromPoint?: unknown })
+      .elementFromPoint;
+    delete (document as Document & { elementsFromPoint?: unknown })
+      .elementsFromPoint;
+  });
+
+  it('rebinds the context menu to a newly clicked cell when the menu is already open', async () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        canExportExcel
+      />,
+    );
+
+    const alphaCell = screen.getByRole('gridcell', { name: 'Alpha' });
+    fireEvent.contextMenu(alphaCell);
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
+
+    const betaCell = Array.from(
+      document.querySelectorAll('[role="gridcell"]'),
+    ).find((element) => element.textContent?.trim() === 'Beta');
+
+    expect(betaCell).not.toBeNull();
+    fireEvent.contextMenu(betaCell as HTMLElement);
+
+    await waitFor(() => {
+      expect(betaCell).toHaveAttribute('data-grid-selected', 'true');
+      expect(
+        screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+      ).toBeVisible();
+    });
+  });
+
+  it('closes the active context menu when the user clicks outside the grid', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+    expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+
+    expect(
+      screen.queryByRole('menuitem', { name: '행 추가' }),
+    ).not.toBeInTheDocument();
   });
 
   it('hides the excel export item when canExportExcel is not set', () => {

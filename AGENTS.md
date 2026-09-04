@@ -1,4 +1,4 @@
-# AGENTS
+﻿# AGENTS
 
 ## 프로젝트 개요
 
@@ -182,7 +182,7 @@ backend/
 - 작업지시서의 순서와 완료 기준을 무시하고 바로 코딩하는 행위를 금지합니다.
 - F1-Grid 관련 기능 수정/변경/버그 수정/추가 작업은 반드시 문서 갱신을 같은 작업으로 포함해야 합니다.
   - 문서와 코드가 같이 변경되지 않으면 작업을 완료로 간주하지 않습니다.
-  - 관련 문서 예시: [docs/guide/F1-GRID.md](docs/guide/F1-GRID.md), [docs/superpowers](docs/superpowers), [docs/result](docs/result)
+  - 관련 문서 예시: [frontend/src/pages/f1-grid-docs/F1-GRID.md](frontend/src/pages/f1-grid-docs/F1-GRID.md), [docs/superpowers](docs/superpowers), [docs/result](docs/result)
   - 변경 항목이 UI 동작, 컬럼/행 동작, 편집 모드, 이벤트, 옵션, 검증 기준, 기대 동작 중 하나라도 포함되면 문서도 동일 범위에서 반영해야 합니다.
 - F1-Grid 문서 갱신 기준:
   - 화면 동작 변경 시 사용자 흐름/동작 설명 업데이트
@@ -243,3 +243,4 @@ backend/
 - [ ] 최종 완료 전 필수 체크리스트 재검증
 
 이 문서는 AI 에이전트가 이 프로젝트의 개발 규칙, 검증 방식, 문서 우선 원칙, 그리고 DB 변경 관리 기준을 빠르게 이해하도록 돕는 기준 문서입니다.
+

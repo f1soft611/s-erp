@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   FormControl,
   IconButton,
   MenuItem,
@@ -15,11 +9,10 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
 import SaveIcon from '@mui/icons-material/Save';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
@@ -181,34 +174,6 @@ export function MenuManagementPage({
           onClick: async () => {
             if (!menuPanelRef.current) return;
             await menuPanelRef.current.saveCurrentChanges();
-          },
-        },
-      ],
-    },
-    {
-      key: 'delete',
-      actions: [
-        {
-          label: '삭제',
-          icon: DeleteIcon,
-          visible: pageActionPermissions.delete,
-          disabled: false,
-          onClick: () => {
-            menuPanelRef.current?.deleteSelectedRows();
-          },
-        },
-      ],
-    },
-    {
-      key: 'excel',
-      actions: [
-        {
-          label: '엑셀',
-          icon: DownloadIcon,
-          visible: pageActionPermissions.excel,
-          disabled: false,
-          onClick: () => {
-            menuPanelRef.current?.exportCurrentRows();
           },
         },
       ],
@@ -477,20 +442,15 @@ export function MenuManagementPage({
           onError={setError}
         />
       </Box>
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>저장하지 않은 변경사항</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            변경사항을 버리고 메뉴 목록을 다시 불러오시겠습니까?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>취소</Button>
-          <Button onClick={confirmDiscardChanges} autoFocus>
-            계속
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <UnsavedChangesConfirmDialog
+        open={confirmOpen}
+        title="저장하지 않은 변경사항"
+        description="변경사항을 버리고 메뉴 목록을 다시 불러오시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={() => setConfirmOpen(false)}
+        onContinue={confirmDiscardChanges}
+      />
     </Box>
   );
 }

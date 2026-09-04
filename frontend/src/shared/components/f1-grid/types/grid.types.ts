@@ -159,6 +159,10 @@ export type F1GridProps<T extends object> = {
   disableFiltering?: boolean;
   canExportExcel?: boolean;
   excelFileName?: string;
+  allowAddRowInContextMenu?: boolean;
+  allowDuplicateRowInContextMenu?: boolean;
+  allowDeleteRowInContextMenu?: boolean;
+  loading?: boolean;
   treeContextMenu?: F1GridContextMenuTreeConfig;
 };
 

@@ -6,6 +6,11 @@
 
 ## 📋 완료 및 정리 절차
 
+### 0. 최종 진입 조건
+
+- 전체 테스트와 필요한 빌드/브라우저 검증이 현재 트리에서 신선하게 통과했는지 확인합니다.
+- 전체 브랜치 코드 리뷰에서 남은 Critical/Important 이슈가 없고, 지연된 Minor 및 모든 판정이 결과 원장에 기록되어 있어야 합니다.
+
 ### 1. 작업 결과 문서 작성 (필수)
 
 - 저장 경로: `docs/result/YYYYMMDD/<work-slug>/`
@@ -28,7 +33,11 @@
 
 ### 3. 브랜치 및 Worktree 정리 (`finishing-a-development-branch`)
 
-- Git Worktree를 사용한 경우, 작업 완료 후 정리합니다:
+- 테스트와 리뷰가 끝난 뒤 사용자에게 아래 선택지를 제시하고, 선택 전에는 병합·Push·삭제를 실행하지 않습니다.
+  1. 기준 브랜치로 로컬 병합
+  2. Push 후 Pull Request 생성
+  3. 현재 브랜치 상태 유지
+- Git Worktree를 사용했고 사용자가 병합 또는 명시적 폐기를 선택한 경우에만, Superpowers가 만든 Worktree인지 확인한 뒤 정리합니다:
   ```bash
   git worktree remove feature/[task-slug]
   # 또는

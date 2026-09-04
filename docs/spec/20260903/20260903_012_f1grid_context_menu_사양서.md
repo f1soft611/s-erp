@@ -1,4 +1,4 @@
-# 상세 사양서
+﻿# 상세 사양서
 
 ## 관련 문서
 
@@ -179,5 +179,6 @@ const treeContextMenu: F1GridContextMenuTreeConfig = {
 
 ## 8. 문서 갱신 대상
 
-- `docs/guide/F1-GRID.md` 25번 섹션: 실제 구현된 메뉴 목록/동작/Props(`canExportExcel`, `excelFileName`)로 갱신, "⚠️ 아직 미구현" 제거.
+- `frontend/src/pages/f1-grid-docs/F1-GRID.md` 25번 섹션: 실제 구현된 메뉴 목록/동작/Props(`canExportExcel`, `excelFileName`)로 갱신, "⚠️ 아직 미구현" 제거.
 - `docs/result/20260903/f1grid-context-menu/`: 결과 문서 + Playwright 스크린샷(메뉴관리 화면에서 우클릭 메뉴 표시, 각 항목 하이라이트 등).
+

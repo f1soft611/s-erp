@@ -1,4 +1,4 @@
-# F1-Grid 문서 포털 구현 정합성 검토 및 보강 계획서
+﻿# F1-Grid 문서 포털 구현 정합성 검토 및 보강 계획서
 
 ## 1. 목적
 
@@ -30,7 +30,7 @@
 
 ### 공통 가이드
 
-4. `docs/guide/F1-GRID.md`
+4. `frontend/src/pages/f1-grid-docs/F1-GRID.md`
    - 현재 구현 API와 향후 계획을 분리한다.
    - 현재 타입에 없는 `enableRowMerge`, `mergeKey`, `mergeWhen`, `refreshRowMerge`, `getRowMergeRanges`, `addRows` 등의 예시를 지원 계약에서 제거하거나 계획 항목으로 이동한다.
    - 현재 구현의 실제 Props/Column/Tree/Ref 계약 및 최신 동작을 반영한다.
@@ -77,3 +77,4 @@
 - 문서의 옵션명·타입·예시가 현재 소스와 일치한다.
 - 지원하지 않는 기능이 사용 가능한 API처럼 보이지 않는다.
 - 관련 테스트, 빌드, Playwright 캡처 및 결과 문서가 남는다.
+

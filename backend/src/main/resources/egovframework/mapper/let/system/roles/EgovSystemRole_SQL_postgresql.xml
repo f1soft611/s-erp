@@ -10,43 +10,56 @@
         <result property="roleDc" column="role_dc"/>
         <result property="useAt" column="use_at"/>
         <result property="isSystemRole" column="is_system_role"/>
+        <result property="userCount" column="user_count"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <select id="selectRoleList" resultMap="role">
         SELECT
-            role_id,
-            tenant_id,
-            role_code,
-            role_nm,
-            role_dc,
-            use_at,
-            is_system_role,
-            created_at,
-            updated_at
-        FROM tb_role
-        WHERE tenant_id = #{tenantId}
+            r.role_id,
+            r.tenant_id,
+            r.role_code,
+            r.role_nm,
+            r.role_dc,
+            r.use_at,
+            r.is_system_role,
+            COALESCE(rc.user_count, 0) AS user_count,
+            r.created_at,
+            r.updated_at
+        FROM tb_role r
+        LEFT JOIN (
+            SELECT role_id, COUNT(*) AS user_count
+            FROM tb_login_account_role
+            GROUP BY role_id
+        ) rc ON rc.role_id = r.role_id
+        WHERE r.tenant_id = #{tenantId}
         <if test="useAt != null and useAt != ''">
-            AND use_at = #{useAt}
+            AND r.use_at = #{useAt}
         </if>
-        ORDER BY role_id ASC
+        ORDER BY r.role_id ASC
     </select>
 
     <select id="selectRoleById" parameterType="map" resultMap="role">
         SELECT
-            role_id,
-            tenant_id,
-            role_code,
-            role_nm,
-            role_dc,
-            use_at,
-            is_system_role,
-            created_at,
-            updated_at
-        FROM tb_role
-        WHERE role_id = #{roleId}
-          AND tenant_id = #{tenantId}
+            r.role_id,
+            r.tenant_id,
+            r.role_code,
+            r.role_nm,
+            r.role_dc,
+            r.use_at,
+            r.is_system_role,
+            COALESCE(rc.user_count, 0) AS user_count,
+            r.created_at,
+            r.updated_at
+        FROM tb_role r
+        LEFT JOIN (
+            SELECT role_id, COUNT(*) AS user_count
+            FROM tb_login_account_role
+            GROUP BY role_id
+        ) rc ON rc.role_id = r.role_id
+        WHERE r.role_id = #{roleId}
+          AND r.tenant_id = #{tenantId}
     </select>
 
     <select id="selectRoleIdByCode" parameterType="map" resultType="long">
@@ -85,5 +98,115 @@
         WHERE role_id = #{roleId}
           AND tenant_id = #{tenantId}
     </update>
+
+    <select id="selectAssignedRoleUsers" parameterType="map" resultType="egovframework.let.system.roles.domain.model.SystemRoleUserVO">
+        SELECT
+            u.user_id AS userId,
+            u.login_id AS loginId,
+            u.user_nm AS userNm,
+            COALESCE(d.department_nm, '-') AS departmentNm,
+            u.email_addr AS emailAddr,
+            NULL AS lastLoginAt
+        FROM tb_login_account_role lar
+        JOIN tb_role r
+          ON r.role_id = lar.role_id
+        JOIN tb_login_account la
+          ON la.login_id = lar.login_id
+        JOIN tb_user u
+          ON u.login_id = la.login_id
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+        WHERE lar.role_id = #{roleId}
+          AND r.tenant_id = #{tenantId}
+          AND COALESCE(la.use_at, 'Y') = 'Y'
+          AND COALESCE(u.use_at, 'Y') = 'Y'
+        ORDER BY u.user_nm ASC
+    </select>
+
+    <select id="selectUnassignedRoleUsers" parameterType="map" resultType="egovframework.let.system.roles.domain.model.SystemRoleUserVO">
+        SELECT
+            u.user_id AS userId,
+            u.login_id AS loginId,
+            u.user_nm AS userNm,
+            COALESCE(d.department_nm, '-') AS departmentNm,
+            u.email_addr AS emailAddr,
+            NULL AS lastLoginAt
+        FROM tb_user u
+        JOIN tb_login_account la
+          ON la.login_id = u.login_id
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+        WHERE u.tenant_id = #{tenantId}
+          AND COALESCE(u.use_at, 'Y') = 'Y'
+          AND COALESCE(la.use_at, 'Y') = 'Y'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM tb_login_account_role lar
+              WHERE lar.login_id = u.login_id
+                AND lar.role_id = #{roleId}
+          )
+        ORDER BY u.user_nm ASC
+    </select>
+
+    <select id="selectRoleUserMappingId" parameterType="map" resultType="long">
+        SELECT lar.login_account_role_id
+        FROM tb_login_account_role lar
+        JOIN tb_role r
+          ON r.role_id = lar.role_id
+        WHERE lar.role_id = #{roleId}
+          AND r.tenant_id = #{tenantId}
+          AND (
+              (#{loginId} IS NOT NULL AND lar.login_id = CAST(#{loginId} AS BIGINT))
+              OR (#{userId} IS NOT NULL AND lar.login_id = (
+                  SELECT u.login_id
+                  FROM tb_user u
+                  WHERE u.user_id = CAST(#{userId} AS BIGINT)
+                    AND u.tenant_id = #{tenantId}
+                  LIMIT 1
+              ))
+          )
+        LIMIT 1
+    </select>
+
+    <select id="selectLoginIdByUserId" parameterType="map" resultType="long">
+        SELECT u.login_id
+        FROM tb_user u
+        WHERE u.user_id = #{userId}
+          AND u.tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
+
+    <insert id="insertRoleUserMapping" parameterType="map">
+        INSERT INTO tb_login_account_role (login_id, role_id)
+        VALUES (#{loginId}, #{roleId})
+        ON CONFLICT (login_id, role_id) DO NOTHING
+    </insert>
+
+    <delete id="deleteRoleUserMapping" parameterType="map">
+        DELETE FROM tb_login_account_role
+        WHERE role_id = #{roleId}
+          AND login_id = CAST(#{loginId} AS BIGINT)
+          AND login_id IN (
+              SELECT la.login_id
+              FROM tb_login_account la
+              WHERE la.tenant_id = #{tenantId}
+          )
+    </delete>
+
+    <select id="selectAssignedUserByLoginId" parameterType="map" resultType="egovframework.let.system.roles.domain.model.SystemRoleUserVO">
+        SELECT
+            u.user_id AS userId,
+            u.login_id AS loginId,
+            u.user_nm AS userNm,
+            COALESCE(d.department_nm, '-') AS departmentNm,
+            u.email_addr AS emailAddr,
+            NULL AS lastLoginAt
+        FROM tb_user u
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+        WHERE u.login_id = #{loginId}
+          AND u.tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
 
 </mapper>

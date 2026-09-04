@@ -86,6 +86,8 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }

@@ -1,4 +1,4 @@
-# F1-Grid dirty cell indicator 결과 문서 (모든 컬럼 타입 검증)
+﻿# F1-Grid dirty cell indicator 결과 문서 (모든 컬럼 타입 검증)
 
 ## 1. 요청 사항
 
@@ -42,8 +42,9 @@ npx vitest run tests/f1-grid.test.tsx tests/menu-management-f1-grid.test.tsx --r
 
 - [frontend/src/shared/components/f1-grid/core/GridCell.tsx](../../../../frontend/src/shared/components/f1-grid/core/GridCell.tsx)
 - [frontend/tests/f1-grid.test.tsx](../../../../frontend/tests/f1-grid.test.tsx)
-- [docs/guide/F1-GRID.md](../../../guide/F1-GRID.md) (컬럼 타입 무관 동일 적용 명시)
+- [frontend/src/pages/f1-grid-docs/F1-GRID.md](../../../frontend/src/pages/f1-grid-docs/F1-GRID.md) (컬럼 타입 무관 동일 적용 명시)
 
 ## 6. 결론
 
 dirty 표시는 이미 모든 컬럼 타입에 동일하게 적용되고 있었으며, 이를 검증하는 회귀 테스트를 추가해 향후 컬럼 타입별 렌더링 변경 시 회귀를 방지한다. 코드 변경은 없었다.
+

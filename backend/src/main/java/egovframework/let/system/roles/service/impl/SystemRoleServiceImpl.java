@@ -13,6 +13,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.system.roles.domain.model.SystemRoleSaveRequestVO;
 import egovframework.let.system.roles.domain.model.SystemRoleSearchConditionVO;
+import egovframework.let.system.roles.domain.model.SystemRoleUserAssignRequestVO;
+import egovframework.let.system.roles.domain.model.SystemRoleUserMapListVO;
+import egovframework.let.system.roles.domain.model.SystemRoleUserVO;
 import egovframework.let.system.roles.domain.model.SystemRoleVO;
 import egovframework.let.system.roles.domain.repository.SystemRoleDAO;
 import egovframework.let.system.roles.service.SystemRoleService;
@@ -86,6 +89,92 @@ public class SystemRoleServiceImpl extends EgovAbstractServiceImpl implements Sy
         systemRoleDAO.updateRole(params);
 
         return findByIdOrThrow(tenantId, roleId);
+    }
+
+    @Override
+    public SystemRoleUserMapListVO listRoleUsers(Long tenantId, Long roleId) throws Exception {
+        findByIdOrThrow(tenantId, roleId);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("roleId", roleId);
+
+        List<SystemRoleUserVO> assignedUsers = systemRoleDAO.selectAssignedRoleUsers(params);
+        List<SystemRoleUserVO> unassignedUsers = systemRoleDAO.selectUnassignedRoleUsers(params);
+
+        for (SystemRoleUserVO user : assignedUsers) {
+            user.setAssigned(Boolean.TRUE);
+        }
+        for (SystemRoleUserVO user : unassignedUsers) {
+            user.setAssigned(Boolean.FALSE);
+        }
+
+        return new SystemRoleUserMapListVO(assignedUsers, unassignedUsers);
+    }
+
+    @Override
+    @Transactional
+    public SystemRoleUserVO assignUserToRole(Long tenantId, Long roleId, SystemRoleUserAssignRequestVO payload)
+            throws Exception {
+        if (payload == null || (payload.getLoginId() == null && payload.getUserId() == null)) {
+            throw new IllegalArgumentException("사용자를 선택해야 합니다.");
+        }
+
+        findByIdOrThrow(tenantId, roleId);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("roleId", roleId);
+        params.put("loginId", payload.getLoginId());
+        params.put("userId", payload.getUserId());
+
+        Long mappedId = systemRoleDAO.selectRoleUserMappingId(params);
+        if (mappedId != null) {
+            throw new IllegalArgumentException("이미 해당 역할에 연결된 사용자입니다.");
+        }
+
+        Long targetLoginId = resolveLoginId(params);
+        if (targetLoginId == null) {
+            throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+        }
+
+        params.put("loginId", targetLoginId);
+        systemRoleDAO.insertRoleUserMapping(params);
+
+        SystemRoleUserVO user = systemRoleDAO.selectAssignedUserByLoginId(params);
+        if (user == null) {
+            user = new SystemRoleUserVO();
+            user.setLoginId(targetLoginId);
+            user.setAssigned(Boolean.TRUE);
+        }
+        user.setAssigned(Boolean.TRUE);
+        return user;
+    }
+
+    @Override
+    @Transactional
+    public boolean removeUserFromRole(Long tenantId, Long roleId, Long loginId) throws Exception {
+        if (loginId == null) {
+            throw new IllegalArgumentException("로그인 ID는 필수입니다.");
+        }
+
+        findByIdOrThrow(tenantId, roleId);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("roleId", roleId);
+        params.put("loginId", loginId);
+        return systemRoleDAO.deleteRoleUserMapping(params) > 0;
+    }
+
+    private Long resolveLoginId(Map<String, Object> params) throws Exception {
+        if (params.get("loginId") != null) {
+            return Long.valueOf(params.get("loginId").toString());
+        }
+        if (params.get("userId") != null) {
+            return systemRoleDAO.selectLoginIdByUserId(params);
+        }
+        return null;
     }
 
     private SystemRoleVO findByIdOrThrow(Long tenantId, Long roleId) throws Exception {

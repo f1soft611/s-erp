@@ -1,4 +1,5 @@
 import {
+  apiDelete,
   apiGet,
   apiPost,
   apiPut,
@@ -13,6 +14,25 @@ interface SystemRoleVO {
   roleDc: string;
   useAt: string;
   isSystemRole: string;
+  userCount?: number | string | null;
+}
+
+interface RoleUserApiRow {
+  loginId: number | string;
+  userId?: number | string;
+  userNm?: string;
+  departmentNm?: string;
+  assigned?: boolean;
+  lastLoginAt?: string | null;
+}
+
+export interface RoleUserRow {
+  id: string;
+  loginId: string;
+  userNm: string;
+  departmentNm: string;
+  assigned: boolean;
+  lastLoginAt: string;
 }
 
 export interface RoleSavePayload {
@@ -27,7 +47,10 @@ const toRow = (role: SystemRoleVO): RoleManagementRow => ({
   name: role.roleNm,
   description: role.roleDc ?? '',
   group: role.roleCode,
-  menuCount: 0,
+  menuCount:
+    typeof role.userCount === 'number'
+      ? role.userCount
+      : Number(String(role.userCount ?? '0').replace(/[^0-9-]/g, '') || 0),
   active: role.useAt === 'Y',
   permissions: {
     read: true,
@@ -37,11 +60,34 @@ const toRow = (role: SystemRoleVO): RoleManagementRow => ({
   },
 });
 
+const toRoleUserRow = (user: RoleUserApiRow): RoleUserRow => ({
+  id: String(user.loginId ?? user.userId ?? ''),
+  loginId: String(user.loginId ?? user.userId ?? ''),
+  userNm: user.userNm ?? '',
+  departmentNm: user.departmentNm ?? '-',
+  assigned: Boolean(user.assigned),
+  lastLoginAt: user.lastLoginAt ?? '-',
+});
+
 export async function fetchRoleRows(): Promise<RoleManagementRow[]> {
   const result = await apiGet<{ resultList: SystemRoleVO[] }>(
     '/api/v1/system/roles',
   );
   return result.resultList.map(toRow);
+}
+
+export async function fetchRoleUserRows(
+  roleId: string,
+): Promise<{ assignedUsers: RoleUserRow[]; unassignedUsers: RoleUserRow[] }> {
+  const result = await apiGet<{
+    assignedUsers: RoleUserApiRow[];
+    unassignedUsers: RoleUserApiRow[];
+  }>(`/api/v1/system/roles/${roleId}/users`);
+
+  return {
+    assignedUsers: (result.assignedUsers ?? []).map(toRoleUserRow),
+    unassignedUsers: (result.unassignedUsers ?? []).map(toRoleUserRow),
+  };
 }
 
 export async function createRole(payload: RoleSavePayload): Promise<void> {
@@ -53,4 +99,20 @@ export async function updateRole(
   payload: RoleSavePayload,
 ): Promise<void> {
   await apiPut(`/api/v1/system/roles/${roleId}`, { useAt: 'Y', ...payload });
+}
+
+export async function assignUserToRole(
+  roleId: string,
+  loginId: string,
+): Promise<void> {
+  await apiPost(`/api/v1/system/roles/${roleId}/users`, {
+    loginId: Number(loginId),
+  });
+}
+
+export async function removeUserFromRole(
+  roleId: string,
+  loginId: string,
+): Promise<void> {
+  await apiDelete(`/api/v1/system/roles/${roleId}/users/${loginId}`);
 }

@@ -1,4 +1,4 @@
-# F1-Grid dirty cell indicator 결과 문서 (원본값 복귀 시 dirty 해제)
+﻿# F1-Grid dirty cell indicator 결과 문서 (원본값 복귀 시 dirty 해제)
 
 ## 1. 문제
 
@@ -44,8 +44,9 @@ npx vitest run tests/menu-management-f1-grid.test.tsx tests/f1-grid.test.tsx --r
 
 - [frontend/src/shared/components/f1-grid/state/GridState.ts](../../../../frontend/src/shared/components/f1-grid/state/GridState.ts)
 - [frontend/tests/menu-management-f1-grid.test.tsx](../../../../frontend/tests/menu-management-f1-grid.test.tsx)
-- [docs/guide/F1-GRID.md](../../../guide/F1-GRID.md) (원본값 비교 기반 dirty 해제 동작 반영)
+- [frontend/src/pages/f1-grid-docs/F1-GRID.md](../../../frontend/src/pages/f1-grid-docs/F1-GRID.md) (원본값 비교 기반 dirty 해제 동작 반영)
 
 ## 7. 결론
 
 dirty 판정을 원본 값 스냅샷과 비교하도록 바꿔, 값을 원래대로 되돌리면 마커와 행 상태(`updated`→`normal`)가 정상적으로 초기화된다.
+
