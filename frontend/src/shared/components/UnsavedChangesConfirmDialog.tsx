@@ -11,7 +11,14 @@ export type UnsavedChangesConfirmDialogAction = {
   label: string;
   onClick: () => void | Promise<void>;
   variant?: 'text' | 'outlined' | 'contained';
-  color?: 'inherit' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning';
+  color?:
+    | 'inherit'
+    | 'primary'
+    | 'secondary'
+    | 'success'
+    | 'error'
+    | 'info'
+    | 'warning';
   disabled?: boolean;
   autoFocus?: boolean;
 };
@@ -48,18 +55,18 @@ export function UnsavedChangesConfirmDialog({
       ? actions
       : [
           {
-            label: cancelLabel,
-            onClick: onCancel,
-            variant: 'text',
-            autoFocus: false,
-          },
-          {
             label: continueLabel,
             onClick: onContinue,
             variant: 'contained',
             color: confirmButtonColor,
             disabled: disableContinue,
             autoFocus: true,
+          },
+          {
+            label: cancelLabel,
+            onClick: onCancel,
+            variant: 'text',
+            autoFocus: false,
           },
         ];
 

@@ -465,7 +465,14 @@ export const RoleManagementPanel = forwardRef<
       },
     );
     return savePromise;
-  }, [loadUserRows, onCreateRole, onRolesSaved, onUpdateRole, showSuccess, userRows]);
+  }, [
+    loadUserRows,
+    onCreateRole,
+    onRolesSaved,
+    onUpdateRole,
+    showSuccess,
+    userRows,
+  ]);
 
   const closeRoleSwitchDialog = useCallback(() => {
     setRoleSwitchDialogOpen(false);
@@ -482,22 +489,6 @@ export const RoleManagementPanel = forwardRef<
     closeRoleSwitchDialog();
     setSelectedRoleId(nextRoleId);
   }, [closeRoleSwitchDialog, pendingRoleId]);
-
-  const saveAndMoveRole = useCallback(async () => {
-    if (!pendingRoleId) return;
-    try {
-      await saveCurrentChanges();
-      const nextRoleId = pendingRoleId;
-      closeRoleSwitchDialog();
-      setSelectedRoleId(nextRoleId);
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : '사용자 매핑 저장에 실패했습니다.';
-      onError?.(message);
-    }
-  }, [closeRoleSwitchDialog, onError, pendingRoleId, saveCurrentChanges]);
 
   const openUserDialog = useCallback(() => {
     if (!selectedRoleId || selectedRoleId.startsWith('new-role-')) return;
@@ -660,6 +651,7 @@ export const RoleManagementPanel = forwardRef<
                     rows={userRows}
                     columns={userColumns}
                     rowKey="id"
+                    storageKey="role-user-mapping-grid"
                     ariaLabel="F1-GRID 사용자 매핑"
                     height="100%"
                     maxHeight="100%"
@@ -747,32 +739,14 @@ export const RoleManagementPanel = forwardRef<
       </Dialog>
       <UnsavedChangesConfirmDialog
         open={roleSwitchDialogOpen}
-        title="역할 전환 확인"
-        description="저장하지 않은 사용자 매핑 변경사항이 있습니다."
+        title="저장하지 않은 변경사항"
+        description="현재 변경사항을 유지하지 않고 선택한 권한으로 이동하시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        disableContinue={saving || userLoading}
         dialogTitleId="role-switch-dialog-title"
         onCancel={closeRoleSwitchDialog}
         onContinue={discardMappingAndMove}
-        actions={[
-          {
-            label: '계속 편집',
-            onClick: closeRoleSwitchDialog,
-            variant: 'text',
-          },
-          {
-            label: '변경 취소 후 이동',
-            onClick: discardMappingAndMove,
-            variant: 'outlined',
-            disabled: saving || userLoading,
-          },
-          {
-            label: '저장 후 이동',
-            onClick: () => {
-              void saveAndMoveRole();
-            },
-            variant: 'contained',
-            disabled: saving || userLoading,
-          },
-        ]}
       />
     </Box>
   );

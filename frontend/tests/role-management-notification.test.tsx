@@ -70,6 +70,7 @@ function createDeferred<T>() {
 describe('RoleManagementPage notifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it('shows a page error when loading roles fails', async () => {
@@ -635,7 +636,7 @@ describe('RoleManagementPage notifications', () => {
     });
   });
 
-  it('keeps the current role and mapping changes when continuing editing after a guarded role switch', async () => {
+  it('keeps the current role and mapping changes when canceling a guarded role switch', async () => {
     apiMocks.apiGet.mockImplementation((path: string) => {
       if (path === '/api/v1/system/roles') {
         return Promise.resolve({
@@ -662,13 +663,13 @@ describe('RoleManagementPage notifications', () => {
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
 
     expect(
-      await screen.findByRole('dialog', { name: '역할 전환 확인' }),
+      await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' }),
     ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: '역할 전환 확인' }),
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
       ).not.toBeInTheDocument(),
     );
 
@@ -681,7 +682,7 @@ describe('RoleManagementPage notifications', () => {
     );
   });
 
-  it('discards local mapping changes before moving without mutation requests', async () => {
+  it('discards the pending mapping and moves on the shared continue action', async () => {
     apiMocks.apiGet.mockImplementation((path: string) => {
       if (path === '/api/v1/system/roles') {
         return Promise.resolve({
@@ -709,26 +710,22 @@ describe('RoleManagementPage notifications', () => {
       await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
     );
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: '변경 취소 후 이동' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
 
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: '역할 전환 확인' }),
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
       ).not.toBeInTheDocument(),
     );
-
     expect(await screen.findByText('선택 역할: 검토자')).toBeVisible();
-    expect(
-      await screen.findByRole('gridcell', { name: '검토자 사용자' }),
-    ).toBeVisible();
     expect(apiMocks.apiPost).not.toHaveBeenCalled();
     expect(apiMocks.apiDelete).not.toHaveBeenCalled();
   });
 
-  it('moves only after the guarded mapping save resolves and keeps the current role when it fails', async () => {
-    const successfulSave = createDeferred<void>();
+  it('keeps the role switch action blocked until the pending save is finished', async () => {
+    const saveForRoleA = createDeferred<void>();
+    const refetchForRoleA = createDeferred<unknown>();
+    let roleAMappingCallCount = 0;
     apiMocks.apiGet.mockImplementation((path: string) => {
       if (path === '/api/v1/system/roles') {
         return Promise.resolve({
@@ -736,50 +733,54 @@ describe('RoleManagementPage notifications', () => {
         });
       }
       if (path === '/api/v1/system/roles/7/users') {
-        return Promise.resolve({
-          assignedUsers: [],
-          unassignedUsers: [createMapping(12, '미할당 사용자')],
-        });
+        roleAMappingCallCount += 1;
+        return roleAMappingCallCount === 1
+          ? Promise.resolve({
+              assignedUsers: [],
+              unassignedUsers: [createMapping(12, '미할당 사용자')],
+            })
+          : refetchForRoleA.promise;
       }
       if (path === '/api/v1/system/roles/8/users') {
-        return Promise.resolve({ assignedUsers: [], unassignedUsers: [] });
+        return Promise.resolve({
+          assignedUsers: [createMapping(8, 'B 역할 사용자', true)],
+          unassignedUsers: [],
+        });
       }
       return Promise.reject(new Error(`Unexpected GET request: ${path}`));
     });
-    apiMocks.apiPost.mockReturnValueOnce(successfulSave.promise);
+    apiMocks.apiPost.mockReturnValueOnce(saveForRoleA.promise);
 
     renderPage();
 
     fireEvent.click(
       await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
     );
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: '저장 후 이동' }),
-    );
+    const continueButton = await screen.findByRole('button', {
+      name: '계속',
+    });
+    expect(continueButton).toBeDisabled();
 
-    expect(screen.getByText('선택 역할: 운영자')).toBeVisible();
-    successfulSave.resolve();
+    saveForRoleA.resolve();
+    await waitFor(() => expect(roleAMappingCallCount).toBe(2));
+    refetchForRoleA.resolve({
+      assignedUsers: [createMapping(7, 'A 역할 사용자', true)],
+      unassignedUsers: [],
+    });
+    await waitFor(() => expect(continueButton).not.toBeDisabled());
+    fireEvent.click(continueButton);
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: '역할 전환 확인' }),
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
       ).not.toBeInTheDocument(),
     );
     expect(await screen.findByText('선택 역할: 검토자')).toBeVisible();
-
-    fireEvent.click(await screen.findByRole('gridcell', { name: '운영자' }));
-    expect(await screen.findByText('선택 역할: 운영자')).toBeVisible();
-    fireEvent.click(
-      await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
-    );
-    fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
-    apiMocks.apiPost.mockRejectedValueOnce(new Error('저장 실패'));
-    fireEvent.click(
-      await screen.findByRole('button', { name: '저장 후 이동' }),
-    );
-
-    expect(await screen.findByText('저장 실패')).toBeVisible();
-    expect(screen.getByText('선택 역할: 운영자')).toBeVisible();
+    expect(
+      await screen.findByRole('gridcell', { name: 'B 역할 사용자' }),
+    ).toBeVisible();
   });
 
   it('keeps role switching locked through a post-save refetch and then loads the selected role', async () => {
@@ -819,10 +820,10 @@ describe('RoleManagementPage notifications', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
-    const discardButton = await screen.findByRole('button', {
-      name: '변경 취소 후 이동',
+    const continueButton = await screen.findByRole('button', {
+      name: '계속',
     });
-    expect(discardButton).toBeDisabled();
+    expect(continueButton).toBeDisabled();
 
     saveForRoleA.resolve();
     await waitFor(() => expect(roleAMappingCallCount).toBe(2));
@@ -830,11 +831,11 @@ describe('RoleManagementPage notifications', () => {
       assignedUsers: [createMapping(7, 'A 역할 사용자', true)],
       unassignedUsers: [],
     });
-    await waitFor(() => expect(discardButton).not.toBeDisabled());
-    fireEvent.click(discardButton);
+    await waitFor(() => expect(continueButton).not.toBeDisabled());
+    fireEvent.click(continueButton);
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: '역할 전환 확인' }),
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
       ).not.toBeInTheDocument(),
     );
     expect(await screen.findByText('선택 역할: 검토자')).toBeVisible();
