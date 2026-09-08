@@ -65,7 +65,7 @@ export function MenuManagementPage({
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -167,7 +167,7 @@ export function MenuManagementPage({
           disabled: false,
           onClick: () => {
             if (!selectedModuleId) return;
-            void requestRefresh(selectedModuleId);
+            void requestRefresh(selectedModuleId, false, true);
           },
         },
       ],
@@ -208,6 +208,7 @@ export function MenuManagementPage({
     reloadPermissions = false,
     clearVisibleMenus = false,
     roleId = selectedRoleId,
+    showSkeleton = false,
   ) {
     if (!moduleId || !roleId) {
       setMenus([]);
@@ -217,7 +218,9 @@ export function MenuManagementPage({
     }
 
     const requestId = ++menuLoadRequestIdRef.current;
-    setLoading(true);
+    if (showSkeleton) {
+      setLoading(true);
+    }
     if (clearVisibleMenus) setMenus([]);
     try {
       setError('');
@@ -241,13 +244,14 @@ export function MenuManagementPage({
       );
       return false;
     } finally {
-      if (requestId === menuLoadRequestIdRef.current) setLoading(false);
+      if (requestId === menuLoadRequestIdRef.current && showSkeleton) {
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     async function initialize() {
-      setLoading(true);
       setError('');
       try {
         const [modulesResult, permissionsResult] = await Promise.all([
@@ -279,8 +283,6 @@ export function MenuManagementPage({
             ? requestError.message
             : '메뉴 관리 정보를 불러오지 못했습니다.',
         );
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -307,11 +309,13 @@ export function MenuManagementPage({
       setError('');
       return;
     }
-    void loadMenus(moduleId, true, true, selectedRoleId).then((didLoad) => {
-      if (didLoad) {
-        setReloadToken((current) => current + 1);
-      }
-    });
+    void loadMenus(moduleId, true, true, selectedRoleId, true).then(
+      (didLoad) => {
+        if (didLoad) {
+          setReloadToken((current) => current + 1);
+        }
+      },
+    );
   }
 
   function requestRoleChange(roleId: string) {
@@ -330,15 +334,21 @@ export function MenuManagementPage({
       setError('');
       return;
     }
-    void loadMenus(selectedModuleId, true, true, roleId).then((didLoad) => {
-      if (didLoad) {
-        setReloadToken((current) => current + 1);
-      }
-    });
+    void loadMenus(selectedModuleId, true, true, roleId, true).then(
+      (didLoad) => {
+        if (didLoad) {
+          setReloadToken((current) => current + 1);
+        }
+      },
+    );
   }
 
-  function requestRefresh(moduleId: number, bypassDirtyConfirmation = false) {
-    if (loading) return Promise.resolve();
+  function requestRefresh(
+    moduleId: number,
+    bypassDirtyConfirmation = false,
+    showSkeleton = false,
+  ) {
+    if (loading && showSkeleton) return Promise.resolve();
     if (!selectedModuleId || !selectedRoleId) {
       setMenus([]);
       setError('');
@@ -350,11 +360,13 @@ export function MenuManagementPage({
       setConfirmOpen(true);
       return Promise.resolve();
     }
-    return loadMenus(moduleId).then((didLoad) => {
-      if (didLoad) {
-        setReloadToken((current) => current + 1);
-      }
-    });
+    return loadMenus(moduleId, false, false, selectedRoleId, showSkeleton).then(
+      (didLoad) => {
+        if (didLoad) {
+          setReloadToken((current) => current + 1);
+        }
+      },
+    );
   }
 
   function confirmDiscardChanges() {
@@ -376,6 +388,7 @@ export function MenuManagementPage({
       reloadPermissions,
       moduleChanged,
       nextRoleId,
+      true,
     ).then((didLoad) => {
       if (didLoad) {
         setReloadToken((current) => current + 1);
@@ -390,6 +403,8 @@ export function MenuManagementPage({
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        height: '100%',
+        overflow: 'hidden',
       }}
     >
       <PageHeader
@@ -513,7 +528,7 @@ export function MenuManagementPage({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && selectedModuleId) {
               event.preventDefault();
-              void requestRefresh(selectedModuleId);
+              void requestRefresh(selectedModuleId, false, true);
             }
           }}
           slotProps={{
@@ -559,9 +574,11 @@ export function MenuManagementPage({
         sx={{
           flex: 1,
           minHeight: 0,
+          height: 'auto',
           display: 'flex',
           flexDirection: 'column',
           pt: 1,
+          overflow: 'visible',
         }}
       >
         {hasRequiredSelection ? (
@@ -573,6 +590,7 @@ export function MenuManagementPage({
             selectedRoleId={selectedRoleId}
             permissions={permissions}
             canExportExcel={pageActionPermissions.excel}
+            menuGridLoading={loading}
             onRefresh={requestRefresh}
             onDirtyChange={setDirty}
             onSavingChange={setSaving}

@@ -364,7 +364,9 @@ function DashboardPage() {
     <Box
       sx={{
         display: 'flex',
-        minHeight: '100vh',
+        height: '100vh',
+        minHeight: 0,
+        overflow: 'hidden',
         bgcolor: theme.palette.background.default,
         color: theme.palette.text.primary,
       }}
@@ -403,8 +405,11 @@ function DashboardPage() {
             sx={{
               flex: 1,
               minWidth: 0,
+              minHeight: 0,
+              height: '100%',
               display: 'flex',
               flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
             {hasAccessibleMenu ? (

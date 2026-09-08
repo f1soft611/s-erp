@@ -37,9 +37,11 @@ type MenuManagementPanelProps = {
   selectedRoleId?: string;
   permissions: MenuPermissionDefinition[];
   canExportExcel?: boolean;
+  menuGridLoading?: boolean;
   onRefresh?: (
     moduleId: number,
     bypassDirtyConfirmation?: boolean,
+    showSkeleton?: boolean,
   ) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   onSavingChange?: (saving: boolean) => void;
@@ -62,6 +64,7 @@ export const MenuManagementPanel = forwardRef<
     selectedModule,
     selectedRoleId,
     canExportExcel = false,
+    menuGridLoading = false,
     onRefresh,
     onDirtyChange,
     onSavingChange,
@@ -347,6 +350,8 @@ export const MenuManagementPanel = forwardRef<
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        height: '100%',
+        overflow: 'hidden',
       }}
     >
       <Card
@@ -357,7 +362,9 @@ export const MenuManagementPanel = forwardRef<
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
-          minHeight: 0,
+          minHeight: 280,
+          height: '100%',
+          overflow: 'hidden',
         }}
       >
         <CardContent
@@ -367,6 +374,8 @@ export const MenuManagementPanel = forwardRef<
             flexDirection: 'column',
             flex: 1,
             minHeight: 0,
+            height: '100%',
+            overflow: 'hidden',
           }}
         >
           <Box
@@ -411,7 +420,31 @@ export const MenuManagementPanel = forwardRef<
               </IconButton>
             </Box>
           </Box>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
+          {message ? (
+            <Box
+              sx={{
+                mb: 1.5,
+                px: 1.5,
+                py: 1,
+                borderRadius: 1,
+                bgcolor: 'error.light',
+                color: 'error.contrastText',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+              role="status"
+            >
+              {message}
+            </Box>
+          ) : null}
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              height: '100%',
+              overflow: 'hidden',
+            }}
+          >
             <F1Tree
               key={treeKey}
               ref={treeRef}
@@ -425,7 +458,6 @@ export const MenuManagementPanel = forwardRef<
               showCheckbox={false}
               treeCheckbox
               height="100%"
-              maxHeight="100%"
               getRowOrder={(row) => row.order}
               columnLine
               ariaLabel="F1-TREE 메뉴 관리"
@@ -433,6 +465,7 @@ export const MenuManagementPanel = forwardRef<
               excelFileName={`${selectedModule?.moduleName ?? 'menu'}-export`}
               createRow={createMenuRow}
               editorPlugins={[menuEditorPlugin]}
+              loading={menuGridLoading}
               beforeEdit={({ row, field }) => {
                 if (field === 'code' && !isNewMenuRow(row.id)) {
                   return false;
@@ -445,19 +478,6 @@ export const MenuManagementPanel = forwardRef<
               }
             />
           </Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mt: 1, display: 'block' }}
-          >
-            변경: 신규 {changes.insertedRows.length}건 / 수정{' '}
-            {changes.updatedRows.length}건 / 삭제 {changes.deletedRows.length}건
-          </Typography>
-          {message ? (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {message}
-            </Typography>
-          ) : null}
         </CardContent>
       </Card>
     </Box>

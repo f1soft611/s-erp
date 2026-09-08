@@ -74,6 +74,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 컬럼 리사이즈와 컬럼 고정 상태가 동시에 동작하며, 마지막 남은 표시 컬럼은 숨길 수 없다.
 - 행 높이 조절 핸들과 키보드 `ArrowUp`/`ArrowDown`으로 `4px` 단위 조절이 가능하다.
 - `wrapText: true` 옵션이 있는 컬럼은 행 높이가 커질 때 줄바꿈을 허용하고, 기본 컬럼은 한 줄 말줄임 유지한다.
+- `height`, `minHeight`, `maxHeight`를 통해 Grid 컨테이너의 전체 높이와 최소/최대 높이를 제어한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.

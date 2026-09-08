@@ -87,6 +87,7 @@ function F1GridInner<T extends object>(
     columnLine = false,
     storageKey,
     height,
+    minHeight,
     maxHeight,
     rowHeight = 32,
     minRowHeight = 32,
@@ -378,7 +379,7 @@ function F1GridInner<T extends object>(
   const editableColumnFields = new Set<string>(
     visibleColumns
       .filter((column) =>
-        visibleRows.some((row, rowIndex) => {
+        visibleRows.some((row) => {
           if (!activeEditorPlugins.length || !isCellEditable(column, row)) {
             return false;
           }
@@ -1394,6 +1395,8 @@ function F1GridInner<T extends object>(
 
   const resolvedHeight =
     typeof height === 'number' ? `${height}px` : (height ?? 'auto');
+  const resolvedMinHeight =
+    typeof minHeight === 'number' ? `${minHeight}px` : (minHeight ?? '0');
   const resolvedMaxHeight =
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1539,8 +1542,8 @@ function F1GridInner<T extends object>(
         overflowX: 'auto',
         overflowY: 'hidden',
         height: resolvedHeight,
+        minHeight: resolvedMinHeight,
         maxHeight: resolvedMaxHeight,
-        minHeight: 0,
         border: 1,
         borderColor: 'divider',
         borderRadius: 1,
@@ -1613,15 +1616,22 @@ function F1GridInner<T extends object>(
           <Box
             sx={{
               width: '100%',
-              minHeight: 180,
-              px: 1,
-              py: 1,
+              height: 'auto',
+              minHeight: 0,
+              px: 0,
+              py: 0,
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <GridLoadingSkeleton
               columns={visibleColumns}
               rows={5}
               showHeader={false}
+              showCheckbox={showCheckbox}
+              checkboxWidth={showCheckbox ? 44 : 0}
+              rowHeight={defaultRowHeight}
+              headerHeight={Math.max(28, defaultRowHeight)}
             />
           </Box>
         ) : (

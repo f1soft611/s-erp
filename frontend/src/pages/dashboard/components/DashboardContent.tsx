@@ -9,6 +9,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
@@ -31,6 +32,78 @@ type DashboardContentProps = {
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
 };
+
+export function ComingSoonPage({
+  title,
+}: {
+  title?: string;
+  description?: string;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  return (
+    <Box
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 220px)',
+        bgcolor: theme.palette.background.default,
+        color: theme.palette.text.primary,
+        textAlign: 'center',
+        px: 2,
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 1.5,
+          maxWidth: 520,
+        }}
+      >
+        <FactCheckOutlined
+          sx={{
+            fontSize: 40,
+            color: isDark
+              ? 'rgba(226, 232, 240, 0.7)'
+              : 'rgba(15, 23, 42, 0.3)',
+          }}
+        />
+
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.05rem',
+            lineHeight: 1.4,
+            color: theme.palette.text.primary,
+          }}
+        >
+          요청하신 페이지는 현재 준비 중입니다
+        </Typography>
+
+        <Typography
+          variant="body2"
+          sx={{
+            color: theme.palette.text.secondary,
+            fontSize: '0.78rem',
+            lineHeight: 1.6,
+          }}
+        >
+          {title
+            ? `${title} 메뉴는 추후 서비스될 예정입니다.`
+            : '추후 실제 화면이 연결됩니다.'}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
 
 function TrendIcon() {
   return (
@@ -129,6 +202,23 @@ export function DashboardContent({
 
   if (selectedModule.id === 'settings' && currentPageKey === 'f1-grid-docs') {
     return <F1GridDocsPage />;
+  }
+
+  if (selectedModule.id === 'sales' || currentPageKey === 'sales-order') {
+    return (
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <PageHeader
+          breadcrumbItems={[selectedModule.name, currentMenuName]}
+          description={content.description}
+        />
+        <Container maxWidth="xl" sx={{ py: 4 }}>
+          <ComingSoonPage
+            title={currentMenuName || selectedModule.name}
+            description="현재 준비 중인 메뉴입니다. 빠른 시일 내에 제공될 예정입니다."
+          />
+        </Container>
+      </Box>
+    );
   }
 
   return (

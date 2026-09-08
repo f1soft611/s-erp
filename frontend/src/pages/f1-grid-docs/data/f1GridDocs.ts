@@ -70,9 +70,9 @@ export const f1GridDocs: F1GridDoc[] = [
           ['rowKey', 'keyof T', '행 식별자'],
           ['ariaLabel', 'string', '그리드 영역 접근성 레이블 (기본값 F1-GRID)'],
           [
-            'height / maxHeight',
+            'height / minHeight / maxHeight',
             'number | string',
-            '그리드 컨테이너 높이 제한',
+            '그리드 컨테이너 높이와 최소/최대 높이 제한',
           ],
           ['columnLine', 'boolean', '컬럼 사이 세로 구분선 표시 여부'],
           ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],

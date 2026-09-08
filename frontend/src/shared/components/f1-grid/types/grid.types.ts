@@ -159,6 +159,7 @@ export type F1GridProps<T extends object> = {
   columnLine?: boolean;
   storageKey?: string;
   height?: number | string;
+  minHeight?: number | string;
   maxHeight?: number | string;
   rowHeight?: number;
   minRowHeight?: number;

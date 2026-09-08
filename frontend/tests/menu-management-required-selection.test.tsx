@@ -120,6 +120,9 @@ describe('MenuManagementPage required selection', () => {
     const moduleSelector = await screen.findByRole('combobox', {
       name: '모듈 선택',
     });
+    await waitFor(() => {
+      expect(moduleSelector).not.toBeDisabled();
+    });
     expect(moduleSelector).toBeVisible();
     expect(screen.getByRole('combobox', { name: '권한 선택' })).toBeVisible();
 
@@ -149,6 +152,21 @@ describe('MenuManagementPage required selection', () => {
   it('shows the grid skeleton while the menu tree is loading on first entry', async () => {
     let resolveMenuRows: ((value: { resultList: [] }) => void) | undefined;
     apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/roles') {
+        return Promise.resolve({ resultList: roles });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
       if (path === '/api/v1/system/menus?moduleId=1&roleId=1') {
         return new Promise((resolve) => {
           resolveMenuRows = resolve;
@@ -159,9 +177,21 @@ describe('MenuManagementPage required selection', () => {
 
     renderPage();
 
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '모듈 선택' }));
+    const moduleSelector = await screen.findByRole('combobox', {
+      name: '모듈 선택',
+    });
+    const roleSelector = await screen.findByRole('combobox', {
+      name: '권한 선택',
+    });
+
+    await waitFor(() => {
+      expect(moduleSelector).not.toBeDisabled();
+      expect(roleSelector).not.toBeDisabled();
+    });
+
+    fireEvent.mouseDown(moduleSelector);
     fireEvent.click(screen.getByRole('option', { name: '기본' }));
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '권한 선택' }));
+    fireEvent.mouseDown(roleSelector);
     fireEvent.click(screen.getByRole('option', { name: '관리자' }));
 
     await waitFor(() => {
@@ -176,6 +206,21 @@ describe('MenuManagementPage required selection', () => {
   it('shows the grid skeleton when the read action is triggered', async () => {
     let resolveMenuRows: ((value: { resultList: [] }) => void) | undefined;
     apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/modules') {
+        return Promise.resolve({
+          resultList: modules.map((module) => ({
+            ...module,
+            moduleNm: module.moduleName,
+            useAt: 'Y',
+          })),
+        });
+      }
+      if (path === '/api/v1/system/roles') {
+        return Promise.resolve({ resultList: roles });
+      }
+      if (path === '/api/v1/system/permissions') {
+        return Promise.resolve({ resultList: permissions });
+      }
       if (path === '/api/v1/system/menus?moduleId=1&roleId=1') {
         if (resolveMenuRows) {
           return new Promise((resolve) => {
@@ -191,9 +236,21 @@ describe('MenuManagementPage required selection', () => {
 
     renderPage();
 
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '모듈 선택' }));
+    const moduleSelector = await screen.findByRole('combobox', {
+      name: '모듈 선택',
+    });
+    const roleSelector = await screen.findByRole('combobox', {
+      name: '권한 선택',
+    });
+
+    await waitFor(() => {
+      expect(moduleSelector).not.toBeDisabled();
+      expect(roleSelector).not.toBeDisabled();
+    });
+
+    fireEvent.mouseDown(moduleSelector);
     fireEvent.click(screen.getByRole('option', { name: '기본' }));
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '권한 선택' }));
+    fireEvent.mouseDown(roleSelector);
     fireEvent.click(screen.getByRole('option', { name: '관리자' }));
 
     resolveMenuRows?.({ resultList: [] });

@@ -54,6 +54,7 @@ import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/Dat
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
 import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
 import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
+import { MenuManagementPanel } from '../src/pages/settings/system/menus/components/MenuManagementPanel';
 
 type MenuRow = {
   id: string;
@@ -112,6 +113,58 @@ const columns: F1GridColumn<MenuRow>[] = [
     ],
   },
 ];
+
+describe('F1-GRID size props', () => {
+  it('applies a numeric minHeight as a CSS pixel value', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with min height"
+        minHeight={240}
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({ minHeight: '240px' });
+  });
+
+  it('keeps a string minHeight value when specified', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with min height string"
+        minHeight="18rem"
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({ minHeight: '18rem' });
+  });
+});
+
+describe('F1-GRID menu layout', () => {
+  it('keeps the menu tree grid at a minimum height without clipping the bottom or forcing fixed height', () => {
+    render(
+      <div style={{ height: 360, display: 'flex', flexDirection: 'column' }}>
+        <MenuManagementPanel
+          menus={[]}
+          selectedModule={{ moduleId: 1, moduleName: '기준 모듈' }}
+          selectedRoleId="role-1"
+          permissions={[]}
+          canExportExcel={false}
+          menuGridLoading={false}
+        />
+      </div>,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({
+      minHeight: '280px',
+      height: 'auto',
+    });
+  });
+});
 
 describe('F1-GRID editor behavior', () => {
   it('selects the current value when the editor receives focus by default', () => {
