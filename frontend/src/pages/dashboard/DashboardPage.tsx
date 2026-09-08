@@ -28,7 +28,12 @@ import {
   moduleItems as staticModuleItems,
   pageContentMap,
 } from './services/dashboardData';
-import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
+import {
+  buildModuleDescriptors,
+  fetchMyMenus,
+  hydrateModuleDescriptors,
+} from './services/menuService';
+import { fetchModuleRows } from '../settings/system/modules/services/moduleManagement.service';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
@@ -91,12 +96,32 @@ function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyMenus().then((response) => {
-      if (cancelled || !response) {
+
+    Promise.all([
+      fetchMyMenus(),
+      fetchModuleRows().catch(() => []),
+    ]).then(([response, moduleRows]) => {
+      if (cancelled) {
         return;
       }
-      setModuleItems(buildModuleItems(buildModuleDescriptors(response)));
+
+      const sourceModules = buildModuleDescriptors(response ?? {
+        user: { userId: 'admin', roles: ['ADMIN'] },
+        menus: staticModuleItems.map((module) => ({
+          menuId: Number(module.id || 0),
+          parentMenuId: null,
+          name: module.name,
+          path: `/${module.id}`,
+          icon: module.name,
+          children: [],
+        })),
+      });
+
+      setModuleItems(
+        buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
+      );
     });
+
     return () => {
       cancelled = true;
     };

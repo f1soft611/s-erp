@@ -12,6 +12,7 @@ import {
 import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
+import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -95,6 +96,18 @@ export function DashboardContent({
   if (selectedModule.id === 'settings' && currentPageKey === 'menus') {
     return (
       <MenuManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'settings' && currentPageKey === 'modules') {
+    return (
+      <ModuleManagementPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}

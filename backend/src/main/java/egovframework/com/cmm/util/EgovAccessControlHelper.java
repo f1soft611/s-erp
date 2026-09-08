@@ -12,17 +12,23 @@ public class EgovAccessControlHelper {
 
     private static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
     private static final String TENANT_ADMIN = "TENANT_ADMIN";
+    private static final String LEGACY_ADMIN = "ADMIN";
 
     private EgovAccessControlHelper() {
     }
 
     /**
      * 로그인 사용자가 테넌트(또는 플랫폼) 관리자 역할인지 확인한다.
+     * legacy ADMIN 또는 any assigned PLATFORM_ADMIN role should also be considered admin access.
      */
     public static boolean isTenantAdmin(LoginVO user) {
         if (user == null || user.getRoleCode() == null) {
             return false;
         }
-        return PLATFORM_ADMIN.equals(user.getRoleCode()) || TENANT_ADMIN.equals(user.getRoleCode());
+
+        String roleCode = user.getRoleCode().trim();
+        return PLATFORM_ADMIN.equals(roleCode)
+            || TENANT_ADMIN.equals(roleCode)
+            || LEGACY_ADMIN.equals(roleCode);
     }
 }

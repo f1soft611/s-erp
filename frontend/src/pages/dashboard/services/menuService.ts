@@ -14,6 +14,7 @@ export type ModuleDescriptor = {
   id: string;
   name: string;
   iconName: string;
+  path?: string;
   tree: MenuTreeNode[];
   menus: MenuItem[];
 };
@@ -70,8 +71,45 @@ export const buildModuleDescriptors = (
       id: toModuleId(root),
       name: root.name,
       iconName: root.icon ?? 'Settings',
+      path: root.path,
       tree,
       menus: flattenMenuTree(tree),
+    };
+  });
+
+const normalizeModulePath = (path?: string | null): string =>
+  (path ?? '').trim().replace(/\/+$/, '').toLowerCase();
+
+export const hydrateModuleDescriptors = (
+  descriptors: ModuleDescriptor[],
+  moduleRows: Array<{ moduleName?: string; moduleCode?: string; iconName?: string; moduleUrl?: string }>,
+): ModuleDescriptor[] =>
+  descriptors.map((descriptor) => {
+    const match =
+      moduleRows.find(
+        (row) =>
+          normalizeModulePath(row.moduleUrl) ===
+            normalizeModulePath(descriptor.path ?? `/${descriptor.id}`),
+      ) ??
+      moduleRows.find(
+        (row) =>
+          (row.moduleName ?? '').trim().toLowerCase() ===
+          descriptor.name.trim().toLowerCase(),
+      ) ??
+      moduleRows.find(
+        (row) =>
+          (row.moduleCode ?? '').trim().toLowerCase() ===
+          descriptor.id.trim().toLowerCase(),
+      );
+
+    if (!match) {
+      return descriptor;
+    }
+
+    return {
+      ...descriptor,
+      name: (match.moduleName ?? descriptor.name).trim() || descriptor.name,
+      iconName: (match.iconName ?? descriptor.iconName).trim() || descriptor.iconName,
     };
   });
 

@@ -83,6 +83,25 @@ public class JwtAuthenticationFilterTest {
                 .anyMatch(a -> "ROLE_TENANT_ADMIN".equals(a.getAuthority())));
     }
 
+    @DisplayName("ADMIN roleCode는 PLATFORM_ADMIN과 동일하게 ROLE_ADMIN으로 매핑된다")
+    @Test
+    public void testLegacyAdminRoleMappedToRoleAdmin() throws Exception {
+        String fakeToken = "legacy.admin.jwt";
+
+        LoginVO loginVO = new LoginVO();
+        loginVO.setId("legacy-admin");
+        loginVO.setRoleCode("ADMIN");
+
+        request.addHeader("Authorization", fakeToken);
+        when(jwtTokenUtil.getLoginVOFromToken(fakeToken)).thenReturn(loginVO);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())));
+    }
+
     @DisplayName("유효하지 않은 토큰이 주어지면 인증 객체가 설정되지 않는다")
     @Test
     public void testInvalidTokenDoesNotSetAuthentication() throws Exception {

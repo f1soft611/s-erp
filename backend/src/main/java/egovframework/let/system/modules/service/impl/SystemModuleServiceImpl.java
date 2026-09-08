@@ -67,6 +67,9 @@ public class SystemModuleServiceImpl extends EgovAbstractServiceImpl implements 
     @Override
     @Transactional
     public SystemModuleVO updateModule(Long tenantId, Long moduleId, SystemModuleSaveRequestVO payload) throws Exception {
+        if (!StringUtils.hasText(payload.getModuleCode())) {
+            throw new IllegalArgumentException("모듈 코드는 필수입니다.");
+        }
         if (!StringUtils.hasText(payload.getModuleNm())) {
             throw new IllegalArgumentException("모듈명은 필수입니다.");
         }
@@ -81,6 +84,7 @@ public class SystemModuleServiceImpl extends EgovAbstractServiceImpl implements 
         Map<String, Object> params = new HashMap<>();
         params.put("moduleId", moduleId);
         params.put("tenantId", tenantId);
+        params.put("moduleCode", moduleCode);
         params.put("moduleNm", payload.getModuleNm().trim());
         params.put("iconNm", payload.getIconNm());
         params.put("moduleUrl", payload.getModuleUrl());

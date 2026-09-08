@@ -83,11 +83,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private String mapRoleCode(LoginVO loginVO) {
         String roleCode = loginVO.getRoleCode();
-        
-        // roleCode 기반 3역할 매핑
+
         if (roleCode != null && !roleCode.isEmpty()) {
-            switch (roleCode) {
+            String normalizedRoleCode = roleCode.trim();
+            switch (normalizedRoleCode) {
                 case "PLATFORM_ADMIN":
+                case "ADMIN":
                     return "ROLE_ADMIN";
                 case "TENANT_ADMIN":
                     return "ROLE_TENANT_ADMIN";
@@ -97,8 +98,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return "ROLE_USER";
             }
         }
-        
-        // 레거시 호환성: groupNm으로 폴백
+
         return "ROLE_ADMIN".equals(loginVO.getGroupNm()) ? "ROLE_ADMIN" : "ROLE_USER";
     }
 }
