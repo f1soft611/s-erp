@@ -144,6 +144,30 @@ describe('F1-GRID size props', () => {
   });
 });
 
+describe('F1-GRID loading overlay', () => {
+  it('shows a refresh-style spinner overlay without rendering skeleton rows while loading', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid loading overlay"
+        loading
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByTestId('grid-loading-skeleton'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
+      0,
+    );
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+});
+
 describe('F1-GRID menu layout', () => {
   it('keeps the menu tree grid at a minimum height without clipping the bottom or forcing fixed height', () => {
     render(

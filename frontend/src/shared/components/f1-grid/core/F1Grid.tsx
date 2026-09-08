@@ -12,7 +12,7 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box, Divider, Menu, MenuItem } from '@mui/material';
+import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
@@ -66,7 +66,6 @@ import {
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
 import { normalizeDateInput } from '../editing/DateEditor';
-import { GridLoadingSkeleton } from '../../PageLoadingSkeleton';
 import {
   getGridColumnPinOffsets,
   getGridColumnPinSide,
@@ -1531,6 +1530,7 @@ function F1GridInner<T extends object>(
       ref={gridContainerRef}
       role="grid"
       aria-label={ariaLabel}
+      aria-busy={loading || undefined}
       onCopy={handleCopy}
       onPaste={handlePaste}
       onContextMenu={openContextMenu}
@@ -1612,29 +1612,7 @@ function F1GridInner<T extends object>(
           overflowX: 'auto',
         }}
       >
-        {loading ? (
-          <Box
-            sx={{
-              width: '100%',
-              height: 'auto',
-              minHeight: 0,
-              px: 0,
-              py: 0,
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <GridLoadingSkeleton
-              columns={visibleColumns}
-              rows={5}
-              showHeader={false}
-              showCheckbox={showCheckbox}
-              checkboxWidth={showCheckbox ? 44 : 0}
-              rowHeight={defaultRowHeight}
-              headerHeight={Math.max(28, defaultRowHeight)}
-            />
-          </Box>
-        ) : (
+        {!loading ? (
           <GridBody
             visibleRows={visibleRows}
             columns={visibleColumns}
@@ -1707,7 +1685,7 @@ function F1GridInner<T extends object>(
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
           />
-        )}
+        ) : null}
         {rangeOverlay ? (
           <Box
             data-range-overlay={copiedCellRange ? 'copy' : 'drag'}
@@ -1733,6 +1711,24 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
+      {loading ? (
+        <Box
+          data-testid="f1-grid-loading-overlay"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(15, 23, 42, 0.08)',
+            pointerEvents: 'auto',
+          }}
+          aria-live="polite"
+        >
+          <CircularProgress size={34} thickness={4} />
+        </Box>
+      ) : null}
       <Menu
         open={Boolean(contextMenu)}
         onClose={closeContextMenu}

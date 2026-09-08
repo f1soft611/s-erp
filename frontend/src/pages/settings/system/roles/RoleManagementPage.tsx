@@ -200,12 +200,20 @@ export function RoleManagementPage({
               ),
             },
           }}
-          sx={{
+          sx={(theme) => ({
             flex: '1 1 220px',
             minWidth: { xs: '100%', sm: 220 },
             maxWidth: 360,
             height: 40,
-          }}
+            '& .MuiOutlinedInput-root': {
+              height: '100%',
+              borderRadius: 2,
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(15, 23, 42, 0.72)'
+                  : 'rgba(255,255,255,0.72)',
+            },
+          })}
         />
       </PageSearchArea>
       <PageMessageArea message={error} onClose={() => setError('')} />

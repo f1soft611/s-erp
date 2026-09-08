@@ -344,12 +344,11 @@ export const MenuManagementPanel = forwardRef<
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 3 },
+        p: { xs: 1.5, sm: 1 },
         minWidth: 0,
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0,
         height: '100%',
         overflow: 'hidden',
       }}
@@ -362,7 +361,6 @@ export const MenuManagementPanel = forwardRef<
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
-          minHeight: 280,
           height: '100%',
           overflow: 'hidden',
         }}
@@ -373,7 +371,6 @@ export const MenuManagementPanel = forwardRef<
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
-            minHeight: 0,
             height: '100%',
             overflow: 'hidden',
           }}
@@ -440,7 +437,6 @@ export const MenuManagementPanel = forwardRef<
           <Box
             sx={{
               flex: 1,
-              minHeight: 0,
               height: '100%',
               overflow: 'hidden',
             }}

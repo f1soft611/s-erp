@@ -570,50 +570,38 @@ export function MenuManagementPage({
         />
       </PageSearchArea>
       <PageMessageArea message={error} onClose={() => setError('')} />
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          height: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          pt: 1,
-          overflow: 'visible',
-        }}
-      >
-        {hasRequiredSelection ? (
-          <MenuManagementPanel
-            ref={menuPanelRef}
-            key={`${selectedModuleId ?? 'none'}-${selectedRoleId}-${reloadToken}`}
-            menus={filteredMenus}
-            selectedModule={selectedModule}
-            selectedRoleId={selectedRoleId}
-            permissions={permissions}
-            canExportExcel={pageActionPermissions.excel}
-            menuGridLoading={loading}
-            onRefresh={requestRefresh}
-            onDirtyChange={setDirty}
-            onSavingChange={setSaving}
-            onSaveSuccess={showSuccess}
-            onError={setError}
-          />
-        ) : (
-          <Box
-            sx={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              py: 4,
-              color: 'text.secondary',
-            }}
-          >
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-              모듈과 권한을 모두 선택하세요.
-            </Typography>
-          </Box>
-        )}
-      </Box>
+      {hasRequiredSelection ? (
+        <MenuManagementPanel
+          ref={menuPanelRef}
+          key={`${selectedModuleId ?? 'none'}-${selectedRoleId}-${reloadToken}`}
+          menus={filteredMenus}
+          selectedModule={selectedModule}
+          selectedRoleId={selectedRoleId}
+          permissions={permissions}
+          canExportExcel={pageActionPermissions.excel}
+          menuGridLoading={loading}
+          onRefresh={requestRefresh}
+          onDirtyChange={setDirty}
+          onSavingChange={setSaving}
+          onSaveSuccess={showSuccess}
+          onError={setError}
+        />
+      ) : (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 4,
+            color: 'text.secondary',
+          }}
+        >
+          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+            모듈과 권한을 모두 선택하세요.
+          </Typography>
+        </Box>
+      )}
       <UnsavedChangesConfirmDialog
         open={confirmOpen}
         title="저장하지 않은 변경사항"

@@ -371,83 +371,98 @@ export const ModuleManagementPanel = forwardRef<
   );
 
   return (
-    <Card
+    <Box
       sx={{
-        borderRadius: 3,
-        border: '1px solid rgba(148,163,184,0.18)',
-        boxShadow: 'none',
+        p: { xs: 1.5, sm: 1 },
+        minWidth: 0,
+        flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0,
-        flex: 1,
+        height: '100%',
+        overflow: 'hidden',
       }}
     >
-      <CardContent
+      <Card
         sx={{
-          p: 2.5,
+          borderRadius: 1,
+          border: '1px solid rgba(148,163,184,0.18)',
+          boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
-          minHeight: 0,
+          height: '100%',
+          overflow: 'hidden',
         }}
       >
-        <Box
+        <CardContent
           sx={{
+            p: 2.5,
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 2,
-            gap: 1,
+            flexDirection: 'column',
+            flex: 1,
+            height: '100%',
+            overflow: 'hidden',
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            모듈 관리
-          </Typography>
-        </Box>
-        <Box sx={{ flex: 1, minHeight: 0 }}>
-          <F1Grid
-            key={moduleGridKey}
-            ref={gridRef}
-            rows={filteredModules}
-            columns={columns}
-            rowKey="id"
-            ariaLabel="F1-GRID 모듈 관리"
-            height="100%"
-            maxHeight="100%"
-            rowHeight={32}
-            minRowHeight={32}
-            maxRowHeight={320}
-            showCheckbox={false}
-            createRow={createModuleRow}
-            editorPlugins={[
-              {
-                id: 'module-grid-editor',
-                enabled: true,
-                canEdit: () => true,
-              },
-            ]}
-            beforeEdit={({ row, field }) => {
-              if (field === 'moduleCode' && !canEditModuleCode(row)) {
-                return false;
-              }
-              return true;
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              flexWrap: 'wrap',
+              gap: 1,
+              mb: 2,
             }}
-            canExportExcel={canExportExcel}
-            excelFileName="module-management-export"
-            loading={moduleGridLoading}
-            allowAddRowInContextMenu={true}
-            allowDuplicateRowInContextMenu={false}
-            allowDeleteRowInContextMenu={true}
-            onChangesChange={(changes) => {
-              onDirtyChange?.(
-                (changes?.insertedRows?.length ?? 0) > 0 ||
-                  (changes?.updatedRows?.length ?? 0) > 0 ||
-                  (changes?.deletedRows?.length ?? 0) > 0,
-              );
-            }}
-          />
-        </Box>
-      </CardContent>
-    </Card>
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              모듈 관리
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+            <F1Grid
+              key={moduleGridKey}
+              ref={gridRef}
+              rows={filteredModules}
+              columns={columns}
+              rowKey="id"
+              ariaLabel="F1-GRID 모듈 관리"
+              height="100%"
+              maxHeight="100%"
+              rowHeight={32}
+              minRowHeight={32}
+              maxRowHeight={320}
+              showCheckbox={false}
+              createRow={createModuleRow}
+              editorPlugins={[
+                {
+                  id: 'module-grid-editor',
+                  enabled: true,
+                  canEdit: () => true,
+                },
+              ]}
+              beforeEdit={({ row, field }) => {
+                if (field === 'moduleCode' && !canEditModuleCode(row)) {
+                  return false;
+                }
+                return true;
+              }}
+              canExportExcel={canExportExcel}
+              excelFileName="module-management-export"
+              loading={moduleGridLoading}
+              allowAddRowInContextMenu={true}
+              allowDuplicateRowInContextMenu={false}
+              allowDeleteRowInContextMenu={true}
+              onChangesChange={(changes) => {
+                onDirtyChange?.(
+                  (changes?.insertedRows?.length ?? 0) > 0 ||
+                    (changes?.updatedRows?.length ?? 0) > 0 ||
+                    (changes?.deletedRows?.length ?? 0) > 0,
+                );
+              }}
+            />
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
   );
 });

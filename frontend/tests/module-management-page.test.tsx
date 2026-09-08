@@ -124,6 +124,35 @@ describe('ModuleManagementPage', () => {
     });
   });
 
+  it('wraps the module panel in the same outer shell as the menu panel', async () => {
+    apiMocks.apiGet.mockResolvedValue({ resultList: [] });
+
+    render(
+      <ModuleManagementPage
+        selectedModule={settingsModule}
+        currentMenuName="모듈관리"
+        content={content}
+        selectedMenuPermissions={{
+          read: true,
+          create: true,
+          update: true,
+          delete: true,
+          excel: true,
+        }}
+      />,
+    );
+
+    const heading = await screen.findByRole('heading', { name: '모듈 관리' });
+    const card = heading.closest('.MuiCard-root');
+    const shell = card?.parentElement;
+
+    expect(shell).not.toBeNull();
+    expect(shell?.className).toContain('MuiBox-root');
+    expect(getComputedStyle(shell as HTMLElement).display).toBe('flex');
+    expect(getComputedStyle(shell as HTMLElement).flexDirection).toBe('column');
+    expect(getComputedStyle(shell as HTMLElement).overflow).toBe('hidden');
+  });
+
   it('shows a known icon select list and locks saved module codes from editing', () => {
     expect(MODULE_ICON_OPTIONS.length).toBeGreaterThan(0);
     expect(
