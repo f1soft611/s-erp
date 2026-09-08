@@ -52,7 +52,9 @@ import {
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
+import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
 import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
+import { MenuManagementPanel } from '../src/pages/settings/system/menus/components/MenuManagementPanel';
 
 type MenuRow = {
   id: string;
@@ -111,6 +113,82 @@ const columns: F1GridColumn<MenuRow>[] = [
     ],
   },
 ];
+
+describe('F1-GRID size props', () => {
+  it('applies a numeric minHeight as a CSS pixel value', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with min height"
+        minHeight={240}
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({ minHeight: '240px' });
+  });
+
+  it('keeps a string minHeight value when specified', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid with min height string"
+        minHeight="18rem"
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({ minHeight: '18rem' });
+  });
+});
+
+describe('F1-GRID loading overlay', () => {
+  it('shows a refresh-style spinner overlay without rendering skeleton rows while loading', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid loading overlay"
+        loading
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByTestId('grid-loading-skeleton'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
+      0,
+    );
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+});
+
+describe('F1-GRID menu layout', () => {
+  it('keeps the menu tree grid at a minimum height without clipping the bottom or forcing fixed height', () => {
+    render(
+      <div style={{ height: 360, display: 'flex', flexDirection: 'column' }}>
+        <MenuManagementPanel
+          menus={[]}
+          selectedModule={{ moduleId: 1, moduleName: '기준 모듈' }}
+          selectedRoleId="role-1"
+          permissions={[]}
+          canExportExcel={false}
+          menuGridLoading={false}
+        />
+      </div>,
+    );
+
+    expect(screen.getByRole('grid')).toHaveStyle({
+      minHeight: '280px',
+      height: 'auto',
+    });
+  });
+});
 
 describe('F1-GRID editor behavior', () => {
   it('selects the current value when the editor receives focus by default', () => {
@@ -266,6 +344,127 @@ describe('F1-GRID clipboard', () => {
         type: 'checkbox',
       }),
     ).toBe(true);
+  });
+});
+
+describe('F1-GRID custom cell rendering', () => {
+  it('renders custom cell markup and applies dynamic styling and properties', () => {
+    const customColumns: F1GridColumn<MenuRow>[] = [
+      {
+        field: 'status',
+        headerName: '상태',
+        renderCell: ({ value }) => (
+          <span>{String(value) === 'draft' ? '작성중' : '확정'}</span>
+        ),
+        getCellStyle: ({ value }) => ({
+          backgroundColor: String(value) === 'draft' ? '#fff8e1' : '#e8f5e9',
+          color: String(value) === 'draft' ? '#ed6c02' : '#2e7d32',
+        }),
+        getCellProps: ({ value }) => ({
+          className: `status-${String(value)}`,
+          title: `status:${String(value)}`,
+        }),
+      },
+    ];
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={customColumns}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    const statusCell = screen.getByText('작성중').closest('[role="gridcell"]');
+    expect(statusCell).toBeInTheDocument();
+    expect(statusCell).toHaveClass('status-draft');
+    expect(statusCell).toHaveStyle({
+      backgroundColor: '#fff8e1',
+      color: '#ed6c02',
+    });
+    expect(statusCell).toHaveAttribute('title', 'status:draft');
+  });
+
+  it('marks editable headers when a registered editor plugin allows editing', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          {
+            field: 'status',
+            headerName: '상태',
+            editable: (row) => row.status === 'draft',
+            type: 'select',
+            options: [
+              { value: 'draft', label: '작성중' },
+              { value: 'confirmed', label: '확정' },
+            ],
+          },
+        ]}
+        rowKey="id"
+        showCheckbox={false}
+        editorPlugins={[
+          {
+            canEdit: ({ column, row }) =>
+              column.field === 'status' && row.status === 'draft',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: '상태' })).toHaveAttribute(
+      'data-editable-column',
+      'true',
+    );
+  });
+});
+
+describe('F1-GRID select icon rendering', () => {
+  it('does not render option icons by default for a plain select editor', () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme()}>
+        <SelectEditor
+          value="draft"
+          options={[
+            { value: 'draft', label: '작성중' },
+            { value: 'confirmed', label: '확정' },
+          ]}
+          onChange={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
+    ).toBe(0);
+  });
+
+  it('renders a custom icon only when a select icon renderer is configured', () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme()}>
+        <SelectEditor
+          value="draft"
+          options={[
+            { value: 'draft', label: '작성중' },
+            { value: 'confirmed', label: '확정' },
+          ]}
+          selectOptionIcon={(option) => (
+            <span data-testid={`icon-${String(option.value)}`}>
+              {String(option.value)}
+            </span>
+          )}
+          onChange={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('icon-draft')).toBeInTheDocument();
+    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
+    ).toBe(1);
   });
 });
 

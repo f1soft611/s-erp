@@ -193,12 +193,34 @@
 제약:
 
 - 복합 PK: `(menu_id, permission_id)`
-- 메뉴별 허용 버튼/기능 권한만 저장하며, 역할별 권한인 `tb_role_menu_permission`과 분리
+- 메뉴별 허용 가능한 기본 버튼/기능 권한만 저장하며, 역할별 선택 권한인 `tb_role_menu_permission`과 분리
 
 역할:
 
-- 리프 메뉴가 사용할 수 있는 권한 코드를 관리
-- 후속 역할 관리 화면에서 역할별로 부여할 수 있는 권한의 기준 제공
+- 리프 메뉴가 지원할 수 있는 권한 코드를 관리
+- 역할 관리 화면에서 선택 가능한 기본 권한의 기준 제공
+
+### 2-13. tb_role_menu_permission
+
+| 컬럼          | 타입      | 설명              |
+| ------------- | --------- | ----------------- |
+| role_id       | bigint    | 역할 FK           |
+| menu_id       | bigint    | 메뉴 FK           |
+| permission_id | bigint    | 버튼/기능 권한 FK |
+| created_at    | timestamp | 생성 일시         |
+| updated_at    | timestamp | 수정 일시         |
+
+제약:
+
+- 복합 PK: `(role_id, menu_id, permission_id)`
+- `tb_role(role_id)`, `tb_menu(menu_id)`, `tb_permission(permission_id)`를 모두 참조
+- 역할별 실제 메뉴 활성화 여부 및 버튼 권한을 저장하는 실사용 매핑 테이블
+
+역할:
+
+- 선택된 역할(Role) 관점에서 어떤 메뉴를 노출할지와 어떤 버튼 권한을 활성화할지 저장
+- 백엔드 `GET /api/v1/system/menus?moduleId={moduleId}&roleId={roleId}` 및 `PUT /api/v1/system/roles/{roleId}/menu-permissions`의 최종 저장소
+- 대시보드 좌측 메뉴와 페이지 헤더 액션 버튼의 권한 계산이 이 테이블을 기준으로 동기화된다
 
 ---
 
@@ -208,3 +230,4 @@
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈별 메뉴 버튼 권한 관리 작업으로 `tb_permission`, `tb_menu_permission` 2개 테이블과 `READ`/`CREATE`/`UPDATE`/`DELETE`/`EXCEL` 초기 권한을 추가. 적용 스크립트는 [20260831_004_create_menu_permission_schema.sql](../../backend/DATABASE/20260831/20260831_004_create_menu_permission_schema.sql) 참고.
+- 2026-08-31: 역할별 메뉴-버튼 권한 매핑 생성 작업으로 `tb_role_menu_permission` 테이블을 별도 신규 추가. 적용 스크립트는 [20260831_005_create_role_menu_permission_schema.sql](../../backend/DATABASE/20260831/20260831_005_create_role_menu_permission_schema.sql) 참고.

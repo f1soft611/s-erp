@@ -12,7 +12,11 @@ function App() {
       <NotificationProvider>
         <Box
           sx={{
-            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            minHeight: 0,
+            overflow: 'hidden',
             bgcolor: 'background.default',
             color: 'text.primary',
           }}

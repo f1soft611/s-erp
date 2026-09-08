@@ -15,6 +15,11 @@ type GridLoadingSkeletonProps = {
   columns: GridColumnLike[];
   rows?: number;
   showHeader?: boolean;
+  gridTemplateColumns?: string;
+  showCheckbox?: boolean;
+  checkboxWidth?: number;
+  rowHeight?: number;
+  headerHeight?: number;
 };
 
 export function PageLoadingSkeleton({ rows = 6 }: PageLoadingSkeletonProps) {
@@ -45,45 +50,76 @@ export function GridLoadingSkeleton({
   columns,
   rows = 6,
   showHeader = true,
+  gridTemplateColumns,
+  showCheckbox = true,
+  checkboxWidth = 44,
+  rowHeight = 32,
+  headerHeight = 32,
 }: GridLoadingSkeletonProps) {
-  const gridTemplateColumns = columns
-    .map((column) => {
-      const minWidth = Math.max(column.minWidth ?? 80, 60);
-      const flex = column.flex ?? 1;
-      return `minmax(${minWidth}px, ${flex}fr)`;
-    })
-    .join(' ');
+  const resolvedGridTemplateColumns =
+    gridTemplateColumns ??
+    [
+      ...(showCheckbox ? [`${checkboxWidth}px`] : []),
+      ...Array.from({ length: columns.length }, () => 'minmax(0, 1fr)'),
+    ].join(' ');
+
+  const checkboxColumnPlaceholder = showCheckbox ? (
+    <Box
+      key="grid-loading-checkbox-placeholder"
+      data-testid="grid-loading-checkbox-skeleton"
+      sx={{
+        gridColumn: 1,
+        width: '100%',
+        minWidth: `${checkboxWidth}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: rowHeight,
+        height: rowHeight,
+      }}
+    >
+      <Skeleton variant="circular" width={16} height={16} />
+    </Box>
+  ) : null;
 
   return (
     <Box
       data-testid="grid-loading-skeleton"
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'grid',
         width: '100%',
-        minHeight: 180,
-        gap: 1,
+        minWidth: 0,
+        maxWidth: '100%',
+        height: 'auto',
+        gap: 0,
       }}
     >
       {showHeader ? (
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns,
-            gap: 1,
+            gridTemplateColumns: resolvedGridTemplateColumns,
+            width: '100%',
+            minWidth: 0,
+            gap: 0,
             alignItems: 'center',
-            px: 0.5,
-            py: 0.5,
+            px: 0,
+            py: 0,
             borderBottom: '1px solid rgba(148,163,184,0.25)',
+            minHeight: headerHeight,
+            height: headerHeight,
           }}
         >
+          {checkboxColumnPlaceholder}
           {columns.map((column, index) => {
             const columnLabel = String(column.headerName ?? column.field ?? '');
             return (
               <Box
                 key={`grid-loading-header-${String(column.field)}-${index}`}
                 sx={{
-                  minHeight: 26,
+                  gridColumn: showCheckbox ? index + 2 : index + 1,
+                  minHeight: headerHeight,
+                  height: headerHeight,
                   display: 'flex',
                   alignItems: 'center',
                   fontSize: '0.75rem',
@@ -103,17 +139,28 @@ export function GridLoadingSkeleton({
           data-testid="grid-loading-row-skeleton"
           sx={{
             display: 'grid',
-            gridTemplateColumns,
-            gap: 1,
+            gridTemplateColumns: resolvedGridTemplateColumns,
+            width: '100%',
+            minWidth: 0,
+            gap: 0,
             alignItems: 'center',
+            minHeight: rowHeight,
+            height: rowHeight,
           }}
         >
+          {checkboxColumnPlaceholder}
           {columns.map((column, columnIndex) => (
             <Skeleton
               key={`grid-loading-cell-${String(column.field)}-${index}-${columnIndex}`}
-              variant="text"
-              height={22}
-              sx={{ borderRadius: 1 }}
+              variant="rectangular"
+              height={Math.max(16, rowHeight - 10)}
+              sx={{
+                gridColumn: showCheckbox ? columnIndex + 2 : columnIndex + 1,
+                width: '100%',
+                borderRadius: 1,
+                boxSizing: 'border-box',
+                alignSelf: 'center',
+              }}
             />
           ))}
         </Box>

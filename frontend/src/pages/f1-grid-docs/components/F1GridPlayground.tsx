@@ -14,12 +14,15 @@ import {
 } from '../../../shared/components/f1-grid';
 import type { PlaygroundKind } from '../types';
 
+type DemoStatus = 'active' | 'idle' | 'blocked';
+
 type DemoRow = {
   id: string;
   code: string;
   name: string;
   group: string;
   qty: number;
+  status: DemoStatus;
 };
 
 const baseRows: DemoRow[] = [
@@ -29,6 +32,7 @@ const baseRows: DemoRow[] = [
     name: '스테인리스 배관 부품',
     group: '원자재',
     qty: 10,
+    status: 'active',
   },
   {
     id: 'two',
@@ -36,6 +40,7 @@ const baseRows: DemoRow[] = [
     name: '스테인리스 배관 부품',
     group: '원자재',
     qty: 5,
+    status: 'idle',
   },
   {
     id: 'three',
@@ -43,6 +48,7 @@ const baseRows: DemoRow[] = [
     name: '실리콘 패킹 가스켓',
     group: '부자재',
     qty: 100,
+    status: 'blocked',
   },
 ];
 
@@ -148,6 +154,108 @@ const columns: F1GridColumn<DemoRow>[] = [
   },
 ];
 
+const statusMeta: Record<
+  DemoStatus,
+  { label: string; color: string; background: string; border: string }
+> = {
+  active: {
+    label: '활성',
+    color: '#1a7f5a',
+    background: '#e8f7ee',
+    border: '#8dd3a9',
+  },
+  idle: {
+    label: '대기',
+    color: '#7a5b00',
+    background: '#fff4db',
+    border: '#e2b95a',
+  },
+  blocked: {
+    label: '중지',
+    color: '#b42318',
+    background: '#fef3f2',
+    border: '#f4b0a7',
+  },
+};
+
+const renderHookColumns: F1GridColumn<DemoRow>[] = [
+  {
+    field: 'code',
+    headerName: '품목코드',
+    width: 130,
+    pinned: 'left',
+    editable: true,
+  },
+  {
+    field: 'name',
+    headerName: '품목명',
+    width: 210,
+    editable: true,
+    wrapText: true,
+  },
+  {
+    field: 'status',
+    headerName: '상태',
+    width: 110,
+    editable: false,
+    align: 'center',
+    renderCell: ({ value }) => {
+      const status = String(value ?? 'idle') as DemoStatus;
+      const meta = statusMeta[status] ?? statusMeta.idle;
+      return (
+        <Box
+          component="span"
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 62,
+            px: 1,
+            py: 0.5,
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            backgroundColor: meta.background,
+            color: meta.color,
+            border: `1px solid ${meta.border}`,
+          }}
+        >
+          {meta.label}
+        </Box>
+      );
+    },
+    getCellStyle: ({ value }) => {
+      const status = String(value ?? 'idle') as DemoStatus;
+      const meta = statusMeta[status] ?? statusMeta.idle;
+      return {
+        backgroundColor: meta.background,
+        color: meta.color,
+        borderRadius: 8,
+        padding: '2px 8px',
+        border: `1px solid ${meta.border}`,
+      };
+    },
+    getCellProps: ({ value }) => {
+      const status = String(value ?? 'idle') as DemoStatus;
+      const meta = statusMeta[status] ?? statusMeta.idle;
+      return {
+        title: `상태: ${meta.label}`,
+        'aria-label': `상태 ${meta.label}`,
+      };
+    },
+  },
+  {
+    field: 'qty',
+    headerName: '수량',
+    width: 90,
+    type: 'number',
+    editable: true,
+    align: 'right',
+    decimalPlaces: 1,
+  },
+];
+
 const treeColumns: F1GridColumn<TreeDemoRow>[] = [
   {
     field: 'name',
@@ -175,6 +283,8 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
     kind === 'layout' && !showCheckbox
       ? playgroundColumns.filter((column) => column.field !== 'group')
       : playgroundColumns;
+  const displayRows = kind === 'editing' ? rows : rows;
+  const displayColumns = kind === 'editing' ? renderHookColumns : activeColumns;
 
   function updateChanges() {
     setChanges(gridRef.current?.getChanges().updatedRows.length ?? 0);
@@ -265,7 +375,13 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
           <Typography variant="body2">변경된 행: {changes}</Typography>
         )}
         {kind === 'editing' && (
-          <Typography variant="body2">셀을 선택해 값을 편집하세요.</Typography>
+          <>
+            <Typography variant="body2">
+              상태 셀은 renderCell / getCellStyle / getCellProps로 커스터마이징된
+              예시입니다.
+            </Typography>
+            <Typography variant="body2">셀을 선택해 값을 편집하세요.</Typography>
+          </>
         )}
         {kind === 'row-merge' && (
           <Typography variant="body2">
@@ -276,8 +392,8 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
       <Box className="f1-doc-grid-wrap">
         <F1Grid
           ref={gridRef}
-          rows={rows}
-          columns={activeColumns}
+          rows={displayRows}
+          columns={displayColumns}
           rowKey="id"
           ariaLabel="F1-Grid documentation example"
           rowHeight={rowHeight}

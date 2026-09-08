@@ -155,7 +155,7 @@
         VALUES (
             #{tenantId},
             #{moduleId},
-            #{parentMenuId},
+            #{parentMenuId, jdbcType=BIGINT},
             #{menuCode},
             #{menuNm},
             #{menuDc},
@@ -169,7 +169,7 @@
 
     <update id="updateMenu" parameterType="map">
         UPDATE tb_menu
-        SET parent_menu_id = #{parentMenuId},
+        SET parent_menu_id = #{parentMenuId, jdbcType=BIGINT},
             menu_nm = #{menuNm},
             menu_dc = #{menuDc},
             menu_url = #{menuUrl},
@@ -228,14 +228,77 @@
             p.permission_id ASC
     </select>
 
+    <select id="selectRoleMenuPermissionCodeRows" parameterType="egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO" resultType="map">
+        SELECT
+            mn.menu_id AS "menuId",
+            p.permission_code AS "permissionCode"
+        FROM tb_menu mn
+        JOIN tb_role_menu_permission rmp
+            ON rmp.menu_id = mn.menu_id
+           AND rmp.role_id = #{roleId}
+        JOIN tb_permission p
+            ON p.permission_id = rmp.permission_id
+           AND p.use_at = 'Y'
+        WHERE mn.tenant_id = #{tenantId}
+        <if test="moduleId != null">
+            AND mn.module_id = #{moduleId}
+        </if>
+        <if test="useAt != null and useAt != ''">
+            AND mn.use_at = #{useAt}
+        </if>
+        ORDER BY
+            p.sort_order ASC,
+            p.permission_id ASC
+    </select>
+
+    <select id="selectRoleIdsByUserAccount" parameterType="map" resultType="long">
+        SELECT DISTINCT lar.role_id
+        FROM tb_login_account_role lar
+        JOIN tb_login_account la
+          ON la.login_id = lar.login_id
+        WHERE la.tenant_id = #{tenantId}
+          AND la.login_code = #{loginCode}
+        ORDER BY lar.role_id ASC
+    </select>
+
+    <select id="selectRoleCodesByUserAccount" parameterType="map" resultType="string">
+        SELECT DISTINCT r.role_code
+        FROM tb_login_account_role lar
+        JOIN tb_login_account la
+          ON la.login_id = lar.login_id
+        JOIN tb_role r
+          ON r.role_id = lar.role_id
+        WHERE la.tenant_id = #{tenantId}
+          AND la.login_code = #{loginCode}
+          AND COALESCE(r.use_at, 'Y') = 'Y'
+        ORDER BY r.role_code ASC
+    </select>
+
     <delete id="deleteMenuPermissions" parameterType="long">
         DELETE FROM tb_menu_permission
         WHERE menu_id = #{value}
     </delete>
 
+    <delete id="deleteRoleMenuPermissions" parameterType="map">
+        DELETE FROM tb_role_menu_permission
+        WHERE role_id = #{roleId}
+          AND menu_id = #{menuId}
+    </delete>
+
     <insert id="insertMenuPermissions" parameterType="map">
         INSERT INTO tb_menu_permission (menu_id, permission_id)
         SELECT #{menuId}, p.permission_id
+        FROM tb_permission p
+        WHERE p.use_at = 'Y'
+          AND p.permission_code IN
+          <foreach collection="permissionCodes" item="permissionCode" open="(" separator="," close=")">
+              #{permissionCode}
+          </foreach>
+    </insert>
+
+    <insert id="insertRoleMenuPermissions" parameterType="map">
+        INSERT INTO tb_role_menu_permission (role_id, menu_id, permission_id)
+        SELECT #{roleId}, #{menuId}, p.permission_id
         FROM tb_permission p
         WHERE p.use_at = 'Y'
           AND p.permission_code IN

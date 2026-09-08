@@ -1,4 +1,3 @@
-import adminUserMenus from '../data/adminUserMenus.json';
 import { apiGet } from '../../../shared/services/apiClient';
 import type {
   MenuItem,
@@ -8,12 +7,19 @@ import type {
   UserMenuResponse,
 } from '../types/dashboard';
 
-export const userMenuResponse = adminUserMenus as UserMenuResponse;
+export const emptyUserMenuResponse: UserMenuResponse = {
+  user: {
+    userId: '',
+    roles: [],
+  },
+  menus: [],
+};
 
 export type ModuleDescriptor = {
   id: string;
   name: string;
   iconName: string;
+  path?: string;
   tree: MenuTreeNode[];
   menus: MenuItem[];
 };
@@ -42,10 +48,39 @@ const toTreeNode = (node: MenuNode): MenuTreeNode => {
   };
 };
 
+const hasEffectiveMenuPermission = (permissions?: MenuPermission): boolean =>
+  Boolean(
+    permissions &&
+    (permissions.read ||
+      permissions.create ||
+      permissions.update ||
+      permissions.delete ||
+      permissions.excel),
+  );
+
+const filterVisibleMenuNodes = (nodes: MenuNode[] = []): MenuNode[] =>
+  nodes.flatMap((node) => {
+    const filteredChildren = filterVisibleMenuNodes(node.children ?? []);
+
+    if (filteredChildren.length > 0) {
+      return [{ ...node, children: filteredChildren }];
+    }
+
+    if (hasEffectiveMenuPermission(node.permissions)) {
+      return [{ ...node }];
+    }
+
+    return [];
+  });
+
 const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
   nodes.flatMap((node) => {
     if (node.children?.length) {
       return flattenMenuTree(node.children);
+    }
+
+    if (!hasEffectiveMenuPermission(node.permissions)) {
+      return [];
     }
 
     return node.pageKey
@@ -54,6 +89,7 @@ const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
             id: node.id,
             name: node.name,
             pageKey: node.pageKey,
+            ...(node.path ? { path: node.path } : {}),
             ...(node.description ? { description: node.description } : {}),
           },
         ]
@@ -63,20 +99,66 @@ const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
 export const buildModuleDescriptors = (
   response: UserMenuResponse,
 ): ModuleDescriptor[] =>
-  response.menus.map((root) => {
-    const tree = root.children?.map(toTreeNode) ?? [];
+  response.menus
+    .map((root) => {
+      const tree = filterVisibleMenuNodes(root.children ?? []).map(toTreeNode);
+
+      return {
+        id: toModuleId(root),
+        name: root.name,
+        iconName: root.icon ?? 'Settings',
+        path: root.path,
+        tree,
+        menus: flattenMenuTree(tree),
+      };
+    })
+    .filter(
+      (descriptor) => descriptor.tree.length > 0 || descriptor.menus.length > 0,
+    );
+
+const normalizeModulePath = (path?: string | null): string =>
+  (path ?? '').trim().replace(/\/+$/, '').toLowerCase();
+
+export const hydrateModuleDescriptors = (
+  descriptors: ModuleDescriptor[],
+  moduleRows: Array<{
+    moduleName?: string;
+    moduleCode?: string;
+    iconName?: string;
+    moduleUrl?: string;
+  }>,
+): ModuleDescriptor[] =>
+  descriptors.map((descriptor) => {
+    const match =
+      moduleRows.find(
+        (row) =>
+          normalizeModulePath(row.moduleUrl) ===
+          normalizeModulePath(descriptor.path ?? `/${descriptor.id}`),
+      ) ??
+      moduleRows.find(
+        (row) =>
+          (row.moduleName ?? '').trim().toLowerCase() ===
+          descriptor.name.trim().toLowerCase(),
+      ) ??
+      moduleRows.find(
+        (row) =>
+          (row.moduleCode ?? '').trim().toLowerCase() ===
+          descriptor.id.trim().toLowerCase(),
+      );
+
+    if (!match) {
+      return descriptor;
+    }
 
     return {
-      id: toModuleId(root),
-      name: root.name,
-      iconName: root.icon ?? 'Settings',
-      tree,
-      menus: flattenMenuTree(tree),
+      ...descriptor,
+      name: (match.moduleName ?? descriptor.name).trim() || descriptor.name,
+      iconName:
+        (match.iconName ?? descriptor.iconName).trim() || descriptor.iconName,
     };
   });
 
-export const moduleDescriptors: ModuleDescriptor[] =
-  buildModuleDescriptors(userMenuResponse);
+export const moduleDescriptors: ModuleDescriptor[] = [];
 
 const collectPermissions = (
   moduleId: string,

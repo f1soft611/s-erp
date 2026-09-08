@@ -46,7 +46,11 @@ public class MyMenuApiController {
         if (user == null) {
             return IntermediateResultVO.success(null);
         }
-        MyMenuResponseVO response = systemMenuService.getMyMenuTree(user.getTenantId(), user.getId(), user.getRoleCode());
+        MyMenuResponseVO response = systemMenuService.getMyMenuTree(
+                user.getTenantId(),
+                user.getId(),
+                user.getRoleId(),
+                user.getRoleCode());
         IntermediateResultVO<MyMenuResponseVO> result = IntermediateResultVO.success(response);
         result.setResultMessage(ResponseCode.SUCCESS.getMessage());
         return result;

@@ -55,13 +55,11 @@ export function RoleManagementPage({
 
   const pageActionPermissions = useMemo(() => {
     const writeAllowed = Boolean(
-      selectedMenuPermissions?.create ||
-      selectedMenuPermissions?.update ||
-      true,
+      selectedMenuPermissions?.create || selectedMenuPermissions?.update,
     );
 
     return {
-      read: Boolean(selectedMenuPermissions?.read ?? true),
+      read: Boolean(selectedMenuPermissions?.read ?? false),
       write: writeAllowed,
       excel: Boolean(selectedMenuPermissions?.excel ?? false),
     };
@@ -202,12 +200,20 @@ export function RoleManagementPage({
               ),
             },
           }}
-          sx={{
+          sx={(theme) => ({
             flex: '1 1 220px',
             minWidth: { xs: '100%', sm: 220 },
             maxWidth: 360,
             height: 40,
-          }}
+            '& .MuiOutlinedInput-root': {
+              height: '100%',
+              borderRadius: 2,
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(15, 23, 42, 0.72)'
+                  : 'rgba(255,255,255,0.72)',
+            },
+          })}
         />
       </PageSearchArea>
       <PageMessageArea message={error} onClose={() => setError('')} />

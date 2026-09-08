@@ -113,14 +113,16 @@ END
 
 ### 2️⃣ **[신규 추가] S-ERP 백엔드 (Java + Spring Boot / eGovFrame + MyBatis)** ⭐ _현재 프로젝트 적용_
 
-- **언어/런타임**: Java 17+, Spring Boot / 전자정부프레임워크(eGovFrame) 4.x
+- **언어/런타임**: Java 8+, Spring Boot / 전자정부프레임워크(eGovFrame) 4.x
 - **ORM/DB**: MyBatis, PostgreSQL (전자정부 eGovAbstractDAO 기반)
 - **빌드/테스트**: Maven (`mvn test`, `mvn spring-boot:run`)
 - **특화 Skill/규칙**:
   - **DB 스키마 관리**: DB 변경 시 `backend/DATABASE/YYYYMMDD` 및 `docs/database/`에 SQL 스크립트, 변경 이력 문서(`.md`), 롤백 스크립트를 동일 일자로 누적 관리
-  - `TenantContextHolder`를 통한 다중 테넌트 DB 라우팅 지원 (JWT 인증 및 트랜잭션 전 컨텍스트 세팅)
+  - `TenantContextHolder`를 통한 다중 테넴트 DB 라우팅 지원 (JWT 인증 및 트랜잭션 전 컨텍스트 세팅)
   - eGovAbstractDAO 연동 시 raw 타입 처리 및 MyBatis XML namespace/DAO 일치 보장
   - MyBatis XML `if test` 문자열 비교 시 이중 따옴표(`active == "Y"`) 사용으로 OGNL `NumberFormatException` 방지
+  - **Java 8 호환 구현 규칙**: `var`, `record`, `List.of()`, `Stream.toList()`, `Path.of()` 등 Java 9+ API/문법을 Java 8 대상 코드에서 금지하고, 명시 타입, `Collectors.toList()`, `Paths.get()`, `Arrays.asList()` 등 Java 8 방식을 사용한다.
+  - **Maven 호환성 점검**: 구현 전후 `pom.xml`의 `maven-compiler-plugin` `source`/`target` 또는 `release` 값이 Java 8 기준과 일치하는지 확인한다.
 
 ### 3️⃣ **Node.js / TypeScript (Express, NestJS, etc.)**
 
@@ -153,10 +155,11 @@ END
 
 ### 6️⃣ **Java (Spring Boot / 일반)**
 
-- **언어**: Java 11+
+- **언어**: Java 8+
 - **테스트**: JUnit, Mockito, TestNG
 - **빌드**: Maven, Gradle
 - **특화 Skill**:
+  - Java 8 호환 문법/컬렉션 API 사용 (예: `Collectors.toList()`, `Arrays.asList()`, `Paths.get()`)
   - Spring Boot devtools 활용
   - 빌드 캐시 최적화
 
@@ -227,7 +230,7 @@ pytest          → pytest.ini 또는 conftest.py
     "tech_stack": "tech-stacks/s-erp-react-vite.yml"
   },
   "backend": {
-    "language": "Java 17",
+    "language": "Java 8+",
     "framework": "Spring Boot + eGovFrame 4.x",
     "orm": "MyBatis (PostgreSQL)",
     "build_system": "Maven",
@@ -363,7 +366,7 @@ tdd_tips:
 
 ```yaml
 name: 'S-ERP Java Backend'
-language: 'Java 17'
+language: 'Java 8+'
 framework: 'Spring Boot / eGovFrame 4.x'
 orm: 'MyBatis (PostgreSQL)'
 build_system: 'Maven'
@@ -382,6 +385,9 @@ db_schema_policy:
 tdd_tips:
   - 'TenantContextHolder 세팅 후 DB 접근 보장'
   - 'MyBatis XML test 조건문 이중 따옴표 사용'
+  - 'Java 8 호환 구현: var, record, List.of(), Stream.toList(), Path.of() 금지'
+  - 'Java 8 대체 방식: 명시 타입, Arrays.asList(), Collectors.toList(), Paths.get(), 기존 switch 문 사용'
+  - 'maven-compiler-plugin source/target/release 값이 Java 8과 일치하는지 확인'
 ```
 
 ## 💡 기술 스택별 템플릿 예시

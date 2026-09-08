@@ -84,7 +84,9 @@ describe('F1-Grid docs portal', () => {
 
     expect(screen.getByText('headerCheckbox')).toBeInTheDocument();
     expect(
-      screen.getByText(/showCheckbox는 행 선택용 체크박스 컬럼 전체를 켜고 끄고/),
+      screen.getByText(
+        /showCheckbox는 행 선택용 체크박스 컬럼 전체를 켜고 끄고/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -97,6 +99,25 @@ describe('F1-Grid docs portal', () => {
     expect(
       screen.getByText(/병합된 영역에서도 셀 드래그 범위 선택이/),
     ).toBeInTheDocument();
+  });
+
+  it('documents column render hooks and the editable-header indicator', () => {
+    render(<F1GridDocsPage initialDocumentId="editing" />);
+
+    expect(screen.getByText('renderCell')).toBeInTheDocument();
+    expect(screen.getByText('getCellStyle')).toBeInTheDocument();
+    expect(screen.getByText('getCellProps')).toBeInTheDocument();
+    expect(
+      screen.getByText(/편집 가능한 컬럼은 헤더 하단에 강조 색상/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a live render hook example in the editing playground', () => {
+    render(<F1GridDocsPage initialDocumentId="editing" />);
+
+    expect(screen.getByText('활성')).toBeInTheDocument();
+    expect(screen.getByText('대기')).toBeInTheDocument();
+    expect(screen.getByText('중지')).toBeInTheDocument();
   });
 
   it('documents Tree Grid expansion options and the Tree Ref API', () => {

@@ -58,9 +58,14 @@ public class SystemMenuApiController {
     @GetMapping
     public ResultVO listMenus(
             @RequestParam(required = false) Long moduleId,
+            @RequestParam(required = false) Long roleId,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         Map<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", systemMenuService.listMenus(user.getTenantId(), moduleId));
+        if (roleId == null) {
+            resultMap.put("resultList", systemMenuService.listMenus(user.getTenantId(), moduleId));
+        } else {
+            resultMap.put("resultList", systemMenuService.listMenus(user.getTenantId(), moduleId, roleId));
+        }
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

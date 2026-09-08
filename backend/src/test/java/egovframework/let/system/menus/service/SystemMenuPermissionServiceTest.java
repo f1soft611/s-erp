@@ -20,11 +20,12 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
+import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionEntry;
 import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
-import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
-import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
 import egovframework.let.system.menus.domain.repository.SystemMenuDAO;
 import egovframework.let.system.menus.service.impl.SystemMenuServiceImpl;
 import egovframework.let.system.modules.domain.model.SystemModuleVO;
@@ -121,6 +122,45 @@ class SystemMenuPermissionServiceTest {
     }
 
     @Test
+    void listMenusWithRoleIdLoadsRoleSpecificPermissionCodesAndEnabledState() throws Exception {
+        SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, mock(SystemModuleService.class));
+        SystemMenuVO firstMenu = menu(menuId);
+        when(systemMenuDAO.selectMenuList(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+            .thenReturn(Collections.singletonList(firstMenu));
+        when(systemMenuDAO.selectRoleMenuPermissionCodeRows(
+                org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                .thenReturn(Arrays.asList(
+                    permissionCodeRow(menuId, "READ"),
+                    permissionCodeRow(menuId, "CREATE")));
+
+        List<SystemMenuVO> result = service.listMenus(tenantId, 2L, 7L);
+
+        verify(systemMenuDAO).selectRoleMenuPermissionCodeRows(argThat(condition -> tenantId.equals(condition.getTenantId())
+            && Long.valueOf(2L).equals(condition.getModuleId())
+            && Long.valueOf(7L).equals(condition.getRoleId())));
+        assertEquals(Arrays.asList("READ", "CREATE"), result.get(0).getPermissionCodes());
+        assertEquals("Y", result.get(0).getUseAt());
+    }
+
+    @Test
+    void replaceRoleMenuPermissionsPersistsSelectedRoleMappings() throws Exception {
+        SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, mock(SystemModuleService.class));
+        SystemMenuVO menu = menu(menuId);
+        menu.setModuleId(2L);
+        when(systemMenuDAO.selectMenuById(anyMap())).thenReturn(menu);
+        when(systemMenuDAO.countActivePermissionCodes(Arrays.asList("READ", "CREATE"))).thenReturn(2);
+
+        service.replaceRoleMenuPermissions(tenantId, 7L, Arrays.asList(
+            new SystemMenuPermissionEntry("READ", "CREATE", true)
+        ));
+
+        verify(systemMenuDAO).deleteRoleMenuPermissions(7L, menuId);
+        verify(systemMenuDAO).insertRoleMenuPermissions(7L, menuId, Arrays.asList("READ", "CREATE"));
+    }
+
+    @Test
     void myMenuTreeUsesSavedMenuPermissionsAndDescription() throws Exception {
         SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
         SystemModuleService systemModuleService = mock(SystemModuleService.class);
@@ -154,6 +194,97 @@ class SystemMenuPermissionServiceTest {
         assertEquals(true, node.getPermissions().isUpdate());
         assertEquals(true, node.getPermissions().isDelete());
         assertEquals(false, node.getPermissions().isExcel());
+    }
+
+    @Test
+    void myMenuTreeUsesRoleScopedPermissionsWhenRoleIdIsAvailable() throws Exception {
+        SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
+        SystemModuleService systemModuleService = mock(SystemModuleService.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, systemModuleService);
+
+        SystemModuleVO module = new SystemModuleVO();
+        module.setModuleId(2L);
+        module.setModuleNm("환경설정");
+        module.setModuleUrl("/settings");
+        module.setUseAt("Y");
+
+        SystemMenuVO parentMenu = menu(3L);
+        parentMenu.setModuleId(2L);
+        parentMenu.setMenuNm("시스템 관리");
+        parentMenu.setMenuDc("시스템 관리");
+        parentMenu.setMenuUrl("/settings/system");
+        parentMenu.setParentMenuId(null);
+
+        SystemMenuVO leafMenu = menu(9L);
+        leafMenu.setModuleId(2L);
+        leafMenu.setMenuNm("모듈관리");
+        leafMenu.setMenuDc("모듈 관리");
+        leafMenu.setMenuUrl("/settings/system/modules");
+        leafMenu.setParentMenuId(parentMenu.getMenuId());
+
+        when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
+        when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(parentMenu, leafMenu));
+        when(systemMenuDAO.selectRoleMenuPermissionCodeRows(
+                org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                .thenReturn(Collections.singletonList(permissionCodeRow(leafMenu.getMenuId(), "READ")));
+
+        MyMenuResponseVO response = service.getMyMenuTree(tenantId, "admin", 7L, "PLATFORM_ADMIN");
+
+        assertEquals(true, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isRead());
+        assertEquals(false, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isCreate());
+        verify(systemMenuDAO).selectRoleMenuPermissionCodeRows(argThat(condition ->
+                tenantId.equals(condition.getTenantId())
+                        && Long.valueOf(7L).equals(condition.getRoleId())
+                        && "Y".equalsIgnoreCase(condition.getUseAt())));
+    }
+
+    @Test
+    void myMenuTreeUsesUnionOfAllAssignedUserRolesWhenMultipleRolePermissionsExist() throws Exception {
+        SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
+        SystemModuleService systemModuleService = mock(SystemModuleService.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, systemModuleService);
+
+        SystemModuleVO module = new SystemModuleVO();
+        module.setModuleId(2L);
+        module.setModuleNm("환경설정");
+        module.setModuleUrl("/settings");
+        module.setUseAt("Y");
+
+        SystemMenuVO parentMenu = menu(3L);
+        parentMenu.setModuleId(2L);
+        parentMenu.setMenuNm("시스템 관리");
+        parentMenu.setMenuDc("시스템 관리");
+        parentMenu.setMenuUrl("/settings/system");
+        parentMenu.setParentMenuId(null);
+
+        SystemMenuVO leafMenu = menu(9L);
+        leafMenu.setModuleId(2L);
+        leafMenu.setMenuNm("모듈관리");
+        leafMenu.setMenuDc("모듈 관리");
+        leafMenu.setMenuUrl("/settings/system/modules");
+        leafMenu.setParentMenuId(parentMenu.getMenuId());
+
+        when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
+        when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(parentMenu, leafMenu));
+        when(systemMenuDAO.selectRoleIdsByUserAccount(tenantId, "admin")).thenReturn(Arrays.asList(7L, 9L));
+        when(systemMenuDAO.selectRoleMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                .thenAnswer(invocation -> {
+                    SystemMenuSearchConditionVO condition = invocation.getArgument(0);
+                    Long roleId = condition.getRoleId();
+                    if (Long.valueOf(7L).equals(roleId)) {
+                        return Collections.singletonList(permissionCodeRow(leafMenu.getMenuId(), "READ"));
+                    }
+                    if (Long.valueOf(9L).equals(roleId)) {
+                        return Collections.singletonList(permissionCodeRow(leafMenu.getMenuId(), "DELETE"));
+                    }
+                    return Collections.emptyList();
+                });
+
+        MyMenuResponseVO response = service.getMyMenuTree(tenantId, "admin", 7L, "PLATFORM_ADMIN");
+
+        assertEquals(true, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isRead());
+        assertEquals(true, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isDelete());
+        assertEquals(false, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isCreate());
     }
 
     @Test

@@ -74,6 +74,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 컬럼 리사이즈와 컬럼 고정 상태가 동시에 동작하며, 마지막 남은 표시 컬럼은 숨길 수 없다.
 - 행 높이 조절 핸들과 키보드 `ArrowUp`/`ArrowDown`으로 `4px` 단위 조절이 가능하다.
 - `wrapText: true` 옵션이 있는 컬럼은 행 높이가 커질 때 줄바꿈을 허용하고, 기본 컬럼은 한 줄 말줄임 유지한다.
+- `height`, `minHeight`, `maxHeight`를 통해 Grid 컨테이너의 전체 높이와 최소/최대 높이를 제어한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
@@ -269,6 +270,65 @@ interface F1GridColumn<T> {
   hidden?: boolean;
   pinned?: 'left' | 'right';
 }
+```
+
+## 컬럼 확장 API (표시 커스터마이징)
+
+`renderCell`, `getCellStyle`, `getCellProps`는 컬럼별로 표시 영역, 동적 스타일, 셀 속성, 접근성 메타데이터를 직접 확장할 수 있게 해준다.
+
+```typescript
+type F1GridCellRenderContext<T> = {
+  row: T;
+  rowId: string | number;
+  column: F1GridColumn<T>;
+  field: keyof T;
+  value: unknown;
+  rowIndex: number;
+};
+
+type F1GridCellProps = {
+  className?: string;
+  style?: React.CSSProperties;
+  title?: string;
+  'aria-label'?: string;
+};
+
+interface F1GridColumn<T> {
+  renderCell?: (context: F1GridCellRenderContext<T>) => React.ReactNode;
+  getCellStyle?: (
+    context: F1GridCellRenderContext<T>,
+  ) => React.CSSProperties | undefined;
+  getCellProps?: (
+    context: F1GridCellRenderContext<T>,
+  ) => F1GridCellProps | undefined;
+}
+```
+
+- `renderCell`은 표시 모드에서만 적용된다. 셀이 편집 모드로 전환되면 기존 `CellEditor` / editor plugin 흐름이 그대로 사용되며, `renderCell`은 무시된다.
+- `getCellStyle`과 `getCellProps.style`은 문자열 CSS가 아니라 `React.CSSProperties` 객체를 반환해야 한다.
+- `getCellProps`에서 반환한 `className`, `title`, `aria-label`은 셀 컨테이너의 속성으로 병합 적용되며, 기존 텍스트 표시/편집 동작을 깨지 않는다.
+- 세 함수 모두 지정하지 않으면 기본 값 표시 및 기존 편집 동작을 그대로 유지한다.
+- 복잡한 스타일은 `getCellProps.className`과 외부 CSS 클래스로 확장하는 것이 가장 안전하다.
+
+예:
+
+```typescript
+const columns: F1GridColumn<Item>[] = [
+  {
+    field: 'status',
+    headerName: '상태',
+    renderCell: ({ value }) => (
+      <span className={value === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}>
+        {value === 'ACTIVE' ? '사용' : '미사용'}
+      </span>
+    ),
+    getCellStyle: ({ value }) =>
+      value === 'ACTIVE' ? { fontWeight: 600 } : undefined,
+    getCellProps: ({ row }) => ({
+      title: row.statusUpdatedAt ? `변경일: ${row.statusUpdatedAt}` : undefined,
+    }),
+  },
+];
 ```
 
 > ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
@@ -1260,6 +1320,18 @@ Selected Row
 단, 특정 색상을 하드코딩하지 않는다.
 
 프로젝트 Theme을 통해 변경 가능하도록 한다.
+
+## 편집 가능 컬럼 헤더 표시
+
+편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다.
+
+판정 조건(모두 만족해야 표시):
+
+1. 그리드에 활성화된 editor plugin이 하나 이상 존재한다.
+2. 화면에 보이는 행(`visibleRows`) 중 하나 이상에서 `isCellEditable(column, row)`이 참이다. 즉 컬럼의 `editable: true` 선언만으로는 표시되지 않는다.
+3. 활성 editor plugin에 `canEdit(context)`가 정의되어 있다면 그 조건도 함께 만족해야 한다.
+
+실제 구현은 `editableColumnFields` 집합을 계산할 때 위 조건을 모두 통과한 컬럼만 `data-editable-column="true"`로 헤더에 반영한다. 헤더 하단 border 표시는 정렬 인디케이터, 필터 표시, 컬럼 고정, 드래그앤드롭 드롭 위치 표시와 공존한다.
 
 ---
 

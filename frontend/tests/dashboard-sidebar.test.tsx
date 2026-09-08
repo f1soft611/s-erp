@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
+import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 
 async function loginAsAdmin() {
   fireEvent.change(screen.getByLabelText(/업체코드/i), {
@@ -148,7 +149,7 @@ describe('Dashboard sidebar', () => {
         expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }),
     );
-    window.history.pushState({}, '', '/dashboard/groupware/documents');
+    window.history.pushState({}, '', '/groupware/documents');
 
     render(<App />);
 
@@ -176,6 +177,33 @@ describe('Dashboard sidebar', () => {
     expect(
       screen.queryByRole('heading', { name: /^대시보드$/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('renders a coming soon state when a menu exists but the page is not implemented yet', () => {
+    render(
+      <DashboardContent
+        selectedModule={{
+          id: 'sales',
+          name: '영업관리',
+          icon: <span aria-hidden="true">S</span>,
+          tree: [],
+          menus: [],
+          path: '/sales',
+        }}
+        currentMenuName="수주 관리"
+        currentPageKey="sales-order"
+        breadcrumbItems={['영업관리', '수주 관리']}
+        content={{
+          title: '수주 관리',
+          description: '수주 관리 화면입니다.',
+          cards: [],
+          items: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByText('준비 중입니다')).toBeInTheDocument();
+    expect(screen.getByText(/현재 준비 중인 메뉴입니다/i)).toBeInTheDocument();
   });
 
   it('renders the ERP-style role and menu management screens', async () => {

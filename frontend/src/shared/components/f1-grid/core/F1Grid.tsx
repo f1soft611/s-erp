@@ -12,7 +12,7 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box, Divider, Menu, MenuItem } from '@mui/material';
+import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
@@ -66,7 +66,6 @@ import {
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
 import { normalizeDateInput } from '../editing/DateEditor';
-import { GridLoadingSkeleton } from '../../PageLoadingSkeleton';
 import {
   getGridColumnPinOffsets,
   getGridColumnPinSide,
@@ -87,6 +86,7 @@ function F1GridInner<T extends object>(
     columnLine = false,
     storageKey,
     height,
+    minHeight,
     maxHeight,
     rowHeight = 32,
     minRowHeight = 32,
@@ -374,6 +374,34 @@ function F1GridInner<T extends object>(
   const visibleRows = disableSorting
     ? filteredRows
     : sortGridRows(filteredRows, sortState);
+
+  const editableColumnFields = new Set<string>(
+    visibleColumns
+      .filter((column) =>
+        visibleRows.some((row) => {
+          if (!activeEditorPlugins.length || !isCellEditable(column, row)) {
+            return false;
+          }
+
+          const context: F1GridEditContext<T> = {
+            row,
+            rowId: getGridRowId(row, rowKey),
+            column,
+            field: column.field,
+            value: row[column.field],
+            defaultValue: String(row[column.field] ?? ''),
+          };
+
+          return activeEditorPlugins.every((plugin) => {
+            if (plugin.canEdit && !plugin.canEdit(context)) {
+              return false;
+            }
+            return true;
+          });
+        }),
+      )
+      .map((column) => String(column.field)),
+  );
 
   const mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -1366,6 +1394,8 @@ function F1GridInner<T extends object>(
 
   const resolvedHeight =
     typeof height === 'number' ? `${height}px` : (height ?? 'auto');
+  const resolvedMinHeight =
+    typeof minHeight === 'number' ? `${minHeight}px` : (minHeight ?? '0');
   const resolvedMaxHeight =
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1500,6 +1530,7 @@ function F1GridInner<T extends object>(
       ref={gridContainerRef}
       role="grid"
       aria-label={ariaLabel}
+      aria-busy={loading || undefined}
       onCopy={handleCopy}
       onPaste={handlePaste}
       onContextMenu={openContextMenu}
@@ -1511,8 +1542,8 @@ function F1GridInner<T extends object>(
         overflowX: 'auto',
         overflowY: 'hidden',
         height: resolvedHeight,
+        minHeight: resolvedMinHeight,
         maxHeight: resolvedMaxHeight,
-        minHeight: 0,
         border: 1,
         borderColor: 'divider',
         borderRadius: 1,
@@ -1566,6 +1597,7 @@ function F1GridInner<T extends object>(
           onPinColumn={pinColumn}
           leftOffsets={leftOffsets}
           rightOffsets={rightOffsets}
+          editableColumnFields={editableColumnFields}
           onReorderColumn={reorderColumn}
         />
       </Box>
@@ -1580,22 +1612,7 @@ function F1GridInner<T extends object>(
           overflowX: 'auto',
         }}
       >
-        {loading ? (
-          <Box
-            sx={{
-              width: '100%',
-              minHeight: 180,
-              px: 1,
-              py: 1,
-            }}
-          >
-            <GridLoadingSkeleton
-              columns={visibleColumns}
-              rows={5}
-              showHeader={false}
-            />
-          </Box>
-        ) : (
+        {!loading ? (
           <GridBody
             visibleRows={visibleRows}
             columns={visibleColumns}
@@ -1668,7 +1685,7 @@ function F1GridInner<T extends object>(
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
           />
-        )}
+        ) : null}
         {rangeOverlay ? (
           <Box
             data-range-overlay={copiedCellRange ? 'copy' : 'drag'}
@@ -1694,6 +1711,24 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
+      {loading ? (
+        <Box
+          data-testid="f1-grid-loading-overlay"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(15, 23, 42, 0.08)',
+            pointerEvents: 'auto',
+          }}
+          aria-live="polite"
+        >
+          <CircularProgress size={34} thickness={4} />
+        </Box>
+      ) : null}
       <Menu
         open={Boolean(contextMenu)}
         onClose={closeContextMenu}

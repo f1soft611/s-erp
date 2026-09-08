@@ -96,7 +96,8 @@
 
     <update id="updateModule" parameterType="map">
         UPDATE tb_module
-        SET module_nm = #{moduleNm},
+        SET module_code = #{moduleCode},
+            module_nm = #{moduleNm},
             icon_nm = #{iconNm},
             module_url = #{moduleUrl},
             sort_order = #{sortOrder},

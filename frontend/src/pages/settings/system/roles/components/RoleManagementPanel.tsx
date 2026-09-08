@@ -513,164 +513,184 @@ export const RoleManagementPanel = forwardRef<
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', lg: '1.2fr 1fr' },
-        gap: 2,
-        p: 3,
-        minHeight: 0,
-        height: '100%',
+        p: { xs: 1.5, sm: 1 },
+        minWidth: 0,
         flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
       }}
     >
-      <Card
+      <Box
         sx={{
-          borderRadius: 3,
-          border: '1px solid rgba(148,163,184,0.18)',
-          boxShadow: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '1.2fr 1fr' },
+          gap: 2,
+          flex: 1,
+          minWidth: 0,
+          height: '100%',
+          overflow: 'hidden',
         }}
       >
-        <CardContent
+        <Card
           sx={{
-            p: 2.5,
+            borderRadius: 1,
+            border: '1px solid rgba(148,163,184,0.18)',
+            boxShadow: 'none',
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
-            minHeight: 0,
+            height: '100%',
+            overflow: 'hidden',
           }}
         >
-          <Box
+          <CardContent
             sx={{
+              p: 2.5,
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 2,
-              gap: 1,
+              flexDirection: 'column',
+              flex: 1,
+              height: '100%',
+              overflow: 'hidden',
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              권한 관리
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            <F1Grid
-              key={roleGridKey}
-              ref={roleGridRef}
-              rows={filteredRoles}
-              columns={roleColumns}
-              rowKey="id"
-              ariaLabel="F1-GRID 권한 관리"
-              height="100%"
-              maxHeight="100%"
-              rowHeight={32}
-              minRowHeight={32}
-              maxRowHeight={320}
-              showCheckbox={false}
-              createRow={createRoleRow}
-              editorPlugins={[roleEditorPlugin]}
-              onSelectionChange={handleRoleSelection}
-              onChangesChange={handleRoleGridChanges}
-              canExportExcel={canExportExcel}
-              excelFileName="role-management-export"
-              loading={roleGridLoading}
-            />
-          </Box>
-        </CardContent>
-      </Card>
-      <Card
-        sx={{
-          borderRadius: 3,
-          border: '1px solid rgba(148,163,184,0.18)',
-          boxShadow: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-        }}
-      >
-        <CardContent
-          sx={{
-            p: 2.5,
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 1,
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              권한별 사용자 매핑
-            </Typography>
-            {selectedRole ? (
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                sx={{
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: '60%',
-                  textAlign: 'right',
-                }}
-              >
-                선택 역할: {selectedRole.name}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                flexWrap: 'wrap',
+                gap: 1,
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                권한 관리
               </Typography>
-            ) : null}
-          </Box>
-          {selectedRole || roleGridLoading ? (
-            <>
-              <Box sx={{ flex: 1, minHeight: 0 }}>
-                {userError ? (
-                  <Typography variant="body2" color="error.main">
-                    {userError}
-                  </Typography>
-                ) : (
-                  <F1Grid
-                    key={userGridKey}
-                    ref={userGridRef}
-                    rows={userRows}
-                    columns={userColumns}
-                    rowKey="id"
-                    storageKey="role-user-mapping-grid"
-                    ariaLabel="F1-GRID 사용자 매핑"
-                    height="100%"
-                    maxHeight="100%"
-                    rowHeight={32}
-                    minRowHeight={32}
-                    maxRowHeight={320}
-                    showCheckbox={false}
-                    editorPlugins={[
-                      {
-                        id: 'role-user-grid-editor',
-                        enabled: true,
-                        canEdit: () => true,
-                      },
-                    ]}
-                    allowAddRowInContextMenu={false}
-                    allowDuplicateRowInContextMenu={false}
-                    allowDeleteRowInContextMenu={false}
-                    onChangesChange={handleUserGridChanges}
-                    loading={userLoading}
-                  />
-                )}
-              </Box>
-            </>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              선택된 권한이 없습니다.
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
+            </Box>
+            <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+              <F1Grid
+                key={roleGridKey}
+                ref={roleGridRef}
+                rows={filteredRoles}
+                columns={roleColumns}
+                rowKey="id"
+                ariaLabel="F1-GRID 권한 관리"
+                height="100%"
+                maxHeight="100%"
+                rowHeight={32}
+                minRowHeight={32}
+                maxRowHeight={320}
+                showCheckbox={false}
+                createRow={createRoleRow}
+                editorPlugins={[roleEditorPlugin]}
+                onSelectionChange={handleRoleSelection}
+                onChangesChange={handleRoleGridChanges}
+                canExportExcel={canExportExcel}
+                excelFileName="role-management-export"
+                loading={roleGridLoading}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+        <Card
+          sx={{
+            borderRadius: 1,
+            border: '1px solid rgba(148,163,184,0.18)',
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            height: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <CardContent
+            sx={{
+              p: 2.5,
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              height: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                flexWrap: 'wrap',
+                gap: 1,
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                권한별 사용자 매핑
+              </Typography>
+              {selectedRole ? (
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '60%',
+                    textAlign: 'right',
+                  }}
+                >
+                  선택 역할: {selectedRole.name}
+                </Typography>
+              ) : null}
+            </Box>
+            {selectedRole || roleGridLoading ? (
+              <>
+                <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                  {userError ? (
+                    <Typography variant="body2" color="error.main">
+                      {userError}
+                    </Typography>
+                  ) : (
+                    <F1Grid
+                      key={userGridKey}
+                      ref={userGridRef}
+                      rows={userRows}
+                      columns={userColumns}
+                      rowKey="id"
+                      storageKey="role-user-mapping-grid"
+                      ariaLabel="F1-GRID 사용자 매핑"
+                      height="100%"
+                      maxHeight="100%"
+                      rowHeight={32}
+                      minRowHeight={32}
+                      maxRowHeight={320}
+                      showCheckbox={false}
+                      editorPlugins={[
+                        {
+                          id: 'role-user-grid-editor',
+                          enabled: true,
+                          canEdit: () => true,
+                        },
+                      ]}
+                      allowAddRowInContextMenu={false}
+                      allowDuplicateRowInContextMenu={false}
+                      allowDeleteRowInContextMenu={false}
+                      onChangesChange={handleUserGridChanges}
+                      loading={userLoading}
+                    />
+                  )}
+                </Box>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                선택된 권한이 없습니다.
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
       <Dialog
         open={userDialogOpen}
         onClose={() => setUserDialogOpen(false)}

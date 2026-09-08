@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildModuleDescriptors,
   getMenuPermission,
   moduleDescriptors,
   userMenuResponse,
@@ -30,7 +31,9 @@ describe('User menu mock data', () => {
     expect(settings.tree[0].children?.map((node) => node.name)).toEqual([
       '권한관리',
       '메뉴관리',
+      '모듈관리',
       'F1 Grid 테스트',
+      'F1-Grid 문서',
     ]);
     expect(groupware.menus.map((menu) => menu.pageKey)).toEqual([
       'overview',
@@ -39,7 +42,9 @@ describe('User menu mock data', () => {
     expect(settings.menus.map((menu) => menu.pageKey)).toEqual([
       'roles',
       'menus',
+      'modules',
       'f1-grid-test',
+      'f1-grid-docs',
     ]);
   });
 
@@ -74,5 +79,61 @@ describe('User menu mock data', () => {
 
   it('returns undefined for an unknown menu', () => {
     expect(getMenuPermission('groupware', 'unknown')).toBeUndefined();
+  });
+
+  it('hides menu leaves whose effective permissions are all false', () => {
+    const modules = buildModuleDescriptors({
+      user: { userId: 'admin', roles: ['ADMIN'] },
+      menus: [
+        {
+          menuId: 200,
+          parentMenuId: null,
+          name: '환경설정',
+          icon: 'Settings',
+          path: '/settings',
+          children: [
+            {
+              menuId: 210,
+              parentMenuId: 200,
+              name: '시스템 관리',
+              path: '/settings/system',
+              children: [
+                {
+                  menuId: 211,
+                  parentMenuId: 210,
+                  name: '권한관리',
+                  path: '/settings/system/roles',
+                  permissions: {
+                    read: false,
+                    create: false,
+                    update: false,
+                    delete: false,
+                    excel: false,
+                  },
+                },
+                {
+                  menuId: 212,
+                  parentMenuId: 210,
+                  name: '메뉴관리',
+                  path: '/settings/system/menus',
+                  permissions: {
+                    read: true,
+                    create: false,
+                    update: false,
+                    delete: false,
+                    excel: false,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(modules[0].menus.map((menu) => menu.name)).toEqual(['메뉴관리']);
+    expect(modules[0].tree[0].children?.map((node) => node.name)).toEqual([
+      '메뉴관리',
+    ]);
   });
 });

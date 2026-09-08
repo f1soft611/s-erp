@@ -1,6 +1,7 @@
 import {
   AppBar,
   Box,
+  CircularProgress,
   IconButton,
   ListItemIcon,
   Menu,
@@ -25,14 +26,19 @@ import {
   buildPageContent,
   buildModuleItems,
   defaultPage,
-  moduleItems as staticModuleItems,
   pageContentMap,
 } from './services/dashboardData';
-import { buildModuleDescriptors, fetchMyMenus } from './services/menuService';
+import {
+  buildModuleDescriptors,
+  fetchMyMenus,
+  hydrateModuleDescriptors,
+} from './services/menuService';
+import { fetchModuleRows } from '../settings/system/modules/services/moduleManagement.service';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
-import type { MenuTreeNode } from './types/dashboard';
+import type { MenuTreeNode, ModuleItem } from './types/dashboard';
+import { NotFoundPage } from '../errors/NotFoundPage';
 
 const themeOptions = [
   { value: 'light', label: '밝은 테마' },
@@ -47,6 +53,47 @@ const displayScaleOptions = [
   { value: 1.3, label: '가장 크게' },
   { value: 1, label: '초기화', icon: <ReplayOutlined fontSize="small" /> },
 ];
+
+const normalizeRoutePath = (path?: string | null): string => {
+  const normalized = (path ?? '').trim();
+  if (!normalized || normalized === '/') {
+    return '/';
+  }
+
+  return normalized.replace(/\/+$/, '') || '/';
+};
+
+const resolveLegacyRoutePath = (pathname: string): string => {
+  if (!pathname || pathname === '/') {
+    return '/';
+  }
+
+  if (pathname === '/dashboard' || pathname === '/dashboard/') {
+    return '/';
+  }
+
+  if (pathname.startsWith('/dashboard/')) {
+    return pathname.replace(/^\/dashboard/, '') || '/';
+  }
+
+  return pathname;
+};
+
+const getModuleRoutePath = (module: ModuleItem): string =>
+  normalizeRoutePath(module.path ?? `/${module.id}`);
+
+const getMenuRoutePath = (module: ModuleItem, menuId: string): string => {
+  const modulePath = getModuleRoutePath(module);
+  const directMatch =
+    module.menus.find((menu) => menu.id === menuId)?.path ??
+    findMenuPath(module.tree, menuId)?.node.path;
+
+  if (directMatch) {
+    return normalizeRoutePath(directMatch);
+  }
+
+  return `${modulePath === '/' ? '' : modulePath}/${menuId}` || '/';
+};
 
 function findMenuPath(
   nodes: MenuTreeNode[],
@@ -85,23 +132,57 @@ function findMenuPath(
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
-  const [moduleItems, setModuleItems] = useState(staticModuleItems);
+  const [moduleItems, setModuleItems] = useState<ModuleItem[]>([]);
+  const [menusLoading, setMenusLoading] = useState(true);
   const defaultModule = moduleItems[0];
-  const defaultMenuId = defaultModule.menus[0]?.id ?? '';
+  const defaultMenuId = defaultModule?.menus[0]?.id ?? '';
+  const emptyModule: ModuleItem = {
+    id: '',
+    name: '접근 가능한 메뉴 없음',
+    icon: null,
+    tree: [],
+    menus: [],
+  };
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyMenus().then((response) => {
-      if (cancelled || !response) {
-        return;
-      }
-      setModuleItems(buildModuleItems(buildModuleDescriptors(response)));
-    });
+    setMenusLoading(true);
+
+    Promise.all([
+      fetchMyMenus().catch(() => ({
+        user: { userId: '', roles: [] },
+        menus: [],
+      })),
+      fetchModuleRows().catch(() => []),
+    ])
+      .then(([response, moduleRows]) => {
+        if (cancelled) {
+          return;
+        }
+
+        const sourceModules = buildModuleDescriptors(
+          response ?? {
+            user: { userId: '', roles: [] },
+            menus: [],
+          },
+        );
+
+        setModuleItems(
+          buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setMenusLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
   }, []);
   const location = useLocation();
+  const effectivePath = resolveLegacyRoutePath(location.pathname);
   const theme = useTheme();
   const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
     null,
@@ -118,19 +199,26 @@ function DashboardPage() {
     toggleMenuPanel,
     closeMobileMenu,
   } = useDashboardResponsive();
-  const pathSegments = location.pathname.split('/').filter(Boolean);
-  const routeModuleId = pathSegments[1] ?? defaultModule.id;
-  const routeMenuId = pathSegments[2] ?? defaultMenuId;
+  const pathSegments = effectivePath.split('/').filter(Boolean);
+  const routeModuleId = pathSegments[0] ?? defaultModule?.id ?? '';
+  const routeMenuId =
+    pathSegments.length > 1
+      ? pathSegments[pathSegments.length - 1]
+      : defaultMenuId;
 
   const selectedModuleId = moduleItems.some(
-    (module) => module.id === routeModuleId,
+    (module) =>
+      module.id === routeModuleId ||
+      normalizeRoutePath(module.path ?? `/${module.id}`) ===
+        normalizeRoutePath(effectivePath),
   )
     ? routeModuleId
-    : defaultModule.id;
+    : (defaultModule?.id ?? '');
 
   const selectedModule =
     moduleItems.find((module) => module.id === selectedModuleId) ??
-    moduleItems[0];
+    moduleItems[0] ??
+    emptyModule;
 
   const selectedMenuPath = findMenuPath(selectedModule.tree, routeMenuId);
   const selectedMenu =
@@ -138,10 +226,10 @@ function DashboardPage() {
       ? selectedMenuPath
       : undefined;
   const fallbackMenu = selectedModule.menus[0] ??
-    defaultModule.menus[0] ?? {
-      id: defaultMenuId,
-      name: defaultModule.name,
-      pageKey: defaultMenuId,
+    defaultModule?.menus[0] ?? {
+      id: defaultMenuId || 'empty-access',
+      name: selectedModule.name,
+      pageKey: defaultMenuId || 'empty-access',
     };
   const fallbackMenuPath = findMenuPath(selectedModule.tree, fallbackMenu.id);
   const selectedMenuId = selectedMenu?.node.id ?? fallbackMenu.id;
@@ -156,27 +244,83 @@ function DashboardPage() {
     currentMenu.name,
   ];
 
+  const isValidDashboardRoute = useMemo(() => {
+    const normalizedPath = normalizeRoutePath(effectivePath);
+    if (normalizedPath === '/') {
+      return true;
+    }
+
+    const validPaths = new Set<string>(['/']);
+    moduleItems.forEach((module) => {
+      validPaths.add(normalizeRoutePath(module.path ?? `/${module.id}`));
+
+      const collectTreePaths = (nodes: MenuTreeNode[]) => {
+        nodes.forEach((node) => {
+          if (node.path) {
+            validPaths.add(normalizeRoutePath(node.path));
+          }
+          if (node.children?.length) {
+            collectTreePaths(node.children);
+          }
+        });
+      };
+
+      collectTreePaths(module.tree);
+      module.menus.forEach((menu) => {
+        if (menu.path) {
+          validPaths.add(normalizeRoutePath(menu.path));
+        }
+      });
+    });
+
+    return validPaths.has(normalizedPath);
+  }, [effectivePath, moduleItems]);
+
   useEffect(() => {
     const pathname = location.pathname;
-    if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const firstMenu = defaultModule.menus[0]?.id ?? defaultMenuId;
-      navigate(`/dashboard/${defaultModule.id}/${firstMenu}`, {
-        replace: true,
-      });
+    if (!defaultModule) {
+      return;
     }
-  }, [location.pathname, navigate]);
+
+    const isRootDashboardAlias =
+      pathname === '/' ||
+      pathname === '/dashboard' ||
+      pathname === '/dashboard/';
+
+    if (isRootDashboardAlias) {
+      const firstMenu = defaultModule.menus[0];
+      const nextPath =
+        (firstMenu?.path ??
+          getMenuRoutePath(defaultModule, firstMenu?.id ?? defaultMenuId)) ||
+        getModuleRoutePath(defaultModule);
+
+      if (nextPath !== pathname) {
+        navigate(nextPath, { replace: true });
+      }
+    }
+  }, [defaultModule, defaultMenuId, location.pathname, navigate]);
 
   const isDarkTheme = themeMode === 'dark';
 
   const handleModuleChange = (moduleId: string) => {
     const nextModule =
       moduleItems.find((module) => module.id === moduleId) ?? moduleItems[0];
-    const nextMenu = nextModule.menus[0]?.id ?? defaultMenuId;
-    navigate(`/dashboard/${nextModule.id}/${nextMenu}`);
+    if (!nextModule) {
+      return;
+    }
+
+    const nextMenu = nextModule.menus[0];
+    const nextPath =
+      nextMenu?.path ??
+      (nextMenu
+        ? getMenuRoutePath(nextModule, nextMenu.id)
+        : getModuleRoutePath(nextModule));
+    navigate(nextPath);
   };
 
   const handleMenuSelect = (menuId: string) => {
-    navigate(`/dashboard/${selectedModuleId}/${menuId}`);
+    const targetPath = getMenuRoutePath(selectedModule, menuId);
+    navigate(targetPath);
   };
 
   const handleLogout = () => {
@@ -210,192 +354,252 @@ function DashboardPage() {
     return buildPageContent(baseContent, currentMenu);
   }, [currentMenu]);
 
+  const hasAccessibleMenu = moduleItems.length > 0;
+
+  if (!menusLoading && !isValidDashboardRoute) {
+    return <NotFoundPage />;
+  }
+
   return (
     <Box
       sx={{
         display: 'flex',
-        minHeight: '100vh',
+        height: '100vh',
+        minHeight: 0,
+        overflow: 'hidden',
         bgcolor: theme.palette.background.default,
         color: theme.palette.text.primary,
       }}
     >
-      <DashboardSidebar
-        moduleItems={moduleItems}
-        selectedModuleId={selectedModuleId}
-        selectedModule={selectedModule}
-        expandedItemIds={expandedItemIds}
-        selectedMenuId={selectedMenuId}
-        onModuleChange={handleModuleChange}
-        onMenuSelect={handleMenuSelect}
-        isMenuPanelCollapsed={isMenuPanelCollapsed}
-        isMobile={isMobile}
-        isMobileMenuOpen={isMobileMenuOpen}
-        onToggleMenu={toggleMenuPanel}
-        onCloseMobileMenu={closeMobileMenu}
-      />
-
-      <Box
-        ref={contentRef}
-        sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}
-      >
-        <AppBar
-          position="sticky"
-          elevation={0}
+      {menusLoading ? (
+        <Box
           sx={{
-            bgcolor: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            borderBottom: `1px solid ${theme.palette.divider}`,
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
           }}
         >
+          <CircularProgress size={34} />
+        </Box>
+      ) : (
+        <>
+          <DashboardSidebar
+            moduleItems={moduleItems}
+            selectedModuleId={selectedModuleId}
+            selectedModule={selectedModule}
+            expandedItemIds={expandedItemIds}
+            selectedMenuId={selectedMenuId}
+            onModuleChange={handleModuleChange}
+            onMenuSelect={handleMenuSelect}
+            isMenuPanelCollapsed={isMenuPanelCollapsed}
+            isMobile={isMobile}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMenu={toggleMenuPanel}
+            onCloseMobileMenu={closeMobileMenu}
+          />
+
           <Box
+            ref={contentRef}
             sx={{
-              px: { xs: 1, md: 3 },
-              py: 1.75,
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              height: '100%',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 1,
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton
-                aria-label={
-                  isMobile
-                    ? isMobileMenuOpen
-                      ? '메뉴 닫기'
-                      : '메뉴 열기'
-                    : isMenuPanelCollapsed
-                      ? '메뉴 패널 펼치기'
-                      : '메뉴 패널 접기'
-                }
-                aria-expanded={
-                  isMobile ? isMobileMenuOpen : !isMenuPanelCollapsed
-                }
-                onClick={toggleMenuPanel}
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                {isMobile && isMobileMenuOpen ? (
-                  <MenuOpenOutlined fontSize="small" />
-                ) : isMobile || isMenuPanelCollapsed ? (
-                  <MenuOutlined fontSize="small" />
-                ) : (
-                  <MenuOpenOutlined fontSize="small" />
-                )}
-              </IconButton>
-              <Typography variant="h6" component="h1" sx={{ fontWeight: 700 }}>
-                {currentMenu.name}
-              </Typography>
-            </Box>
+            {hasAccessibleMenu ? (
+              <>
+                <AppBar
+                  position="sticky"
+                  elevation={0}
+                  sx={{
+                    bgcolor: theme.palette.background.paper,
+                    color: theme.palette.text.primary,
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      px: { xs: 1, md: 3 },
+                      py: 1.75,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 1,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton
+                        aria-label={
+                          isMobile
+                            ? isMobileMenuOpen
+                              ? '메뉴 닫기'
+                              : '메뉴 열기'
+                            : isMenuPanelCollapsed
+                              ? '메뉴 패널 펼치기'
+                              : '메뉴 패널 접기'
+                        }
+                        aria-expanded={
+                          isMobile ? isMobileMenuOpen : !isMenuPanelCollapsed
+                        }
+                        onClick={toggleMenuPanel}
+                        sx={{ color: theme.palette.text.secondary }}
+                      >
+                        {isMobile && isMobileMenuOpen ? (
+                          <MenuOpenOutlined fontSize="small" />
+                        ) : isMobile || isMenuPanelCollapsed ? (
+                          <MenuOutlined fontSize="small" />
+                        ) : (
+                          <MenuOpenOutlined fontSize="small" />
+                        )}
+                      </IconButton>
+                      <Typography
+                        variant="h6"
+                        component="h1"
+                        sx={{ fontWeight: 700 }}
+                      >
+                        {currentMenu.name}
+                      </Typography>
+                    </Box>
 
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                ml: 'auto',
-                minWidth: 0,
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <Tooltip title="테마 설정">
-                <IconButton
-                  aria-label="테마 설정"
-                  aria-controls={
-                    themeMenuAnchor ? 'theme-settings-menu' : undefined
-                  }
-                  aria-haspopup="menu"
-                  aria-expanded={themeMenuAnchor ? 'true' : undefined}
-                  onClick={handleOpenThemeMenu}
-                  sx={{ color: theme.palette.text.secondary }}
-                >
-                  {isDarkTheme ? (
-                    <DarkModeOutlined fontSize="small" />
-                  ) : (
-                    <LightModeOutlined fontSize="small" />
-                  )}
-                </IconButton>
-              </Tooltip>
-              <Menu
-                id="theme-settings-menu"
-                anchorEl={themeMenuAnchor}
-                open={Boolean(themeMenuAnchor)}
-                onClose={() => setThemeMenuAnchor(null)}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        ml: 'auto',
+                        minWidth: 0,
+                        flexWrap: 'wrap',
+                        justifyContent: 'flex-end',
+                      }}
+                    >
+                      <Tooltip title="테마 설정">
+                        <IconButton
+                          aria-label="테마 설정"
+                          aria-controls={
+                            themeMenuAnchor ? 'theme-settings-menu' : undefined
+                          }
+                          aria-haspopup="menu"
+                          aria-expanded={themeMenuAnchor ? 'true' : undefined}
+                          onClick={handleOpenThemeMenu}
+                          sx={{ color: theme.palette.text.secondary }}
+                        >
+                          {isDarkTheme ? (
+                            <DarkModeOutlined fontSize="small" />
+                          ) : (
+                            <LightModeOutlined fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Menu
+                        id="theme-settings-menu"
+                        anchorEl={themeMenuAnchor}
+                        open={Boolean(themeMenuAnchor)}
+                        onClose={() => setThemeMenuAnchor(null)}
+                      >
+                        {themeOptions.map((option) => (
+                          <MenuItem
+                            key={option.value}
+                            selected={themeMode === option.value}
+                            onClick={() => handleThemeChange(option.value)}
+                          >
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </Menu>
+                      <Tooltip title="화면크기 설정">
+                        <IconButton
+                          aria-label="화면크기 설정"
+                          aria-controls={
+                            displayScaleMenuAnchor
+                              ? 'display-scale-settings-menu'
+                              : undefined
+                          }
+                          aria-haspopup="menu"
+                          aria-expanded={
+                            displayScaleMenuAnchor ? 'true' : undefined
+                          }
+                          onClick={handleOpenDisplayScaleMenu}
+                          sx={{ color: theme.palette.text.secondary }}
+                        >
+                          <TuneOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Menu
+                        id="display-scale-settings-menu"
+                        anchorEl={displayScaleMenuAnchor}
+                        open={Boolean(displayScaleMenuAnchor)}
+                        onClose={() => setDisplayScaleMenuAnchor(null)}
+                      >
+                        {displayScaleOptions.map((option) => (
+                          <MenuItem
+                            key={`${option.label}-${String(option.value)}`}
+                            selected={
+                              Number(option.value) === Number(displayScale)
+                            }
+                            onClick={() =>
+                              handleDisplayScaleChange(option.value)
+                            }
+                          >
+                            {option.icon ? (
+                              <ListItemIcon sx={{ minWidth: 32 }}>
+                                {option.icon}
+                              </ListItemIcon>
+                            ) : null}
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </Menu>
+                      <IconButton
+                        aria-label="notifications"
+                        sx={{ color: theme.palette.text.secondary }}
+                      >
+                        <NotificationsOutlined fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        aria-label="logout"
+                        sx={{ color: theme.palette.text.secondary }}
+                        onClick={handleLogout}
+                      >
+                        <LogoutOutlined fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                </AppBar>
+
+                <DashboardContent
+                  selectedModule={selectedModule}
+                  currentMenuName={currentMenu.name}
+                  currentPageKey={currentMenu.pageKey ?? defaultMenuId}
+                  breadcrumbItems={breadcrumbItems}
+                  content={content}
+                  selectedMenuPermissions={currentMenu.permissions}
+                />
+              </>
+            ) : (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  px: 3,
+                }}
               >
-                {themeOptions.map((option) => (
-                  <MenuItem
-                    key={option.value}
-                    selected={themeMode === option.value}
-                    onClick={() => handleThemeChange(option.value)}
-                  >
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Menu>
-              <Tooltip title="화면크기 설정">
-                <IconButton
-                  aria-label="화면크기 설정"
-                  aria-controls={
-                    displayScaleMenuAnchor
-                      ? 'display-scale-settings-menu'
-                      : undefined
-                  }
-                  aria-haspopup="menu"
-                  aria-expanded={displayScaleMenuAnchor ? 'true' : undefined}
-                  onClick={handleOpenDisplayScaleMenu}
-                  sx={{ color: theme.palette.text.secondary }}
-                >
-                  <TuneOutlined fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Menu
-                id="display-scale-settings-menu"
-                anchorEl={displayScaleMenuAnchor}
-                open={Boolean(displayScaleMenuAnchor)}
-                onClose={() => setDisplayScaleMenuAnchor(null)}
-              >
-                {displayScaleOptions.map((option) => (
-                  <MenuItem
-                    key={`${option.label}-${String(option.value)}`}
-                    selected={Number(option.value) === Number(displayScale)}
-                    onClick={() => handleDisplayScaleChange(option.value)}
-                  >
-                    {option.icon ? (
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        {option.icon}
-                      </ListItemIcon>
-                    ) : null}
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Menu>
-              <IconButton
-                aria-label="notifications"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                <NotificationsOutlined fontSize="small" />
-              </IconButton>
-              <IconButton
-                aria-label="logout"
-                sx={{ color: theme.palette.text.secondary }}
-                onClick={handleLogout}
-              >
-                <LogoutOutlined fontSize="small" />
-              </IconButton>
-            </Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  접근 가능한 메뉴가 없습니다.
+                </Typography>
+              </Box>
+            )}
           </Box>
-        </AppBar>
-
-        <DashboardContent
-          selectedModule={selectedModule}
-          currentMenuName={currentMenu.name}
-          currentPageKey={currentMenu.pageKey ?? defaultMenuId}
-          breadcrumbItems={breadcrumbItems}
-          content={content}
-          selectedMenuPermissions={currentMenu.permissions}
-        />
-      </Box>
+        </>
+      )}
     </Box>
   );
 }

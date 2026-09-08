@@ -101,6 +101,7 @@ export function CellEditor<T extends object>({
       <SelectEditor
         value={value}
         options={column.options ?? []}
+        selectOptionIcon={column.selectOptionIcon}
         onChange={onSelectChange}
       />
     );

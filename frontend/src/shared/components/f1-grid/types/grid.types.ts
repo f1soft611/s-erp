@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 export type F1GridRowId = string | number;
 
@@ -34,6 +34,22 @@ export type F1GridEditContext<T extends object> = {
   defaultValue: string;
 };
 
+export type F1GridCellRenderContext<T extends object> = {
+  row: T;
+  rowId: F1GridRowId;
+  column: F1GridColumn<T>;
+  field: keyof T;
+  value: unknown;
+  rowIndex: number;
+};
+
+export type F1GridCellProps = {
+  className?: string;
+  style?: CSSProperties;
+  title?: string;
+  'aria-label'?: string;
+};
+
 export type F1GridEditLifecycle<T extends object> = (
   context: F1GridEditContext<T>,
 ) => boolean | void;
@@ -62,6 +78,7 @@ export type F1GridColumn<T extends object> = {
   format?: F1GridNumberFormat;
   decimalPlaces?: number;
   options?: F1GridOption[];
+  selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
   min?: number;
   max?: number;
@@ -70,6 +87,13 @@ export type F1GridColumn<T extends object> = {
     row: T,
     applyPatch: (changes: Partial<T>) => void,
   ) => Partial<T> | undefined;
+  renderCell?: (context: F1GridCellRenderContext<T>) => ReactNode;
+  getCellStyle?: (
+    context: F1GridCellRenderContext<T>,
+  ) => CSSProperties | undefined;
+  getCellProps?: (
+    context: F1GridCellRenderContext<T>,
+  ) => F1GridCellProps | undefined;
   align?: 'left' | 'center' | 'right';
   headerAlign?: 'left' | 'center' | 'right';
   wrapText?: boolean;
@@ -135,6 +159,7 @@ export type F1GridProps<T extends object> = {
   columnLine?: boolean;
   storageKey?: string;
   height?: number | string;
+  minHeight?: number | string;
   maxHeight?: number | string;
   rowHeight?: number;
   minRowHeight?: number;

@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import egovframework.let.system.menus.domain.model.MenuPermissionVO;
 import egovframework.let.system.menus.domain.model.MenuTreeNodeVO;
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionEntry;
 import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSearchConditionVO;
@@ -50,15 +51,29 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
 
     @Override
     public List<SystemMenuVO> listMenus(Long tenantId, Long moduleId) throws Exception {
+        return listMenusInternal(tenantId, moduleId, null);
+    }
+
+    @Override
+    public List<SystemMenuVO> listMenus(Long tenantId, Long moduleId, Long roleId) throws Exception {
+        return listMenusInternal(tenantId, moduleId, roleId);
+    }
+
+    private List<SystemMenuVO> listMenusInternal(Long tenantId, Long moduleId, Long roleId) throws Exception {
         SystemMenuSearchConditionVO condition = new SystemMenuSearchConditionVO();
         condition.setTenantId(tenantId);
         condition.setModuleId(moduleId);
+        condition.setRoleId(roleId);
         List<SystemMenuVO> menus = systemMenuDAO.selectMenuList(condition);
         Map<Long, List<String>> permissionCodesByMenuId = new HashMap<>();
         for (SystemMenuVO menu : menus) {
             permissionCodesByMenuId.put(menu.getMenuId(), new ArrayList<>());
         }
-        for (Map<String, Object> row : systemMenuDAO.selectMenuPermissionCodeRows(condition)) {
+
+        Iterable<Map<String, Object>> permissionRows = roleId == null
+                ? systemMenuDAO.selectMenuPermissionCodeRows(condition)
+                : systemMenuDAO.selectRoleMenuPermissionCodeRows(condition);
+        for (Map<String, Object> row : permissionRows) {
             Long menuId = ((Number) row.get("menuId")).longValue();
             List<String> permissionCodes = permissionCodesByMenuId.get(menuId);
             if (permissionCodes != null) {
@@ -66,7 +81,11 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             }
         }
         for (SystemMenuVO menu : menus) {
-            menu.setPermissionCodes(permissionCodesByMenuId.get(menu.getMenuId()));
+            List<String> codes = permissionCodesByMenuId.get(menu.getMenuId());
+            menu.setPermissionCodes(codes);
+            if (menu.getUseAt() == null || menu.getUseAt().trim().isEmpty()) {
+                menu.setUseAt("Y");
+            }
         }
         return menus;
     }
@@ -88,10 +107,13 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         validateParentMenu(tenantId, payload.getParentMenuId(), payload.getModuleId());
         validateMenuCodeDuplication(tenantId, payload.getMenuCode(), null);
 
+        Long moduleId = normalizeNullableLong(payload.getModuleId());
+        Long parentMenuId = normalizeNullableLong(payload.getParentMenuId());
+
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
-        params.put("moduleId", payload.getModuleId());
-        params.put("parentMenuId", payload.getParentMenuId());
+        params.put("moduleId", moduleId);
+        params.put("parentMenuId", parentMenuId);
         params.put("menuCode", payload.getMenuCode().trim());
         params.put("menuNm", payload.getMenuNm().trim());
         params.put("menuDc", payload.getMenuDc());
@@ -120,10 +142,12 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             validateMenuCodeDuplication(tenantId, menuCode, menuId);
         }
 
+        Long parentMenuId = normalizeNullableLong(payload.getParentMenuId());
+
         Map<String, Object> params = new HashMap<>();
         params.put("menuId", menuId);
         params.put("tenantId", tenantId);
-        params.put("parentMenuId", payload.getParentMenuId());
+        params.put("parentMenuId", parentMenuId);
         params.put("menuNm", payload.getMenuNm().trim());
         params.put("menuDc", payload.getMenuDc());
         params.put("menuUrl", payload.getMenuUrl());
@@ -180,15 +204,64 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
     }
 
     @Override
-    public MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, String roleCode) throws Exception {
+    @Transactional
+    public void replaceRoleMenuPermissions(Long tenantId, Long roleId, List<SystemMenuPermissionEntry> payload) throws Exception {
+        if (roleId == null) {
+            throw new IllegalArgumentException("역할은 필수입니다.");
+        }
+        if (payload == null || payload.isEmpty()) {
+            return;
+        }
+
+        for (SystemMenuPermissionEntry entry : payload) {
+            if (entry == null) {
+                continue;
+            }
+
+            Long targetMenuId = entry.getMenuId();
+            if (targetMenuId == null) {
+                if (StringUtils.hasText(entry.getMenuCode())) {
+                    Map<String, Object> codeParams = new HashMap<>();
+                    codeParams.put("tenantId", tenantId);
+                    codeParams.put("menuCode", entry.getMenuCode().trim());
+                    targetMenuId = systemMenuDAO.selectMenuIdByCode(codeParams);
+                }
+                if (targetMenuId == null) {
+                    Map<String, Object> params = new HashMap<>();
+                    params.put("tenantId", tenantId);
+                    params.put("menuId", null);
+                    SystemMenuVO fallbackMenu = systemMenuDAO.selectMenuById(params);
+                    if (fallbackMenu != null) {
+                        targetMenuId = fallbackMenu.getMenuId();
+                    }
+                }
+            }
+            if (targetMenuId == null) {
+                continue;
+            }
+
+            findByIdOrThrow(tenantId, targetMenuId);
+            List<String> permissionCodes = normalizePermissionCodes(entry.getPermissionCodes());
+            if (!permissionCodes.isEmpty()
+                    && systemMenuDAO.countActivePermissionCodes(permissionCodes) != permissionCodes.size()) {
+                throw new IllegalArgumentException("유효하지 않은 권한 코드입니다.");
+            }
+
+            systemMenuDAO.deleteRoleMenuPermissions(roleId, targetMenuId);
+            if (!permissionCodes.isEmpty()) {
+                systemMenuDAO.insertRoleMenuPermissions(roleId, targetMenuId, permissionCodes);
+            }
+        }
+    }
+
+    @Override
+    public MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, Long roleId, String roleCode) throws Exception {
         List<SystemModuleVO> modules = systemModuleService.listModules(tenantId).stream()
                 .filter(module -> "Y".equalsIgnoreCase(module.getUseAt()))
                 .collect(Collectors.toList());
         List<SystemMenuVO> menus = systemMenuDAO.selectActiveMenusForTenant(tenantId);
-        SystemMenuSearchConditionVO condition = new SystemMenuSearchConditionVO();
-        condition.setTenantId(tenantId);
-        condition.setUseAt("Y");
-        Map<Long, List<String>> permissionCodesByMenuId = permissionCodesByMenuId(menus, condition);
+        List<Long> effectiveRoleIds = resolveEffectiveRoleIds(tenantId, userId, roleId);
+        Map<Long, Set<String>> permissionCodesByMenuId = permissionCodesByMenuId(menus, tenantId, effectiveRoleIds);
 
         List<MenuTreeNodeVO> tree = new ArrayList<>();
         for (SystemModuleVO module : modules) {
@@ -198,7 +271,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
             moduleNode.setName(module.getModuleNm());
             moduleNode.setIcon(module.getIconNm());
             moduleNode.setPath(module.getModuleUrl());
-                moduleNode.setChildren(buildMenuChildren(
+            moduleNode.setChildren(buildMenuChildren(
                     menus, module.getModuleId(), null, permissionCodesByMenuId));
             tree.add(moduleNode);
         }
@@ -206,7 +279,15 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         MyMenuResponseVO response = new MyMenuResponseVO();
         MyMenuResponseVO.UserSummary user = new MyMenuResponseVO.UserSummary();
         user.setUserId(userId);
-        user.setRoles(Collections.singletonList(roleCode));
+        List<String> assignedRoles = systemMenuDAO.selectRoleCodesByUserAccount(tenantId, userId);
+        LinkedHashSet<String> roleNames = new LinkedHashSet<>();
+        if (StringUtils.hasText(roleCode)) {
+            roleNames.add(roleCode);
+        }
+        if (assignedRoles != null) {
+            roleNames.addAll(assignedRoles);
+        }
+        user.setRoles(roleNames.isEmpty() ? Collections.emptyList() : new ArrayList<>(roleNames));
         response.setUser(user);
         response.setMenus(tree);
         return response;
@@ -214,7 +295,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
 
     private List<MenuTreeNodeVO> buildMenuChildren(
             List<SystemMenuVO> menus, Long moduleId, Long parentMenuId,
-            Map<Long, List<String>> permissionCodesByMenuId) {
+            Map<Long, Set<String>> permissionCodesByMenuId) {
         List<MenuTreeNodeVO> result = new ArrayList<>();
         for (SystemMenuVO menu : menus) {
             boolean sameModule = moduleId.equals(menu.getModuleId());
@@ -245,23 +326,58 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         return result;
     }
 
-    private Map<Long, List<String>> permissionCodesByMenuId(
-            List<SystemMenuVO> menus, SystemMenuSearchConditionVO condition) throws Exception {
-        Map<Long, List<String>> result = new HashMap<>();
+    private Map<Long, Set<String>> permissionCodesByMenuId(
+            List<SystemMenuVO> menus, Long tenantId, List<Long> roleIds) throws Exception {
+        Map<Long, Set<String>> result = new HashMap<>();
         for (SystemMenuVO menu : menus) {
-            result.put(menu.getMenuId(), new ArrayList<>());
+            result.put(menu.getMenuId(), new LinkedHashSet<>());
         }
-        for (Map<String, Object> row : systemMenuDAO.selectMenuPermissionCodeRows(condition)) {
-            Long menuId = ((Number) row.get("menuId")).longValue();
-            List<String> codes = result.get(menuId);
-            if (codes != null) {
-                codes.add((String) row.get("permissionCode"));
-            }
+
+        if (roleIds == null || roleIds.isEmpty()) {
+            SystemMenuSearchConditionVO condition = new SystemMenuSearchConditionVO();
+            condition.setTenantId(tenantId);
+            condition.setUseAt("Y");
+            collectPermissionCodeRows(result, systemMenuDAO.selectMenuPermissionCodeRows(condition));
+            return result;
+        }
+
+        LinkedHashSet<Long> distinctRoleIds = new LinkedHashSet<>(roleIds);
+        for (Long roleId : distinctRoleIds) {
+            SystemMenuSearchConditionVO condition = new SystemMenuSearchConditionVO();
+            condition.setTenantId(tenantId);
+            condition.setRoleId(roleId);
+            condition.setUseAt("Y");
+            collectPermissionCodeRows(result, systemMenuDAO.selectRoleMenuPermissionCodeRows(condition));
         }
         return result;
     }
 
-    private MenuPermissionVO toMenuPermission(List<String> permissionCodes) {
+    private void collectPermissionCodeRows(
+            Map<Long, Set<String>> result, Iterable<Map<String, Object>> rows) {
+        for (Map<String, Object> row : rows) {
+            Long menuId = ((Number) row.get("menuId")).longValue();
+            Set<String> codes = result.get(menuId);
+            if (codes != null) {
+                codes.add((String) row.get("permissionCode"));
+            }
+        }
+    }
+
+    private List<Long> resolveEffectiveRoleIds(Long tenantId, String userId, Long requestedRoleId) throws Exception {
+        List<Long> assignedRoleIds = systemMenuDAO.selectRoleIdsByUserAccount(tenantId, userId);
+        if (assignedRoleIds == null || assignedRoleIds.isEmpty()) {
+            return requestedRoleId == null ? Collections.emptyList() : Collections.singletonList(requestedRoleId);
+        }
+
+        LinkedHashSet<Long> merged = new LinkedHashSet<>();
+        if (requestedRoleId != null) {
+            merged.add(requestedRoleId);
+        }
+        merged.addAll(assignedRoleIds);
+        return new ArrayList<>(merged);
+    }
+
+    private MenuPermissionVO toMenuPermission(Set<String> permissionCodes) {
         Set<String> codes = permissionCodes == null
                 ? Collections.emptySet()
                 : new LinkedHashSet<>(permissionCodes);
@@ -271,6 +387,20 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
                 codes.contains("UPDATE"),
                 codes.contains("DELETE"),
                 codes.contains("EXCEL"));
+    }
+
+    private Long normalizeNullableLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        String normalized = String.valueOf(value).trim();
+        if (!StringUtils.hasText(normalized) || "null".equalsIgnoreCase(normalized)) {
+            return null;
+        }
+        return Long.valueOf(normalized);
     }
 
     private SystemMenuVO findByIdOrThrow(Long tenantId, Long menuId) throws Exception {

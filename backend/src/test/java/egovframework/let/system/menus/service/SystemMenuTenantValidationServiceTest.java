@@ -103,6 +103,23 @@ class SystemMenuTenantValidationServiceTest {
     }
 
     @Test
+    void createMenuAllowsRootMenuWhenParentMenuIsNull() throws Exception {
+        SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
+        SystemModuleService moduleService = mock(SystemModuleService.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(menuDAO, moduleService);
+        when(moduleService.listModules(TENANT_ID)).thenReturn(Collections.singletonList(module(MODULE_ID)));
+        when(menuDAO.insertMenu(anyMap())).thenReturn(31L);
+        when(menuDAO.selectMenuIdByCode(anyMap())).thenReturn(null);
+        when(menuDAO.selectMenuById(anyMap())).thenReturn(menu(31L, MODULE_ID));
+        when(menuDAO.selectMenuPermissionCodes(31L)).thenReturn(Collections.emptyList());
+
+        SystemMenuVO created = service.createMenu(TENANT_ID, request(MODULE_ID, null));
+
+        assertEquals(31L, created.getMenuId());
+        verify(menuDAO).insertMenu(anyMap());
+    }
+
+    @Test
     void createMenuInsertsWhenModuleAndParentBelongToTenantAndModule() throws Exception {
         SystemMenuDAO menuDAO = mock(SystemMenuDAO.class);
         SystemModuleService moduleService = mock(SystemModuleService.class);

@@ -1,6 +1,23 @@
 import type { ReactNode } from 'react';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
+import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
+import FolderOutlined from '@mui/icons-material/FolderOutlined';
+import AssignmentOutlined from '@mui/icons-material/AssignmentOutlined';
+import BusinessOutlined from '@mui/icons-material/BusinessOutlined';
+import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
+import PeopleOutlined from '@mui/icons-material/PeopleOutlined';
+import BuildOutlined from '@mui/icons-material/BuildOutlined';
+import VpnKeyOutlined from '@mui/icons-material/VpnKeyOutlined';
+import Inventory2Outlined from '@mui/icons-material/Inventory2Outlined';
+import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
+import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
+import ShoppingCartOutlined from '@mui/icons-material/ShoppingCartOutlined';
+import AdminPanelSettingsOutlined from '@mui/icons-material/AdminPanelSettingsOutlined';
+import ListAltOutlined from '@mui/icons-material/ListAltOutlined';
+import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import type { ModuleItem, PageContent } from '../types/dashboard';
 import { moduleDescriptors, type ModuleDescriptor } from './menuService';
 
@@ -8,6 +25,23 @@ function ModuleIcon({ name }: { name: string }): ReactNode {
   const map: Record<string, ReactNode> = {
     Groups: <GroupsOutlined fontSize="medium" />,
     Settings: <SettingsOutlined fontSize="medium" />,
+    Dashboard: <DashboardOutlined fontSize="medium" />,
+    Folder: <FolderOutlined fontSize="medium" />,
+    Assignment: <AssignmentOutlined fontSize="medium" />,
+    Business: <BusinessOutlined fontSize="medium" />,
+    Security: <SecurityOutlined fontSize="medium" />,
+    People: <PeopleOutlined fontSize="medium" />,
+    Build: <BuildOutlined fontSize="medium" />,
+    VpnKey: <VpnKeyOutlined fontSize="medium" />,
+    Inventory: <Inventory2Outlined fontSize="medium" />,
+    Notifications: <NotificationsOutlined fontSize="medium" />,
+    CalendarMonth: <CalendarMonthOutlined fontSize="medium" />,
+    ShoppingCart: <ShoppingCartOutlined fontSize="medium" />,
+    AdminPanelSettings: <AdminPanelSettingsOutlined fontSize="medium" />,
+    ListAlt: <ListAltOutlined fontSize="medium" />,
+    CheckCircle: <CheckCircleOutlined fontSize="medium" />,
+    FileText: <DescriptionOutlined fontSize="medium" />,
+    ClipboardCheck: <FactCheckOutlined fontSize="medium" />,
   };
 
   return map[name] ?? map.Settings;
@@ -16,10 +50,11 @@ function ModuleIcon({ name }: { name: string }): ReactNode {
 export const buildModuleItems = (
   descriptors: ModuleDescriptor[],
 ): ModuleItem[] =>
-  descriptors.map(({ id, name, iconName, tree, menus }) => ({
+  descriptors.map(({ id, name, iconName, path, tree, menus }) => ({
     id,
     name,
     icon: <ModuleIcon name={iconName} />,
+    path,
     tree,
     menus,
   }));
@@ -146,6 +181,26 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '그룹웨어 메뉴 구성', meta: '운영팀 · 오늘', status: '사용' },
       { title: '환경설정 메뉴 구성', meta: '운영팀 · 오늘', status: '사용' },
       { title: '메뉴 정렬 순서 정비', meta: 'IT팀 · 어제', status: '완료' },
+    ],
+  },
+  modules: {
+    title: '모듈관리',
+    description: '모듈 코드와 루트 경로, 아이콘, 사용 여부를 관리합니다.',
+    kind: 'menus',
+    cards: [
+      { label: '등록 모듈', value: '05' },
+      { label: '활성 모듈', value: '04' },
+      { label: '미사용', value: '01' },
+      { label: '메뉴 수', value: '18' },
+    ],
+    items: [
+      { title: '그룹웨어 모듈 정렬', meta: '운영팀 · 오늘', status: '사용' },
+      {
+        title: '환경설정 모듈 경로 점검',
+        meta: 'IT팀 · 어제',
+        status: '검토중',
+      },
+      { title: '품질관리 모듈 설정', meta: '품질팀 · 2일 전', status: '신규' },
     ],
   },
   'f1-grid-test': {

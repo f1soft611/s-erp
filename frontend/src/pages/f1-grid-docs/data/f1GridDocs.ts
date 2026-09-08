@@ -70,9 +70,9 @@ export const f1GridDocs: F1GridDoc[] = [
           ['rowKey', 'keyof T', '행 식별자'],
           ['ariaLabel', 'string', '그리드 영역 접근성 레이블 (기본값 F1-GRID)'],
           [
-            'height / maxHeight',
+            'height / minHeight / maxHeight',
             'number | string',
-            '그리드 컨테이너 높이 제한',
+            '그리드 컨테이너 높이와 최소/최대 높이 제한',
           ],
           ['columnLine', 'boolean', '컬럼 사이 세로 구분선 표시 여부'],
           ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],
@@ -153,6 +153,32 @@ export const f1GridDocs: F1GridDoc[] = [
             'Grid 단위 편집 전/후 훅 (beforeEdit/afterEdit는 호환 별칭)',
           ],
         ],
+      },
+      {
+        type: 'api',
+        heading: 'Cell render hooks',
+        rows: [
+          [
+            'renderCell',
+            '(context) => ReactNode',
+            '표시 모드에서만 적용되는 커스텀 셀 렌더러',
+          ],
+          [
+            'getCellStyle',
+            '(context) => CSSProperties | undefined',
+            '동적 셀 스타일 반환',
+          ],
+          [
+            'getCellProps',
+            '(context) => { className, style, title, aria-label } | undefined',
+            '셀 속성/ARIA/title 확장',
+          ],
+        ],
+      },
+      {
+        type: 'prose',
+        heading: 'Editable header indicator',
+        body: '편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다. 판정은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족해야 한다.',
       },
       { type: 'code', heading: 'Editable column', code },
       {
@@ -564,6 +590,21 @@ export const f1GridDocs: F1GridDoc[] = [
           ['required / min / max / validate', '-', '검증 규칙'],
           ['onOpenCodePicker', '함수', '코드 선택기 연동'],
           ['align / headerAlign', 'left | center | right', '정렬'],
+          [
+            'renderCell',
+            '(context) => ReactNode',
+            '표시 모드에서만 적용되는 커스텀 셀 렌더러',
+          ],
+          [
+            'getCellStyle',
+            '(context) => CSSProperties | undefined',
+            '동적 셀 스타일 반환',
+          ],
+          [
+            'getCellProps',
+            '(context) => { className, style, title, aria-label } | undefined',
+            '셀 속성/ARIA/title 확장',
+          ],
           ['wrapText / mergeRows', 'boolean', '줄바꿈 / 연속 값 병합'],
           ['headerCheckbox', 'boolean', 'checkbox 컬럼 헤더 전체 선택 토글'],
           ['hidden / pinned', 'boolean / left | right', '숨김 / 고정'],

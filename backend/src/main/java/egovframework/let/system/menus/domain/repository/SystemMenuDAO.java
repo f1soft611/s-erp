@@ -91,10 +91,48 @@ public class SystemMenuDAO extends EgovAbstractMapper {
     }
 
     /**
+     * 선택 역할 기준 메뉴 권한 코드를 일괄 조회한다.
+     */
+    public List<Map<String, Object>> selectRoleMenuPermissionCodeRows(SystemMenuSearchConditionVO condition)
+            throws Exception {
+        return selectList("SystemMenuDAO.selectRoleMenuPermissionCodeRows", condition);
+    }
+
+    /**
+     * 로그인 계정에 할당된 모든 역할 ID를 조회한다.
+     */
+    public List<Long> selectRoleIdsByUserAccount(Long tenantId, String loginCode) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("loginCode", loginCode);
+        return selectList("SystemMenuDAO.selectRoleIdsByUserAccount", params);
+    }
+
+    /**
+     * 로그인 계정에 할당된 모든 역할 코드를 조회한다.
+     */
+    public List<String> selectRoleCodesByUserAccount(Long tenantId, String loginCode) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("loginCode", loginCode);
+        return selectList("SystemMenuDAO.selectRoleCodesByUserAccount", params);
+    }
+
+    /**
      * 메뉴의 권한 매핑을 모두 삭제한다.
      */
     public void deleteMenuPermissions(Long menuId) throws Exception {
         delete("SystemMenuDAO.deleteMenuPermissions", menuId);
+    }
+
+    /**
+     * 역할별 메뉴 권한 매핑을 모두 삭제한다.
+     */
+    public void deleteRoleMenuPermissions(Long roleId, Long menuId) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("roleId", roleId);
+        params.put("menuId", menuId);
+        delete("SystemMenuDAO.deleteRoleMenuPermissions", params);
     }
 
     /**
@@ -105,6 +143,17 @@ public class SystemMenuDAO extends EgovAbstractMapper {
         params.put("menuId", menuId);
         params.put("permissionCodes", permissionCodes);
         insert("SystemMenuDAO.insertMenuPermissions", params);
+    }
+
+    /**
+     * 역할별 메뉴 권한 매핑을 등록한다.
+     */
+    public void insertRoleMenuPermissions(Long roleId, Long menuId, List<String> permissionCodes) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("roleId", roleId);
+        params.put("menuId", menuId);
+        params.put("permissionCodes", permissionCodes);
+        insert("SystemMenuDAO.insertRoleMenuPermissions", params);
     }
 
     /**

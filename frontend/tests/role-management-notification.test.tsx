@@ -73,6 +73,40 @@ describe('RoleManagementPage notifications', () => {
     window.localStorage.clear();
   });
 
+  it('fills the shared grid container when the loading skeleton is active', () => {
+    const columns: F1GridColumn<{ id: number; roleNm: string }>[] = [
+      { field: 'id', headerName: 'ID', width: 80 },
+      { field: 'roleNm', headerName: '역할명', width: 220 },
+    ];
+
+    render(
+      <div style={{ width: 600, height: 320 }}>
+        <F1Grid
+          rows={[{ id: 1, roleNm: '운영자' }]}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="F1-GRID 로딩 크기 검증"
+          height={320}
+          loading
+        />
+      </div>,
+    );
+
+    expect(screen.getByTestId('grid-loading-skeleton')).not.toHaveStyle({
+      height: '100%',
+    });
+    expect(screen.getByTestId('grid-loading-skeleton')).not.toHaveStyle({
+      overflow: 'hidden',
+    });
+
+    const rowSkeleton = screen.getAllByTestId('grid-loading-row-skeleton')[0];
+    expect(rowSkeleton).toHaveStyle({
+      gap: '0px',
+      minHeight: '32px',
+    });
+    expect(screen.getAllByTestId('grid-loading-row-skeleton')).toHaveLength(5);
+  });
+
   it('shows a page error when loading roles fails', async () => {
     apiMocks.apiGet.mockRejectedValueOnce(new Error('역할 목록 조회 실패'));
 

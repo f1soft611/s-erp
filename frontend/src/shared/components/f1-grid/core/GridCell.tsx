@@ -83,23 +83,44 @@ export function GridCell<T extends object>({
 }: GridCellProps<T>) {
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
+  const cellRenderContext = {
+    row,
+    rowId,
+    column,
+    field: column.field,
+    value,
+    rowIndex,
+  };
   const displayValue =
     column.type === 'rownumber'
       ? String(rowIndex + 1)
       : getCellDisplayValue(column, value as T[keyof T]);
+  const customCellProps = column.getCellProps?.(cellRenderContext) ?? {};
+  const customCellStyle = column.getCellStyle?.(cellRenderContext);
+  const mergedCellStyle = {
+    ...(customCellStyle ?? {}),
+    ...(customCellProps.style ?? {}),
+  };
   const hideRangeStartBorder = rangeStart && !editing;
   const activeHighlight =
     (focused || editing) && !(selected && !editing && (rangeStart || !focused));
   const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
+  const cellClassName =
+    [customCellProps.className].filter(Boolean).join(' ') || undefined;
 
   return (
     <Box
       key={String(column.field)}
       role="gridcell"
-      aria-label={adornment && !merged ? displayValue : undefined}
+      aria-label={
+        customCellProps['aria-label'] ??
+        (adornment && !merged ? displayValue : undefined)
+      }
       data-grid-error={errorMessage}
       data-dirty-cell={dirtyCell ? 'true' : 'false'}
-      title={errorMessage}
+      title={customCellProps.title ?? errorMessage ?? undefined}
+      className={cellClassName}
+      style={mergedCellStyle}
       tabIndex={focused ? 0 : -1}
       ref={onCellRef}
       onClick={onFocus}
@@ -233,6 +254,11 @@ export function GridCell<T extends object>({
           onSelectChange={onSelectChange}
           onCodePick={onCodePick}
         />
+      ) : column.renderCell ? (
+        <>
+          {adornment}
+          {column.renderCell(cellRenderContext)}
+        </>
       ) : (
         <>
           {adornment}
