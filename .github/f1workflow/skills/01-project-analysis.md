@@ -20,8 +20,9 @@
 - **S-ERP 백엔드 (`backend/`)**:
   - 스택 정의 참조: `.github/f1workflow/tech-stacks/s-erp-java-egov.yml`
   - `backend/pom.xml`, `backend/src/main/resources/` 확인
-  - 주요 스택: Java 17, Spring Boot / eGovFrame 4.x, MyBatis (PostgreSQL), Maven
+  - 주요 스택: Java 8+, Spring Boot / eGovFrame 4.x, MyBatis (PostgreSQL), Maven
   - 테스트 명령: `mvn test`, 실행 명령: `mvn spring-boot:run`
+  - Java 8 호환성 점검: Java 9+ 문법/API 사용 여부, `maven-compiler-plugin` `source`/`target` 또는 `release` 값, `var`, `record`, `List.of()`, `Stream.toList()`, `Path.of()` 사용 금지 여부 확인
 
 ### 3. 빌드 및 테스트 기준선(Baseline) 점검
 

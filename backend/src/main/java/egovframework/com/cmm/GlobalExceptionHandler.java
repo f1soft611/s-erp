@@ -13,6 +13,9 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String FRIENDLY_PARENT_MENU_ERROR =
+            "상위 메뉴 정보가 올바르지 않습니다. 상위 메뉴를 다시 선택한 뒤 저장해 주세요.";
+
     @ExceptionHandler(BizException.class)
     public ResponseEntity<Map<String, Object>> handleBizException(BizException e) {
         Map<String, Object> res = new HashMap<>();
@@ -24,26 +27,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException e) {
-        Throwable t = e;
-        String msg = null;
-
-        while (t != null) {
-            // MSSQL JDBC 예외 메시지 우선
-            if (t instanceof com.microsoft.sqlserver.jdbc.SQLServerException) {
-                msg = t.getMessage();
-                break;
-            }
-            t = t.getCause();
-        }
-
-        if (msg == null) {
-            msg = e.getMessage();
-        }
+        String message = normalizeDataAccessMessage(e);
 
         Map<String, Object> res = new HashMap<>();
         res.put("resultCode", "FAIL");
-        res.put("message", msg);
-        res.put("resultMessage", msg);
+        res.put("message", message);
+        res.put("resultMessage", message);
         return ResponseEntity.status(500).body(res);
     }
 
@@ -86,8 +75,42 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleException(Exception e) {
         Map<String, Object> res = new HashMap<>();
         res.put("resultCode", "FAIL");
-        res.put("message", "서버 처리 중 오류가 발생했습니다.");
-        res.put("resultMessage", "서버 처리 중 오류가 발생했습니다.");
+        res.put("message", "서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        res.put("resultMessage", "서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
         return ResponseEntity.status(500).body(res);
+    }
+
+    private String normalizeDataAccessMessage(DataAccessException e) {
+        String rawMessage = extractThrowableMessage(e);
+        if (rawMessage == null || rawMessage.trim().isEmpty()) {
+            return "데이터 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+        }
+
+        String normalized = rawMessage.toLowerCase();
+        if (normalized.contains("parent_menu_id")
+                && normalized.contains("bigint")
+                && (normalized.contains("character varying") || normalized.contains("varchar"))) {
+            return FRIENDLY_PARENT_MENU_ERROR;
+        }
+
+        if (normalized.contains("parent_menu_id")
+                && normalized.contains("bigint")
+                && normalized.contains("numeric")) {
+            return FRIENDLY_PARENT_MENU_ERROR;
+        }
+
+        return "데이터 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    private String extractThrowableMessage(Throwable throwable) {
+        Throwable cursor = throwable;
+        while (cursor != null) {
+            String message = cursor.getMessage();
+            if (message != null && !message.trim().isEmpty()) {
+                return message;
+            }
+            cursor = cursor.getCause();
+        }
+        return null;
     }
 }

@@ -25,6 +25,9 @@ public class SystemMenuSearchConditionVO implements Serializable {
     @Schema(description = "모듈 ID")
     private Long moduleId;
 
+    @Schema(description = "권한(Role) ID")
+    private Long roleId;
+
     @Schema(description = "사용 여부")
     private String useAt;
 }

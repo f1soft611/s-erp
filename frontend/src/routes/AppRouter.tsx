@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import { F1GridDocsPage } from '../pages/f1-grid-docs/F1GridDocsPage';
+import { NotFoundPage } from '../pages/errors/NotFoundPage';
 import {
   isAuthenticated,
   subscribeAuthChange,
@@ -20,7 +21,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAuthState();
   console.log('PublicRoute auth', isAuthed, 'path', window.location.pathname);
 
-  return isAuthed ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+  return isAuthed ? <Navigate to="/" replace /> : <>{children}</>;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,9 @@ function AppRouter() {
       <Route
         path="/"
         element={
-          <Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
         }
       />
       <Route
@@ -62,9 +65,15 @@ function AppRouter() {
         }
       />
       <Route
-        path="*"
+        path="/*"
         element={
-          <Navigate to={isAuthenticated() ? '/dashboard' : '/login'} replace />
+          isAuthenticated() ? (
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          ) : (
+            <NotFoundPage />
+          )
         }
       />
     </Routes>

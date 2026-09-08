@@ -124,9 +124,11 @@ export async function fetchActivePermissions(): Promise<
 
 export async function fetchMenuRows(
   moduleId: number,
+  roleId?: string,
 ): Promise<MenuManagementRow[]> {
+  const query = roleId ? `&roleId=${roleId}` : '';
   const result = await apiGet<{ resultList: SystemMenuVO[] }>(
-    `/api/v1/system/menus?moduleId=${moduleId}`,
+    `/api/v1/system/menus?moduleId=${moduleId}${query}`,
   );
   return (result.resultList ?? []).map(toRow);
 }
@@ -140,16 +142,49 @@ export async function replaceMenuPermissions(
   });
 }
 
+export async function saveRoleMenuPermissions(
+  roleId: string,
+  menuPermissions: Array<{
+    menuId: string | number;
+    permissionCodes: string[];
+  }>,
+): Promise<void> {
+  await apiPut(`/api/v1/system/roles/${roleId}/menu-permissions`, {
+    menuPermissions: menuPermissions.map(({ menuId, permissionCodes }) => ({
+      menuId: Number(menuId),
+      permissionCodes: (permissionCodes ?? []).filter(
+        (code): code is string =>
+          typeof code === 'string' && code.trim().length > 0,
+      ),
+    })),
+  });
+}
+
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized || normalized.toLowerCase() === 'null') {
+    return null;
+  }
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function toSaveRequest(
   row: MenuManagementRow,
   insertedMenuIds: Record<string, string> = {},
 ) {
-  const parentMenuId = row.parentMenuId
+  const resolvedParentMenuId = row.parentMenuId
     ? (insertedMenuIds[row.parentMenuId] ?? row.parentMenuId)
     : null;
+
   return {
     moduleId: row.moduleId,
-    parentMenuId: parentMenuId ? Number(parentMenuId) : null,
+    parentMenuId: toNullableNumber(resolvedParentMenuId),
     menuCode: row.code.trim(),
     menuNm: row.name.trim(),
     menuDc: row.description.trim() || null,
@@ -181,7 +216,10 @@ export async function saveMenuChanges(
   for (const row of changes.updatedRows) {
     const operationKey = `update:${row.id}`;
     if (checkpoint.completedOperations.has(operationKey)) continue;
-    await apiPut(`/api/v1/system/menus/${row.id}`, toSaveRequest(row));
+    await apiPut(
+      `/api/v1/system/menus/${row.id}`,
+      toSaveRequest(row, checkpoint.insertedMenuIds),
+    );
     checkpoint.completedOperations.add(operationKey);
   }
   for (const row of changes.deletedRows) {

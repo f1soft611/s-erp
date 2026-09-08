@@ -50,10 +50,11 @@ function ModuleIcon({ name }: { name: string }): ReactNode {
 export const buildModuleItems = (
   descriptors: ModuleDescriptor[],
 ): ModuleItem[] =>
-  descriptors.map(({ id, name, iconName, tree, menus }) => ({
+  descriptors.map(({ id, name, iconName, path, tree, menus }) => ({
     id,
     name,
     icon: <ModuleIcon name={iconName} />,
+    path,
     tree,
     menus,
   }));

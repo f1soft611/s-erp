@@ -66,11 +66,9 @@ export function ModuleManagementPage({
 
   const pageActionPermissions = useMemo(
     () => ({
-      read: Boolean(selectedMenuPermissions?.read ?? true),
+      read: Boolean(selectedMenuPermissions?.read ?? false),
       write: Boolean(
-        selectedMenuPermissions?.create ||
-        selectedMenuPermissions?.update ||
-        true,
+        selectedMenuPermissions?.create || selectedMenuPermissions?.update,
       ),
       excel: Boolean(selectedMenuPermissions?.excel ?? false),
     }),

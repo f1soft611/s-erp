@@ -6,10 +6,12 @@ import {
   MenuItem,
   Select,
   TextField,
+  Typography,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
@@ -24,6 +26,8 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { MenuManagementPanel } from './components/MenuManagementPanel';
 import { MENU_PERMISSION_GROUPS } from './constants/menuPermissionGroups';
+import { fetchRoleRows } from '../roles/services/roleManagement.service';
+import type { RoleManagementRow } from '../roles/types/roleManagement.types';
 import {
   fetchActivePermissions,
   fetchMenuRows,
@@ -53,16 +57,20 @@ export function MenuManagementPage({
   const { showSuccess } = useNotification();
   const [menus, setMenus] = useState<MenuManagementRow[]>([]);
   const [modules, setModules] = useState<MenuModuleOption[]>([]);
+  const [roles, setRoles] = useState<RoleManagementRow[]>([]);
   const [permissions, setPermissions] = useState<MenuPermissionDefinition[]>(
     [],
   );
   const [selectedModuleId, setSelectedModuleId] = useState<number>();
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
+  const hasRequiredSelection =
+    Boolean(selectedModuleId) && Boolean(selectedRoleId);
   const filteredMenus = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return menus;
@@ -76,6 +84,7 @@ export function MenuManagementPage({
     });
   }, [menus, searchQuery]);
   const [pendingModuleId, setPendingModuleId] = useState<number>();
+  const [pendingRoleId, setPendingRoleId] = useState<string>();
   const [pendingPermissionReload, setPendingPermissionReload] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const menuLoadRequestIdRef = useRef(0);
@@ -178,20 +187,42 @@ export function MenuManagementPage({
         },
       ],
     },
+    {
+      key: 'delete',
+      actions: [
+        {
+          label: '삭제',
+          icon: DeleteIcon,
+          visible: pageActionPermissions.delete,
+          disabled: saving,
+          onClick: () => {
+            menuPanelRef.current?.deleteSelectedRows();
+          },
+        },
+      ],
+    },
   ];
 
   async function loadMenus(
     moduleId: number,
     reloadPermissions = false,
     clearVisibleMenus = false,
+    roleId = selectedRoleId,
   ) {
+    if (!moduleId || !roleId) {
+      setMenus([]);
+      setDirty(false);
+      setError('');
+      return false;
+    }
+
     const requestId = ++menuLoadRequestIdRef.current;
     setLoading(true);
     if (clearVisibleMenus) setMenus([]);
     try {
       setError('');
       const [nextMenus, nextPermissions] = await Promise.all([
-        fetchMenuRows(moduleId),
+        fetchMenuRows(moduleId, roleId),
         reloadPermissions
           ? fetchActivePermissions()
           : Promise.resolve(undefined),
@@ -219,16 +250,28 @@ export function MenuManagementPage({
       setLoading(true);
       setError('');
       try {
-        const [nextModules, nextPermissions] = await Promise.all([
+        const [modulesResult, permissionsResult] = await Promise.all([
           fetchModules(),
           fetchActivePermissions(),
         ]);
-        console.log('init modules', nextModules, nextPermissions);
-        setModules(nextModules);
-        setPermissions(nextPermissions);
-        const firstModule = nextModules[0];
+        setModules(modulesResult);
+        setPermissions(permissionsResult);
+
+        let nextRoles: RoleManagementRow[] = [];
+        try {
+          nextRoles = await fetchRoleRows();
+        } catch {
+          nextRoles = [];
+        }
+        setRoles(nextRoles);
+
+        const firstModule = modulesResult[0];
         setSelectedModuleId(firstModule?.moduleId);
-        if (firstModule) await loadMenus(firstModule.moduleId);
+        if (firstModule && selectedRoleId) {
+          await loadMenus(firstModule.moduleId, false, true, selectedRoleId);
+        } else {
+          setMenus([]);
+        }
       } catch (requestError) {
         setMenus([]);
         setError(
@@ -252,12 +295,42 @@ export function MenuManagementPage({
     if (loading || moduleId === selectedModuleId) return;
     if (dirty) {
       setPendingModuleId(moduleId);
+      setPendingRoleId(selectedRoleId);
       setPendingPermissionReload(true);
       setConfirmOpen(true);
       return;
     }
     setSelectedModuleId(moduleId);
-    void loadMenus(moduleId, true, true).then((didLoad) => {
+    if (!selectedRoleId) {
+      setMenus([]);
+      setDirty(false);
+      setError('');
+      return;
+    }
+    void loadMenus(moduleId, true, true, selectedRoleId).then((didLoad) => {
+      if (didLoad) {
+        setReloadToken((current) => current + 1);
+      }
+    });
+  }
+
+  function requestRoleChange(roleId: string) {
+    if (loading || roleId === selectedRoleId || !selectedModuleId) return;
+    if (dirty) {
+      setPendingModuleId(selectedModuleId);
+      setPendingRoleId(roleId);
+      setPendingPermissionReload(true);
+      setConfirmOpen(true);
+      return;
+    }
+    setSelectedRoleId(roleId);
+    if (!selectedModuleId || !roleId) {
+      setMenus([]);
+      setDirty(false);
+      setError('');
+      return;
+    }
+    void loadMenus(selectedModuleId, true, true, roleId).then((didLoad) => {
       if (didLoad) {
         setReloadToken((current) => current + 1);
       }
@@ -266,6 +339,11 @@ export function MenuManagementPage({
 
   function requestRefresh(moduleId: number, bypassDirtyConfirmation = false) {
     if (loading) return Promise.resolve();
+    if (!selectedModuleId || !selectedRoleId) {
+      setMenus([]);
+      setError('');
+      return Promise.resolve();
+    }
     if (dirty && !bypassDirtyConfirmation) {
       setPendingModuleId(moduleId);
       setPendingPermissionReload(false);
@@ -281,20 +359,28 @@ export function MenuManagementPage({
 
   function confirmDiscardChanges() {
     const nextModuleId = pendingModuleId;
+    const nextRoleId = pendingRoleId ?? selectedRoleId;
     const reloadPermissions = pendingPermissionReload;
     setConfirmOpen(false);
     setPendingModuleId(undefined);
+    setPendingRoleId(undefined);
     setPendingPermissionReload(false);
     if (nextModuleId === undefined) return;
     const moduleChanged = nextModuleId !== selectedModuleId;
     if (moduleChanged) setSelectedModuleId(nextModuleId);
-    void loadMenus(nextModuleId, reloadPermissions, moduleChanged).then(
-      (didLoad) => {
-        if (didLoad) {
-          setReloadToken((current) => current + 1);
-        }
-      },
-    );
+    if (nextRoleId && nextRoleId !== selectedRoleId) {
+      setSelectedRoleId(nextRoleId);
+    }
+    void loadMenus(
+      nextModuleId,
+      reloadPermissions,
+      moduleChanged,
+      nextRoleId,
+    ).then((didLoad) => {
+      if (didLoad) {
+        setReloadToken((current) => current + 1);
+      }
+    });
   }
 
   return (
@@ -368,6 +454,56 @@ export function MenuManagementPage({
           </Select>
         </FormControl>
 
+        <FormControl
+          size="small"
+          sx={(theme) => ({
+            width: { xs: '100%', sm: 'auto' },
+            minWidth: { sm: 220 },
+            maxWidth: '100%',
+            flex: '0 1 280px',
+            height: 40,
+            m: 0,
+            '& .MuiOutlinedInput-root': {
+              height: '100%',
+              borderRadius: 2,
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(15, 23, 42, 0.72)'
+                  : 'rgba(255,255,255,0.72)',
+            },
+          })}
+        >
+          <Select
+            value={selectedRoleId}
+            displayEmpty
+            inputProps={{ 'aria-label': '권한 선택' }}
+            disabled={loading || saving || roles.length === 0}
+            onChange={(event) => requestRoleChange(String(event.target.value))}
+            renderValue={(selected) => {
+              if (!selected) return '권한 선택';
+              const matchingRole = roles.find(
+                (role) => role.id === String(selected),
+              );
+              return matchingRole?.name ?? '권한 선택';
+            }}
+            sx={{
+              '& .MuiSelect-select': {
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: '40px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+              },
+            }}
+          >
+            {roles.map((role) => (
+              <MenuItem key={role.id} value={role.id}>
+                {role.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
         <TextField
           size="small"
           margin="none"
@@ -428,19 +564,37 @@ export function MenuManagementPage({
           pt: 1,
         }}
       >
-        <MenuManagementPanel
-          ref={menuPanelRef}
-          key={`${selectedModuleId ?? 'none'}-${reloadToken}`}
-          menus={filteredMenus}
-          selectedModule={selectedModule}
-          permissions={permissions}
-          canExportExcel={pageActionPermissions.excel}
-          onRefresh={requestRefresh}
-          onDirtyChange={setDirty}
-          onSavingChange={setSaving}
-          onSaveSuccess={showSuccess}
-          onError={setError}
-        />
+        {hasRequiredSelection ? (
+          <MenuManagementPanel
+            ref={menuPanelRef}
+            key={`${selectedModuleId ?? 'none'}-${selectedRoleId}-${reloadToken}`}
+            menus={filteredMenus}
+            selectedModule={selectedModule}
+            selectedRoleId={selectedRoleId}
+            permissions={permissions}
+            canExportExcel={pageActionPermissions.excel}
+            onRefresh={requestRefresh}
+            onDirtyChange={setDirty}
+            onSavingChange={setSaving}
+            onSaveSuccess={showSuccess}
+            onError={setError}
+          />
+        ) : (
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 4,
+              color: 'text.secondary',
+            }}
+          >
+            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+              모듈과 권한을 모두 선택하세요.
+            </Typography>
+          </Box>
+        )}
       </Box>
       <UnsavedChangesConfirmDialog
         open={confirmOpen}

@@ -1,4 +1,20 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
+import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
+import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
+import FolderOutlined from '@mui/icons-material/FolderOutlined';
+import Inventory2Outlined from '@mui/icons-material/Inventory2Outlined';
+import PeopleOutlined from '@mui/icons-material/PeopleOutlined';
+import BusinessOutlined from '@mui/icons-material/BusinessOutlined';
+import AdminPanelSettingsOutlined from '@mui/icons-material/AdminPanelSettingsOutlined';
+import ListAltOutlined from '@mui/icons-material/ListAltOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
+import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
+import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
+import AssignmentOutlined from '@mui/icons-material/AssignmentOutlined';
+import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
+import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
+import ShoppingCartOutlined from '@mui/icons-material/ShoppingCartOutlined';
 import {
   forwardRef,
   useCallback,
@@ -70,6 +86,33 @@ export const MODULE_ICON_OPTIONS = [
   { value: 'CalendarMonth', label: 'CalendarMonth' },
   { value: 'ShoppingCart', label: 'ShoppingCart' },
 ];
+
+const moduleIconMap = {
+  Settings: <SettingsOutlined fontSize="small" />,
+  Folder: <FolderOutlined fontSize="small" />,
+  Dashboard: <DashboardOutlined fontSize="small" />,
+  Inventory: <Inventory2Outlined fontSize="small" />,
+  People: <PeopleOutlined fontSize="small" />,
+  Business: <BusinessOutlined fontSize="small" />,
+  AdminPanelSettings: <AdminPanelSettingsOutlined fontSize="small" />,
+  ListAlt: <ListAltOutlined fontSize="small" />,
+  FileText: <DescriptionOutlined fontSize="small" />,
+  ClipboardCheck: <FactCheckOutlined fontSize="small" />,
+  CheckCircle: <CheckCircleOutlined fontSize="small" />,
+  Notifications: <NotificationsOutlined fontSize="small" />,
+  Assignment: <AssignmentOutlined fontSize="small" />,
+  Security: <SecurityOutlined fontSize="small" />,
+  CalendarMonth: <CalendarMonthOutlined fontSize="small" />,
+  ShoppingCart: <ShoppingCartOutlined fontSize="small" />,
+} as const;
+
+const renderModuleOptionIcon = (option: {
+  value: string | number | boolean;
+  label: string;
+}) => {
+  const iconName = String(option.value);
+  return moduleIconMap[iconName as keyof typeof moduleIconMap] ?? undefined;
+};
 
 export const canEditModuleCode = (row: ModuleManagementRow): boolean =>
   !row.id || String(row.id).startsWith('new-module-');
@@ -143,6 +186,7 @@ export const ModuleManagementPanel = forwardRef<
       editable: true,
       type: 'select',
       options: MODULE_ICON_OPTIONS,
+      selectOptionIcon: renderModuleOptionIcon,
       headerAlign: 'center',
     },
     {

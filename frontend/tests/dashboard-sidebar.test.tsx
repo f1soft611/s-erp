@@ -148,7 +148,7 @@ describe('Dashboard sidebar', () => {
         expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }),
     );
-    window.history.pushState({}, '', '/dashboard/groupware/documents');
+    window.history.pushState({}, '', '/groupware/documents');
 
     render(<App />);
 

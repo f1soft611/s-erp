@@ -52,6 +52,7 @@ import {
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
+import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
 import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
 
 type MenuRow = {
@@ -266,6 +267,127 @@ describe('F1-GRID clipboard', () => {
         type: 'checkbox',
       }),
     ).toBe(true);
+  });
+});
+
+describe('F1-GRID custom cell rendering', () => {
+  it('renders custom cell markup and applies dynamic styling and properties', () => {
+    const customColumns: F1GridColumn<MenuRow>[] = [
+      {
+        field: 'status',
+        headerName: '상태',
+        renderCell: ({ value }) => (
+          <span>{String(value) === 'draft' ? '작성중' : '확정'}</span>
+        ),
+        getCellStyle: ({ value }) => ({
+          backgroundColor: String(value) === 'draft' ? '#fff8e1' : '#e8f5e9',
+          color: String(value) === 'draft' ? '#ed6c02' : '#2e7d32',
+        }),
+        getCellProps: ({ value }) => ({
+          className: `status-${String(value)}`,
+          title: `status:${String(value)}`,
+        }),
+      },
+    ];
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={customColumns}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    const statusCell = screen.getByText('작성중').closest('[role="gridcell"]');
+    expect(statusCell).toBeInTheDocument();
+    expect(statusCell).toHaveClass('status-draft');
+    expect(statusCell).toHaveStyle({
+      backgroundColor: '#fff8e1',
+      color: '#ed6c02',
+    });
+    expect(statusCell).toHaveAttribute('title', 'status:draft');
+  });
+
+  it('marks editable headers when a registered editor plugin allows editing', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          {
+            field: 'status',
+            headerName: '상태',
+            editable: (row) => row.status === 'draft',
+            type: 'select',
+            options: [
+              { value: 'draft', label: '작성중' },
+              { value: 'confirmed', label: '확정' },
+            ],
+          },
+        ]}
+        rowKey="id"
+        showCheckbox={false}
+        editorPlugins={[
+          {
+            canEdit: ({ column, row }) =>
+              column.field === 'status' && row.status === 'draft',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: '상태' })).toHaveAttribute(
+      'data-editable-column',
+      'true',
+    );
+  });
+});
+
+describe('F1-GRID select icon rendering', () => {
+  it('does not render option icons by default for a plain select editor', () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme()}>
+        <SelectEditor
+          value="draft"
+          options={[
+            { value: 'draft', label: '작성중' },
+            { value: 'confirmed', label: '확정' },
+          ]}
+          onChange={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
+    ).toBe(0);
+  });
+
+  it('renders a custom icon only when a select icon renderer is configured', () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme()}>
+        <SelectEditor
+          value="draft"
+          options={[
+            { value: 'draft', label: '작성중' },
+            { value: 'confirmed', label: '확정' },
+          ]}
+          selectOptionIcon={(option) => (
+            <span data-testid={`icon-${String(option.value)}`}>
+              {String(option.value)}
+            </span>
+          )}
+          onChange={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('icon-draft')).toBeInTheDocument();
+    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
+    ).toBe(1);
   });
 });
 

@@ -55,13 +55,11 @@ export function RoleManagementPage({
 
   const pageActionPermissions = useMemo(() => {
     const writeAllowed = Boolean(
-      selectedMenuPermissions?.create ||
-      selectedMenuPermissions?.update ||
-      true,
+      selectedMenuPermissions?.create || selectedMenuPermissions?.update,
     );
 
     return {
-      read: Boolean(selectedMenuPermissions?.read ?? true),
+      read: Boolean(selectedMenuPermissions?.read ?? false),
       write: writeAllowed,
       excel: Boolean(selectedMenuPermissions?.excel ?? false),
     };

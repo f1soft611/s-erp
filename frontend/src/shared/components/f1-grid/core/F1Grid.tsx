@@ -375,6 +375,34 @@ function F1GridInner<T extends object>(
     ? filteredRows
     : sortGridRows(filteredRows, sortState);
 
+  const editableColumnFields = new Set<string>(
+    visibleColumns
+      .filter((column) =>
+        visibleRows.some((row, rowIndex) => {
+          if (!activeEditorPlugins.length || !isCellEditable(column, row)) {
+            return false;
+          }
+
+          const context: F1GridEditContext<T> = {
+            row,
+            rowId: getGridRowId(row, rowKey),
+            column,
+            field: column.field,
+            value: row[column.field],
+            defaultValue: String(row[column.field] ?? ''),
+          };
+
+          return activeEditorPlugins.every((plugin) => {
+            if (plugin.canEdit && !plugin.canEdit(context)) {
+              return false;
+            }
+            return true;
+          });
+        }),
+      )
+      .map((column) => String(column.field)),
+  );
+
   const mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
   > = [];
@@ -1566,6 +1594,7 @@ function F1GridInner<T extends object>(
           onPinColumn={pinColumn}
           leftOffsets={leftOffsets}
           rightOffsets={rightOffsets}
+          editableColumnFields={editableColumnFields}
           onReorderColumn={reorderColumn}
         />
       </Box>

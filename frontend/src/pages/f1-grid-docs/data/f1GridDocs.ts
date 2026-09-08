@@ -154,6 +154,32 @@ export const f1GridDocs: F1GridDoc[] = [
           ],
         ],
       },
+      {
+        type: 'api',
+        heading: 'Cell render hooks',
+        rows: [
+          [
+            'renderCell',
+            '(context) => ReactNode',
+            '표시 모드에서만 적용되는 커스텀 셀 렌더러',
+          ],
+          [
+            'getCellStyle',
+            '(context) => CSSProperties | undefined',
+            '동적 셀 스타일 반환',
+          ],
+          [
+            'getCellProps',
+            '(context) => { className, style, title, aria-label } | undefined',
+            '셀 속성/ARIA/title 확장',
+          ],
+        ],
+      },
+      {
+        type: 'prose',
+        heading: 'Editable header indicator',
+        body: '편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다. 판정은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족해야 한다.',
+      },
       { type: 'code', heading: 'Editable column', code },
       {
         type: 'code',
@@ -564,6 +590,21 @@ export const f1GridDocs: F1GridDoc[] = [
           ['required / min / max / validate', '-', '검증 규칙'],
           ['onOpenCodePicker', '함수', '코드 선택기 연동'],
           ['align / headerAlign', 'left | center | right', '정렬'],
+          [
+            'renderCell',
+            '(context) => ReactNode',
+            '표시 모드에서만 적용되는 커스텀 셀 렌더러',
+          ],
+          [
+            'getCellStyle',
+            '(context) => CSSProperties | undefined',
+            '동적 셀 스타일 반환',
+          ],
+          [
+            'getCellProps',
+            '(context) => { className, style, title, aria-label } | undefined',
+            '셀 속성/ARIA/title 확장',
+          ],
           ['wrapText / mergeRows', 'boolean', '줄바꿈 / 연속 값 병합'],
           ['headerCheckbox', 'boolean', 'checkbox 컬럼 헤더 전체 선택 토글'],
           ['hidden / pinned', 'boolean / left | right', '숨김 / 고정'],

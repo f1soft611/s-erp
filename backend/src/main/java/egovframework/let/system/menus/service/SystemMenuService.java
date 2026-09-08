@@ -3,7 +3,9 @@ package egovframework.let.system.menus.service;
 import java.util.List;
 
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionEntry;
 import egovframework.let.system.menus.domain.model.SystemMenuPermissionSaveRequestVO;
+import egovframework.let.system.menus.domain.model.SystemMenuRolePermissionSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuSaveRequestVO;
 import egovframework.let.system.menus.domain.model.SystemMenuVO;
 
@@ -23,6 +25,16 @@ public interface SystemMenuService {
      * @exception Exception
      */
     List<SystemMenuVO> listMenus(Long tenantId, Long moduleId) throws Exception;
+
+    /**
+     * 선택 권한 기준으로 메뉴 목록과 기본 기능 권한을 조회한다.
+     *
+     * @param tenantId
+     * @param moduleId
+     * @param roleId
+     * @exception Exception
+     */
+    List<SystemMenuVO> listMenus(Long tenantId, Long moduleId, Long roleId) throws Exception;
 
     /**
      * 메뉴를 등록한다.
@@ -64,6 +76,26 @@ public interface SystemMenuService {
     void deleteMenu(Long tenantId, Long menuId) throws Exception;
 
     /**
+     * 선택 역할에 대한 메뉴 사용 여부 및 기본 기능 권한을 일괄 반영한다.
+     *
+     * @param tenantId
+     * @param roleId
+     * @param payload
+     * @exception Exception
+     */
+    void replaceRoleMenuPermissions(Long tenantId, Long roleId,
+            List<SystemMenuPermissionEntry> payload) throws Exception;
+
+    default void replaceRoleMenuPermissions(Long tenantId, Long roleId,
+            SystemMenuRolePermissionSaveRequestVO payload) throws Exception {
+        if (payload == null) {
+            replaceRoleMenuPermissions(tenantId, roleId, java.util.Collections.emptyList());
+            return;
+        }
+        replaceRoleMenuPermissions(tenantId, roleId, payload.getMenuPermissions());
+    }
+
+    /**
      * 로그인 사용자의 테넌트/역할 기준 모듈-메뉴 트리를 조회한다.
      *
      * @param tenantId
@@ -71,5 +103,18 @@ public interface SystemMenuService {
      * @param roleCode
      * @exception Exception
      */
-    MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, String roleCode) throws Exception;
+    default MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, String roleCode) throws Exception {
+        return getMyMenuTree(tenantId, userId, null, roleCode);
+    }
+
+    /**
+     * 로그인 사용자의 테넌트/역할 기준 모듈-메뉴 트리를 조회한다.
+     *
+     * @param tenantId
+     * @param userId
+     * @param roleId
+     * @param roleCode
+     * @exception Exception
+     */
+    MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, Long roleId, String roleCode) throws Exception;
 }

@@ -13,6 +13,36 @@ interface ApiEnvelope<T> {
   resultCode: number | string;
   resultMessage: string;
   result: T;
+  message?: string;
+}
+
+export function normalizeApiErrorMessage(
+  message: string | null | undefined,
+): string {
+  const raw = String(message ?? '').trim();
+  if (!raw) {
+    return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('parent_menu_id') &&
+    lower.includes('bigint') &&
+    (lower.includes('character varying') || lower.includes('varchar'))
+  ) {
+    return '상위 메뉴 정보가 올바르지 않습니다. 상위 메뉴를 다시 선택한 뒤 저장해 주세요.';
+  }
+
+  const cleaned = raw
+    .replace(/caused by:\s*/gi, '')
+    .replace(
+      /\b(org\.postgresql|org\.springframework|com\.mysql|java\.[^:]+):\s*/gi,
+      '',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return cleaned || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -58,7 +88,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const body = (await response.json()) as ApiEnvelope<T>;
 
   if (!response.ok || String(body.resultCode) !== '200') {
-    throw new Error(body.resultMessage || '요청이 실패했습니다.');
+    throw new Error(
+      normalizeApiErrorMessage(
+        body.resultMessage || body.message || '요청이 실패했습니다.',
+      ),
+    );
   }
 
   return body.result;

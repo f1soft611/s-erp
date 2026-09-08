@@ -4,6 +4,7 @@ export type MenuItem = {
   id: string;
   name: string;
   pageKey: string;
+  path?: string;
   description?: string;
   permissions?: MenuPermission;
 };
@@ -50,6 +51,7 @@ export type ModuleItem = {
   id: string;
   name: string;
   icon: ReactNode;
+  path?: string;
   tree: MenuTreeNode[];
   menus: MenuItem[];
 };

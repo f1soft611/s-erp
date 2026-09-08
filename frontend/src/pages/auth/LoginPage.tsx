@@ -35,10 +35,13 @@ function LoginPage() {
 
     if (result?.ok) {
       setSessionNotice(null);
-      window.history.pushState({}, '', '/dashboard');
+      window.history.pushState({}, '', '/');
       window.dispatchEvent(new PopStateEvent('popstate'));
-      console.log('navigating to dashboard path', window.location.pathname);
-      navigate('/dashboard', { replace: true });
+      console.log(
+        'navigating to root dashboard path',
+        window.location.pathname,
+      );
+      navigate('/', { replace: true });
     }
   };
 

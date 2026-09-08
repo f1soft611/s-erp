@@ -3,6 +3,7 @@ package egovframework.let.system.roles.controller;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,6 +22,9 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.EgovAccessControlHelper;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.system.menus.domain.model.SystemMenuPermissionEntry;
+import egovframework.let.system.menus.domain.model.SystemMenuRolePermissionSaveRequestVO;
+import egovframework.let.system.menus.service.SystemMenuService;
 import egovframework.let.system.roles.domain.model.SystemRoleSaveRequestVO;
 import egovframework.let.system.roles.domain.model.SystemRoleUserAssignRequestVO;
 import egovframework.let.system.roles.domain.model.SystemRoleUserMapListVO;
@@ -33,7 +37,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 
 /**
  * 역할 관리를 위한 컨트롤러 클래스 (목록/등록/수정만 제공, 삭제는 제외)
@@ -42,13 +45,25 @@ import lombok.RequiredArgsConstructor;
  * @version 1.0
  */
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/v1/system/roles")
 @Tag(name = "SystemRoleApiController", description = "역할 관리")
 public class SystemRoleApiController {
 
     private final ResultVoHelper resultVoHelper;
+    private final SystemMenuService systemMenuService;
     private final SystemRoleService systemRoleService;
+
+    public SystemRoleApiController(ResultVoHelper resultVoHelper, SystemRoleService systemRoleService) {
+        this(resultVoHelper, null, systemRoleService);
+    }
+
+    @Autowired
+    public SystemRoleApiController(ResultVoHelper resultVoHelper, SystemMenuService systemMenuService,
+            SystemRoleService systemRoleService) {
+        this.resultVoHelper = resultVoHelper;
+        this.systemMenuService = systemMenuService;
+        this.systemRoleService = systemRoleService;
+    }
 
     @Operation(summary = "역할 목록 조회", security = { @SecurityRequirement(name = "Authorization") },
             tags = { "SystemRoleApiController" })
@@ -121,6 +136,27 @@ public class SystemRoleApiController {
         resultMap.put("assignedUsers", result.getAssignedUsers());
         resultMap.put("unassignedUsers", result.getUnassignedUsers());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "역할 메뉴 권한 일괄 저장", security = { @SecurityRequirement(name = "Authorization") },
+            tags = { "SystemRoleApiController" })
+    @PutMapping("/{roleId}/menu-permissions")
+    public ResultVO replaceRoleMenuPermissions(
+            @PathVariable Long roleId,
+            @RequestBody SystemMenuRolePermissionSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAdmin(user);
+        try {
+            if (payload == null || payload.getMenuPermissions() == null) {
+                throw new IllegalArgumentException("저장할 메뉴 권한 정보가 없습니다.");
+            }
+            systemMenuService.replaceRoleMenuPermissions(user.getTenantId(), roleId, payload.getMenuPermissions());
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("message", "역할 메뉴 권한이 저장되었습니다.");
+            return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+        } catch (Exception ex) {
+            return buildInputErrorResult(ex.getMessage());
+        }
     }
 
     @Operation(summary = "역할 사용자 연결 추가", security = { @SecurityRequirement(name = "Authorization") },

@@ -82,6 +82,7 @@ type GridHeaderProps<T extends object> = {
   ) => void;
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
+  editableColumnFields?: Set<string>;
   onReorderColumn?: (
     sourceField: string,
     targetField: string,
@@ -116,6 +117,7 @@ export function GridHeader<T extends object>({
   onPinColumn,
   leftOffsets,
   rightOffsets,
+  editableColumnFields,
   onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
@@ -346,6 +348,8 @@ export function GridHeader<T extends object>({
           const hasFilter = filters.some(
             (filter) => filter.field === column.field,
           );
+          const isEditableHeader =
+            editableColumnFields?.has(String(column.field)) ?? false;
           const isMenuOpen =
             menuColumn?.field === column.field &&
             Boolean(menuAnchor || columnListAnchor || filterAnchor);
@@ -359,11 +363,13 @@ export function GridHeader<T extends object>({
             <Box
               key={String(column.field)}
               role="columnheader"
+              aria-label={column.headerName}
               draggable={Boolean(onReorderColumn) && !pinSide}
               data-drop-target={isDropTarget ? 'true' : undefined}
               data-drop-position={
                 isDropTarget ? (dropPosition ?? 'before') : undefined
               }
+              data-editable-column={isEditableHeader ? 'true' : undefined}
               aria-grabbed={isDraggingColumn || undefined}
               onDragStart={(event) => {
                 if (!onReorderColumn || pinSide) return;
@@ -444,6 +450,10 @@ export function GridHeader<T extends object>({
                 borderRightColor: 'divider',
                 borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
                 borderLeftColor: 'divider',
+                borderBottom: isEditableHeader ? 2 : undefined,
+                borderBottomColor: isEditableHeader
+                  ? 'primary.main'
+                  : undefined,
                 minWidth: 0,
                 width: '100%',
                 boxSizing: 'border-box',
