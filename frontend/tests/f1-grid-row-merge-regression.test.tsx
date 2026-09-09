@@ -46,9 +46,9 @@ describe('F1-Grid row merge regression', () => {
     const cells = screen.getAllByRole('gridcell');
     fireEvent.click(cells[2]);
 
-    expect(cells[0]).toHaveAttribute('tabIndex', '-1');
-    expect(cells[1]).toHaveAttribute('tabIndex', '-1');
-    expect(cells[2]).toHaveAttribute('tabIndex', '0');
+    expect(cells[0].getAttribute('tabIndex')).toBe('-1');
+    expect(cells[1].getAttribute('tabIndex')).toBe('-1');
+    expect(cells[2].getAttribute('tabIndex')).toBe('0');
     expect(getComputedStyle(cells[0]).outlineStyle).toBe('none');
     expect(getComputedStyle(cells[1]).outlineStyle).toBe('none');
   });
