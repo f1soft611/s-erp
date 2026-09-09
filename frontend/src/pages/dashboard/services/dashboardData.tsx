@@ -203,6 +203,13 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '품질관리 모듈 설정', meta: '품질팀 · 2일 전', status: '신규' },
     ],
   },
+  warehouses: {
+    title: '창고관리',
+    description: '창고명과 사용 여부를 관리합니다.',
+    kind: 'menus',
+    cards: [],
+    items: [],
+  },
   'f1-grid-test': {
     title: 'F1 Grid 테스트',
     description: '클립보드, 검증, 확장 에디터와 키보드 입력을 확인합니다.',
