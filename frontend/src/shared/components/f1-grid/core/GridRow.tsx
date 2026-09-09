@@ -37,6 +37,7 @@ type GridRowProps<T extends object> = {
     Array<{ isStart: boolean; span: number } | undefined>
   >;
   visibleRows: T[];
+  selectedIds: F1GridRowId[];
   rowKey: keyof T;
   onSelectRow: (rowId: F1GridRowId, event: MouseEvent<HTMLElement>) => void;
   onSetRowSelection: (rowId: F1GridRowId, checked: boolean) => void;
@@ -76,6 +77,74 @@ type GridRowProps<T extends object> = {
 
 function getStateKey(rowId: F1GridRowId): string {
   return String(rowId);
+}
+
+export function getMergeGroupStartIndex<T extends object>(
+  rows: T[],
+  rowIndex: number,
+  field: keyof T,
+): number {
+  let startIndex = rowIndex;
+
+  while (
+    startIndex > 0 &&
+    Object.is(rows[startIndex - 1][field], rows[rowIndex][field])
+  ) {
+    startIndex -= 1;
+  }
+
+  return startIndex;
+}
+
+export function getActiveMergeGroupStartKeys<T extends object>({
+  columns,
+  mergeInfoByColumn,
+  visibleRows,
+  rowKey,
+  selectedIds,
+  focusedCell,
+  editingCell,
+}: {
+  columns: F1GridColumn<T>[];
+  mergeInfoByColumn: Array<
+    Array<{ isStart: boolean; span: number } | undefined>
+  >;
+  visibleRows: T[];
+  rowKey: keyof T;
+  selectedIds: F1GridRowId[];
+  focusedCell?: { rowId: F1GridRowId; columnIndex: number };
+  editingCell?: { rowId: F1GridRowId; columnIndex: number };
+}): Set<string> {
+  const activeKeys = new Set<string>();
+  const rowIds = new Set<string>(
+    [editingCell?.rowId, focusedCell?.rowId, ...selectedIds]
+      .filter((rowId): rowId is F1GridRowId => rowId !== undefined)
+      .map(String),
+  );
+
+  rowIds.forEach((rowId) => {
+    const rowIndex = visibleRows.findIndex(
+      (item) => String(item[rowKey]) === rowId,
+    );
+    if (rowIndex < 0) return;
+
+    columns.forEach((column, columnIndex) => {
+      if (!column.mergeRows) return;
+
+      const groupStartIndex = getMergeGroupStartIndex(
+        visibleRows,
+        rowIndex,
+        column.field,
+      );
+      const groupStartInfo = mergeInfoByColumn[columnIndex]?.[groupStartIndex];
+
+      if (groupStartInfo && groupStartInfo.span > 1) {
+        activeKeys.add(`${columnIndex}:${groupStartIndex}`);
+      }
+    });
+  });
+
+  return activeKeys;
 }
 
 export function GridRow<T extends object>({
@@ -161,6 +230,27 @@ export function GridRow<T extends object>({
   ) {
     return (
       first?.rowId === second.rowId && first.columnIndex === second.columnIndex
+    );
+  }
+
+  function isActiveMergeGroup(
+    column: F1GridColumn<T>,
+    columnIndex: number,
+    mergeInfo: { isStart: boolean; span: number } | undefined,
+  ): boolean {
+    if (!column.mergeRows || !mergeInfo?.isStart || mergeInfo.span <= 1) {
+      return false;
+    }
+
+    const activeCells = [focusedCell, editingCell].filter(
+      (activeCell): activeCell is { rowId: F1GridRowId; columnIndex: number } =>
+        activeCell?.columnIndex === columnIndex,
+    );
+
+    return activeCells.some((activeCell) =>
+      visibleRows
+        .slice(rowIndex, rowIndex + mergeInfo.span)
+        .some((item) => String(item[rowKey]) === String(activeCell.rowId)),
     );
   }
 
@@ -264,6 +354,11 @@ export function GridRow<T extends object>({
           ? undefined
           : mergeInfoByColumn[columnIndex]?.[rowIndex];
         const merged = getMerged(rowIndex, columnIndex, value);
+        const mergeGroupActive = isActiveMergeGroup(
+          column,
+          columnIndex,
+          mergeInfo,
+        );
 
         return (
           <GridCell
@@ -277,9 +372,11 @@ export function GridRow<T extends object>({
             focused={focused}
             editing={editing}
             selected={Boolean(selected)}
+            selectionRangeActive={selectedRangeHasMultipleCells}
             rangeStart={isSelectedRangeStart || isCopiedRangeStart}
             merged={merged}
             mergeInfo={mergeInfo}
+            mergeGroupActive={mergeGroupActive}
             rowHeight={rowHeight}
             defaultRowHeight={defaultRowHeight}
             rowIndex={rowIndex}
@@ -289,7 +386,15 @@ export function GridRow<T extends object>({
               dirtyCellMap[`${String(rowId)}:${String(column.field)}`],
             )}
             onFocus={() => {
-              onSetFocusedCell(cell);
+              const focusRowIndex =
+                column.mergeRows && merged
+                  ? getMergeGroupStartIndex(visibleRows, rowIndex, column.field)
+                  : rowIndex;
+              const focusRow = visibleRows[focusRowIndex];
+              onSetFocusedCell({
+                rowId: focusRow[rowKey] as F1GridRowId,
+                columnIndex,
+              });
               onSelectRow(rowId, {} as MouseEvent<HTMLElement>);
             }}
             onMouseDown={(event) => {

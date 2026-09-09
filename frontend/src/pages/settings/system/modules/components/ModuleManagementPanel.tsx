@@ -50,6 +50,7 @@ type ModuleManagementPanelProps = {
   ) => Promise<void> | void;
   onDeleteModule?: (moduleId: string) => Promise<void> | void;
   onModulesSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
+  onSaveSuccess?: (message: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onError?: (message: string) => void;
   moduleGridKey?: number;
@@ -129,6 +130,7 @@ export const ModuleManagementPanel = forwardRef<
     onUpdateModule = updateModule,
     onDeleteModule = deleteModule,
     onModulesSaved,
+    onSaveSuccess,
     onDirtyChange,
     onError,
     moduleGridKey = 0,
@@ -328,6 +330,7 @@ export const ModuleManagementPanel = forwardRef<
           nextChanges.deletedRows.length
         ) {
           await onModulesSaved?.();
+          onSaveSuccess?.('모듈을 저장했습니다.');
           completedOperationsRef.current.clear();
         }
       } catch (error) {
@@ -356,7 +359,14 @@ export const ModuleManagementPanel = forwardRef<
     );
 
     return savePromise;
-  }, [onCreateModule, onDeleteModule, onError, onModulesSaved, onUpdateModule]);
+  }, [
+    onCreateModule,
+    onDeleteModule,
+    onError,
+    onModulesSaved,
+    onSaveSuccess,
+    onUpdateModule,
+  ]);
 
   useImperativeHandle(
     ref,

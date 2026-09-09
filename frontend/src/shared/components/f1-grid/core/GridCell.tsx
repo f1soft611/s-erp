@@ -14,9 +14,11 @@ type GridCellProps<T extends object> = {
   focused: boolean;
   editing: boolean;
   selected: boolean;
+  selectionRangeActive?: boolean;
   rangeStart?: boolean;
   merged: boolean;
   mergeInfo?: { isStart: boolean; span: number };
+  mergeGroupActive?: boolean;
   rowHeight: number;
   defaultRowHeight: number;
   rowIndex: number;
@@ -52,11 +54,10 @@ export function getGridCellBottomBorder(
   isMergeStart: boolean | undefined,
   mergeSpan?: number,
 ) {
-  const shouldShowMergeBoundary = Boolean(
-    isMergeStart && mergeSpan && mergeSpan > 1,
-  );
-
-  return isLastRow || shouldShowMergeBoundary ? 1 : merged ? 0 : undefined;
+  if (merged && !isMergeStart) return 0;
+  if (isLastRow) return 1;
+  if (isMergeStart && mergeSpan && mergeSpan > 1) return 0;
+  return undefined;
 }
 
 export function GridCell<T extends object>({
@@ -69,9 +70,11 @@ export function GridCell<T extends object>({
   focused,
   editing,
   selected,
+  selectionRangeActive = false,
   rangeStart = false,
   merged,
   mergeInfo,
+  mergeGroupActive = false,
   rowHeight,
   defaultRowHeight,
   rowIndex,
@@ -116,7 +119,9 @@ export function GridCell<T extends object>({
   };
   const hideRangeStartBorder = rangeStart && !editing;
   const activeHighlight =
-    (focused || editing) && !(selected && !editing && (rangeStart || !focused));
+    !selectionRangeActive &&
+    (focused || editing || mergeGroupActive) &&
+    !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
   const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
   const cellClassName =
     [customCellProps.className].filter(Boolean).join(' ') || undefined;

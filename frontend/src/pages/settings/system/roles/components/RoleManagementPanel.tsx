@@ -30,7 +30,6 @@ import {
   type F1GridRef,
 } from '../../../../../shared/components/f1-grid';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
-import { useNotification } from '../../../../../shared/context/NotificationContext';
 import type { RoleManagementRow } from '../types/roleManagement.types';
 import {
   assignUserToRole,
@@ -50,6 +49,7 @@ type RoleManagementPanelProps = {
     payload: RoleSavePayload,
   ) => Promise<void> | void;
   onRolesSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
+  onSaveSuccess?: (message: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onError?: (message: string) => void;
   roleGridKey?: number;
@@ -79,6 +79,7 @@ export const RoleManagementPanel = forwardRef<
     onCreateRole,
     onUpdateRole,
     onRolesSaved,
+    onSaveSuccess,
     onDirtyChange,
     onError,
     roleGridKey = 0,
@@ -100,7 +101,6 @@ export const RoleManagementPanel = forwardRef<
   const [pendingRoleId, setPendingRoleId] = useState<string>();
   const [roleSwitchDialogOpen, setRoleSwitchDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { showSuccess } = useNotification();
   const roleGridRef = useRef<F1GridRef<RoleManagementRow>>(null);
   const userGridRef = useRef<F1GridRef<RoleUserRow>>(null);
   const userRequestIdRef = useRef(0);
@@ -441,8 +441,11 @@ export const RoleManagementPanel = forwardRef<
           roleChanges.updatedRows.length ||
           mappingChanges.updatedRows.length
         ) {
-          showSuccess('역할을 저장했습니다.');
+          onSaveSuccess?.('역할을 저장했습니다.');
         }
+        setRoleGridDirty(false);
+        setUserGridDirty(false);
+        userGridDirtyRef.current = false;
       } finally {
         setSaving(false);
       }
@@ -466,8 +469,8 @@ export const RoleManagementPanel = forwardRef<
     loadUserRows,
     onCreateRole,
     onRolesSaved,
+    onSaveSuccess,
     onUpdateRole,
-    showSuccess,
     userRows,
   ]);
 
@@ -480,6 +483,7 @@ export const RoleManagementPanel = forwardRef<
     if (!pendingRoleId) return;
     ++userRequestIdRef.current;
     userGridDirtyRef.current = false;
+    setRoleGridDirty(false);
     setUserGridDirty(false);
     setUserGridKey((current) => current + 1);
     const nextRoleId = pendingRoleId;

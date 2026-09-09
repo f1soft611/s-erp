@@ -338,6 +338,64 @@ describe('F1-Grid context menu', () => {
     expect(screen.getByRole('gridcell', { name: '새 행' })).toBeVisible();
   });
 
+  it('clears tree sorting from the shared context menu', async () => {
+    render(
+      <F1Tree
+        rows={treeRows}
+        columns={treeColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="정렬 테스트 트리"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
+
+    expect(screen.getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(
+      ['Beta', 'Alpha'],
+    );
+
+    fireEvent.contextMenu(getGridBody('정렬 테스트 트리'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '정렬 해제' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(
+        ['Alpha', 'Beta'],
+      );
+    });
+  });
+
+  it('clears tree filters from the shared context menu', async () => {
+    render(
+      <F1Tree
+        rows={treeRows}
+        columns={treeColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="필터 테스트 트리"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
+    fireEvent.change(screen.getByLabelText('이름 필터 값'), {
+      target: { value: 'Alpha' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(screen.queryByRole('gridcell', { name: 'Beta' })).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(getGridBody('필터 테스트 트리'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터 해제' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('gridcell', { name: 'Beta' })).toBeVisible();
+    });
+  });
+
   it('deletes only the row that was right-clicked when nothing else is selected', () => {
     render(
       <F1Grid

@@ -225,6 +225,7 @@ export function GridBody<T extends object>({
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
             visibleRows={visibleRows}
+            selectedIds={selectedIds}
             rowKey={rowKey}
             onSelectRow={onSelectRow}
             onSetRowSelection={onSetRowSelection}

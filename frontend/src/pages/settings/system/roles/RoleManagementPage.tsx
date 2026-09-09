@@ -6,6 +6,8 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useNotification } from '../../../../shared/context/NotificationContext';
 import type {
   ModuleItem,
   PageContent,
@@ -43,6 +45,7 @@ export function RoleManagementPage({
   breadcrumbItems,
   selectedMenuPermissions,
 }: RoleManagementPageProps) {
+  const { showSuccess } = useNotification();
   const rolePanelRef = useRef<RoleManagementPanelHandle>(null);
   const [roles, setRoles] = useState<RoleManagementRow[]>([]);
   const [error, setError] = useState('');
@@ -51,6 +54,7 @@ export function RoleManagementPage({
   const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [roleGridKey, setRoleGridKey] = useState(0);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const roleRequestIdRef = useRef(0);
 
   const pageActionPermissions = useMemo(() => {
@@ -111,6 +115,7 @@ export function RoleManagementPage({
   const handleRolesSaved = useCallback(
     async (_options?: { silent?: boolean }) => {
       await loadRoles();
+      setPanelDirty(false);
       setRoleGridKey((current) => current + 1);
     },
     [loadRoles],
@@ -132,6 +137,21 @@ export function RoleManagementPage({
     }
   }, []);
 
+  const requestRoleRefresh = useCallback(() => {
+    if (panelDirty) {
+      setRefreshConfirmOpen(true);
+      return;
+    }
+    void loadRoles({ showSkeleton: true });
+  }, [loadRoles, panelDirty]);
+
+  const confirmRoleRefresh = useCallback(() => {
+    setRefreshConfirmOpen(false);
+    setPanelDirty(false);
+    setRoleGridKey((current) => current + 1);
+    void loadRoles({ showSkeleton: true });
+  }, [loadRoles]);
+
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'read',
@@ -141,9 +161,7 @@ export function RoleManagementPage({
           icon: SearchIcon,
           visible: pageActionPermissions.read,
           disabled: false,
-          onClick: () => {
-            void loadRoles({ showSkeleton: true });
-          },
+          onClick: requestRoleRefresh,
         },
       ],
     },
@@ -225,10 +243,20 @@ export function RoleManagementPage({
         onCreateRole={handleCreateRole}
         onUpdateRole={handleUpdateRole}
         onRolesSaved={handleRolesSaved}
+        onSaveSuccess={showSuccess}
         onDirtyChange={setPanelDirty}
         onError={setError}
         roleGridKey={roleGridKey}
         roleGridLoading={pageLoading}
+      />
+      <UnsavedChangesConfirmDialog
+        open={refreshConfirmOpen}
+        title="저장하지 않은 변경사항"
+        description="변경사항을 버리고 권한 목록을 다시 불러오시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={() => setRefreshConfirmOpen(false)}
+        onContinue={confirmRoleRefresh}
       />
     </Box>
   );
