@@ -249,6 +249,7 @@
 ## 변경 이력
 
 - 2026-09-09: 창고 관리 작업으로 `tb_warehouse` 테이블을 신규 추가. 적용 스크립트는 [backend/DATABASE/20260909](../../backend/DATABASE/20260909) 참고.
+- 2026-09-09: 창고관리 화면(`/settings/system/warehouses`)을 T1358606250 테넌트 사이드바에 등록 — `tb_menu`(`ST_WAREHOUSE`, 환경설정 > 시스템 관리 하위) 1건, `tb_menu_permission` 5건, `tb_role_menu_permission`(PLATFORM_ADMIN) 5건 추가. 스키마 변경 없음(seed). 적용 스크립트는 [20260909_002_seed_warehouse_menu.sql](../../backend/DATABASE/20260909/20260909_002_seed_warehouse_menu.sql) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
