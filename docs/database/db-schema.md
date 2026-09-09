@@ -222,10 +222,33 @@
 - 백엔드 `GET /api/v1/system/menus?moduleId={moduleId}&roleId={roleId}` 및 `PUT /api/v1/system/roles/{roleId}/menu-permissions`의 최종 저장소
 - 대시보드 좌측 메뉴와 페이지 헤더 액션 버튼의 권한 계산이 이 테이블을 기준으로 동기화된다
 
+### 2-14. tb_warehouse
+
+| 컬럼         | 타입      | 설명                        |
+| ------------ | --------- | --------------------------- |
+| warehouse_id | bigint    | 창고 PK                     |
+| tenant_id    | bigint    | 소속 테넌트 FK              |
+| warehouse_nm | varchar   | 창고명 (테넌트 내 유일)     |
+| use_at       | char      | 사용 여부 (Y/N)             |
+| created_by   | bigint    | 생성자                      |
+| created_at   | timestamp | 생성 일시                   |
+| updated_by   | bigint    | 수정자                      |
+| updated_at   | timestamp | 수정 일시                   |
+
+제약:
+
+- `UNIQUE (tenant_id, warehouse_nm)`
+- `tb_tenant(tenant_id)` 참조, 테넌트 삭제 시 함께 삭제(`ON DELETE CASCADE`)
+
+역할:
+
+- 테넌트별 창고 마스터 관리
+
 ---
 
 ## 변경 이력
 
+- 2026-09-09: 창고 관리 작업으로 `tb_warehouse` 테이블을 신규 추가. 적용 스크립트는 [backend/DATABASE/20260909](../../backend/DATABASE/20260909) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
