@@ -46,6 +46,19 @@ function toJustifyContent(align: 'left' | 'center' | 'right') {
   return 'flex-start';
 }
 
+export function getGridCellBottomBorder(
+  isLastRow: boolean | undefined,
+  merged: boolean,
+  isMergeStart: boolean | undefined,
+  mergeSpan?: number,
+) {
+  const shouldShowMergeBoundary = Boolean(
+    isMergeStart && mergeSpan && mergeSpan > 1,
+  );
+
+  return isLastRow || shouldShowMergeBoundary ? 1 : merged ? 0 : undefined;
+}
+
 export function GridCell<T extends object>({
   row,
   rowId,
@@ -179,7 +192,12 @@ export function GridCell<T extends object>({
           ? `${rowIndex + 1} / span ${mergeInfo.span}`
           : rowIndex + 1,
         borderTop: hideRangeStartBorder ? 0 : merged ? 0 : 1,
-        borderBottom: isLastRow ? 1 : merged ? 0 : undefined,
+        borderBottom: getGridCellBottomBorder(
+          isLastRow,
+          merged,
+          mergeInfo?.isStart,
+          mergeInfo?.span,
+        ),
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
         opacity: mergedCellHidden ? 0 : 1,

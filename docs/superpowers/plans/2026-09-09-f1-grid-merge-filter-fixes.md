@@ -17,7 +17,7 @@
 - Modify: `frontend/tests/f1-grid.test.tsx`
 - Modify: `frontend/src/shared/components/f1-grid/core/GridCell.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Render a two-row `mergeRows` column, locate the first cell, and assert its computed MUI style contains a 1px bottom border.
 
@@ -25,13 +25,13 @@ Render a two-row `mergeRows` column, locate the first cell, and assert its compu
 expect(mergedCell).toHaveStyle({ borderBottom: '1px solid' });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/f1-grid.test.tsx -t "renders a bottom boundary for a merged span"`
 
 Expected: FAIL because the merged start cell is not the grid's final row and currently receives `borderBottom: 0`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Make the existing `borderBottom` condition render `1` when the cell is a visible merged start cell, while retaining the current last-row behavior for other cells.
 
@@ -39,7 +39,7 @@ Make the existing `borderBottom` condition render `1` when the cell is a visible
 borderBottom: isLastRow || (merged && mergeInfo?.isStart) ? 1 : merged ? 0 : undefined,
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/f1-grid.test.tsx -t "row merge"`
 
@@ -52,7 +52,7 @@ Expected: PASS, including existing parent merge group tests.
 - Modify: `frontend/tests/f1-grid.test.tsx`
 - Modify: `frontend/src/shared/components/f1-grid/core/GridHeader.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Open a column menu, click `필터`, and assert the rendered filter menu uses a still-mounted header menu button as its anchor rather than the clicked `MenuItem`.
 
@@ -60,13 +60,13 @@ Open a column menu, click `필터`, and assert the rendered filter menu uses a s
 expect(filterMenu).toHaveAttribute('data-anchor-column', 'code');
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/f1-grid.test.tsx -t "anchors the column filter menu to its header button"`
 
 Expected: FAIL because `openFilterPopover` assigns its transient menu item to `filterAnchor`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Store the header menu button supplied to `openColumnMenu` and assign it to `filterAnchor` when opening the filter.
 
@@ -77,7 +77,7 @@ setFilterAnchor(event.currentTarget);
 
 Clear the stored filter anchor whenever `closeMenus` runs.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/f1-grid.test.tsx -t "column filter"`
 
@@ -91,17 +91,17 @@ Expected: PASS with the filter popover anchored to the matching header button.
 - Create: `docs/result/20260909/f1grid-merge-filter-position-fix/README.md`
 - Create: `docs/result/20260909/f1grid-merge-filter-position-fix/screenshots/desktop.png`
 
-- [ ] **Step 1: Document the behavior**
+- [x] **Step 1: Document the behavior**
 
 Add concise Row Merge and column filter notes documenting that a merged range draws its lower boundary and that a filter is positioned under its source header button.
 
-- [ ] **Step 2: Run focused validation**
+- [x] **Step 2: Run focused validation**
 
 Run: `npx vitest run tests/f1-grid.test.tsx -t "row merge|column filter"`
 
 Expected: PASS.
 
-- [ ] **Step 3: Run build validation**
+- [x] **Step 3: Run build validation**
 
 Run: `npm run build`
 
@@ -111,6 +111,6 @@ Expected: PASS with TypeScript and Vite build success.
 
 Use the existing F1-Grid capture script pattern to navigate through the UI, open a filter menu, and save the desktop screenshot in the result directory.
 
-- [ ] **Step 5: Record results**
+- [x] **Step 5: Record results**
 
 Document the reported symptoms, root causes, code changes, regression tests, build result, and screenshot location in the result README.

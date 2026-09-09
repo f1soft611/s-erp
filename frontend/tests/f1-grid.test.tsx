@@ -51,6 +51,7 @@ import {
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
+import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/GridCell';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
 import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
 import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
@@ -1371,6 +1372,14 @@ describe('F1-GRID row merge', () => {
       { isStart: false, span: 0 },
     ]);
   });
+
+  it('renders a bottom boundary for a merged span', () => {
+    expect(getGridCellBottomBorder(false, true, true, 2)).toBe(1);
+    expect(getGridCellBottomBorder(false, false, true, 2)).toBe(1);
+    expect(getGridCellBottomBorder(false, false, true, 1)).toBeUndefined();
+    expect(getGridCellBottomBorder(false, true, false)).toBe(0);
+    expect(getGridCellBottomBorder(true, false, false)).toBe(1);
+  });
 });
 
 describe('F1-GRID row height', () => {
@@ -2432,6 +2441,15 @@ describe('F1-GRID filtering', () => {
       expect(screen.queryByRole('gridcell', { name: 'DASH' })).toBeNull();
     });
     expect(screen.getByRole('gridcell', { name: 'SET' })).toBeInTheDocument();
+  });
+
+  it('anchors the column filter menu to its header button', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
+
+    expect(screen.getAllByLabelText('코드 컬럼 메뉴')).toHaveLength(2);
   });
 });
 

@@ -122,6 +122,9 @@ export function GridHeader<T extends object>({
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [headerMenuAnchor, setHeaderMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
   const [columnListAnchor, setColumnListAnchor] = useState<HTMLElement | null>(
     null,
   );
@@ -173,6 +176,7 @@ export function GridHeader<T extends object>({
 
   function closeMenus() {
     setMenuAnchor(null);
+    setHeaderMenuAnchor(null);
     setColumnListAnchor(null);
     setFilterAnchor(null);
   }
@@ -184,6 +188,7 @@ export function GridHeader<T extends object>({
     event.stopPropagation();
     setMenuColumn(column);
     setMenuAnchor(event.currentTarget);
+    setHeaderMenuAnchor(event.currentTarget);
   }
 
   function openFilterPopover(event: MouseEvent<HTMLElement>) {
@@ -197,7 +202,7 @@ export function GridHeader<T extends object>({
       value2: existing?.value2 === undefined ? '' : String(existing.value2),
     });
     setMenuAnchor(null);
-    setFilterAnchor(event.currentTarget);
+    setFilterAnchor(headerMenuAnchor);
   }
 
   function applyFilterDraft() {
@@ -747,6 +752,11 @@ export function GridHeader<T extends object>({
         open={Boolean(filterAnchor)}
         onClose={closeMenus}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            'aria-label': filterAnchor?.getAttribute('aria-label') ?? undefined,
+          },
+        }}
       >
         <Box
           sx={{
