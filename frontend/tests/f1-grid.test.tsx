@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+﻿import { createRef } from 'react';
 import {
   act,
   fireEvent,
@@ -51,6 +51,11 @@ import {
   type F1GridSort,
 } from '../src/shared/components/f1-grid';
 import { normalizeDateInput } from '../src/shared/components/f1-grid/editing/DateEditor';
+import { getGridCellBottomBorder } from '../src/shared/components/f1-grid/core/GridCell';
+import {
+  getActiveMergeGroupStartKeys,
+  getMergeGroupStartIndex,
+} from '../src/shared/components/f1-grid/core/GridRow';
 import { NumberEditor } from '../src/shared/components/f1-grid/editing/NumberEditor';
 import { SelectEditor } from '../src/shared/components/f1-grid/editing/SelectEditor';
 import { TextEditor } from '../src/shared/components/f1-grid/editing/TextEditor';
@@ -85,10 +90,10 @@ const rows: MenuRow[] = [
 ];
 
 const columns: F1GridColumn<MenuRow>[] = [
-  { field: 'code', headerName: '코드', editable: true },
+  { field: 'code', headerName: '肄붾뱶', editable: true },
   {
     field: 'order',
-    headerName: '정렬',
+    headerName: '?占쎈젹',
     editable: true,
     type: 'number',
     align: 'center',
@@ -96,20 +101,20 @@ const columns: F1GridColumn<MenuRow>[] = [
   },
   {
     field: 'enabled',
-    headerName: '사용 여부',
+    headerName: '?占쎌슜 ?占쏙옙?',
     editable: true,
     type: 'checkbox',
     headerCheckbox: true,
   },
-  { field: 'startDate', headerName: '시작일', editable: true, type: 'date' },
+  { field: 'startDate', headerName: 'Start date', editable: true, type: 'date' },
   {
     field: 'status',
-    headerName: '상태',
+    headerName: '?占쏀깭',
     editable: (row) => row.status === 'draft',
     type: 'select',
     options: [
-      { value: 'draft', label: '작성중' },
-      { value: 'confirmed', label: '확정' },
+      { value: 'draft', label: 'Draft' },
+      { value: 'confirmed', label: '?占쎌젙' },
     ],
   },
 ];
@@ -174,7 +179,7 @@ describe('F1-GRID menu layout', () => {
       <div style={{ height: 360, display: 'flex', flexDirection: 'column' }}>
         <MenuManagementPanel
           menus={[]}
-          selectedModule={{ moduleId: 1, moduleName: '기준 모듈' }}
+          selectedModule={{ moduleId: 1, moduleName: '湲곤옙? 紐⑤뱢' }}
           selectedRoleId="role-1"
           permissions={[]}
           canExportExcel={false}
@@ -234,7 +239,7 @@ describe('F1-GRID number formatting', () => {
   it('formats numeric values with a custom decimal precision', () => {
     const column: F1GridColumn<{ amount: number }>[][0] = {
       field: 'amount',
-      headerName: '금액',
+      headerName: '湲덉븸',
       type: 'number',
       format: 'number',
       decimalPlaces: 2,
@@ -246,13 +251,13 @@ describe('F1-GRID number formatting', () => {
   it('formats currency values when a custom number format is specified', () => {
     const column: F1GridColumn<{ amount: number }>[][0] = {
       field: 'amount',
-      headerName: '금액',
+      headerName: '湲덉븸',
       type: 'currency',
       format: 'currency',
       decimalPlaces: 0,
     };
 
-    expect(getCellDisplayValue(column, 12345.6)).toBe('₩12,346');
+    expect(getCellDisplayValue(column, 12345.6)).toBe('??2,346');
   });
 });
 
@@ -303,7 +308,7 @@ describe('F1-GRID editor plugins', () => {
 
   it('does not enable editing from a plugin when the column is not explicitly editable', () => {
     const columnsWithoutEditableFlag: F1GridColumn<MenuRow>[] = [
-      { field: 'code', headerName: '코드', editable: false },
+      { field: 'code', headerName: '肄붾뱶', editable: false },
     ];
 
     render(
@@ -333,14 +338,14 @@ describe('F1-GRID clipboard', () => {
     expect(
       coerceClipboardValue('12', {
         field: 'order',
-        headerName: '정렬',
+        headerName: '?占쎈젹',
         type: 'number',
       }),
     ).toBe(12);
     expect(
       coerceClipboardValue('Y', {
         field: 'enabled',
-        headerName: '사용 여부',
+        headerName: '?占쎌슜 ?占쏙옙?',
         type: 'checkbox',
       }),
     ).toBe(true);
@@ -352,9 +357,9 @@ describe('F1-GRID custom cell rendering', () => {
     const customColumns: F1GridColumn<MenuRow>[] = [
       {
         field: 'status',
-        headerName: '상태',
+        headerName: '?占쏀깭',
         renderCell: ({ value }) => (
-          <span>{String(value) === 'draft' ? '작성중' : '확정'}</span>
+          <span>{String(value) === 'draft' ? 'Draft' : 'Confirmed'}</span>
         ),
         getCellStyle: ({ value }) => ({
           backgroundColor: String(value) === 'draft' ? '#fff8e1' : '#e8f5e9',
@@ -376,7 +381,7 @@ describe('F1-GRID custom cell rendering', () => {
       />,
     );
 
-    const statusCell = screen.getByText('작성중').closest('[role="gridcell"]');
+    const statusCell = screen.getByText('Draft').closest('[role="gridcell"]');
     expect(statusCell).toBeInTheDocument();
     expect(statusCell).toHaveClass('status-draft');
     expect(statusCell).toHaveStyle({
@@ -393,12 +398,12 @@ describe('F1-GRID custom cell rendering', () => {
         columns={[
           {
             field: 'status',
-            headerName: '상태',
+            headerName: '?占쏀깭',
             editable: (row) => row.status === 'draft',
             type: 'select',
             options: [
-              { value: 'draft', label: '작성중' },
-              { value: 'confirmed', label: '확정' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'confirmed', label: '?占쎌젙' },
             ],
           },
         ]}
@@ -413,7 +418,7 @@ describe('F1-GRID custom cell rendering', () => {
       />,
     );
 
-    expect(screen.getByRole('columnheader', { name: '상태' })).toHaveAttribute(
+    expect(screen.getByRole('columnheader', { name: '?占쏀깭' })).toHaveAttribute(
       'data-editable-column',
       'true',
     );
@@ -427,15 +432,15 @@ describe('F1-GRID select icon rendering', () => {
         <SelectEditor
           value="draft"
           options={[
-            { value: 'draft', label: '작성중' },
-            { value: 'confirmed', label: '확정' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'confirmed', label: '?占쎌젙' },
           ]}
           onChange={() => undefined}
         />
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
     ).toBe(0);
@@ -447,8 +452,8 @@ describe('F1-GRID select icon rendering', () => {
         <SelectEditor
           value="draft"
           options={[
-            { value: 'draft', label: '작성중' },
-            { value: 'confirmed', label: '확정' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'confirmed', label: '?占쎌젙' },
           ]}
           selectOptionIcon={(option) => (
             <span data-testid={`icon-${String(option.value)}`}>
@@ -461,7 +466,7 @@ describe('F1-GRID select icon rendering', () => {
     );
 
     expect(screen.getByTestId('icon-draft')).toBeInTheDocument();
-    expect(screen.getByText('작성중')).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-f1grid-option-icon="true"]').length,
     ).toBe(1);
@@ -471,11 +476,11 @@ describe('F1-GRID select icon rendering', () => {
 describe('F1-GRID column management', () => {
   it('creates proportional grid tracks for flex columns', () => {
     expect(
-      getGridColumnTrack({ field: 'code', headerName: '코드', flex: 1 }),
+      getGridColumnTrack({ field: 'code', headerName: '肄붾뱶', flex: 1 }),
     ).toBe('minmax(0px, 1fr)');
     expect(
       getGridColumnTrack(
-        { field: 'order', headerName: '정렬', flex: 2, width: 80 },
+        { field: 'order', headerName: '?占쎈젹', flex: 2, width: 80 },
         140,
       ),
     ).toBe('140px');
@@ -484,7 +489,7 @@ describe('F1-GRID column management', () => {
   it('uses the configured width for a pinned flex column', () => {
     expect(
       getGridColumnTrack(
-        { field: 'code', headerName: '코드', flex: 1, width: 130 },
+        { field: 'code', headerName: '肄붾뱶', flex: 1, width: 130 },
         undefined,
         true,
       ),
@@ -495,9 +500,9 @@ describe('F1-GRID column management', () => {
     expect(
       getGridColumnTracks(
         [
-          { field: 'code', headerName: '코드', width: 100 },
-          { field: 'order', headerName: '정렬', width: 120, flex: 2 },
-          { field: 'status', headerName: '상태', width: 60, flex: 1 },
+          { field: 'code', headerName: '肄붾뱶', width: 100 },
+          { field: 'order', headerName: '?占쎈젹', width: 120, flex: 2 },
+          { field: 'status', headerName: '?占쏀깭', width: 60, flex: 1 },
         ],
         {},
         new Map(),
@@ -509,9 +514,9 @@ describe('F1-GRID column management', () => {
 
   it('filters hidden columns while preserving the configured order', () => {
     const configuredColumns = [
-      { field: 'code', headerName: '코드' },
-      { field: 'order', headerName: '정렬' },
-      { field: 'status', headerName: '상태' },
+      { field: 'code', headerName: '肄붾뱶' },
+      { field: 'order', headerName: '?占쎈젹' },
+      { field: 'status', headerName: '?占쏀깭' },
     ] satisfies F1GridColumn<MenuRow>[];
 
     expect(
@@ -524,7 +529,7 @@ describe('F1-GRID column management', () => {
   it('prevents hiding the last visible column', () => {
     const configuredColumn = {
       field: 'code',
-      headerName: '코드',
+      headerName: '肄붾뱶',
     } satisfies F1GridColumn<MenuRow>;
 
     expect(canHideGridColumn([configuredColumn], configuredColumn)).toBe(false);
@@ -535,9 +540,9 @@ describe('F1-GRID column management', () => {
 
   it('reorders columns according to the given field order, keeping unknown fields at the end', () => {
     const configuredColumns = [
-      { field: 'code', headerName: '코드' },
-      { field: 'order', headerName: '정렬' },
-      { field: 'status', headerName: '상태' },
+      { field: 'code', headerName: '肄붾뱶' },
+      { field: 'order', headerName: '?占쎈젹' },
+      { field: 'status', headerName: '?占쏀깭' },
     ] satisfies F1GridColumn<MenuRow>[];
 
     expect(
@@ -563,20 +568,20 @@ describe('F1-GRID column management', () => {
   it('hides and restores a column through the header column list menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: '정렬 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '?占쎈젹 ?占쎌떆' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('columnheader', { name: /정렬/ })).toBeNull();
+      expect(screen.queryByRole('columnheader', { name: /?占쎈젹/ })).toBeNull();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: '정렬 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '?占쎈젹 ?占쎌떆' }));
     await waitFor(() => {
       expect(
-        screen.getByRole('columnheader', { name: /정렬/ }),
+        screen.getByRole('columnheader', { name: /?占쎈젹/ }),
       ).toBeInTheDocument();
     });
   });
@@ -686,30 +691,30 @@ describe('F1-GRID cell range selection', () => {
 describe('F1-GRID validation', () => {
   it('returns field errors for required, bounds, and custom validation', () => {
     const errors = validateGridRow(
-      { id: 'line-1', itemCode: '', qty: 0, name: '금지 품목' },
+      { id: 'line-1', itemCode: '', qty: 0, name: '湲덌옙? ?占쎈ぉ' },
       [
-        { field: 'itemCode', headerName: '품목코드', required: true },
-        { field: 'qty', headerName: '수량', min: 1, max: 9 },
+        { field: 'itemCode', headerName: '?占쎈ぉ肄붾뱶', required: true },
+        { field: 'qty', headerName: '?占쎈웾', min: 1, max: 9 },
         {
           field: 'name',
-          headerName: '품목명',
+          headerName: 'Item name',
           validate: (value) =>
-            value === '금지 품목' ? '등록할 수 없는 품목입니다.' : true,
+            value === '湲덌옙? ?占쎈ぉ' ? '?占쎈줉?????占쎈뒗 ?占쎈ぉ?占쎈땲??' : true,
         },
       ],
     );
 
     expect(errors).toEqual({
-      itemCode: '품목코드은(는) 필수입니다.',
-      qty: '수량은(는) 1 이상이어야 합니다.',
-      name: '등록할 수 없는 품목입니다.',
+      itemCode: '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??',
+      qty: '?占쎈웾?占??? 1 ?占쎌긽?占쎌뼱???占쎈땲??',
+      name: '?占쎈줉?????占쎈뒗 ?占쎈ぉ?占쎈땲??',
     });
   });
 
   it('renders an empty-state message when there are no rows', () => {
     render(<F1Grid rows={[]} columns={columns} rowKey="id" />);
 
-    expect(screen.getByText('데이터가 없습니다')).toBeInTheDocument();
+    expect(screen.getByText('?占쎌씠?占쏙옙? ?占쎌뒿?占쎈떎')).toBeInTheDocument();
   });
 });
 
@@ -729,7 +734,7 @@ describe('F1-GRID extended editors', () => {
   it('formats currency values for display', () => {
     expect(
       getCellDisplayValue(
-        { field: 'price', headerName: '단가', type: 'currency' },
+        { field: 'price', headerName: '?占쏙옙?', type: 'currency' },
         12000,
       ),
     ).toBe('12,000');
@@ -742,34 +747,34 @@ describe('F1-GRID extended editors', () => {
       >();
     const onOpenCodePicker = () => ({
       itemCode: 'ITEM-002',
-      itemName: '테스트 품목',
+      itemName: '?占쎌뒪???占쎈ぉ',
     });
 
     render(
       <F1Grid
         ref={gridRef}
-        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목' }]}
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' }]}
         columns={[
           {
             field: 'itemCode',
-            headerName: '품목코드',
+            headerName: '?占쎈ぉ肄붾뱶',
             type: 'code',
             editable: true,
             onOpenCodePicker,
           },
-          { field: 'itemName', headerName: '품목명', editable: true },
+          { field: 'itemName', headerName: 'Item name', editable: true },
         ]}
         rowKey="id"
       />,
     );
 
     fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
-    fireEvent.click(screen.getByRole('button', { name: '코드 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 ?占쏀깮' }));
 
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({
         itemCode: 'ITEM-002',
-        itemName: '테스트 품목',
+        itemName: '?占쎌뒪???占쎈ぉ',
       }),
     ]);
   });
@@ -786,24 +791,24 @@ describe('F1-GRID extended editors', () => {
     const extendedColumns: F1GridColumn<ExtendedRow>[] = [
       {
         field: 'status',
-        headerName: '상태',
+        headerName: '?占쏀깭',
         type: 'autocomplete',
         editable: true,
         options: [
-          { value: 'ready', label: '준비' },
-          { value: 'done', label: '완료' },
+          { value: 'ready', label: 'Ready' },
+          { value: 'done', label: '?占쎈즺' },
         ],
       },
-      { field: 'ratio', headerName: '비율', type: 'decimal', editable: true },
+      { field: 'ratio', headerName: '鍮꾩쑉', type: 'decimal', editable: true },
       {
         field: 'deliveryAt',
-        headerName: '납기 일시',
+        headerName: '?占쎄린 ?占쎌떆',
         type: 'datetime',
         editable: true,
       },
       {
         field: 'workTime',
-        headerName: '작업 시각',
+        headerName: '?占쎌뾽 ?占쎄컖',
         type: 'time',
         editable: true,
       },
@@ -826,11 +831,11 @@ describe('F1-GRID extended editors', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '준비' }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '以占? }));
     fireEvent.change(screen.getByDisplayValue('ready'), {
-      target: { value: '완료' },
+      target: { value: '?占쎈즺' },
     });
-    fireEvent.keyDown(screen.getByDisplayValue('완료'), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByDisplayValue('?占쎈즺'), { key: 'Enter' });
     fireEvent.doubleClick(screen.getByRole('gridcell', { name: '1.5' }));
     fireEvent.change(screen.getByDisplayValue('1.5'), {
       target: { value: '2.75' },
@@ -867,15 +872,15 @@ describe('F1-GRID extended editors', () => {
     const statusColumns: F1GridColumn<StatusRow>[] = [
       {
         field: 'status',
-        headerName: '상태',
+        headerName: '?占쏀깭',
         type: 'autocomplete',
         editable: true,
         options: [
-          { value: 'ready', label: '준비' },
-          { value: 'done', label: '완료' },
+          { value: 'ready', label: 'Ready' },
+          { value: 'done', label: '?占쎈즺' },
         ],
       },
-      { field: 'note', headerName: '비고', editable: true },
+      { field: 'note', headerName: '鍮꾧퀬', editable: true },
     ];
 
     render(
@@ -887,11 +892,11 @@ describe('F1-GRID extended editors', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '준비' }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '以占? }));
     fireEvent.change(screen.getByDisplayValue('ready'), {
-      target: { value: '완료' },
+      target: { value: '?占쎈즺' },
     });
-    fireEvent.keyDown(screen.getByDisplayValue('완료'), { key: 'Tab' });
+    fireEvent.keyDown(screen.getByDisplayValue('?占쎈즺'), { key: 'Tab' });
 
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'line-1', status: 'done' }),
@@ -905,7 +910,7 @@ describe('F1-GRID extended editors', () => {
         columns={[
           {
             field: 'workTime',
-            headerName: '작업 시각',
+            headerName: '?占쎌뾽 ?占쎄컖',
             type: 'time',
             editable: true,
           },
@@ -931,21 +936,21 @@ describe('F1-GRID dirty indicator across column types', () => {
     workTime: string;
   };
   const mixedColumns: F1GridColumn<MixedRow>[] = [
-    { field: 'name', headerName: '이름', editable: true },
-    { field: 'qty', headerName: '수량', type: 'number', editable: true },
+    { field: 'name', headerName: '?占쎈쫫', editable: true },
+    { field: 'qty', headerName: '?占쎈웾', type: 'number', editable: true },
     {
       field: 'active',
-      headerName: '사용',
+      headerName: '?占쎌슜',
       type: 'checkbox',
       editable: true,
     },
     {
       field: 'startDate',
-      headerName: '시작일',
+      headerName: 'Status',
       type: 'date',
       editable: true,
     },
-    { field: 'workTime', headerName: '작업시각', type: 'time', editable: true },
+    { field: 'workTime', headerName: '?占쎌뾽?占쎄컖', type: 'time', editable: true },
   ];
   const mixedRows: MixedRow[] = [
     {
@@ -1008,7 +1013,7 @@ describe('F1-GRID dirty indicator across column types', () => {
       />,
     );
 
-    const checkbox = screen.getByRole('checkbox', { name: '사용 line-1' });
+    const checkbox = screen.getByRole('checkbox', { name: '?占쎌슜 line-1' });
     fireEvent.click(checkbox);
 
     expect(checkbox.closest('[role="gridcell"]')).toHaveAttribute(
@@ -1070,21 +1075,21 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
   const itemColumns: F1GridColumn<ItemRow>[] = [
     {
       field: 'itemCode',
-      headerName: '품목코드',
+      headerName: '?占쎈ぉ肄붾뱶',
       editable: true,
       required: true,
     },
-    { field: 'itemName', headerName: '품목명', editable: true },
+    { field: 'itemName', headerName: 'Item name', editable: true },
     {
       field: 'qty',
-      headerName: '수량',
+      headerName: '?占쎈웾',
       type: 'number',
       editable: true,
       min: 1,
     },
   ];
   const itemRows: ItemRow[] = [
-    { id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목', qty: 1 },
+    { id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ', qty: 1 },
   ];
 
   it('pastes TSV from the focused cell and adds overflow rows as inserted', () => {
@@ -1109,7 +1114,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     fireEvent.click(itemCodeCell);
     fireEvent.paste(itemCodeCell, {
       clipboardData: {
-        getData: () => 'ITEM-010\t신규 품목\t3\nITEM-011\t추가 품목\t4',
+        getData: () => 'ITEM-010\t?占쎄퇋 ?占쎈ぉ\t3\nITEM-011\t異뷂옙? ?占쎈ぉ\t4',
       },
     });
 
@@ -1117,7 +1122,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
       expect.objectContaining({
         id: 'line-1',
         itemCode: 'ITEM-010',
-        itemName: '신규 품목',
+        itemName: '?占쎄퇋 ?占쎈ぉ',
         qty: 3,
       }),
     ]);
@@ -1125,7 +1130,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
       expect.objectContaining({
         id: 'line-2',
         itemCode: 'ITEM-011',
-        itemName: '추가 품목',
+        itemName: '異뷂옙? ?占쎈ぉ',
         qty: 4,
       }),
     ]);
@@ -1133,7 +1138,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
 
   it('copies selected rows as tab-separated clipboard text', () => {
     render(<F1Grid rows={itemRows} columns={itemColumns} rowKey="id" />);
-    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.click(screen.getByLabelText('line-1 ???占쏀깮'));
     const setData = vi.fn();
 
     fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
@@ -1142,7 +1147,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
 
     expect(setData).toHaveBeenCalledWith(
       'text/plain',
-      'ITEM-001\t기존 품목\t1',
+      'ITEM-001\t湲곗〈 ?占쎈ぉ\t1',
     );
   });
 
@@ -1163,8 +1168,8 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     });
     expect(valid).toBe(false);
     expect(
-      screen.getByRole('gridcell', { name: '품목코드은(는) 필수입니다.' }),
-    ).toHaveAttribute('data-grid-error', '품목코드은(는) 필수입니다.');
+      screen.getByRole('gridcell', { name: '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??' }),
+    ).toHaveAttribute('data-grid-error', '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??');
   });
 
   it('uses Home, End, Insert, and Ctrl+D while leaving Backspace to the editor', () => {
@@ -1204,7 +1209,7 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     act(() => {
       gridRef.current?.clearSelection();
     });
-    fireEvent.click(screen.getByLabelText('line-1 행 선택'));
+    fireEvent.click(screen.getByLabelText('line-1 ???占쏀깮'));
     fireEvent.keyDown(codeCell, { key: 'd', ctrlKey: true });
     expect(gridRef.current?.getChanges().insertedRows).toHaveLength(2);
   });
@@ -1346,10 +1351,10 @@ describe('F1-GRID row merge', () => {
 
   it('keeps a lower merge inside the active parent merge group', () => {
     const rows = [
-      { id: '1', itemName: '품목 A', category: 'RAW' },
-      { id: '2', itemName: '품목 A', category: 'RAW' },
-      { id: '3', itemName: '품목 B', category: 'RAW' },
-      { id: '4', itemName: '품목 B', category: 'RAW' },
+      { id: '1', itemName: '?占쎈ぉ A', category: 'RAW' },
+      { id: '2', itemName: '?占쎈ぉ A', category: 'RAW' },
+      { id: '3', itemName: '?占쎈ぉ B', category: 'RAW' },
+      { id: '4', itemName: '?占쎈ぉ B', category: 'RAW' },
     ];
     const itemNameInfo = getGridMergeInfo(rows, 'itemName');
     const parentGroupByRow: number[] = [];
@@ -1371,6 +1376,72 @@ describe('F1-GRID row merge', () => {
       { isStart: false, span: 0 },
     ]);
   });
+
+  it('renders a bottom boundary for a merged span', () => {
+    expect(getGridCellBottomBorder(false, true, true, 2)).toBe(1);
+    expect(getGridCellBottomBorder(false, false, true, 2)).toBe(1);
+    expect(getGridCellBottomBorder(false, false, false, 2, true)).toBe(1);
+    expect(getGridCellBottomBorder(false, false, true, 1)).toBeUndefined();
+    expect(getGridCellBottomBorder(false, true, false)).toBe(0);
+    expect(getGridCellBottomBorder(true, true, false)).toBe(0);
+    expect(getGridCellBottomBorder(true, false, false)).toBe(1);
+  });
+
+  it('resolves the merge-group start from a later row in the same merged group', () => {
+    const rows = [
+      { id: '1', itemName: '?占쎈ぉ A' },
+      { id: '2', itemName: '?占쎈ぉ A' },
+      { id: '3', itemName: '?占쎈ぉ B' },
+    ];
+
+    expect(getMergeGroupStartIndex(rows, 1, 'itemName')).toBe(0);
+    expect(getMergeGroupStartIndex(rows, 2, 'itemName')).toBe(2);
+  });
+
+  it('uses any active row inside a merged group to resolve the active group start', () => {
+    const rows = [
+      { id: '1', itemName: '?占쎈ぉ A' },
+      { id: '2', itemName: '?占쎈ぉ A' },
+      { id: '3', itemName: '?占쎈ぉ B' },
+    ];
+    const columns = [
+      { field: 'itemName', headerName: 'Item', mergeRows: true },
+    ];
+
+    const activeKeys = getActiveMergeGroupStartKeys({
+      columns,
+      mergeInfoByColumn: [getGridMergeInfo(rows, 'itemName')],
+      visibleRows: rows,
+      rowKey: 'id',
+      selectedIds: ['3', '2'],
+    });
+
+    expect(activeKeys.has('0:0')).toBe(true);
+    expect(activeKeys.has('0:2')).toBe(false);
+  });
+
+  it('keeps the merged group border visible when a later row is selected', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', itemName: '?占쎈ぉ A' },
+          { id: '2', itemName: '?占쎈ぉ A' },
+          { id: '3', itemName: '?占쎈ぉ B' },
+        ]}
+        columns={[{ field: 'itemName', headerName: 'Item', mergeRows: true }]}
+        rowKey="id"
+      />,
+    );
+
+    const mergedCells = screen.getAllByRole('gridcell');
+    expect(mergedCells).toHaveLength(3);
+
+    fireEvent.click(mergedCells[1]);
+
+    expect(mergedCells[0]).toHaveAttribute('tabIndex', '0');
+    expect(getComputedStyle(mergedCells[0]).borderBottomWidth).toBe('1px');
+    expect(getComputedStyle(mergedCells[0]).outline).toContain('2px solid');
+  });
 });
 
 describe('F1-GRID row height', () => {
@@ -1385,10 +1456,10 @@ describe('F1-GRID row height', () => {
     render(
       <F1Grid
         rows={[
-          { id: 'first', description: '첫 번째 긴 설명' },
-          { id: 'second', description: '두 번째 긴 설명' },
+          { id: 'first', description: '占?踰덉㎏ 占??占쎈챸' },
+          { id: 'second', description: '??踰덉㎏ 占??占쎈챸' },
         ]}
-        columns={[{ field: 'description', headerName: '설명', wrapText: true }]}
+        columns={[{ field: 'description', headerName: '?占쎈챸', wrapText: true }]}
         rowKey="id"
         minRowHeight={40}
         maxRowHeight={120}
@@ -1396,7 +1467,7 @@ describe('F1-GRID row height', () => {
     );
 
     const handles = screen.getAllByRole('button', {
-      name: /행 높이 조절/,
+      name: /???占쎌씠 議곗젅/,
     });
     expect(handles).toHaveLength(2);
     expect(handles[0]).toHaveAttribute('aria-valuenow', '40');
@@ -1414,13 +1485,13 @@ describe('F1-GRID row height', () => {
   });
 
   it('uses ellipsis by default and wraps configured cells after resizing', () => {
-    const longText = '셀 안에서 여러 줄로 표시되어야 하는 긴 설명입니다.';
+    const longText = '?占??占쎌뿉???占쎈윭 以꾨줈 ?占쎌떆?占쎌뼱???占쎈뒗 占??占쎈챸?占쎈땲??';
     render(
       <F1Grid
         rows={[{ id: 'first', wrapped: longText, clipped: longText }]}
         columns={[
-          { field: 'wrapped', headerName: '줄바꿈', wrapText: true },
-          { field: 'clipped', headerName: '말줄임' },
+          { field: 'wrapped', headerName: 'Wrapped', wrapText: true },
+          { field: 'clipped', headerName: 'Clipped' },
         ]}
         rowKey="id"
       />,
@@ -1434,7 +1505,7 @@ describe('F1-GRID row height', () => {
       overflow: 'hidden',
     });
 
-    fireEvent.keyDown(screen.getByRole('button', { name: /행 높이 조절/ }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: /???占쎌씠 議곗젅/ }), {
       key: 'ArrowDown',
     });
     expect(wrappedText).toHaveStyle({ whiteSpace: 'normal' });
@@ -1446,7 +1517,7 @@ describe('F1-GRID row height', () => {
       <AppSettingsProvider>
         <F1Grid
           rows={[{ id: 'first', code: 'A' }]}
-          columns={[{ field: 'code', headerName: '코드' }]}
+          columns={[{ field: 'code', headerName: '肄붾뱶' }]}
           rowKey="id"
           minRowHeight={40}
           maxRowHeight={200}
@@ -1454,7 +1525,7 @@ describe('F1-GRID row height', () => {
       </AppSettingsProvider>,
     );
 
-    const handle = screen.getByRole('button', { name: /행 높이 조절/ });
+    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '48');
     window.localStorage.removeItem('erp-display-scale');
   });
@@ -1463,14 +1534,14 @@ describe('F1-GRID row height', () => {
     render(
       <F1Grid
         rows={[{ id: 'first', code: 'A' }]}
-        columns={[{ field: 'code', headerName: '코드' }]}
+        columns={[{ field: 'code', headerName: '肄붾뱶' }]}
         rowKey="id"
         minRowHeight={40}
         maxRowHeight={200}
       />,
     );
 
-    const handle = screen.getByRole('button', { name: /행 높이 조절/ });
+    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '40');
   });
 });
@@ -1491,14 +1562,14 @@ describe('F1-GRID interaction', () => {
       <F1Grid
         rows={rows}
         columns={[
-          { field: 'code', headerName: '코드', headerGroup: '기본정보' },
-          { field: 'status', headerName: '상태', headerGroup: '기본정보' },
+          { field: 'code', headerName: '肄붾뱶', headerGroup: '湲곕낯?占쎈낫' },
+          { field: 'status', headerName: '?占쏀깭', headerGroup: '湲곕낯?占쎈낫' },
         ]}
         rowKey="id"
       />,
     );
 
-    const groupHeader = screen.getByText('기본정보');
+    const groupHeader = screen.getByText('湲곕낯?占쎈낫');
     expect(groupHeader).toBeInTheDocument();
     expect(groupHeader.closest('[role="columnheader"]')).toBeTruthy();
     expect(getComputedStyle(groupHeader).backgroundColor).toBe(
@@ -1507,9 +1578,9 @@ describe('F1-GRID interaction', () => {
     expect(screen.getByRole('gridcell', { name: 'DASH' })).toBeVisible();
     expect(screen.getAllByRole('columnheader')).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ textContent: '기본정보' }),
-        expect.objectContaining({ textContent: '코드' }),
-        expect.objectContaining({ textContent: '상태' }),
+        expect.objectContaining({ textContent: '湲곕낯?占쎈낫' }),
+        expect.objectContaining({ textContent: '肄붾뱶' }),
+        expect.objectContaining({ textContent: '?占쏀깭' }),
       ]),
     );
 
@@ -1523,10 +1594,10 @@ describe('F1-GRID interaction', () => {
   it('keeps the default cursor outside edit mode and switches to a text cursor while editing', () => {
     render(
       <F1Grid
-        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '기존 품목' }]}
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' }]}
         columns={[
-          { field: 'itemCode', headerName: '품목코드', editable: true },
-          { field: 'itemName', headerName: '품목명', editable: true },
+          { field: 'itemCode', headerName: '?占쎈ぉ肄붾뱶', editable: true },
+          { field: 'itemName', headerName: 'Item name', editable: true },
         ]}
         rowKey="id"
       />,
@@ -1545,7 +1616,7 @@ describe('F1-GRID interaction', () => {
       <F1Grid
         rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
         columns={[
-          { field: 'itemCode', headerName: '품목코드', editable: true },
+          { field: 'itemCode', headerName: '?占쎈ぉ肄붾뱶', editable: true },
         ]}
         rowKey="id"
       />,
@@ -1563,7 +1634,7 @@ describe('F1-GRID interaction', () => {
       <F1Grid
         rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
         columns={[
-          { field: 'itemCode', headerName: '품목코드', editable: true },
+          { field: 'itemCode', headerName: '?占쎈ぉ肄붾뱶', editable: true },
         ]}
         rowKey="id"
       />,
@@ -1583,7 +1654,7 @@ describe('F1-GRID interaction', () => {
         columns={[
           {
             field: 'quantity',
-            headerName: '수량',
+            headerName: '?占쎈웾',
             type: 'number',
             editable: true,
           },
@@ -1608,8 +1679,8 @@ describe('F1-GRID interaction', () => {
           { id: '3', code: 'C', name: 'Gamma' },
         ]}
         columns={[
-          { field: 'code', headerName: '코드' },
-          { field: 'name', headerName: '이름' },
+          { field: 'code', headerName: '肄붾뱶' },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1633,8 +1704,8 @@ describe('F1-GRID interaction', () => {
           { id: '2', code: 'B', name: 'Beta' },
         ]}
         columns={[
-          { field: 'code', headerName: '코드' },
-          { field: 'name', headerName: '이름' },
+          { field: 'code', headerName: '肄붾뱶' },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1666,8 +1737,8 @@ describe('F1-GRID interaction', () => {
           { id: '2', code: 'A', name: 'Beta' },
         ]}
         columns={[
-          { field: 'code', headerName: '코드', mergeRows: true },
-          { field: 'name', headerName: '이름' },
+          { field: 'code', headerName: '肄붾뱶', mergeRows: true },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1693,11 +1764,11 @@ describe('F1-GRID interaction', () => {
         columns={[
           {
             field: 'code',
-            headerName: '코드',
+            headerName: '肄붾뱶',
             mergeRows: true,
             pinned: 'left',
           },
-          { field: 'name', headerName: '이름' },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1721,8 +1792,8 @@ describe('F1-GRID interaction', () => {
           { id: '2', code: 'B', name: 'Beta' },
         ]}
         columns={[
-          { field: 'code', headerName: '코드' },
-          { field: 'name', headerName: '이름' },
+          { field: 'code', headerName: '肄붾뱶' },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1752,8 +1823,8 @@ describe('F1-GRID interaction', () => {
           { id: '2', code: 'B', name: 'Beta' },
         ]}
         columns={[
-          { field: 'code', headerName: '코드' },
-          { field: 'name', headerName: '이름' },
+          { field: 'code', headerName: '肄붾뱶' },
+          { field: 'name', headerName: '?占쎈쫫' },
         ]}
         rowKey="id"
       />,
@@ -1859,8 +1930,8 @@ describe('F1-GRID interaction', () => {
   it('renders vertical column lines once between columns when columnLine is enabled', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
-    const orderHeader = screen.getByRole('columnheader', { name: /정렬/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
+    const orderHeader = screen.getByRole('columnheader', { name: /?占쎈젹/ });
     const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
     const orderCell = screen.getByRole('gridcell', { name: '1' });
 
@@ -1879,7 +1950,7 @@ describe('F1-GRID interaction', () => {
 
     render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
 
-    const statusCell = screen.getByRole('gridcell', { name: '작성중' });
+    const statusCell = screen.getByRole('gridcell', { name: '?占쎌꽦占? });
     fireEvent.doubleClick(statusCell);
     expect(
       screen
@@ -1888,9 +1959,9 @@ describe('F1-GRID interaction', () => {
         ?.querySelector('fieldset'),
     ).toBeNull();
     fireEvent.mouseDown(screen.getByRole('combobox'));
-    fireEvent.click(screen.getByRole('option', { name: '확정' }));
+    fireEvent.click(screen.getByRole('option', { name: '?占쎌젙' }));
 
-    expect(screen.getAllByRole('gridcell', { name: '확정' })).toHaveLength(2);
+    expect(screen.getAllByRole('gridcell', { name: '?占쎌젙' })).toHaveLength(2);
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', status: 'confirmed' }),
     ]);
@@ -1951,16 +2022,16 @@ describe('F1-GRID interaction', () => {
           },
         ]}
         columns={[
-          { field: 'code', headerName: '코드', editable: true },
+          { field: 'code', headerName: '肄붾뱶', editable: true },
           {
             field: 'startDate',
-            headerName: '시작일',
+            headerName: 'Status',
             editable: true,
             type: 'date',
           },
           {
             field: 'status',
-            headerName: '상태',
+            headerName: '?占쏀깭',
             editable: true,
             type: 'time',
           },
@@ -1992,16 +2063,16 @@ describe('F1-GRID interaction', () => {
           },
         ]}
         columns={[
-          { field: 'code', headerName: '코드', editable: true },
+          { field: 'code', headerName: '肄붾뱶', editable: true },
           {
             field: 'startDate',
-            headerName: '시작일',
+            headerName: 'Status',
             editable: true,
             type: 'date',
           },
           {
             field: 'status',
-            headerName: '상태',
+            headerName: '?占쏀깭',
             editable: true,
             type: 'time',
           },
@@ -2035,7 +2106,7 @@ describe('F1-GRID interaction', () => {
   it('keeps predicate-disabled rows read-only', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '확정' }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '?占쎌젙' }));
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
@@ -2043,7 +2114,7 @@ describe('F1-GRID interaction', () => {
   it('applies headerAlign independently from cell alignment', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByRole('columnheader', { name: /정렬/ })).toHaveStyle({
+    expect(screen.getByRole('columnheader', { name: /?占쎈젹/ })).toHaveStyle({
       textAlign: 'center',
     });
   });
@@ -2059,13 +2130,13 @@ describe('F1-GRID interaction', () => {
   it('only renders the select-all checkbox in the header when headerCheckbox is set', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByLabelText('사용 여부 전체 선택')).toBeInTheDocument();
-    expect(screen.queryByLabelText('상태 전체 선택')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮')).toBeInTheDocument();
+    expect(screen.queryByLabelText('?占쏀깭 ?占쎌껜 ?占쏀깮')).not.toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', {
-        name: /사용 여부/,
+        name: /?占쎌슜 ?占쏙옙?/,
       }),
-    ).toHaveTextContent('사용 여부');
+    ).toHaveTextContent('?占쎌슜 ?占쏙옙?');
   });
 
   it('selects rows through row checkboxes and exposes their IDs through the ref', () => {
@@ -2073,8 +2144,8 @@ describe('F1-GRID interaction', () => {
 
     render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByLabelText('dashboard 행 선택'));
-    fireEvent.click(screen.getByLabelText('settings 행 선택'));
+    fireEvent.click(screen.getByLabelText('dashboard ???占쏀깮'));
+    fireEvent.click(screen.getByLabelText('settings ???占쏀깮'));
 
     expect(gridRef.current?.getSelectedRowIds()).toEqual([
       'dashboard',
@@ -2120,7 +2191,7 @@ describe('F1-GRID interaction', () => {
   it('keeps a merged value editable for a non-leading row', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
     const mergeColumns: F1GridColumn<MenuRow>[] = [
-      { field: 'status', headerName: '상태', editable: true, mergeRows: true },
+      { field: 'status', headerName: '?占쏀깭', editable: true, mergeRows: true },
     ];
     const mergeRows = [
       { ...rows[0], status: 'draft' },
@@ -2158,7 +2229,7 @@ describe('F1-GRID interaction', () => {
 
   it('only unmerges the group containing the edited cell', () => {
     const mergeColumns: F1GridColumn<MenuRow>[] = [
-      { field: 'status', headerName: '상태', editable: true, mergeRows: true },
+      { field: 'status', headerName: '?占쏀깭', editable: true, mergeRows: true },
     ];
     const mergeRows = [
       { ...rows[0], status: 'draft' },
@@ -2189,12 +2260,12 @@ describe('F1-GRID interaction', () => {
     const mergeColumns: F1GridColumn<MenuRow>[] = [
       {
         field: 'status',
-        headerName: '상태',
+        headerName: '?占쏀깭',
         editable: true,
         mergeRows: true,
         pinned: 'left',
       },
-      { field: 'code', headerName: '코드', editable: true },
+      { field: 'code', headerName: '肄붾뱶', editable: true },
     ];
     const mergeRows = [
       { ...rows[0], status: 'draft', code: 'DASH' },
@@ -2209,7 +2280,7 @@ describe('F1-GRID interaction', () => {
         .gridRow,
     ).toBe('1/span 2');
     expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: /상태/ })).left,
+      getComputedStyle(screen.getByRole('columnheader', { name: /?占쏀깭/ })).left,
     ).toBe('44px');
   });
 
@@ -2254,13 +2325,13 @@ describe('F1-GRID interaction', () => {
 
     render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
 
-    const headerCheckbox = screen.getByLabelText('사용 여부 전체 선택');
+    const headerCheckbox = screen.getByLabelText('?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮');
     expect(headerCheckbox).toBeChecked();
 
     fireEvent.click(headerCheckbox);
 
-    expect(screen.getByLabelText('사용 여부 dashboard')).not.toBeChecked();
-    expect(screen.getByLabelText('사용 여부 settings')).not.toBeChecked();
+    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? dashboard')).not.toBeChecked();
+    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? settings')).not.toBeChecked();
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', enabled: false }),
       expect.objectContaining({ id: 'settings', enabled: false }),
@@ -2268,8 +2339,8 @@ describe('F1-GRID interaction', () => {
 
     fireEvent.click(headerCheckbox);
 
-    expect(screen.getByLabelText('사용 여부 dashboard')).toBeChecked();
-    expect(screen.getByLabelText('사용 여부 settings')).toBeChecked();
+    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? dashboard')).toBeChecked();
+    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? settings')).toBeChecked();
   });
 
   it('moves the focused cell with ArrowRight and starts editing with F2', () => {
@@ -2292,7 +2363,7 @@ describe('F1-GRID header divider', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
     expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+      getComputedStyle(screen.getByRole('columnheader', { name: /肄붾뱶/ }))
         .borderRightWidth,
     ).toBe('1px');
   });
@@ -2350,14 +2421,14 @@ describe('F1-GRID sorting', () => {
   it('sorts a column ascending and descending through the header menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }));
 
     const cellsDesc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
     expect(cellsDesc[0]).toHaveTextContent('SET');
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '오름차순 정렬' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈쫫李⑥닚 ?占쎈젹' }));
 
     const cellsAsc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
     expect(cellsAsc[0]).toHaveTextContent('DASH');
@@ -2374,11 +2445,11 @@ describe('F1-GRID filtering', () => {
   it('matches rows using contains, range, and empty operators', () => {
     const textColumn: F1GridColumn<MenuRow> = {
       field: 'code',
-      headerName: '코드',
+      headerName: '肄붾뱶',
     };
     const numberColumn: F1GridColumn<MenuRow> = {
       field: 'order',
-      headerName: '정렬',
+      headerName: '?占쎈젹',
       type: 'number',
     };
 
@@ -2421,17 +2492,26 @@ describe('F1-GRID filtering', () => {
   it('filters visible rows through the header filter popover', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
-    fireEvent.change(screen.getByLabelText('코드 필터 값'), {
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쏀꽣' }));
+    fireEvent.change(screen.getByLabelText('肄붾뱶 ?占쏀꽣 占?), {
       target: { value: 'SET' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    fireEvent.click(screen.getByRole('button', { name: '?占쎌슜' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('gridcell', { name: 'DASH' })).toBeNull();
     });
     expect(screen.getByRole('gridcell', { name: 'SET' })).toBeInTheDocument();
+  });
+
+  it('anchors the column filter menu to its header button', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쏀꽣' }));
+
+    expect(screen.getAllByLabelText('肄붾뱶 而щ읆 硫붾돱')).toHaveLength(2);
   });
 });
 
@@ -2449,11 +2529,11 @@ describe('F1-GRID column pin', () => {
       />,
     );
 
-    expect(screen.getByRole('columnheader', { name: /코드/ })).toHaveStyle({
+    expect(screen.getByRole('columnheader', { name: /肄붾뱶/ })).toHaveStyle({
       position: 'sticky',
       left: '44px',
     });
-    expect(screen.getByRole('columnheader', { name: /사용 여부/ })).toHaveStyle(
+    expect(screen.getByRole('columnheader', { name: /?占쎌슜 ?占쏙옙?/ })).toHaveStyle(
       {
         position: 'sticky',
         right: '0px',
@@ -2474,9 +2554,9 @@ describe('F1-GRID column pin', () => {
 
   it('accumulates left and right pin offsets from the checkbox column width', () => {
     const orderedColumns = [
-      { field: 'status', headerName: '상태', width: 100 },
-      { field: 'order', headerName: '정렬', width: 80 },
-      { field: 'code', headerName: '코드', width: 120 },
+      { field: 'status', headerName: '?占쏀깭', width: 100 },
+      { field: 'order', headerName: '?占쎈젹', width: 80 },
+      { field: 'code', headerName: '肄붾뱶', width: 120 },
     ] satisfies F1GridColumn<MenuRow>[];
     const pinned = new Map<string, 'left' | 'right'>([
       ['status', 'left'],
@@ -2492,22 +2572,22 @@ describe('F1-GRID column pin', () => {
   it('pins a column to the left and unpins it through the header menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
       expect(
-        getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+        getComputedStyle(screen.getByRole('columnheader', { name: /肄붾뱶/ }))
           .position,
       ).toBe('sticky');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '고정 해제' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '怨좎젙 ?占쎌젣' }));
 
     await waitFor(() => {
       expect(
-        getComputedStyle(screen.getByRole('columnheader', { name: /코드/ }))
+        getComputedStyle(screen.getByRole('columnheader', { name: /肄붾뱶/ }))
           .position,
       ).not.toBe('sticky');
     });
@@ -2516,11 +2596,11 @@ describe('F1-GRID column pin', () => {
   it('keeps pinned header and body cells visually above scrolling cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
-      const pinnedHeader = screen.getByRole('columnheader', { name: /코드/ });
+      const pinnedHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
       const pinnedCell = screen.getByRole('gridcell', { name: 'DASH' });
 
       expect(pinnedHeader).toHaveStyle({
@@ -2540,12 +2620,12 @@ describe('F1-GRID column pin', () => {
   it('keeps the row-selection header above a pinned column header', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
       expect(
-        screen.getByRole('columnheader', { name: '전체 행 선택' }),
+        screen.getByRole('columnheader', { name: '?占쎌껜 ???占쏀깮' }),
       ).toHaveStyle({
         backgroundColor: 'rgb(232, 236, 244)',
         zIndex: '4',
@@ -2556,11 +2636,11 @@ describe('F1-GRID column pin', () => {
   it('keeps row-selection cells above pinned body cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
-      const selectionCheckbox = screen.getByLabelText('dashboard 행 선택');
+      const selectionCheckbox = screen.getByLabelText('dashboard ???占쏀깮');
       expect(selectionCheckbox.closest('.MuiBox-root')).toHaveStyle({
         zIndex: '3',
       });
@@ -2570,13 +2650,13 @@ describe('F1-GRID column pin', () => {
   it('keeps selected row-selection cells opaque above scrolling cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
-    fireEvent.click(screen.getByLabelText('dashboard 행 선택'));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
+    fireEvent.click(screen.getByLabelText('dashboard ???占쏀깮'));
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText('dashboard 행 선택').closest('.MuiBox-root'),
+        screen.getByLabelText('dashboard ???占쏀깮').closest('.MuiBox-root'),
       ).toHaveStyle({
         backgroundColor: 'rgb(232, 238, 252)',
       });
@@ -2590,11 +2670,11 @@ describe('F1-GRID column pin', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('columnheader', { name: /코드/ })).toHaveStyle({
+      expect(screen.getByRole('columnheader', { name: /肄붾뱶/ })).toHaveStyle({
         backgroundColor: 'rgb(28, 36, 50)',
       });
     });
@@ -2614,7 +2694,7 @@ describe('F1-GRID column resize', () => {
     );
 
     const resizeHandle = screen.getByRole('separator', {
-      name: '코드 컬럼 너비 조절',
+      name: '肄붾뱶 而щ읆 ?占쎈퉬 議곗젅',
     });
     expect(resizeHandle).toBeInTheDocument();
 
@@ -2623,7 +2703,7 @@ describe('F1-GRID column resize', () => {
     fireEvent.mouseMove(window, { clientX: 220 });
     fireEvent.mouseUp(window);
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).toBeVisible();
   });
 
@@ -2667,20 +2747,20 @@ describe('F1-GRID column resize', () => {
     );
 
     const resizeHandle = screen.getByRole('separator', {
-      name: '코드 컬럼 너비 조절',
+      name: '肄붾뱶 而щ읆 ?占쎈퉬 議곗젅',
     });
 
     fireEvent.dblClick(resizeHandle);
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).toBeVisible();
   });
 });
 
 describe('F1-GRID rownumber column', () => {
   const rownumberColumns: F1GridColumn<MenuRow>[] = [
-    { field: 'id', headerName: '순번', type: 'rownumber', editable: true },
-    { field: 'code', headerName: '코드', editable: true },
+    { field: 'id', headerName: '?占쎈쾲', type: 'rownumber', editable: true },
+    { field: 'code', headerName: '肄붾뱶', editable: true },
   ];
 
   it('renders the current display position instead of the underlying field value', () => {
@@ -2693,8 +2773,8 @@ describe('F1-GRID rownumber column', () => {
   it('renumbers rows after sorting instead of keeping the original data order', () => {
     render(<F1Grid rows={rows} columns={rownumberColumns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '내림차순 정렬' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }));
 
     const cells = screen.getAllByRole('gridcell', { name: /^[12]$/ });
     expect(cells.map((cell) => cell.textContent)).toEqual(['1', '2']);
@@ -2736,8 +2816,8 @@ describe('F1-GRID column drag reorder', () => {
   it('reorders columns when a header is dragged and dropped on another header', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2749,19 +2829,19 @@ describe('F1-GRID column drag reorder', () => {
       .map((header) => header.textContent)
       .filter((text) => text);
     expect(headerFields).toEqual([
-      '정렬',
-      '사용 여부',
-      '시작일',
-      '코드',
-      '상태',
+      '?占쎈젹',
+      '?占쎌슜 ?占쏙옙?',
+      '?占쎌옉??,
+      '肄붾뱶',
+      '?占쏀깭',
     ]);
   });
 
   it('marks the drop target header while dragging a column', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2773,10 +2853,10 @@ describe('F1-GRID column drag reorder', () => {
   it('excludes pinned columns from drag reorder targets', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).not.toHaveAttribute('draggable', 'true');
   });
 
@@ -2790,8 +2870,8 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /상태/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
+    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2816,11 +2896,11 @@ describe('F1-GRID column drag reorder', () => {
       .map((header) => header.textContent)
       .filter((text) => text);
     expect(headerFields).toEqual([
-      '정렬',
-      '사용 여부',
-      '시작일',
-      '코드',
-      '상태',
+      '?占쎈젹',
+      '?占쎌슜 ?占쏙옙?',
+      '?占쎌옉??,
+      '肄붾뱶',
+      '?占쏀깭',
     ]);
   });
 
@@ -2837,7 +2917,7 @@ describe('F1-GRID column drag reorder', () => {
     );
 
     const resizeHandle = screen.getByRole('separator', {
-      name: '코드 컬럼 너비 조절',
+      name: '肄붾뱶 而щ읆 ?占쎈퉬 議곗젅',
     });
     fireEvent.mouseDown(resizeHandle, { clientX: 100 });
     fireEvent.mouseMove(window, { clientX: 220 });
@@ -2860,7 +2940,7 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).toBeInTheDocument();
     const headerRow = screen.getAllByRole('row')[0];
     expect(getComputedStyle(headerRow).gridTemplateColumns).toContain(
@@ -2878,9 +2958,9 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '컬럼 목록' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: '코드 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '肄붾뱶 ?占쎌떆' }));
 
     const stored = window.localStorage.getItem('test-grid-column-hidden');
     expect(stored).not.toBeNull();
@@ -2898,7 +2978,7 @@ describe('F1-GRID column drag reorder', () => {
     );
 
     expect(
-      screen.queryByRole('columnheader', { name: /^코드$/ }),
+      screen.queryByRole('columnheader', { name: /^肄붾뱶$/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -2912,8 +2992,8 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '왼쪽 고정' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     const stored = window.localStorage.getItem('test-grid-column-pinned');
     expect(stored).not.toBeNull();
@@ -2930,12 +3010,15 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).not.toHaveAttribute('draggable', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '코드 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
     expect(
-      screen.getByRole('menuitem', { name: '고정 해제' }),
+      screen.getByRole('menuitem', { name: '怨좎젙 ?占쎌젣' }),
     ).not.toHaveAttribute('aria-disabled', 'true');
   });
 });
+
+
+

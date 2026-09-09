@@ -1,0 +1,19 @@
+{
+  "servers": {
+    "s-erp-postgresql-readonly": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/tools/mcp-postgresql-readonly/dist/index.js"
+      ],
+      "env": {
+        "S_ERP_DB_HOST": "${env:S_ERP_DB_HOST}",
+        "S_ERP_DB_PORT": "${env:S_ERP_DB_PORT}",
+        "S_ERP_DB_NAME": "${env:S_ERP_DB_NAME}",
+        "S_ERP_DB_USER": "${env:S_ERP_DB_USER}",
+        "S_ERP_DB_PASSWORD": "${env:S_ERP_DB_PASSWORD}",
+        "S_ERP_DB_SSL": "${env:S_ERP_DB_SSL}"
+      }
+    }
+  }
+}

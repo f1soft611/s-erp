@@ -28,6 +28,13 @@ const pageProps = {
     cards: [],
     items: [],
   },
+  selectedMenuPermissions: {
+    read: true,
+    create: true,
+    update: true,
+    delete: true,
+    excel: true,
+  },
 };
 
 function renderPage(overrides: Partial<typeof pageProps> = {}) {
@@ -385,6 +392,94 @@ describe('RoleManagementPage notifications', () => {
       expect(
         screen.getByRole('gridcell', { name: '운영 담당자' }),
       ).toBeVisible();
+    });
+  });
+
+  it('guards a dirty role grid refresh with the shared confirmation dialog', async () => {
+    let roleListCalls = 0;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/roles') {
+        roleListCalls += 1;
+        return Promise.resolve({
+          resultList: [
+            createRole(7, roleListCalls === 1 ? '운영자' : '운영 담당자'),
+          ],
+        });
+      }
+      if (path === '/api/v1/system/roles/7/users') {
+        return Promise.resolve({ assignedUsers: [], unassignedUsers: [] });
+      }
+      return Promise.reject(new Error(`Unexpected GET request: ${path}`));
+    });
+
+    renderPage();
+
+    const nameCell = await screen.findByRole('gridcell', { name: '운영자' });
+    fireEvent.doubleClick(nameCell);
+    fireEvent.change(await screen.findByDisplayValue('운영자'), {
+      target: { value: '운영자 편집' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('운영자 편집'), {
+      key: 'Enter',
+      code: 'Enter',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(
+      await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toHaveTextContent('변경사항을 버리고 권한 목록을 다시 불러오시겠습니까?');
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(roleListCalls).toBe(1);
+    expect(screen.getByRole('gridcell', { name: '운영자 편집' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    fireEvent.click(await screen.findByRole('button', { name: '계속' }));
+    await waitFor(() => expect(roleListCalls).toBe(2));
+    expect(
+      await screen.findByRole('gridcell', { name: '운영 담당자' }),
+    ).toBeVisible();
+  });
+
+  it('clears the dirty state after confirming a refresh so the save button is re-disabled', async () => {
+    let roleListCalls = 0;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/roles') {
+        roleListCalls += 1;
+        return Promise.resolve({
+          resultList: [
+            createRole(7, roleListCalls === 1 ? '운영자' : '운영 담당자'),
+          ],
+        });
+      }
+      if (path === '/api/v1/system/roles/7/users') {
+        return Promise.resolve({ assignedUsers: [], unassignedUsers: [] });
+      }
+      return Promise.reject(new Error(`Unexpected GET request: ${path}`));
+    });
+
+    renderPage();
+
+    const nameCell = await screen.findByRole('gridcell', { name: '운영자' });
+    fireEvent.doubleClick(nameCell);
+    fireEvent.change(await screen.findByDisplayValue('운영자'), {
+      target: { value: '운영자 편집' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('운영자 편집'), {
+      key: 'Enter',
+      code: 'Enter',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    fireEvent.click(await screen.findByRole('button', { name: '계속' }));
+
+    await waitFor(() => expect(roleListCalls).toBe(2));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     });
   });
 

@@ -328,8 +328,6 @@ function F1TreeInner<T extends object>(
           </Box>
         );
       }}
-      disableSorting
-      disableFiltering
     />
   );
 }

@@ -6,6 +6,8 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useNotification } from '../../../../shared/context/NotificationContext';
 import type {
   ModuleItem,
   PageContent,
@@ -43,6 +45,7 @@ export function ModuleManagementPage({
   breadcrumbItems,
   selectedMenuPermissions,
 }: ModuleManagementPageProps) {
+  const { showSuccess } = useNotification();
   const modulePanelRef = useRef<ModuleManagementPanelHandle>(null);
   const [modules, setModules] = useState<ModuleManagementRow[]>([]);
   const [error, setError] = useState('');
@@ -51,6 +54,7 @@ export function ModuleManagementPage({
   const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [moduleGridKey, setModuleGridKey] = useState(0);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const moduleRequestIdRef = useRef(0);
 
   const filteredModules = useMemo(() => {
@@ -113,6 +117,7 @@ export function ModuleManagementPage({
 
   const handleModulesSaved = useCallback(async () => {
     await loadModules();
+    setPanelDirty(false);
     setModuleGridKey((current) => current + 1);
   }, [loadModules]);
 
@@ -132,6 +137,21 @@ export function ModuleManagementPage({
     }
   }, []);
 
+  const requestModuleRefresh = useCallback(() => {
+    if (panelDirty) {
+      setRefreshConfirmOpen(true);
+      return;
+    }
+    void loadModules({ showSkeleton: true });
+  }, [loadModules, panelDirty]);
+
+  const confirmModuleRefresh = useCallback(() => {
+    setRefreshConfirmOpen(false);
+    setPanelDirty(false);
+    setModuleGridKey((current) => current + 1);
+    void loadModules({ showSkeleton: true });
+  }, [loadModules]);
+
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'read',
@@ -141,9 +161,7 @@ export function ModuleManagementPage({
           icon: SearchIcon,
           visible: pageActionPermissions.read,
           disabled: false,
-          onClick: () => {
-            void loadModules({ showSkeleton: true });
-          },
+          onClick: requestModuleRefresh,
         },
       ],
     },
@@ -226,10 +244,20 @@ export function ModuleManagementPage({
         onUpdateModule={updateModule}
         onDeleteModule={deleteModule}
         onModulesSaved={handleModulesSaved}
+        onSaveSuccess={showSuccess}
         onDirtyChange={setPanelDirty}
         onError={setError}
         moduleGridKey={moduleGridKey}
         moduleGridLoading={pageLoading}
+      />
+      <UnsavedChangesConfirmDialog
+        open={refreshConfirmOpen}
+        title="저장하지 않은 변경사항"
+        description="변경사항을 버리고 모듈 목록을 다시 불러오시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={() => setRefreshConfirmOpen(false)}
+        onContinue={confirmModuleRefresh}
       />
     </Box>
   );
