@@ -41,10 +41,13 @@ function F1TreeInner<T extends object>(
   ref: ForwardedRef<F1TreeRef<T>>,
 ) {
   const gridRef = useRef<F1GridRef<T>>(null);
-  const pendingChildInsertRef = useRef<{
-    parentId: F1GridRowId;
-    existingInsertedIds: Set<F1GridRowId>;
-  }>();
+  const pendingChildInsertRef = useRef<
+    | {
+        parentId: F1GridRowId;
+        existingInsertedIds: Set<F1GridRowId>;
+      }
+    | undefined
+  >(undefined);
   const currentProjectionRef = useRef<F1TreeProjection<T>>({
     rows: [],
     metaById: {},
