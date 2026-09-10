@@ -243,10 +243,20 @@ export const RoleManagementPanel = forwardRef<
 
   const roleColumns: F1GridColumn<RoleManagementRow>[] = [
     {
+      field: 'id',
+      type: 'rownumber',
+      width: 60,
+      headerName: '순번',
+      headerAlign: 'center',
+      align: 'center',
+      pinned: 'left',
+    },
+    {
       field: 'group',
       headerName: '역할 코드',
       flex: 1,
       editable: (row) => row.id.startsWith('new-role-'),
+      required: true,
       headerAlign: 'center',
     },
     {
@@ -254,6 +264,7 @@ export const RoleManagementPanel = forwardRef<
       headerName: '역할명',
       flex: 1,
       editable: true,
+      required: true,
       headerAlign: 'center',
     },
     {
@@ -286,6 +297,15 @@ export const RoleManagementPanel = forwardRef<
   ];
 
   const userColumns: F1GridColumn<RoleUserRow>[] = [
+    {
+      field: 'id',
+      type: 'rownumber',
+      width: 60,
+      headerName: '순번',
+      headerAlign: 'center',
+      align: 'center',
+      pinned: 'left',
+    },
     {
       field: 'loginId',
       headerName: '로그인 ID',
@@ -663,7 +683,6 @@ export const RoleManagementPanel = forwardRef<
                       rows={userRows}
                       columns={userColumns}
                       rowKey="id"
-                      storageKey="role-user-mapping-grid"
                       ariaLabel="F1-GRID 사용자 매핑"
                       height="100%"
                       maxHeight="100%"

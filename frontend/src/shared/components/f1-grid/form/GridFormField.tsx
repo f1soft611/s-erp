@@ -1,6 +1,7 @@
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Autocomplete,
+  Box,
   Checkbox,
   FormControl,
   FormControlLabel,
@@ -16,6 +17,7 @@ import type {
   F1GridFormMode,
   F1GridOption,
 } from '../types/grid.types';
+import { normalizeGridNumberInput } from '../utils/grid.utils';
 
 export type GridFormFieldProps<T extends object> = {
   column: F1GridColumn<T>;
@@ -26,6 +28,24 @@ export type GridFormFieldProps<T extends object> = {
   error?: string;
   onPatch: (patch: Partial<T>) => void;
 };
+
+const requiredAsteriskStyle = {
+  color: 'error.main',
+  fontWeight: 700,
+  lineHeight: 1,
+  ml: 0.25,
+} as const;
+
+const renderRequiredFieldLabel = (label: string, required: boolean) => (
+  <>
+    {label}
+    {required ? (
+      <Box component="span" aria-hidden="true" sx={requiredAsteriskStyle}>
+        *
+      </Box>
+    ) : null}
+  </>
+);
 
 export function GridFormField<T extends object>({
   column,
@@ -49,15 +69,45 @@ export function GridFormField<T extends object>({
 
   const sharedTextFieldProps = {
     fullWidth: true,
-    label: column.headerName,
+    label: renderRequiredFieldLabel(column.headerName, column.required),
     margin: 'none' as const,
-    required: column.required,
+    required: false,
     error: Boolean(error),
     helperText: error,
+    size: 'small' as const,
+    sx: {
+      '& .MuiInputBase-root': {
+        minHeight: 38,
+      },
+      '& .MuiInputBase-input': {
+        fontSize: '0.93rem',
+        paddingBottom: '8.5px',
+        paddingTop: '8.5px',
+      },
+      '& .MuiInputLabel-root': {
+        color: 'text.secondary',
+        fontSize: '0.82rem',
+        fontWeight: 600,
+        opacity: 1,
+      },
+      '& .MuiInputLabel-root.Mui-focused': {
+        color: 'primary.main',
+      },
+      '& .MuiInputLabel-root.Mui-error': {
+        color: 'error.main',
+      },
+      '& .MuiFormHelperText-root': {
+        color: 'text.secondary',
+        fontSize: '0.75rem',
+        marginLeft: 0,
+        marginTop: 0.5,
+      },
+    },
     slotProps: {
       htmlInput: {
         readOnly,
         'aria-describedby': error ? helperTextId : undefined,
+        'aria-required': column.required,
       },
       formHelperText: { id: helperTextId },
     },
@@ -65,18 +115,26 @@ export function GridFormField<T extends object>({
 
   if (column.type === 'checkbox') {
     return (
-      <FormControl required={column.required} error={Boolean(error)}>
+      <FormControl error={Boolean(error)} aria-required={column.required}>
         <FormControlLabel
-          label={column.headerName}
+          label={renderRequiredFieldLabel(column.headerName, column.required)}
+          sx={{
+            alignItems: 'center',
+            marginLeft: -0.5,
+            marginRight: 0,
+            minHeight: 38,
+            my: 0,
+          }}
           control={
             <Checkbox
               checked={Boolean(displayedValue)}
-              required={column.required}
+              size="small"
               slotProps={{
                 input: {
                   readOnly,
                   'aria-describedby': error ? helperTextId : undefined,
                   'aria-invalid': Boolean(error),
+                  'aria-required': column.required,
                 },
               }}
               onChange={(event) => {
@@ -125,6 +183,7 @@ export function GridFormField<T extends object>({
       <Autocomplete
         fullWidth
         readOnly={readOnly}
+        size="small"
         options={options}
         value={selectedOption ?? null}
         getOptionLabel={(option) => option.label}
@@ -138,17 +197,30 @@ export function GridFormField<T extends object>({
           <TextField
             {...params}
             fullWidth
-            label={column.headerName}
+            label={renderRequiredFieldLabel(column.headerName, column.required)}
             margin="none"
-            required={column.required}
+            size="small"
+            required={false}
             error={Boolean(error)}
             helperText={error}
+            sx={{
+              '& .MuiInputBase-root': { minHeight: 38 },
+              '& .MuiInputBase-input': { fontSize: '0.93rem' },
+              '& .MuiInputLabel-root': {
+                color: 'text.secondary',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                opacity: 1,
+              },
+              '& .MuiInputLabel-root.Mui-focused': { color: 'primary.main' },
+            }}
             slotProps={{
               ...params.slotProps,
               htmlInput: {
                 ...params.slotProps.htmlInput,
                 readOnly,
                 'aria-describedby': error ? helperTextId : undefined,
+                'aria-required': column.required,
               },
               formHelperText: { id: helperTextId },
             }}
@@ -188,8 +260,10 @@ export function GridFormField<T extends object>({
                       disabled={readOnly || !column.onOpenCodePicker}
                       edge="end"
                       onClick={openCodePicker}
+                      size="small"
+                      sx={{ p: 0.75 }}
                     >
-                      <SearchIcon />
+                      <SearchIcon fontSize="small" />
                     </IconButton>
                   </span>
                 </Tooltip>
@@ -212,17 +286,26 @@ export function GridFormField<T extends object>({
       : column.type === 'date' || column.type === 'time'
         ? column.type
         : 'text';
+  const normalizedDisplayValue =
+    isNumber && displayedValue !== null && displayedValue !== undefined
+      ? normalizeGridNumberInput(String(displayedValue), column.decimalPlaces)
+      : displayedValue;
 
   return (
     <TextField
       {...sharedTextFieldProps}
       type={inputType}
-      value={displayedValue == null ? '' : String(displayedValue)}
+      value={
+        normalizedDisplayValue == null ? '' : String(normalizedDisplayValue)
+      }
       onChange={(event) => {
+        const nextTextValue = isNumber
+          ? normalizeGridNumberInput(event.target.value, column.decimalPlaces)
+          : event.target.value;
         const nextValue =
-          isNumber && event.target.value !== ''
-            ? Number(event.target.value)
-            : event.target.value;
+          isNumber && nextTextValue !== ''
+            ? Number(nextTextValue)
+            : nextTextValue;
         applyValue(nextValue);
       }}
     />

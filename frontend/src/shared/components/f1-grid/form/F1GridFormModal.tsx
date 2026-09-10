@@ -11,7 +11,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, SyntheticEvent } from 'react';
 import type {
@@ -84,7 +84,7 @@ export function F1GridFormModal<T extends object>({
     input?.focus();
   }, [focusRequest]);
 
-  const sections = buildGridFormSections(columns);
+  const sections = buildGridFormSections(columns, draftRow);
   const includedColumns = sections.flatMap((section) =>
     section.fields.map((field) => ({
       ...field.column,
@@ -97,11 +97,15 @@ export function F1GridFormModal<T extends object>({
     plugin.getTitle?.(context) ??
     (mode === 'create' ? '신규 등록' : '정보 수정');
   const descriptionRow = originalRow ?? draftRow;
+  const targetColumn = columns.find(
+    (column) => column.form?.targetField !== undefined,
+  );
+  const targetField = (targetColumn?.form?.targetField ?? rowKey) as keyof T;
+  const targetLabel = targetColumn?.form?.targetLabel ?? '대상';
+  const targetValue = descriptionRow[targetField];
   const defaultDescription =
-    mode === 'edit' &&
-    descriptionRow[rowKey] !== undefined &&
-    descriptionRow[rowKey] !== null
-      ? `대상: ${String(descriptionRow[rowKey])}`
+    mode === 'edit' && targetValue !== undefined && targetValue !== null
+      ? `${targetLabel}: ${String(targetValue)}`
       : undefined;
   const description = plugin.getDescription?.(context) ?? defaultDescription;
 
@@ -166,8 +170,13 @@ export function F1GridFormModal<T extends object>({
           },
           sx: {
             bgcolor: 'background.paper',
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 2,
+            boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
             display: 'flex',
             flexDirection: 'column',
+            overflow: 'hidden',
             width: '100%',
           },
         },
@@ -184,25 +193,74 @@ export function F1GridFormModal<T extends object>({
           flexShrink: 0,
           gap: 2,
           justifyContent: 'space-between',
+          px: 2,
+          py: 1.75,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography component="h2" id={titleId} variant="h6">
+        <Box sx={{ minWidth: 0, width: '100%' }}>
+          <Typography
+            component="h2"
+            id={titleId}
+            sx={{
+              color: 'text.primary',
+              fontSize: { xs: '1.1rem', sm: '1.4rem' },
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.3,
+            }}
+            variant="h6"
+          >
             {title}
           </Typography>
           {description && (
-            <Typography
-              id={descriptionId}
-              color="text.secondary"
-              variant="body2"
+            <Box
+              sx={{
+                alignItems: 'center',
+                bgcolor: alpha(theme.palette.primary.main, 0.04),
+                border: 1,
+                borderColor: alpha(theme.palette.primary.main, 0.12),
+                borderLeft: 2,
+                borderLeftColor: 'primary.main',
+                borderRadius: 1,
+                display: 'flex',
+                mt: 1.25,
+                px: 1.25,
+                py: 0.75,
+                width: '100%',
+              }}
             >
-              {description}
-            </Typography>
+              <Typography
+                id={descriptionId}
+                color="text.primary"
+                sx={{
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  lineHeight: 1.4,
+                }}
+                variant="body2"
+              >
+                {description}
+              </Typography>
+            </Box>
           )}
         </Box>
         <Tooltip title="닫기">
-          <IconButton aria-label="닫기" edge="end" onClick={onCancel}>
-            <CloseIcon />
+          <IconButton
+            aria-label="닫기"
+            edge="end"
+            onClick={onCancel}
+            sx={{
+              bgcolor: 'action.hover',
+              borderRadius: '10px',
+              color: 'text.secondary',
+              height: 40,
+              width: 40,
+              '&:hover': {
+                bgcolor: 'action.selected',
+              },
+            }}
+          >
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </DialogTitle>
@@ -210,18 +268,26 @@ export function F1GridFormModal<T extends object>({
       <DialogContent
         data-testid="f1-grid-form-content"
         style={{ overflowY: 'auto' }}
-        sx={{ bgcolor: 'background.default', py: 2.5 }}
+        sx={{
+          bgcolor: 'background.default',
+          backgroundImage:
+            'linear-gradient(180deg, rgba(148, 163, 184, 0.05) 0%, rgba(148, 163, 184, 0) 120px)',
+          px: 3,
+          pt: 1.5,
+          pb: 1.5,
+        }}
       >
         <Box
           data-testid="f1-grid-form-grid"
           style={{ display: 'grid' }}
           sx={{
-            gap: 2,
+            gap: 1.5,
             gridTemplateColumns: {
               xs: 'minmax(0, 1fr)',
               sm: 'repeat(2, minmax(0, 1fr))',
               lg: 'repeat(3, minmax(0, 1fr))',
             },
+            mt: 1,
           }}
         >
           {sections.map((section) => (
@@ -232,23 +298,38 @@ export function F1GridFormModal<T extends object>({
                 bgcolor: 'background.paper',
                 border: 1,
                 borderColor: 'divider',
-                borderLeft: 3,
+                borderLeft: 2,
                 borderLeftColor: 'primary.main',
-                borderRadius: '6px',
+                borderRadius: '10px',
+                boxShadow: '0 1px 0 rgba(15, 23, 42, 0.03)',
                 display: 'grid',
-                gap: 2,
+                gap: 1.15,
                 gridColumn: '1 / -1',
                 gridTemplateColumns: 'subgrid',
-                p: 2,
+                p: 1.5,
               }}
             >
-              <Typography
-                component="h3"
-                sx={{ gridColumn: '1 / -1' }}
-                variant="subtitle2"
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  gridColumn: '1 / -1',
+                  pb: 0.75,
+                }}
               >
-                {section.group}
-              </Typography>
+                <Typography
+                  component="h3"
+                  sx={{
+                    color: 'text.primary',
+                    fontSize: '0.94rem',
+                    fontWeight: 700,
+                    letterSpacing: '-0.01em',
+                  }}
+                  variant="subtitle2"
+                >
+                  {section.group}
+                </Typography>
+              </Box>
               {section.fields.map((field) => {
                 const fieldName = String(field.field);
                 const smSpan = Math.min(field.span, 2);
@@ -306,6 +387,8 @@ export function F1GridFormModal<T extends object>({
 
       <DialogActions
         sx={{
+          alignItems: 'center',
+          bgcolor: 'background.paper',
           borderColor: 'divider',
           borderTop: 1,
           flexShrink: 0,
@@ -315,13 +398,35 @@ export function F1GridFormModal<T extends object>({
           py: 1.5,
         }}
       >
-        <Typography color="text.secondary" variant="caption">
+        <Typography
+          color="text.secondary"
+          sx={{ fontSize: '0.78rem', fontWeight: 500 }}
+          variant="caption"
+        >
           적용 후 화면의 저장 버튼으로 최종 저장됩니다.
         </Typography>
         <Box sx={{ display: 'flex', flexShrink: 0, gap: 1 }}>
-          <Button onClick={onCancel}>취소</Button>
-          <Button variant="contained" onClick={applyDraft}>
+          <Button
+            onClick={applyDraft}
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 700,
+              minWidth: 96,
+              px: 2.5,
+            }}
+            variant="contained"
+          >
             적용
+          </Button>
+          <Button
+            onClick={onCancel}
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 600,
+              px: 2,
+            }}
+          >
+            취소
           </Button>
         </Box>
       </DialogActions>

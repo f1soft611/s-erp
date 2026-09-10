@@ -253,6 +253,42 @@ describe('F1-GRID number formatting', () => {
     expect(getCellDisplayValue(column, 12345.6)).toBe('12,345.60');
   });
 
+  it('normalizes integer and decimal editor input to the configured precision', () => {
+    const handleChange = vi.fn();
+
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12.34"
+          decimalPlaces={0}
+          onChange={handleChange}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '12.34' },
+    });
+    expect(handleChange).toHaveBeenLastCalledWith('12');
+
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12.34"
+          decimalPlaces={1}
+          onChange={handleChange}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '12.34' },
+    });
+    expect(handleChange).toHaveBeenLastCalledWith('12.3');
+  });
+
   it('formats currency values when a custom number format is specified', () => {
     const column: F1GridColumn<{ amount: number }>[][0] = {
       field: 'amount',
@@ -263,6 +299,22 @@ describe('F1-GRID number formatting', () => {
     };
 
     expect(getCellDisplayValue(column, 12345.6)).toBe('??2,346');
+  });
+
+  it('renders a required marker in the header for required columns', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { field: 'code', headerName: '코드', editable: true, required: true },
+          { field: 'status', headerName: '상태', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toHaveTextContent('코드*');
   });
 });
 
@@ -580,7 +632,7 @@ describe('F1-GRID column management', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('columnheader', { name: /?占쎈젹/ }),
+        screen.queryByRole('columnheader', { name: /\?占쎈젹/ }),
       ).toBeNull();
     });
 
@@ -591,7 +643,7 @@ describe('F1-GRID column management', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '?占쎈젹 ?占쎌떆' }));
     await waitFor(() => {
       expect(
-        screen.getByRole('columnheader', { name: /?占쎈젹/ }),
+        screen.getByRole('columnheader', { name: /\?占쎈젹/ }),
       ).toBeInTheDocument();
     });
   });
@@ -1496,7 +1548,7 @@ describe('F1-GRID row height', () => {
     );
 
     const handles = screen.getAllByRole('button', {
-      name: /???占쎌씠 議곗젅/,
+      name: /\?\?\?占쎌씠 議곗젅/,
     });
     expect(handles).toHaveLength(2);
     expect(handles[0]).toHaveAttribute('aria-valuenow', '40');
@@ -1536,7 +1588,7 @@ describe('F1-GRID row height', () => {
     });
 
     fireEvent.keyDown(
-      screen.getByRole('button', { name: /???占쎌씠 議곗젅/ }),
+      screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ }),
       {
         key: 'ArrowDown',
       },
@@ -1558,7 +1610,7 @@ describe('F1-GRID row height', () => {
       </AppSettingsProvider>,
     );
 
-    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
+    const handle = screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '48');
     window.localStorage.removeItem('erp-display-scale');
   });
@@ -1574,7 +1626,7 @@ describe('F1-GRID row height', () => {
       />,
     );
 
-    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
+    const handle = screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '40');
   });
 });
@@ -1999,7 +2051,7 @@ describe('F1-GRID interaction', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const orderHeader = screen.getByRole('columnheader', { name: /?占쎈젹/ });
+    const orderHeader = screen.getByRole('columnheader', { name: /\?占쎈젹/ });
     const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
     const orderCell = screen.getByRole('gridcell', { name: '1' });
 
@@ -2184,7 +2236,7 @@ describe('F1-GRID interaction', () => {
   it('applies headerAlign independently from cell alignment', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByRole('columnheader', { name: /?占쎈젹/ })).toHaveStyle({
+    expect(screen.getByRole('columnheader', { name: /\?占쎈젹/ })).toHaveStyle({
       textAlign: 'center',
     });
   });
@@ -2208,7 +2260,7 @@ describe('F1-GRID interaction', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', {
-        name: /?占쎌슜 ?占쏙옙?/,
+        name: /\?占쎌슜 \?占쏙옙\?/,
       }),
     ).toHaveTextContent('?占쎌슜 ?占쏙옙?');
   });
@@ -2364,7 +2416,7 @@ describe('F1-GRID interaction', () => {
         .gridRow,
     ).toBe('1/span 2');
     expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: /?占쏀깭/ }))
+      getComputedStyle(screen.getByRole('columnheader', { name: /\?占쏀깭/ }))
         .left,
     ).toBe('44px');
   });
@@ -2637,7 +2689,7 @@ describe('F1-GRID column pin', () => {
       left: '44px',
     });
     expect(
-      screen.getByRole('columnheader', { name: /?占쎌슜 ?占쏙옙?/ }),
+      screen.getByRole('columnheader', { name: /\?占쎌슜 \?占쏙옙\?/ }),
     ).toHaveStyle({
       position: 'sticky',
       right: '0px',
@@ -2938,7 +2990,9 @@ describe('F1-GRID column drag reorder', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2962,7 +3016,9 @@ describe('F1-GRID column drag reorder', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2994,7 +3050,9 @@ describe('F1-GRID column drag reorder', () => {
     );
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });

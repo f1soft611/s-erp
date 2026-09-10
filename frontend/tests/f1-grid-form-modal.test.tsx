@@ -28,24 +28,27 @@ type FormRow = {
 };
 
 describe('F1-Grid form model', () => {
-  it('builds form sections from sorted visible data columns', () => {
+  it('builds form sections from editable fields only by default', () => {
     const columns: F1GridColumn<FormRow>[] = [
       { field: 'id', headerName: '번호', type: 'rownumber' },
       {
         field: 'name',
         headerName: '이름',
+        editable: true,
         headerGroup: '기본 정보',
         form: { order: 20, span: 2 },
       },
       {
         field: 'status',
         headerName: '사용 여부',
+        editable: false,
         headerGroup: '상태',
         form: { order: 10 },
       },
       {
         field: 'department',
         headerName: '부서',
+        editable: true,
         headerGroup: '기본 정보',
         form: { group: '조직', order: 10, label: '소속 부서' },
       },
@@ -53,40 +56,57 @@ describe('F1-Grid form model', () => {
       {
         field: 'secret',
         headerName: '숨김 값',
+        editable: true,
         hidden: true,
         form: { hidden: false, group: '상태', order: 15 },
       },
       {
         field: 'department',
         headerName: '제외할 필드',
+        editable: true,
         form: { hidden: true },
       },
     ];
 
-    const sections = buildGridFormSections(columns);
+    const sections = buildGridFormSections(columns, {
+      id: '1',
+      name: '홍길동',
+      status: true,
+      department: '개발',
+      memo: '메모',
+      secret: '숨김',
+    });
 
     expect(sections.map((section) => section.group)).toEqual([
       '기본 정보',
-      '상태',
       '조직',
+      '상태',
     ]);
     expect(
       sections.map((section) => section.fields.map((field) => field.field)),
-    ).toEqual([['memo', 'name'], ['status', 'secret'], ['department']]);
-    expect(sections[1].fields[0]).toEqual({
-      column: columns[2],
-      field: 'status',
-      label: '사용 여부',
-      group: '상태',
-      order: 10,
-      span: 1,
+    ).toEqual([['name'], ['department'], ['secret']]);
+    expect(sections[0].fields[0]).toEqual({
+      column: columns[1],
+      field: 'name',
+      label: '이름',
+      group: '기본 정보',
+      order: 20,
+      span: 2,
     });
-    expect(sections[2].fields[0]).toEqual({
+    expect(sections[1].fields[0]).toEqual({
       column: columns[3],
       field: 'department',
       label: '소속 부서',
       group: '조직',
       order: 10,
+      span: 1,
+    });
+    expect(sections[2].fields[0]).toEqual({
+      column: columns[5],
+      field: 'secret',
+      label: '숨김 값',
+      group: '상태',
+      order: 15,
       span: 1,
     });
   });
@@ -531,6 +551,36 @@ describe('row form modal', () => {
       mode: 'create',
       row: expect.objectContaining({ name: '홍길동' }),
     });
+  });
+
+  it('allows the target label and field to be configured from form metadata', () => {
+    render(
+      <F1GridFormModal
+        open
+        mode="edit"
+        row={modalRow}
+        originalRow={modalRow}
+        columns={[
+          {
+            field: 'id',
+            headerName: '사번',
+            form: { targetField: 'name', targetLabel: '메뉴명' },
+          },
+          {
+            field: 'name',
+            headerName: '이름',
+            editable: true,
+            required: true,
+          },
+        ]}
+        rowKey="id"
+        plugin={{}}
+        onCancel={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('메뉴명: 홍길동')).toBeInTheDocument();
   });
 
   it('renders section headings and field labels in form order with label overrides', () => {

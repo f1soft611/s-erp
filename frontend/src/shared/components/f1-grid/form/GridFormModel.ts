@@ -15,6 +15,10 @@ export type GridFormSection<T extends object> = {
   fields: GridFormField<T>[];
 };
 
+type GridFormFieldEntry<T extends object> = GridFormField<T> & {
+  sourceIndex: number;
+};
+
 export function isGridFormFieldReadOnly<T extends object>(
   column: F1GridColumn<T>,
   row: T,
@@ -30,6 +34,7 @@ export function isGridFormFieldReadOnly<T extends object>(
 
 export function buildGridFormSections<T extends object>(
   columns: F1GridColumn<T>[],
+  row?: T,
 ): GridFormSection<T>[] {
   const fields = columns
     .map((column, sourceIndex) => ({
@@ -41,26 +46,28 @@ export function buildGridFormSections<T extends object>(
       order: column.form?.order ?? sourceIndex,
       span: column.form?.span ?? 1,
     }))
-    .filter(
-      ({ column }) =>
-        column.type !== 'rownumber' &&
-        column.form?.hidden !== true &&
-        (!column.hidden || column.form?.hidden === false),
-    )
-    .sort(
-      (left, right) =>
-        left.order - right.order || left.sourceIndex - right.sourceIndex,
-    );
+    .filter(({ column }) => {
+      if (column.type === 'rownumber') return false;
+      if (column.form?.hidden === true) return false;
+      if (column.hidden && column.form?.hidden !== false) return false;
+      if (row !== undefined && !isCellEditable(column, row)) return false;
+      return true;
+    });
 
-  const sections = new Map<string, GridFormField<T>[]>();
-  fields.forEach(({ sourceIndex: _sourceIndex, ...field }) => {
-    const sectionFields = sections.get(field.group) ?? [];
-    sectionFields.push(field);
-    sections.set(field.group, sectionFields);
+  const groups = new Map<string, GridFormFieldEntry<T>[]>();
+  fields.forEach((field) => {
+    const sectionFields = groups.get(field.group) ?? [];
+    sectionFields.push({ ...field, sourceIndex: field.sourceIndex });
+    groups.set(field.group, sectionFields);
   });
 
-  return Array.from(sections, ([group, sectionFields]) => ({
+  return Array.from(groups, ([group, sectionFields]) => ({
     group,
-    fields: sectionFields,
+    fields: sectionFields
+      .sort(
+        (left, right) =>
+          left.order - right.order || left.sourceIndex - right.sourceIndex,
+      )
+      .map(({ sourceIndex: _sourceIndex, ...field }) => field),
   }));
 }

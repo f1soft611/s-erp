@@ -1,8 +1,10 @@
 import { InputBase } from '@mui/material';
 import type { KeyboardEvent } from 'react';
+import { normalizeGridNumberInput } from '../utils/grid.utils';
 
 type NumberEditorProps = {
   value: string;
+  decimalPlaces?: number;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   selectOnFocus?: boolean;
@@ -10,18 +12,23 @@ type NumberEditorProps = {
 
 export function NumberEditor({
   value,
+  decimalPlaces,
   onChange,
   onKeyDown,
   selectOnFocus = true,
 }: NumberEditorProps) {
+  const normalizedValue = normalizeGridNumberInput(value, decimalPlaces);
+
   return (
     <InputBase
       autoFocus
       fullWidth
       type="number"
       inputMode="numeric"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
+      value={normalizedValue}
+      onChange={(event) =>
+        onChange(normalizeGridNumberInput(event.target.value, decimalPlaces))
+      }
       onKeyDown={onKeyDown}
       onFocus={(event) => {
         if (!selectOnFocus) return;

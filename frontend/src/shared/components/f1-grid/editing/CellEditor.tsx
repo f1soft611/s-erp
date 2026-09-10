@@ -46,6 +46,7 @@ export function CellEditor<T extends object>({
     return (
       <CurrencyEditor
         value={value}
+        decimalPlaces={column.decimalPlaces}
         onChange={onChange}
         onKeyDown={onKeyDown}
         selectOnFocus={selectOnFocus}
@@ -55,6 +56,7 @@ export function CellEditor<T extends object>({
     return (
       <DecimalEditor
         value={value}
+        decimalPlaces={column.decimalPlaces}
         onChange={onChange}
         onKeyDown={onKeyDown}
         selectOnFocus={selectOnFocus}
@@ -91,6 +93,7 @@ export function CellEditor<T extends object>({
     return (
       <NumberEditor
         value={value}
+        decimalPlaces={column.decimalPlaces}
         onChange={onChange}
         onKeyDown={onKeyDown}
         selectOnFocus={selectOnFocus}

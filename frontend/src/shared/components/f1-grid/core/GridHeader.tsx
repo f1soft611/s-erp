@@ -573,6 +573,20 @@ export function GridHeader<T extends object>({
                   />
                 ) : null}
                 {column.headerName}
+                {column.required ? (
+                  <Box
+                    component="span"
+                    aria-label={`${column.headerName} 필수`}
+                    sx={{
+                      color: 'error.main',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      ml: 0.25,
+                    }}
+                  >
+                    *
+                  </Box>
+                ) : null}
                 {sortIndicator ? (
                   <Box
                     component="span"

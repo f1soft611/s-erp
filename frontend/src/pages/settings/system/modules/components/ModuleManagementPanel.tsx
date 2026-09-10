@@ -167,10 +167,20 @@ export const ModuleManagementPanel = forwardRef<
 
   const columns: F1GridColumn<ModuleManagementRow>[] = [
     {
+      field: 'id',
+      type: 'rownumber',
+      width: 60,
+      headerName: '순번',
+      headerAlign: 'center',
+      align: 'center',
+      pinned: 'left',
+    },
+    {
       field: 'moduleCode',
       headerName: '모듈 코드',
       flex: 1,
       editable: (row) => canEditModuleCode(row),
+      required: true,
       headerAlign: 'center',
       align: 'left',
     },
@@ -179,6 +189,7 @@ export const ModuleManagementPanel = forwardRef<
       headerName: '모듈명',
       flex: 1.2,
       editable: true,
+      required: true,
       headerAlign: 'center',
     },
     {
@@ -186,6 +197,7 @@ export const ModuleManagementPanel = forwardRef<
       headerName: '아이콘명',
       flex: 1,
       editable: true,
+      required: true,
       type: 'select',
       options: MODULE_ICON_OPTIONS,
       selectOptionIcon: renderModuleOptionIcon,
@@ -196,6 +208,7 @@ export const ModuleManagementPanel = forwardRef<
       headerName: '루트 경로',
       flex: 1.2,
       editable: true,
+      required: true,
       headerAlign: 'center',
     },
     {
@@ -204,6 +217,7 @@ export const ModuleManagementPanel = forwardRef<
       flex: 0.8,
       type: 'number',
       editable: true,
+      required: true,
       align: 'center',
       headerAlign: 'center',
     },

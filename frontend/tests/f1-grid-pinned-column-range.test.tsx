@@ -73,8 +73,8 @@ describe('F1Grid pinned-column drag selection', () => {
       '[data-range-overlay="drag"]',
     ) as HTMLElement | null;
     expect(overlay).not.toBeNull();
-    expect(parseFloat(window.getComputedStyle(overlay as HTMLElement).left)).toBe(
-      171,
-    );
+    expect(
+      parseFloat(window.getComputedStyle(overlay as HTMLElement).left),
+    ).toBe(171);
   });
 });
