@@ -30,6 +30,12 @@ type GridBodyProps<T extends object> = {
   selectedCellRange?: F1GridCellRange;
   selectedCellRangeBounds?: F1GridCellRangeBounds;
   isCellSelectionDragging?: boolean;
+  dragSelectionStateRef: {
+    current: {
+      active: boolean;
+      previousCell: { rowId: F1GridRowId; columnIndex: number } | null;
+    };
+  };
   copiedCellRange?: F1GridCellRange;
   draftValue: string;
   dirtyCellMap?: Record<string, boolean>;
@@ -116,6 +122,7 @@ export function GridBody<T extends object>({
   selectedCellRange,
   selectedCellRangeBounds,
   isCellSelectionDragging = false,
+  dragSelectionStateRef,
   copiedCellRange,
   draftValue,
   dirtyCellMap = {},
@@ -250,6 +257,7 @@ export function GridBody<T extends object>({
             selectedCellRange={selectedCellRange}
             selectedCellRangeBounds={selectedCellRangeBounds}
             isCellSelectionDragging={isCellSelectionDragging}
+            dragSelectionStateRef={dragSelectionStateRef}
             copiedCellRange={copiedCellRange}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}

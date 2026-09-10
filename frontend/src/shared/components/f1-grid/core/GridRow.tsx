@@ -1,6 +1,8 @@
 import {
   memo,
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   type KeyboardEvent,
   type MouseEvent,
@@ -34,6 +36,12 @@ type GridRowProps<T extends object> = {
   selectedCellRange?: F1GridCellRange;
   selectedCellRangeBounds?: F1GridCellRangeBounds;
   isCellSelectionDragging?: boolean;
+  dragSelectionStateRef: {
+    current: {
+      active: boolean;
+      previousCell: { rowId: F1GridRowId; columnIndex: number } | null;
+    };
+  };
   copiedCellRange?: F1GridCellRange;
   draftValue: string;
   dirtyCellMap?: Record<string, boolean>;
@@ -215,6 +223,7 @@ const GridRowInner = <T extends object>({
   selectedCellRange,
   selectedCellRangeBounds,
   isCellSelectionDragging = false,
+  dragSelectionStateRef,
   copiedCellRange,
   draftValue,
   dirtyCellMap = {},
@@ -251,6 +260,115 @@ const GridRowInner = <T extends object>({
       startY: number;
       startHeight: number;
     } | null>(null);
+    const previousDragCellRef = useRef<
+      { rowId: F1GridRowId; columnIndex: number } | null
+    >(null);
+
+    const isSameCell = useCallback(
+      (
+        first: { rowId: F1GridRowId; columnIndex: number } | undefined,
+        second: { rowId: F1GridRowId; columnIndex: number },
+      ) => {
+        return (
+          first?.rowId === second.rowId &&
+          first?.columnIndex === second.columnIndex
+        );
+      },
+      [],
+    );
+
+    const getCell = useCallback(
+      (rowId: F1GridRowId, columnIndex: number) => ({ rowId, columnIndex }),
+      [],
+    );
+
+    const rowSelectionMeta = useMemo(() => {
+      const selectedRangeHasMultipleCells =
+        !!selectedCellRange &&
+        (selectedCellRange.anchor.rowId !== selectedCellRange.focus.rowId ||
+          selectedCellRange.anchor.columnIndex !==
+            selectedCellRange.focus.columnIndex);
+      const copiedRangeHasMultipleCells =
+        !!copiedCellRange &&
+        (copiedCellRange.anchor.rowId !== copiedCellRange.focus.rowId ||
+          copiedCellRange.anchor.columnIndex !==
+            copiedCellRange.focus.columnIndex);
+
+      return {
+        selectedRangeHasMultipleCells,
+        copiedRangeHasMultipleCells,
+      };
+    }, [copiedCellRange, selectedCellRange]);
+
+    const handleCellMouseDown = useCallback(
+      (
+        event: MouseEvent<HTMLElement>,
+        cell: { rowId: F1GridRowId; columnIndex: number },
+      ) => {
+        if (event.button === 2) {
+          onSetFocusedCell(cell);
+          onSelectRow(rowId, event as unknown as MouseEvent<HTMLElement>);
+        }
+
+        const previousCell = previousDragCellRef.current;
+        const isSameDragCell =
+          previousCell?.rowId === cell.rowId &&
+          previousCell?.columnIndex === cell.columnIndex;
+
+        if (isSameDragCell && !selectedCellRange) {
+          return;
+        }
+
+        dragSelectionStateRef.current = {
+          active: true,
+          previousCell: cell,
+        };
+        previousDragCellRef.current = cell;
+        onCellSelectionStart(cell);
+      },
+      [
+        dragSelectionStateRef,
+        onCellSelectionStart,
+        onSelectRow,
+        onSetFocusedCell,
+        rowId,
+        selectedCellRange,
+      ],
+    );
+
+    const handleCellMouseEnter = useCallback(
+      (cell: { rowId: F1GridRowId; columnIndex: number }) => {
+        const dragState = dragSelectionStateRef.current;
+        const dragAlreadyActive =
+          isCellSelectionDragging || dragState.active || !!selectedCellRange;
+
+        if (!dragAlreadyActive) return;
+
+        const previousCell = dragState.previousCell ?? previousDragCellRef.current;
+        const isSameDragCell =
+          previousCell?.rowId === cell.rowId &&
+          previousCell?.columnIndex === cell.columnIndex;
+
+        if (isSameDragCell) return;
+
+        dragState.previousCell = cell;
+        previousDragCellRef.current = cell;
+        onCellSelectionDrag(cell);
+      },
+      [
+        dragSelectionStateRef,
+        isCellSelectionDragging,
+        onCellSelectionDrag,
+        selectedCellRange,
+      ],
+    );
+
+    useEffect(() => {
+      if (!selectedCellRange) {
+        previousDragCellRef.current = null;
+        dragSelectionStateRef.current.previousCell = null;
+      }
+    }, [dragSelectionStateRef, selectedCellRange]);
 
     useEffect(() => {
       function handlePointerMove(event: PointerEvent) {
@@ -280,45 +398,31 @@ const GridRowInner = <T extends object>({
       };
     }, [maxRowHeight, minRowHeight, onUpdateRowHeight, rowId]);
 
-    function isSameCell(
-      first: { rowId: F1GridRowId; columnIndex: number } | undefined,
-      second: { rowId: F1GridRowId; columnIndex: number },
-    ) {
-      return (
-        first?.rowId === second.rowId &&
-        first.columnIndex === second.columnIndex
-      );
-    }
+    const isActiveMergeGroup = useCallback(
+      (
+        column: F1GridColumn<T>,
+        columnIndex: number,
+        mergeInfo: { isStart: boolean; span: number } | undefined,
+      ): boolean => {
+        if (!column.mergeRows || !mergeInfo?.isStart || mergeInfo.span <= 1) {
+          return false;
+        }
 
-    function isActiveMergeGroup(
-      column: F1GridColumn<T>,
-      columnIndex: number,
-      mergeInfo: { isStart: boolean; span: number } | undefined,
-    ): boolean {
-      if (!column.mergeRows || !mergeInfo?.isStart || mergeInfo.span <= 1) {
-        return false;
-      }
+        const activeCells = [focusedCell, editingCell].filter(
+          (
+            activeCell,
+          ): activeCell is { rowId: F1GridRowId; columnIndex: number } =>
+            activeCell?.columnIndex === columnIndex,
+        );
 
-      const activeCells = [focusedCell, editingCell].filter(
-        (
-          activeCell,
-        ): activeCell is { rowId: F1GridRowId; columnIndex: number } =>
-          activeCell?.columnIndex === columnIndex,
-      );
-
-      return activeCells.some((activeCell) =>
-        visibleRows
-          .slice(rowIndex, rowIndex + mergeInfo.span)
-          .some((item) => String(item[rowKey]) === String(activeCell.rowId)),
-      );
-    }
-
-    function getCell(
-      rowId: F1GridRowId,
-      columnIndex: number,
-    ): { rowId: F1GridRowId; columnIndex: number } {
-      return { rowId, columnIndex };
-    }
+        return activeCells.some((activeCell) =>
+          visibleRows
+            .slice(rowIndex, rowIndex + mergeInfo.span)
+            .some((item) => String(item[rowKey]) === String(activeCell.rowId)),
+        );
+      },
+      [editingCell, focusedCell, rowIndex, rowKey, visibleRows],
+    );
 
     return (
       <Box
@@ -373,15 +477,9 @@ const GridRowInner = <T extends object>({
           const focused = isSameCell(focusedCell, cell);
           const isLastRow = rowIndex === visibleRows.length - 1;
           const selectedRangeHasMultipleCells =
-            !!selectedCellRange &&
-            (selectedCellRange.anchor.rowId !== selectedCellRange.focus.rowId ||
-              selectedCellRange.anchor.columnIndex !==
-                selectedCellRange.focus.columnIndex);
+            rowSelectionMeta.selectedRangeHasMultipleCells;
           const copiedRangeHasMultipleCells =
-            !!copiedCellRange &&
-            (copiedCellRange.anchor.rowId !== copiedCellRange.focus.rowId ||
-              copiedCellRange.anchor.columnIndex !==
-                copiedCellRange.focus.columnIndex);
+            rowSelectionMeta.copiedRangeHasMultipleCells;
           const selected =
             !!selectedCellRangeBounds &&
             rowIndex >= selectedCellRangeBounds.minRowIndex &&
@@ -390,10 +488,12 @@ const GridRowInner = <T extends object>({
             columnIndex <= selectedCellRangeBounds.maxColumnIndex;
           const isSelectedRangeStart =
             selectedRangeHasMultipleCells &&
+            !!selectedCellRange &&
             String(rowId) === String(selectedCellRange.anchor.rowId) &&
             columnIndex === selectedCellRange.anchor.columnIndex;
           const isCopiedRangeStart =
             copiedRangeHasMultipleCells &&
+            !!copiedCellRange &&
             String(rowId) === String(copiedCellRange.anchor.rowId) &&
             columnIndex === copiedCellRange.anchor.columnIndex;
           const value = column.getValue?.(row) ?? row[column.field];
@@ -455,19 +555,10 @@ const GridRowInner = <T extends object>({
                 });
                 onSelectRow(rowId, {} as MouseEvent<HTMLElement>);
               }}
-              onMouseDown={(event: MouseEvent<HTMLElement>) => {
-                if (event.button === 2) {
-                  onSetFocusedCell(cell);
-                  onSelectRow(
-                    rowId,
-                    event as unknown as MouseEvent<HTMLElement>,
-                  );
-                }
-                onCellSelectionStart(cell);
-              }}
-              onMouseEnter={() => {
-                if (selectedCellRange) onCellSelectionDrag(cell);
-              }}
+              onMouseDown={(event: MouseEvent<HTMLElement>) =>
+                handleCellMouseDown(event, cell)
+              }
+              onMouseEnter={() => handleCellMouseEnter(cell)}
               onMouseUp={onCellSelectionEnd}
               onBlur={onCommitEdit}
               onDoubleClick={() => onStartEdit(rowId, columnIndex)}

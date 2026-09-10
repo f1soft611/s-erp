@@ -268,6 +268,110 @@ describe('F1-GRID loading overlay', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the drag overlay visible after the grid body is scrolled vertically', async () => {
+    const rowsWithLongList = [
+      { id: 'row-1', code: 'A', name: 'Alpha' },
+      { id: 'row-2', code: 'B', name: 'Beta' },
+    ];
+
+    render(
+      <F1Grid
+        rows={rowsWithLongList}
+        columns={[
+          { field: 'code', headerName: 'Code', width: 160 },
+          { field: 'name', headerName: 'Name', width: 160 },
+        ]}
+        rowKey="id"
+        height={180}
+      />,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'scrollTop', {
+      configurable: true,
+      value: 1200,
+      writable: true,
+    });
+    Object.defineProperty(bodyScroll, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 420,
+        bottom: 180,
+        width: 420,
+        height: 180,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+
+    const startCell = screen.getByRole('gridcell', { name: 'A' });
+    const endCell = screen.getByRole('gridcell', { name: 'Beta' });
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function () {
+        if (this === startCell) {
+          return {
+            left: 10,
+            top: 120,
+            right: 170,
+            bottom: 160,
+            width: 160,
+            height: 40,
+            x: 10,
+            y: 120,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === endCell) {
+          return {
+            left: 10,
+            top: 180,
+            right: 170,
+            bottom: 220,
+            width: 160,
+            height: 40,
+            x: 10,
+            y: 180,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        if (this === bodyScroll) {
+          return {
+            left: 0,
+            top: 0,
+            right: 420,
+            bottom: 180,
+            width: 420,
+            height: 180,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return originalRect.call(this);
+      },
+    );
+
+    fireEvent.mouseDown(startCell);
+    await waitFor(() => {
+      expect(screen.getByRole('gridcell', { name: 'A' })).toBeInTheDocument();
+    });
+    fireEvent.mouseEnter(endCell);
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-range-overlay="drag"]')).not.toBeNull();
+    });
+
+    const overlay = document.querySelector(
+      '[data-range-overlay="drag"]',
+    ) as HTMLElement;
+    expect(Number.parseFloat(getComputedStyle(overlay).top)).toBeGreaterThan(0);
+    expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeGreaterThanOrEqual(0);
+  });
+
   it('renders only viewport columns while keeping pinned columns mounted', () => {
     type WideRow = { id: string } & Record<string, string>;
     const wideRows: WideRow[] = [

@@ -1,5 +1,8 @@
 import {
   memo,
+  useCallback,
+  useMemo,
+  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -142,32 +145,68 @@ const GridCellInner = <T extends object>({
 }: GridCellProps<T>) => {
     const value = column.getValue?.(row) ?? row[column.field];
     const editable = isCellEditable(column, row);
-    const cellRenderContext = {
-      row,
-      rowId,
-      column,
-      field: column.field,
-      value,
-      rowIndex,
-    };
-    const displayValue =
-      column.type === 'rownumber'
-        ? String(rowIndex + 1)
-        : getCellDisplayValue(column, value as T[keyof T]);
-    const customCellProps = column.getCellProps?.(cellRenderContext) ?? {};
-    const customCellStyle = column.getCellStyle?.(cellRenderContext);
-    const mergedCellStyle = {
-      ...(customCellStyle ?? {}),
-      ...(customCellProps.style ?? {}),
-    };
+    const cellRenderContext = useMemo(
+      () => ({
+        row,
+        rowId,
+        column,
+        field: column.field,
+        value,
+        rowIndex,
+      }),
+      [column, row, rowId, rowIndex, value],
+    );
+    const displayValue = useMemo(
+      () =>
+        column.type === 'rownumber'
+          ? String(rowIndex + 1)
+          : getCellDisplayValue(column, value as T[keyof T]),
+      [column, rowIndex, value],
+    );
+    const customCellProps = useMemo(
+      () => column.getCellProps?.(cellRenderContext) ?? {},
+      [cellRenderContext, column],
+    );
+    const customCellStyle = useMemo(
+      () => column.getCellStyle?.(cellRenderContext),
+      [cellRenderContext, column],
+    );
+    const mergedCellStyle = useMemo(
+      () => ({
+        ...(customCellStyle ?? {}),
+        ...(customCellProps.style ?? {}),
+      }),
+      [customCellStyle, customCellProps.style],
+    );
     const hideRangeStartBorder = rangeStart && !editing;
     const activeHighlight =
       !selectionRangeActive &&
       (focused || editing || mergeGroupActive) &&
       !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
     const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
-    const cellClassName =
-      [customCellProps.className].filter(Boolean).join(' ') || undefined;
+    const cellClassName = useMemo(
+      () => [customCellProps.className].filter(Boolean).join(' ') || undefined,
+      [customCellProps.className],
+    );
+    const handleBlurCapture = useCallback(
+      (event: FocusEvent<HTMLElement>) => {
+        const nextTarget = event.relatedTarget;
+        if (
+          nextTarget instanceof Node &&
+          event.currentTarget.contains(nextTarget)
+        ) {
+          return;
+        }
+        const hasOpenEditorPopup = Boolean(
+          document.querySelector(
+            '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
+          ),
+        );
+        if (hasOpenEditorPopup) return;
+        onBlur?.();
+      },
+      [onBlur],
+    );
 
     return (
       <Box
@@ -188,22 +227,7 @@ const GridCellInner = <T extends object>({
         onMouseDown={onMouseDown}
         onMouseEnter={onMouseEnter}
         onMouseUp={onMouseUp}
-        onBlurCapture={(event) => {
-          const nextTarget = event.relatedTarget;
-          if (
-            nextTarget instanceof Node &&
-            event.currentTarget.contains(nextTarget)
-          ) {
-            return;
-          }
-          const hasOpenEditorPopup = Boolean(
-            document.querySelector(
-              '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
-            ),
-          );
-          if (hasOpenEditorPopup) return;
-          onBlur?.();
-        }}
+        onBlurCapture={handleBlurCapture}
         onDoubleClick={onDoubleClick}
         onKeyDown={onKeyDown}
         data-grid-selected={selected ? 'true' : 'false'}

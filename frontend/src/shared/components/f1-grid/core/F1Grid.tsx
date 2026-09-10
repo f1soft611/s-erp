@@ -194,6 +194,13 @@ function F1GridInner<T extends object>(
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
   const cellRangeDragRef = useRef<F1GridCellRange | null>(null);
+  const dragSelectionStateRef = useRef<{
+    active: boolean;
+    previousCell: { rowId: F1GridRowId; columnIndex: number } | null;
+  }>({
+    active: false,
+    previousCell: null,
+  });
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [rowFormSession, setRowFormSession] = useState<
@@ -1648,6 +1655,10 @@ function F1GridInner<T extends object>(
 
   function finishCellSelectionRange() {
     cellRangeDragRef.current = null;
+    dragSelectionStateRef.current = {
+      active: false,
+      previousCell: null,
+    };
     setIsCellSelectionDragging(false);
   }
 
@@ -2046,7 +2057,6 @@ function F1GridInner<T extends object>(
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
     const scrollLeft = bodyScrollRef.current.scrollLeft;
-    const scrollTop = bodyScrollRef.current.scrollTop;
     const topLeftField = visibleColumns[minColumnIndex];
     const topLeftPinnedSide =
       topLeftField !== undefined
@@ -2059,7 +2069,7 @@ function F1GridInner<T extends object>(
         0,
         topLeftRect.left - containerRect.left + leftScrollCompensation + 1,
       ),
-      top: Math.max(0, topLeftRect.top - containerRect.top - scrollTop + 1),
+      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
       width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
       height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
@@ -2255,6 +2265,7 @@ function F1GridInner<T extends object>(
             selectedCellRangeBounds={selectedCellRangeBounds}
             copiedCellRange={copiedCellRange}
             isCellSelectionDragging={isCellSelectionDragging}
+            dragSelectionStateRef={dragSelectionStateRef}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
@@ -2270,12 +2281,20 @@ function F1GridInner<T extends object>(
             }}
             onStartEdit={startEdit}
             onCellSelectionStart={(cell) => {
+              dragSelectionStateRef.current = {
+                active: true,
+                previousCell: cell,
+              };
               setFocusedCell(cell);
               cellRangeDragRef.current = createGridCellRange(cell);
               setIsCellSelectionDragging(true);
               setCellSelectionRange(cell, cell);
             }}
             onCellSelectionDrag={(cell) => {
+              dragSelectionStateRef.current = {
+                ...dragSelectionStateRef.current,
+                previousCell: cell,
+              };
               updateCellSelectionRange(cell);
             }}
             onCellSelectionEnd={finishCellSelectionRange}
