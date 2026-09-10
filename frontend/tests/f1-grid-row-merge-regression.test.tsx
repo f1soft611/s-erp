@@ -17,6 +17,31 @@ describe('F1-Grid row merge regression', () => {
     expect(getGridCellBottomBorder(false, true, true, 2)).toBe(0);
   });
 
+  it('keeps the bottom border when a merged group reaches the final visible row', () => {
+    const rows: MergeRow[] = [
+      { id: '1', itemName: 'Item A', category: 'Raw', quantity: 1 },
+      { id: '2', itemName: 'Item A', category: 'Raw', quantity: 2 },
+      { id: '3', itemName: 'Item A', category: 'Raw', quantity: 3 },
+    ];
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { field: 'itemName', headerName: 'Item name', mergeRows: true },
+          { field: 'category', headerName: 'Category', mergeRows: true },
+          { field: 'quantity', headerName: 'Quantity' },
+        ]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    const mergedStartCell = screen.getByRole('gridcell', { name: 'Item A' });
+    expect(mergedStartCell).not.toBeNull();
+    expect(getComputedStyle(mergedStartCell).borderBottomWidth).toBe('1px');
+  });
+
   it('focuses the merge start cell when a later merged row is clicked', () => {
     const rows: MergeRow[] = [
       { id: '1', itemName: 'Item A', category: 'Raw', quantity: 1 },

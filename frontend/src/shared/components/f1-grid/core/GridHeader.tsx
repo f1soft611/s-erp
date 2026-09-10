@@ -26,7 +26,6 @@ import type {
   F1GridFilter,
   F1GridFilterOperator,
   F1GridPinSide,
-  F1GridRowId,
   F1GridSort,
 } from '../types/grid.types';
 
@@ -48,10 +47,11 @@ const OPERATOR_LABELS: Record<F1GridFilterOperator, string> = {
 type GridHeaderProps<T extends object> = {
   columns: F1GridColumn<T>[];
   allColumns: F1GridColumn<T>[];
+  renderedColumnIndexes?: Set<number>;
   rows: T[];
   columnLine: boolean;
   selectedAll: boolean;
-  selectedIds: F1GridRowId[];
+  selectedCount: number;
   columnWidths: Record<string, number>;
   columnTracks: string;
   resizableColumns?: boolean;
@@ -95,10 +95,11 @@ type GridHeaderProps<T extends object> = {
 export function GridHeader<T extends object>({
   columns,
   allColumns,
+  renderedColumnIndexes,
   rows,
   columnLine,
   selectedAll,
-  selectedIds,
+  selectedCount,
   columnWidths,
   columnTracks,
   resizableColumns = true,
@@ -344,13 +345,20 @@ export function GridHeader<T extends object>({
               size="small"
               aria-label="전체 행 선택"
               checked={selectedAll}
-              indeterminate={selectedIds.length > 0 && !selectedAll}
+              indeterminate={selectedCount > 0 && !selectedAll}
               onChange={onToggleAllRows}
             />
           </Box>
         ) : null}
         {groupLabelNodes}
         {columns.map((column, columnIndex) => {
+          if (
+            renderedColumnIndexes &&
+            !renderedColumnIndexes.has(columnIndex)
+          ) {
+            return null;
+          }
+
           const checkboxState = getColumnCheckboxState(column);
           const pinSide = getGridColumnPinSide(pinnedFields, column);
           const sortIndicator = getGridSortIndicator(sorts, column.field);

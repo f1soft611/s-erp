@@ -86,7 +86,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
-- dirty 판정은 최초 로드 시점의 원본 값(`originalRowsById`)과 비교하며, 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드의 dirty 마크가 사라지고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
+- dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
@@ -1219,9 +1219,8 @@ Tree Grid는 일반 Grid와 별도의 컴포넌트로 분리하지 않고 Core G
 다음 데이터를 고려한다.
 
 ```text
+1,000 rows
 10,000 rows
-100,000 rows
-1,000,000 rows
 ```
 
 전체 데이터를 DOM에 렌더링하지 않는다.
@@ -1724,6 +1723,111 @@ Agent는 모든 기능을 한 번에 구현하지 않는다.
 7. Large Dataset Test
 ```
 
+## Large Dataset Sample (10,000 rows)
+
+대용량 데이터는 특별한 별도 화면이 아니라 기존 F1-Grid UX를 그대로 유지하면서 큰 데이터 집합을 다루는 방식으로 정의한다.
+
+- 10,000 rows: 기본 대용량 검증 기준으로 사용한다.
+- 1,000 rows: 빠른 로딩 검증용 미리보기 샘플로 사용한다.
+- 핵심 가정: 대용량 데이터에서도 체크박스 선택, dirty 상태, 셀 편집, 필터/정렬, 키보드 이동이 기존 흐름과 동일해야 한다.
+- 문서/테스트에서 함께 쓰는 샘플 값에는 품목코드, 관리담당자, 카테고리, 수량, 금액, 수정일 등 ERP 운영 데이터에 가까운 필드를 포함한다.
+- 대용량 샘플 생성은 50,000 / 100,000 건처럼 과도한 데이터를 즉시 생성하지 않고, 버튼 클릭 시 공통 로딩 스피너를 노출한 뒤 1,000건 또는 10,000건 기준 데이터를 조립한다.
+
+```ts
+const createLargeDataset = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `row-${index + 1}`,
+    itemCode: `ITEM-${String(index + 1).padStart(6, '0')}`,
+    itemName: `대용량 시뮬레이션 품목 ${index + 1}`,
+    category: ['원자재', '부자재', '반제품', '완제품'][index % 4],
+    quantity: ((index * 17) % 2000) + 10,
+    amount: (index + 1) * 3850 + 12500,
+    status: index % 3 === 0 ? 'active' : index % 2 === 0 ? 'hold' : 'pending',
+    manager: `담당자 ${String((index % 18) + 1).padStart(2, '0')}`,
+    updatedAt: `2026-09-${String((index % 28) + 1).padStart(2, '0')}`,
+  }));
+```
+
+대용량 시나리오 검증은 다음 순서로 진행한다.
+
+```text
+1. 1,000 rows 미리보기 로드
+2. 공통 로딩 스피너 노출 확인
+3. 10,000 rows 로드
+4. 스크롤 및 전체 선택 상태 확인
+5. 정렬/필터 조건 적용
+6. 단일 행 선택, 키보드 이동, dirty 상태 유지 재검증
+7. 결과를 문서와 테스트 기준선으로 기록
+```
+
+### Virtualized rendering contract
+
+F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 분리한다. 행 수가 200개 이상이면 row virtualization이 자동 활성화되고, 컬럼 수가 12개 이상이면서 가로 overflow가 있으면 column virtualization이 자동 활성화된다.
+
+```tsx
+<F1Grid
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  height={420}
+  virtualizeRows
+  virtualizeColumns
+  rowOverscan={8}
+  columnOverscan={2}
+  fixedRowHeightThreshold={10000}
+/>
+```
+
+- `virtualizeRows`, `virtualizeColumns`: 자동 활성화 판단을 호출부에서 재정의한다.
+- `rowOverscan`: viewport 위/아래에 추가 렌더링할 행 수이며 기본값은 8이다.
+- `columnOverscan`: viewport 좌/우에 추가 렌더링할 일반 컬럼 수이며 기본값은 2이다.
+- `fixedRowHeightThreshold`: 기본값 10,000이며, 이상에서는 행 높이를 고정하고 행 리사이즈 핸들을 비활성화한다.
+- pinned 컬럼, 편집 중 컬럼, 선택 범위의 anchor/focus 컬럼은 viewport 밖이어도 DOM에 유지한다.
+- 스크롤 위치는 `requestAnimationFrame`당 한 번만 React state에 반영한다.
+- 선택 범위는 셀마다 state를 만들지 않고 `{ anchor, focus }`로 저장한 뒤 숫자 bounds를 한 번 계산해 렌더 셀에서 비교한다.
+- export, validate, 전체 선택, 정렬/필터, dirty/edit 데이터는 virtual window가 아니라 전체 visible rows를 기준으로 동작한다.
+
+100,000행 모드에서는 고정 행 높이를 전제로 하므로 개별 행 높이 변경이 필요하면 `fixedRowHeightThreshold`를 조정해야 한다. 임계값을 지나치게 높이면 스크롤 시 가변 높이 누적 계산 비용이 증가할 수 있다.
+
+### Data Engine v2
+
+- 행은 `rowById`와 `rowIndexById`로 인덱싱하며 단일 행 조회는 평균 O(1)로 처리한다.
+- 변경 전 전체 행 복사본을 만들지 않고 수정된 필드의 원본값과 현재 patch만 저장한다.
+- 일반 행 선택은 `Set`, 전체 선택은 `allSelected + excludedIds`로 보관한다. 배열은 callback/Ref 호출처럼 실제 ID 목록이 필요할 때만 만든다.
+- Tab 이동은 전체 `행 × 컬럼` 편집 가능 행렬을 만들지 않고 현재 위치부터 다음 편집 가능 셀까지만 검사한다.
+- 10,000행 이상 로컬 데이터에 정렬/필터가 적용되면 Web Worker query를 사용한다. Worker를 사용할 수 없거나 `getValue` 컬럼이 있으면 동기 query로 fallback한다.
+- F1Tree는 구조 index를 재사용하며 expand/collapse 시 visible row sequence만 다시 계산한다.
+
+### Server-side data source
+
+서버가 정렬/필터/페이지 결과를 소유해야 하는 운영 화면은 `rows` 대신 `dataSource`를 지정할 수 있다.
+
+```tsx
+<F1Grid
+  columns={columns}
+  rowKey="id"
+  dataSource={{
+    pageSize: 200,
+    load: ({ offset, limit, sorts, filters, signal }) =>
+      inventoryService.search({
+        offset,
+        limit,
+        sorts,
+        filters,
+        signal,
+      }),
+  }}
+  onDataSourceError={(error) => notify(error.message)}
+/>
+```
+
+- 새 정렬/필터 요청은 이전 요청의 `AbortSignal`을 취소한다.
+- 응답은 `{ rows, totalRowCount }` 구조를 사용한다.
+- 로드된 하단 overscan 영역에 도달하면 현재 로드 건수를 `offset`으로 다음 페이지를 자동 요청한다.
+- 다음 페이지를 추가하거나 서버 결과를 교체해도 local dirty row와 sparse patch는 유지한다.
+- 서버 모드에서는 로컬 Worker 정렬/필터를 중복 적용하지 않는다.
+- 기존 `rows` 기반 화면은 변경 없이 로컬 모드로 동작한다.
+
 ## Phase 8 - Advanced
 
 ```text
@@ -1824,7 +1928,6 @@ Excel Export 원본값 반복 출력
 ```text
 1,000 rows
 10,000 rows
-100,000 rows
 ```
 
 대용량 조회 테스트:
@@ -1836,7 +1939,7 @@ Excel Export 원본값 반복 출력
 필터 변경 시 서버 Query 재생성
 페이지 변경 시 선택/편집 상태 오염 없음
 Virtual Scroll DOM Node 수 제한
-100,000건 스크롤 중 입력 지연 확인
+10,000건 스크롤 중 입력 지연 확인
 totalCount 비활성 화면 조회 확인
 서버 집계 결과 표시 확인
 Excel Export 서버 분리 확인

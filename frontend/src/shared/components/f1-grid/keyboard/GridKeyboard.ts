@@ -25,3 +25,24 @@ export function getNextEditableCell(
     }
   }
 }
+
+export function findNextEditableCell(
+  current: GridCellPosition,
+  rowCount: number,
+  columnCount: number,
+  direction: 1 | -1,
+  isEditable: (rowIndex: number, columnIndex: number) => boolean,
+): GridCellPosition | undefined {
+  if (rowCount <= 0 || columnCount <= 0) return undefined;
+
+  let index = current.rowIndex * columnCount + current.columnIndex;
+  const cellCount = rowCount * columnCount;
+
+  while (true) {
+    index += direction;
+    if (index < 0 || index >= cellCount) return undefined;
+    const rowIndex = Math.floor(index / columnCount);
+    const columnIndex = index % columnCount;
+    if (isEditable(rowIndex, columnIndex)) return { rowIndex, columnIndex };
+  }
+}

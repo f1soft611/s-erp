@@ -25,6 +25,19 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByTestId('f1-grid-doc-playground')).toBeInTheDocument();
   });
 
+  it('documents a large dataset sample and exposes the 10k workload guidance', () => {
+    render(<F1GridDocsPage initialDocumentId="large-data" />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Large Dataset' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('1,000 rows')).toBeInTheDocument();
+    expect(screen.getByText('10,000 rows')).toBeInTheDocument();
+    expect(
+      screen.getByText(/대용량 셀 렌더링과 선택 상태 유지/),
+    ).toBeInTheDocument();
+  });
+
   it('keeps the label spacing consistent and the hero title styled as a headline', () => {
     render(<F1GridDocsPage />);
 

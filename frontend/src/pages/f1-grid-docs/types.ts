@@ -5,6 +5,7 @@ export type PlaygroundKind =
   | 'editing'
   | 'selection'
   | 'layout'
+  | 'large-data'
   | 'row-merge'
   | 'row-form-modal'
   | 'context-menu'

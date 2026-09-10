@@ -3,6 +3,7 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ForwardedRef,
@@ -24,7 +25,9 @@ import {
   createGridData,
   duplicateGridRows,
   getGridChanges,
+  getGridRowById,
   markRowsDeleted,
+  rebaseGridData,
   restoreGridRows,
   updateGridRow,
   type F1GridData,
@@ -40,8 +43,19 @@ import type {
   F1GridRowId,
   F1GridSort,
 } from '../types/grid.types';
-import { getNextEditableCell } from '../keyboard/GridKeyboard';
-import { getSelectedRowIds as resolveSelectedRowIds } from '../selection/GridSelection';
+import { findNextEditableCell } from '../keyboard/GridKeyboard';
+import {
+  createGridCellRange,
+  createGridRowSelection,
+  getGridCellRangeBounds,
+  isGridRowSelected,
+  materializeGridRowSelection,
+  selectAllGridRows,
+  setGridRowSelected,
+  type F1GridCellPosition,
+  type F1GridCellRange,
+  type F1GridRowSelection,
+} from '../selection/GridSelection';
 import { getGridMergeInfo } from '../merge/GridRowMerge';
 import {
   getAutoFitColumnWidth,
@@ -72,13 +86,24 @@ import {
   getGridColumnPinSide,
   getPinnedGridColumns,
 } from '../columns/GridColumnPin';
+import {
+  createGridRafScheduler,
+  getVirtualColumnIndexes,
+  getVirtualRowWindow,
+  type GridViewportMetrics,
+} from './GridVirtualization';
+import {
+  createGridQueryWorkerClient,
+  type GridQueryWorkerClient,
+} from '../query/GridQueryEngine';
+import {
+  createGridDataSourceController,
+  type GridDataSourceController,
+} from '../query/GridDataSource';
 
 const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
-
-type F1GridCell = {
-  rowId: F1GridRowId;
-  columnIndex: number;
-};
+const GRID_ROW_VIRTUALIZATION_THRESHOLD = 200;
+const GRID_COLUMN_VIRTUALIZATION_THRESHOLD = 12;
 
 type F1GridRowFormSession<T extends object> = {
   mode: 'create' | 'edit';
@@ -88,7 +113,9 @@ type F1GridRowFormSession<T extends object> = {
 
 function F1GridInner<T extends object>(
   {
-    rows,
+    rows: localRows = [],
+    dataSource,
+    onDataSourceError,
     columns,
     rowKey,
     rowFormPlugin,
@@ -104,6 +131,13 @@ function F1GridInner<T extends object>(
     resizableRows = true,
     resizableColumns = true,
     minColumnWidth = 50,
+    virtualizeRows,
+    virtualizeColumns,
+    rowOverscan = 8,
+    columnOverscan = 2,
+    fixedRowHeightThreshold = 10000,
+    queryWorkerThreshold = 10000,
+    disableQueryWorker = false,
     showCheckbox = true,
     createRow,
     createDuplicate,
@@ -129,21 +163,28 @@ function F1GridInner<T extends object>(
   }: F1GridProps<T>,
   ref: ForwardedRef<F1GridRef<T>>,
 ) {
+  const [serverRows, setServerRows] = useState<T[]>([]);
+  const [serverTotalRowCount, setServerTotalRowCount] = useState(0);
+  const [dataSourceLoading, setDataSourceLoading] = useState(false);
+  const dataSourceLoadingRef = useRef(false);
+  const dataSourceRequestRef = useRef(0);
+  const dataSourceControllerRef = useRef<GridDataSourceController<T>>(
+    createGridDataSourceController<T>(),
+  );
+  const rows = dataSource ? serverRows : localRows;
   const [data, setData] = useState<F1GridData<T>>(() =>
     createGridData(rows, rowKey),
   );
   const lastRowsPropRef = useRef(rows);
-  const [selectedIds, setSelectedIds] = useState<F1GridRowId[]>([]);
+  const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
+    createGridRowSelection,
+  );
   const [lastSelectedRowId, setLastSelectedRowId] = useState<F1GridRowId>();
-  const [focusedCell, setFocusedCell] = useState<F1GridCell>();
-  const [editingCell, setEditingCell] = useState<F1GridCell>();
-  const [cellSelection, setCellSelection] = useState<
-    { start: F1GridCell; end: F1GridCell } | undefined
-  >();
+  const [focusedCell, setFocusedCell] = useState<F1GridCellPosition>();
+  const [editingCell, setEditingCell] = useState<F1GridCellPosition>();
+  const [cellSelection, setCellSelection] = useState<F1GridCellRange>();
   const [isCellSelectionDragging, setIsCellSelectionDragging] = useState(false);
-  const [copiedCellRange, setCopiedCellRange] = useState<
-    { start: F1GridCell; end: F1GridCell } | undefined
-  >();
+  const [copiedCellRange, setCopiedCellRange] = useState<F1GridCellRange>();
   const [rangeOverlay, setRangeOverlay] = useState<{
     left: number;
     top: number;
@@ -152,10 +193,14 @@ function F1GridInner<T extends object>(
   } | null>(null);
   const cellSelectionRef = useRef(cellSelection);
   const copiedCellRangeRef = useRef(copiedCellRange);
-  const cellRangeDragRef = useRef<{
-    start: F1GridCell;
-    current: F1GridCell;
-  } | null>(null);
+  const cellRangeDragRef = useRef<F1GridCellRange | null>(null);
+  const dragSelectionStateRef = useRef<{
+    active: boolean;
+    previousCell: { rowId: F1GridRowId; columnIndex: number } | null;
+  }>({
+    active: false,
+    previousCell: null,
+  });
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [rowFormSession, setRowFormSession] = useState<
@@ -164,6 +209,13 @@ function F1GridInner<T extends object>(
   const [rowFormErrors, setRowFormErrors] = useState<Record<string, string>>(
     {},
   );
+  const queryWorkerRef = useRef<GridQueryWorkerClient<T> | null>(null);
+  const [workerQueryResult, setWorkerQueryResult] = useState<{
+    source: T[];
+    rows: T[];
+  }>();
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryWorkerFailed, setQueryWorkerFailed] = useState(false);
   const displayScale = useOptionalDisplayScale();
   const normalizedMinRowHeight = Math.max(1, minRowHeight * displayScale);
   const normalizedMaxRowHeight = Math.max(
@@ -181,6 +233,8 @@ function F1GridInner<T extends object>(
   >(undefined);
   const contextMenuReopenTimeoutRef = useRef<number | undefined>(undefined);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
     () => {
@@ -236,8 +290,12 @@ function F1GridInner<T extends object>(
   });
   const editingCellNodeRef = useRef<HTMLElement | null>(null);
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
-  const activeEditorPlugins = (editorPlugins ?? editors ?? []).filter(
-    (plugin) => plugin && (plugin.enabled ?? true),
+  const activeEditorPlugins = useMemo(
+    () =>
+      (editorPlugins ?? editors ?? []).filter(
+        (plugin) => plugin && (plugin.enabled ?? true),
+      ),
+    [editorPlugins, editors],
   );
   const rowFormActive = Boolean(
     rowFormPlugin && rowFormPlugin.enabled !== false,
@@ -248,7 +306,7 @@ function F1GridInner<T extends object>(
     columnIndex: number,
   ): F1GridEditContext<T> | undefined {
     const column = visibleColumns[columnIndex];
-    const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
+    const row = getGridRowById(data, rowId);
     if (!column || !row) return undefined;
 
     return {
@@ -262,12 +320,11 @@ function F1GridInner<T extends object>(
   }
 
   function canStartEditor(rowId: F1GridRowId, columnIndex: number) {
-    if (activeEditorPlugins.length === 0) return false;
     const context = resolveEditContext(rowId, columnIndex);
     if (!context) return false;
     if (!isCellEditable(context.column, context.row)) return false;
 
-    const pluginEnabled = activeEditorPlugins.some((plugin) => {
+    const pluginEnabled = activeEditorPlugins.every((plugin) => {
       if (plugin.canEdit && !plugin.canEdit(context)) return false;
       return true;
     });
@@ -279,7 +336,7 @@ function F1GridInner<T extends object>(
       if (result === false) return false;
     }
 
-    const pluginStartResult = activeEditorPlugins.some((plugin) => {
+    const pluginStartResult = activeEditorPlugins.every((plugin) => {
       if (!plugin.startEdit) return true;
       const result = plugin.startEdit(context);
       return result !== false;
@@ -325,24 +382,45 @@ function F1GridInner<T extends object>(
     );
   }
 
-  const orderedColumns = reorderGridColumns(columns, columnOrder);
-  const visibleColumns = getPinnedGridColumns(
-    getVisibleGridColumns(orderedColumns, hiddenColumnFields),
-    pinnedFields,
+  const orderedColumns = useMemo(
+    () => reorderGridColumns(columns, columnOrder),
+    [columnOrder, columns],
   );
-  const { leftOffsets, rightOffsets } = getGridColumnPinOffsets(
-    visibleColumns,
-    pinnedFields,
-    columnWidths,
-    showCheckbox ? 44 : 0,
-    rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0,
+  const visibleColumns = useMemo(
+    () =>
+      getPinnedGridColumns(
+        getVisibleGridColumns(orderedColumns, hiddenColumnFields),
+        pinnedFields,
+      ),
+    [hiddenColumnFields, orderedColumns, pinnedFields],
   );
-  const dataColumnTracks = getGridColumnTracks(
-    visibleColumns,
-    columnWidths,
-    pinnedFields,
-    gridContainerWidth,
-    showCheckbox ? 44 : 0,
+  const { leftOffsets, rightOffsets } = useMemo(
+    () =>
+      getGridColumnPinOffsets(
+        visibleColumns,
+        pinnedFields,
+        columnWidths,
+        showCheckbox ? 44 : 0,
+        rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0,
+      ),
+    [columnWidths, pinnedFields, rowFormActive, showCheckbox, visibleColumns],
+  );
+  const dataColumnTracks = useMemo(
+    () =>
+      getGridColumnTracks(
+        visibleColumns,
+        columnWidths,
+        pinnedFields,
+        gridContainerWidth,
+        showCheckbox ? 44 : 0,
+      ),
+    [
+      columnWidths,
+      gridContainerWidth,
+      pinnedFields,
+      showCheckbox,
+      visibleColumns,
+    ],
   );
   const columnTracks = rowFormActive
     ? `${dataColumnTracks}${dataColumnTracks ? ' ' : ''}${GRID_ROW_FORM_ACTION_COLUMN_WIDTH}px`
@@ -373,106 +451,504 @@ function F1GridInner<T extends object>(
     return () => observer.disconnect();
   }, []);
 
-  const activeRows = data.rows.filter(
-    (row) =>
-      data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
+  const activeRows = useMemo(
+    () =>
+      data.rows.filter(
+        (row) =>
+          data.stateById[getStateKey(getGridRowId(row, rowKey))] !== 'deleted',
+      ),
+    [data.rows, data.stateById, rowKey],
   );
-  const dirtyCellMap: Record<string, boolean> = {};
-  activeRows.forEach((row) => {
-    const stateKey = getStateKey(getGridRowId(row, rowKey));
-    const originalRow = data.originalRowsById[stateKey];
-    const rowDirtyFields = data.dirtyFieldsById[stateKey] ?? {};
-    visibleColumns.forEach((column) => {
-      const field = String(column.field);
-      const isDirty = !originalRow
-        ? true
-        : column.getValue
+  const projectedRows = useMemo(
+    () => rowProjection?.(activeRows).rows ?? activeRows,
+    [activeRows, rowProjection],
+  );
+  async function loadDataSourcePage(offset: number, append: boolean) {
+    if (!dataSource || dataSourceLoadingRef.current) return;
+
+    const requestId = ++dataSourceRequestRef.current;
+    dataSourceLoadingRef.current = true;
+    setDataSourceLoading(true);
+    try {
+      const result = await dataSourceControllerRef.current.load(dataSource, {
+        offset,
+        limit: Math.max(1, dataSource.pageSize ?? 200),
+        sorts: sortState,
+        filters: filterState,
+      });
+      if (!result || requestId !== dataSourceRequestRef.current) return;
+      setServerRows((current) =>
+        append ? [...current, ...result.rows] : result.rows,
+      );
+      setServerTotalRowCount(result.totalRowCount);
+    } catch (error: unknown) {
+      if (requestId === dataSourceRequestRef.current) {
+        onDataSourceError?.(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+    } finally {
+      if (requestId === dataSourceRequestRef.current) {
+        dataSourceLoadingRef.current = false;
+        setDataSourceLoading(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!dataSource) return;
+    dataSourceRequestRef.current += 1;
+    dataSourceLoadingRef.current = false;
+    setServerRows([]);
+    void loadDataSourcePage(0, false);
+  }, [dataSource, filterState, onDataSourceError, sortState]);
+
+  useEffect(() => () => dataSourceControllerRef.current.dispose(), []);
+  const queryWorkerEligible =
+    !dataSource &&
+    !disableQueryWorker &&
+    !queryWorkerFailed &&
+    projectedRows.length >= Math.max(1, queryWorkerThreshold) &&
+    (filterState.length > 0 || sortState.length > 0) &&
+    columns.every((column) => !column.getValue) &&
+    typeof Worker !== 'undefined';
+
+  useEffect(() => {
+    if (!queryWorkerEligible) {
+      setWorkerQueryResult(undefined);
+      setQueryLoading(false);
+      return;
+    }
+
+    if (!queryWorkerRef.current) {
+      try {
+        queryWorkerRef.current = createGridQueryWorkerClient<T>(
+          new Worker(new URL('../query/GridQueryWorker.ts', import.meta.url), {
+            type: 'module',
+          }),
+        );
+      } catch {
+        setQueryWorkerFailed(true);
+        setQueryLoading(false);
+        return;
+      }
+    }
+
+    let active = true;
+    setQueryLoading(true);
+    void queryWorkerRef.current
+      .query({
+        rows: projectedRows,
+        filters: filterState,
+        sorts: sortState,
+        columnTypes: Object.fromEntries(
+          columns.map((column) => [String(column.field), column.type]),
+        ),
+      })
+      .then((response) => {
+        if (active)
+          setWorkerQueryResult({ source: projectedRows, rows: response.rows });
+      })
+      .catch(() => {
+        if (active) {
+          setWorkerQueryResult(undefined);
+          setQueryWorkerFailed(true);
+          queryWorkerRef.current?.dispose();
+          queryWorkerRef.current = null;
+        }
+      })
+      .finally(() => {
+        if (active) setQueryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [columns, filterState, projectedRows, queryWorkerEligible, sortState]);
+
+  useEffect(
+    () => () => {
+      queryWorkerRef.current?.dispose();
+      queryWorkerRef.current = null;
+    },
+    [],
+  );
+  const filteredRows = useMemo(
+    () =>
+      dataSource
+        ? projectedRows
+        : queryWorkerEligible
+          ? workerQueryResult?.source === projectedRows
+            ? workerQueryResult.rows
+            : projectedRows
+          : disableFiltering
+            ? projectedRows
+            : applyGridFilters(projectedRows, filterState, columns),
+    [
+      columns,
+      disableFiltering,
+      filterState,
+      projectedRows,
+      queryWorkerEligible,
+      dataSource,
+      workerQueryResult,
+    ],
+  );
+  const visibleRows = useMemo(
+    () =>
+      dataSource || queryWorkerEligible || disableSorting
+        ? filteredRows
+        : sortGridRows(filteredRows, sortState),
+    [dataSource, disableSorting, filteredRows, queryWorkerEligible, sortState],
+  );
+  const rowIndexById = useMemo(
+    () =>
+      new Map(
+        visibleRows.map((row, index) => [
+          String(getGridRowId(row, rowKey)),
+          index,
+        ]),
+      ),
+    [rowKey, visibleRows],
+  );
+  const visibleRowIds = useMemo(
+    () => visibleRows.map((row) => getGridRowId(row, rowKey)),
+    [rowKey, visibleRows],
+  );
+  const selectedIds = useMemo(
+    () => materializeGridRowSelection(rowSelection, visibleRowIds),
+    [rowSelection, visibleRowIds],
+  );
+  const selectedCount = rowSelection.allSelected
+    ? Math.max(0, visibleRows.length - rowSelection.excludedIds.size)
+    : rowSelection.includedIds.size;
+  const selectedCellRangeBounds = useMemo(
+    () => getGridCellRangeBounds(cellSelection, rowIndexById),
+    [cellSelection, rowIndexById],
+  );
+  const [bodyScrollMetrics, setBodyScrollMetrics] =
+    useState<GridViewportMetrics>({
+      scrollTop: 0,
+      scrollLeft: 0,
+      viewportHeight: 0,
+      viewportWidth: 0,
+    });
+  const viewportSchedulerRef = useRef<
+    ReturnType<typeof createGridRafScheduler<GridViewportMetrics>> | undefined
+  >(undefined);
+  if (!viewportSchedulerRef.current) {
+    viewportSchedulerRef.current = createGridRafScheduler<GridViewportMetrics>(
+      (next) => {
+        setBodyScrollMetrics((current) =>
+          current.scrollTop === next.scrollTop &&
+          current.scrollLeft === next.scrollLeft &&
+          current.viewportHeight === next.viewportHeight &&
+          current.viewportWidth === next.viewportWidth
+            ? current
+            : next,
+        );
+      },
+    );
+  }
+
+  function scheduleViewportMeasure(bodyScroll: HTMLDivElement) {
+    viewportSchedulerRef.current?.schedule({
+      scrollTop: bodyScroll.scrollTop,
+      scrollLeft: bodyScroll.scrollLeft,
+      viewportHeight: bodyScroll.clientHeight,
+      viewportWidth: bodyScroll.clientWidth,
+    });
+  }
+
+  useEffect(() => {
+    const bodyScroll = bodyScrollRef.current;
+    if (!bodyScroll) return;
+
+    const measureViewport = () => scheduleViewportMeasure(bodyScroll);
+
+    measureViewport();
+    window.addEventListener('resize', measureViewport);
+
+    return () => {
+      viewportSchedulerRef.current?.cancel();
+      window.removeEventListener('resize', measureViewport);
+    };
+  }, []);
+
+  const rowVirtualState = useMemo(() => {
+    if (visibleRows.length === 0) {
+      return {
+        visibleRows: [] as T[],
+        startIndex: 0,
+        topPadding: 0,
+        bottomPadding: 0,
+      };
+    }
+
+    const virtualizationActive =
+      virtualizeRows ?? visibleRows.length >= GRID_ROW_VIRTUALIZATION_THRESHOLD;
+    if (!virtualizationActive) {
+      return {
+        visibleRows,
+        startIndex: 0,
+        topPadding: 0,
+        bottomPadding: 0,
+      };
+    }
+
+    const viewportHeight = bodyScrollMetrics.viewportHeight || 240;
+    const normalizedOverscan = Math.max(0, Math.floor(rowOverscan));
+    const normalizedFixedThreshold = Math.max(
+      1,
+      Math.floor(fixedRowHeightThreshold),
+    );
+    const fixedHeightMode =
+      visibleRows.length >= normalizedFixedThreshold ||
+      Object.keys(rowHeights).length === 0;
+
+    if (fixedHeightMode) {
+      const window = getVirtualRowWindow({
+        rowCount: visibleRows.length,
+        rowHeight: defaultRowHeight,
+        scrollTop: bodyScrollMetrics.scrollTop,
+        viewportHeight,
+        overscan: normalizedOverscan,
+      });
+      return {
+        visibleRows: visibleRows.slice(window.startIndex, window.endIndex),
+        startIndex: window.startIndex,
+        topPadding: window.topPadding,
+        bottomPadding: window.bottomPadding,
+      };
+    }
+
+    const overscanPx = defaultRowHeight * normalizedOverscan;
+    const cumulativeHeights = [0];
+    let totalHeight = 0;
+
+    visibleRows.forEach((row) => {
+      const rowHeight =
+        rowHeights[String(getGridRowId(row, rowKey))] ?? defaultRowHeight;
+      totalHeight += rowHeight;
+      cumulativeHeights.push(totalHeight);
+    });
+
+    let startIndex = 0;
+    while (
+      startIndex < visibleRows.length &&
+      cumulativeHeights[startIndex + 1] <= bodyScrollMetrics.scrollTop
+    ) {
+      startIndex += 1;
+    }
+
+    let endIndex = startIndex;
+    const scrollLimit =
+      bodyScrollMetrics.scrollTop + viewportHeight + overscanPx;
+    while (
+      endIndex < visibleRows.length &&
+      cumulativeHeights[endIndex + 1] < scrollLimit
+    ) {
+      endIndex += 1;
+    }
+
+    const slicedEnd = Math.min(visibleRows.length, endIndex + 1);
+
+    return {
+      visibleRows: visibleRows.slice(startIndex, slicedEnd),
+      startIndex,
+      topPadding: cumulativeHeights[startIndex],
+      bottomPadding: Math.max(
+        0,
+        totalHeight - (cumulativeHeights[slicedEnd] ?? totalHeight),
+      ),
+    };
+  }, [
+    bodyScrollMetrics.scrollTop,
+    bodyScrollMetrics.viewportHeight,
+    defaultRowHeight,
+    fixedRowHeightThreshold,
+    rowHeights,
+    rowKey,
+    rowOverscan,
+    virtualizeRows,
+    visibleRows,
+  ]);
+
+  const resolvedColumnWidths = useMemo(
+    () =>
+      dataColumnTracks
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((track) => Number.parseFloat(track) || 140)
+        .slice(showCheckbox ? 1 : 0),
+    [dataColumnTracks, showCheckbox],
+  );
+  const renderedColumnIndexes = useMemo(() => {
+    const viewportWidth =
+      bodyScrollMetrics.viewportWidth || gridContainerWidth || 800;
+    const totalWidth = resolvedColumnWidths.reduce(
+      (sum, width) => sum + width,
+      0,
+    );
+    const virtualizationActive =
+      virtualizeColumns ??
+      (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
+        totalWidth > viewportWidth);
+    if (!virtualizationActive) {
+      return new Set(visibleColumns.map((_, index) => index));
+    }
+
+    const pinnedIndexes = visibleColumns
+      .map((column, index) =>
+        getGridColumnPinSide(pinnedFields, column) ? index : -1,
+      )
+      .filter((index) => index >= 0);
+    const protectedIndexes = [
+      focusedCell?.columnIndex,
+      editingCell?.columnIndex,
+      cellSelection?.anchor.columnIndex,
+      cellSelection?.focus.columnIndex,
+      copiedCellRange?.anchor.columnIndex,
+      copiedCellRange?.focus.columnIndex,
+    ].filter((index): index is number => index !== undefined);
+
+    return new Set(
+      getVirtualColumnIndexes({
+        widths: resolvedColumnWidths,
+        scrollLeft: Math.max(
+          0,
+          bodyScrollMetrics.scrollLeft - (showCheckbox ? 44 : 0),
+        ),
+        viewportWidth: Math.max(
+          0,
+          viewportWidth -
+            (showCheckbox ? 44 : 0) -
+            (rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0),
+        ),
+        overscan: columnOverscan,
+        pinnedIndexes,
+        protectedIndexes,
+      }),
+    );
+  }, [
+    bodyScrollMetrics.scrollLeft,
+    bodyScrollMetrics.viewportWidth,
+    cellSelection,
+    columnOverscan,
+    copiedCellRange,
+    editingCell,
+    focusedCell,
+    gridContainerWidth,
+    pinnedFields,
+    resolvedColumnWidths,
+    rowFormActive,
+    showCheckbox,
+    virtualizeColumns,
+    visibleColumns,
+  ]);
+
+  const dirtyCellMap = useMemo(() => {
+    const nextDirtyCellMap: Record<string, boolean> = {};
+    rowVirtualState.visibleRows.forEach((row) => {
+      const stateKey = getStateKey(getGridRowId(row, rowKey));
+      const originalValues = data.originalValuesById[stateKey];
+      const rowDirtyFields = data.dirtyFieldsById[stateKey] ?? {};
+      visibleColumns.forEach((column) => {
+        const field = String(column.field);
+        const originalRow = originalValues
+          ? ({ ...row, ...originalValues } as T)
+          : row;
+        const isDirty = column.getValue
           ? !areGridValuesEqual(
               column.getValue(row),
               column.getValue(originalRow),
             )
           : Boolean(rowDirtyFields[field]);
-      dirtyCellMap[`${stateKey}:${field}`] = isDirty;
+        nextDirtyCellMap[`${stateKey}:${field}`] = isDirty;
+      });
     });
-  });
-  const projectedRows = rowProjection?.(activeRows).rows ?? activeRows;
-  const filteredRows = disableFiltering
-    ? projectedRows
-    : applyGridFilters(projectedRows, filterState, columns);
-  const visibleRows = disableSorting
-    ? filteredRows
-    : sortGridRows(filteredRows, sortState);
+    return nextDirtyCellMap;
+  }, [
+    data.dirtyFieldsById,
+    data.originalValuesById,
+    rowKey,
+    rowVirtualState.visibleRows,
+    visibleColumns,
+  ]);
 
-  const editableColumnFields = new Set<string>(
-    visibleColumns
-      .filter((column) =>
-        visibleRows.some((row) => {
-          if (!activeEditorPlugins.length || !isCellEditable(column, row)) {
-            return false;
-          }
+  const editableColumnFields = useMemo(
+    () =>
+      new Set<string>(
+        visibleColumns
+          .filter((column) =>
+            visibleRows.some((row) => {
+              if (!isCellEditable(column, row)) {
+                return false;
+              }
 
-          const context: F1GridEditContext<T> = {
-            row,
-            rowId: getGridRowId(row, rowKey),
-            column,
-            field: column.field,
-            value: row[column.field],
-            defaultValue: String(row[column.field] ?? ''),
-          };
+              const context: F1GridEditContext<T> = {
+                row,
+                rowId: getGridRowId(row, rowKey),
+                column,
+                field: column.field,
+                value: row[column.field],
+                defaultValue: String(row[column.field] ?? ''),
+              };
 
-          return activeEditorPlugins.every((plugin) => {
-            if (plugin.canEdit && !plugin.canEdit(context)) {
-              return false;
-            }
-            return true;
-          });
-        }),
-      )
-      .map((column) => String(column.field)),
+              return activeEditorPlugins.every((plugin) => {
+                if (plugin.canEdit && !plugin.canEdit(context)) {
+                  return false;
+                }
+                return true;
+              });
+            }),
+          )
+          .map((column) => String(column.field)),
+      ),
+    [activeEditorPlugins, rowKey, visibleColumns, visibleRows],
   );
 
-  const mergeInfoByColumn: Array<
-    Array<{ isStart: boolean; span: number } | undefined>
-  > = [];
-  visibleColumns.forEach((column, columnIndex) => {
-    if (!column.mergeRows) {
-      mergeInfoByColumn[columnIndex] = [];
-      return;
-    }
-
-    const previousMergeColumnIndex = (() => {
-      for (let index = columnIndex - 1; index >= 0; index -= 1) {
-        if (visibleColumns[index].mergeRows) {
-          return index;
-        }
+  const mergeInfoByColumn = useMemo(() => {
+    const nextMergeInfo: Array<
+      Array<{ isStart: boolean; span: number } | undefined>
+    > = [];
+    visibleColumns.forEach((column, columnIndex) => {
+      if (!column.mergeRows) {
+        nextMergeInfo[columnIndex] = [];
+        return;
       }
-      return undefined;
-    })();
 
-    const previousMergeInfo =
-      previousMergeColumnIndex === undefined
-        ? undefined
-        : mergeInfoByColumn[previousMergeColumnIndex];
+      const previousMergeColumnIndex = (() => {
+        for (let index = columnIndex - 1; index >= 0; index -= 1) {
+          if (visibleColumns[index].mergeRows) return index;
+        }
+        return undefined;
+      })();
+      const previousMergeInfo =
+        previousMergeColumnIndex === undefined
+          ? undefined
+          : nextMergeInfo[previousMergeColumnIndex];
+      let parentGroupByRow: number[] | undefined;
+      if (previousMergeInfo) {
+        parentGroupByRow = [];
+        previousMergeInfo.forEach((info, rowIndex) => {
+          parentGroupByRow![rowIndex] =
+            info?.isStart === true
+              ? rowIndex
+              : rowIndex > 0
+                ? parentGroupByRow![rowIndex - 1]
+                : rowIndex;
+        });
+      }
 
-    let parentGroupByRow: number[] | undefined;
-    if (previousMergeInfo) {
-      parentGroupByRow = [];
-      previousMergeInfo.forEach((info, rowIndex) => {
-        parentGroupByRow![rowIndex] =
-          info?.isStart === true
-            ? rowIndex
-            : rowIndex > 0
-              ? parentGroupByRow![rowIndex - 1]
-              : rowIndex;
-      });
-    }
-
-    mergeInfoByColumn[columnIndex] = getGridMergeInfo(
-      visibleRows,
-      column.field,
-      parentGroupByRow,
-    );
-  });
+      nextMergeInfo[columnIndex] = getGridMergeInfo(
+        visibleRows,
+        column.field,
+        parentGroupByRow,
+      );
+    });
+    return nextMergeInfo;
+  }, [visibleColumns, visibleRows]);
 
   function toggleSortColumn(
     column: F1GridColumn<T>,
@@ -533,17 +1009,19 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     if (lastRowsPropRef.current === rows) return;
     lastRowsPropRef.current = rows;
-    const changes = getGridChanges(data, rowKey);
+    const changes = getGridChanges(data);
     if (
       changes.insertedRows.length === 0 &&
       changes.updatedRows.length === 0 &&
       changes.deletedRows.length === 0
     ) {
       setData(createGridData(rows, rowKey));
-      setSelectedIds([]);
+      setRowSelection(createGridRowSelection());
       setFocusedCell(undefined);
+    } else if (dataSource) {
+      setData((current) => rebaseGridData(current, rows, rowKey));
     }
-  }, [data, rowKey, rows]);
+  }, [data, dataSource, rowKey, rows]);
 
   useEffect(() => {
     if (!focusedCell) return;
@@ -566,7 +1044,7 @@ function F1GridInner<T extends object>(
   }, [editingCell, focusedCell]);
 
   useEffect(() => {
-    onChangesChange?.(getGridChanges(data, rowKey));
+    onChangesChange?.(getGridChanges(data));
   }, [data, onChangesChange, rowKey]);
 
   useEffect(() => {
@@ -581,7 +1059,55 @@ function F1GridInner<T extends object>(
     copiedCellRangeRef.current = copiedCellRange;
   }, [copiedCellRange]);
 
-  function getCell(rowId: F1GridRowId, columnIndex: number): F1GridCell {
+  useEffect(() => {
+    if (!isCellSelectionDragging) return;
+
+    let frameId: number | undefined;
+
+    function handlePointerMove(event: PointerEvent) {
+      const nextCell = resolvePointerCell(event.clientX, event.clientY);
+      if (!nextCell) return;
+
+      const previousCell = dragSelectionStateRef.current.previousCell;
+      const isSameCell =
+        previousCell?.rowId === nextCell.rowId &&
+        previousCell?.columnIndex === nextCell.columnIndex;
+      if (isSameCell) return;
+
+      if (frameId !== undefined) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = undefined;
+        dragSelectionStateRef.current = {
+          ...dragSelectionStateRef.current,
+          previousCell: nextCell,
+        };
+        updateCellSelectionRange(nextCell);
+      });
+    }
+
+    function handlePointerUp() {
+      finishCellSelectionRange();
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      if (frameId !== undefined) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isCellSelectionDragging, visibleRows, rowKey]);
+
+  function getCell(
+    rowId: F1GridRowId,
+    columnIndex: number,
+  ): F1GridCellPosition {
     return { rowId, columnIndex };
   }
 
@@ -617,21 +1143,21 @@ function F1GridInner<T extends object>(
   function handleCopy(event: ClipboardEvent<HTMLElement>) {
     const range =
       cellSelectionRef.current ??
-      (focusedCell ? { start: focusedCell, end: focusedCell } : undefined);
+      (focusedCell ? createGridCellRange(focusedCell) : undefined);
     if (range) {
       const startRowIndex = visibleRows.findIndex(
-        (row) => getGridRowId(row, rowKey) === range.start.rowId,
+        (row) => getGridRowId(row, rowKey) === range.anchor.rowId,
       );
       const endRowIndex = visibleRows.findIndex(
-        (row) => getGridRowId(row, rowKey) === range.end.rowId,
+        (row) => getGridRowId(row, rowKey) === range.focus.rowId,
       );
       const startColIndex = Math.min(
-        range.start.columnIndex,
-        range.end.columnIndex,
+        range.anchor.columnIndex,
+        range.focus.columnIndex,
       );
       const endColIndex = Math.max(
-        range.start.columnIndex,
-        range.end.columnIndex,
+        range.anchor.columnIndex,
+        range.focus.columnIndex,
       );
       const selectedRows = visibleRows.slice(
         Math.min(startRowIndex, endRowIndex),
@@ -657,7 +1183,7 @@ function F1GridInner<T extends object>(
     }
 
     const selectedRows = visibleRows.filter((row) =>
-      selectedIds.includes(getGridRowId(row, rowKey)),
+      isGridRowSelected(rowSelection, getGridRowId(row, rowKey)),
     );
     const rowValue =
       selectedRows.length > 0
@@ -673,7 +1199,7 @@ function F1GridInner<T extends object>(
     event.preventDefault();
     event.clipboardData.setData('text/plain', rowValue);
     setCopiedCellRange(
-      focusedCell ? { start: focusedCell, end: focusedCell } : copiedCellRange,
+      focusedCell ? createGridCellRange(focusedCell) : copiedCellRange,
     );
   }
 
@@ -738,35 +1264,34 @@ function F1GridInner<T extends object>(
       const range = visibleRows
         .slice(Math.min(rowIndex, lastIndex), Math.max(rowIndex, lastIndex) + 1)
         .map((row) => getGridRowId(row, rowKey));
-      setSelectedIds(range);
+      setRowSelection({
+        allSelected: false,
+        includedIds: new Set(range),
+        excludedIds: new Set(),
+      });
     } else if (event?.ctrlKey || event?.metaKey) {
-      setSelectedIds((current) =>
-        resolveSelectedRowIds(current, rowId, {
-          ctrlKey: true,
-          shiftKey: false,
-        }),
+      setRowSelection((current) =>
+        setGridRowSelected(current, rowId, !isGridRowSelected(current, rowId)),
       );
     } else {
-      setSelectedIds([rowId]);
+      setRowSelection({
+        allSelected: false,
+        includedIds: new Set([rowId]),
+        excludedIds: new Set(),
+      });
     }
 
     setLastSelectedRowId(rowId);
   }
 
-  function setRowSelection(rowId: F1GridRowId, checked: boolean) {
-    setSelectedIds((current) =>
-      checked
-        ? current.includes(rowId)
-          ? current
-          : [...current, rowId]
-        : current.filter((id) => id !== rowId),
-    );
+  function setSingleRowSelection(rowId: F1GridRowId, checked: boolean) {
+    setRowSelection((current) => setGridRowSelected(current, rowId, checked));
     setLastSelectedRowId(rowId);
   }
 
   function startEdit(rowId: F1GridRowId, columnIndex: number) {
     const column = visibleColumns[columnIndex];
-    const row = data.rows.find((item) => getGridRowId(item, rowKey) === rowId);
+    const row = getGridRowById(data, rowId);
     const context =
       column && row ? resolveEditContext(rowId, columnIndex) : undefined;
 
@@ -809,7 +1334,7 @@ function F1GridInner<T extends object>(
     setDraftValue('');
   }
 
-  function commitEdit(nextCell?: F1GridCell) {
+  function commitEdit(nextCell?: F1GridCellPosition) {
     if (!editingCell) return;
 
     const column = visibleColumns[editingCell.columnIndex];
@@ -829,9 +1354,7 @@ function F1GridInner<T extends object>(
         : column.type === 'date'
           ? normalizeDateInput(draftValue) || draftValue
           : (matchedAutocompleteOption?.value ?? draftValue);
-    const row = data.rows.find(
-      (item) => getGridRowId(item, rowKey) === editingCell.rowId,
-    );
+    const row = getGridRowById(data, editingCell.rowId);
 
     if (
       column &&
@@ -924,15 +1447,8 @@ function F1GridInner<T extends object>(
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!focusedCell) return;
-
-    const editableByRow = visibleRows.map((row) =>
-      visibleColumns.map(
-        (column) => isCellEditable(column, row) && column.type !== 'checkbox',
-      ),
-    );
-    const currentFocusedRowIndex = visibleRows.findIndex(
-      (row) => getGridRowId(row, rowKey) === focusedCell.rowId,
-    );
+    const currentFocusedRowIndex =
+      rowIndexById.get(String(focusedCell.rowId)) ?? -1;
 
     if (currentFocusedRowIndex < 0) return;
 
@@ -950,7 +1466,7 @@ function F1GridInner<T extends object>(
 
     if (event.key === 'Delete') {
       event.preventDefault();
-      if (selectedIds.length > 0) {
+      if (selectedCount > 0) {
         handleDeleteSelectedRows();
       } else {
         const row = visibleRows[currentFocusedRowIndex];
@@ -1008,13 +1524,24 @@ function F1GridInner<T extends object>(
     if (event.key === 'Tab') {
       event.preventDefault();
       const direction = event.shiftKey ? -1 : 1;
-      const nextCellPos = getNextEditableCell(
+      const nextCellPos = findNextEditableCell(
         {
           rowIndex: currentFocusedRowIndex,
           columnIndex: focusedCell.columnIndex,
         },
-        editableByRow,
+        visibleRows.length,
+        visibleColumns.length,
         direction,
+        (rowIndex, columnIndex) => {
+          const row = visibleRows[rowIndex];
+          const column = visibleColumns[columnIndex];
+          return Boolean(
+            row &&
+            column &&
+            isCellEditable(column, row) &&
+            column.type !== 'checkbox',
+          );
+        },
       );
 
       if (!nextCellPos) return;
@@ -1078,7 +1605,11 @@ function F1GridInner<T extends object>(
     const newRowId = getGridRowId(newRow, rowKey);
 
     setData((current) => addGridRow(current, newRow, rowKey));
-    setSelectedIds([newRowId]);
+    setRowSelection({
+      allSelected: false,
+      includedIds: new Set([newRowId]),
+      excludedIds: new Set(),
+    });
 
     const firstEditableCol = visibleColumns.findIndex(
       (column) => isCellEditable(column, newRow) && column.type !== 'checkbox',
@@ -1118,7 +1649,11 @@ function F1GridInner<T extends object>(
       }
 
       setData((current) => addGridRow(current, draftRow, rowKey));
-      setSelectedIds([draftRowId]);
+      setRowSelection({
+        allSelected: false,
+        includedIds: new Set([draftRowId]),
+        excludedIds: new Set(),
+      });
       closeRowForm();
       return;
     }
@@ -1144,32 +1679,217 @@ function F1GridInner<T extends object>(
     closeRowForm();
   }
 
-  function setCellSelectionRange(start: F1GridCell, end: F1GridCell) {
-    const next = { start, end };
+  function resolvePointerCell(
+    clientX: number,
+    clientY: number,
+  ): F1GridCellPosition | undefined {
+    if (!gridContainerRef.current) return undefined;
+
+    const hitTargets =
+      typeof document !== 'undefined' &&
+      typeof document.elementsFromPoint === 'function'
+        ? document.elementsFromPoint(clientX, clientY)
+        : [];
+
+    const candidate =
+      hitTargets.length > 0
+        ? hitTargets.find((element): element is HTMLElement => {
+            if (!(element instanceof HTMLElement)) return false;
+            const gridCell = element.closest('[role="gridcell"]');
+            return !!gridCell && gridContainerRef.current!.contains(gridCell);
+          })
+        : typeof document !== 'undefined' &&
+            typeof document.elementFromPoint === 'function'
+          ? (document.elementFromPoint(clientX, clientY) as HTMLElement | null)
+          : null;
+
+    if (candidate) {
+      const gridCell = candidate.closest(
+        '[role="gridcell"]',
+      ) as HTMLElement | null;
+      if (gridCell && gridContainerRef.current.contains(gridCell)) {
+        const rowNode = gridCell.closest(
+          '[data-f1-grid-row-id]',
+        ) as HTMLElement | null;
+        const rowIdAttr = rowNode?.getAttribute('data-f1-grid-row-id');
+        if (rowIdAttr && rowNode) {
+          const targetRow = visibleRows.find(
+            (row) => String(getGridRowId(row, rowKey)) === rowIdAttr,
+          );
+          if (targetRow) {
+            const rowCellNodes = rowNode.querySelectorAll('[role="gridcell"]');
+            const columnIndex = Array.from(rowCellNodes).indexOf(gridCell);
+            if (columnIndex >= 0) {
+              return {
+                rowId: getGridRowId(targetRow, rowKey),
+                columnIndex,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    let nearestCell:
+      | {
+          rowId: F1GridRowId;
+          columnIndex: number;
+          distance: number;
+          inside: boolean;
+        }
+      | undefined;
+
+    for (const [key, node] of cellNodeRefs.current.entries()) {
+      if (
+        !gridContainerRef.current ||
+        !gridContainerRef.current.contains(node)
+      ) {
+        continue;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const insideCell =
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom;
+      const nearestX = Math.min(Math.max(clientX, rect.left), rect.right);
+      const nearestY = Math.min(Math.max(clientY, rect.top), rect.bottom);
+      const distance = (clientX - nearestX) ** 2 + (clientY - nearestY) ** 2;
+      const [rowIdText, columnIndexText] = key.split(':');
+      const columnIndex = Number.parseInt(columnIndexText, 10);
+      const targetRow = visibleRows.find(
+        (row) => String(getGridRowId(row, rowKey)) === rowIdText,
+      );
+      if (!targetRow || Number.isNaN(columnIndex)) continue;
+
+      const nextCell = {
+        rowId: getGridRowId(targetRow, rowKey),
+        columnIndex,
+        distance,
+        inside: insideCell,
+      };
+
+      if (
+        !nearestCell ||
+        (insideCell && !nearestCell.inside) ||
+        (insideCell === nearestCell.inside && distance < nearestCell.distance)
+      ) {
+        nearestCell = nextCell;
+      }
+    }
+
+    const previousDragCell = dragSelectionStateRef.current.previousCell;
+    if (
+      previousDragCell &&
+      nearestCell &&
+      nearestCell.rowId === previousDragCell.rowId &&
+      nearestCell.columnIndex === previousDragCell.columnIndex
+    ) {
+      const previousNode = cellNodeRefs.current.get(
+        `${String(previousDragCell.rowId)}:${previousDragCell.columnIndex}`,
+      );
+      if (previousNode) {
+        const previousRect = previousNode.getBoundingClientRect();
+        const boundaryPadding = 8;
+        const pointerWithinPreviousWidth =
+          clientX >= previousRect.left && clientX <= previousRect.right;
+        const pointerWithinPreviousHeight =
+          clientY >= previousRect.top && clientY <= previousRect.bottom;
+
+        const isNearBottomBoundary =
+          Math.abs(clientY - previousRect.bottom) <= boundaryPadding &&
+          pointerWithinPreviousWidth;
+        const isNearRightBoundary =
+          Math.abs(clientX - previousRect.right) <= boundaryPadding &&
+          pointerWithinPreviousHeight;
+
+        if (isNearBottomBoundary || isNearRightBoundary) {
+          const previousRowIndex = visibleRows.findIndex(
+            (row) => getGridRowId(row, rowKey) === previousDragCell.rowId,
+          );
+
+          if (previousRowIndex >= 0) {
+            const rowBelow = visibleRows[previousRowIndex + 1];
+            if (rowBelow && isNearBottomBoundary) {
+              return {
+                rowId: getGridRowId(rowBelow, rowKey),
+                columnIndex: previousDragCell.columnIndex,
+              };
+            }
+          }
+
+          if (previousDragCell.columnIndex + 1 < visibleColumns.length) {
+            if (isNearRightBoundary) {
+              return {
+                rowId: previousDragCell.rowId,
+                columnIndex: previousDragCell.columnIndex + 1,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return nearestCell
+      ? {
+          rowId: nearestCell.rowId,
+          columnIndex: nearestCell.columnIndex,
+        }
+      : undefined;
+  }
+
+  function setCellSelectionRange(
+    anchor: F1GridCellPosition,
+    focus: F1GridCellPosition,
+  ) {
+    const next = createGridCellRange(anchor, focus);
+    const current = cellSelectionRef.current;
+    const isSameSelection =
+      current &&
+      current.anchor.rowId === next.anchor.rowId &&
+      current.anchor.columnIndex === next.anchor.columnIndex &&
+      current.focus.rowId === next.focus.rowId &&
+      current.focus.columnIndex === next.focus.columnIndex;
+
+    if (isSameSelection) return;
+
     setCellSelection(next);
     cellSelectionRef.current = next;
     setCopiedCellRange(undefined);
     copiedCellRangeRef.current = undefined;
   }
 
-  function updateCellSelectionRange(cell: F1GridCell) {
+  function updateCellSelectionRange(cell: F1GridCellPosition) {
     if (!cellRangeDragRef.current) return;
-    cellRangeDragRef.current.current = cell;
-    setCellSelection({
-      start: cellRangeDragRef.current.start,
-      end: cell,
-    });
+    const next = createGridCellRange(cellRangeDragRef.current.anchor, cell);
+    const current = cellSelectionRef.current;
+    const isSameSelection =
+      current &&
+      current.anchor.rowId === next.anchor.rowId &&
+      current.anchor.columnIndex === next.anchor.columnIndex &&
+      current.focus.rowId === next.focus.rowId &&
+      current.focus.columnIndex === next.focus.columnIndex;
+
+    if (isSameSelection) return;
+
+    cellRangeDragRef.current.focus = cell;
+    setCellSelection(next);
   }
 
   function finishCellSelectionRange() {
     cellRangeDragRef.current = null;
+    dragSelectionStateRef.current = {
+      active: false,
+      previousCell: null,
+    };
     setIsCellSelectionDragging(false);
   }
 
   function handleDeleteSelectedRows() {
-    if (selectedIds.length === 0) return;
+    if (selectedCount === 0) return;
     setData((current) => markRowsDeleted(current, rowKey, selectedIds));
-    setSelectedIds([]);
+    setRowSelection(createGridRowSelection());
     setFocusedCell(undefined);
     setEditingCell(undefined);
   }
@@ -1179,7 +1899,7 @@ function F1GridInner<T extends object>(
   }
 
   function handleDuplicateSelectedRows() {
-    if (selectedIds.length === 0 || !createDuplicate) return;
+    if (selectedCount === 0 || !createDuplicate) return;
     setData((current) =>
       duplicateGridRows(current, rowKey, selectedIds, createDuplicate),
     );
@@ -1283,12 +2003,24 @@ function F1GridInner<T extends object>(
 
     const applySelection = () => {
       if (targetRowId !== undefined) {
-        setSelectedIds([targetRowId]);
+        setRowSelection({
+          allSelected: false,
+          includedIds: new Set([targetRowId]),
+          excludedIds: new Set(),
+        });
       }
       if (clickedCell) {
         setFocusedCell(clickedCell);
         setCellSelectionRange(clickedCell, clickedCell);
-        setSelectedIds(targetRowId !== undefined ? [targetRowId] : []);
+        setRowSelection(
+          targetRowId !== undefined
+            ? {
+                allSelected: false,
+                includedIds: new Set([targetRowId]),
+                excludedIds: new Set(),
+              }
+            : createGridRowSelection(),
+        );
       }
     };
 
@@ -1434,7 +2166,7 @@ function F1GridInner<T extends object>(
       return selectedIds;
     },
     clearSelection() {
-      setSelectedIds([]);
+      setRowSelection(createGridRowSelection());
     },
     addRow(row?: Partial<T>) {
       handleAddRow(row);
@@ -1455,7 +2187,7 @@ function F1GridInner<T extends object>(
       return activeRows;
     },
     getChanges() {
-      return getGridChanges(data, rowKey);
+      return getGridChanges(data);
     },
     validate,
     startEdit(rowId: F1GridRowId, field: keyof T) {
@@ -1471,9 +2203,7 @@ function F1GridInner<T extends object>(
       const column = visibleColumns.find((item) => item.field === field);
 
       setData((current) => {
-        const row = current.rows.find(
-          (item) => getGridRowId(item, rowKey) === rowId,
-        );
+        const row = getGridRowById(current, rowId);
         if (!row || !column || !isCellEditable(column, row)) return current;
 
         const patch = column.onValueChange?.(row, value) ?? {
@@ -1486,7 +2216,7 @@ function F1GridInner<T extends object>(
   }));
 
   const selectedAll =
-    visibleRows.length > 0 && selectedIds.length === visibleRows.length;
+    visibleRows.length > 0 && selectedCount === visibleRows.length;
   const showAddRowInContextMenu = allowAddRowInContextMenu ?? true;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
@@ -1497,9 +2227,6 @@ function F1GridInner<T extends object>(
     typeof minHeight === 'number' ? `${minHeight}px` : (minHeight ?? '0');
   const resolvedMaxHeight =
     typeof maxHeight === 'number' ? `${maxHeight}px` : (maxHeight ?? 'none');
-  const headerScrollRef = useRef<HTMLDivElement | null>(null);
-  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
-
   function updateRangeOverlay() {
     const range = copiedCellRange ?? cellSelection;
     if (!range || !bodyScrollRef.current) {
@@ -1508,18 +2235,18 @@ function F1GridInner<T extends object>(
     }
 
     const isSingleCellRange =
-      range.start.rowId === range.end.rowId &&
-      range.start.columnIndex === range.end.columnIndex;
+      range.anchor.rowId === range.focus.rowId &&
+      range.anchor.columnIndex === range.focus.columnIndex;
     if (isSingleCellRange) {
       setRangeOverlay(null);
       return;
     }
 
     const startRowIndex = visibleRows.findIndex(
-      (row) => getGridRowId(row, rowKey) === range.start.rowId,
+      (row) => getGridRowId(row, rowKey) === range.anchor.rowId,
     );
     const endRowIndex = visibleRows.findIndex(
-      (row) => getGridRowId(row, rowKey) === range.end.rowId,
+      (row) => getGridRowId(row, rowKey) === range.focus.rowId,
     );
     if (startRowIndex < 0 || endRowIndex < 0) {
       setRangeOverlay((current) => (current ? null : current));
@@ -1529,12 +2256,12 @@ function F1GridInner<T extends object>(
     const minRowIndex = Math.min(startRowIndex, endRowIndex);
     const maxRowIndex = Math.max(startRowIndex, endRowIndex);
     const minColumnIndex = Math.min(
-      range.start.columnIndex,
-      range.end.columnIndex,
+      range.anchor.columnIndex,
+      range.focus.columnIndex,
     );
     const maxColumnIndex = Math.max(
-      range.start.columnIndex,
-      range.end.columnIndex,
+      range.anchor.columnIndex,
+      range.focus.columnIndex,
     );
 
     const topLeftRow = visibleRows[minRowIndex];
@@ -1554,7 +2281,6 @@ function F1GridInner<T extends object>(
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
     const scrollLeft = bodyScrollRef.current.scrollLeft;
-    const scrollTop = bodyScrollRef.current.scrollTop;
     const topLeftField = visibleColumns[minColumnIndex];
     const topLeftPinnedSide =
       topLeftField !== undefined
@@ -1567,7 +2293,7 @@ function F1GridInner<T extends object>(
         0,
         topLeftRect.left - containerRect.left + leftScrollCompensation + 1,
       ),
-      top: Math.max(0, topLeftRect.top - containerRect.top - scrollTop + 1),
+      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
       width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
       height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
@@ -1641,7 +2367,8 @@ function F1GridInner<T extends object>(
       ref={gridContainerRef}
       role="grid"
       aria-label={ariaLabel}
-      aria-busy={loading || undefined}
+      aria-busy={loading || queryLoading || dataSourceLoading || undefined}
+      aria-rowcount={dataSource ? serverTotalRowCount : visibleRows.length}
       onCopy={handleCopy}
       onPaste={handlePaste}
       onContextMenu={openContextMenu}
@@ -1678,10 +2405,11 @@ function F1GridInner<T extends object>(
         <GridHeader
           columns={visibleColumns}
           allColumns={columns}
+          renderedColumnIndexes={renderedColumnIndexes}
           rows={visibleRows}
           columnLine={columnLine}
           selectedAll={selectedAll}
-          selectedIds={selectedIds}
+          selectedCount={selectedCount}
           columnWidths={columnWidths}
           columnTracks={columnTracks}
           resizableColumns={resizableColumns}
@@ -1690,11 +2418,7 @@ function F1GridInner<T extends object>(
           onResizeColumn={handleResizeColumn}
           getColumnCheckboxState={getColumnCheckboxState}
           onToggleAllRows={() => {
-            setSelectedIds(
-              selectedAll
-                ? []
-                : visibleRows.map((row) => getGridRowId(row, rowKey)),
-            );
+            setRowSelection(selectAllGridRows(!selectedAll));
           }}
           onToggleColumnCheckbox={toggleColumnCheckbox}
           onToggleColumnVisibility={toggleColumnVisibility}
@@ -1716,6 +2440,19 @@ function F1GridInner<T extends object>(
       </Box>
       <Box
         ref={bodyScrollRef}
+        data-testid="f1-grid-body-scroll"
+        onScroll={(event) => {
+          const bodyScroll = event.currentTarget;
+          scheduleViewportMeasure(bodyScroll);
+          if (
+            dataSource &&
+            serverRows.length < serverTotalRowCount &&
+            bodyScroll.scrollTop + bodyScroll.clientHeight >=
+              bodyScroll.scrollHeight - defaultRowHeight * 8
+          ) {
+            void loadDataSourcePage(serverRows.length, true);
+          }
+        }}
         onContextMenu={openContextMenu}
         sx={{
           position: 'relative',
@@ -1723,12 +2460,16 @@ function F1GridInner<T extends object>(
           minHeight: 0,
           overflowY: 'auto',
           overflowX: 'auto',
+          overflowAnchor: 'none',
         }}
       >
         {!loading ? (
           <GridBody
-            visibleRows={visibleRows}
+            visibleRows={rowVirtualState.visibleRows}
+            allRows={visibleRows}
+            rowStartIndex={rowVirtualState.startIndex}
             columns={visibleColumns}
+            renderedColumnIndexes={renderedColumnIndexes}
             rowKey={rowKey}
             columnLine={columnLine}
             columnTracks={columnTracks}
@@ -1736,19 +2477,27 @@ function F1GridInner<T extends object>(
             minRowHeight={normalizedMinRowHeight}
             maxRowHeight={normalizedMaxRowHeight}
             rowHeights={rowHeights}
-            resizableRows={resizableRows}
+            resizableRows={
+              resizableRows &&
+              visibleRows.length < Math.max(1, fixedRowHeightThreshold)
+            }
             selectedIds={selectedIds}
+            rowSelection={rowSelection}
             focusedCell={focusedCell}
             editingCell={editingCell}
             selectedCellRange={cellSelection}
+            selectedCellRangeBounds={selectedCellRangeBounds}
             copiedCellRange={copiedCellRange}
             isCellSelectionDragging={isCellSelectionDragging}
+            dragSelectionStateRef={dragSelectionStateRef}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
             getRowId={(row) => getGridRowId(row, rowKey)}
+            virtualTopPadding={rowVirtualState.topPadding}
+            virtualBottomPadding={rowVirtualState.bottomPadding}
             onSelectRow={selectRow}
-            onSetRowSelection={setRowSelection}
+            onSetRowSelection={setSingleRowSelection}
             onSetFocusedCell={(cell) => {
               setFocusedCell(cell);
               setCopiedCellRange(undefined);
@@ -1756,12 +2505,20 @@ function F1GridInner<T extends object>(
             }}
             onStartEdit={startEdit}
             onCellSelectionStart={(cell) => {
+              dragSelectionStateRef.current = {
+                active: true,
+                previousCell: cell,
+              };
               setFocusedCell(cell);
-              cellRangeDragRef.current = { start: cell, current: cell };
+              cellRangeDragRef.current = createGridCellRange(cell);
               setIsCellSelectionDragging(true);
               setCellSelectionRange(cell, cell);
             }}
             onCellSelectionDrag={(cell) => {
+              dragSelectionStateRef.current = {
+                ...dragSelectionStateRef.current,
+                previousCell: cell,
+              };
               updateCellSelectionRange(cell);
             }}
             onCellSelectionEnd={finishCellSelectionRange}
@@ -1829,7 +2586,7 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
-      {loading ? (
+      {loading || queryLoading || dataSourceLoading ? (
         <Box
           data-testid="f1-grid-loading-overlay"
           sx={{
@@ -1879,7 +2636,7 @@ function F1GridInner<T extends object>(
         ) : null}
         {showDuplicateRowInContextMenu ? (
           <MenuItem
-            disabled={!createDuplicate || selectedIds.length === 0}
+            disabled={!createDuplicate || selectedCount === 0}
             onClick={handleDuplicateContextClick}
           >
             행 복사
@@ -1887,7 +2644,7 @@ function F1GridInner<T extends object>(
         ) : null}
         {showDeleteRowInContextMenu ? (
           <MenuItem
-            disabled={selectedIds.length === 0}
+            disabled={selectedCount === 0}
             onClick={handleDeleteContextClick}
           >
             행 삭제

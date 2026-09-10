@@ -178,6 +178,24 @@ export type F1GridRowProjection<T extends object> = {
   rows: T[];
 };
 
+export type F1GridDataSourceQuery<T extends object> = {
+  offset: number;
+  limit: number;
+  sorts: F1GridSort<T>[];
+  filters: F1GridFilter<T>[];
+  signal: AbortSignal;
+};
+
+export type F1GridDataSourceResult<T extends object> = {
+  rows: T[];
+  totalRowCount: number;
+};
+
+export type F1GridDataSource<T extends object> = {
+  pageSize?: number;
+  load(query: F1GridDataSourceQuery<T>): Promise<F1GridDataSourceResult<T>>;
+};
+
 /** F1Tree가 내부적으로 주입하는 트리 전용 컨텍스트 메뉴 확장 포인트. 일반 F1Grid 사용 화면에서는 지정하지 않는다. */
 export type F1GridContextMenuTreeConfig = {
   onAddRoot: () => void;
@@ -185,7 +203,9 @@ export type F1GridContextMenuTreeConfig = {
 };
 
 export type F1GridProps<T extends object> = {
-  rows: T[];
+  rows?: T[];
+  dataSource?: F1GridDataSource<T>;
+  onDataSourceError?: (error: Error) => void;
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
   rowFormPlugin?: F1GridRowFormPlugin<T>;
@@ -201,6 +221,13 @@ export type F1GridProps<T extends object> = {
   resizableRows?: boolean;
   resizableColumns?: boolean;
   minColumnWidth?: number;
+  virtualizeRows?: boolean;
+  virtualizeColumns?: boolean;
+  rowOverscan?: number;
+  columnOverscan?: number;
+  fixedRowHeightThreshold?: number;
+  queryWorkerThreshold?: number;
+  disableQueryWorker?: boolean;
   showCheckbox?: boolean;
   createRow?: () => T;
   createDuplicate?: (row: T) => T;
@@ -246,6 +273,7 @@ export type F1TreeProps<T extends object> = Omit<
   F1GridProps<T>,
   'rowProjection' | 'cellAdornment'
 > & {
+  rows: T[];
   parentKey: keyof T;
   treeColumn: keyof T;
   treeCheckbox?: boolean;
