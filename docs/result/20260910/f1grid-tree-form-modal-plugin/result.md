@@ -15,6 +15,8 @@ F1-Grid/F1-Tree에 선택적으로 활성화하는 행 폼 모달 플러그인�
 ## 구현 결과
 
 - `rowFormPlugin`이 활성화된 Grid/Tree에만 48px 우측 고정 `상세` 액션 열을 추가했다.
+- `상세` 액션 열은 사용자가 해제할 수 없는 우측 pin 1번 시스템 영역으로 고정하고, 사용자가 오른쪽 고정한 데이터 컬럼은 `상세` 열 왼쪽의 2번 이후 영역부터 배치되도록 했다.
+- 우측 고정 그룹 내부 경계는 divider만 남기고, shadow는 고정 그룹의 바깥쪽 경계에만 표시해 액션 열과 데이터 pin 컬럼 사이의 겹침감을 제거했다.
 - 수정 모달은 행 복사본을 draft로 사용하며 `적용` 전에는 Grid 변경 상태를 수정하지 않는다.
 - 신규 모달은 `createRow()`와 전달 patch로 draft를 만들고 `적용` 시에만 inserted 행을 생성한다.
 - 컬럼 `type`, `headerName`, `headerGroup`, `required`, `min`, `max`, `validate`, `options`, `onValueChange`, `onOpenCodePicker`를 폼에 재사용한다.
@@ -44,6 +46,16 @@ npx vitest run tests/f1-grid-form-modal.test.tsx tests/f1-tree.test.tsx tests/f1
 
 Test Files  3 passed
 Tests       29 passed | 43 skipped
+Exit code   0
+```
+
+### 우측 고정 액션 열 회귀 테스트
+
+```text
+npx vitest run tests/f1-grid-form-modal.test.tsx tests/f1-grid-pinned-column-range.test.tsx
+
+Test Files  2 passed
+Tests       39 passed
 Exit code   0
 ```
 

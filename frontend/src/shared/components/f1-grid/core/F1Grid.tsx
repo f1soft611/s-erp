@@ -73,6 +73,8 @@ import {
   getPinnedGridColumns,
 } from '../columns/GridColumnPin';
 
+const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
+
 type F1GridCell = {
   rowId: F1GridRowId;
   columnIndex: number;
@@ -138,6 +140,7 @@ function F1GridInner<T extends object>(
   const [cellSelection, setCellSelection] = useState<
     { start: F1GridCell; end: F1GridCell } | undefined
   >();
+  const [isCellSelectionDragging, setIsCellSelectionDragging] = useState(false);
   const [copiedCellRange, setCopiedCellRange] = useState<
     { start: F1GridCell; end: F1GridCell } | undefined
   >();
@@ -332,7 +335,7 @@ function F1GridInner<T extends object>(
     pinnedFields,
     columnWidths,
     showCheckbox ? 44 : 0,
-    rowFormActive ? 48 : 0,
+    rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0,
   );
   const dataColumnTracks = getGridColumnTracks(
     visibleColumns,
@@ -342,8 +345,12 @@ function F1GridInner<T extends object>(
     showCheckbox ? 44 : 0,
   );
   const columnTracks = rowFormActive
-    ? `${dataColumnTracks}${dataColumnTracks ? ' ' : ''}48px`
+    ? `${dataColumnTracks}${dataColumnTracks ? ' ' : ''}${GRID_ROW_FORM_ACTION_COLUMN_WIDTH}px`
     : dataColumnTracks;
+  const hasRightPinnedColumns = visibleColumns.some(
+    (column) => getGridColumnPinSide(pinnedFields, column) === 'right',
+  );
+  const formActionPinnedShadow = !hasRightPinnedColumns;
 
   useLayoutEffect(() => {
     const container = gridContainerRef.current;
@@ -507,14 +514,20 @@ function F1GridInner<T extends object>(
 
   function getPinOffset(
     column: F1GridColumn<T>,
-  ): { side: 'left' | 'right'; offset: number } | undefined {
+  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined {
     const side = getGridColumnPinSide(pinnedFields, column);
     if (!side) return undefined;
     const offset =
       side === 'left'
         ? leftOffsets[String(column.field)]
         : rightOffsets[String(column.field)];
-    return offset === undefined ? undefined : { side, offset };
+    if (offset === undefined) return undefined;
+    const rightPinnedBoundaryOffset = Math.max(...Object.values(rightOffsets));
+    return {
+      side,
+      offset,
+      shadow: side === 'right' ? offset === rightPinnedBoundaryOffset : true,
+    };
   }
 
   useEffect(() => {
@@ -1141,6 +1154,7 @@ function F1GridInner<T extends object>(
 
   function updateCellSelectionRange(cell: F1GridCell) {
     if (!cellRangeDragRef.current) return;
+    cellRangeDragRef.current.current = cell;
     setCellSelection({
       start: cellRangeDragRef.current.start,
       end: cell,
@@ -1149,6 +1163,7 @@ function F1GridInner<T extends object>(
 
   function finishCellSelectionRange() {
     cellRangeDragRef.current = null;
+    setIsCellSelectionDragging(false);
   }
 
   function handleDeleteSelectedRows() {
@@ -1538,9 +1553,21 @@ function F1GridInner<T extends object>(
     const containerRect = bodyScrollRef.current.getBoundingClientRect();
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
+    const scrollLeft = bodyScrollRef.current.scrollLeft;
+    const scrollTop = bodyScrollRef.current.scrollTop;
+    const topLeftField = visibleColumns[minColumnIndex];
+    const topLeftPinnedSide =
+      topLeftField !== undefined
+        ? pinnedFields.get(String(topLeftField.field))
+        : undefined;
+    const leftScrollCompensation =
+      topLeftPinnedSide === 'left' ? scrollLeft : -scrollLeft;
     const next = {
-      left: Math.max(0, topLeftRect.left - containerRect.left + 1),
-      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
+      left: Math.max(
+        0,
+        topLeftRect.left - containerRect.left + leftScrollCompensation + 1,
+      ),
+      top: Math.max(0, topLeftRect.top - containerRect.top - scrollTop + 1),
       width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
       height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
@@ -1683,6 +1710,7 @@ function F1GridInner<T extends object>(
           rightOffsets={rightOffsets}
           editableColumnFields={editableColumnFields}
           showFormAction={rowFormActive}
+          formActionPinnedShadow={formActionPinnedShadow}
           onReorderColumn={reorderColumn}
         />
       </Box>
@@ -1714,6 +1742,7 @@ function F1GridInner<T extends object>(
             editingCell={editingCell}
             selectedCellRange={cellSelection}
             copiedCellRange={copiedCellRange}
+            isCellSelectionDragging={isCellSelectionDragging}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
@@ -1729,6 +1758,7 @@ function F1GridInner<T extends object>(
             onCellSelectionStart={(cell) => {
               setFocusedCell(cell);
               cellRangeDragRef.current = { start: cell, current: cell };
+              setIsCellSelectionDragging(true);
               setCellSelectionRange(cell, cell);
             }}
             onCellSelectionDrag={(cell) => {
@@ -1770,6 +1800,7 @@ function F1GridInner<T extends object>(
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
             showFormAction={rowFormActive}
+            formActionPinnedShadow={formActionPinnedShadow}
             onOpenRowForm={openEditRowForm}
           />
         ) : null}

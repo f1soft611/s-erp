@@ -28,6 +28,7 @@ type GridRowProps<T extends object> = {
     start: { rowId: F1GridRowId; columnIndex: number };
     end: { rowId: F1GridRowId; columnIndex: number };
   };
+  isCellSelectionDragging?: boolean;
   copiedCellRange?: {
     start: { rowId: F1GridRowId; columnIndex: number };
     end: { rowId: F1GridRowId; columnIndex: number };
@@ -71,10 +72,11 @@ type GridRowProps<T extends object> = {
   getMerged: (rowIndex: number, columnIndex: number, value: unknown) => boolean;
   getPinOffset: (
     column: F1GridColumn<T>,
-  ) => { side: 'left' | 'right'; offset: number } | undefined;
+  ) => { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   showCheckbox?: boolean;
   showFormAction?: boolean;
+  formActionPinnedShadow?: boolean;
   onOpenRowForm?: (row: T) => void;
 };
 
@@ -165,6 +167,7 @@ export function GridRow<T extends object>({
   focusedCell,
   editingCell,
   selectedCellRange,
+  isCellSelectionDragging = false,
   copiedCellRange,
   draftValue,
   dirtyCellMap = {},
@@ -194,6 +197,7 @@ export function GridRow<T extends object>({
   cellAdornment,
   showCheckbox = true,
   showFormAction = false,
+  formActionPinnedShadow = true,
   onOpenRowForm,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
@@ -286,7 +290,7 @@ export function GridRow<T extends object>({
             borderColor: 'divider',
             position: 'sticky',
             left: 0,
-            zIndex: 3,
+            zIndex: 6,
             backgroundColor: (theme) =>
               isSelected
                 ? theme.palette.mode === 'dark'
@@ -454,6 +458,7 @@ export function GridRow<T extends object>({
           rowIndex={rowIndex}
           columnIndex={(showCheckbox ? 2 : 1) + columns.length}
           isLastRow={rowIndex === visibleRows.length - 1}
+          pinnedShadow={formActionPinnedShadow}
           onEdit={() => onOpenRowForm(row)}
         />
       ) : null}
@@ -468,6 +473,12 @@ export function GridRow<T extends object>({
           aria-valuenow={rowHeight}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => {
+            if (isCellSelectionDragging) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+
             event.preventDefault();
             event.stopPropagation();
             resizeStateRef.current = {
@@ -492,7 +503,8 @@ export function GridRow<T extends object>({
             p: 0,
             border: 0,
             bgcolor: 'transparent',
-            cursor: 'row-resize',
+            cursor: isCellSelectionDragging ? 'default' : 'row-resize',
+            pointerEvents: isCellSelectionDragging ? 'none' : 'auto',
             zIndex: 2,
             '&:focus-visible': {
               outline: '2px solid',

@@ -84,6 +84,7 @@ type GridHeaderProps<T extends object> = {
   rightOffsets: Record<string, number>;
   editableColumnFields?: Set<string>;
   showFormAction?: boolean;
+  formActionPinnedShadow?: boolean;
   onReorderColumn?: (
     sourceField: string,
     targetField: string,
@@ -120,6 +121,7 @@ export function GridHeader<T extends object>({
   rightOffsets,
   editableColumnFields,
   showFormAction = false,
+  formActionPinnedShadow = true,
   onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
@@ -489,7 +491,10 @@ export function GridHeader<T extends object>({
                   : pinSide === 'left'
                     ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                     : pinSide === 'right'
-                      ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                      ? rightOffsets[String(column.field)] ===
+                        Math.max(...Object.values(rightOffsets))
+                        ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                        : undefined
                       : undefined,
                 opacity: isDraggingColumn ? 0.78 : 1,
                 '&::before': isBeforeDrop
@@ -639,6 +644,9 @@ export function GridHeader<T extends object>({
               borderLeft: 1,
               borderColor: 'divider',
               boxSizing: 'border-box',
+              boxShadow: formActionPinnedShadow
+                ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                : undefined,
               display: 'flex',
               gridColumn: (showCheckbox ? 2 : 1) + columns.length,
               gridRow: hasGroups ? '1 / span 2' : undefined,
@@ -646,7 +654,9 @@ export function GridHeader<T extends object>({
               minHeight: 28,
               position: 'sticky',
               right: 0,
-              width: '100%',
+              width: 48,
+              minWidth: 48,
+              maxWidth: 48,
               zIndex: 4,
             }}
           >

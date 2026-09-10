@@ -1,6 +1,4 @@
-import { Box, Card, CardContent, IconButton, Typography } from '@mui/material';
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
+import { Box, Card, CardContent, Typography } from '@mui/material';
 import {
   forwardRef,
   useEffect,
@@ -183,7 +181,7 @@ export const MenuManagementPanel = forwardRef<
       if (field === 'code') {
         return isNewMenuRow(row.id);
       }
-      return ['name', 'path', 'description'].includes(String(field));
+      return ['name', 'path', 'description', 'order'].includes(String(field));
     },
   };
 
@@ -229,6 +227,7 @@ export const MenuManagementPanel = forwardRef<
       headerName: '정렬',
       width: 80,
       editable: true,
+      decimalPlaces: 0,
       type: 'number',
       align: 'center',
       headerAlign: 'center',
@@ -388,7 +387,7 @@ export const MenuManagementPanel = forwardRef<
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               메뉴 관리
             </Typography>
-            <Box
+            {/* <Box
               role="toolbar"
               aria-label="메뉴 그리드 제어"
               sx={{
@@ -415,7 +414,7 @@ export const MenuManagementPanel = forwardRef<
               >
                 <UnfoldLessIcon fontSize="small" />
               </IconButton>
-            </Box>
+            </Box> */}
           </Box>
           {message ? (
             <Box

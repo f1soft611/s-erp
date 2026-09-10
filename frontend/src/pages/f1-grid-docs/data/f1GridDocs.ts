@@ -204,7 +204,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Activate explicitly',
-        body: 'rowFormPlugin을 전달하고 enabled가 false가 아닐 때만 우측 고정 상세 열과 신규·수정 모달이 활성화됩니다. 플러그인이 없거나 비활성이면 인라인 편집과 즉시 행 추가를 포함한 기존 동작이 그대로 유지됩니다.',
+        body: 'rowFormPlugin을 전달하고 enabled가 false가 아닐 때만 우측 고정 상세 열과 신규·수정 모달이 활성화됩니다. 상세 열은 해제할 수 없는 폼 플러그인 전용 우측 pin 1번 영역이며, 사용자가 다른 컬럼을 오른쪽 고정하면 상세 열 왼쪽의 2번 이후 고정 영역에 배치됩니다. 플러그인이 없거나 비활성이면 인라인 편집과 즉시 행 추가를 포함한 기존 동작이 그대로 유지됩니다.',
       },
       {
         type: 'api',

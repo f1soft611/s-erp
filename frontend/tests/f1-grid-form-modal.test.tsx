@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -863,6 +864,85 @@ describe('F1-Grid row form integration', () => {
     });
   });
 
+  it('keeps the synthetic action header and row cell styled like a pinned right column', () => {
+    render(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    const actionHeader = screen.getByRole('columnheader', {
+      name: '상세',
+    });
+    const actionCell = screen
+      .getByRole('button', { name: 'ROW-001 행 정보 수정' })
+      .closest('[role="gridcell"]');
+
+    expect(getComputedStyle(actionHeader).backgroundColor).toBe(
+      'rgb(232, 236, 244)',
+    );
+    expect(getComputedStyle(actionHeader).boxShadow).toBe('');
+    expect(getComputedStyle(actionCell as Element).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(actionCell as Element).borderTopWidth).toBe('1px');
+    expect(getComputedStyle(actionCell as Element).borderLeftWidth).toBe('1px');
+    expect(getComputedStyle(actionCell as Element).position).toBe('sticky');
+  });
+
+  it('keeps the action column shadow when it is the only right-pinned column', () => {
+    render(
+      <F1Grid
+        rows={integratedRows}
+        columns={[{ field: 'name', headerName: '이름', editable: true }]}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    const actionHeader = screen.getByRole('columnheader', { name: '상세' });
+    const actionCell = screen
+      .getByRole('button', { name: 'ROW-001 행 정보 수정' })
+      .closest('[role="gridcell"]');
+
+    expect(getComputedStyle(actionHeader).boxShadow).toContain(
+      'rgba(0, 0, 0, 0.32)',
+    );
+    expect(getComputedStyle(actionCell as Element).boxShadow).toContain(
+      'rgba(0, 0, 0, 0.32)',
+    );
+  });
+
+  it('keeps the sticky action cell visually separated from the checkbox column', () => {
+    render(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox
+        resizableRows={false}
+      />,
+    );
+
+    const actionCell = screen
+      .getByRole('button', { name: 'ROW-001 행 정보 수정' })
+      .closest('[role="gridcell"]');
+
+    expect(getComputedStyle(actionCell as Element).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(actionCell as Element).borderLeftWidth).toBe('1px');
+    expect(getComputedStyle(actionCell as Element).position).toBe('sticky');
+  });
+
   it('adds the action column width to right pinned offsets', () => {
     const pinnedFields = new Map<string, 'left' | 'right'>([
       ['status', 'right'],
@@ -880,6 +960,34 @@ describe('F1-Grid row form integration', () => {
       leftOffsets: {},
       rightOffsets: { status: 48 },
     });
+  });
+
+  it('treats the action column as the first locked right pin when data columns are right pinned', () => {
+    render(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    const actionHeader = screen.getByRole('columnheader', { name: '상세' });
+    const pinnedHeader = screen.getByRole('columnheader', { name: '상태' });
+    const actionCell = screen
+      .getByRole('button', { name: 'ROW-001 행 정보 수정' })
+      .closest('[role="gridcell"]');
+
+    expect(getComputedStyle(actionHeader).right).toBe('0px');
+    expect(getComputedStyle(actionCell as Element).right).toBe('0px');
+    expect(getComputedStyle(actionHeader).boxShadow).toBe('');
+    expect(getComputedStyle(actionCell as Element).boxShadow).toBe('');
+    expect(getComputedStyle(pinnedHeader).right).toBe('48px');
+    expect(getComputedStyle(pinnedHeader).boxShadow).toContain(
+      'rgba(0, 0, 0, 0.32)',
+    );
   });
 
   it('isolates action cell events from row selection and the grid context menu', () => {
