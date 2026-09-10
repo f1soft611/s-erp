@@ -1059,6 +1059,51 @@ function F1GridInner<T extends object>(
     copiedCellRangeRef.current = copiedCellRange;
   }, [copiedCellRange]);
 
+  useEffect(() => {
+    if (!isCellSelectionDragging) return;
+
+    let frameId: number | undefined;
+
+    function handlePointerMove(event: PointerEvent) {
+      const nextCell = resolvePointerCell(event.clientX, event.clientY);
+      if (!nextCell) return;
+
+      const previousCell = dragSelectionStateRef.current.previousCell;
+      const isSameCell =
+        previousCell?.rowId === nextCell.rowId &&
+        previousCell?.columnIndex === nextCell.columnIndex;
+      if (isSameCell) return;
+
+      if (frameId !== undefined) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = undefined;
+        dragSelectionStateRef.current = {
+          ...dragSelectionStateRef.current,
+          previousCell: nextCell,
+        };
+        updateCellSelectionRange(nextCell);
+      });
+    }
+
+    function handlePointerUp() {
+      finishCellSelectionRange();
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      if (frameId !== undefined) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isCellSelectionDragging, visibleRows, rowKey]);
+
   function getCell(
     rowId: F1GridRowId,
     columnIndex: number,
@@ -1634,11 +1679,181 @@ function F1GridInner<T extends object>(
     closeRowForm();
   }
 
+  function resolvePointerCell(
+    clientX: number,
+    clientY: number,
+  ): F1GridCellPosition | undefined {
+    if (!gridContainerRef.current) return undefined;
+
+    const hitTargets =
+      typeof document !== 'undefined' &&
+      typeof document.elementsFromPoint === 'function'
+        ? document.elementsFromPoint(clientX, clientY)
+        : [];
+
+    const candidate =
+      hitTargets.length > 0
+        ? hitTargets.find((element): element is HTMLElement => {
+            if (!(element instanceof HTMLElement)) return false;
+            const gridCell = element.closest('[role="gridcell"]');
+            return !!gridCell && gridContainerRef.current!.contains(gridCell);
+          })
+        : typeof document !== 'undefined' &&
+            typeof document.elementFromPoint === 'function'
+          ? (document.elementFromPoint(clientX, clientY) as HTMLElement | null)
+          : null;
+
+    if (candidate) {
+      const gridCell = candidate.closest(
+        '[role="gridcell"]',
+      ) as HTMLElement | null;
+      if (gridCell && gridContainerRef.current.contains(gridCell)) {
+        const rowNode = gridCell.closest(
+          '[data-f1-grid-row-id]',
+        ) as HTMLElement | null;
+        const rowIdAttr = rowNode?.getAttribute('data-f1-grid-row-id');
+        if (rowIdAttr && rowNode) {
+          const targetRow = visibleRows.find(
+            (row) => String(getGridRowId(row, rowKey)) === rowIdAttr,
+          );
+          if (targetRow) {
+            const rowCellNodes = rowNode.querySelectorAll('[role="gridcell"]');
+            const columnIndex = Array.from(rowCellNodes).indexOf(gridCell);
+            if (columnIndex >= 0) {
+              return {
+                rowId: getGridRowId(targetRow, rowKey),
+                columnIndex,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    let nearestCell:
+      | {
+          rowId: F1GridRowId;
+          columnIndex: number;
+          distance: number;
+          inside: boolean;
+        }
+      | undefined;
+
+    for (const [key, node] of cellNodeRefs.current.entries()) {
+      if (
+        !gridContainerRef.current ||
+        !gridContainerRef.current.contains(node)
+      ) {
+        continue;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const insideCell =
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom;
+      const nearestX = Math.min(Math.max(clientX, rect.left), rect.right);
+      const nearestY = Math.min(Math.max(clientY, rect.top), rect.bottom);
+      const distance = (clientX - nearestX) ** 2 + (clientY - nearestY) ** 2;
+      const [rowIdText, columnIndexText] = key.split(':');
+      const columnIndex = Number.parseInt(columnIndexText, 10);
+      const targetRow = visibleRows.find(
+        (row) => String(getGridRowId(row, rowKey)) === rowIdText,
+      );
+      if (!targetRow || Number.isNaN(columnIndex)) continue;
+
+      const nextCell = {
+        rowId: getGridRowId(targetRow, rowKey),
+        columnIndex,
+        distance,
+        inside: insideCell,
+      };
+
+      if (
+        !nearestCell ||
+        (insideCell && !nearestCell.inside) ||
+        (insideCell === nearestCell.inside && distance < nearestCell.distance)
+      ) {
+        nearestCell = nextCell;
+      }
+    }
+
+    const previousDragCell = dragSelectionStateRef.current.previousCell;
+    if (
+      previousDragCell &&
+      nearestCell &&
+      nearestCell.rowId === previousDragCell.rowId &&
+      nearestCell.columnIndex === previousDragCell.columnIndex
+    ) {
+      const previousNode = cellNodeRefs.current.get(
+        `${String(previousDragCell.rowId)}:${previousDragCell.columnIndex}`,
+      );
+      if (previousNode) {
+        const previousRect = previousNode.getBoundingClientRect();
+        const boundaryPadding = 8;
+        const pointerWithinPreviousWidth =
+          clientX >= previousRect.left && clientX <= previousRect.right;
+        const pointerWithinPreviousHeight =
+          clientY >= previousRect.top && clientY <= previousRect.bottom;
+
+        const isNearBottomBoundary =
+          Math.abs(clientY - previousRect.bottom) <= boundaryPadding &&
+          pointerWithinPreviousWidth;
+        const isNearRightBoundary =
+          Math.abs(clientX - previousRect.right) <= boundaryPadding &&
+          pointerWithinPreviousHeight;
+
+        if (isNearBottomBoundary || isNearRightBoundary) {
+          const previousRowIndex = visibleRows.findIndex(
+            (row) => getGridRowId(row, rowKey) === previousDragCell.rowId,
+          );
+
+          if (previousRowIndex >= 0) {
+            const rowBelow = visibleRows[previousRowIndex + 1];
+            if (rowBelow && isNearBottomBoundary) {
+              return {
+                rowId: getGridRowId(rowBelow, rowKey),
+                columnIndex: previousDragCell.columnIndex,
+              };
+            }
+          }
+
+          if (previousDragCell.columnIndex + 1 < visibleColumns.length) {
+            if (isNearRightBoundary) {
+              return {
+                rowId: previousDragCell.rowId,
+                columnIndex: previousDragCell.columnIndex + 1,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return nearestCell
+      ? {
+          rowId: nearestCell.rowId,
+          columnIndex: nearestCell.columnIndex,
+        }
+      : undefined;
+  }
+
   function setCellSelectionRange(
     anchor: F1GridCellPosition,
     focus: F1GridCellPosition,
   ) {
     const next = createGridCellRange(anchor, focus);
+    const current = cellSelectionRef.current;
+    const isSameSelection =
+      current &&
+      current.anchor.rowId === next.anchor.rowId &&
+      current.anchor.columnIndex === next.anchor.columnIndex &&
+      current.focus.rowId === next.focus.rowId &&
+      current.focus.columnIndex === next.focus.columnIndex;
+
+    if (isSameSelection) return;
+
     setCellSelection(next);
     cellSelectionRef.current = next;
     setCopiedCellRange(undefined);
@@ -1647,10 +1862,19 @@ function F1GridInner<T extends object>(
 
   function updateCellSelectionRange(cell: F1GridCellPosition) {
     if (!cellRangeDragRef.current) return;
+    const next = createGridCellRange(cellRangeDragRef.current.anchor, cell);
+    const current = cellSelectionRef.current;
+    const isSameSelection =
+      current &&
+      current.anchor.rowId === next.anchor.rowId &&
+      current.anchor.columnIndex === next.anchor.columnIndex &&
+      current.focus.rowId === next.focus.rowId &&
+      current.focus.columnIndex === next.focus.columnIndex;
+
+    if (isSameSelection) return;
+
     cellRangeDragRef.current.focus = cell;
-    setCellSelection(
-      createGridCellRange(cellRangeDragRef.current.anchor, cell),
-    );
+    setCellSelection(next);
   }
 
   function finishCellSelectionRange() {
