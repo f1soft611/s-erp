@@ -202,10 +202,6 @@ export const MenuManagementPanel = forwardRef<
       editable: true,
       required: true,
       pinned: 'left',
-      form: {
-        targetField: 'name',
-        targetLabel: '메뉴명',
-      },
     },
     {
       field: 'code',
@@ -214,6 +210,10 @@ export const MenuManagementPanel = forwardRef<
       editable: (row: MenuManagementRow) => isNewMenuRow(row.id),
       required: true,
       mergeRows: true,
+      form: {
+        targetField: 'code',
+        targetLabel: '메뉴코드',
+      },
     },
     {
       field: 'path',
