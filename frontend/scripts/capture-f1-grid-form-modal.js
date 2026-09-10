@@ -211,6 +211,47 @@ async function setTheme(page, theme) {
   );
 }
 
+async function waitForModalTransition(page) {
+  await page.waitForFunction(() => {
+    const dialogRoot = Array.from(
+      document.querySelectorAll('.MuiDialog-root'),
+    ).find((root) => root.querySelector('[role="dialog"]'));
+    const backdrop = dialogRoot?.querySelector('.MuiDialog-backdrop');
+    const container = dialogRoot?.querySelector('.MuiDialog-container');
+    const paper = dialogRoot?.querySelector('.MuiDialog-paper');
+    if (
+      !(backdrop instanceof HTMLElement) ||
+      !(container instanceof HTMLElement) ||
+      !(paper instanceof HTMLElement)
+    ) {
+      return false;
+    }
+
+    const isTransformStable = (transform) => {
+      if (transform === 'none') return true;
+
+      const matrix = new DOMMatrixReadOnly(transform);
+      return (
+        Math.abs(matrix.a - 1) <= 0.01 &&
+        Math.abs(matrix.b) <= 0.01 &&
+        Math.abs(matrix.c) <= 0.01 &&
+        Math.abs(matrix.d - 1) <= 0.01
+      );
+    };
+    const backdropStyle = getComputedStyle(backdrop);
+    const containerStyle = getComputedStyle(container);
+    const paperStyle = getComputedStyle(paper);
+
+    return (
+      Number.parseFloat(backdropStyle.opacity) >= 0.45 &&
+      Number.parseFloat(containerStyle.opacity) >= 0.99 &&
+      Number.parseFloat(paperStyle.opacity) >= 0.99 &&
+      isTransformStable(containerStyle.transform) &&
+      isTransformStable(paperStyle.transform)
+    );
+  });
+}
+
 async function assertModalLayout(page, capture) {
   const dialog = page.getByRole('dialog');
   await dialog.waitFor({ state: 'visible' });
@@ -221,12 +262,23 @@ async function assertModalLayout(page, capture) {
     const paper = element.matches('.MuiDialog-paper')
       ? element
       : element.querySelector('.MuiDialog-paper');
+    const dialogRoot = element.closest('.MuiDialog-root');
+    const backdrop = dialogRoot?.querySelector('.MuiDialog-backdrop');
+    const container = dialogRoot?.querySelector('.MuiDialog-container');
     const formGrid = element.querySelector('[data-testid="f1-grid-form-grid"]');
-    if (!(paper instanceof HTMLElement) || !(formGrid instanceof HTMLElement)) {
-      throw new Error('Dialog paper or form grid is missing');
+    if (
+      !(backdrop instanceof HTMLElement) ||
+      !(container instanceof HTMLElement) ||
+      !(paper instanceof HTMLElement) ||
+      !(formGrid instanceof HTMLElement)
+    ) {
+      throw new Error('Dialog backdrop, container, paper, or form grid is missing');
     }
 
     const paperRect = paper.getBoundingClientRect();
+    const backdropStyle = getComputedStyle(backdrop);
+    const containerStyle = getComputedStyle(container);
+    const paperStyle = getComputedStyle(paper);
     const fieldRects = Array.from(
       formGrid.querySelectorAll('[data-form-field="true"]'),
       (field) => field.getBoundingClientRect(),
@@ -247,6 +299,14 @@ async function assertModalLayout(page, capture) {
       gridTemplateColumns,
       innerHeight: window.innerHeight,
       innerWidth: window.innerWidth,
+      modalAppearance: {
+        backdropOpacity: backdropStyle.opacity,
+        containerOpacity: containerStyle.opacity,
+        containerTransform: containerStyle.transform,
+        paperBackgroundColor: paperStyle.backgroundColor,
+        paperOpacity: paperStyle.opacity,
+        paperTransform: paperStyle.transform,
+      },
       paperRect: {
         bottom: paperRect.bottom,
         height: paperRect.height,
@@ -304,6 +364,7 @@ async function captureModal(page, capture) {
   await editRowButton.focus();
   await editRowButton.press('Enter');
 
+  await waitForModalTransition(page);
   const metrics = await assertModalLayout(page, capture);
   const screenshotPath = path.join(screenshotDirectory, capture.fileName);
   await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -316,6 +377,7 @@ async function captureModal(page, capture) {
       columns: metrics.computedColumnCount,
       dialog: metrics.paperRect,
       gridTemplateColumns: metrics.gridTemplateColumns,
+      modalAppearance: metrics.modalAppearance,
       screenshotBytes: screenshotStat.size,
     }),
   );
