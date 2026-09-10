@@ -2,10 +2,19 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { GridRow } from './GridRow';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridCellRange,
+  F1GridCellRangeBounds,
+  F1GridRowSelection,
+} from '../selection/GridSelection';
+import { isGridRowSelected } from '../selection/GridSelection';
 
 type GridBodyProps<T extends object> = {
   visibleRows: T[];
+  allRows: T[];
+  rowStartIndex: number;
   columns: F1GridColumn<T>[];
+  renderedColumnIndexes?: Set<number>;
   rowKey: keyof T;
   columnLine: boolean;
   columnTracks: string;
@@ -15,17 +24,13 @@ type GridBodyProps<T extends object> = {
   rowHeights: Record<string, number>;
   resizableRows: boolean;
   selectedIds: F1GridRowId[];
+  rowSelection: F1GridRowSelection;
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
-  selectedCellRange?: {
-    start: { rowId: F1GridRowId; columnIndex: number };
-    end: { rowId: F1GridRowId; columnIndex: number };
-  };
+  selectedCellRange?: F1GridCellRange;
+  selectedCellRangeBounds?: F1GridCellRangeBounds;
   isCellSelectionDragging?: boolean;
-  copiedCellRange?: {
-    start: { rowId: F1GridRowId; columnIndex: number };
-    end: { rowId: F1GridRowId; columnIndex: number };
-  };
+  copiedCellRange?: F1GridCellRange;
   draftValue: string;
   dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
@@ -63,6 +68,8 @@ type GridBodyProps<T extends object> = {
     column: F1GridColumn<T>,
   ) => { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
+  virtualTopPadding?: number;
+  virtualBottomPadding?: number;
   showCheckbox?: boolean;
   showFormAction?: boolean;
   formActionPinnedShadow?: boolean;
@@ -90,7 +97,10 @@ function getMergeGroupStart<T extends object>(
 
 export function GridBody<T extends object>({
   visibleRows,
+  allRows,
+  rowStartIndex,
   columns,
+  renderedColumnIndexes,
   rowKey,
   columnLine,
   columnTracks,
@@ -100,9 +110,11 @@ export function GridBody<T extends object>({
   rowHeights,
   resizableRows,
   selectedIds,
+  rowSelection,
   focusedCell,
   editingCell,
   selectedCellRange,
+  selectedCellRangeBounds,
   isCellSelectionDragging = false,
   copiedCellRange,
   draftValue,
@@ -128,6 +140,8 @@ export function GridBody<T extends object>({
   onUpdateRowHeight,
   getPinOffset,
   cellAdornment,
+  virtualTopPadding = 0,
+  virtualBottomPadding = 0,
   showCheckbox = true,
   showFormAction = false,
   formActionPinnedShadow = true,
@@ -143,15 +157,15 @@ export function GridBody<T extends object>({
       return false;
     }
 
-    const editingRowIndex = visibleRows.findIndex(
+    const editingRowIndex = allRows.findIndex(
       (item) => getRowId(item) === editingCell.rowId,
     );
 
     if (editingRowIndex < 0) return false;
 
     return (
-      getMergeGroupStart(visibleRows, rowIndex, column.field) ===
-      getMergeGroupStart(visibleRows, editingRowIndex, column.field)
+      getMergeGroupStart(allRows, rowIndex, column.field) ===
+      getMergeGroupStart(allRows, editingRowIndex, column.field)
     );
   }
 
@@ -163,7 +177,7 @@ export function GridBody<T extends object>({
     const column = columns[columnIndex];
     const mergeEditing = getMergeEditing(rowIndex, columnIndex);
     const editing =
-      editingCell?.rowId === getRowId(visibleRows[rowIndex]) &&
+      editingCell?.rowId === getRowId(allRows[rowIndex]) &&
       editingCell?.columnIndex === columnIndex;
     const mergeInfo = mergeEditing
       ? undefined
@@ -175,7 +189,7 @@ export function GridBody<T extends object>({
       !mergeEditing &&
       !editing &&
       !mergeInfo?.isStart &&
-      Object.is(visibleRows[rowIndex - 1][column.field], value),
+      Object.is(allRows[rowIndex - 1][column.field], value),
     );
   }
 
@@ -202,19 +216,23 @@ export function GridBody<T extends object>({
       sx={{
         display: 'grid',
         gridTemplateColumns: columnTracks,
-        gridTemplateRows: visibleRows
-          .map(
+        gridTemplateRows: [
+          `${virtualTopPadding}px`,
+          ...visibleRows.map(
             (row) =>
               `${rowHeights[String(getRowId(row))] ?? defaultRowHeight}px`,
-          )
-          .join(' '),
+          ),
+          `${virtualBottomPadding}px`,
+        ].join(' '),
         minWidth: 'max-content',
         isolation: 'isolate',
       }}
     >
-      {visibleRows.map((row, rowIndex) => {
+      <Box sx={{ gridColumn: '1 / -1', gridRow: 1, minHeight: 0 }} />
+      {visibleRows.map((row, renderIndex) => {
+        const rowIndex = rowStartIndex + renderIndex;
         const rowId = getRowId(row);
-        const isSelected = selectedIds.includes(rowId);
+        const isSelected = isGridRowSelected(rowSelection, rowId);
 
         return (
           <GridRow
@@ -222,18 +240,21 @@ export function GridBody<T extends object>({
             row={row}
             rowId={rowId}
             rowIndex={rowIndex}
+            renderIndex={renderIndex + 1}
             columns={columns}
+            renderedColumnIndexes={renderedColumnIndexes}
             columnLine={columnLine}
             isSelected={isSelected}
             focusedCell={focusedCell}
             editingCell={editingCell}
             selectedCellRange={selectedCellRange}
+            selectedCellRangeBounds={selectedCellRangeBounds}
             isCellSelectionDragging={isCellSelectionDragging}
             copiedCellRange={copiedCellRange}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
-            visibleRows={visibleRows}
+            visibleRows={allRows}
             selectedIds={selectedIds}
             rowKey={rowKey}
             onSelectRow={onSelectRow}
@@ -271,6 +292,13 @@ export function GridBody<T extends object>({
           />
         );
       })}
+      <Box
+        sx={{
+          gridColumn: '1 / -1',
+          gridRow: visibleRows.length + 2,
+          minHeight: 0,
+        }}
+      />
     </Box>
   );
 }

@@ -9,12 +9,18 @@ import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
 import { GridFormActionCell } from '../form/GridFormActionCell';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridCellRange,
+  F1GridCellRangeBounds,
+} from '../selection/GridSelection';
 
 type GridRowProps<T extends object> = {
   row: T;
   rowId: F1GridRowId;
   rowIndex: number;
+  renderIndex: number;
   columns: F1GridColumn<T>[];
+  renderedColumnIndexes?: Set<number>;
   columnLine: boolean;
   isSelected: boolean;
   rowHeight: number;
@@ -24,15 +30,10 @@ type GridRowProps<T extends object> = {
   resizableRows: boolean;
   focusedCell?: { rowId: F1GridRowId; columnIndex: number };
   editingCell?: { rowId: F1GridRowId; columnIndex: number };
-  selectedCellRange?: {
-    start: { rowId: F1GridRowId; columnIndex: number };
-    end: { rowId: F1GridRowId; columnIndex: number };
-  };
+  selectedCellRange?: F1GridCellRange;
+  selectedCellRangeBounds?: F1GridCellRangeBounds;
   isCellSelectionDragging?: boolean;
-  copiedCellRange?: {
-    start: { rowId: F1GridRowId; columnIndex: number };
-    end: { rowId: F1GridRowId; columnIndex: number };
-  };
+  copiedCellRange?: F1GridCellRange;
   draftValue: string;
   dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
@@ -156,7 +157,9 @@ export function GridRow<T extends object>({
   row,
   rowId,
   rowIndex,
+  renderIndex,
   columns,
+  renderedColumnIndexes,
   columnLine,
   isSelected,
   rowHeight,
@@ -167,6 +170,7 @@ export function GridRow<T extends object>({
   focusedCell,
   editingCell,
   selectedCellRange,
+  selectedCellRangeBounds,
   isCellSelectionDragging = false,
   copiedCellRange,
   draftValue,
@@ -282,7 +286,7 @@ export function GridRow<T extends object>({
         <Box
           sx={{
             gridColumn: 1,
-            gridRow: rowIndex + 1,
+            gridRow: renderIndex + 1,
             display: 'flex',
             justifyContent: 'center',
             borderTop: 1,
@@ -311,52 +315,38 @@ export function GridRow<T extends object>({
         </Box>
       ) : null}
       {columns.map((column, columnIndex) => {
+        if (renderedColumnIndexes && !renderedColumnIndexes.has(columnIndex)) {
+          return null;
+        }
+
         const cell = getCell(rowId, columnIndex);
         const editing = isSameCell(editingCell, cell);
         const focused = isSameCell(focusedCell, cell);
         const isLastRow = rowIndex === visibleRows.length - 1;
-        const dragRowStartIndex = visibleRows.findIndex(
-          (item) =>
-            String(item[rowKey]) ===
-            String(selectedCellRange?.start.rowId ?? rowId),
-        );
-        const dragRowEndIndex = visibleRows.findIndex(
-          (item) =>
-            String(item[rowKey]) ===
-            String(selectedCellRange?.end.rowId ?? rowId),
-        );
         const selectedRangeHasMultipleCells =
           !!selectedCellRange &&
-          (selectedCellRange.start.rowId !== selectedCellRange.end.rowId ||
-            selectedCellRange.start.columnIndex !==
-              selectedCellRange.end.columnIndex);
+          (selectedCellRange.anchor.rowId !== selectedCellRange.focus.rowId ||
+            selectedCellRange.anchor.columnIndex !==
+              selectedCellRange.focus.columnIndex);
         const copiedRangeHasMultipleCells =
           !!copiedCellRange &&
-          (copiedCellRange.start.rowId !== copiedCellRange.end.rowId ||
-            copiedCellRange.start.columnIndex !==
-              copiedCellRange.end.columnIndex);
+          (copiedCellRange.anchor.rowId !== copiedCellRange.focus.rowId ||
+            copiedCellRange.anchor.columnIndex !==
+              copiedCellRange.focus.columnIndex);
         const selected =
-          !!selectedCellRange &&
-          rowIndex >= Math.min(dragRowStartIndex, dragRowEndIndex) &&
-          rowIndex <= Math.max(dragRowStartIndex, dragRowEndIndex) &&
-          columnIndex >=
-            Math.min(
-              selectedCellRange.start.columnIndex,
-              selectedCellRange.end.columnIndex,
-            ) &&
-          columnIndex <=
-            Math.max(
-              selectedCellRange.start.columnIndex,
-              selectedCellRange.end.columnIndex,
-            );
+          !!selectedCellRangeBounds &&
+          rowIndex >= selectedCellRangeBounds.minRowIndex &&
+          rowIndex <= selectedCellRangeBounds.maxRowIndex &&
+          columnIndex >= selectedCellRangeBounds.minColumnIndex &&
+          columnIndex <= selectedCellRangeBounds.maxColumnIndex;
         const isSelectedRangeStart =
           selectedRangeHasMultipleCells &&
-          String(rowId) === String(selectedCellRange.start.rowId) &&
-          columnIndex === selectedCellRange.start.columnIndex;
+          String(rowId) === String(selectedCellRange.anchor.rowId) &&
+          columnIndex === selectedCellRange.anchor.columnIndex;
         const isCopiedRangeStart =
           copiedRangeHasMultipleCells &&
-          String(rowId) === String(copiedCellRange.start.rowId) &&
-          columnIndex === copiedCellRange.start.columnIndex;
+          String(rowId) === String(copiedCellRange.anchor.rowId) &&
+          columnIndex === copiedCellRange.anchor.columnIndex;
         const value = column.getValue?.(row) ?? row[column.field];
         const mergeEditing = getMergeEditing(columnIndex);
         const mergeInfo = mergeEditing
@@ -394,6 +384,7 @@ export function GridRow<T extends object>({
             rowHeight={rowHeight}
             defaultRowHeight={defaultRowHeight}
             rowIndex={rowIndex}
+            renderRowIndex={renderIndex}
             isLastRow={isLastRow}
             draftValue={draftValue}
             dirtyCell={Boolean(
@@ -460,7 +451,7 @@ export function GridRow<T extends object>({
       {showFormAction && onOpenRowForm ? (
         <GridFormActionCell
           rowId={rowId}
-          rowIndex={rowIndex}
+          rowIndex={renderIndex}
           columnIndex={(showCheckbox ? 2 : 1) + columns.length}
           isLastRow={rowIndex === visibleRows.length - 1}
           pinnedShadow={formActionPinnedShadow}
@@ -500,7 +491,7 @@ export function GridRow<T extends object>({
           }}
           sx={{
             gridColumn: '1 / -1',
-            gridRow: rowIndex + 1,
+            gridRow: renderIndex + 1,
             alignSelf: 'end',
             justifySelf: 'stretch',
             height: 6,

@@ -24,16 +24,21 @@ type IndexedRow<T extends object> = {
   rowKey: string;
 };
 
+export type F1TreeIndex<T extends object> = {
+  indexedRows: IndexedRow<T>[];
+  childrenByParent: Map<string, IndexedRow<T>[]>;
+  rootRows: IndexedRow<T>[];
+};
+
 function toRowKey(value: unknown): string | undefined {
   if (typeof value !== 'string' && typeof value !== 'number') return undefined;
   return getStateKey(value);
 }
 
-export function projectTreeRows<T extends object>(
+export function createTreeIndex<T extends object>(
   rows: T[],
   { rowKey, parentKey, getRowOrder }: F1TreeProjectionOptions<T>,
-  expandedIds: Set<F1GridRowId>,
-): F1TreeProjection<T> {
+): F1TreeIndex<T> {
   const indexedRows = rows.map((row, index) => {
     const rowId = getGridRowId(row, rowKey);
     return { index, row, rowId, rowKey: getStateKey(rowId) };
@@ -63,6 +68,21 @@ export function projectTreeRows<T extends object>(
     const rightOrder = getRowOrder?.(right.row) ?? 0;
     return leftOrder - rightOrder || left.index - right.index;
   };
+  rootRows.sort(compareRows);
+  childrenByParent.forEach((children) => children.sort(compareRows));
+
+  return {
+    indexedRows: [...indexedRows].sort(compareRows),
+    childrenByParent,
+    rootRows,
+  };
+}
+
+export function projectTreeIndex<T extends object>(
+  index: F1TreeIndex<T>,
+  expandedIds: Set<F1GridRowId>,
+): F1TreeProjection<T> {
+  const { indexedRows, childrenByParent, rootRows } = index;
   const outputRows: T[] = [];
   const metaById: Record<string, F1TreeRowMeta> = {};
   const visited = new Set<string>();
@@ -72,9 +92,7 @@ export function projectTreeRows<T extends object>(
     if (visited.has(item.rowKey)) return;
     visited.add(item.rowKey);
 
-    const children = (childrenByParent.get(item.rowKey) ?? []).sort(
-      compareRows,
-    );
+    const children = childrenByParent.get(item.rowKey) ?? [];
     metaById[item.rowKey] = { depth, hasChildren: children.length > 0 };
     if (!visible) return;
 
@@ -83,11 +101,18 @@ export function projectTreeRows<T extends object>(
     children.forEach((child) => visit(child, depth + 1, expanded));
   }
 
-  rootRows.sort(compareRows).forEach((item) => visit(item, 0, true));
+  rootRows.forEach((item) => visit(item, 0, true));
   indexedRows
     .filter((item) => !visited.has(item.rowKey))
-    .sort(compareRows)
     .forEach((item) => visit(item, 0, true));
 
   return { rows: outputRows, metaById };
+}
+
+export function projectTreeRows<T extends object>(
+  rows: T[],
+  options: F1TreeProjectionOptions<T>,
+  expandedIds: Set<F1GridRowId>,
+): F1TreeProjection<T> {
+  return projectTreeIndex(createTreeIndex(rows, options), expandedIds);
 }

@@ -504,12 +504,12 @@ export const f1GridDocs: F1GridDoc[] = [
     title: 'Large Dataset',
     category: 'feature',
     description:
-      '10,000건 대용량 샘플로 F1-Grid의 렌더링과 선택 상태를 검증합니다.',
+      '1,000건/10,000건 대용량 샘플을 클릭으로 로드해 F1-Grid의 렌더링과 선택 상태를 검증합니다.',
     sections: [
       {
         type: 'prose',
         heading: 'Scale without losing the workflow',
-        body: '대용량 데이터에서도 F1-Grid는 기존 흐름을 유지해야 합니다. 스크롤, 선택, 정렬, 체크박스, dirty 표시는 10,000건 기준으로 동일한 UX를 유지하는 것을 확인합니다.',
+        body: '대용량 데이터에서도 F1-Grid는 기존 흐름을 유지해야 합니다. 기본 미리보기는 가볍게 유지하고, 사용자가 1,000건 또는 10,000건을 선택했을 때만 로딩 스피너를 노출한 뒤 데이터를 조립합니다. 스크롤, 선택, 정렬, 체크박스, dirty 표시는 해당 기준으로 동일한 UX를 유지하는 것을 확인합니다.',
       },
       {
         type: 'api',
@@ -714,6 +714,16 @@ export const f1GridDocs: F1GridDoc[] = [
         heading: 'F1GridProps',
         rows: [
           ['rows', 'T[]', '표시할 데이터'],
+          [
+            'dataSource',
+            'F1GridDataSource<T>',
+            '서버 정렬/필터 및 페이지 조회 데이터 소스',
+          ],
+          [
+            'onDataSourceError',
+            '(error: Error) => void',
+            '서버 데이터 조회 오류 콜백',
+          ],
           ['columns', 'F1GridColumn<T>[]', '컬럼 정의'],
           ['rowKey', 'keyof T', '행 식별자'],
           ['ariaLabel', 'string', '접근성 레이블'],
@@ -725,6 +735,26 @@ export const f1GridDocs: F1GridDoc[] = [
             'resizableRows / resizableColumns',
             'boolean',
             '행/컬럼 크기 조절 허용',
+          ],
+          [
+            'virtualizeRows / virtualizeColumns',
+            'boolean',
+            '행/컬럼 가상화 자동 판단 재정의',
+          ],
+          [
+            'rowOverscan / columnOverscan',
+            'number',
+            'viewport 밖에 추가 렌더링할 행/컬럼 수',
+          ],
+          [
+            'fixedRowHeightThreshold',
+            'number',
+            '고정 행 높이 대용량 모드 활성화 임계값',
+          ],
+          [
+            'queryWorkerThreshold / disableQueryWorker',
+            'number / boolean',
+            '로컬 Worker 정렬·필터 임계값과 비활성화 옵션',
           ],
           ['minColumnWidth', 'number', '컬럼 최소 너비'],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시'],
@@ -902,7 +932,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Implemented vs planned',
-        body: '포털 예시는 F1GridProps/F1GridColumn 등 실제 구현 계약만 사용합니다. 집계, 서버사이드 페이지네이션, 가상 스크롤, Excel Export 등은 아직 구현되지 않았으므로 포털과 Playground에 포함하지 않습니다.',
+        body: '포털 예시는 F1GridProps/F1GridColumn 등 실제 구현 계약만 사용합니다. 행/컬럼 가상화는 공용 그리드의 자동 임계값과 overscan 옵션으로 지원합니다. 집계와 서버사이드 페이지네이션은 아직 구현되지 않았으므로 포털과 Playground에 포함하지 않습니다.',
       },
       {
         type: 'code',

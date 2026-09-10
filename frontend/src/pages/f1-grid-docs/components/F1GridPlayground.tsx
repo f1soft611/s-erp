@@ -435,7 +435,7 @@ function createLargeDataset(rowCount: number): LargeDataRow[] {
 function LargeDataPlayground() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<LargeDataRow[]>(() =>
-    createLargeDataset(10000),
+    createLargeDataset(250),
   );
   const loadTimerRef = useRef<number | null>(null);
 
@@ -465,8 +465,8 @@ function LargeDataPlayground() {
       <Box className="f1-doc-playground-controls">
         <Typography variant="subtitle1">Try it</Typography>
         <Typography variant="body2">
-          대용량 셀 렌더링과 선택 상태 유지: 10,000건 샘플을 기준으로
-          검증합니다.
+          대용량 셀 렌더링과 선택 상태 유지: 1,000건/10,000건 샘플을 클릭으로
+          로드해 검증합니다.
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
           <Button size="small" onClick={() => handleLoadSample(1000)}>

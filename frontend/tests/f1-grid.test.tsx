@@ -125,6 +125,38 @@ const columns: F1GridColumn<MenuRow>[] = [
 ];
 
 describe('F1-GRID size props', () => {
+  it('keeps cell render work limited when a cell is selected', () => {
+    const renderCellSpy = vi.fn(({ value }) => <span>{String(value)}</span>);
+    const manyRows = Array.from({ length: 64 }, (_, index) => ({
+      id: `row-${index}`,
+      value: `value-${index}`,
+    }));
+    const manyColumns: F1GridColumn<(typeof manyRows)[number]>[] = [
+      {
+        field: 'value',
+        headerName: 'Value',
+        editable: true,
+        renderCell: renderCellSpy,
+      },
+    ];
+
+    render(
+      <F1Grid
+        rows={manyRows}
+        columns={manyColumns}
+        rowKey="id"
+        ariaLabel="grid with limited rerender"
+        height={240}
+      />,
+    );
+
+    const before = renderCellSpy.mock.calls.length;
+    fireEvent.mouseDown(screen.getByRole('gridcell', { name: 'value-0' }));
+    fireEvent.mouseUp(screen.getByRole('gridcell', { name: 'value-0' }));
+
+    expect(renderCellSpy.mock.calls.length - before).toBeLessThan(12);
+  });
+
   it('applies a numeric minHeight as a CSS pixel value', () => {
     render(
       <F1Grid
@@ -175,6 +207,180 @@ describe('F1-GRID loading overlay', () => {
     );
     expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('renders only the visible window for large row sets to keep the grid responsive', () => {
+    const largeRows = Array.from({ length: 1500 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${String(index).padStart(4, '0')}`,
+    }));
+
+    const largeColumns: F1GridColumn<{ id: string; code: string }>[] = [
+      { field: 'code', headerName: 'Code', width: 160 },
+    ];
+
+    render(
+      <F1Grid
+        rows={largeRows}
+        columns={largeColumns}
+        rowKey="id"
+        ariaLabel="large row virtualized grid"
+        height={240}
+      />,
+    );
+
+    expect(screen.getAllByRole('row').length).toBeLessThan(250);
+  });
+
+  it('moves the virtual row window after vertical scrolling', async () => {
+    const largeRows = Array.from({ length: 1500 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${String(index).padStart(4, '0')}`,
+    }));
+    const largeColumns: F1GridColumn<{ id: string; code: string }>[] = [
+      { field: 'code', headerName: 'Code', width: 160 },
+    ];
+
+    const { container } = render(
+      <F1Grid
+        rows={largeRows}
+        columns={largeColumns}
+        rowKey="id"
+        height={240}
+      />,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 240,
+    });
+    bodyScroll.scrollTop = 3200;
+    fireEvent.scroll(bodyScroll);
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-f1-grid-row-id="row-92"]'),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      container.querySelector('[data-f1-grid-row-id="row-0"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders only viewport columns while keeping pinned columns mounted', () => {
+    type WideRow = { id: string } & Record<string, string>;
+    const wideRows: WideRow[] = [
+      Object.fromEntries([
+        ['id', 'row-1'],
+        ...Array.from({ length: 20 }, (_, index) => [
+          `field${index}`,
+          `value-${index}`,
+        ]),
+      ]) as WideRow,
+    ];
+    const wideColumns: F1GridColumn<WideRow>[] = Array.from(
+      { length: 20 },
+      (_, index) => ({
+        field: `field${index}`,
+        headerName: `Column ${index}`,
+        width: 120,
+        pinned: index === 0 ? 'left' : index === 19 ? 'right' : undefined,
+      }),
+    );
+
+    render(
+      <F1Grid
+        rows={wideRows}
+        columns={wideColumns}
+        rowKey="id"
+        ariaLabel="wide virtualized grid"
+        height={240}
+        virtualizeColumns
+        columnOverscan={1}
+      />,
+    );
+
+    expect(
+      screen.getByRole('columnheader', { name: 'Column 0' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('columnheader', { name: 'Column 19' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Column 10' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('moves the virtual column window on horizontal scroll and selects the mounted cell', async () => {
+    type WideRow = { id: string } & Record<string, string>;
+    const wideRows: WideRow[] = [
+      Object.fromEntries([
+        ['id', 'row-1'],
+        ...Array.from({ length: 20 }, (_, index) => [
+          `field${index}`,
+          `value-${index}`,
+        ]),
+      ]) as WideRow,
+    ];
+    const wideColumns: F1GridColumn<WideRow>[] = Array.from(
+      { length: 20 },
+      (_, index) => ({
+        field: `field${index}`,
+        headerName: `Column ${index}`,
+        width: 120,
+      }),
+    );
+
+    render(
+      <F1Grid
+        rows={wideRows}
+        columns={wideColumns}
+        rowKey="id"
+        height={240}
+        virtualizeColumns
+        columnOverscan={1}
+      />,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    bodyScroll.scrollLeft = 1200;
+    fireEvent.scroll(bodyScroll);
+
+    const targetCell = await screen.findByRole('gridcell', {
+      name: 'value-10',
+    });
+    fireEvent.mouseDown(targetCell);
+
+    expect(targetCell).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('uses fixed row heights above the configured large-data threshold', () => {
+    const largeRows = Array.from({ length: 200 }, (_, index) => ({
+      id: `fixed-${index}`,
+      code: `ITEM-${index}`,
+    }));
+    const largeColumns: F1GridColumn<{ id: string; code: string }>[] = [
+      { field: 'code', headerName: 'Code', width: 160 },
+    ];
+
+    render(
+      <F1Grid
+        rows={largeRows}
+        columns={largeColumns}
+        rowKey="id"
+        height={240}
+        fixedRowHeightThreshold={100}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'fixed-0 행 높이 조절' }),
+    ).not.toBeInTheDocument();
   });
 });
 

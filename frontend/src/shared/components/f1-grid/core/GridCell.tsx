@@ -23,6 +23,7 @@ type GridCellProps<T extends object> = {
   rowHeight: number;
   defaultRowHeight: number;
   rowIndex: number;
+  renderRowIndex?: number;
   isLastRow?: boolean;
   draftValue: string;
   dirtyCell?: boolean;
@@ -81,6 +82,7 @@ export function GridCell<T extends object>({
   rowHeight,
   defaultRowHeight,
   rowIndex,
+  renderRowIndex = rowIndex,
   isLastRow,
   draftValue,
   dirtyCell = false,
@@ -197,8 +199,8 @@ export function GridCell<T extends object>({
         borderLeftColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
         gridRow: mergeInfo?.isStart
-          ? `${rowIndex + 1} / span ${mergeInfo.span}`
-          : rowIndex + 1,
+          ? `${renderRowIndex + 1} / span ${mergeInfo.span}`
+          : renderRowIndex + 1,
         borderTop: hideRangeStartBorder ? 0 : merged ? 0 : 1,
         borderBottom: getGridCellBottomBorder(
           isLastRow,

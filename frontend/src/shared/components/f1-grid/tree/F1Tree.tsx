@@ -22,7 +22,12 @@ import type {
   F1TreeRef,
 } from '../types/grid.types';
 import { getGridRowId, getStateKey } from '../utils/grid.utils';
-import { projectTreeRows, type F1TreeProjection } from './TreeProjection';
+import {
+  createTreeIndex,
+  projectTreeIndex,
+  type F1TreeIndex,
+  type F1TreeProjection,
+} from './TreeProjection';
 
 function F1TreeInner<T extends object>(
   {
@@ -52,6 +57,16 @@ function F1TreeInner<T extends object>(
     rows: [],
     metaById: {},
   });
+  const treeIndexCacheRef = useRef<
+    | {
+        rows: T[];
+        rowKey: keyof T;
+        parentKey: keyof T;
+        getRowOrder?: (row: T) => number;
+        index: F1TreeIndex<T>;
+      }
+    | undefined
+  >(undefined);
   const allParentIds = useMemo(
     () =>
       rows
@@ -168,11 +183,32 @@ function F1TreeInner<T extends object>(
   }, [allParentIds, defaultExpandAll]);
 
   const projectRows = (gridRows: T[]) => {
-    const projection = projectTreeRows(
-      gridRows,
-      { rowKey, parentKey, getRowOrder },
-      expandedIds,
-    );
+    const cached = treeIndexCacheRef.current;
+    let treeIndex = cached?.index;
+    if (
+      !cached ||
+      cached.rows !== gridRows ||
+      cached.rowKey !== rowKey ||
+      cached.parentKey !== parentKey ||
+      cached.getRowOrder !== getRowOrder
+    ) {
+      treeIndex = createTreeIndex(gridRows, {
+        rowKey,
+        parentKey,
+        getRowOrder,
+      });
+      treeIndexCacheRef.current = {
+        rows: gridRows,
+        rowKey,
+        parentKey,
+        getRowOrder,
+        index: treeIndex,
+      };
+    }
+    if (!treeIndex) {
+      return { rows: gridRows };
+    }
+    const projection = projectTreeIndex(treeIndex, expandedIds);
     const rowsWithHierarchyMetadata = projection.rows.map((row) => {
       const rowId = getGridRowId(row, rowKey);
       const metadata = projection.metaById[getStateKey(rowId)];
@@ -316,6 +352,8 @@ function F1TreeInner<T extends object>(
       {...gridProps}
       rows={rows}
       rowKey={rowKey}
+      disableSorting
+      disableFiltering
       onChangesChange={handleChangesChange}
       rowProjection={(gridRows) => projectRows(gridRows)}
       treeContextMenu={{
