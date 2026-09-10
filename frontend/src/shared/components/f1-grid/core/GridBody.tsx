@@ -267,8 +267,10 @@ export function GridBody<T extends object>({
             onStartEdit={onStartEdit}
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}
-            onUpdateCell={(field, value) => onUpdateRow(rowId, field, value)}
-            onUpdateRow={(changes) => onPatchRow(rowId, changes)}
+            onUpdateCell={(field: keyof T, value: unknown) =>
+              onUpdateRow(rowId, field, value)
+            }
+            onUpdateRow={(changes: Partial<T>) => onPatchRow(rowId, changes)}
             getCellError={getCellError}
             onStopEdit={onStopEdit}
             onCellRef={onCellRef}
@@ -279,10 +281,12 @@ export function GridBody<T extends object>({
             maxRowHeight={maxRowHeight}
             resizableRows={resizableRows}
             onUpdateRowHeight={onUpdateRowHeight}
-            getMergeEditing={(columnIndex) =>
+            getMergeEditing={(columnIndex: number) =>
               getMergeEditing(rowIndex, columnIndex)
             }
-            getMerged={(ri, ci, val) => getMerged(ri, ci, val)}
+            getMerged={(ri: number, ci: number, val: unknown) =>
+              getMerged(ri, ci, val)
+            }
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
