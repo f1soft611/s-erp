@@ -372,6 +372,109 @@ describe('F1-GRID loading overlay', () => {
     expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeGreaterThanOrEqual(0);
   });
 
+  it('positions the selection overlay in scrolled content coordinates', async () => {
+    const rowsWithLongList = [
+      { id: 'row-1', code: 'A', name: 'Alpha' },
+      { id: 'row-2', code: 'B', name: 'Beta' },
+    ];
+
+    render(
+      <F1Grid
+        rows={rowsWithLongList}
+        columns={[
+          { field: 'code', headerName: 'Code', width: 160 },
+          { field: 'name', headerName: 'Name', width: 160 },
+        ]}
+        rowKey="id"
+        height={180}
+      />,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'scrollTop', {
+      configurable: true,
+      value: 210,
+      writable: true,
+    });
+    Object.defineProperty(bodyScroll, 'scrollLeft', {
+      configurable: true,
+      value: 120,
+      writable: true,
+    });
+    Object.defineProperty(bodyScroll, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 20,
+        top: 10,
+        right: 420,
+        bottom: 190,
+        width: 400,
+        height: 180,
+        x: 20,
+        y: 10,
+        toJSON: () => ({}),
+      }),
+    });
+
+    const startCell = screen.getByRole('gridcell', { name: 'A' });
+    const endCell = screen.getByRole('gridcell', { name: 'Beta' });
+    Object.defineProperty(startCell, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 80,
+        top: 220,
+        right: 240,
+        bottom: 260,
+        width: 160,
+        height: 40,
+        x: 80,
+        y: 220,
+        toJSON: () => ({}),
+      } as DOMRect),
+    });
+    Object.defineProperty(endCell, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 80,
+        top: 260,
+        right: 240,
+        bottom: 300,
+        width: 160,
+        height: 40,
+        x: 80,
+        y: 260,
+        toJSON: () => ({}),
+      } as DOMRect),
+    });
+    Object.defineProperty(bodyScroll, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 20,
+        top: 10,
+        right: 420,
+        bottom: 190,
+        width: 400,
+        height: 180,
+        x: 20,
+        y: 10,
+        toJSON: () => ({}),
+      } as DOMRect),
+    });
+
+    fireEvent.mouseDown(startCell);
+    fireEvent.mouseEnter(endCell);
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-range-overlay="drag"]')).not.toBeNull();
+    });
+
+    const overlay = document.querySelector(
+      '[data-range-overlay="drag"]',
+    ) as HTMLElement;
+    expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeCloseTo(181, 1);
+    expect(Number.parseFloat(getComputedStyle(overlay).top)).toBeCloseTo(421, 1);
+  });
+
   it('continues the range drag after the viewport scrolls while the pointer stays in place', async () => {
     const largeRows = Array.from({ length: 80 }, (_, index) => ({
       id: `row-${index}`,

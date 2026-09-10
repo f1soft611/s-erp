@@ -2281,19 +2281,15 @@ function F1GridInner<T extends object>(
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
     const scrollLeft = bodyScrollRef.current.scrollLeft;
-    const topLeftField = visibleColumns[minColumnIndex];
-    const topLeftPinnedSide =
-      topLeftField !== undefined
-        ? pinnedFields.get(String(topLeftField.field))
-        : undefined;
-    const leftScrollCompensation =
-      topLeftPinnedSide === 'left' ? scrollLeft : -scrollLeft;
     const next = {
-      left: Math.max(
+      left: Math.max(0, topLeftRect.left - containerRect.left + scrollLeft + 1),
+      top: Math.max(
         0,
-        topLeftRect.left - containerRect.left + leftScrollCompensation + 1,
+        topLeftRect.top -
+          containerRect.top +
+          bodyScrollRef.current.scrollTop +
+          1,
       ),
-      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
       width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
       height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
