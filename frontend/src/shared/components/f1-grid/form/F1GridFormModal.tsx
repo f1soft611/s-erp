@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, SyntheticEvent } from 'react';
 import type {
   F1GridColumn,
   F1GridFormMode,
@@ -37,6 +37,7 @@ export type F1GridFormModalProps<T extends object> = {
   externalErrors?: Record<string, string>;
   onCancel: () => void;
   onApply: (draftRow: T) => void;
+  onDraftChange?: (fields: string[]) => void;
 };
 
 export function F1GridFormModal<T extends object>({
@@ -50,6 +51,7 @@ export function F1GridFormModal<T extends object>({
   externalErrors = {},
   onCancel,
   onApply,
+  onDraftChange,
 }: F1GridFormModalProps<T>) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -107,6 +109,7 @@ export function F1GridFormModal<T extends object>({
     setDraftRow((current) => ({ ...current, ...patch }));
     const patchedFields = Object.keys(patch);
     if (patchedFields.length === 0) return;
+    onDraftChange?.(patchedFields);
     setValidationErrors((current) => {
       const nextErrors = { ...current };
       patchedFields.forEach((field) => delete nextErrors[field]);
@@ -138,10 +141,18 @@ export function F1GridFormModal<T extends object>({
     onApply(appliedDraft);
   };
 
+  const stopGridEventPropagation = (event: SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
   return (
     <Dialog
       open={open}
       onClose={onCancel}
+      onContextMenu={stopGridEventPropagation}
+      onCopy={stopGridEventPropagation}
+      onKeyDown={stopGridEventPropagation}
+      onPaste={stopGridEventPropagation}
       fullScreen={fullScreen}
       fullWidth
       maxWidth={false}

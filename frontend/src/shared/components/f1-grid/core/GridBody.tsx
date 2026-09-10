@@ -63,6 +63,8 @@ type GridBodyProps<T extends object> = {
   ) => { side: 'left' | 'right'; offset: number } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   showCheckbox?: boolean;
+  showFormAction?: boolean;
+  onOpenRowForm?: (row: T) => void;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -124,6 +126,8 @@ export function GridBody<T extends object>({
   getPinOffset,
   cellAdornment,
   showCheckbox = true,
+  showFormAction = false,
+  onOpenRowForm,
 }: GridBodyProps<T>) {
   function getMergeEditing(rowIndex: number, columnIndex: number): boolean {
     const column = columns[columnIndex];
@@ -256,6 +260,8 @@ export function GridBody<T extends object>({
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
+            showFormAction={showFormAction}
+            onOpenRowForm={onOpenRowForm}
           />
         );
       })}

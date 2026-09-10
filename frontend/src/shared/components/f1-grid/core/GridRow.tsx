@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
+import { GridFormActionCell } from '../form/GridFormActionCell';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
 
 type GridRowProps<T extends object> = {
@@ -73,6 +74,8 @@ type GridRowProps<T extends object> = {
   ) => { side: 'left' | 'right'; offset: number } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   showCheckbox?: boolean;
+  showFormAction?: boolean;
+  onOpenRowForm?: (row: T) => void;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -190,6 +193,8 @@ export function GridRow<T extends object>({
   getPinOffset,
   cellAdornment,
   showCheckbox = true,
+  showFormAction = false,
+  onOpenRowForm,
 }: GridRowProps<T>) {
   const resizeStateRef = useRef<{
     startY: number;
@@ -443,6 +448,15 @@ export function GridRow<T extends object>({
           />
         );
       })}
+      {showFormAction && onOpenRowForm ? (
+        <GridFormActionCell
+          rowId={rowId}
+          rowIndex={rowIndex}
+          columnIndex={(showCheckbox ? 2 : 1) + columns.length}
+          isLastRow={rowIndex === visibleRows.length - 1}
+          onEdit={() => onOpenRowForm(row)}
+        />
+      ) : null}
       {resizableRows ? (
         <Box
           component="button"

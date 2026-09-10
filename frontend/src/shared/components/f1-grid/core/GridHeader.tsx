@@ -83,6 +83,7 @@ type GridHeaderProps<T extends object> = {
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
   editableColumnFields?: Set<string>;
+  showFormAction?: boolean;
   onReorderColumn?: (
     sourceField: string,
     targetField: string,
@@ -118,6 +119,7 @@ export function GridHeader<T extends object>({
   leftOffsets,
   rightOffsets,
   editableColumnFields,
+  showFormAction = false,
   onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
@@ -624,6 +626,33 @@ export function GridHeader<T extends object>({
             </Box>
           );
         })}
+        {showFormAction ? (
+          <Box
+            role="columnheader"
+            aria-label="상세"
+            sx={{
+              alignItems: 'center',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgb(28, 36, 50)'
+                  : 'rgb(232, 236, 244)',
+              borderLeft: 1,
+              borderColor: 'divider',
+              boxSizing: 'border-box',
+              display: 'flex',
+              gridColumn: (showCheckbox ? 2 : 1) + columns.length,
+              gridRow: hasGroups ? '1 / span 2' : undefined,
+              justifyContent: 'center',
+              minHeight: 28,
+              position: 'sticky',
+              right: 0,
+              width: '100%',
+              zIndex: 4,
+            }}
+          >
+            상세
+          </Box>
+        ) : null}
       </Box>
       <Menu
         anchorEl={menuAnchor}

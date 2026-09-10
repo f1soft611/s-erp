@@ -35,6 +35,7 @@ export function getGridColumnPinOffsets<T extends object>(
   pinnedFields: Map<string, F1GridPinSide>,
   columnWidths?: Record<string, number>,
   checkboxWidth = 44,
+  trailingOffset = 0,
 ): GridColumnPinOffsets {
   const leftOffsets: Record<string, number> = {};
   const rightOffsets: Record<string, number> = {};
@@ -48,7 +49,7 @@ export function getGridColumnPinOffsets<T extends object>(
     leftCursor += colWidth;
   });
 
-  let rightCursor = 0;
+  let rightCursor = trailingOffset;
   [...columns].reverse().forEach((column) => {
     if (pinnedFields.get(String(column.field)) !== 'right') return;
     rightOffsets[String(column.field)] = rightCursor;

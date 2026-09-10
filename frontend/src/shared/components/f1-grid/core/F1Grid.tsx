@@ -16,6 +16,7 @@ import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
+import { F1GridFormModal } from '../form/F1GridFormModal';
 import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
@@ -77,11 +78,18 @@ type F1GridCell = {
   columnIndex: number;
 };
 
+type F1GridRowFormSession<T extends object> = {
+  mode: 'create' | 'edit';
+  row: T;
+  originalRow?: T;
+};
+
 function F1GridInner<T extends object>(
   {
     rows,
     columns,
     rowKey,
+    rowFormPlugin,
     ariaLabel = 'F1-GRID',
     columnLine = false,
     storageKey,
@@ -147,6 +155,12 @@ function F1GridInner<T extends object>(
   } | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+  const [rowFormSession, setRowFormSession] = useState<
+    F1GridRowFormSession<T> | undefined
+  >();
+  const [rowFormErrors, setRowFormErrors] = useState<Record<string, string>>(
+    {},
+  );
   const displayScale = useOptionalDisplayScale();
   const normalizedMinRowHeight = Math.max(1, minRowHeight * displayScale);
   const normalizedMaxRowHeight = Math.max(
@@ -221,6 +235,9 @@ function F1GridInner<T extends object>(
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
   const activeEditorPlugins = (editorPlugins ?? editors ?? []).filter(
     (plugin) => plugin && (plugin.enabled ?? true),
+  );
+  const rowFormActive = Boolean(
+    rowFormPlugin && rowFormPlugin.enabled !== false,
   );
 
   function resolveEditContext(
@@ -315,14 +332,18 @@ function F1GridInner<T extends object>(
     pinnedFields,
     columnWidths,
     showCheckbox ? 44 : 0,
+    rowFormActive ? 48 : 0,
   );
-  const columnTracks = getGridColumnTracks(
+  const dataColumnTracks = getGridColumnTracks(
     visibleColumns,
     columnWidths,
     pinnedFields,
     gridContainerWidth,
     showCheckbox ? 44 : 0,
   );
+  const columnTracks = rowFormActive
+    ? `${dataColumnTracks}${dataColumnTracks ? ' ' : ''}48px`
+    : dataColumnTracks;
 
   useLayoutEffect(() => {
     const container = gridContainerRef.current;
@@ -1034,6 +1055,13 @@ function F1GridInner<T extends object>(
 
     const baseRow = createRow ? createRow() : ({} as T);
     const newRow = { ...baseRow, ...row } as T;
+    if (rowFormActive) {
+      const newRowId = newRow[rowKey];
+      if (typeof newRowId !== 'string' && typeof newRowId !== 'number') return;
+      setRowFormErrors({});
+      setRowFormSession({ mode: 'create', row: { ...newRow } });
+      return;
+    }
     const newRowId = getGridRowId(newRow, rowKey);
 
     setData((current) => addGridRow(current, newRow, rowKey));
@@ -1045,6 +1073,62 @@ function F1GridInner<T extends object>(
     if (firstEditableCol >= 0) {
       setFocusedCell(getCell(newRowId, firstEditableCol));
     }
+  }
+
+  function openEditRowForm(row: T) {
+    setRowFormErrors({});
+    setRowFormSession({
+      mode: 'edit',
+      row: { ...row },
+      originalRow: { ...row },
+    });
+  }
+
+  function closeRowForm() {
+    setRowFormSession(undefined);
+    setRowFormErrors({});
+  }
+
+  function applyRowForm(draftRow: T) {
+    if (!rowFormSession) return;
+
+    if (rowFormSession.mode === 'create') {
+      const draftRowId = getGridRowId(draftRow, rowKey);
+      const duplicate = data.rows.some(
+        (row) => getGridRowId(row, rowKey) === draftRowId,
+      );
+      if (duplicate) {
+        setRowFormErrors({
+          [String(rowKey)]: '이미 존재하는 행 ID입니다.',
+        });
+        return;
+      }
+
+      setData((current) => addGridRow(current, draftRow, rowKey));
+      setSelectedIds([draftRowId]);
+      closeRowForm();
+      return;
+    }
+
+    const originalRow = rowFormSession.originalRow;
+    if (!originalRow) return;
+    const patch = Object.fromEntries(
+      Object.keys(draftRow)
+        .filter(
+          (field) =>
+            !areGridValuesEqual(
+              originalRow[field as keyof T],
+              draftRow[field as keyof T],
+            ),
+        )
+        .map((field) => [field, draftRow[field as keyof T]]),
+    ) as Partial<T>;
+
+    if (Object.keys(patch).length > 0) {
+      const rowId = getGridRowId(originalRow, rowKey);
+      setData((current) => updateGridRow(current, rowKey, rowId, patch));
+    }
+    closeRowForm();
   }
 
   function setCellSelectionRange(start: F1GridCell, end: F1GridCell) {
@@ -1598,6 +1682,7 @@ function F1GridInner<T extends object>(
           leftOffsets={leftOffsets}
           rightOffsets={rightOffsets}
           editableColumnFields={editableColumnFields}
+          showFormAction={rowFormActive}
           onReorderColumn={reorderColumn}
         />
       </Box>
@@ -1684,6 +1769,8 @@ function F1GridInner<T extends object>(
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
+            showFormAction={rowFormActive}
+            onOpenRowForm={openEditRowForm}
           />
         ) : null}
         {rangeOverlay ? (
@@ -1797,6 +1884,29 @@ function F1GridInner<T extends object>(
           설정을 기본값으로 복원
         </MenuItem>
       </Menu>
+      {rowFormActive && rowFormPlugin && rowFormSession ? (
+        <F1GridFormModal
+          open
+          mode={rowFormSession.mode}
+          row={rowFormSession.row}
+          originalRow={rowFormSession.originalRow}
+          columns={columns}
+          rowKey={rowKey}
+          plugin={rowFormPlugin}
+          externalErrors={rowFormErrors}
+          onCancel={closeRowForm}
+          onApply={applyRowForm}
+          onDraftChange={(fields) => {
+            setRowFormErrors((current) =>
+              Object.fromEntries(
+                Object.entries(current).filter(
+                  ([field]) => !fields.includes(field),
+                ),
+              ),
+            );
+          }}
+        />
+      ) : null}
     </Box>
   );
 }

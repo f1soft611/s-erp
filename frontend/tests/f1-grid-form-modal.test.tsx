@@ -1,12 +1,21 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { F1Grid } from '../src/shared/components/f1-grid';
+import { getGridColumnPinOffsets } from '../src/shared/components/f1-grid/columns/GridColumnPin';
 import { F1GridFormModal } from '../src/shared/components/f1-grid/form/F1GridFormModal';
 import { GridFormField } from '../src/shared/components/f1-grid/form/GridFormField';
 import {
   buildGridFormSections,
   isGridFormFieldReadOnly,
 } from '../src/shared/components/f1-grid/form/GridFormModel';
-import type { F1GridColumn } from '../src/shared/components/f1-grid';
+import type { F1GridColumn, F1GridRef } from '../src/shared/components/f1-grid';
 
 type FormRow = {
   id: string;
@@ -678,6 +687,45 @@ describe('row form modal', () => {
     expect(onCancel).toHaveBeenCalledTimes(3);
   });
 
+  it('isolates portal field events from grid ancestor handlers', () => {
+    const onCopy = vi.fn();
+    const onPaste = vi.fn();
+    const onContextMenu = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <div
+        onCopy={onCopy}
+        onPaste={onPaste}
+        onContextMenu={onContextMenu}
+        onKeyDown={onKeyDown}
+      >
+        <F1GridFormModal
+          open
+          mode="edit"
+          row={modalRow}
+          originalRow={modalRow}
+          columns={createModalColumns()}
+          rowKey="id"
+          plugin={{}}
+          onCancel={vi.fn()}
+          onApply={vi.fn()}
+        />
+      </div>,
+    );
+
+    const input = screen.getByRole('textbox', { name: /성명/ });
+    fireEvent.copy(input);
+    fireEvent.paste(input);
+    fireEvent.contextMenu(input);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    expect(onCopy).not.toHaveBeenCalled();
+    expect(onPaste).not.toHaveBeenCalled();
+    expect(onContextMenu).not.toHaveBeenCalled();
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
   it('renders fixed modal regions, responsive grid span contracts, and final-save guidance', () => {
     renderRowFormModal();
 
@@ -728,5 +776,326 @@ describe('row form modal', () => {
         value: originalMatchMedia,
       });
     }
+  });
+});
+
+type IntegratedFormRow = {
+  id: string;
+  name: string;
+  status: string;
+};
+
+const integratedRows: IntegratedFormRow[] = [
+  { id: 'ROW-001', name: '첫 번째 행', status: '사용' },
+];
+
+const integratedColumns: F1GridColumn<IntegratedFormRow>[] = [
+  { field: 'name', headerName: '이름', editable: true, width: 120 },
+  { field: 'status', headerName: '상태', pinned: 'right', width: 80 },
+];
+
+describe('F1-Grid row form integration', () => {
+  it('renders the synthetic action column only when the row form plugin is active', () => {
+    const { rerender } = render(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole('columnheader', { name: '상세' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'ROW-001 행 정보 수정' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(3);
+
+    rerender(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{ enabled: false }}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('columnheader', { name: '상세' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'ROW-001 행 정보 수정' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(2);
+  });
+
+  it('appends one 48px track for the active action column without changing data columns', () => {
+    render(
+      <F1Grid
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    const actionHeader = screen.getByRole('columnheader', { name: '상세' });
+    const actionCell = screen
+      .getByRole('button', { name: 'ROW-001 행 정보 수정' })
+      .closest('[role="gridcell"]');
+    expect(actionHeader.parentElement).toHaveStyle({
+      gridTemplateColumns: '120px 80px 48px',
+    });
+    expect(actionCell).toHaveStyle({ gridColumn: '3' });
+    expect(integratedColumns).toHaveLength(2);
+    expect(integratedRows[0]).toEqual({
+      id: 'ROW-001',
+      name: '첫 번째 행',
+      status: '사용',
+    });
+  });
+
+  it('adds the action column width to right pinned offsets', () => {
+    const pinnedFields = new Map<string, 'left' | 'right'>([
+      ['status', 'right'],
+    ]);
+
+    expect(
+      getGridColumnPinOffsets(
+        integratedColumns,
+        pinnedFields,
+        undefined,
+        0,
+        48,
+      ),
+    ).toEqual({
+      leftOffsets: {},
+      rightOffsets: { status: 48 },
+    });
+  });
+
+  it('isolates action cell events from row selection and the grid context menu', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+      />,
+    );
+
+    const editButton = screen.getByRole('button', {
+      name: 'ROW-001 행 정보 수정',
+    });
+    const actionCell = editButton.closest('[role="gridcell"]');
+    expect(actionCell).not.toBeNull();
+
+    fireEvent.contextMenu(actionCell as Element);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    fireEvent.click(editButton);
+    expect(gridRef.current?.getSelectedRowIds()).toEqual([]);
+    expect(
+      screen.getByRole('dialog', { name: '정보 수정' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens an isolated edit draft and discards it on cancel', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ROW-001 행 정보 수정' }),
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+      target: { value: '취소할 이름' },
+    });
+
+    expect(gridRef.current?.getRows()[0].name).toBe('첫 번째 행');
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(gridRef.current?.getRows()).toEqual(integratedRows);
+    expect(gridRef.current?.getChanges()).toEqual({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+  });
+
+  it('applies only changed edit fields and closes without changes for an equal draft', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ROW-001 행 정보 수정' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ROW-001 행 정보 수정' }),
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+      target: { value: '변경된 이름' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(gridRef.current?.getRows()[0]).toEqual({
+      ...integratedRows[0],
+      name: '변경된 이름',
+    });
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      { ...integratedRows[0], name: '변경된 이름' },
+    ]);
+    expect(
+      screen.getByRole('gridcell', { name: '변경된 이름' }),
+    ).toHaveAttribute('data-dirty-cell', 'true');
+    expect(screen.getByRole('gridcell', { name: '사용' })).toHaveAttribute(
+      'data-dirty-cell',
+      'false',
+    );
+  });
+
+  it('opens a create draft from createRow and partial values and cancels without insertion', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        createRow={() => ({ id: 'ROW-002', name: '', status: '대기' })}
+      />,
+    );
+
+    act(() => gridRef.current?.addRow({ name: '부분 입력' }));
+
+    expect(
+      screen.getByRole('dialog', { name: '신규 등록' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue(
+      '부분 입력',
+    );
+    expect(gridRef.current?.getRows()).toEqual(integratedRows);
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([]);
+  });
+
+  it('adds a valid create draft only when apply is clicked', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        createRow={() => ({ id: 'ROW-002', name: '', status: '대기' })}
+      />,
+    );
+
+    act(() => gridRef.current?.addRow());
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+      target: { value: '신규 행' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([
+      { id: 'ROW-002', name: '신규 행', status: '대기' },
+    ]);
+  });
+
+  it('does not open a create draft without a valid row key', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={integratedRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => gridRef.current?.addRow({ name: '식별자 없음' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(gridRef.current?.getRows()).toEqual(integratedRows);
+  });
+
+  it('keeps a duplicate create draft open with a row key error and allows correction', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    const columnsWithId: F1GridColumn<IntegratedFormRow>[] = [
+      { field: 'id', headerName: '행 ID', editable: true, required: true },
+      ...integratedColumns,
+    ];
+    const rowsWithSecondId = [
+      ...integratedRows,
+      { id: 'ROW-002', name: '두 번째 행', status: '사용' },
+    ];
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={rowsWithSecondId}
+        columns={columnsWithId}
+        rowKey="id"
+        rowFormPlugin={{}}
+        createRow={() => ({ id: 'ROW-001', name: '중복 행', status: '대기' })}
+      />,
+    );
+
+    act(() => gridRef.current?.addRow());
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('이미 존재하는 행 ID입니다.')).toBeInTheDocument();
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([]);
+
+    fireEvent.change(screen.getByRole('textbox', { name: /행 ID/ }), {
+      target: { value: 'ROW-002' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(screen.getByText('이미 존재하는 행 ID입니다.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('textbox', { name: /행 ID/ }), {
+      target: { value: 'ROW-003' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([
+      { id: 'ROW-003', name: '중복 행', status: '대기' },
+    ]);
   });
 });
