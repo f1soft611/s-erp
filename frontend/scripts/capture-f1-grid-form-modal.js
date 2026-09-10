@@ -119,6 +119,26 @@ async function openDashboardMenuIfNeeded(page, target) {
   await target.waitFor({ state: 'visible' });
 }
 
+async function waitForDashboardOverlayToClear(page) {
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll('.MuiBackdrop-root')).every(
+      (backdrop) => {
+        const style = getComputedStyle(backdrop);
+        const rect = backdrop.getBoundingClientRect();
+
+        return (
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          style.opacity === '0' ||
+          style.pointerEvents === 'none' ||
+          rect.width === 0 ||
+          rect.height === 0
+        );
+      },
+    ),
+  );
+}
+
 async function openRowFormPlayground(page) {
   await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
 
@@ -136,6 +156,17 @@ async function openRowFormPlayground(page) {
   await openDashboardMenuIfNeeded(page, docsMenu);
   await docsMenu.click();
 
+  const visibleDashboardDrawer = page.locator('.MuiDrawer-paper:visible');
+  const dashboardMenuClose = visibleDashboardDrawer
+    .getByRole('button', { name: '메뉴 닫기', exact: true })
+    .first();
+  if (await dashboardMenuClose.isVisible()) {
+    await dashboardMenuClose.focus();
+    await dashboardMenuClose.press('Enter');
+    await visibleDashboardDrawer.waitFor({ state: 'hidden' });
+  }
+  await waitForDashboardOverlayToClear(page);
+
   const docsNavigation = page.getByRole('navigation', {
     name: 'F1-Grid documentation',
   });
@@ -144,9 +175,11 @@ async function openRowFormPlayground(page) {
     exact: true,
   });
   if (!(await rowFormDocument.isVisible())) {
-    await page
-      .getByRole('button', { name: 'Open documentation menu' })
-      .click();
+    const docsMenuButton = page.getByRole('button', {
+      name: 'Open documentation menu',
+    });
+    await docsMenuButton.focus();
+    await docsMenuButton.press('Enter');
   }
   await rowFormDocument.waitFor({ state: 'visible' });
   await rowFormDocument.click();
@@ -164,15 +197,16 @@ async function setTheme(page, theme) {
   if (currentColorScheme === expectedColorScheme) return;
 
   await page.getByRole('button', { name: '테마 설정' }).click();
+  const themeMenuItem = page.getByRole('menuitem', {
+    name: theme === 'dark' ? '다크 테마' : '밝은 테마',
+    exact: true,
+  });
+  await themeMenuItem.click();
   await page
-    .getByRole('menuitem', {
-      name: theme === 'dark' ? '다크 테마' : '밝은 테마',
-      exact: true,
-    })
-    .click();
+    .locator('#theme-settings-menu .MuiBackdrop-root')
+    .waitFor({ state: 'detached' });
   await page.waitForFunction(
-    (colorScheme) =>
-      document.documentElement.style.colorScheme === colorScheme,
+    (colorScheme) => document.documentElement.style.colorScheme === colorScheme,
     expectedColorScheme,
   );
 }
@@ -184,10 +218,10 @@ async function assertModalLayout(page, capture) {
   await dialog.getByRole('heading', { name: '운영 정보' }).waitFor();
 
   const metrics = await dialog.evaluate((element) => {
-    const paper = element.querySelector('.MuiDialog-paper');
-    const formGrid = element.querySelector(
-      '[data-testid="f1-grid-form-grid"]',
-    );
+    const paper = element.matches('.MuiDialog-paper')
+      ? element
+      : element.querySelector('.MuiDialog-paper');
+    const formGrid = element.querySelector('[data-testid="f1-grid-form-grid"]');
     if (!(paper instanceof HTMLElement) || !(formGrid instanceof HTMLElement)) {
       throw new Error('Dialog paper or form grid is missing');
     }
@@ -263,18 +297,18 @@ async function captureModal(page, capture) {
   await openRowFormPlayground(page);
   await setTheme(page, capture.theme);
 
-  await page
-    .getByRole('button', { name: 'one 행 정보 수정', exact: true })
-    .click();
+  const editRowButton = page.getByRole('button', {
+    name: 'one 행 정보 수정',
+    exact: true,
+  });
+  await editRowButton.focus();
+  await editRowButton.press('Enter');
 
   const metrics = await assertModalLayout(page, capture);
   const screenshotPath = path.join(screenshotDirectory, capture.fileName);
   await page.screenshot({ path: screenshotPath, fullPage: false });
   const screenshotStat = await fs.stat(screenshotPath);
-  assert(
-    screenshotStat.size > 0,
-    `Screenshot is blank: ${screenshotPath}`,
-  );
+  assert(screenshotStat.size > 0, `Screenshot is blank: ${screenshotPath}`);
 
   console.log(
     JSON.stringify({
