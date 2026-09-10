@@ -346,6 +346,80 @@ const treeColumns: F1GridColumn<TreeDemoRow>[] = [
   { field: 'owner', headerName: '담당자', width: 120, editable: false },
 ];
 
+function ContextMenuPlayground() {
+  const gridRef = useRef<F1GridRef<DemoRow>>(null);
+  const [rows, setRows] = useState(baseRows);
+  const [exportEnabled, setExportEnabled] = useState(true);
+  const [showAddRow, setShowAddRow] = useState(true);
+  const [showDuplicateRow, setShowDuplicateRow] = useState(true);
+  const [showDeleteRow, setShowDeleteRow] = useState(true);
+
+  function createDuplicate(row: DemoRow): DemoRow {
+    return {
+      ...row,
+      id: `${row.id}-copy-${Math.random().toString(36).slice(2, 8)}`,
+    };
+  }
+
+  return (
+    <Box className="f1-doc-playground" data-testid="f1-grid-doc-playground">
+      <Box className="f1-doc-playground-controls">
+        <Typography variant="subtitle1">Try it</Typography>
+        <Typography variant="body2">
+          우클릭 메뉴는 엑셀 내보내기와 같은 자주 쓰는 액션을 한 번에
+          제공합니다.
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+          <Button
+            size="small"
+            onClick={() => setExportEnabled((value) => !value)}
+          >
+            Toggle export menu
+          </Button>
+          <Button size="small" onClick={() => setShowAddRow((value) => !value)}>
+            Toggle add row
+          </Button>
+          <Button
+            size="small"
+            onClick={() => setShowDuplicateRow((value) => !value)}
+          >
+            Toggle duplicate row
+          </Button>
+          <Button
+            size="small"
+            onClick={() => setShowDeleteRow((value) => !value)}
+          >
+            Toggle delete row
+          </Button>
+        </Box>
+      </Box>
+      <Box className="f1-doc-grid-wrap">
+        <F1Grid
+          ref={gridRef}
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="F1-Grid context menu example"
+          height={260}
+          showCheckbox
+          canExportExcel={exportEnabled}
+          excelFileName="f1-grid-context-menu-demo"
+          allowAddRowInContextMenu={showAddRow}
+          allowDuplicateRowInContextMenu={showDuplicateRow}
+          allowDeleteRowInContextMenu={showDeleteRow}
+          createDuplicate={createDuplicate}
+          onSelectionChange={() => {
+            gridRef.current?.getSelectedRows();
+          }}
+        />
+      </Box>
+      <Button size="small" onClick={() => setRows(baseRows)}>
+        Reset sample
+      </Button>
+    </Box>
+  );
+}
+
 function RowFormModalPlayground() {
   const gridRef = useRef<F1GridRef<RowFormDemoRow>>(null);
   const nextRowNumber = useRef(rowFormRows.length + 1);
@@ -446,6 +520,10 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
 
   if (kind === 'row-form-modal') {
     return <RowFormModalPlayground />;
+  }
+
+  if (kind === 'context-menu') {
+    return <ContextMenuPlayground />;
   }
 
   if (kind === 'tree') {

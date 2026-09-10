@@ -48,7 +48,11 @@ export function normalizeGridNumberInput(
   decimalPlaces?: number,
 ): string {
   if (rawValue === '') return '';
-  if (!Number.isInteger(decimalPlaces) || decimalPlaces < 0) {
+  if (
+    decimalPlaces === undefined ||
+    !Number.isInteger(decimalPlaces) ||
+    decimalPlaces < 0
+  ) {
     return rawValue;
   }
 

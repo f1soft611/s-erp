@@ -19,6 +19,7 @@ import {
 } from '../../../../../shared/components/PermissionGroup';
 import {
   createMenuSaveCheckpoint,
+  replaceMenuPermissions,
   saveMenuChanges,
   saveRoleMenuPermissions,
   type MenuSaveCheckpoint,
@@ -327,9 +328,7 @@ export const MenuManagementPanel = forwardRef<
         } else {
           for (const row of permissionTargets) {
             const menuId = savedMenus.insertedMenuIds[row.id] ?? row.id;
-            await (
-              await import('../services/menuManagement.service')
-            ).replaceMenuPermissions(menuId, row.permissionCodes);
+            await replaceMenuPermissions(menuId, row.permissionCodes);
           }
         }
 

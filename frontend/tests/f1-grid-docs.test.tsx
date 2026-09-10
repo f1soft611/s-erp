@@ -176,4 +176,19 @@ describe('F1-Grid docs portal', () => {
       screen.getByRole('heading', { name: 'F1TreeRef' }),
     ).toBeInTheDocument();
   });
+
+  it('documents the current grid props and provides a live context-menu sample', () => {
+    render(<F1GridDocsPage initialDocumentId="context-menu" />);
+
+    expect(screen.getByText('minHeight')).toBeInTheDocument();
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(screen.getByText('allowAddRowInContextMenu')).toBeInTheDocument();
+    expect(
+      screen.getByText('allowDuplicateRowInContextMenu'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('allowDeleteRowInContextMenu')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Toggle export menu' }),
+    ).toBeInTheDocument();
+  });
 });

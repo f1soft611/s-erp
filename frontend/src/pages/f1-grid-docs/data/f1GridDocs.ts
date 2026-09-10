@@ -77,6 +77,7 @@ export const f1GridDocs: F1GridDoc[] = [
           ['columnLine', 'boolean', '컬럼 사이 세로 구분선 표시 여부'],
           ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
           [
             'onChangesChange',
@@ -553,6 +554,24 @@ export const f1GridDocs: F1GridDoc[] = [
           ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
           ['excelFileName', 'string', '다운로드 파일명 기본값'],
           [
+            'allowAddRowInContextMenu',
+            'boolean',
+            '우클릭 행 추가 메뉴 표시 여부',
+          ],
+          [
+            'allowDuplicateRowInContextMenu',
+            'boolean',
+            '우클릭 행 복사 메뉴 표시 여부',
+          ],
+          [
+            'allowDeleteRowInContextMenu',
+            'boolean',
+            '우클릭 행 삭제 메뉴 표시 여부',
+          ],
+          ['createDuplicate', '(row) => T', '복사용 신규 행 생성 로직'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          ['minHeight', 'number | string', '그리드 최소 높이 제어'],
+          [
             'treeContextMenu',
             'F1GridContextMenuTreeConfig',
             'F1Tree가 내부적으로 주입하는 트리 전용 콜백',
@@ -562,10 +581,22 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'code',
         heading: 'Enable the export menu',
-        code: '<F1Tree rows={rows} rowKey="id" parentKey="parentId" treeColumn="name" canExportExcel={hasExcelPermission} excelFileName="menu-export" />',
+        code: `const columns = [{ field: 'name', headerName: '메뉴명', width: 220, editable: true }];
+
+<F1Grid
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  canExportExcel
+  excelFileName="menu-export"
+  allowAddRowInContextMenu
+  allowDuplicateRowInContextMenu
+  allowDeleteRowInContextMenu
+  createDuplicate={(row) => ({ ...row, id: crypto.randomUUID() })}
+/>`,
       },
     ],
-    playground: 'tree',
+    playground: 'context-menu',
   },
   {
     id: 'tree-grid',
@@ -695,6 +726,13 @@ export const f1GridDocs: F1GridDoc[] = [
             '표시 행 가공 (Tree 등에서 사용)',
           ],
           ['cellAdornment', '(row, column) => ReactNode', '셀 앞 장식 렌더링'],
+          ['minHeight', 'number | string', '그리드 최소 높이 제어'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'allowAddRowInContextMenu / allowDuplicateRowInContextMenu / allowDeleteRowInContextMenu',
+            'boolean',
+            '우클릭 메뉴 액션 노출 제어',
+          ],
           [
             'disableSorting / disableFiltering',
             'boolean',

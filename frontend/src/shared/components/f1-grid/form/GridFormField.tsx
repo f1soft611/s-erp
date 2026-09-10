@@ -59,6 +59,7 @@ export function GridFormField<T extends object>({
   const helperTextId = `${fieldName}-form-helper-text`;
   const displayedValue = column.getValue ? column.getValue(row) : value;
   const options = column.options ?? [];
+  const isRequired = Boolean(column.required);
 
   const applyValue = (nextValue: unknown) => {
     onPatch(
@@ -69,7 +70,7 @@ export function GridFormField<T extends object>({
 
   const sharedTextFieldProps = {
     fullWidth: true,
-    label: renderRequiredFieldLabel(column.headerName, column.required),
+    label: renderRequiredFieldLabel(column.headerName, isRequired),
     margin: 'none' as const,
     required: false,
     error: Boolean(error),
@@ -107,7 +108,7 @@ export function GridFormField<T extends object>({
       htmlInput: {
         readOnly,
         'aria-describedby': error ? helperTextId : undefined,
-        'aria-required': column.required,
+        'aria-required': isRequired,
       },
       formHelperText: { id: helperTextId },
     },
@@ -115,9 +116,9 @@ export function GridFormField<T extends object>({
 
   if (column.type === 'checkbox') {
     return (
-      <FormControl error={Boolean(error)} aria-required={column.required}>
+      <FormControl error={Boolean(error)} aria-required={isRequired}>
         <FormControlLabel
-          label={renderRequiredFieldLabel(column.headerName, column.required)}
+          label={renderRequiredFieldLabel(column.headerName, isRequired)}
           sx={{
             alignItems: 'center',
             marginLeft: -0.5,
@@ -134,7 +135,7 @@ export function GridFormField<T extends object>({
                   readOnly,
                   'aria-describedby': error ? helperTextId : undefined,
                   'aria-invalid': Boolean(error),
-                  'aria-required': column.required,
+                  'aria-required': isRequired,
                 },
               }}
               onChange={(event) => {
@@ -197,7 +198,7 @@ export function GridFormField<T extends object>({
           <TextField
             {...params}
             fullWidth
-            label={renderRequiredFieldLabel(column.headerName, column.required)}
+            label={renderRequiredFieldLabel(column.headerName, isRequired)}
             margin="none"
             size="small"
             required={false}
@@ -220,7 +221,7 @@ export function GridFormField<T extends object>({
                 ...params.slotProps.htmlInput,
                 readOnly,
                 'aria-describedby': error ? helperTextId : undefined,
-                'aria-required': column.required,
+                'aria-required': isRequired,
               },
               formHelperText: { id: helperTextId },
             }}
