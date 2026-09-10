@@ -1,7 +1,4 @@
-import type {
-  F1GridColumn,
-  F1GridFormMode,
-} from '../types/grid.types';
+import type { F1GridColumn, F1GridFormMode } from '../types/grid.types';
 import { isCellEditable } from '../utils/grid.utils';
 
 export type GridFormField<T extends object> = {

@@ -455,7 +455,8 @@ export const MenuManagementPanel = forwardRef<
               treeCheckbox
               height="100%"
               getRowOrder={(row) => row.order}
-              columnLine
+              rowFormPlugin={{}}
+              columnLine={true}
               ariaLabel="F1-TREE 메뉴 관리"
               canExportExcel={canExportExcel}
               excelFileName={`${selectedModule?.moduleName ?? 'menu'}-export`}

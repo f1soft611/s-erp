@@ -272,7 +272,9 @@ async function assertModalLayout(page, capture) {
       !(paper instanceof HTMLElement) ||
       !(formGrid instanceof HTMLElement)
     ) {
-      throw new Error('Dialog backdrop, container, paper, or form grid is missing');
+      throw new Error(
+        'Dialog backdrop, container, paper, or form grid is missing',
+      );
     }
 
     const paperRect = paper.getBoundingClientRect();

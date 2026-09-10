@@ -133,9 +133,7 @@ describe('F1-Grid docs portal', () => {
       screen.getByRole('columnheader', { name: '상세' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'one 행 정보 수정' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'one 행 정보 수정' }));
 
     expect(
       screen.getByRole('dialog', { name: '정보 수정' }),

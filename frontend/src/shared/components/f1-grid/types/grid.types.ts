@@ -52,9 +52,7 @@ export type F1GridRowFormPlugin<T extends object> = {
   enabled?: boolean;
   getTitle?: (context: F1GridRowFormContext<T>) => string;
   getDescription?: (context: F1GridRowFormContext<T>) => string;
-  onBeforeApply?: (
-    context: F1GridRowFormApplyContext<T>,
-  ) => boolean | void;
+  onBeforeApply?: (context: F1GridRowFormApplyContext<T>) => boolean | void;
 };
 
 export type F1GridEditContext<T extends object> = {

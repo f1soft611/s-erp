@@ -18,6 +18,7 @@ import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPa
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
+import { pageContentMap } from '../services/dashboardData';
 import type {
   MenuPermission,
   ModuleItem,
@@ -204,7 +205,13 @@ export function DashboardContent({
     return <F1GridDocsPage />;
   }
 
-  if (selectedModule.id === 'sales' || currentPageKey === 'sales-order') {
+  const isUnknownPageKey =
+    Boolean(currentPageKey) &&
+    !Object.prototype.hasOwnProperty.call(pageContentMap, currentPageKey) &&
+    currentPageKey !== 'approval' &&
+    currentPageKey !== 'empty-access';
+
+  if (isUnknownPageKey) {
     return (
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <PageHeader

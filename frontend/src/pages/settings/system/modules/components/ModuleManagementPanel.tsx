@@ -443,6 +443,8 @@ export const ModuleManagementPanel = forwardRef<
               maxRowHeight={320}
               showCheckbox={false}
               createRow={createModuleRow}
+              rowFormPlugin={{}}
+              columnLine={true}
               editorPlugins={[
                 {
                   id: 'module-grid-editor',

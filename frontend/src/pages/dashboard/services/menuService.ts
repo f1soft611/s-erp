@@ -36,6 +36,7 @@ const toNodeId = (node: MenuNode): string =>
 const toTreeNode = (node: MenuNode): MenuTreeNode => {
   const id = toNodeId(node);
   const children = node.children?.map(toTreeNode);
+  const fallbackPageKey = id;
 
   return {
     id,
@@ -43,7 +44,7 @@ const toTreeNode = (node: MenuNode): MenuTreeNode => {
     name: node.name,
     ...(node.description ? { description: node.description } : {}),
     ...(node.path ? { path: node.path } : {}),
-    ...(children?.length ? { children } : { pageKey: id }),
+    ...(children?.length ? { children } : { pageKey: fallbackPageKey }),
     ...(node.permissions ? { permissions: node.permissions } : {}),
   };
 };
@@ -83,17 +84,16 @@ const flattenMenuTree = (nodes: MenuTreeNode[]): MenuItem[] =>
       return [];
     }
 
-    return node.pageKey
-      ? [
-          {
-            id: node.id,
-            name: node.name,
-            pageKey: node.pageKey,
-            ...(node.path ? { path: node.path } : {}),
-            ...(node.description ? { description: node.description } : {}),
-          },
-        ]
-      : [];
+    const pageKey = node.pageKey ?? node.id;
+    return [
+      {
+        id: node.id,
+        name: node.name,
+        pageKey,
+        ...(node.path ? { path: node.path } : {}),
+        ...(node.description ? { description: node.description } : {}),
+      },
+    ];
   });
 
 export const buildModuleDescriptors = (
@@ -196,12 +196,7 @@ export const getMenuPermission = (
 
 /**
  * 로그인 사용자 기준 모듈-메뉴 트리를 백엔드에서 조회한다.
- * 실패 시 null을 반환하며, 호출부는 로컬 기본 데이터로 대체 처리한다.
+ * 실패 시 예외를 그대로 던지므로, 호출부가 네트워크 오류와 빈 메뉴를 구분해서 처리해야 한다.
  */
-export const fetchMyMenus = async (): Promise<UserMenuResponse | null> => {
-  try {
-    return await apiGet<UserMenuResponse>('/api/v1/menus/my');
-  } catch {
-    return null;
-  }
-};
+export const fetchMyMenus = async (): Promise<UserMenuResponse> =>
+  apiGet<UserMenuResponse>('/api/v1/menus/my');

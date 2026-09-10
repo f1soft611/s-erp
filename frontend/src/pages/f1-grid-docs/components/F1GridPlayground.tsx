@@ -522,10 +522,12 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
         {kind === 'editing' && (
           <>
             <Typography variant="body2">
-              상태 셀은 renderCell / getCellStyle / getCellProps로 커스터마이징된
-              예시입니다.
+              상태 셀은 renderCell / getCellStyle / getCellProps로
+              커스터마이징된 예시입니다.
             </Typography>
-            <Typography variant="body2">셀을 선택해 값을 편집하세요.</Typography>
+            <Typography variant="body2">
+              셀을 선택해 값을 편집하세요.
+            </Typography>
           </>
         )}
         {kind === 'row-merge' && (

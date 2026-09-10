@@ -212,7 +212,11 @@ export const f1GridDocs: F1GridDoc[] = [
         rows: [
           ['rowFormPlugin', 'F1GridRowFormPlugin<T>', '선택형 행 폼 플러그인'],
           ['enabled', 'boolean (기본 true)', '상세 열과 모달 활성화 여부'],
-          ['getTitle / getDescription', '함수', '모드와 draft 행 기반 헤더 재정의'],
+          [
+            'getTitle / getDescription',
+            '함수',
+            '모드와 draft 행 기반 헤더 재정의',
+          ],
           [
             'onBeforeApply',
             '(context) => boolean | void',
@@ -225,7 +229,11 @@ export const f1GridDocs: F1GridDoc[] = [
         heading: 'F1GridColumn.form',
         rows: [
           ['form.hidden', 'boolean', '폼 포함 여부 재정의'],
-          ['form.readOnly', 'boolean | (row, mode) => boolean', '읽기 전용 재정의'],
+          [
+            'form.readOnly',
+            'boolean | (row, mode) => boolean',
+            '읽기 전용 재정의',
+          ],
           ['form.label', 'string', 'headerName 대신 사용할 라벨'],
           [
             'form.group',
@@ -246,17 +254,33 @@ export const f1GridDocs: F1GridDoc[] = [
         heading: 'Draft lifecycle',
         rows: [
           ['수정', '상세 → draft → 적용', '변경 필드만 기존 dirty 상태에 반영'],
-          ['신규', 'addRow() → createRow() → 적용', '적용할 때만 inserted 행 생성'],
+          [
+            '신규',
+            'addRow() → createRow() → 적용',
+            '적용할 때만 inserted 행 생성',
+          ],
           ['취소 / 닫기', 'draft 폐기', 'Grid 행과 변경 이력은 그대로 유지'],
-          ['검증 실패', '모달 유지', '오류 표시 후 첫 오류 입력으로 포커스 이동'],
-          ['서버 저장', '수행하지 않음', '기존 화면의 getChanges()와 저장 흐름이 담당'],
+          [
+            '검증 실패',
+            '모달 유지',
+            '오류 표시 후 첫 오류 입력으로 포커스 이동',
+          ],
+          [
+            '서버 저장',
+            '수행하지 않음',
+            '기존 화면의 getChanges()와 저장 흐름이 담당',
+          ],
         ],
       },
       {
         type: 'api',
         heading: 'F1-Tree and responsive behavior',
         rows: [
-          ['루트 추가', 'F1TreeRef.addRow()', '부모 기본값을 유지한 신규 draft'],
+          [
+            '루트 추가',
+            'F1TreeRef.addRow()',
+            '부모 기본값을 유지한 신규 draft',
+          ],
           [
             '하위 추가',
             'F1TreeRef.addChildRow(parentId)',
@@ -264,7 +288,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ],
           ['1280px 이상', '최대 960px / 3열', 'form.span 1~3 적용'],
           ['768px 이상', '가용 폭 / 2열', 'span은 최대 2열로 제한'],
-          ['768px 미만', 'fullScreen / 1열', '375px부터 겹침과 페이지 가로 스크롤 방지'],
+          [
+            '768px 미만',
+            'fullScreen / 1열',
+            '375px부터 겹침과 페이지 가로 스크롤 방지',
+          ],
           [
             'theme tokens',
             'background / text / divider / primary / action',
@@ -681,7 +709,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ['field', 'keyof T', '데이터 필드'],
           ['headerName', 'string', '헤더 표시명'],
           ['headerGroup', 'string', '헤더 상단 그룹 라벨'],
-          ['form', 'F1GridColumnFormOptions<T>', '행 폼 표시·그룹·순서·폭 재정의'],
+          [
+            'form',
+            'F1GridColumnFormOptions<T>',
+            '행 폼 표시·그룹·순서·폭 재정의',
+          ],
           ['getValue / onValueChange', '함수', '표시값 계산 / 값 변경 시 패치'],
           ['width / flex / maxWidth', 'number', '너비 정책'],
           ['editable', 'boolean | (row) => boolean', '편집 가능 여부'],
