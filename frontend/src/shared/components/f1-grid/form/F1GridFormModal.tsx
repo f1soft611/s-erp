@@ -59,20 +59,18 @@ export function F1GridFormModal<T extends object>({
   const descriptionId = useId();
   const fieldRefs = useRef(new Map<string, HTMLDivElement>());
   const [draftRow, setDraftRow] = useState<T>(() => ({ ...row }));
-  const [previousOpen, setPreviousOpen] = useState(open);
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
   const [focusRequest, setFocusRequest] = useState<{ field: string }>();
 
-  if (open !== previousOpen) {
-    setPreviousOpen(open);
-    if (open) {
-      setDraftRow({ ...row });
-      setValidationErrors({});
-      setFocusRequest(undefined);
-    }
-  }
+  useEffect(() => {
+    if (!open) return;
+
+    setDraftRow({ ...row });
+    setValidationErrors({});
+    setFocusRequest(undefined);
+  }, [open, row]);
 
   useEffect(() => {
     if (!focusRequest) return;

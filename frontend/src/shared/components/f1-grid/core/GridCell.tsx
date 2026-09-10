@@ -18,6 +18,7 @@ type GridCellProps<T extends object> = {
   rangeStart?: boolean;
   merged: boolean;
   mergeInfo?: { isStart: boolean; span: number };
+  mergeEndsAtLastRow?: boolean;
   mergeGroupActive?: boolean;
   rowHeight: number;
   defaultRowHeight: number;
@@ -53,9 +54,10 @@ export function getGridCellBottomBorder(
   merged: boolean,
   isMergeStart: boolean | undefined,
   mergeSpan?: number,
+  mergeEndsAtLastRow = false,
 ) {
   if (merged && !isMergeStart) return 0;
-  if (isLastRow) return 1;
+  if (isLastRow || mergeEndsAtLastRow) return 1;
   if (isMergeStart && mergeSpan && mergeSpan > 1) return 0;
   return undefined;
 }
@@ -74,6 +76,7 @@ export function GridCell<T extends object>({
   rangeStart = false,
   merged,
   mergeInfo,
+  mergeEndsAtLastRow = false,
   mergeGroupActive = false,
   rowHeight,
   defaultRowHeight,
@@ -202,6 +205,7 @@ export function GridCell<T extends object>({
           merged,
           mergeInfo?.isStart,
           mergeInfo?.span,
+          mergeEndsAtLastRow,
         ),
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',

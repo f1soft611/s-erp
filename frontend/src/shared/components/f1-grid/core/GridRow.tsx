@@ -363,6 +363,10 @@ export function GridRow<T extends object>({
           ? undefined
           : mergeInfoByColumn[columnIndex]?.[rowIndex];
         const merged = getMerged(rowIndex, columnIndex, value);
+        const mergeEndsAtLastRow =
+          mergeInfo?.isStart &&
+          mergeInfo.span > 1 &&
+          rowIndex + mergeInfo.span === visibleRows.length;
         const mergeGroupActive = isActiveMergeGroup(
           column,
           columnIndex,
@@ -385,6 +389,7 @@ export function GridRow<T extends object>({
             rangeStart={isSelectedRangeStart || isCopiedRangeStart}
             merged={merged}
             mergeInfo={mergeInfo}
+            mergeEndsAtLastRow={mergeEndsAtLastRow}
             mergeGroupActive={mergeGroupActive}
             rowHeight={rowHeight}
             defaultRowHeight={defaultRowHeight}

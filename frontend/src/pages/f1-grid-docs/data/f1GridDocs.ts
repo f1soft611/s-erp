@@ -500,6 +500,43 @@ export const f1GridDocs: F1GridDoc[] = [
     playground: 'row-height',
   },
   {
+    id: 'large-data',
+    title: 'Large Dataset',
+    category: 'feature',
+    description:
+      '10,000건 대용량 샘플로 F1-Grid의 렌더링과 선택 상태를 검증합니다.',
+    sections: [
+      {
+        type: 'prose',
+        heading: 'Scale without losing the workflow',
+        body: '대용량 데이터에서도 F1-Grid는 기존 흐름을 유지해야 합니다. 스크롤, 선택, 정렬, 체크박스, dirty 표시는 10,000건 기준으로 동일한 UX를 유지하는 것을 확인합니다.',
+      },
+      {
+        type: 'api',
+        heading: 'Large dataset sample sizes',
+        rows: [
+          ['1K target', 'preview target', '빠른 로딩 검증'],
+          ['10K target', 'primary target', '대용량 기준선'],
+          ['selection / scroll', 'preserved', '대용량 렌더링 기준'],
+        ],
+      },
+      {
+        type: 'code',
+        heading: 'Generate large sample rows',
+        code: `const createLargeDataset = (count) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: \`row-\${index + 1}\`,
+    itemCode: \`ITEM-\${String(index + 1).padStart(6, '0')}\`,
+    itemName: \`대용량 시뮬레이션 품목 \${index + 1}\`,
+    quantity: (index * 17) % 2000 + 10,
+    amount: (index + 1) * 3850 + 12500,
+    status: index % 3 === 0 ? 'active' : index % 2 === 0 ? 'hold' : 'pending',
+  }));`,
+      },
+    ],
+    playground: 'large-data',
+  },
+  {
     id: 'row-merge',
     title: 'Row Merge',
     category: 'feature',

@@ -5,7 +5,7 @@ import {
   Switch,
   Typography,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   F1Grid,
   F1Tree,
@@ -346,6 +346,153 @@ const treeColumns: F1GridColumn<TreeDemoRow>[] = [
   { field: 'owner', headerName: '담당자', width: 120, editable: false },
 ];
 
+type LargeDataRow = {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  category: string;
+  status: 'active' | 'hold' | 'pending';
+  quantity: number;
+  amount: number;
+  manager: string;
+  updatedAt: string;
+};
+
+const largeDataColumns: F1GridColumn<LargeDataRow>[] = [
+  {
+    field: 'itemCode',
+    headerName: '품목코드',
+    width: 130,
+    editable: false,
+    pinned: 'left',
+  },
+  {
+    field: 'itemName',
+    headerName: '품목명',
+    width: 220,
+    editable: false,
+    wrapText: true,
+  },
+  { field: 'category', headerName: '카테고리', width: 110, editable: false },
+  {
+    field: 'status',
+    headerName: '상태',
+    width: 100,
+    editable: false,
+    align: 'center',
+  },
+  {
+    field: 'quantity',
+    headerName: '수량',
+    width: 90,
+    type: 'number',
+    editable: false,
+    align: 'right',
+    decimalPlaces: 0,
+  },
+  {
+    field: 'amount',
+    headerName: '금액',
+    width: 120,
+    type: 'currency',
+    editable: false,
+    align: 'right',
+    format: 'currency',
+  },
+  { field: 'manager', headerName: '담당자', width: 120, editable: false },
+  {
+    field: 'updatedAt',
+    headerName: '수정일',
+    width: 120,
+    editable: false,
+    type: 'date',
+  },
+];
+
+function createLargeDataset(rowCount: number): LargeDataRow[] {
+  return Array.from({ length: rowCount }, (_, index) => {
+    const rowNo = index + 1;
+    const status: LargeDataRow['status'] =
+      rowNo % 3 === 0 ? 'pending' : rowNo % 2 === 0 ? 'hold' : 'active';
+    const categoryList = ['원자재', '부자재', '반제품', '완제품'];
+    const managerIndex = ((rowNo - 1) % 18) + 1;
+    const dateValue = new Date(2026, 8, ((rowNo - 1) % 28) + 1);
+
+    return {
+      id: `large-${rowNo}`,
+      itemCode: `ITEM-${String(rowNo).padStart(6, '0')}`,
+      itemName: `대용량 시뮬레이션 품목 ${rowNo}`,
+      category: categoryList[(rowNo - 1) % categoryList.length],
+      status,
+      quantity: ((rowNo * 17) % 2000) + 10,
+      amount: rowNo * 3850 + 12500,
+      manager: `담당자 ${String(managerIndex).padStart(2, '0')}`,
+      updatedAt: dateValue.toISOString().slice(0, 10),
+    };
+  });
+}
+
+function LargeDataPlayground() {
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<LargeDataRow[]>(() =>
+    createLargeDataset(10000),
+  );
+  const loadTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (loadTimerRef.current !== null) {
+        window.clearTimeout(loadTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleLoadSample(nextSize: number) {
+    if (loadTimerRef.current !== null) {
+      window.clearTimeout(loadTimerRef.current);
+    }
+
+    setLoading(true);
+    loadTimerRef.current = window.setTimeout(() => {
+      setRows(createLargeDataset(nextSize));
+      setLoading(false);
+      loadTimerRef.current = null;
+    }, 250);
+  }
+
+  return (
+    <Box className="f1-doc-playground" data-testid="f1-grid-doc-playground">
+      <Box className="f1-doc-playground-controls">
+        <Typography variant="subtitle1">Try it</Typography>
+        <Typography variant="body2">
+          대용량 셀 렌더링과 선택 상태 유지: 10,000건 샘플을 기준으로
+          검증합니다.
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+          <Button size="small" onClick={() => handleLoadSample(1000)}>
+            1,000 rows
+          </Button>
+          <Button size="small" onClick={() => handleLoadSample(10000)}>
+            10,000 rows
+          </Button>
+        </Box>
+      </Box>
+      <Box className="f1-doc-grid-wrap">
+        <F1Grid
+          rows={rows}
+          columns={largeDataColumns}
+          rowKey="id"
+          ariaLabel="F1-Grid large dataset example"
+          height={420}
+          showCheckbox
+          rowHeight={32}
+          loading={loading}
+        />
+      </Box>
+    </Box>
+  );
+}
+
 function ContextMenuPlayground() {
   const gridRef = useRef<F1GridRef<DemoRow>>(null);
   const [rows, setRows] = useState(baseRows);
@@ -520,6 +667,10 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
 
   if (kind === 'row-form-modal') {
     return <RowFormModalPlayground />;
+  }
+
+  if (kind === 'large-data') {
+    return <LargeDataPlayground />;
   }
 
   if (kind === 'context-menu') {

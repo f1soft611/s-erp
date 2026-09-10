@@ -1219,9 +1219,8 @@ Tree Grid는 일반 Grid와 별도의 컴포넌트로 분리하지 않고 Core G
 다음 데이터를 고려한다.
 
 ```text
+1,000 rows
 10,000 rows
-100,000 rows
-1,000,000 rows
 ```
 
 전체 데이터를 DOM에 렌더링하지 않는다.
@@ -1724,6 +1723,43 @@ Agent는 모든 기능을 한 번에 구현하지 않는다.
 7. Large Dataset Test
 ```
 
+## Large Dataset Sample (10,000 rows)
+
+대용량 데이터는 특별한 별도 화면이 아니라 기존 F1-Grid UX를 그대로 유지하면서 큰 데이터 집합을 다루는 방식으로 정의한다.
+
+- 10,000 rows: 기본 대용량 검증 기준으로 사용한다.
+- 1,000 rows: 빠른 로딩 검증용 미리보기 샘플로 사용한다.
+- 핵심 가정: 대용량 데이터에서도 체크박스 선택, dirty 상태, 셀 편집, 필터/정렬, 키보드 이동이 기존 흐름과 동일해야 한다.
+- 문서/테스트에서 함께 쓰는 샘플 값에는 품목코드, 관리담당자, 카테고리, 수량, 금액, 수정일 등 ERP 운영 데이터에 가까운 필드를 포함한다.
+- 대용량 샘플 생성은 고용량 데이터(50,000 / 100,000)를 즉시 생성하지 않고, 버튼 클릭 시 공통 로딩 스피너를 노출한 뒤 10,000건 기준 데이터를 조립한다.
+
+```ts
+const createLargeDataset = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `row-${index + 1}`,
+    itemCode: `ITEM-${String(index + 1).padStart(6, '0')}`,
+    itemName: `대용량 시뮬레이션 품목 ${index + 1}`,
+    category: ['원자재', '부자재', '반제품', '완제품'][index % 4],
+    quantity: ((index * 17) % 2000) + 10,
+    amount: (index + 1) * 3850 + 12500,
+    status: index % 3 === 0 ? 'active' : index % 2 === 0 ? 'hold' : 'pending',
+    manager: `담당자 ${String((index % 18) + 1).padStart(2, '0')}`,
+    updatedAt: `2026-09-${String((index % 28) + 1).padStart(2, '0')}`,
+  }));
+```
+
+대용량 시나리오 검증은 다음 순서로 진행한다.
+
+```text
+1. 1,000 rows 미리보기 로드
+2. 공통 로딩 스피너 노출 확인
+3. 10,000 rows 로드
+4. 스크롤 및 전체 선택 상태 확인
+5. 정렬/필터 조건 적용
+6. 단일 행 선택, 키보드 이동, dirty 상태 유지 재검증
+7. 결과를 문서와 테스트 기준선으로 기록
+```
+
 ## Phase 8 - Advanced
 
 ```text
@@ -1824,7 +1860,6 @@ Excel Export 원본값 반복 출력
 ```text
 1,000 rows
 10,000 rows
-100,000 rows
 ```
 
 대용량 조회 테스트:
@@ -1836,7 +1871,7 @@ Excel Export 원본값 반복 출력
 필터 변경 시 서버 Query 재생성
 페이지 변경 시 선택/편집 상태 오염 없음
 Virtual Scroll DOM Node 수 제한
-100,000건 스크롤 중 입력 지연 확인
+10,000건 스크롤 중 입력 지연 확인
 totalCount 비활성 화면 조회 확인
 서버 집계 결과 표시 확인
 Excel Export 서버 분리 확인
