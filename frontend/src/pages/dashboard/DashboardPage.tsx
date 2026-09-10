@@ -134,6 +134,8 @@ function DashboardPage() {
   const navigate = useNavigate();
   const [moduleItems, setModuleItems] = useState<ModuleItem[]>([]);
   const [menusLoading, setMenusLoading] = useState(true);
+  const [menusError, setMenusError] = useState(false);
+  const [menusReloadToken, setMenusReloadToken] = useState(0);
   const defaultModule = moduleItems[0];
   const defaultMenuId = defaultModule?.menus[0]?.id ?? '';
   const emptyModule: ModuleItem = {
@@ -146,30 +148,39 @@ function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setMenusLoading(true);
+    const wait = (ms: number) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      });
 
-    Promise.all([
-      fetchMyMenus().catch(() => ({
-        user: { userId: '', roles: [] },
-        menus: [],
-      })),
-      fetchModuleRows().catch(() => []),
-    ])
+    // 로그인 직후 토큰 갱신 등과 겹치는 순간적인 네트워크 오류를 흡수하기 위해 1회 재시도한다.
+    const loadOnce = () => Promise.all([fetchMyMenus(), fetchModuleRows()]);
+
+    setMenusLoading(true);
+    setMenusError(false);
+
+    loadOnce()
+      .catch(async (error) => {
+        if (cancelled) {
+          throw error;
+        }
+        await wait(500);
+        return loadOnce();
+      })
       .then(([response, moduleRows]) => {
         if (cancelled) {
           return;
         }
 
-        const sourceModules = buildModuleDescriptors(
-          response ?? {
-            user: { userId: '', roles: [] },
-            menus: [],
-          },
-        );
-
+        const sourceModules = buildModuleDescriptors(response);
         setModuleItems(
           buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
         );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMenusError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -180,7 +191,7 @@ function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [menusReloadToken]);
   const location = useLocation();
   const effectivePath = resolveLegacyRoutePath(location.pathname);
   const theme = useTheme();
@@ -222,7 +233,7 @@ function DashboardPage() {
 
   const selectedMenuPath = findMenuPath(selectedModule.tree, routeMenuId);
   const selectedMenu =
-    selectedMenuPath?.node.pageKey && !selectedMenuPath.node.children?.length
+    selectedMenuPath && !selectedMenuPath.node.children?.length
       ? selectedMenuPath
       : undefined;
   const fallbackMenu = selectedModule.menus[0] ??
@@ -236,6 +247,7 @@ function DashboardPage() {
   const expandedItemIds =
     selectedMenu?.parentIds ?? fallbackMenuPath?.parentIds ?? [];
   const currentMenu = selectedMenu?.node ?? fallbackMenu;
+  const currentPageKey = currentMenu.pageKey ?? currentMenu.id ?? defaultMenuId;
   const currentParentNames =
     selectedMenu?.parentNames ?? fallbackMenuPath?.parentNames ?? [];
   const breadcrumbItems = [
@@ -350,11 +362,39 @@ function DashboardPage() {
 
   const content = useMemo(() => {
     const baseContent =
-      pageContentMap[currentMenu.pageKey ?? defaultMenuId] ?? defaultPage;
+      pageContentMap[currentPageKey] ?? pageContentMap[defaultMenuId] ?? defaultPage;
     return buildPageContent(baseContent, currentMenu);
-  }, [currentMenu]);
+  }, [currentMenu, currentPageKey, defaultMenuId]);
 
   const hasAccessibleMenu = moduleItems.length > 0;
+
+  if (menusError) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          bgcolor: theme.palette.background.default,
+          color: theme.palette.text.primary,
+        }}
+      >
+        <Typography variant="body1">
+          메뉴 정보를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해
+          주세요.
+        </Typography>
+        <IconButton
+          aria-label="메뉴 다시 불러오기"
+          onClick={() => setMenusReloadToken((token) => token + 1)}
+        >
+          <ReplayOutlined />
+        </IconButton>
+      </Box>
+    );
+  }
 
   if (!menusLoading && !isValidDashboardRoute) {
     return <NotFoundPage />;
@@ -576,7 +616,7 @@ function DashboardPage() {
                 <DashboardContent
                   selectedModule={selectedModule}
                   currentMenuName={currentMenu.name}
-                  currentPageKey={currentMenu.pageKey ?? defaultMenuId}
+                  currentPageKey={currentPageKey}
                   breadcrumbItems={breadcrumbItems}
                   content={content}
                   selectedMenuPermissions={currentMenu.permissions}

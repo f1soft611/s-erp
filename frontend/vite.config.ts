@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
 
   build: {
+    chunkSizeWarningLimit: 1000,
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -28,6 +29,10 @@ export default defineConfig({
             {
               name: 'vendor-mui',
               test: /[\\/]node_modules[\\/]@mui[\\/]/,
+            },
+            {
+              name: 'vendor-exceljs',
+              test: /[\\/]node_modules[\\/]exceljs[\\/]/,
             },
           ],
         },

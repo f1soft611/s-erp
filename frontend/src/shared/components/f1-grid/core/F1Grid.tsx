@@ -16,6 +16,7 @@ import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
+import { F1GridFormModal } from '../form/F1GridFormModal';
 import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
@@ -72,9 +73,17 @@ import {
   getPinnedGridColumns,
 } from '../columns/GridColumnPin';
 
+const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
+
 type F1GridCell = {
   rowId: F1GridRowId;
   columnIndex: number;
+};
+
+type F1GridRowFormSession<T extends object> = {
+  mode: 'create' | 'edit';
+  row: T;
+  originalRow?: T;
 };
 
 function F1GridInner<T extends object>(
@@ -82,6 +91,7 @@ function F1GridInner<T extends object>(
     rows,
     columns,
     rowKey,
+    rowFormPlugin,
     ariaLabel = 'F1-GRID',
     columnLine = false,
     storageKey,
@@ -130,6 +140,7 @@ function F1GridInner<T extends object>(
   const [cellSelection, setCellSelection] = useState<
     { start: F1GridCell; end: F1GridCell } | undefined
   >();
+  const [isCellSelectionDragging, setIsCellSelectionDragging] = useState(false);
   const [copiedCellRange, setCopiedCellRange] = useState<
     { start: F1GridCell; end: F1GridCell } | undefined
   >();
@@ -147,6 +158,12 @@ function F1GridInner<T extends object>(
   } | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+  const [rowFormSession, setRowFormSession] = useState<
+    F1GridRowFormSession<T> | undefined
+  >();
+  const [rowFormErrors, setRowFormErrors] = useState<Record<string, string>>(
+    {},
+  );
   const displayScale = useOptionalDisplayScale();
   const normalizedMinRowHeight = Math.max(1, minRowHeight * displayScale);
   const normalizedMaxRowHeight = Math.max(
@@ -221,6 +238,9 @@ function F1GridInner<T extends object>(
   const cellNodeRefs = useRef(new Map<string, HTMLElement>());
   const activeEditorPlugins = (editorPlugins ?? editors ?? []).filter(
     (plugin) => plugin && (plugin.enabled ?? true),
+  );
+  const rowFormActive = Boolean(
+    rowFormPlugin && rowFormPlugin.enabled !== false,
   );
 
   function resolveEditContext(
@@ -315,14 +335,22 @@ function F1GridInner<T extends object>(
     pinnedFields,
     columnWidths,
     showCheckbox ? 44 : 0,
+    rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0,
   );
-  const columnTracks = getGridColumnTracks(
+  const dataColumnTracks = getGridColumnTracks(
     visibleColumns,
     columnWidths,
     pinnedFields,
     gridContainerWidth,
     showCheckbox ? 44 : 0,
   );
+  const columnTracks = rowFormActive
+    ? `${dataColumnTracks}${dataColumnTracks ? ' ' : ''}${GRID_ROW_FORM_ACTION_COLUMN_WIDTH}px`
+    : dataColumnTracks;
+  const hasRightPinnedColumns = visibleColumns.some(
+    (column) => getGridColumnPinSide(pinnedFields, column) === 'right',
+  );
+  const formActionPinnedShadow = !hasRightPinnedColumns;
 
   useLayoutEffect(() => {
     const container = gridContainerRef.current;
@@ -486,14 +514,20 @@ function F1GridInner<T extends object>(
 
   function getPinOffset(
     column: F1GridColumn<T>,
-  ): { side: 'left' | 'right'; offset: number } | undefined {
+  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined {
     const side = getGridColumnPinSide(pinnedFields, column);
     if (!side) return undefined;
     const offset =
       side === 'left'
         ? leftOffsets[String(column.field)]
         : rightOffsets[String(column.field)];
-    return offset === undefined ? undefined : { side, offset };
+    if (offset === undefined) return undefined;
+    const rightPinnedBoundaryOffset = Math.max(...Object.values(rightOffsets));
+    return {
+      side,
+      offset,
+      shadow: side === 'right' ? offset === rightPinnedBoundaryOffset : true,
+    };
   }
 
   useEffect(() => {
@@ -1034,6 +1068,13 @@ function F1GridInner<T extends object>(
 
     const baseRow = createRow ? createRow() : ({} as T);
     const newRow = { ...baseRow, ...row } as T;
+    if (rowFormActive) {
+      const newRowId = newRow[rowKey];
+      if (typeof newRowId !== 'string' && typeof newRowId !== 'number') return;
+      setRowFormErrors({});
+      setRowFormSession({ mode: 'create', row: { ...newRow } });
+      return;
+    }
     const newRowId = getGridRowId(newRow, rowKey);
 
     setData((current) => addGridRow(current, newRow, rowKey));
@@ -1047,6 +1088,62 @@ function F1GridInner<T extends object>(
     }
   }
 
+  function openEditRowForm(row: T) {
+    setRowFormErrors({});
+    setRowFormSession({
+      mode: 'edit',
+      row: { ...row },
+      originalRow: { ...row },
+    });
+  }
+
+  function closeRowForm() {
+    setRowFormSession(undefined);
+    setRowFormErrors({});
+  }
+
+  function applyRowForm(draftRow: T) {
+    if (!rowFormSession) return;
+
+    if (rowFormSession.mode === 'create') {
+      const draftRowId = getGridRowId(draftRow, rowKey);
+      const duplicate = data.rows.some(
+        (row) => getGridRowId(row, rowKey) === draftRowId,
+      );
+      if (duplicate) {
+        setRowFormErrors({
+          [String(rowKey)]: '이미 존재하는 행 ID입니다.',
+        });
+        return;
+      }
+
+      setData((current) => addGridRow(current, draftRow, rowKey));
+      setSelectedIds([draftRowId]);
+      closeRowForm();
+      return;
+    }
+
+    const originalRow = rowFormSession.originalRow;
+    if (!originalRow) return;
+    const patch = Object.fromEntries(
+      Object.keys(draftRow)
+        .filter(
+          (field) =>
+            !areGridValuesEqual(
+              originalRow[field as keyof T],
+              draftRow[field as keyof T],
+            ),
+        )
+        .map((field) => [field, draftRow[field as keyof T]]),
+    ) as Partial<T>;
+
+    if (Object.keys(patch).length > 0) {
+      const rowId = getGridRowId(originalRow, rowKey);
+      setData((current) => updateGridRow(current, rowKey, rowId, patch));
+    }
+    closeRowForm();
+  }
+
   function setCellSelectionRange(start: F1GridCell, end: F1GridCell) {
     const next = { start, end };
     setCellSelection(next);
@@ -1057,6 +1154,7 @@ function F1GridInner<T extends object>(
 
   function updateCellSelectionRange(cell: F1GridCell) {
     if (!cellRangeDragRef.current) return;
+    cellRangeDragRef.current.current = cell;
     setCellSelection({
       start: cellRangeDragRef.current.start,
       end: cell,
@@ -1065,6 +1163,7 @@ function F1GridInner<T extends object>(
 
   function finishCellSelectionRange() {
     cellRangeDragRef.current = null;
+    setIsCellSelectionDragging(false);
   }
 
   function handleDeleteSelectedRows() {
@@ -1454,9 +1553,21 @@ function F1GridInner<T extends object>(
     const containerRect = bodyScrollRef.current.getBoundingClientRect();
     const topLeftRect = topLeftNode.getBoundingClientRect();
     const bottomRightRect = bottomRightNode.getBoundingClientRect();
+    const scrollLeft = bodyScrollRef.current.scrollLeft;
+    const scrollTop = bodyScrollRef.current.scrollTop;
+    const topLeftField = visibleColumns[minColumnIndex];
+    const topLeftPinnedSide =
+      topLeftField !== undefined
+        ? pinnedFields.get(String(topLeftField.field))
+        : undefined;
+    const leftScrollCompensation =
+      topLeftPinnedSide === 'left' ? scrollLeft : -scrollLeft;
     const next = {
-      left: Math.max(0, topLeftRect.left - containerRect.left + 1),
-      top: Math.max(0, topLeftRect.top - containerRect.top + 1),
+      left: Math.max(
+        0,
+        topLeftRect.left - containerRect.left + leftScrollCompensation + 1,
+      ),
+      top: Math.max(0, topLeftRect.top - containerRect.top - scrollTop + 1),
       width: Math.max(0, bottomRightRect.right - topLeftRect.left - 2),
       height: Math.max(0, bottomRightRect.bottom - topLeftRect.top - 2),
     };
@@ -1598,6 +1709,8 @@ function F1GridInner<T extends object>(
           leftOffsets={leftOffsets}
           rightOffsets={rightOffsets}
           editableColumnFields={editableColumnFields}
+          showFormAction={rowFormActive}
+          formActionPinnedShadow={formActionPinnedShadow}
           onReorderColumn={reorderColumn}
         />
       </Box>
@@ -1629,6 +1742,7 @@ function F1GridInner<T extends object>(
             editingCell={editingCell}
             selectedCellRange={cellSelection}
             copiedCellRange={copiedCellRange}
+            isCellSelectionDragging={isCellSelectionDragging}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
             mergeInfoByColumn={mergeInfoByColumn}
@@ -1644,6 +1758,7 @@ function F1GridInner<T extends object>(
             onCellSelectionStart={(cell) => {
               setFocusedCell(cell);
               cellRangeDragRef.current = { start: cell, current: cell };
+              setIsCellSelectionDragging(true);
               setCellSelectionRange(cell, cell);
             }}
             onCellSelectionDrag={(cell) => {
@@ -1684,6 +1799,9 @@ function F1GridInner<T extends object>(
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
+            showFormAction={rowFormActive}
+            formActionPinnedShadow={formActionPinnedShadow}
+            onOpenRowForm={openEditRowForm}
           />
         ) : null}
         {rangeOverlay ? (
@@ -1797,6 +1915,29 @@ function F1GridInner<T extends object>(
           설정을 기본값으로 복원
         </MenuItem>
       </Menu>
+      {rowFormActive && rowFormPlugin && rowFormSession ? (
+        <F1GridFormModal
+          open
+          mode={rowFormSession.mode}
+          row={rowFormSession.row}
+          originalRow={rowFormSession.originalRow}
+          columns={columns}
+          rowKey={rowKey}
+          plugin={rowFormPlugin}
+          externalErrors={rowFormErrors}
+          onCancel={closeRowForm}
+          onApply={applyRowForm}
+          onDraftChange={(fields) => {
+            setRowFormErrors((current) =>
+              Object.fromEntries(
+                Object.entries(current).filter(
+                  ([field]) => !fields.includes(field),
+                ),
+              ),
+            );
+          }}
+        />
+      ) : null}
     </Box>
   );
 }

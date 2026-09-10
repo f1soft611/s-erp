@@ -83,6 +83,8 @@ type GridHeaderProps<T extends object> = {
   leftOffsets: Record<string, number>;
   rightOffsets: Record<string, number>;
   editableColumnFields?: Set<string>;
+  showFormAction?: boolean;
+  formActionPinnedShadow?: boolean;
   onReorderColumn?: (
     sourceField: string,
     targetField: string,
@@ -118,6 +120,8 @@ export function GridHeader<T extends object>({
   leftOffsets,
   rightOffsets,
   editableColumnFields,
+  showFormAction = false,
+  formActionPinnedShadow = true,
   onReorderColumn,
 }: GridHeaderProps<T>) {
   const [menuColumn, setMenuColumn] = useState<F1GridColumn<T>>();
@@ -487,7 +491,10 @@ export function GridHeader<T extends object>({
                   : pinSide === 'left'
                     ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
                     : pinSide === 'right'
-                      ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                      ? rightOffsets[String(column.field)] ===
+                        Math.max(...Object.values(rightOffsets))
+                        ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                        : undefined
                       : undefined,
                 opacity: isDraggingColumn ? 0.78 : 1,
                 '&::before': isBeforeDrop
@@ -566,6 +573,20 @@ export function GridHeader<T extends object>({
                   />
                 ) : null}
                 {column.headerName}
+                {column.required ? (
+                  <Box
+                    component="span"
+                    aria-label={`${column.headerName} 필수`}
+                    sx={{
+                      color: 'error.main',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      ml: 0.25,
+                    }}
+                  >
+                    *
+                  </Box>
+                ) : null}
                 {sortIndicator ? (
                   <Box
                     component="span"
@@ -624,6 +645,38 @@ export function GridHeader<T extends object>({
             </Box>
           );
         })}
+        {showFormAction ? (
+          <Box
+            role="columnheader"
+            aria-label="상세"
+            sx={{
+              alignItems: 'center',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgb(28, 36, 50)'
+                  : 'rgb(232, 236, 244)',
+              borderLeft: 1,
+              borderColor: 'divider',
+              boxSizing: 'border-box',
+              boxShadow: formActionPinnedShadow
+                ? '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+                : undefined,
+              display: 'flex',
+              gridColumn: (showCheckbox ? 2 : 1) + columns.length,
+              gridRow: hasGroups ? '1 / span 2' : undefined,
+              justifyContent: 'center',
+              minHeight: 28,
+              position: 'sticky',
+              right: 0,
+              width: 48,
+              minWidth: 48,
+              maxWidth: 48,
+              zIndex: 4,
+            }}
+          >
+            상세
+          </Box>
+        ) : null}
       </Box>
       <Menu
         anchorEl={menuAnchor}

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>F1-Grid 행 상세 폼 레이아웃 비교</title>
+    <style>
+      :root {
+        --ink: #1e293b;
+        --muted: #64748b;
+        --line: #cbd5e1;
+        --paper: #fff;
+        --soft: #f8fafc;
+        --accent: #0f766e;
+        --accent-soft: #ccfbf1;
+        --warn: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 28px;
+        color: var(--ink);
+        background: linear-gradient(
+          135deg,
+          #edf6f4 0%,
+          #f8fafc 45%,
+          #fff7ed 100%
+        );
+        font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+      }
+      header {
+        max-width: 1440px;
+        margin: 0 auto 20px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        letter-spacing: 0;
+      }
+      .lead {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .cards {
+        max-width: 1440px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        border: 2px solid transparent;
+        background: var(--paper);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.09);
+        cursor: pointer;
+        transition: 0.16s ease;
+        overflow: hidden;
+      }
+      .card:hover,
+      .card.selected {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+      }
+      .card.selected {
+        box-shadow:
+          0 0 0 3px var(--accent-soft),
+          0 12px 30px rgba(15, 23, 42, 0.12);
+      }
+      .card-head {
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .tag {
+        display: inline-block;
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-weight: 800;
+        font-size: 12px;
+      }
+      h2 {
+        margin: 0 0 6px;
+        font-size: 19px;
+        letter-spacing: 0;
+      }
+      .card-head p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .stage {
+        position: relative;
+        height: 400px;
+        padding: 14px;
+        background: #f1f5f9;
+        overflow: hidden;
+      }
+      .toolbar {
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 9px;
+        background: #334155;
+        color: white;
+        font-size: 11px;
+      }
+      .grid {
+        border: 1px solid #94a3b8;
+        background: white;
+        font-size: 10px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 30px 1.1fr 1fr 1fr 34px;
+        min-height: 29px;
+        border-bottom: 1px solid #dbe3ec;
+      }
+      .row > span {
+        padding: 7px 6px;
+        border-right: 1px solid #e2e8f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row.group {
+        min-height: 23px;
+        background: #dbe5ee;
+        font-weight: 700;
+        grid-template-columns: 30px 2.1fr 2fr 34px;
+      }
+      .row.header {
+        background: #eef2f7;
+        font-weight: 700;
+      }
+      .action {
+        color: var(--accent);
+        font-size: 16px;
+        text-align: center;
+        padding: 3px !important;
+      }
+      .detail {
+        padding: 12px;
+        background: #f8fffd;
+        border-bottom: 2px solid #5eead4;
+      }
+      .section-title {
+        margin: 0 0 8px;
+        color: #115e59;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 10px;
+      }
+      .field label {
+        display: block;
+        margin-bottom: 3px;
+        color: #475569;
+        font-size: 9px;
+      }
+      .input {
+        height: 25px;
+        padding: 5px 7px;
+        border: 1px solid #94a3b8;
+        background: #fff;
+        color: #334155;
+      }
+      .growth {
+        margin-top: 8px;
+        padding: 7px;
+        border-left: 3px solid var(--accent);
+        background: #ecfdf5;
+        color: #166534;
+        font-size: 10px;
+      }
+      .drawer {
+        position: absolute;
+        inset: 14px 14px 14px 42%;
+        padding: 14px;
+        background: white;
+        border-left: 3px solid var(--accent);
+        box-shadow: -10px 0 24px rgba(15, 23, 42, 0.16);
+      }
+      .drawer .fields {
+        grid-template-columns: 1fr;
+      }
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.38);
+      }
+      .modal {
+        width: 84%;
+        padding: 16px;
+        background: white;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.3);
+      }
+      .notes {
+        padding: 14px 18px 18px;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .notes strong {
+        color: var(--accent);
+      }
+      .tradeoff {
+        color: var(--warn);
+      }
+      footer {
+        max-width: 1440px;
+        margin: 18px auto 0;
+        padding: 13px 16px;
+        border: 1px solid #99f6e4;
+        background: #f0fdfa;
+        color: #134e4a;
+        font-size: 14px;
+      }
+      @media (max-width: 960px) {
+        .cards {
+          grid-template-columns: 1fr;
+        }
+        .stage {
+          height: 360px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>행 상세 폼을 어디에 펼칠까요?</h1>
+      <p class="lead">
+        카드를 클릭해 선택하세요. 멀티헤더의 그룹은 폼 섹션으로 변환하고, 컬럼
+        타입은 대응 입력 필드로 표현한 개념 목업입니다.
+      </p>
+    </header>
+    <main class="cards">
+      <article class="card selected" onclick="selectCard(this)">
+        <div class="card-head">
+          <span class="tag">A · 권장</span>
+          <h2>행 아래 인라인 상세</h2>
+          <p>선택한 데이터 행 바로 다음에 전체 폭 상세 영역을 삽입합니다.</p>
+        </div>
+        <div class="stage">
+          <div class="toolbar">
+            <span>품목 마스터</span><span>조회 24건</span>
+          </div>
+          <div class="grid">
+            <div class="row group">
+              <span></span><span>기본 정보</span><span>운영 정보</span
+              ><span></span>
+            </div>
+            <div class="row header">
+              <span>□</span><span>품목코드</span><span>품목명</span
+              ><span>사용</span><span></span>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-101</span><span>원재료 A</span
+              ><span>예</span><span class="action">⌃</span>
+            </div>
+            <div class="detail">
+              <p class="section-title">기본 정보</p>
+              <div class="fields">
+                <div class="field">
+                  <label>품목코드 · text</label>
+                  <div class="input">ITEM-101</div>
+                </div>
+                <div class="field">
+                  <label>품목명 · text</label>
+                  <div class="input">원재료 A</div>
+                </div>
+              </div>
+              <p class="section-title" style="margin-top: 10px">운영 정보</p>
+              <div class="fields">
+                <div class="field">
+                  <label>사용 여부 · checkbox</label>
+                  <div class="input">☑ 사용</div>
+                </div>
+                <div class="field">
+                  <label>등록일 · date</label>
+                  <div class="input">2026-09-10</div>
+                </div>
+              </div>
+              <div class="growth">
+                폼 높이만큼 Grid가 자동 증가. 페이지 가용 높이를 넘으면 Grid
+                body 내부 스크롤.
+              </div>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-102</span><span>부자재 B</span
+              ><span>예</span><span class="action">⌄</span>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>맥락 유지와 데이터 비교에 가장 유리</strong><br /><span
+            class="tradeoff"
+            >여러 행을 동시에 열면 세로 길이가 빠르게 증가</span
+          >
+        </div>
+      </article>
+
+      <article class="card" onclick="selectCard(this)">
+        <div class="card-head">
+          <span class="tag">B</span>
+          <h2>우측 상세 드로어</h2>
+          <p>그리드 높이는 유지하고 선택 행 폼을 오른쪽에 고정합니다.</p>
+        </div>
+        <div class="stage">
+          <div class="toolbar">
+            <span>품목 마스터</span><span>조회 24건</span>
+          </div>
+          <div class="grid">
+            <div class="row header">
+              <span>□</span><span>품목코드</span><span>품목명</span
+              ><span>사용</span><span></span>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-101</span><span>원재료 A</span
+              ><span>예</span><span class="action">›</span>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-102</span><span>부자재 B</span
+              ><span>예</span><span class="action">›</span>
+            </div>
+          </div>
+          <div class="drawer">
+            <p class="section-title">ITEM-101 상세</p>
+            <div class="fields">
+              <div class="field">
+                <label>품목코드</label>
+                <div class="input">ITEM-101</div>
+              </div>
+              <div class="field">
+                <label>품목명</label>
+                <div class="input">원재료 A</div>
+              </div>
+              <div class="field">
+                <label>사용 여부</label>
+                <div class="input">☑ 사용</div>
+              </div>
+              <div class="field">
+                <label>등록일</label>
+                <div class="input">2026-09-10</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>대량 조회와 편집 전환이 안정적</strong><br /><span
+            class="tradeoff"
+            >좁은 화면에서 그리드와 폼이 서로 폭을 빼앗음</span
+          >
+        </div>
+      </article>
+
+      <article class="card" onclick="selectCard(this)">
+        <div class="card-head">
+          <span class="tag">C</span>
+          <h2>모달 상세 폼</h2>
+          <p>행 위 액션으로 독립된 편집 대화상자를 엽니다.</p>
+        </div>
+        <div class="stage">
+          <div class="toolbar">
+            <span>품목 마스터</span><span>조회 24건</span>
+          </div>
+          <div class="grid">
+            <div class="row header">
+              <span>□</span><span>품목코드</span><span>품목명</span
+              ><span>사용</span><span></span>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-101</span><span>원재료 A</span
+              ><span>예</span><span class="action">↗</span>
+            </div>
+            <div class="row">
+              <span>□</span><span>ITEM-102</span><span>부자재 B</span
+              ><span>예</span><span class="action">↗</span>
+            </div>
+          </div>
+          <div class="backdrop">
+            <div class="modal">
+              <p class="section-title">품목 상세 편집</p>
+              <div class="fields">
+                <div class="field">
+                  <label>품목코드</label>
+                  <div class="input">ITEM-101</div>
+                </div>
+                <div class="field">
+                  <label>품목명</label>
+                  <div class="input">원재료 A</div>
+                </div>
+                <div class="field">
+                  <label>사용 여부</label>
+                  <div class="input">☑ 사용</div>
+                </div>
+                <div class="field">
+                  <label>등록일</label>
+                  <div class="input">2026-09-10</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notes">
+          <strong>복잡한 폼과 검증 메시지 공간 확보</strong><br /><span
+            class="tradeoff"
+            >행 비교 흐름이 끊기고 요청한 “행 펼침”과 거리가 있음</span
+          >
+        </div>
+      </article>
+    </main>
+    <footer>
+      <strong>높이 권장 규칙:</strong> `height`가 없으면 내용만큼 자연 증가,
+      `height/maxHeight`가 있으면 외부 레이아웃 크기를 존중하고 본문 내부
+      스크롤. 작은 화면에서는 상세 폼 필드를 1열로 재배치합니다.
+    </footer>
+    <script>
+      function selectCard(card) {
+        document
+          .querySelectorAll('.card')
+          .forEach((item) => item.classList.remove('selected'));
+        card.classList.add('selected');
+      }
+    </script>
+  </body>
+</html>

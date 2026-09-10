@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { buildModuleDescriptors } from '../src/pages/dashboard/services/menuService';
 
 async function loginAsAdmin() {
   fireEvent.change(screen.getByLabelText(/업체코드/i), {
@@ -202,8 +203,99 @@ describe('Dashboard sidebar', () => {
       />,
     );
 
-    expect(screen.getByText('준비 중입니다')).toBeInTheDocument();
-    expect(screen.getByText(/현재 준비 중인 메뉴입니다/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/요청하신 페이지는 현재 준비 중입니다/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/수주 관리 메뉴는 추후 서비스될 예정입니다/i),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps DB-backed leaf menus in the selectable list even without a mapped page key', () => {
+    const descriptors = buildModuleDescriptors({
+      user: { userId: 'admin', roles: ['ADMIN'] },
+      menus: [
+        {
+          menuId: 200,
+          parentMenuId: null,
+          name: '환경설정',
+          icon: 'Settings',
+          path: '/settings',
+          children: [
+            {
+              menuId: 210,
+              parentMenuId: 200,
+              name: '시스템 관리',
+              path: '/settings/system',
+              children: [
+                {
+                  menuId: 220,
+                  parentMenuId: 210,
+                  name: '창고관리',
+                  path: '/settings/system/warehouse',
+                  permissions: {
+                    read: true,
+                    create: true,
+                    update: true,
+                    delete: true,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(descriptors[0].menus).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'warehouse',
+          name: '창고관리',
+          pageKey: 'warehouse',
+        }),
+      ]),
+    );
+  });
+
+  it('renders a coming soon state for an unimplemented leaf menu without a mapped page key', () => {
+    render(
+      <DashboardContent
+        selectedModule={{
+          id: 'sales',
+          name: '영업관리',
+          icon: <span aria-hidden="true">S</span>,
+          tree: [
+            {
+              id: 'purchase-order',
+              name: '발주 관리',
+              pageKey: 'unmapped-leaf-menu',
+            },
+          ],
+          menus: [
+            {
+              id: 'purchase-order',
+              name: '발주 관리',
+              pageKey: 'unmapped-leaf-menu',
+            },
+          ],
+          path: '/sales',
+        }}
+        currentMenuName="발주 관리"
+        currentPageKey="unmapped-leaf-menu"
+        breadcrumbItems={['영업관리', '발주 관리']}
+        content={{
+          title: '발주 관리',
+          description: '발주 관리 화면입니다.',
+          cards: [],
+          items: [],
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/발주 관리 메뉴는 추후 서비스될 예정입니다\./i),
+    ).toBeInTheDocument();
   });
 
   it('renders the ERP-style role and menu management screens', async () => {

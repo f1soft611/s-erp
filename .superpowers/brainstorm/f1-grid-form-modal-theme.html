@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>F1-Grid 폼 모달 테마 설계</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 28px;
+        background-color: #e8edf1;
+        background-image:
+          linear-gradient(#d8e0e7 1px, transparent 1px),
+          linear-gradient(90deg, #d8e0e7 1px, transparent 1px);
+        background-size: 24px 24px;
+        color: #17212b;
+        font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+      }
+      h1 {
+        max-width: 1400px;
+        margin: 0 auto 8px;
+        font-size: 26px;
+        letter-spacing: 0;
+      }
+      .lead {
+        max-width: 1400px;
+        margin: 0 auto 22px;
+        color: #52606d;
+      }
+      .compare {
+        max-width: 1400px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .scene {
+        min-width: 0;
+        padding: 22px;
+        background: rgba(15, 23, 42, 0.16);
+      }
+      .scene.dark {
+        background: rgba(2, 6, 23, 0.82);
+      }
+      .label {
+        margin-bottom: 10px;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .dark .label {
+        color: #cbd5e1;
+      }
+      .modal {
+        display: flex;
+        max-height: 700px;
+        min-height: 570px;
+        flex-direction: column;
+        border: 1px solid var(--divider);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--text);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+        overflow: hidden;
+      }
+      .light {
+        --paper: #fff;
+        --surface: #f8fafc;
+        --text: #1f2937;
+        --secondary: #64748b;
+        --divider: #d8e0e8;
+        --primary: #00695c;
+        --primary-soft: #e0f2f1;
+        --field: #fff;
+        --focus: #00897b;
+      }
+      .dark {
+        --paper: #17202b;
+        --surface: #111923;
+        --text: #edf2f7;
+        --secondary: #9cabbc;
+        --divider: #344353;
+        --primary: #5eead4;
+        --primary-soft: #153b38;
+        --field: #202c39;
+        --focus: #2dd4bf;
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--divider);
+      }
+      .title-wrap {
+        display: flex;
+        gap: 11px;
+        align-items: center;
+      }
+      .icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 6px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-weight: 900;
+      }
+      .modal h2 {
+        margin: 0 0 3px;
+        font-size: 17px;
+        letter-spacing: 0;
+      }
+      .sub {
+        color: var(--secondary);
+        font-size: 11px;
+      }
+      .close {
+        border: 0;
+        background: transparent;
+        color: var(--secondary);
+        font-size: 22px;
+      }
+      .body {
+        flex: 1;
+        overflow: auto;
+        padding: 18px;
+        background: var(--surface);
+      }
+      .section {
+        margin-bottom: 16px;
+        border: 1px solid var(--divider);
+        border-radius: 6px;
+        background: var(--paper);
+        overflow: hidden;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--divider);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .section-title:before {
+        content: '';
+        width: 3px;
+        height: 14px;
+        background: var(--primary);
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 13px 16px;
+        padding: 14px;
+      }
+      .field label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        color: var(--secondary);
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .required {
+        color: #dc2626;
+      }
+      .input {
+        height: 34px;
+        padding: 8px 10px;
+        border: 1px solid var(--divider);
+        border-radius: 4px;
+        background: var(--field);
+        color: var(--text);
+        font-size: 12px;
+      }
+      .input.focus {
+        border-color: var(--focus);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .box {
+        display: grid;
+        width: 17px;
+        height: 17px;
+        place-items: center;
+        border-radius: 3px;
+        background: var(--primary);
+        color: var(--paper);
+        font-size: 11px;
+      }
+      .modal-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        border-top: 1px solid var(--divider);
+        background: var(--paper);
+      }
+      .hint {
+        color: var(--secondary);
+        font-size: 10px;
+      }
+      .buttons {
+        display: flex;
+        gap: 8px;
+      }
+      .button {
+        height: 34px;
+        padding: 0 16px;
+        border: 1px solid var(--divider);
+        border-radius: 5px;
+        background: var(--paper);
+        color: var(--text);
+        font-weight: 700;
+      }
+      .button.primary {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fff;
+      }
+      .dark .button.primary {
+        color: #062b27;
+      }
+      .caption {
+        max-width: 1400px;
+        margin: 18px auto 0;
+        padding: 14px 16px;
+        border-left: 4px solid #00695c;
+        background: #fff;
+        color: #334155;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      @media (max-width: 900px) {
+        body {
+          padding: 16px;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+        }
+        .modal {
+          min-height: 620px;
+        }
+        .fields {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>F1-Grid / F1-Tree Form Modal</h1>
+    <p class="lead">
+      현재 테마 토큰을 그대로 사용하며, 멀티헤더를 구획이 분명한 폼 섹션으로
+      자동 전환합니다.
+    </p>
+    <main class="compare">
+      <div class="scene light">
+        <div class="label">LIGHT THEME</div>
+        <section class="modal">
+          <header class="modal-head">
+            <div class="title-wrap">
+              <div class="icon">✎</div>
+              <div>
+                <h2>품목 정보 수정</h2>
+                <div class="sub">
+                  ITEM-101 · 선택한 행의 변경사항을 편집합니다
+                </div>
+              </div>
+            </div>
+            <button class="close">×</button>
+          </header>
+          <div class="body">
+            <section class="section">
+              <h3 class="section-title">기본 정보</h3>
+              <div class="fields">
+                <div class="field">
+                  <label>품목코드 <span class="required">필수</span></label>
+                  <div class="input focus">ITEM-101</div>
+                </div>
+                <div class="field">
+                  <label>품목명 <span class="required">필수</span></label>
+                  <div class="input">원재료 A</div>
+                </div>
+                <div class="field">
+                  <label>품목 유형</label>
+                  <div class="input">원재료 ▾</div>
+                </div>
+                <div class="field">
+                  <label>표준 단위</label>
+                  <div class="input">kg ▾</div>
+                </div>
+              </div>
+            </section>
+            <section class="section">
+              <h3 class="section-title">운영 정보</h3>
+              <div class="fields">
+                <div class="field">
+                  <label>사용 여부</label>
+                  <div class="input check"><span class="box">✓</span> 사용</div>
+                </div>
+                <div class="field">
+                  <label>적용일</label>
+                  <div class="input">2026-09-10　▣</div>
+                </div>
+                <div class="field">
+                  <label>기준 단가</label>
+                  <div class="input">12,500</div>
+                </div>
+                <div class="field">
+                  <label>비고</label>
+                  <div class="input">생산 기본 원재료</div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <footer class="modal-foot">
+            <span class="hint"
+              >적용 후 화면의 저장 버튼으로 최종 저장됩니다.</span
+            >
+            <div class="buttons">
+              <button class="button">취소</button
+              ><button class="button primary">적용</button>
+            </div>
+          </footer>
+        </section>
+      </div>
+      <div class="scene dark">
+        <div class="label">DARK THEME</div>
+        <section class="modal">
+          <header class="modal-head">
+            <div class="title-wrap">
+              <div class="icon">✎</div>
+              <div>
+                <h2>품목 정보 수정</h2>
+                <div class="sub">
+                  ITEM-101 · 선택한 행의 변경사항을 편집합니다
+                </div>
+              </div>
+            </div>
+            <button class="close">×</button>
+          </header>
+          <div class="body">
+            <section class="section">
+              <h3 class="section-title">기본 정보</h3>
+              <div class="fields">
+                <div class="field">
+                  <label>품목코드 <span class="required">필수</span></label>
+                  <div class="input focus">ITEM-101</div>
+                </div>
+                <div class="field">
+                  <label>품목명 <span class="required">필수</span></label>
+                  <div class="input">원재료 A</div>
+                </div>
+                <div class="field">
+                  <label>품목 유형</label>
+                  <div class="input">원재료 ▾</div>
+                </div>
+                <div class="field">
+                  <label>표준 단위</label>
+                  <div class="input">kg ▾</div>
+                </div>
+              </div>
+            </section>
+            <section class="section">
+              <h3 class="section-title">운영 정보</h3>
+              <div class="fields">
+                <div class="field">
+                  <label>사용 여부</label>
+                  <div class="input check"><span class="box">✓</span> 사용</div>
+                </div>
+                <div class="field">
+                  <label>적용일</label>
+                  <div class="input">2026-09-10　▣</div>
+                </div>
+                <div class="field">
+                  <label>기준 단가</label>
+                  <div class="input">12,500</div>
+                </div>
+                <div class="field">
+                  <label>비고</label>
+                  <div class="input">생산 기본 원재료</div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <footer class="modal-foot">
+            <span class="hint"
+              >적용 후 화면의 저장 버튼으로 최종 저장됩니다.</span
+            >
+            <div class="buttons">
+              <button class="button">취소</button
+              ><button class="button primary">적용</button>
+            </div>
+          </footer>
+        </section>
+      </div>
+    </main>
+    <div class="caption">
+      <strong>설계 포인트:</strong> MUI 테마 토큰 기반 자동 색상 전환 · 8px 이하
+      모서리 · 섹션 구획은 얇은 경계선과 짧은 강조선 사용 · 긴 폼은 본문만
+      스크롤 · 모바일 전체 화면 및 1열 필드 전환
+    </div>
+  </body>
+</html>

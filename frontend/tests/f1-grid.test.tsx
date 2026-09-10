@@ -106,7 +106,12 @@ const columns: F1GridColumn<MenuRow>[] = [
     type: 'checkbox',
     headerCheckbox: true,
   },
-  { field: 'startDate', headerName: 'Start date', editable: true, type: 'date' },
+  {
+    field: 'startDate',
+    headerName: 'Start date',
+    editable: true,
+    type: 'date',
+  },
   {
     field: 'status',
     headerName: '?占쏀깭',
@@ -248,6 +253,42 @@ describe('F1-GRID number formatting', () => {
     expect(getCellDisplayValue(column, 12345.6)).toBe('12,345.60');
   });
 
+  it('normalizes integer and decimal editor input to the configured precision', () => {
+    const handleChange = vi.fn();
+
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12.34"
+          decimalPlaces={0}
+          onChange={handleChange}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '12.34' },
+    });
+    expect(handleChange).toHaveBeenLastCalledWith('12');
+
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <NumberEditor
+          value="12.34"
+          decimalPlaces={1}
+          onChange={handleChange}
+          onKeyDown={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '12.34' },
+    });
+    expect(handleChange).toHaveBeenLastCalledWith('12.3');
+  });
+
   it('formats currency values when a custom number format is specified', () => {
     const column: F1GridColumn<{ amount: number }>[][0] = {
       field: 'amount',
@@ -258,6 +299,22 @@ describe('F1-GRID number formatting', () => {
     };
 
     expect(getCellDisplayValue(column, 12345.6)).toBe('??2,346');
+  });
+
+  it('renders a required marker in the header for required columns', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[
+          { field: 'code', headerName: '코드', editable: true, required: true },
+          { field: 'status', headerName: '상태', editable: true },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    const codeHeader = screen.getByRole('columnheader', { name: /코드/ });
+    expect(codeHeader).toHaveTextContent('코드*');
   });
 });
 
@@ -418,10 +475,9 @@ describe('F1-GRID custom cell rendering', () => {
       />,
     );
 
-    expect(screen.getByRole('columnheader', { name: '?占쏀깭' })).toHaveAttribute(
-      'data-editable-column',
-      'true',
-    );
+    expect(
+      screen.getByRole('columnheader', { name: '?占쏀깭' }),
+    ).toHaveAttribute('data-editable-column', 'true');
   });
 });
 
@@ -568,20 +624,26 @@ describe('F1-GRID column management', () => {
   it('hides and restores a column through the header column list menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
     fireEvent.click(screen.getByRole('checkbox', { name: '?占쎈젹 ?占쎌떆' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('columnheader', { name: /?占쎈젹/ })).toBeNull();
+      expect(
+        screen.queryByRole('columnheader', { name: /\?占쎈젹/ }),
+      ).toBeNull();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
     fireEvent.click(screen.getByRole('checkbox', { name: '?占쎈젹 ?占쎌떆' }));
     await waitFor(() => {
       expect(
-        screen.getByRole('columnheader', { name: /?占쎈젹/ }),
+        screen.getByRole('columnheader', { name: /\?占쎈젹/ }),
       ).toBeInTheDocument();
     });
   });
@@ -699,7 +761,9 @@ describe('F1-GRID validation', () => {
           field: 'name',
           headerName: 'Item name',
           validate: (value) =>
-            value === '湲덌옙? ?占쎈ぉ' ? '?占쎈줉?????占쎈뒗 ?占쎈ぉ?占쎈땲??' : true,
+            value === '湲덌옙? ?占쎈ぉ'
+              ? '?占쎈줉?????占쎈뒗 ?占쎈ぉ?占쎈땲??'
+              : true,
         },
       ],
     );
@@ -714,7 +778,9 @@ describe('F1-GRID validation', () => {
   it('renders an empty-state message when there are no rows', () => {
     render(<F1Grid rows={[]} columns={columns} rowKey="id" />);
 
-    expect(screen.getByText('?占쎌씠?占쏙옙? ?占쎌뒿?占쎈떎')).toBeInTheDocument();
+    expect(
+      screen.getByText('?占쎌씠?占쏙옙? ?占쎌뒿?占쎈떎'),
+    ).toBeInTheDocument();
   });
 });
 
@@ -753,7 +819,9 @@ describe('F1-GRID extended editors', () => {
     render(
       <F1Grid
         ref={gridRef}
-        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' }]}
+        rows={[
+          { id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' },
+        ]}
         columns={[
           {
             field: 'itemCode',
@@ -831,7 +899,7 @@ describe('F1-GRID extended editors', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '以占? }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ready' }));
     fireEvent.change(screen.getByDisplayValue('ready'), {
       target: { value: '?占쎈즺' },
     });
@@ -892,7 +960,7 @@ describe('F1-GRID extended editors', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '以占? }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ready' }));
     fireEvent.change(screen.getByDisplayValue('ready'), {
       target: { value: '?占쎈즺' },
     });
@@ -950,7 +1018,12 @@ describe('F1-GRID dirty indicator across column types', () => {
       type: 'date',
       editable: true,
     },
-    { field: 'workTime', headerName: '?占쎌뾽?占쎄컖', type: 'time', editable: true },
+    {
+      field: 'workTime',
+      headerName: '?占쎌뾽?占쎄컖',
+      type: 'time',
+      editable: true,
+    },
   ];
   const mixedRows: MixedRow[] = [
     {
@@ -1114,7 +1187,8 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     fireEvent.click(itemCodeCell);
     fireEvent.paste(itemCodeCell, {
       clipboardData: {
-        getData: () => 'ITEM-010\t?占쎄퇋 ?占쎈ぉ\t3\nITEM-011\t異뷂옙? ?占쎈ぉ\t4',
+        getData: () =>
+          'ITEM-010\t?占쎄퇋 ?占쎈ぉ\t3\nITEM-011\t異뷂옙? ?占쎈ぉ\t4',
       },
     });
 
@@ -1168,8 +1242,13 @@ describe('F1-GRID clipboard, validation, and keyboard commands', () => {
     });
     expect(valid).toBe(false);
     expect(
-      screen.getByRole('gridcell', { name: '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??' }),
-    ).toHaveAttribute('data-grid-error', '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??');
+      screen.getByRole('gridcell', {
+        name: '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??',
+      }),
+    ).toHaveAttribute(
+      'data-grid-error',
+      '?占쎈ぉ肄붾뱶?占??? ?占쎌닔?占쎈땲??',
+    );
   });
 
   it('uses Home, End, Insert, and Ctrl+D while leaving Backspace to the editor', () => {
@@ -1459,7 +1538,9 @@ describe('F1-GRID row height', () => {
           { id: 'first', description: '占?踰덉㎏ 占??占쎈챸' },
           { id: 'second', description: '??踰덉㎏ 占??占쎈챸' },
         ]}
-        columns={[{ field: 'description', headerName: '?占쎈챸', wrapText: true }]}
+        columns={[
+          { field: 'description', headerName: '?占쎈챸', wrapText: true },
+        ]}
         rowKey="id"
         minRowHeight={40}
         maxRowHeight={120}
@@ -1467,7 +1548,7 @@ describe('F1-GRID row height', () => {
     );
 
     const handles = screen.getAllByRole('button', {
-      name: /???占쎌씠 議곗젅/,
+      name: /\?\?\?占쎌씠 議곗젅/,
     });
     expect(handles).toHaveLength(2);
     expect(handles[0]).toHaveAttribute('aria-valuenow', '40');
@@ -1485,7 +1566,8 @@ describe('F1-GRID row height', () => {
   });
 
   it('uses ellipsis by default and wraps configured cells after resizing', () => {
-    const longText = '?占??占쎌뿉???占쎈윭 以꾨줈 ?占쎌떆?占쎌뼱???占쎈뒗 占??占쎈챸?占쎈땲??';
+    const longText =
+      '?占??占쎌뿉???占쎈윭 以꾨줈 ?占쎌떆?占쎌뼱???占쎈뒗 占??占쎈챸?占쎈땲??';
     render(
       <F1Grid
         rows={[{ id: 'first', wrapped: longText, clipped: longText }]}
@@ -1505,9 +1587,12 @@ describe('F1-GRID row height', () => {
       overflow: 'hidden',
     });
 
-    fireEvent.keyDown(screen.getByRole('button', { name: /???占쎌씠 議곗젅/ }), {
-      key: 'ArrowDown',
-    });
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ }),
+      {
+        key: 'ArrowDown',
+      },
+    );
     expect(wrappedText).toHaveStyle({ whiteSpace: 'normal' });
   });
 
@@ -1525,7 +1610,7 @@ describe('F1-GRID row height', () => {
       </AppSettingsProvider>,
     );
 
-    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
+    const handle = screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '48');
     window.localStorage.removeItem('erp-display-scale');
   });
@@ -1541,7 +1626,7 @@ describe('F1-GRID row height', () => {
       />,
     );
 
-    const handle = screen.getByRole('button', { name: /???占쎌씠 議곗젅/ });
+    const handle = screen.getByRole('button', { name: /\?\?\?占쎌씠 議곗젅/ });
     expect(handle).toHaveAttribute('aria-valuenow', '40');
   });
 });
@@ -1563,7 +1648,11 @@ describe('F1-GRID interaction', () => {
         rows={rows}
         columns={[
           { field: 'code', headerName: '肄붾뱶', headerGroup: '湲곕낯?占쎈낫' },
-          { field: 'status', headerName: '?占쏀깭', headerGroup: '湲곕낯?占쎈낫' },
+          {
+            field: 'status',
+            headerName: '?占쏀깭',
+            headerGroup: '湲곕낯?占쎈낫',
+          },
         ]}
         rowKey="id"
       />,
@@ -1594,7 +1683,9 @@ describe('F1-GRID interaction', () => {
   it('keeps the default cursor outside edit mode and switches to a text cursor while editing', () => {
     render(
       <F1Grid
-        rows={[{ id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' }]}
+        rows={[
+          { id: 'line-1', itemCode: 'ITEM-001', itemName: '湲곗〈 ?占쎈ぉ' },
+        ]}
         columns={[
           { field: 'itemCode', headerName: '?占쎈ぉ肄붾뱶', editable: true },
           { field: 'itemName', headerName: 'Item name', editable: true },
@@ -1694,6 +1785,35 @@ describe('F1-GRID interaction', () => {
 
     expect(secondCell).toHaveAttribute('tabindex', '0');
     expect(firstCell).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('does not allow row resizing while a cell drag selection is active', () => {
+    render(
+      <F1Grid
+        rows={[
+          { id: '1', code: 'A', name: 'Alpha' },
+          { id: '2', code: 'B', name: 'Beta' },
+        ]}
+        columns={[
+          { field: 'code', headerName: '肄붾뱶' },
+          { field: 'name', headerName: '?占쎈쫫' },
+        ]}
+        rowKey="id"
+        resizableRows
+      />,
+    );
+
+    const handle = screen.getAllByRole('button', { name: /행 높이 조절/ })[0];
+    const start = screen.getByRole('gridcell', { name: 'A' });
+    const end = screen.getByRole('gridcell', { name: 'Beta' });
+
+    fireEvent.mouseDown(start);
+    expect(handle).toHaveStyle({ pointerEvents: 'none' });
+
+    fireEvent.mouseEnter(end);
+    fireEvent.mouseUp(end);
+
+    expect(handle).not.toHaveStyle({ pointerEvents: 'none' });
   });
 
   it('supports cell-range drag selection across adjacent cells', () => {
@@ -1931,7 +2051,7 @@ describe('F1-GRID interaction', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" columnLine />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const orderHeader = screen.getByRole('columnheader', { name: /?占쎈젹/ });
+    const orderHeader = screen.getByRole('columnheader', { name: /\?占쎈젹/ });
     const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
     const orderCell = screen.getByRole('gridcell', { name: '1' });
 
@@ -1950,7 +2070,7 @@ describe('F1-GRID interaction', () => {
 
     render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
 
-    const statusCell = screen.getByRole('gridcell', { name: '?占쎌꽦占? });
+    const statusCell = screen.getByRole('gridcell', { name: '?占쎌꽦占?' });
     fireEvent.doubleClick(statusCell);
     expect(
       screen
@@ -1961,7 +2081,9 @@ describe('F1-GRID interaction', () => {
     fireEvent.mouseDown(screen.getByRole('combobox'));
     fireEvent.click(screen.getByRole('option', { name: '?占쎌젙' }));
 
-    expect(screen.getAllByRole('gridcell', { name: '?占쎌젙' })).toHaveLength(2);
+    expect(screen.getAllByRole('gridcell', { name: '?占쎌젙' })).toHaveLength(
+      2,
+    );
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', status: 'confirmed' }),
     ]);
@@ -2114,7 +2236,7 @@ describe('F1-GRID interaction', () => {
   it('applies headerAlign independently from cell alignment', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByRole('columnheader', { name: /?占쎈젹/ })).toHaveStyle({
+    expect(screen.getByRole('columnheader', { name: /\?占쎈젹/ })).toHaveStyle({
       textAlign: 'center',
     });
   });
@@ -2130,11 +2252,15 @@ describe('F1-GRID interaction', () => {
   it('only renders the select-all checkbox in the header when headerCheckbox is set', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮')).toBeInTheDocument();
-    expect(screen.queryByLabelText('?占쏀깭 ?占쎌껜 ?占쏀깮')).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText('?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('?占쏀깭 ?占쎌껜 ?占쏀깮'),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', {
-        name: /?占쎌슜 ?占쏙옙?/,
+        name: /\?占쎌슜 \?占쏙옙\?/,
       }),
     ).toHaveTextContent('?占쎌슜 ?占쏙옙?');
   });
@@ -2191,7 +2317,12 @@ describe('F1-GRID interaction', () => {
   it('keeps a merged value editable for a non-leading row', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
     const mergeColumns: F1GridColumn<MenuRow>[] = [
-      { field: 'status', headerName: '?占쏀깭', editable: true, mergeRows: true },
+      {
+        field: 'status',
+        headerName: '?占쏀깭',
+        editable: true,
+        mergeRows: true,
+      },
     ];
     const mergeRows = [
       { ...rows[0], status: 'draft' },
@@ -2229,7 +2360,12 @@ describe('F1-GRID interaction', () => {
 
   it('only unmerges the group containing the edited cell', () => {
     const mergeColumns: F1GridColumn<MenuRow>[] = [
-      { field: 'status', headerName: '?占쏀깭', editable: true, mergeRows: true },
+      {
+        field: 'status',
+        headerName: '?占쏀깭',
+        editable: true,
+        mergeRows: true,
+      },
     ];
     const mergeRows = [
       { ...rows[0], status: 'draft' },
@@ -2280,7 +2416,8 @@ describe('F1-GRID interaction', () => {
         .gridRow,
     ).toBe('1/span 2');
     expect(
-      getComputedStyle(screen.getByRole('columnheader', { name: /?占쏀깭/ })).left,
+      getComputedStyle(screen.getByRole('columnheader', { name: /\?占쏀깭/ }))
+        .left,
     ).toBe('44px');
   });
 
@@ -2325,13 +2462,19 @@ describe('F1-GRID interaction', () => {
 
     render(<F1Grid ref={gridRef} rows={rows} columns={columns} rowKey="id" />);
 
-    const headerCheckbox = screen.getByLabelText('?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮');
+    const headerCheckbox = screen.getByLabelText(
+      '?占쎌슜 ?占쏙옙? ?占쎌껜 ?占쏀깮',
+    );
     expect(headerCheckbox).toBeChecked();
 
     fireEvent.click(headerCheckbox);
 
-    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? dashboard')).not.toBeChecked();
-    expect(screen.getByLabelText('?占쎌슜 ?占쏙옙? settings')).not.toBeChecked();
+    expect(
+      screen.getByLabelText('?占쎌슜 ?占쏙옙? dashboard'),
+    ).not.toBeChecked();
+    expect(
+      screen.getByLabelText('?占쎌슜 ?占쏙옙? settings'),
+    ).not.toBeChecked();
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: 'dashboard', enabled: false }),
       expect.objectContaining({ id: 'settings', enabled: false }),
@@ -2421,14 +2564,22 @@ describe('F1-GRID sorting', () => {
   it('sorts a column ascending and descending through the header menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }),
+    );
 
     const cellsDesc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
     expect(cellsDesc[0]).toHaveTextContent('SET');
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈쫫李⑥닚 ?占쎈젹' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: '?占쎈쫫李⑥닚 ?占쎈젹' }),
+    );
 
     const cellsAsc = screen.getAllByRole('gridcell', { name: /DASH|SET/ });
     expect(cellsAsc[0]).toHaveTextContent('DASH');
@@ -2492,9 +2643,11 @@ describe('F1-GRID filtering', () => {
   it('filters visible rows through the header filter popover', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쏀꽣' }));
-    fireEvent.change(screen.getByLabelText('肄붾뱶 ?占쏀꽣 占?), {
+    fireEvent.change(screen.getByLabelText('肄붾뱶 ?占쏀꽣 占?'), {
       target: { value: 'SET' },
     });
     fireEvent.click(screen.getByRole('button', { name: '?占쎌슜' }));
@@ -2508,7 +2661,9 @@ describe('F1-GRID filtering', () => {
   it('anchors the column filter menu to its header button', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쏀꽣' }));
 
     expect(screen.getAllByLabelText('肄붾뱶 而щ읆 硫붾돱')).toHaveLength(2);
@@ -2533,12 +2688,12 @@ describe('F1-GRID column pin', () => {
       position: 'sticky',
       left: '44px',
     });
-    expect(screen.getByRole('columnheader', { name: /?占쎌슜 ?占쏙옙?/ })).toHaveStyle(
-      {
-        position: 'sticky',
-        right: '0px',
-      },
-    );
+    expect(
+      screen.getByRole('columnheader', { name: /\?占쎌슜 \?占쏙옙\?/ }),
+    ).toHaveStyle({
+      position: 'sticky',
+      right: '0px',
+    });
   });
 
   it('reorders columns into left-pinned, unpinned, and right-pinned groups', () => {
@@ -2572,7 +2727,9 @@ describe('F1-GRID column pin', () => {
   it('pins a column to the left and unpins it through the header menu', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
@@ -2582,7 +2739,9 @@ describe('F1-GRID column pin', () => {
       ).toBe('sticky');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '怨좎젙 ?占쎌젣' }));
 
     await waitFor(() => {
@@ -2596,7 +2755,9 @@ describe('F1-GRID column pin', () => {
   it('keeps pinned header and body cells visually above scrolling cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
@@ -2620,7 +2781,9 @@ describe('F1-GRID column pin', () => {
   it('keeps the row-selection header above a pinned column header', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
@@ -2636,7 +2799,9 @@ describe('F1-GRID column pin', () => {
   it('keeps row-selection cells above pinned body cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
@@ -2650,7 +2815,9 @@ describe('F1-GRID column pin', () => {
   it('keeps selected row-selection cells opaque above scrolling cells', async () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
     fireEvent.click(screen.getByLabelText('dashboard ???占쏀깮'));
 
@@ -2670,7 +2837,9 @@ describe('F1-GRID column pin', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     await waitFor(() => {
@@ -2773,8 +2942,12 @@ describe('F1-GRID rownumber column', () => {
   it('renumbers rows after sorting instead of keeping the original data order', () => {
     render(<F1Grid rows={rows} columns={rownumberColumns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: '?占쎈┝李⑥닚 ?占쎈젹' }),
+    );
 
     const cells = screen.getAllByRole('gridcell', { name: /^[12]$/ });
     expect(cells.map((cell) => cell.textContent)).toEqual(['1', '2']);
@@ -2817,7 +2990,9 @@ describe('F1-GRID column drag reorder', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2831,7 +3006,7 @@ describe('F1-GRID column drag reorder', () => {
     expect(headerFields).toEqual([
       '?占쎈젹',
       '?占쎌슜 ?占쏙옙?',
-      '?占쎌옉??,
+      '?占쎌옉??',
       '肄붾뱶',
       '?占쏀깭',
     ]);
@@ -2841,7 +3016,9 @@ describe('F1-GRID column drag reorder', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2853,7 +3030,9 @@ describe('F1-GRID column drag reorder', () => {
   it('excludes pinned columns from drag reorder targets', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
@@ -2871,7 +3050,9 @@ describe('F1-GRID column drag reorder', () => {
     );
 
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
-    const statusHeader = screen.getByRole('columnheader', { name: /?占쏀깭/ });
+    const statusHeader = screen.getByRole('columnheader', {
+      name: /\?占쏀깭/,
+    });
     const dataTransfer = createDataTransfer();
 
     fireEvent.dragStart(codeHeader, { dataTransfer });
@@ -2898,7 +3079,7 @@ describe('F1-GRID column drag reorder', () => {
     expect(headerFields).toEqual([
       '?占쎈젹',
       '?占쎌슜 ?占쏙옙?',
-      '?占쎌옉??,
+      '?占쎌옉??',
       '肄붾뱶',
       '?占쏀깭',
     ]);
@@ -2958,7 +3139,9 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '而щ읆 紐⑸줉' }));
     fireEvent.click(screen.getByRole('checkbox', { name: '肄붾뱶 ?占쎌떆' }));
 
@@ -2992,7 +3175,9 @@ describe('F1-GRID column drag reorder', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     fireEvent.click(screen.getByRole('menuitem', { name: '?占쎌そ 怨좎젙' }));
 
     const stored = window.localStorage.getItem('test-grid-column-pinned');
@@ -3013,12 +3198,11 @@ describe('F1-GRID column drag reorder', () => {
     const codeHeader = screen.getByRole('columnheader', { name: /肄붾뱶/ });
     expect(codeHeader).not.toHaveAttribute('draggable', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '肄붾뱶 而щ읆 硫붾돱' }),
+    );
     expect(
       screen.getByRole('menuitem', { name: '怨좎젙 ?占쎌젣' }),
     ).not.toHaveAttribute('aria-disabled', 'true');
   });
 });
-
-
-

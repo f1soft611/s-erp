@@ -73,14 +73,18 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 헤더 메뉴에서 컬럼 정렬, 필터, 고정, 숨김/표시를 조작할 수 있다.
 - 컬럼 리사이즈와 컬럼 고정 상태가 동시에 동작하며, 마지막 남은 표시 컬럼은 숨길 수 없다.
 - 행 높이 조절 핸들과 키보드 `ArrowUp`/`ArrowDown`으로 `4px` 단위 조절이 가능하다.
+- 셀 범위 드래그 선택 중에는 행 높이 조절 핸들이 비활성화되어 `rowresize` 동작이 발생하지 않는다.
 - `wrapText: true` 옵션이 있는 컬럼은 행 높이가 커질 때 줄바꿈을 허용하고, 기본 컬럼은 한 줄 말줄임 유지한다.
 - `height`, `minHeight`, `maxHeight`를 통해 Grid 컨테이너의 전체 높이와 최소/최대 높이를 제어한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
+- `loading` 상태를 사용해 그리드 전체 영역에 로딩 스피너를 표시하고, `minHeight`를 넘겨 부모 영역에서 내부 스크롤이 유지되도록 할 수 있다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+- 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
+- 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 로드 시점의 원본 값(`originalRowsById`)과 비교하며, 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드의 dirty 마크가 사라지고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
@@ -478,6 +482,101 @@ Tab
 Escape
 ```
 
+## 행 폼 모달 플러그인
+
+`rowFormPlugin`은 많은 컬럼을 가로 셀 편집 대신 폼으로 등록·수정해야 하는 화면에서 선택적으로 사용한다. 활성 상태는 prop이 있고 `enabled !== false`인 경우이며, 이때 Grid 마지막에 폭 `48px`의 우측 고정 `상세` 열이 자동 추가된다. `상세` 열은 사용자가 해제할 수 없는 폼 플러그인 전용 우측 pin 1번 영역으로 동작하고, 사용자가 다른 컬럼을 오른쪽 고정하면 해당 컬럼은 `상세` 열 왼쪽의 2번 이후 고정 영역에 배치된다. 합성 액션 열은 컬럼 배열, 행 데이터, Excel 내보내기, 클립보드, 셀 선택 및 검증 대상에는 포함되지 않는다.
+
+플러그인이 없거나 `enabled: false`이면 액션 열과 모달을 만들지 않는다. `addRow()`는 기존처럼 즉시 행을 추가하고 인라인 편집을 비롯한 기존 Grid/Tree 동작도 변경하지 않는다.
+
+공개 타입:
+
+```typescript
+type F1GridFormMode = 'create' | 'edit';
+
+type F1GridColumnFormOptions<T extends object> = {
+  hidden?: boolean;
+  readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
+  label?: string;
+  group?: string;
+  order?: number;
+  span?: 1 | 2 | 3;
+  targetField?: keyof T;
+  targetLabel?: string;
+};
+
+type F1GridRowFormPlugin<T extends object> = {
+  id?: string;
+  enabled?: boolean;
+  getTitle?: (context: { mode: F1GridFormMode; row: T }) => string;
+  getDescription?: (context: { mode: F1GridFormMode; row: T }) => string;
+  onBeforeApply?: (context: {
+    mode: F1GridFormMode;
+    originalRow?: T;
+    draftRow: T;
+  }) => boolean | void;
+};
+
+interface F1GridColumn<T extends object> {
+  form?: F1GridColumnFormOptions<T>;
+}
+
+interface F1GridProps<T extends object> {
+  rowFormPlugin?: F1GridRowFormPlugin<T>;
+}
+```
+
+### 컬럼 자동 매핑과 우선순위
+
+- `headerName`은 기본 필드 라벨이고 `headerGroup`은 기본 폼 섹션이다.
+- 그룹은 `form.group` → `headerGroup` → `기본 정보` 순으로 결정한다.
+- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
+- 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
+- `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
+- `form.targetField`와 `form.targetLabel`로 수정 모달 상단의 메타 정보(`예: 메뉴명: 홍길동`)를 재정의할 수 있으며, 기본값은 `rowKey`와 `대상`이다.
+- `text`, `number`, `decimal`, `currency`, `checkbox`, `date`, `datetime`, `time`, `select`, `autocomplete`, `code` 컬럼은 대응 입력으로 변환된다.
+- `rownumber`, 선택 체크박스, 합성 액션 열, 선언상 숨김 컬럼은 기본 제외한다. `form.hidden: false`이면 숨김 컬럼도 명시적으로 폼에 포함할 수 있다.
+
+### draft 적용과 취소
+
+- 수정 모달은 원본 행의 얕은 복사본을 draft로 사용한다. 입력 중에는 Grid 행과 변경 상태를 건드리지 않고, 적용 시 달라진 필드만 기존 dirty/updated 상태에 반영한다.
+- 활성 플러그인에서 `addRow(partial?)`는 `createRow()`와 partial을 합친 신규 draft를 연다. 적용 시에만 inserted 행을 생성하고 취소 시 빈 행이나 변경 이력을 남기지 않는다.
+- `required`, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
+- `onBeforeApply`가 `false`를 반환하면 적용을 중단하고 모달을 유지한다.
+- 취소, 닫기, `Escape`, backdrop 닫기는 모두 draft를 폐기한다.
+- 모달은 API를 호출하거나 서버에 저장하지 않는다. 최종 저장은 화면이 `getChanges()`와 기존 저장 버튼 흐름으로 수행한다.
+
+### F1-Tree와 반응형 UI
+
+`F1TreeRef.addRow()`는 부모 기본값을 유지한 루트 draft를 열고, `addChildRow(parentId, partial?)`는 `parentKey` 값을 보존한 하위 draft를 연다. 하위 행은 적용된 뒤에만 추가되고 부모 노드가 펼쳐지며, 취소 시 펼침 상태를 바꾸지 않는다. 트리 펼침 상태와 모달 open 상태는 독립적이다.
+
+1280px 이상에서는 최대 `960px`의 3열 폼, 768px 이상 1280px 미만에서는 2열 폼, 768px 미만에서는 full-screen 1열 폼을 사용한다. `form.span`은 각 뷰포트의 가용 열 수를 넘지 않게 제한된다. 모달은 `background`, `text`, `divider`, `primary`, `action` MUI 테마 토큰을 사용해 라이트·다크 테마에 대응한다.
+
+```tsx
+<F1Grid
+  ref={gridRef}
+  rows={rows}
+  columns={[
+    {
+      field: 'name',
+      headerName: '품목명',
+      headerGroup: '기본 정보',
+      editable: true,
+      form: { span: 2 },
+    },
+    {
+      field: 'active',
+      headerName: '사용 여부',
+      headerGroup: '운영 정보',
+      type: 'checkbox',
+      editable: true,
+    },
+  ]}
+  rowKey="id"
+  createRow={() => ({ id: crypto.randomUUID(), name: '', active: true })}
+  rowFormPlugin={{ enabled: true }}
+/>
+```
+
 ---
 
 # 8. Keyboard Navigation
@@ -678,13 +777,14 @@ ERP 전표, 발주, 생산지시, BOM, 재고조회 화면에서 같은 값이 �
 - 연속된 Row의 값이 같은 경우에만 병합한다.
 - 정렬, 필터, 페이지 변경 후에는 현재 표시 Row 기준으로 다시 계산한다.
 - 실제 Row 데이터는 합치지 않고 화면 표시만 병합한다.
-- 병합 시작 셀은 병합 span 전체의 하단에 행 경계선을 표시한다.
+- 병합 시작 셀은 병합 span 전체를 차지하되, 내부 그룹의 하단 경계는 다음 행의 단일 행 경계선으로 표시해 border가 겹치지 않도록 한다.
 - 편집, 선택, 복사, 붙여넣기, Validation은 원본 Row 단위로 동작한다.
 - 병합된 셀을 클릭하면 병합 범위의 첫 번째 Row Cell에 Focus를 둔다.
 - 병합 범위의 어느 행을 클릭해도 첫 번째 Row Cell을 기준으로 병합 그룹 전체 선택 경계를 표시한다.
 - 병합 그룹 선택 경계는 현재 포커스/편집 중인 셀의 컬럼에만 표시하며, 같은 행의 다른 컬럼을 클릭해도 다른 병합 컬럼을 활성화하지 않는다.
 - 병합 내부의 숨은 셀은 실제 그리드 마지막 행이어도 별도 하단선을 표시하지 않아 중간 병합 그룹의 경계선이 두꺼워지지 않도록 한다.
-- 병합된 영역 안에서도 마우스 드래그를 이용한 셀 범위 선택(Drag Cell Range Selection) 및 핀 고정(pinned) 컬럼과의 병합 동작을 지원한다.
+- 병합된 영역 안에서도 마우스 드래그를 이용한 셀 범위 선택(Drag Cell Range Selection) 및 핀 고정(pinned) 컬럼과의 병합 동작을 지원한다. 드래그 중에는 개별 포커스/병합 outline을 숨기고 선택 범위 overlay만 표시한다.
+- 핀 고정 컬럼이 드래그 범위에 포함되더라도 수평 스크롤 상태에서 overlay 위치가 컬럼 위치와 함께 자연스럽게 보정되며, sticky 컬럼 경계에서 좌표가 어긋나지 않는다.
 - 병합된 영역 안에서도 행 선택과 체크박스 선택은 개별 Row 기준으로 유지한다.
 
 지원 모드:

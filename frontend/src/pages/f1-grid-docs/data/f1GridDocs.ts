@@ -77,6 +77,7 @@ export const f1GridDocs: F1GridDoc[] = [
           ['columnLine', 'boolean', '컬럼 사이 세로 구분선 표시 여부'],
           ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
           [
             'onChangesChange',
@@ -193,6 +194,133 @@ export const f1GridDocs: F1GridDoc[] = [
       },
     ],
     playground: 'editing',
+  },
+  {
+    id: 'row-form-modal',
+    title: 'Row Form Modal',
+    category: 'feature',
+    description:
+      '컬럼 정의에서 신규·수정 행 폼을 만들고 Grid 변경 상태에 적용합니다.',
+    sections: [
+      {
+        type: 'prose',
+        heading: 'Activate explicitly',
+        body: 'rowFormPlugin을 전달하고 enabled가 false가 아닐 때만 우측 고정 상세 열과 신규·수정 모달이 활성화됩니다. 상세 열은 해제할 수 없는 폼 플러그인 전용 우측 pin 1번 영역이며, 사용자가 다른 컬럼을 오른쪽 고정하면 상세 열 왼쪽의 2번 이후 고정 영역에 배치됩니다. 플러그인이 없거나 비활성이면 인라인 편집과 즉시 행 추가를 포함한 기존 동작이 그대로 유지됩니다.',
+      },
+      {
+        type: 'api',
+        heading: 'F1GridRowFormPlugin',
+        rows: [
+          ['rowFormPlugin', 'F1GridRowFormPlugin<T>', '선택형 행 폼 플러그인'],
+          ['enabled', 'boolean (기본 true)', '상세 열과 모달 활성화 여부'],
+          [
+            'getTitle / getDescription',
+            '함수',
+            '모드와 draft 행 기반 헤더 재정의',
+          ],
+          [
+            'onBeforeApply',
+            '(context) => boolean | void',
+            'false 반환 시 적용 중단 및 모달 유지',
+          ],
+        ],
+      },
+      {
+        type: 'api',
+        heading: 'F1GridColumn.form',
+        rows: [
+          ['form.hidden', 'boolean', '폼 포함 여부 재정의'],
+          [
+            'form.readOnly',
+            'boolean | (row, mode) => boolean',
+            '읽기 전용 재정의',
+          ],
+          ['form.label', 'string', 'headerName 대신 사용할 라벨'],
+          [
+            'form.group',
+            'string',
+            '그룹 우선순위: form.group → headerGroup → 기본 정보',
+          ],
+          ['form.order', 'number', '폼 전체 필드 정렬 순서'],
+          ['form.span', '1 | 2 | 3', '데스크톱 3열 기준 점유 폭'],
+        ],
+      },
+      {
+        type: 'prose',
+        heading: 'Automatic mapping and validation',
+        body: 'headerName은 기본 라벨, headerGroup은 자동 섹션이 되고 text, number, decimal, currency, checkbox, date, datetime, time, select, autocomplete, code 타입은 대응 입력으로 변환됩니다. 숨김·행번호·합성 열은 기본 제외되며 required, min, max, validate는 폼 포함 컬럼에만 적용됩니다. 읽기 전용은 form.readOnly, editable 함수, editable 값 순으로 판정합니다.',
+      },
+      {
+        type: 'api',
+        heading: 'Draft lifecycle',
+        rows: [
+          ['수정', '상세 → draft → 적용', '변경 필드만 기존 dirty 상태에 반영'],
+          [
+            '신규',
+            'addRow() → createRow() → 적용',
+            '적용할 때만 inserted 행 생성',
+          ],
+          ['취소 / 닫기', 'draft 폐기', 'Grid 행과 변경 이력은 그대로 유지'],
+          [
+            '검증 실패',
+            '모달 유지',
+            '오류 표시 후 첫 오류 입력으로 포커스 이동',
+          ],
+          [
+            '서버 저장',
+            '수행하지 않음',
+            '기존 화면의 getChanges()와 저장 흐름이 담당',
+          ],
+        ],
+      },
+      {
+        type: 'api',
+        heading: 'F1-Tree and responsive behavior',
+        rows: [
+          [
+            '루트 추가',
+            'F1TreeRef.addRow()',
+            '부모 기본값을 유지한 신규 draft',
+          ],
+          [
+            '하위 추가',
+            'F1TreeRef.addChildRow(parentId)',
+            'parentKey를 보존하고 적용 후 부모 펼침',
+          ],
+          ['1280px 이상', '최대 960px / 3열', 'form.span 1~3 적용'],
+          ['768px 이상', '가용 폭 / 2열', 'span은 최대 2열로 제한'],
+          [
+            '768px 미만',
+            'fullScreen / 1열',
+            '375px부터 겹침과 페이지 가로 스크롤 방지',
+          ],
+          [
+            'theme tokens',
+            'background / text / divider / primary / action',
+            '라이트·다크 테마 공통 사용',
+          ],
+        ],
+      },
+      {
+        type: 'code',
+        heading: 'Column-driven row form',
+        code: `const columns = [
+  { field: 'name', headerName: '품목명', headerGroup: '기본 정보', editable: true, form: { span: 2 } },
+  { field: 'quantity', headerName: '수량', headerGroup: '기본 정보', type: 'number', editable: true },
+  { field: 'active', headerName: '사용 여부', headerGroup: '운영 정보', type: 'checkbox', editable: true },
+];
+
+<F1Grid
+  ref={gridRef}
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  createRow={() => ({ id: crypto.randomUUID(), name: '', quantity: 0, active: true })}
+  rowFormPlugin={{ enabled: true }}
+/>`,
+      },
+    ],
+    playground: 'row-form-modal',
   },
   {
     id: 'selection',
@@ -426,6 +554,24 @@ export const f1GridDocs: F1GridDoc[] = [
           ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
           ['excelFileName', 'string', '다운로드 파일명 기본값'],
           [
+            'allowAddRowInContextMenu',
+            'boolean',
+            '우클릭 행 추가 메뉴 표시 여부',
+          ],
+          [
+            'allowDuplicateRowInContextMenu',
+            'boolean',
+            '우클릭 행 복사 메뉴 표시 여부',
+          ],
+          [
+            'allowDeleteRowInContextMenu',
+            'boolean',
+            '우클릭 행 삭제 메뉴 표시 여부',
+          ],
+          ['createDuplicate', '(row) => T', '복사용 신규 행 생성 로직'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          ['minHeight', 'number | string', '그리드 최소 높이 제어'],
+          [
             'treeContextMenu',
             'F1GridContextMenuTreeConfig',
             'F1Tree가 내부적으로 주입하는 트리 전용 콜백',
@@ -435,10 +581,22 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'code',
         heading: 'Enable the export menu',
-        code: '<F1Tree rows={rows} rowKey="id" parentKey="parentId" treeColumn="name" canExportExcel={hasExcelPermission} excelFileName="menu-export" />',
+        code: `const columns = [{ field: 'name', headerName: '메뉴명', width: 220, editable: true }];
+
+<F1Grid
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  canExportExcel
+  excelFileName="menu-export"
+  allowAddRowInContextMenu
+  allowDuplicateRowInContextMenu
+  allowDeleteRowInContextMenu
+  createDuplicate={(row) => ({ ...row, id: crypto.randomUUID() })}
+/>`,
       },
     ],
-    playground: 'tree',
+    playground: 'context-menu',
   },
   {
     id: 'tree-grid',
@@ -546,6 +704,11 @@ export const f1GridDocs: F1GridDoc[] = [
             '편집기 플러그인 (editors는 호환 별칭)',
           ],
           [
+            'rowFormPlugin',
+            'F1GridRowFormPlugin<T>',
+            '선택형 신규·수정 행 폼과 상세 열',
+          ],
+          [
             'onBeforeEdit / beforeEdit',
             'F1GridEditLifecycle<T>',
             '편집 시작 전 훅',
@@ -563,6 +726,13 @@ export const f1GridDocs: F1GridDoc[] = [
             '표시 행 가공 (Tree 등에서 사용)',
           ],
           ['cellAdornment', '(row, column) => ReactNode', '셀 앞 장식 렌더링'],
+          ['minHeight', 'number | string', '그리드 최소 높이 제어'],
+          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'allowAddRowInContextMenu / allowDuplicateRowInContextMenu / allowDeleteRowInContextMenu',
+            'boolean',
+            '우클릭 메뉴 액션 노출 제어',
+          ],
           [
             'disableSorting / disableFiltering',
             'boolean',
@@ -577,6 +747,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ['field', 'keyof T', '데이터 필드'],
           ['headerName', 'string', '헤더 표시명'],
           ['headerGroup', 'string', '헤더 상단 그룹 라벨'],
+          [
+            'form',
+            'F1GridColumnFormOptions<T>',
+            '행 폼 표시·그룹·순서·폭 재정의',
+          ],
           ['getValue / onValueChange', '함수', '표시값 계산 / 값 변경 시 패치'],
           ['width / flex / maxWidth', 'number', '너비 정책'],
           ['editable', 'boolean | (row) => boolean', '편집 가능 여부'],
@@ -670,6 +845,7 @@ export const f1GridDocs: F1GridDoc[] = [
         links: [
           { id: 'core-grid', label: 'Core Grid' },
           { id: 'editing', label: 'Cell Editing' },
+          { id: 'row-form-modal', label: 'Row Form Modal' },
           { id: 'tree-grid', label: 'Tree Grid' },
         ],
       },

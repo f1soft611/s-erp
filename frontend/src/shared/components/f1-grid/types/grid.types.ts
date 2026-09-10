@@ -25,6 +25,38 @@ export type F1GridOption = {
 
 export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
+export type F1GridFormMode = 'create' | 'edit';
+
+export type F1GridColumnFormOptions<T extends object> = {
+  hidden?: boolean;
+  readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
+  label?: string;
+  group?: string;
+  order?: number;
+  span?: 1 | 2 | 3;
+  targetField?: keyof T;
+  targetLabel?: string;
+};
+
+export type F1GridRowFormContext<T extends object> = {
+  mode: F1GridFormMode;
+  row: T;
+};
+
+export type F1GridRowFormApplyContext<T extends object> = {
+  mode: F1GridFormMode;
+  originalRow?: T;
+  draftRow: T;
+};
+
+export type F1GridRowFormPlugin<T extends object> = {
+  id?: string;
+  enabled?: boolean;
+  getTitle?: (context: F1GridRowFormContext<T>) => string;
+  getDescription?: (context: F1GridRowFormContext<T>) => string;
+  onBeforeApply?: (context: F1GridRowFormApplyContext<T>) => boolean | void;
+};
+
 export type F1GridEditContext<T extends object> = {
   row: T;
   rowId: F1GridRowId;
@@ -68,6 +100,7 @@ export type F1GridColumn<T extends object> = {
   field: keyof T;
   headerName: string;
   headerGroup?: string;
+  form?: F1GridColumnFormOptions<T>;
   getValue?: (row: T) => unknown;
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;
@@ -155,6 +188,7 @@ export type F1GridProps<T extends object> = {
   rows: T[];
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
+  rowFormPlugin?: F1GridRowFormPlugin<T>;
   ariaLabel?: string;
   columnLine?: boolean;
   storageKey?: string;

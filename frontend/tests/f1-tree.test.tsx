@@ -187,7 +187,7 @@ describe('F1Tree interaction', () => {
     expect(screen.getByRole('gridcell', { name: 'Grand child' })).toBeVisible();
   });
 
-  it('toggles descendants and expands a parent before adding a child', () => {
+  it('without row form plugin, toggles descendants and expands a parent before adding a child', () => {
     const ref = createRef<F1TreeRef<TreeRow>>();
     render(
       <F1Tree
@@ -631,5 +631,255 @@ describe('F1Tree interaction', () => {
 
     expect(input).toBeInTheDocument();
     expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+});
+
+describe('F1Tree row form modal', () => {
+  const rows: TreeRow[] = [
+    {
+      id: 'root',
+      parentId: null,
+      order: 1,
+      name: 'Root',
+      hasChildren: false,
+      allowed: false,
+    },
+    {
+      id: 'existing-child',
+      parentId: 'root',
+      order: 1,
+      name: 'Existing child',
+      hasChildren: false,
+      allowed: false,
+    },
+  ];
+  const columns = [
+    { field: 'name' as const, headerName: '메뉴명', editable: true },
+  ];
+  const createRow = (): TreeRow => ({
+    id: 'new-row',
+    parentId: null,
+    order: 0,
+    name: '새 메뉴',
+    hasChildren: false,
+    allowed: false,
+  });
+
+  function getGridBody(ariaLabel: string) {
+    const grid = screen.getByRole('grid', { name: ariaLabel });
+    return grid.lastElementChild as HTMLElement;
+  }
+
+  it('opens addChildRow in a modal and keeps the parent collapsed when cancelled', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 자식 취소 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => {
+      ref.current?.addChildRow('root', {
+        id: 'cancelled-child',
+        name: '취소할 자식',
+      });
+    });
+
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeVisible();
+    expect(ref.current?.isExpanded('root')).toBe(false);
+    expect(ref.current?.getChanges().insertedRows).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(ref.current?.isExpanded('root')).toBe(false);
+    expect(ref.current?.getChanges().insertedRows).toEqual([]);
+  });
+
+  it('expands the parent only after addChildRow is applied and preserves the parent ID', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 자식 적용 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => {
+      ref.current?.addChildRow('root', {
+        id: 'applied-child',
+        name: '적용한 자식',
+        parentId: 'incorrect-parent',
+      });
+    });
+    expect(ref.current?.isExpanded('root')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(ref.current?.isExpanded('root')).toBe(true);
+    expect(ref.current?.getChanges().insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: 'applied-child',
+        name: '적용한 자식',
+        parentId: 'root',
+      }),
+    );
+    expect(screen.getByRole('gridcell', { name: '적용한 자식' })).toBeVisible();
+  });
+
+  it('opens addRow in a modal and inserts a root only after apply', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 루트 적용 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => {
+      ref.current?.addRow({ id: 'applied-root', name: '적용한 루트' });
+    });
+
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeVisible();
+    expect(ref.current?.getChanges().insertedRows).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(ref.current?.getChanges().insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: 'applied-root',
+        name: '적용한 루트',
+        parentId: null,
+      }),
+    );
+  });
+
+  it('opens row form modals from the root and child tree context actions', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 컨텍스트 모달 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('F1-TREE 컨텍스트 모달 테스트'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '루트 추가' }));
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(ref.current?.getChanges().insertedRows).toEqual([]);
+
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Root' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '행 추가' }));
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: '메뉴명' })).toHaveValue(
+      '새 메뉴',
+    );
+    expect(ref.current?.isExpanded('root')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(ref.current?.isExpanded('root')).toBe(true);
+    expect(ref.current?.getChanges().insertedRows).toContainEqual(
+      expect.objectContaining({ parentId: 'root' }),
+    );
+  });
+
+  it('keeps expand and collapse controls independent while a child modal is open', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 모달 펼침 독립 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => {
+      ref.current?.addChildRow('root');
+    });
+    const dialog = screen.getByRole('dialog', { name: '신규 등록' });
+
+    act(() => {
+      ref.current?.expandRow('root');
+    });
+    expect(ref.current?.isExpanded('root')).toBe(true);
+    expect(dialog).toBeVisible();
+
+    act(() => {
+      ref.current?.collapseRow('root');
+    });
+    expect(ref.current?.isExpanded('root')).toBe(false);
+    expect(dialog).toBeVisible();
+  });
+
+  it('does not expand a cancelled parent when later changes include an older inserted child', () => {
+    const ref = createRef<F1TreeRef<TreeRow>>();
+    render(
+      <F1Tree
+        ref={ref}
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 취소 후 변경 테스트"
+        defaultExpanded={[]}
+        createRow={createRow}
+        rowFormPlugin={{}}
+      />,
+    );
+
+    act(() => {
+      ref.current?.addChildRow('root', { id: 'older-child' });
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    act(() => {
+      ref.current?.collapseRow('root');
+      ref.current?.addChildRow('root', { id: 'cancelled-child' });
+    });
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    act(() => {
+      ref.current?.setCellValue('root', 'name', '변경된 Root');
+    });
+
+    expect(ref.current?.isExpanded('root')).toBe(false);
   });
 });

@@ -43,6 +43,60 @@ export function isCellEditable<T extends object>(
     : Boolean(column.editable);
 }
 
+export function normalizeGridNumberInput(
+  rawValue: string,
+  decimalPlaces?: number,
+): string {
+  if (rawValue === '') return '';
+  if (
+    decimalPlaces === undefined ||
+    !Number.isInteger(decimalPlaces) ||
+    decimalPlaces < 0
+  ) {
+    return rawValue;
+  }
+
+  const trimComma = rawValue.replace(/,/g, '');
+  if (trimComma === '') return '';
+
+  const sign = trimComma.startsWith('-')
+    ? '-'
+    : trimComma.startsWith('+')
+      ? '+'
+      : '';
+  const unsigned = sign ? trimComma.slice(1) : trimComma;
+
+  if (decimalPlaces === 0) {
+    const digits = unsigned.replace(/[^\d]/g, '');
+    return digits ? `${sign}${digits}` : sign;
+  }
+
+  if (unsigned === '.' || unsigned === '-.' || unsigned === '+.') {
+    return `${sign}.`;
+  }
+
+  const hasDecimalPoint = unsigned.includes('.');
+  const [integerPart, fractionPart = ''] = unsigned.split('.');
+  const sanitizedInteger = integerPart.replace(/[^\d]/g, '');
+  const sanitizedFraction = fractionPart
+    .replace(/[^\d]/g, '')
+    .slice(0, decimalPlaces);
+
+  if (sanitizedInteger === '' && sanitizedFraction === '' && !hasDecimalPoint) {
+    return sign || '';
+  }
+
+  if (hasDecimalPoint && sanitizedFraction === '') {
+    return `${sign}${sanitizedInteger}.`;
+  }
+
+  if (sanitizedInteger === '' && sanitizedFraction !== '') {
+    return `${sign}.${sanitizedFraction}`;
+  }
+
+  return `${sign}${sanitizedInteger}${sanitizedFraction ? `.${sanitizedFraction}` : ''}`;
+}
+
 export function getGridColumnTrack<T extends object>(
   column: F1GridColumn<T>,
   resizedWidth?: number,

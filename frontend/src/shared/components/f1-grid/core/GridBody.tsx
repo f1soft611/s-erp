@@ -21,6 +21,7 @@ type GridBodyProps<T extends object> = {
     start: { rowId: F1GridRowId; columnIndex: number };
     end: { rowId: F1GridRowId; columnIndex: number };
   };
+  isCellSelectionDragging?: boolean;
   copiedCellRange?: {
     start: { rowId: F1GridRowId; columnIndex: number };
     end: { rowId: F1GridRowId; columnIndex: number };
@@ -60,9 +61,12 @@ type GridBodyProps<T extends object> = {
   onUpdateRowHeight: (rowId: F1GridRowId, height: number) => void;
   getPinOffset: (
     column: F1GridColumn<T>,
-  ) => { side: 'left' | 'right'; offset: number } | undefined;
+  ) => { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   showCheckbox?: boolean;
+  showFormAction?: boolean;
+  formActionPinnedShadow?: boolean;
+  onOpenRowForm?: (row: T) => void;
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -99,6 +103,7 @@ export function GridBody<T extends object>({
   focusedCell,
   editingCell,
   selectedCellRange,
+  isCellSelectionDragging = false,
   copiedCellRange,
   draftValue,
   dirtyCellMap = {},
@@ -124,6 +129,9 @@ export function GridBody<T extends object>({
   getPinOffset,
   cellAdornment,
   showCheckbox = true,
+  showFormAction = false,
+  formActionPinnedShadow = true,
+  onOpenRowForm,
 }: GridBodyProps<T>) {
   function getMergeEditing(rowIndex: number, columnIndex: number): boolean {
     const column = columns[columnIndex];
@@ -220,6 +228,7 @@ export function GridBody<T extends object>({
             focusedCell={focusedCell}
             editingCell={editingCell}
             selectedCellRange={selectedCellRange}
+            isCellSelectionDragging={isCellSelectionDragging}
             copiedCellRange={copiedCellRange}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}
@@ -256,6 +265,9 @@ export function GridBody<T extends object>({
             getPinOffset={getPinOffset}
             cellAdornment={cellAdornment}
             showCheckbox={showCheckbox}
+            showFormAction={showFormAction}
+            formActionPinnedShadow={formActionPinnedShadow}
+            onOpenRowForm={onOpenRowForm}
           />
         );
       })}

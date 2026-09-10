@@ -38,7 +38,7 @@ type GridCellProps<T extends object> = {
   onCodePick: () => void;
   errorMessage?: string;
   onCellRef: (node: HTMLElement | null) => void;
-  pinOffset?: { side: 'left' | 'right'; offset: number };
+  pinOffset?: { side: 'left' | 'right'; offset: number; shadow?: boolean };
   adornment?: ReactNode;
 };
 
@@ -217,9 +217,11 @@ export function GridCell<T extends object>({
             ? 'error.lighter'
             : undefined,
         boxShadow: pinOffset
-          ? pinOffset.side === 'left'
-            ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
-            : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+          ? pinOffset.shadow === false
+            ? undefined
+            : pinOffset.side === 'left'
+              ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+              : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
           : errorMessage
             ? 'inset 0 0 0 1px'
             : undefined,

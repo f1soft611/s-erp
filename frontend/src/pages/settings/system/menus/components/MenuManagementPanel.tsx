@@ -1,6 +1,4 @@
-import { Box, Card, CardContent, IconButton, Typography } from '@mui/material';
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
+import { Box, Card, CardContent, Typography } from '@mui/material';
 import {
   forwardRef,
   useEffect,
@@ -21,6 +19,7 @@ import {
 } from '../../../../../shared/components/PermissionGroup';
 import {
   createMenuSaveCheckpoint,
+  replaceMenuPermissions,
   saveMenuChanges,
   saveRoleMenuPermissions,
   type MenuSaveCheckpoint,
@@ -183,7 +182,7 @@ export const MenuManagementPanel = forwardRef<
       if (field === 'code') {
         return isNewMenuRow(row.id);
       }
-      return ['name', 'path', 'description'].includes(String(field));
+      return ['name', 'path', 'description', 'order'].includes(String(field));
     },
   };
 
@@ -202,6 +201,7 @@ export const MenuManagementPanel = forwardRef<
       headerName: '메뉴명',
       width: 220,
       editable: true,
+      required: true,
       pinned: 'left',
     },
     {
@@ -209,18 +209,30 @@ export const MenuManagementPanel = forwardRef<
       headerName: '메뉴코드',
       width: 140,
       editable: (row: MenuManagementRow) => isNewMenuRow(row.id),
+      required: true,
       mergeRows: true,
+      form: {
+        targetField: 'code',
+        targetLabel: '메뉴코드',
+      },
     },
     {
       field: 'path',
       headerName: '경로',
       width: 220,
+      form: {
+        span: 2,
+      },
       editable: true,
+      required: true,
     },
     {
       field: 'description',
       headerName: '메뉴설명',
       width: 260,
+      form: {
+        span: 3,
+      },
       editable: true,
       wrapText: true,
     },
@@ -229,6 +241,8 @@ export const MenuManagementPanel = forwardRef<
       headerName: '정렬',
       width: 80,
       editable: true,
+      required: true,
+      decimalPlaces: 0,
       type: 'number',
       align: 'center',
       headerAlign: 'center',
@@ -314,9 +328,7 @@ export const MenuManagementPanel = forwardRef<
         } else {
           for (const row of permissionTargets) {
             const menuId = savedMenus.insertedMenuIds[row.id] ?? row.id;
-            await (
-              await import('../services/menuManagement.service')
-            ).replaceMenuPermissions(menuId, row.permissionCodes);
+            await replaceMenuPermissions(menuId, row.permissionCodes);
           }
         }
 
@@ -388,7 +400,7 @@ export const MenuManagementPanel = forwardRef<
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               메뉴 관리
             </Typography>
-            <Box
+            {/* <Box
               role="toolbar"
               aria-label="메뉴 그리드 제어"
               sx={{
@@ -415,7 +427,7 @@ export const MenuManagementPanel = forwardRef<
               >
                 <UnfoldLessIcon fontSize="small" />
               </IconButton>
-            </Box>
+            </Box> */}
           </Box>
           {message ? (
             <Box
@@ -455,7 +467,8 @@ export const MenuManagementPanel = forwardRef<
               treeCheckbox
               height="100%"
               getRowOrder={(row) => row.order}
-              columnLine
+              rowFormPlugin={{}}
+              columnLine={true}
               ariaLabel="F1-TREE 메뉴 관리"
               canExportExcel={canExportExcel}
               excelFileName={`${selectedModule?.moduleName ?? 'menu'}-export`}
