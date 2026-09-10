@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { F1GridFormModal } from '../src/shared/components/f1-grid/form/F1GridFormModal';
 import { GridFormField } from '../src/shared/components/f1-grid/form/GridFormField';
 import {
   buildGridFormSections,
@@ -59,11 +60,9 @@ describe('F1-Grid form model', () => {
       '상태',
       '조직',
     ]);
-    expect(sections.map((section) => section.fields.map((field) => field.field))).toEqual([
-      ['memo', 'name'],
-      ['status', 'secret'],
-      ['department'],
-    ]);
+    expect(
+      sections.map((section) => section.fields.map((field) => field.field)),
+    ).toEqual([['memo', 'name'], ['status', 'secret'], ['department']]);
     expect(sections[1].fields[0]).toEqual({
       column: columns[2],
       field: 'status',
@@ -113,7 +112,9 @@ describe('F1-Grid form model', () => {
     };
 
     expect(isGridFormFieldReadOnly(formReadOnly, row, 'create')).toBe(true);
-    expect(isGridFormFieldReadOnly(formReadOnlyByMode, row, 'create')).toBe(false);
+    expect(isGridFormFieldReadOnly(formReadOnlyByMode, row, 'create')).toBe(
+      false,
+    );
     expect(isGridFormFieldReadOnly(formReadOnlyByMode, row, 'edit')).toBe(true);
     expect(isGridFormFieldReadOnly(checkbox, row, 'edit')).toBe(false);
     expect(isGridFormFieldReadOnly(ordinary, row, 'edit')).toBe(true);
@@ -346,7 +347,10 @@ describe('typed form field', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '품목 코드 선택' }));
 
-    expect(onOpenCodePicker).toHaveBeenCalledWith(typedRow, expect.any(Function));
+    expect(onOpenCodePicker).toHaveBeenCalledWith(
+      typedRow,
+      expect.any(Function),
+    );
     expect(onPatch).toHaveBeenCalledTimes(1);
     expect(onPatch).toHaveBeenCalledWith({
       code: 'B02',
@@ -358,26 +362,29 @@ describe('typed form field', () => {
     ['date', 'date', '2026-09-11'],
     ['datetime', 'datetime-local', '2026-09-11T10:45'],
     ['time', 'time', '10:45'],
-  ] as const)('patches %s values as compatible strings', (type, inputType, nextValue) => {
-    const onPatch = vi.fn();
-    const field = type as 'date' | 'datetime' | 'time';
+  ] as const)(
+    'patches %s values as compatible strings',
+    (type, inputType, nextValue) => {
+      const onPatch = vi.fn();
+      const field = type as 'date' | 'datetime' | 'time';
 
-    render(
-      <GridFormField
-        column={{ field, headerName: type, type }}
-        row={typedRow}
-        mode="edit"
-        value={typedRow[field]}
-        readOnly={false}
-        onPatch={onPatch}
-      />,
-    );
+      render(
+        <GridFormField
+          column={{ field, headerName: type, type }}
+          row={typedRow}
+          mode="edit"
+          value={typedRow[field]}
+          readOnly={false}
+          onPatch={onPatch}
+        />,
+      );
 
-    fireEvent.change(screen.getByLabelText(type), {
-      target: { value: nextValue, type: inputType },
-    });
-    expect(onPatch).toHaveBeenLastCalledWith({ [field]: nextValue });
-  });
+      fireEvent.change(screen.getByLabelText(type), {
+        target: { value: nextValue, type: inputType },
+      });
+      expect(onPatch).toHaveBeenLastCalledWith({ [field]: nextValue });
+    },
+  );
 
   it('connects required, read-only, error and helper text accessibility', () => {
     render(
@@ -398,5 +405,328 @@ describe('typed form field', () => {
     expect(input).toHaveAttribute('readonly');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', helper.id);
+  });
+});
+
+type ModalRow = {
+  id: string;
+  name: string;
+  department: string;
+  memo: string;
+  hiddenValue: string;
+};
+
+const modalRow: ModalRow = {
+  id: 'EMP-001',
+  name: '홍길동',
+  department: '개발팀',
+  memo: '원본 메모',
+  hiddenValue: '',
+};
+
+const createModalColumns = (): F1GridColumn<ModalRow>[] => [
+  { field: 'id', headerName: '사번', editable: true, required: true },
+  {
+    field: 'name',
+    headerName: '이름',
+    headerGroup: '인적 정보',
+    editable: true,
+    required: true,
+    form: { order: 20, label: '성명', span: 2 },
+  },
+  {
+    field: 'department',
+    headerName: '부서',
+    headerGroup: '인적 정보',
+    editable: true,
+    form: { order: 10 },
+  },
+  { field: 'memo', headerName: '메모', editable: true, form: { order: 30 } },
+  {
+    field: 'hiddenValue',
+    headerName: '숨김 값',
+    editable: true,
+    form: { hidden: true },
+  },
+];
+
+const renderRowFormModal = (
+  overrides: Partial<
+    React.ComponentProps<typeof F1GridFormModal<ModalRow>>
+  > = {},
+) => {
+  const props: React.ComponentProps<typeof F1GridFormModal<ModalRow>> = {
+    open: true,
+    mode: 'edit',
+    row: modalRow,
+    originalRow: modalRow,
+    columns: createModalColumns(),
+    rowKey: 'id',
+    plugin: {},
+    onCancel: vi.fn(),
+    onApply: vi.fn(),
+    ...overrides,
+  };
+
+  return { ...render(<F1GridFormModal {...props} />), props };
+};
+
+describe('row form modal', () => {
+  it('renders an accessible dialog with default edit title and row description', () => {
+    renderRowFormModal();
+
+    const dialog = screen.getByRole('dialog', { name: '정보 수정' });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByText('대상: EMP-001')).toBeInTheDocument();
+    expect(dialog).toHaveAttribute(
+      'aria-labelledby',
+      screen.getByRole('heading', { name: '정보 수정' }).id,
+    );
+  });
+
+  it('uses create defaults and plugin title and description contexts', () => {
+    const getTitle = vi.fn(({ row }: { row: ModalRow }) => `${row.name} 등록`);
+    const getDescription = vi.fn(
+      ({ mode }: { mode: 'create' | 'edit' }) => `${mode} 안내`,
+    );
+    const { rerender } = renderRowFormModal({
+      mode: 'create',
+      row: { ...modalRow, id: '' },
+      originalRow: undefined,
+    });
+
+    expect(
+      screen.getByRole('dialog', { name: '신규 등록' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^대상:/)).not.toBeInTheDocument();
+
+    rerender(
+      <F1GridFormModal
+        open
+        mode="create"
+        row={{ ...modalRow, id: '' }}
+        columns={createModalColumns()}
+        rowKey="id"
+        plugin={{ getTitle, getDescription }}
+        onCancel={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: '홍길동 등록' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('create 안내')).toBeInTheDocument();
+    expect(getTitle).toHaveBeenCalledWith({
+      mode: 'create',
+      row: expect.objectContaining({ name: '홍길동' }),
+    });
+  });
+
+  it('renders section headings and field labels in form order with label overrides', () => {
+    renderRowFormModal();
+
+    const headings = screen.getAllByRole('heading', { level: 3 });
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      '기본 정보',
+      '인적 정보',
+    ]);
+    expect(
+      screen
+        .getAllByTestId(/^f1-grid-form-field-/)
+        .map((field) => field.getAttribute('data-field')),
+    ).toEqual(['id', 'memo', 'department', 'name']);
+    expect(screen.getByRole('textbox', { name: /성명/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: '숨김 값' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps an isolated draft, preserves it across new columns arrays, and discards it on cancel', () => {
+    const onCancel = vi.fn();
+    const { rerender } = renderRowFormModal({ onCancel });
+    const nameInput = screen.getByRole('textbox', { name: /성명/ });
+
+    fireEvent.change(nameInput, { target: { value: '변경 이름' } });
+    expect(modalRow.name).toBe('홍길동');
+
+    rerender(
+      <F1GridFormModal
+        open
+        mode="edit"
+        row={modalRow}
+        originalRow={modalRow}
+        columns={createModalColumns()}
+        rowKey="id"
+        plugin={{}}
+        onCancel={onCancel}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: /성명/ })).toHaveValue(
+      '변경 이름',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(modalRow.name).toBe('홍길동');
+
+    const nextRow = { ...modalRow, id: 'EMP-002', name: '새 세션 이름' };
+    rerender(
+      <F1GridFormModal
+        open={false}
+        mode="edit"
+        row={nextRow}
+        originalRow={nextRow}
+        columns={createModalColumns()}
+        rowKey="id"
+        plugin={{}}
+        onCancel={onCancel}
+        onApply={vi.fn()}
+      />,
+    );
+    rerender(
+      <F1GridFormModal
+        open
+        mode="edit"
+        row={nextRow}
+        originalRow={nextRow}
+        columns={createModalColumns()}
+        rowKey="id"
+        plugin={{}}
+        onCancel={onCancel}
+        onApply={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: /성명/ })).toHaveValue(
+      '새 세션 이름',
+    );
+  });
+
+  it('validates only included columns, keeps the dialog open, and focuses the first invalid input', async () => {
+    const onApply = vi.fn();
+    renderRowFormModal({
+      row: { ...modalRow, id: '', hiddenValue: '' },
+      columns: [
+        ...createModalColumns(),
+        {
+          field: 'hiddenValue',
+          headerName: '제외 필수값',
+          required: true,
+          form: { hidden: true },
+        },
+      ],
+      onApply,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    const idInput = screen.getByRole('textbox', { name: /사번/ });
+    const error = screen.getByText('사번은(는) 필수입니다.');
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(idInput).toHaveAttribute('aria-invalid', 'true');
+    expect(idInput).toHaveAttribute('aria-describedby', error.id);
+    expect(
+      screen.queryByText('제외 필수값은(는) 필수입니다.'),
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(idInput).toHaveFocus());
+  });
+
+  it('keeps the dialog open when onBeforeApply returns false', () => {
+    const onApply = vi.fn();
+    const onBeforeApply = vi.fn(() => false);
+    renderRowFormModal({ plugin: { onBeforeApply }, onApply });
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(onBeforeApply).toHaveBeenCalledWith({
+      mode: 'edit',
+      originalRow: modalRow,
+      draftRow: expect.objectContaining(modalRow),
+    });
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('applies a copied valid draft after validation and plugin approval', () => {
+    const onApply = vi.fn();
+    const onBeforeApply = vi.fn();
+    renderRowFormModal({ plugin: { onBeforeApply }, onApply });
+
+    fireEvent.change(screen.getByRole('textbox', { name: /성명/ }), {
+      target: { value: '김수정' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(onBeforeApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith({ ...modalRow, name: '김수정' });
+    expect(onApply.mock.calls[0][0]).not.toBe(modalRow);
+  });
+
+  it('routes cancel, close, Escape, and backdrop dismissal through onCancel', () => {
+    const onCancel = vi.fn();
+    renderRowFormModal({ onCancel });
+
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    const backdrop = document.querySelector('.MuiBackdrop-root');
+    expect(backdrop).not.toBeNull();
+    fireEvent.mouseDown(backdrop as Element);
+    fireEvent.click(backdrop as Element);
+
+    expect(onCancel).toHaveBeenCalledTimes(3);
+  });
+
+  it('renders fixed modal regions, responsive grid span contracts, and final-save guidance', () => {
+    renderRowFormModal();
+
+    expect(screen.getByRole('dialog')).toHaveStyle({
+      maxWidth: '960px',
+      maxHeight: '85vh',
+    });
+    expect(screen.getByTestId('f1-grid-form-content')).toHaveStyle({
+      overflowY: 'auto',
+    });
+    expect(screen.getByTestId('f1-grid-form-grid')).toHaveStyle({
+      display: 'grid',
+    });
+    expect(screen.getByTestId('f1-grid-form-field-name')).toHaveStyle({
+      '--f1-form-span-xs': '1',
+      '--f1-form-span-sm': '2',
+      '--f1-form-span-lg': '2',
+    });
+    expect(
+      screen.getByText('적용 후 화면의 저장 버튼으로 최종 저장됩니다.'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses a full-screen dialog on mobile matchMedia', () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.includes('max-width:599.95px'),
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+
+    try {
+      renderRowFormModal();
+      expect(screen.getByRole('dialog')).toHaveClass(
+        'MuiDialog-paperFullScreen',
+      );
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 });
