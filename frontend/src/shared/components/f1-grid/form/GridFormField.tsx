@@ -160,8 +160,12 @@ export function GridFormField<T extends object>({
 
   if (column.type === 'code') {
     const openCodePicker = () => {
-      const returnedPatch = column.onOpenCodePicker?.(row, onPatch);
-      if (returnedPatch) onPatch(returnedPatch);
+      const mergedPatch: Partial<T> = {};
+      const returnedPatch = column.onOpenCodePicker?.(row, (patch) => {
+        Object.assign(mergedPatch, patch);
+      });
+      if (returnedPatch) Object.assign(mergedPatch, returnedPatch);
+      if (Object.keys(mergedPatch).length > 0) onPatch(mergedPatch);
     };
 
     return (

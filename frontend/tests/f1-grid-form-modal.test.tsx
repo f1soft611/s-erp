@@ -347,8 +347,11 @@ describe('typed form field', () => {
     fireEvent.click(screen.getByRole('button', { name: '품목 코드 선택' }));
 
     expect(onOpenCodePicker).toHaveBeenCalledWith(typedRow, expect.any(Function));
-    expect(onPatch).toHaveBeenNthCalledWith(1, { code: 'B02' });
-    expect(onPatch).toHaveBeenNthCalledWith(2, { codeName: '변경 코드' });
+    expect(onPatch).toHaveBeenCalledTimes(1);
+    expect(onPatch).toHaveBeenCalledWith({
+      code: 'B02',
+      codeName: '변경 코드',
+    });
   });
 
   it.each([
