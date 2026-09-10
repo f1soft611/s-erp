@@ -3,6 +3,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Box, Checkbox, IconButton } from '@mui/material';
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -14,6 +15,7 @@ import {
 } from 'react';
 import { F1Grid } from '../core/F1Grid';
 import type {
+  F1GridChanges,
   F1GridRef,
   F1GridRowId,
   F1TreeProps,
@@ -39,6 +41,10 @@ function F1TreeInner<T extends object>(
   ref: ForwardedRef<F1TreeRef<T>>,
 ) {
   const gridRef = useRef<F1GridRef<T>>(null);
+  const pendingChildInsertRef = useRef<{
+    parentId: F1GridRowId;
+    existingInsertedIds: Set<F1GridRowId>;
+  }>();
   const currentProjectionRef = useRef<F1TreeProjection<T>>({
     rows: [],
     metaById: {},
@@ -214,15 +220,58 @@ function F1TreeInner<T extends object>(
     });
   }
 
+  const rowFormActive = Boolean(
+    gridProps.rowFormPlugin && gridProps.rowFormPlugin.enabled !== false,
+  );
+
+  const handleChangesChange = useCallback(
+    (changes: F1GridChanges<T>) => {
+      const pendingInsert = pendingChildInsertRef.current;
+      if (
+        pendingInsert &&
+        changes.insertedRows.some(
+          (row) =>
+            row[parentKey] === pendingInsert.parentId &&
+            !pendingInsert.existingInsertedIds.has(getGridRowId(row, rowKey)),
+        )
+      ) {
+        pendingChildInsertRef.current = undefined;
+        setExpandedIds((current) =>
+          new Set(current).add(pendingInsert.parentId),
+        );
+      }
+      gridProps.onChangesChange?.(changes);
+    },
+    [gridProps.onChangesChange, parentKey, rowKey],
+  );
+
+  function addChildRow(parentId: F1GridRowId, row?: Partial<T>) {
+    if (rowFormActive) {
+      pendingChildInsertRef.current = {
+        parentId,
+        existingInsertedIds: new Set(
+          gridRef.current
+            ?.getChanges()
+            .insertedRows.map((insertedRow) =>
+              getGridRowId(insertedRow, rowKey),
+            ) ?? [],
+        ),
+      };
+    } else {
+      addExpanded(parentId);
+    }
+    gridRef.current?.addRow({ ...row, [parentKey]: parentId } as Partial<T>);
+  }
+
   useImperativeHandle(ref, () => ({
     getSelectedRows: () => gridRef.current?.getSelectedRows() ?? [],
     getSelectedRowIds: () => gridRef.current?.getSelectedRowIds() ?? [],
     clearSelection: () => gridRef.current?.clearSelection(),
-    addRow: (row) => gridRef.current?.addRow(row),
-    addChildRow: (parentId, row) => {
-      addExpanded(parentId);
-      gridRef.current?.addRow({ ...row, [parentKey]: parentId } as Partial<T>);
+    addRow: (row) => {
+      pendingChildInsertRef.current = undefined;
+      gridRef.current?.addRow(row);
     },
+    addChildRow,
     deleteSelectedRows: () => {
       const selectedIds = gridRef.current?.getSelectedRowIds() ?? [];
       const blockedIds = selectedIds.filter(
@@ -264,18 +313,20 @@ function F1TreeInner<T extends object>(
       {...gridProps}
       rows={rows}
       rowKey={rowKey}
+      onChangesChange={handleChangesChange}
       rowProjection={(gridRows) => projectRows(gridRows)}
       treeContextMenu={{
-        onAddRoot: () => gridRef.current?.addRow(),
+        onAddRoot: () => {
+          pendingChildInsertRef.current = undefined;
+          gridRef.current?.addRow();
+        },
         onAddChild: (targetRowId) => {
           if (targetRowId === undefined) {
+            pendingChildInsertRef.current = undefined;
             gridRef.current?.addRow();
             return;
           }
-          addExpanded(targetRowId);
-          gridRef.current?.addRow({
-            [parentKey]: targetRowId,
-          } as Partial<T>);
+          addChildRow(targetRowId);
         },
       }}
       cellAdornment={(row, column) => {
