@@ -6,6 +6,7 @@ export type PlaygroundKind =
   | 'selection'
   | 'layout'
   | 'row-merge'
+  | 'row-form-modal'
   | 'tree';
 
 export type DocSection =

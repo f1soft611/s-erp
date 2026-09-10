@@ -81,6 +81,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+- 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 로드 시점의 원본 값(`originalRowsById`)과 비교하며, 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드의 dirty 마크가 사라지고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
@@ -476,6 +477,98 @@ F2
 Enter
 Tab
 Escape
+```
+
+## 행 폼 모달 플러그인
+
+`rowFormPlugin`은 많은 컬럼을 가로 셀 편집 대신 폼으로 등록·수정해야 하는 화면에서 선택적으로 사용한다. 활성 상태는 prop이 있고 `enabled !== false`인 경우이며, 이때 Grid 마지막에 폭 `48px`의 우측 고정 `상세` 열이 자동 추가된다. 합성 액션 열은 컬럼 배열, 행 데이터, Excel 내보내기, 클립보드, 셀 선택 및 검증 대상에는 포함되지 않는다.
+
+플러그인이 없거나 `enabled: false`이면 액션 열과 모달을 만들지 않는다. `addRow()`는 기존처럼 즉시 행을 추가하고 인라인 편집을 비롯한 기존 Grid/Tree 동작도 변경하지 않는다.
+
+공개 타입:
+
+```typescript
+type F1GridFormMode = 'create' | 'edit';
+
+type F1GridColumnFormOptions<T extends object> = {
+  hidden?: boolean;
+  readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
+  label?: string;
+  group?: string;
+  order?: number;
+  span?: 1 | 2 | 3;
+};
+
+type F1GridRowFormPlugin<T extends object> = {
+  id?: string;
+  enabled?: boolean;
+  getTitle?: (context: { mode: F1GridFormMode; row: T }) => string;
+  getDescription?: (context: { mode: F1GridFormMode; row: T }) => string;
+  onBeforeApply?: (context: {
+    mode: F1GridFormMode;
+    originalRow?: T;
+    draftRow: T;
+  }) => boolean | void;
+};
+
+interface F1GridColumn<T extends object> {
+  form?: F1GridColumnFormOptions<T>;
+}
+
+interface F1GridProps<T extends object> {
+  rowFormPlugin?: F1GridRowFormPlugin<T>;
+}
+```
+
+### 컬럼 자동 매핑과 우선순위
+
+- `headerName`은 기본 필드 라벨이고 `headerGroup`은 기본 폼 섹션이다.
+- 그룹은 `form.group` → `headerGroup` → `기본 정보` 순으로 결정한다.
+- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
+- 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
+- `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
+- `text`, `number`, `decimal`, `currency`, `checkbox`, `date`, `datetime`, `time`, `select`, `autocomplete`, `code` 컬럼은 대응 입력으로 변환된다.
+- `rownumber`, 선택 체크박스, 합성 액션 열, 선언상 숨김 컬럼은 기본 제외한다. `form.hidden: false`이면 숨김 컬럼도 명시적으로 폼에 포함할 수 있다.
+
+### draft 적용과 취소
+
+- 수정 모달은 원본 행의 얕은 복사본을 draft로 사용한다. 입력 중에는 Grid 행과 변경 상태를 건드리지 않고, 적용 시 달라진 필드만 기존 dirty/updated 상태에 반영한다.
+- 활성 플러그인에서 `addRow(partial?)`는 `createRow()`와 partial을 합친 신규 draft를 연다. 적용 시에만 inserted 행을 생성하고 취소 시 빈 행이나 변경 이력을 남기지 않는다.
+- `required`, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
+- `onBeforeApply`가 `false`를 반환하면 적용을 중단하고 모달을 유지한다.
+- 취소, 닫기, `Escape`, backdrop 닫기는 모두 draft를 폐기한다.
+- 모달은 API를 호출하거나 서버에 저장하지 않는다. 최종 저장은 화면이 `getChanges()`와 기존 저장 버튼 흐름으로 수행한다.
+
+### F1-Tree와 반응형 UI
+
+`F1TreeRef.addRow()`는 부모 기본값을 유지한 루트 draft를 열고, `addChildRow(parentId, partial?)`는 `parentKey` 값을 보존한 하위 draft를 연다. 하위 행은 적용된 뒤에만 추가되고 부모 노드가 펼쳐지며, 취소 시 펼침 상태를 바꾸지 않는다. 트리 펼침 상태와 모달 open 상태는 독립적이다.
+
+1280px 이상에서는 최대 `960px`의 3열 폼, 768px 이상 1280px 미만에서는 2열 폼, 768px 미만에서는 full-screen 1열 폼을 사용한다. `form.span`은 각 뷰포트의 가용 열 수를 넘지 않게 제한된다. 모달은 `background`, `text`, `divider`, `primary`, `action` MUI 테마 토큰을 사용해 라이트·다크 테마에 대응한다.
+
+```tsx
+<F1Grid
+  ref={gridRef}
+  rows={rows}
+  columns={[
+    {
+      field: 'name',
+      headerName: '품목명',
+      headerGroup: '기본 정보',
+      editable: true,
+      form: { span: 2 },
+    },
+    {
+      field: 'active',
+      headerName: '사용 여부',
+      headerGroup: '운영 정보',
+      type: 'checkbox',
+      editable: true,
+    },
+  ]}
+  rowKey="id"
+  createRow={() => ({ id: crypto.randomUUID(), name: '', active: true })}
+  rowFormPlugin={{ enabled: true }}
+/>
 ```
 
 ---

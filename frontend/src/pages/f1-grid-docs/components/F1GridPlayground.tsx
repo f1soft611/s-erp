@@ -60,6 +60,84 @@ type TreeDemoRow = {
   owner: string;
 };
 
+type RowFormDemoRow = {
+  id: string;
+  itemName: string;
+  quantity: number;
+  active: boolean;
+  effectiveDate: string;
+  status: 'ready' | 'paused';
+};
+
+const rowFormRows: RowFormDemoRow[] = [
+  {
+    id: 'one',
+    itemName: '스테인리스 배관 부품',
+    quantity: 10,
+    active: true,
+    effectiveDate: '2026-09-10',
+    status: 'ready',
+  },
+  {
+    id: 'two',
+    itemName: '실리콘 패킹 가스켓',
+    quantity: 100,
+    active: false,
+    effectiveDate: '2026-09-12',
+    status: 'paused',
+  },
+];
+
+const rowFormColumns: F1GridColumn<RowFormDemoRow>[] = [
+  {
+    field: 'itemName',
+    headerName: '품목명',
+    headerGroup: '기본 정보',
+    editable: true,
+    required: true,
+    width: 190,
+    form: { span: 2 },
+  },
+  {
+    field: 'quantity',
+    headerName: '수량',
+    headerGroup: '기본 정보',
+    type: 'number',
+    editable: true,
+    min: 0,
+    width: 90,
+  },
+  {
+    field: 'active',
+    headerName: '사용 여부',
+    headerGroup: '운영 정보',
+    type: 'checkbox',
+    editable: true,
+    width: 100,
+  },
+  {
+    field: 'effectiveDate',
+    headerName: '적용일',
+    headerGroup: '운영 정보',
+    type: 'date',
+    editable: true,
+    required: true,
+    width: 120,
+  },
+  {
+    field: 'status',
+    headerName: '상태',
+    headerGroup: '운영 정보',
+    type: 'select',
+    editable: true,
+    width: 100,
+    options: [
+      { value: 'ready', label: '운영' },
+      { value: 'paused', label: '중지' },
+    ],
+  },
+];
+
 const treeRows: TreeDemoRow[] = [
   {
     id: 'erp',
@@ -268,6 +346,69 @@ const treeColumns: F1GridColumn<TreeDemoRow>[] = [
   { field: 'owner', headerName: '담당자', width: 120, editable: false },
 ];
 
+function RowFormModalPlayground() {
+  const gridRef = useRef<F1GridRef<RowFormDemoRow>>(null);
+  const nextRowNumber = useRef(rowFormRows.length + 1);
+  const [rows, setRows] = useState(rowFormRows);
+  const [changes, setChanges] = useState(0);
+
+  function createRow(): RowFormDemoRow {
+    const id = `form-${String(nextRowNumber.current).padStart(3, '0')}`;
+    nextRowNumber.current += 1;
+    return {
+      id,
+      itemName: '',
+      quantity: 0,
+      active: true,
+      effectiveDate: '2026-09-10',
+      status: 'ready',
+    };
+  }
+
+  function resetSample() {
+    nextRowNumber.current = rowFormRows.length + 1;
+    setRows(rowFormRows.map((row) => ({ ...row })));
+    setChanges(0);
+  }
+
+  return (
+    <Box className="f1-doc-playground" data-testid="f1-grid-doc-playground">
+      <Box className="f1-doc-playground-controls">
+        <Typography variant="subtitle1">Try it</Typography>
+        <Typography variant="body2">
+          상세 버튼으로 수정하거나 신규 행을 폼으로 등록하세요. 적용 후 변경은
+          Grid 상태에만 남습니다.
+        </Typography>
+        <Typography variant="body2">변경된 행: {changes}</Typography>
+        <Button size="small" onClick={() => gridRef.current?.addRow()}>
+          신규 행 추가
+        </Button>
+      </Box>
+      <Box className="f1-doc-grid-wrap">
+        <F1Grid
+          ref={gridRef}
+          rows={rows}
+          columns={rowFormColumns}
+          rowKey="id"
+          ariaLabel="F1-Grid row form modal example"
+          height={280}
+          showCheckbox={false}
+          createRow={createRow}
+          rowFormPlugin={{ id: 'f1-grid-docs-row-form', enabled: true }}
+          onChangesChange={(nextChanges) =>
+            setChanges(
+              nextChanges.insertedRows.length + nextChanges.updatedRows.length,
+            )
+          }
+        />
+      </Box>
+      <Button size="small" onClick={resetSample}>
+        Reset sample
+      </Button>
+    </Box>
+  );
+}
+
 export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
   const gridRef = useRef<F1GridRef<DemoRow>>(null);
   const [rows, setRows] = useState(baseRows);
@@ -302,6 +443,10 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
     startEdit: () => true,
     endEdit: () => true,
   };
+
+  if (kind === 'row-form-modal') {
+    return <RowFormModalPlayground />;
+  }
 
   if (kind === 'tree') {
     return (

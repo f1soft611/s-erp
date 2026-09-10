@@ -120,6 +120,34 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('중지')).toBeInTheDocument();
   });
 
+  it('documents and demonstrates the row form modal playground', () => {
+    render(<F1GridDocsPage initialDocumentId="row-form-modal" />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Row Form Modal' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('rowFormPlugin')).toBeInTheDocument();
+    expect(screen.getByText('form.group')).toBeInTheDocument();
+    expect(screen.getByText('form.span')).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: '상세' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'one 행 정보 수정' }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: '정보 수정' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '기본 정보' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '운영 정보' }),
+    ).toBeInTheDocument();
+  });
+
   it('documents Tree Grid expansion options and the Tree Ref API', () => {
     render(<F1GridDocsPage initialDocumentId="tree-grid" />);
 
