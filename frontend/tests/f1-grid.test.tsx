@@ -126,10 +126,14 @@ const columns: F1GridColumn<MenuRow>[] = [
 
 describe('F1-GRID default prop behavior', () => {
   it('keeps column lines and alternating row striping enabled by default', () => {
-    render(<F1Grid rows={rows} columns={columns} rowKey="id" ariaLabel="grid" />);
+    render(
+      <F1Grid rows={rows} columns={columns} rowKey="id" ariaLabel="grid" />,
+    );
 
     const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
-    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe('true');
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe(
+      'true',
+    );
     expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('true');
   });
 
@@ -146,8 +150,12 @@ describe('F1-GRID default prop behavior', () => {
     );
 
     const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
-    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe('false');
-    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('false');
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe(
+      'false',
+    );
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe(
+      'false',
+    );
   });
 });
 
@@ -852,13 +860,50 @@ describe('F1-GRID loading overlay', () => {
     );
 
     render(
+      <F1Grid rows={wideRows} columns={wideColumns} rowKey="id" height={240} />,
+    );
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll] = Array.from(grid.children) as HTMLElement[];
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(bodyScroll, 'offsetWidth', {
+      configurable: true,
+      value: 377,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    bodyScroll.scrollLeft = 2564;
+    fireEvent.resize(window);
+
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+  });
+
+  it('keeps the action header aligned with the body action cell when vertical scrolling is active', async () => {
+    const rows = Array.from({ length: 80 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${index}`,
+    }));
+
+    render(
       <F1Grid
-        rows={wideRows}
-        columns={wideColumns}
+        rows={rows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
         rowKey="id"
         height={240}
-        virtualizeColumns
-        columnOverscan={1}
+        rowFormPlugin={{}}
+        showCheckbox={false}
       />,
     );
 
@@ -873,11 +918,91 @@ describe('F1-GRID loading overlay', () => {
       configurable: true,
       value: 377,
     });
-    bodyScroll.scrollLeft = 2564;
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
     fireEvent.scroll(bodyScroll);
 
     await waitFor(() => {
       expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+    expect(screen.getByRole('columnheader', { name: '상세' })).toHaveStyle({
+      width: '65px',
+      right: '-17px',
+    });
+    expect(
+      screen.getByRole('columnheader', { name: '상세' }),
+    ).toBeInTheDocument();
+  });
+
+  it('clears the header scrollbar gutter when rows shrink below the vertical scroll threshold', async () => {
+    const manyRows = Array.from({ length: 80 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${index}`,
+    }));
+    const fewRows = manyRows.slice(0, 2);
+    const { rerender } = render(
+      <F1Grid
+        rows={manyRows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
+        rowKey="id"
+        height={240}
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll] = Array.from(grid.children) as HTMLElement[];
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    Object.defineProperty(bodyScroll, 'offsetWidth', {
+      configurable: true,
+      value: 377,
+    });
+    fireEvent.scroll(bodyScroll);
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 377,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 200,
+    });
+    rerender(
+      <F1Grid
+        rows={fewRows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
+        rowKey="id"
+        height={240}
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+    fireEvent.resize(window);
+
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '0px' });
     });
   });
 
@@ -1620,6 +1745,30 @@ describe('F1-GRID extended editors', () => {
         itemName: '?占쎌뒪???占쎈ぉ',
       }),
     ]);
+  });
+
+  it('fills the code picker button to the editor cell width', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
+        columns={[
+          {
+            field: 'itemCode',
+            headerName: '품목코드',
+            type: 'code',
+            editable: true,
+            onOpenCodePicker: () => ({}),
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
+
+    expect(screen.getByRole('button', { name: '코드 선택' })).toHaveStyle({
+      width: '100%',
+    });
   });
 
   it('stores autocomplete, decimal, datetime, and time editor values', () => {

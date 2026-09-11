@@ -9,7 +9,7 @@ export function PageMessageArea({ message, onClose }: PageMessageAreaProps) {
   if (!message) return null;
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 2 }}>
+    <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 2, pb: 2 }}>
       <Alert
         severity="error"
         onClose={onClose}

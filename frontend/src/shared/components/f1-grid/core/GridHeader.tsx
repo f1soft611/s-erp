@@ -84,6 +84,8 @@ type GridHeaderProps<T extends object> = {
   rightOffsets: Record<string, number>;
   editableColumnFields?: Set<string>;
   showFormAction?: boolean;
+  formActionWidth?: number;
+  formActionRightOffset?: number;
   formActionPinnedShadow?: boolean;
   onReorderColumn?: (
     sourceField: string,
@@ -122,6 +124,8 @@ export function GridHeader<T extends object>({
   rightOffsets,
   editableColumnFields,
   showFormAction = false,
+  formActionWidth = 48,
+  formActionRightOffset = 0,
   formActionPinnedShadow = true,
   onReorderColumn,
 }: GridHeaderProps<T>) {
@@ -674,11 +678,12 @@ export function GridHeader<T extends object>({
               gridRow: hasGroups ? '1 / span 2' : undefined,
               justifyContent: 'center',
               minHeight: 28,
+              padding: 0,
               position: 'sticky',
-              right: 0,
-              width: 48,
-              minWidth: 48,
-              maxWidth: 48,
+              right: -formActionRightOffset,
+              width: formActionWidth,
+              minWidth: formActionWidth,
+              maxWidth: formActionWidth,
               zIndex: 4,
             }}
           >

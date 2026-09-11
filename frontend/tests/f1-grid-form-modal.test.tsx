@@ -937,6 +937,8 @@ describe('F1-Grid row form integration', () => {
       'rgb(232, 236, 244)',
     );
     expect(getComputedStyle(actionHeader).boxShadow).toBe('');
+    expect(getComputedStyle(actionHeader).paddingLeft).toBe('0px');
+    expect(getComputedStyle(actionHeader).paddingRight).toBe('0px');
     expect(getComputedStyle(actionCell as Element).backgroundColor).toBe(
       'rgb(255, 255, 255)',
     );

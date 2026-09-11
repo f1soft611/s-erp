@@ -663,15 +663,16 @@ function F1GridInner<T extends object>(
   }
 
   function scheduleViewportMeasure(bodyScroll: HTMLDivElement) {
+    const hasVerticalOverflow =
+      bodyScroll.scrollHeight > bodyScroll.clientHeight;
     viewportSchedulerRef.current?.schedule({
       scrollTop: bodyScroll.scrollTop,
       scrollLeft: bodyScroll.scrollLeft,
       viewportHeight: bodyScroll.clientHeight,
       viewportWidth: bodyScroll.clientWidth,
-      verticalScrollbarWidth: Math.max(
-        0,
-        bodyScroll.offsetWidth - bodyScroll.clientWidth,
-      ),
+      verticalScrollbarWidth: hasVerticalOverflow
+        ? Math.max(0, bodyScroll.offsetWidth - bodyScroll.clientWidth)
+        : 0,
     });
   }
 
@@ -684,9 +685,20 @@ function F1GridInner<T extends object>(
     measureViewport();
     window.addEventListener('resize', measureViewport);
 
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        viewportSchedulerRef.current?.cancel();
+        window.removeEventListener('resize', measureViewport);
+      };
+    }
+
+    const observer = new ResizeObserver(measureViewport);
+    observer.observe(bodyScroll);
+
     return () => {
       viewportSchedulerRef.current?.cancel();
       window.removeEventListener('resize', measureViewport);
+      observer.disconnect();
     };
   }, []);
 
@@ -2466,6 +2478,11 @@ function F1GridInner<T extends object>(
           rightOffsets={rightOffsets}
           editableColumnFields={editableColumnFields}
           showFormAction={rowFormActive}
+          formActionWidth={
+            GRID_ROW_FORM_ACTION_COLUMN_WIDTH +
+            bodyScrollMetrics.verticalScrollbarWidth
+          }
+          formActionRightOffset={bodyScrollMetrics.verticalScrollbarWidth}
           formActionPinnedShadow={formActionPinnedShadow}
           onReorderColumn={reorderColumn}
         />

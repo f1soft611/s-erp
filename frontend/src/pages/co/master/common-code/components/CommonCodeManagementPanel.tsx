@@ -6,7 +6,26 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import {
+  createCommonCodeGroup,
+  createCommonCodeItem,
+  deleteCommonCodeGroup,
+  deleteCommonCodeItem,
+  updateCommonCodeGroup,
+  updateCommonCodeItem,
+} from '../services/commonCodeManagement.service';
+import {
+  Box,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  List,
+  ListItemButton,
+  ListItemText,
+  Typography,
+} from '@mui/material';
 import Splitter from '../../../../../shared/components/Splitter';
 import {
   F1Grid,
@@ -69,7 +88,12 @@ const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
   },
 ];
 
-const itemColumns: F1GridColumn<CommonCodeItemRow>[] = [
+const itemColumns = (
+  onOpenParentPicker?: (
+    row: CommonCodeItemRow,
+    applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
+  ) => void,
+): F1GridColumn<CommonCodeItemRow>[] => [
   {
     field: 'id',
     type: 'rownumber',
@@ -95,20 +119,40 @@ const itemColumns: F1GridColumn<CommonCodeItemRow>[] = [
   {
     field: 'parentItemNm',
     headerName: '상위코드명',
-    editable: true,
+    editable: () => Boolean(onOpenParentPicker),
     width: 150,
+    type: 'code',
+    onOpenCodePicker: onOpenParentPicker
+      ? (row, applyPatch) => {
+          onOpenParentPicker(row, applyPatch);
+        }
+      : undefined,
   },
   {
     field: 'useAt',
     headerName: '사용여부',
     editable: true,
     width: 100,
+    type: 'checkbox',
+    headerCheckbox: true,
+    align: 'center',
+    headerAlign: 'center',
+    onValueChange: (_row, value) => ({
+      useAt: Boolean(value) ? 'Y' : 'N',
+    }),
   },
   {
     field: 'sortOrder',
     headerName: '정렬순서',
     editable: true,
     width: 100,
+    type: 'number',
+    align: 'right',
+    headerAlign: 'center',
+    min: 0,
+    onValueChange: (_row, value) => ({
+      sortOrder: Number(value ?? 0),
+    }),
   },
   {
     field: 'itemDc',
@@ -140,6 +184,13 @@ export const CommonCodeManagementPanel = forwardRef<
 ) {
   const treeRef = useRef<F1TreeRef<CommonCodeGroupRow>>(null);
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
+  const parentPickerApplyRef = useRef<
+    ((changes: Partial<CommonCodeItemRow>) => void) | null
+  >(null);
+  const [parentPickerOpen, setParentPickerOpen] = useState(false);
+  const [parentPickerOptions, setParentPickerOptions] = useState<
+    CommonCodeItemRow[]
+  >([]);
   const [groupChanges, setGroupChanges] = useState<
     F1GridChanges<CommonCodeGroupRow>
   >({
@@ -222,6 +273,58 @@ export const CommonCodeManagementPanel = forwardRef<
         }
       }
 
+      for (const row of nextGroupChanges.insertedRows) {
+        await createCommonCodeGroup({
+          groupCode: row.groupCode,
+          groupNm: row.groupNm,
+          groupDc: row.groupDc,
+          parentGroupId: row.parentGroupId,
+          sortOrder: row.sortOrder,
+          useAt: row.useAt,
+        });
+      }
+
+      for (const row of nextGroupChanges.updatedRows) {
+        await updateCommonCodeGroup(String(row.id), {
+          groupCode: row.groupCode,
+          groupNm: row.groupNm,
+          groupDc: row.groupDc,
+          parentGroupId: row.parentGroupId,
+          sortOrder: row.sortOrder,
+          useAt: row.useAt,
+        });
+      }
+
+      for (const row of nextGroupChanges.deletedRows) {
+        await deleteCommonCodeGroup(String(row.id));
+      }
+
+      for (const row of nextItemChanges.insertedRows) {
+        await createCommonCodeItem(String(row.groupId), {
+          itemCode: row.itemCode,
+          itemNm: row.itemNm,
+          itemDc: row.itemDc,
+          parentItemId: row.parentItemId,
+          sortOrder: row.sortOrder,
+          useAt: row.useAt,
+        });
+      }
+
+      for (const row of nextItemChanges.updatedRows) {
+        await updateCommonCodeItem(String(row.groupId), String(row.id), {
+          itemCode: row.itemCode,
+          itemNm: row.itemNm,
+          itemDc: row.itemDc,
+          parentItemId: row.parentItemId,
+          sortOrder: row.sortOrder,
+          useAt: row.useAt,
+        });
+      }
+
+      for (const row of nextItemChanges.deletedRows) {
+        await deleteCommonCodeItem(String(row.groupId), String(row.id));
+      }
+
       const nextGroups = treeRef.current?.getActiveRows() ?? groups;
       const nextItems = gridRef.current?.getActiveRows() ?? items;
 
@@ -240,6 +343,43 @@ export const CommonCodeManagementPanel = forwardRef<
     }
   }, [groups, items, onError, onGroupsSaved, onItemsSaved, onSaveSuccess]);
 
+  const selectedGroup =
+    groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? null;
+  const selectedGroupItems = selectedGroup
+    ? items.filter((item) => item.groupId === selectedGroup.id)
+    : [];
+  const parentGroup =
+    selectedGroup && selectedGroup.parentGroupId
+      ? (groups.find((group) => group.id === selectedGroup.parentGroupId) ??
+        null)
+      : null;
+  const parentGroupItems = parentGroup
+    ? items.filter((item) => item.groupId === parentGroup.id)
+    : [];
+
+  const openParentPicker = useCallback(
+    (
+      row: CommonCodeItemRow,
+      applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
+    ) => {
+      if (!parentGroup) {
+        setParentPickerOpen(false);
+        return;
+      }
+
+      parentPickerApplyRef.current = applyPatch;
+      setParentPickerOptions(
+        parentGroupItems.filter((item) => item.id !== row.id),
+      );
+      setParentPickerOpen(true);
+    },
+    [parentGroup, parentGroupItems],
+  );
+
+  const itemGridColumns = itemColumns(
+    parentGroup ? openParentPicker : undefined,
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -249,9 +389,9 @@ export const CommonCodeManagementPanel = forwardRef<
         if (!rows.length) return;
 
         const csv = [
-          itemColumns.map((column) => column.headerName).join(','),
+          itemGridColumns.map((column) => column.headerName).join(','),
           ...rows.map((row) =>
-            itemColumns
+            itemGridColumns
               .map((column) => {
                 const value = row[column.field as keyof CommonCodeItemRow];
                 const stringValue = value == null ? '' : String(value);
@@ -273,14 +413,9 @@ export const CommonCodeManagementPanel = forwardRef<
       },
       getDirtyState,
     }),
-    [getDirtyState, saveCurrentChanges],
+    [getDirtyState, itemGridColumns, saveCurrentChanges],
   );
 
-  const selectedGroup =
-    groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? null;
-  const selectedGroupItems = selectedGroup
-    ? items.filter((item) => item.groupId === selectedGroup.id)
-    : [];
   return (
     <Box
       sx={{
@@ -354,6 +489,8 @@ export const CommonCodeManagementPanel = forwardRef<
                 height="100%"
                 defaultExpandAll
                 showCheckbox={false}
+                allowAddRowInContextMenu={false}
+                allowDeleteRowInContextMenu={false}
                 ariaLabel="공통코드 그룹 트리"
                 onSelectionChange={(rowIds) => {
                   const nextId = rowIds[0];
@@ -429,17 +566,55 @@ export const CommonCodeManagementPanel = forwardRef<
                 key={commonCodeGridKey}
                 ref={gridRef}
                 rows={selectedGroupItems}
-                columns={itemColumns}
+                columns={itemGridColumns}
                 rowKey="id"
                 ariaLabel="공통코드 상세코드"
                 height="100%"
                 canExportExcel={canExportExcel}
                 showCheckbox={false}
+                allowAddRowInContextMenu={false}
+                allowDeleteRowInContextMenu={false}
                 onChangesChange={(changes) => {
                   setItemChanges(changes);
                 }}
               />
             </Box>
+            <Dialog
+              open={parentPickerOpen}
+              onClose={() => setParentPickerOpen(false)}
+              maxWidth="sm"
+              fullWidth
+            >
+              <DialogTitle>상위코드 선택</DialogTitle>
+              <DialogContent dividers sx={{ p: 0 }}>
+                <List disablePadding>
+                  {parentPickerOptions.length > 0 ? (
+                    parentPickerOptions.map((item) => (
+                      <ListItemButton
+                        key={item.id}
+                        onClick={() => {
+                          parentPickerApplyRef.current?.({
+                            parentItemId: item.id,
+                            parentItemNm: item.itemNm,
+                          });
+                          setParentPickerOpen(false);
+                        }}
+                      >
+                        <ListItemText
+                          primary={item.itemNm}
+                          secondary={item.itemCode}
+                        />
+                      </ListItemButton>
+                    ))
+                  ) : (
+                    <ListItemText
+                      primary="선택 가능한 상위코드가 없습니다."
+                      sx={{ px: 2, py: 2 }}
+                    />
+                  )}
+                </List>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       </Splitter>

@@ -119,6 +119,74 @@ describe('F1Tree interaction', () => {
     ).toContain('44px 180px 100px');
   });
 
+  it('keeps row-number and action columns visible in tree mode', () => {
+    render(
+      <F1Tree
+        rows={[
+          {
+            id: 'root',
+            parentId: null,
+            order: 1,
+            name: 'Root',
+            hasChildren: true,
+            allowed: false,
+          },
+          {
+            id: 'child',
+            parentId: 'root',
+            order: 1,
+            name: 'Child',
+            hasChildren: false,
+            allowed: false,
+          },
+        ]}
+        columns={[
+          {
+            field: 'id' as const,
+            headerName: '순번',
+            type: 'rownumber',
+            width: 60,
+            pinned: 'left',
+          },
+          {
+            field: 'name' as const,
+            headerName: '메뉴명',
+            width: 200,
+            editable: true,
+          },
+          {
+            field: 'allowed' as const,
+            headerName: '허용',
+            type: 'checkbox',
+            width: 80,
+          },
+        ]}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 행번호와 액션 컬럼 검증"
+        defaultExpanded="all"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+
+    const headerRow = screen.getAllByRole('row')[0];
+    expect(headerRow).toHaveStyle({
+      gridTemplateColumns: '60px 200px 80px 48px',
+    });
+    expect(screen.getByRole('columnheader', { name: '순번' })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: '상세' })).toBeVisible();
+
+    const actionButton = screen.getByRole('button', { name: 'root 행 정보 수정' });
+    expect(actionButton.closest('[role="gridcell"]')).toHaveStyle({
+      gridColumn: '4',
+    });
+
+    const childTreeCell = screen.getByRole('gridcell', { name: 'Child' });
+    expect(childTreeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
   it('expands every parent on first render when defaultExpandAll is enabled', () => {
     render(
       <F1Tree

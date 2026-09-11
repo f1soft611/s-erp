@@ -167,11 +167,56 @@ describe('CommonCode management page', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('공통코드 관리')).toBeInTheDocument();
+    expect(screen.getAllByText(/공통코드 관리/).length).toBeGreaterThan(0);
     expect(
       screen.queryByText('요청하신 페이지는 현재 준비 중입니다'),
     ).not.toBeInTheDocument();
     expect(screen.getByText('공통코드 그룹 관리')).toBeInTheDocument();
+  });
+
+  it('renders the use flag as a checkbox and the sort order as a numeric field for detail rows', async () => {
+    const theme = createTheme();
+
+    render(
+      <ThemeProvider theme={theme}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="공통코드 관리"
+            currentPageKey="cmncodes"
+            breadcrumbItems={['기준정보', '공통코드 관리']}
+            content={{
+              title: '공통코드 관리',
+              description: '공통코드를 그룹과 상세코드로 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: true,
+              excel: true,
+            }}
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    const grid = await screen.findByRole('grid', { name: '공통코드 상세코드' });
+    expect(grid).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: '사용여부' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: '정렬순서' }),
+    ).toBeInTheDocument();
   });
 
   it('hides the add/delete row actions from the common code context menu while keeping export and reset actions', async () => {

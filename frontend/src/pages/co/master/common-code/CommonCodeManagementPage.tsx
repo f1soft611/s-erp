@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, TextField } from '@mui/material';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import SaveIcon from '@mui/icons-material/Save';
@@ -18,9 +18,9 @@ import {
   type CommonCodeManagementPanelHandle,
 } from './components/CommonCodeManagementPanel';
 import {
-  commonCodeGroupSeed,
-  commonCodeItemSeed,
-} from './data/commonCodeManagement.data';
+  fetchCommonCodeGroups,
+  fetchCommonCodeItems,
+} from './services/commonCodeManagement.service';
 import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
@@ -49,14 +49,10 @@ export function CommonCodeManagementPage({
 }: CommonCodeManagementPageProps) {
   const { showSuccess } = useNotification();
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
-  const [groups, setGroups] =
-    useState<CommonCodeGroupRow[]>(commonCodeGroupSeed);
-  const [items, setItems] = useState<CommonCodeItemRow[]>(commonCodeItemSeed);
+  const [groups, setGroups] = useState<CommonCodeGroupRow[]>([]);
+  const [items, setItems] = useState<CommonCodeItemRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGroupId, setSelectedGroupId] = useState(
-    commonCodeGroupSeed.find((group) => group.parentGroupId === null)?.id ??
-      commonCodeGroupSeed[0].id,
-  );
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [error, setError] = useState('');
   const [panelDirty, setPanelDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,6 +69,45 @@ export function CommonCodeManagementPage({
     }),
     [selectedMenuPermissions],
   );
+
+  const loadCommonCodeData = useCallback(async () => {
+    setError('');
+
+    try {
+      const nextGroups = await fetchCommonCodeGroups();
+      setGroups(nextGroups);
+
+      const nextSelectedGroupId =
+        selectedGroupId &&
+        nextGroups.some((group) => group.id === selectedGroupId)
+          ? selectedGroupId
+          : (nextGroups.find((group) => group.parentGroupId === null)?.id ??
+            nextGroups[0]?.id ??
+            '');
+
+      setSelectedGroupId(nextSelectedGroupId);
+
+      if (nextSelectedGroupId) {
+        const nextItems = await fetchCommonCodeItems(nextSelectedGroupId);
+        setItems(nextItems);
+      } else {
+        setItems([]);
+      }
+    } catch (requestError) {
+      setGroups([]);
+      setItems([]);
+      setSelectedGroupId('');
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : '공통코드 목록을 불러오지 못했습니다.',
+      );
+    }
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    void loadCommonCodeData();
+  }, [loadCommonCodeData]);
 
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -121,20 +156,16 @@ export function CommonCodeManagementPage({
       return;
     }
     setError('');
-  }, [panelDirty]);
+    void loadCommonCodeData();
+  }, [loadCommonCodeData, panelDirty]);
 
   const confirmRefresh = useCallback(() => {
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
-    setGroups(commonCodeGroupSeed);
-    setItems(commonCodeItemSeed);
-    setSelectedGroupId(
-      commonCodeGroupSeed.find((group) => group.parentGroupId === null)?.id ??
-        commonCodeGroupSeed[0].id,
-    );
+    void loadCommonCodeData();
     setCommonCodeGridKey((current) => current + 1);
     setError('');
-  }, []);
+  }, [loadCommonCodeData]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
