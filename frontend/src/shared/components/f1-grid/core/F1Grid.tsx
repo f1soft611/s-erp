@@ -88,6 +88,7 @@ import {
 } from '../columns/GridColumnPin';
 import {
   createGridRafScheduler,
+  DEFAULT_GRID_ROW_OVERSCAN,
   getVirtualColumnIndexes,
   getVirtualRowWindow,
   type GridViewportMetrics,
@@ -133,7 +134,7 @@ function F1GridInner<T extends object>(
     minColumnWidth = 50,
     virtualizeRows,
     virtualizeColumns,
-    rowOverscan = 8,
+    rowOverscan = DEFAULT_GRID_ROW_OVERSCAN,
     columnOverscan = 2,
     fixedRowHeightThreshold = 10000,
     queryWorkerThreshold = 10000,
@@ -675,6 +676,11 @@ function F1GridInner<T extends object>(
     };
   }, []);
 
+  const rowHeightsById = useMemo(
+    () => new Map(Object.entries(rowHeights)),
+    [rowHeights],
+  );
+
   const rowVirtualState = useMemo(() => {
     if (visibleRows.length === 0) {
       return {
@@ -697,7 +703,13 @@ function F1GridInner<T extends object>(
     }
 
     const viewportHeight = bodyScrollMetrics.viewportHeight || 240;
-    const normalizedOverscan = Math.max(0, Math.floor(rowOverscan));
+    const normalizedOverscan = Math.max(
+      2,
+      Math.min(
+        DEFAULT_GRID_ROW_OVERSCAN,
+        Math.max(0, Math.floor(rowOverscan || DEFAULT_GRID_ROW_OVERSCAN)),
+      ),
+    );
     const normalizedFixedThreshold = Math.max(
       1,
       Math.floor(fixedRowHeightThreshold),
@@ -728,7 +740,8 @@ function F1GridInner<T extends object>(
 
     visibleRows.forEach((row) => {
       const rowHeight =
-        rowHeights[String(getGridRowId(row, rowKey))] ?? defaultRowHeight;
+        rowHeightsById.get(String(getGridRowId(row, rowKey))) ??
+        defaultRowHeight;
       totalHeight += rowHeight;
       cumulativeHeights.push(totalHeight);
     });
@@ -767,7 +780,7 @@ function F1GridInner<T extends object>(
     bodyScrollMetrics.viewportHeight,
     defaultRowHeight,
     fixedRowHeightThreshold,
-    rowHeights,
+    rowHeightsById,
     rowKey,
     rowOverscan,
     virtualizeRows,

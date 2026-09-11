@@ -25,7 +25,11 @@ export function DocContent({
         color="primary"
         className="f1-doc-category"
       >
-        {doc.category}
+        {doc.category === 'guide'
+          ? '가이드'
+          : doc.category === 'feature'
+            ? '기능'
+            : '참조'}
       </Typography>
       <Typography component="h1" variant="h3" className="f1-doc-title">
         {doc.title}
@@ -48,9 +52,9 @@ export function DocContent({
             <Table size="small" aria-label={section.heading}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Property</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Description</TableCell>
+                  <TableCell>속성</TableCell>
+                  <TableCell>타입</TableCell>
+                  <TableCell>설명</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

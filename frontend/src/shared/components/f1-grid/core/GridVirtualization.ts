@@ -1,3 +1,6 @@
+export const DEFAULT_GRID_ROW_OVERSCAN = 4;
+export const DEFAULT_GRID_COLUMN_OVERSCAN = 2;
+
 export type GridViewportMetrics = {
   scrollTop: number;
   scrollLeft: number;
@@ -27,7 +30,10 @@ export function getVirtualRowWindow({
 }): GridRowWindow {
   const normalizedRowCount = Math.max(0, Math.floor(rowCount));
   const normalizedRowHeight = Math.max(1, rowHeight);
-  const normalizedOverscan = Math.max(0, Math.floor(overscan));
+  const normalizedOverscan = Math.max(
+    2,
+    Math.min(DEFAULT_GRID_ROW_OVERSCAN, Math.max(0, Math.floor(overscan))),
+  );
   const normalizedScrollTop = Math.max(0, scrollTop);
   const normalizedViewportHeight = Math.max(0, viewportHeight);
   const startIndex = Math.max(
