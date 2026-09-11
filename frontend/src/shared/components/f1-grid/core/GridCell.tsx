@@ -284,11 +284,7 @@ const GridCellInner = <T extends object>({
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
         zIndex: pinOffset ? 2 : undefined,
-        bgcolor: pinOffset
-          ? 'background.paper'
-          : errorMessage
-            ? 'error.lighter'
-            : undefined,
+        bgcolor: errorMessage ? 'error.lighter' : undefined,
         boxShadow: pinOffset
           ? pinOffset.shadow === false
             ? undefined
@@ -301,9 +297,11 @@ const GridCellInner = <T extends object>({
         backgroundColor:
           selected && !focused && !editing
             ? 'rgba(25, 118, 210, 0.045)'
-            : stripeRows && rowIndex % 2 === 1 && !pinOffset && !errorMessage
+            : stripeRows && rowIndex % 2 === 1 && !errorMessage
               ? 'rgba(148, 163, 184, 0.04)'
-              : undefined,
+              : pinOffset
+                ? 'background.paper'
+                : undefined,
         color: errorMessage ? 'error.main' : undefined,
         outline: activeHighlight ? '2px solid' : 'none',
         outlineColor: 'primary.main',

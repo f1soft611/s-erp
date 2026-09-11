@@ -178,13 +178,49 @@ describe('F1Tree interaction', () => {
     expect(screen.getByRole('columnheader', { name: '순번' })).toBeVisible();
     expect(screen.getByRole('columnheader', { name: '상세' })).toBeVisible();
 
-    const actionButton = screen.getByRole('button', { name: 'root 행 정보 수정' });
+    const actionButton = screen.getByRole('button', {
+      name: 'root 행 정보 수정',
+    });
     expect(actionButton.closest('[role="gridcell"]')).toHaveStyle({
       gridColumn: '4',
     });
 
     const childTreeCell = screen.getByRole('gridcell', { name: 'Child' });
     expect(childTreeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
+  it('keeps alternating striping on pinned tree columns', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={[
+          {
+            field: 'id' as const,
+            headerName: '순번',
+            type: 'rownumber',
+            width: 60,
+            pinned: 'left',
+          },
+          {
+            field: 'name' as const,
+            headerName: '메뉴명',
+            width: 200,
+            editable: true,
+          },
+        ]}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="F1-TREE 고정 컬럼 줄무늬 검증"
+        defaultExpanded="all"
+      />,
+    );
+
+    const pinnedStripedCell = screen.getByRole('gridcell', { name: '2' });
+    expect(pinnedStripedCell.getAttribute('data-f1-grid-striped')).toBe('true');
+    expect(getComputedStyle(pinnedStripedCell).backgroundColor).not.toBe(
+      'rgb(255, 255, 255)',
+    );
   });
 
   it('expands every parent on first render when defaultExpandAll is enabled', () => {
