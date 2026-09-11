@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createGridRafScheduler,
+  DEFAULT_GRID_ROW_OVERSCAN,
   getVirtualColumnIndexes,
   getVirtualRowWindow,
 } from '../src/shared/components/f1-grid/core/GridVirtualization';
@@ -10,6 +11,10 @@ import {
 } from '../src/shared/components/f1-grid/selection/GridSelection';
 
 describe('F1Grid virtualization engine', () => {
+  it('uses a tighter default row overscan for large data rendering', () => {
+    expect(DEFAULT_GRID_ROW_OVERSCAN).toBe(4);
+  });
+
   it('calculates a fixed-height window without scanning 100,000 rows', () => {
     const window = getVirtualRowWindow({
       rowCount: 100_000,

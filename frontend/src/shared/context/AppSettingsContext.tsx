@@ -21,7 +21,9 @@ type AppSettingsContextValue = {
   setDisplayScale: (scale: number) => void;
 };
 
-const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
+export const AppSettingsContext = createContext<AppSettingsContextValue | null>(
+  null,
+);
 
 function getStoredThemeMode(): AppThemeMode {
   const value = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -95,8 +97,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+export function useOptionalAppSettings() {
+  return useContext(AppSettingsContext);
+}
+
 export function useAppSettings() {
-  const context = useContext(AppSettingsContext);
+  const context = useOptionalAppSettings();
   if (!context) {
     throw new Error('useAppSettings must be used inside AppSettingsProvider');
   }
@@ -104,6 +110,6 @@ export function useAppSettings() {
 }
 
 export function useOptionalDisplayScale(): number {
-  const context = useContext(AppSettingsContext);
+  const context = useOptionalAppSettings();
   return context?.displayScale ?? DEFAULT_DISPLAY_SCALE;
 }

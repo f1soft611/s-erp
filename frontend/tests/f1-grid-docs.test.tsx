@@ -204,4 +204,18 @@ describe('F1-Grid docs portal', () => {
       screen.getByRole('button', { name: 'Toggle export menu' }),
     ).toBeInTheDocument();
   });
+
+  it('offers a quick search for developer docs and keeps the filter accessible', () => {
+    render(<F1GridDocsPage />);
+
+    const searchField = screen.getByRole('textbox', {
+      name: '문서 검색',
+    });
+    expect(searchField).toBeInTheDocument();
+
+    fireEvent.change(searchField, { target: { value: '편집' } });
+
+    expect(screen.getByRole('button', { name: '셀 편집' })).toBeInTheDocument();
+    expect(screen.getByText('검색 결과')).toBeInTheDocument();
+  });
 });
