@@ -45,6 +45,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    reporters: [
+      'default',
+      ['json', { outputFile: '.artifacts/vitest/report.json' }],
+    ],
+    outputFile: '.artifacts/vitest/report.json',
 
     exclude: [
       '**/node_modules/**',
