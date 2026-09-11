@@ -222,10 +222,58 @@
 - 백엔드 `GET /api/v1/system/menus?moduleId={moduleId}&roleId={roleId}` 및 `PUT /api/v1/system/roles/{roleId}/menu-permissions`의 최종 저장소
 - 대시보드 좌측 메뉴와 페이지 헤더 액션 버튼의 권한 계산이 이 테이블을 기준으로 동기화된다
 
+### 2-14. tb_common_code_group
+
+| 컬럼                 | 타입      | 설명                   |
+| -------------------- | --------- | ---------------------- |
+| common_code_group_id | bigint    | 공통코드 그룹 PK       |
+| tenant_id            | bigint    | 소속 테넌트            |
+| group_code           | varchar   | 그룹 코드              |
+| group_nm             | varchar   | 그룹명                 |
+| group_dc             | varchar   | 그룹 설명              |
+| parent_group_id      | bigint    | 상위 그룹 FK(자기참조) |
+| sort_order           | int       | 정렬 순서              |
+| use_at               | char      | 사용 여부              |
+| created_at           | timestamp | 생성 일시              |
+| updated_at           | timestamp | 수정 일시              |
+| created_by           | bigint    | 생성자                 |
+| updated_by           | bigint    | 수정자                 |
+
+역할:
+
+- 공통코드 그룹 계층을 저장하는 기준 테이블
+- 부모-자식 계층을 자기참조로 관리
+- 공통코드 관리 화면의 그룹 트리 원천 데이터
+
+### 2-15. tb_common_code_item
+
+| 컬럼                | 타입      | 설명                       |
+| ------------------- | --------- | -------------------------- |
+| common_code_item_id | bigint    | 공통코드 상세 PK           |
+| tenant_id           | bigint    | 소속 테넌트                |
+| group_id            | bigint    | 그룹 FK                    |
+| item_code           | varchar   | 상세코드                   |
+| item_nm             | varchar   | 상세코드명                 |
+| item_dc             | varchar   | 상세코드 설명              |
+| parent_item_id      | bigint    | 상위 상세코드 FK(자기참조) |
+| sort_order          | int       | 정렬 순서                  |
+| use_at              | char      | 사용 여부                  |
+| created_at          | timestamp | 생성 일시                  |
+| updated_at          | timestamp | 수정 일시                  |
+| created_by          | bigint    | 생성자                     |
+| updated_by          | bigint    | 수정자                     |
+
+역할:
+
+- 그룹 하위 상세코드 데이터를 저장
+- 자식 그룹의 상위코드 선택을 제한하는 기준 테이블
+- F1Grid 상세 목록과 상위코드 선택 목록의 백엔드 원천 데이터
+
 ---
 
 ## 변경 이력
 
+- 2026-09-11: 공통코드 관리 기능을 위한 `tb_common_code_group`, `tb_common_code_item` 신규 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260911](../../backend/DATABASE/20260911) 및 [docs/database/2026-09-11](2026-09-11) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.

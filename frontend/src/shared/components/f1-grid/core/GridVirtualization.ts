@@ -6,6 +6,7 @@ export type GridViewportMetrics = {
   scrollLeft: number;
   viewportHeight: number;
   viewportWidth: number;
+  verticalScrollbarWidth: number;
 };
 
 export type GridRowWindow = {
@@ -84,7 +85,7 @@ export function getVirtualColumnIndexes({
   widths.forEach((rawWidth, index) => {
     const width = Math.max(0, rawWidth);
     const right = currentLeft + width;
-    if (right > normalizedScrollLeft && currentLeft < viewportEnd) {
+    if (right >= normalizedScrollLeft && currentLeft <= viewportEnd) {
       if (!foundVisible) firstVisible = index;
       lastVisible = index;
       foundVisible = true;

@@ -537,8 +537,8 @@ export const RoleManagementPanel = forwardRef<
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 1 },
         minWidth: 0,
+        minHeight: 0,
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
@@ -553,43 +553,48 @@ export const RoleManagementPanel = forwardRef<
           gap: 2,
           flex: 1,
           minWidth: 0,
+          minHeight: 0,
           height: '100%',
           overflow: 'hidden',
         }}
       >
         <Card
           sx={{
-            borderRadius: 1,
-            border: '1px solid rgba(148,163,184,0.18)',
             boxShadow: 'none',
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
+            minHeight: 0,
             height: '100%',
             overflow: 'hidden',
           }}
         >
           <CardContent
             sx={{
-              p: 2.5,
+              p: 1,
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
+              minHeight: 0,
               height: '100%',
               overflow: 'hidden',
+              '&:last-child': {
+                pb: 1,
+              },
             }}
           >
             <Box
               sx={{
+                px: 1,
+                py: 1,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: { xs: 'flex-start', sm: 'center' },
                 flexWrap: 'wrap',
                 gap: 1,
-                mb: 2,
               }}
             >
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                 권한 관리
               </Typography>
             </Box>
@@ -601,8 +606,7 @@ export const RoleManagementPanel = forwardRef<
                 columns={roleColumns}
                 rowKey="id"
                 ariaLabel="F1-GRID 권한 관리"
-                height="100%"
-                maxHeight="100%"
+                height={'100%'}
                 rowHeight={32}
                 minRowHeight={32}
                 maxRowHeight={320}
@@ -620,37 +624,41 @@ export const RoleManagementPanel = forwardRef<
         </Card>
         <Card
           sx={{
-            borderRadius: 1,
-            border: '1px solid rgba(148,163,184,0.18)',
             boxShadow: 'none',
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
+            minHeight: 0,
             height: '100%',
             overflow: 'hidden',
           }}
         >
           <CardContent
             sx={{
-              p: 2.5,
+              p: 1,
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
+              minHeight: 0,
               height: '100%',
               overflow: 'hidden',
+              '&:last-child': {
+                pb: 1,
+              },
             }}
           >
             <Box
               sx={{
+                px: 1,
+                py: 1,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: { xs: 'flex-start', sm: 'center' },
                 flexWrap: 'wrap',
                 gap: 1,
-                mb: 2,
               }}
             >
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                 권한별 사용자 매핑
               </Typography>
               {selectedRole ? (
@@ -684,8 +692,7 @@ export const RoleManagementPanel = forwardRef<
                       columns={userColumns}
                       rowKey="id"
                       ariaLabel="F1-GRID 사용자 매핑"
-                      height="100%"
-                      maxHeight="100%"
+                      height={'100%'}
                       rowHeight={32}
                       minRowHeight={32}
                       maxRowHeight={320}

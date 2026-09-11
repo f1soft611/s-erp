@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { Box, Card, CardContent } from '@mui/material';
 import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import FolderOutlined from '@mui/icons-material/FolderOutlined';
@@ -41,7 +41,6 @@ import {
 
 type ModuleManagementPanelProps = {
   modules: ModuleManagementRow[];
-  searchQuery?: string;
   canExportExcel?: boolean;
   onCreateModule?: (payload: ModuleSavePayload) => Promise<void> | void;
   onUpdateModule?: (
@@ -124,7 +123,6 @@ export const ModuleManagementPanel = forwardRef<
 >(function ModuleManagementPanel(
   {
     modules,
-    searchQuery = '',
     canExportExcel = false,
     onCreateModule = createModule,
     onUpdateModule = updateModule,
@@ -142,18 +140,6 @@ export const ModuleManagementPanel = forwardRef<
   const saveInFlightRef = useRef<Promise<void> | undefined>(undefined);
   const completedOperationsRef = useRef(new Set<string>());
 
-  const filteredModules = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return modules;
-
-    return modules.filter((module) =>
-      [module.moduleCode, module.moduleName, module.iconName, module.moduleUrl]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [modules, searchQuery]);
-
   useEffect(() => {
     const nextChanges =
       gridRef.current?.getChanges() ?? emptyChanges<ModuleManagementRow>();
@@ -163,84 +149,87 @@ export const ModuleManagementPanel = forwardRef<
         nextChanges.updatedRows.length > 0 ||
         nextChanges.deletedRows.length > 0,
     );
-  }, [filteredModules, onDirtyChange]);
+  }, [modules, onDirtyChange]);
 
-  const columns: F1GridColumn<ModuleManagementRow>[] = [
-    {
-      field: 'id',
-      type: 'rownumber',
-      width: 60,
-      headerName: '순번',
-      headerAlign: 'center',
-      align: 'center',
-      pinned: 'left',
-    },
-    {
-      field: 'moduleCode',
-      headerName: '모듈 코드',
-      flex: 1,
-      editable: (row) => canEditModuleCode(row),
-      required: true,
-      headerAlign: 'center',
-      align: 'left',
-    },
-    {
-      field: 'moduleName',
-      headerName: '모듈명',
-      flex: 1.2,
-      editable: true,
-      required: true,
-      headerAlign: 'center',
-    },
-    {
-      field: 'iconName',
-      headerName: '아이콘명',
-      flex: 1,
-      editable: true,
-      required: true,
-      type: 'select',
-      options: MODULE_ICON_OPTIONS,
-      selectOptionIcon: renderModuleOptionIcon,
-      headerAlign: 'center',
-    },
-    {
-      field: 'moduleUrl',
-      headerName: '루트 경로',
-      flex: 1.2,
-      editable: true,
-      required: true,
-      headerAlign: 'center',
-    },
-    {
-      field: 'sortOrder',
-      headerName: '정렬 순서',
-      flex: 0.8,
-      type: 'number',
-      editable: true,
-      required: true,
-      align: 'center',
-      headerAlign: 'center',
-    },
-    {
-      field: 'menuCount',
-      headerName: '메뉴 수',
-      flex: 0.7,
-      type: 'number',
-      editable: false,
-      align: 'center',
-      headerAlign: 'center',
-    },
-    {
-      field: 'use',
-      headerName: '사용 여부',
-      flex: 0.8,
-      type: 'checkbox',
-      editable: true,
-      headerCheckbox: true,
-      align: 'center',
-      headerAlign: 'center',
-    },
-  ];
+  const columns = useMemo<F1GridColumn<ModuleManagementRow>[]>(
+    () => [
+      {
+        field: 'id',
+        type: 'rownumber',
+        width: 60,
+        headerName: '순번',
+        headerAlign: 'center',
+        align: 'center',
+        pinned: 'left',
+      },
+      {
+        field: 'moduleCode',
+        headerName: '모듈 코드',
+        flex: 1,
+        editable: (row) => canEditModuleCode(row),
+        required: true,
+        headerAlign: 'center',
+        align: 'left',
+      },
+      {
+        field: 'moduleName',
+        headerName: '모듈명',
+        flex: 1.2,
+        editable: true,
+        required: true,
+        headerAlign: 'center',
+      },
+      {
+        field: 'iconName',
+        headerName: '아이콘명',
+        flex: 1,
+        editable: true,
+        required: true,
+        type: 'select',
+        options: MODULE_ICON_OPTIONS,
+        selectOptionIcon: renderModuleOptionIcon,
+        headerAlign: 'center',
+      },
+      {
+        field: 'moduleUrl',
+        headerName: '루트 경로',
+        flex: 1.2,
+        editable: true,
+        required: true,
+        headerAlign: 'center',
+      },
+      {
+        field: 'sortOrder',
+        headerName: '정렬 순서',
+        flex: 0.8,
+        type: 'number',
+        editable: true,
+        required: true,
+        align: 'center',
+        headerAlign: 'center',
+      },
+      {
+        field: 'menuCount',
+        headerName: '메뉴 수',
+        flex: 0.7,
+        type: 'number',
+        editable: false,
+        align: 'center',
+        headerAlign: 'center',
+      },
+      {
+        field: 'use',
+        headerName: '사용 여부',
+        flex: 0.8,
+        type: 'checkbox',
+        editable: true,
+        headerCheckbox: true,
+        align: 'center',
+        headerAlign: 'center',
+      },
+    ],
+    [],
+  );
 
   const createModuleRow = useCallback(
     (): ModuleManagementRow => ({
@@ -285,16 +274,19 @@ export const ModuleManagementPanel = forwardRef<
     URL.revokeObjectURL(url);
   }, [columns]);
 
-  const toPayload = (row: ModuleManagementRow): ModuleSavePayload => ({
-    moduleCode: row.moduleCode.trim(),
-    moduleNm: row.moduleName.trim(),
-    iconNm: row.iconName.trim() || null,
-    moduleUrl: row.moduleUrl.trim() || null,
-    sortOrder: Number.isFinite(Number(row.sortOrder))
-      ? Number(row.sortOrder)
-      : 0,
-    useAt: row.use ? 'Y' : 'N',
-  });
+  const toPayload = useCallback(
+    (row: ModuleManagementRow): ModuleSavePayload => ({
+      moduleCode: row.moduleCode.trim(),
+      moduleNm: row.moduleName.trim(),
+      iconNm: row.iconName.trim() || null,
+      moduleUrl: row.moduleUrl.trim() || null,
+      sortOrder: Number.isFinite(Number(row.sortOrder))
+        ? Number(row.sortOrder)
+        : 0,
+      useAt: row.use ? 'Y' : 'N',
+    }),
+    [],
+  );
 
   const saveCurrentChanges = useCallback(() => {
     if (saveInFlightRef.current) {
@@ -379,6 +371,7 @@ export const ModuleManagementPanel = forwardRef<
     onError,
     onModulesSaved,
     onSaveSuccess,
+    toPayload,
     onUpdateModule,
   ]);
 
@@ -397,8 +390,8 @@ export const ModuleManagementPanel = forwardRef<
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 1 },
         minWidth: 0,
+        minHeight: 0,
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
@@ -408,50 +401,38 @@ export const ModuleManagementPanel = forwardRef<
     >
       <Card
         sx={{
-          borderRadius: 1,
-          border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
+          minHeight: 0,
           height: '100%',
           overflow: 'hidden',
         }}
       >
         <CardContent
           sx={{
-            p: 2.5,
+            p: 1,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
+            minHeight: 0,
             height: '100%',
             overflow: 'hidden',
+            '&:last-child': {
+              pb: 1,
+            },
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              flexWrap: 'wrap',
-              gap: 1,
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              모듈 관리
-            </Typography>
-          </Box>
           <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
             <F1Grid
               key={moduleGridKey}
               ref={gridRef}
-              rows={filteredModules}
+              rows={modules}
               columns={columns}
               rowKey="id"
               ariaLabel="F1-GRID 모듈 관리"
-              height="100%"
-              maxHeight="100%"
+              height={'100%'}
               rowHeight={32}
               minRowHeight={32}
               maxRowHeight={320}

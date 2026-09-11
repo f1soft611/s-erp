@@ -65,17 +65,38 @@ function AppRouter() {
         }
       />
       <Route
-        path="/*"
+        path="/groupware/*"
         element={
-          isAuthenticated() ? (
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          ) : (
-            <NotFoundPage />
-          )
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
         }
       />
+      <Route
+        path="/sales/*"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/co/*"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/*"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

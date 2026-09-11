@@ -203,6 +203,60 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '품질관리 모듈 설정', meta: '품질팀 · 2일 전', status: '신규' },
     ],
   },
+  'common-code': {
+    title: '공통코드 관리',
+    description: '공통코드를 그룹과 상세코드로 관리합니다.',
+    cards: [
+      { label: '그룹 수', value: '08' },
+      { label: '상세코드 수', value: '46' },
+      { label: '사용 중', value: '39' },
+      { label: '미사용', value: '07' },
+    ],
+    items: [
+      {
+        title: '첨부문서업무 그룹 정리',
+        meta: '운영팀 · 오늘',
+        status: '정상',
+      },
+      {
+        title: '거래처 구분 코드 확인',
+        meta: '인사팀 · 어제',
+        status: '검토중',
+      },
+      {
+        title: '공통코드 정렬 기준 조정',
+        meta: 'IT팀 · 2일 전',
+        status: '신규',
+      },
+    ],
+  },
+  cmncodes: {
+    title: '공통코드 관리',
+    description: '공통코드를 그룹과 상세코드로 관리합니다.',
+    cards: [
+      { label: '그룹 수', value: '08' },
+      { label: '상세코드 수', value: '46' },
+      { label: '사용 중', value: '39' },
+      { label: '미사용', value: '07' },
+    ],
+    items: [
+      {
+        title: '첨부문서업무 그룹 정리',
+        meta: '운영팀 · 오늘',
+        status: '정상',
+      },
+      {
+        title: '거래처 구분 코드 확인',
+        meta: '인사팀 · 어제',
+        status: '검토중',
+      },
+      {
+        title: '공통코드 정렬 기준 조정',
+        meta: 'IT팀 · 2일 전',
+        status: '신규',
+      },
+    ],
+  },
   'f1-grid-test': {
     title: 'F1 Grid 테스트',
     description: '클립보드, 검증, 확장 에디터와 키보드 입력을 확인합니다.',

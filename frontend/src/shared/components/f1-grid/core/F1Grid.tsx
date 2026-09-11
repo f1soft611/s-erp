@@ -633,6 +633,7 @@ function F1GridInner<T extends object>(
       scrollLeft: 0,
       viewportHeight: 0,
       viewportWidth: 0,
+      verticalScrollbarWidth: 0,
     });
   const viewportSchedulerRef = useRef<
     ReturnType<typeof createGridRafScheduler<GridViewportMetrics>> | undefined
@@ -644,7 +645,8 @@ function F1GridInner<T extends object>(
           current.scrollTop === next.scrollTop &&
           current.scrollLeft === next.scrollLeft &&
           current.viewportHeight === next.viewportHeight &&
-          current.viewportWidth === next.viewportWidth
+          current.viewportWidth === next.viewportWidth &&
+          current.verticalScrollbarWidth === next.verticalScrollbarWidth
             ? current
             : next,
         );
@@ -658,6 +660,10 @@ function F1GridInner<T extends object>(
       scrollLeft: bodyScroll.scrollLeft,
       viewportHeight: bodyScroll.clientHeight,
       viewportWidth: bodyScroll.clientWidth,
+      verticalScrollbarWidth: Math.max(
+        0,
+        bodyScroll.offsetWidth - bodyScroll.clientWidth,
+      ),
     });
   }
 
@@ -2405,9 +2411,12 @@ function F1GridInner<T extends object>(
         sx={{
           width: '100%',
           overflowX: 'auto',
-          overflowY: 'hidden',
+          overflowY: 'auto',
           flex: '0 0 auto',
+          scrollbarGutter: 'stable',
           scrollbarWidth: 'none',
+          boxSizing: 'border-box',
+          paddingRight: `${bodyScrollMetrics.verticalScrollbarWidth}px`,
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
@@ -2470,6 +2479,7 @@ function F1GridInner<T extends object>(
           overflowY: 'auto',
           overflowX: 'auto',
           overflowAnchor: 'none',
+          scrollbarGutter: 'stable',
         }}
       >
         {!loading ? (

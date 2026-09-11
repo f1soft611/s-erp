@@ -31,3 +31,6 @@ id_rsa
 id_rsa.pub
 credentials.json
 secrets.json
+frontend/vitest-last.json
+frontend/vitest-router-login.json
+frontend/vitest-summary.txt

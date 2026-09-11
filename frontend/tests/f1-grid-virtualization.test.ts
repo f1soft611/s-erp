@@ -42,7 +42,20 @@ describe('F1Grid virtualization engine', () => {
       protectedIndexes: [6],
     });
 
-    expect(indexes).toEqual([0, 2, 3, 4, 5, 6, 7]);
+    expect(indexes).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('keeps the column window aligned when the scroll boundary lands exactly on a column edge', () => {
+    const indexes = getVirtualColumnIndexes({
+      widths: [40, 53, 66, 79, 92, 105],
+      scrollLeft: 330,
+      viewportWidth: 60,
+      overscan: 1,
+      pinnedIndexes: [0, 5],
+      protectedIndexes: [4],
+    });
+
+    expect(indexes).toEqual([0, 3, 4, 5]);
   });
 
   it('coalesces repeated viewport updates into one animation frame using the latest value', () => {

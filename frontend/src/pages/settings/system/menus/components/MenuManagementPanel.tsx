@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { Box, Card, CardContent } from '@mui/material';
 import {
   forwardRef,
   useEffect,
@@ -356,8 +356,8 @@ export const MenuManagementPanel = forwardRef<
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 1 },
         minWidth: 0,
+        minHeight: 0,
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
@@ -367,24 +367,27 @@ export const MenuManagementPanel = forwardRef<
     >
       <Card
         sx={{
-          borderRadius: 1,
-          border: '1px solid rgba(148,163,184,0.18)',
           boxShadow: 'none',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
+          minHeight: 0,
           height: '100%',
           overflow: 'hidden',
         }}
       >
         <CardContent
           sx={{
-            p: 2.5,
+            p: 1,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
+            minHeight: 0,
             height: '100%',
             overflow: 'hidden',
+            '&:last-child': {
+              pb: 1,
+            },
           }}
         >
           <Box
@@ -394,12 +397,9 @@ export const MenuManagementPanel = forwardRef<
               alignItems: { xs: 'flex-start', sm: 'center' },
               flexWrap: 'wrap',
               gap: 1,
-              mb: 2,
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              메뉴 관리
-            </Typography>
+            {/* <Typography sx={{ fontWeight: 700 }}>메뉴 관리</Typography> */}
             {/* <Box
               role="toolbar"
               aria-label="메뉴 그리드 제어"
@@ -465,7 +465,7 @@ export const MenuManagementPanel = forwardRef<
               defaultExpandAll
               showCheckbox={false}
               treeCheckbox
-              height="100%"
+              height={'100%'}
               getRowOrder={(row) => row.order}
               rowFormPlugin={{}}
               columnLine={true}

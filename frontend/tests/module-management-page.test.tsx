@@ -323,15 +323,18 @@ describe('ModuleManagementPage', () => {
       />,
     );
 
-    const heading = await screen.findByRole('heading', { name: '모듈 관리' });
-    const card = heading.closest('.MuiCard-root');
+    const grid = await screen.findByRole('grid', { name: 'F1-GRID 모듈 관리' });
+    const card = grid.closest('.MuiCard-root');
     const shell = card?.parentElement;
 
+    expect(grid).toBeVisible();
     expect(shell).not.toBeNull();
     expect(shell?.className).toContain('MuiBox-root');
     expect(getComputedStyle(shell as HTMLElement).display).toBe('flex');
     expect(getComputedStyle(shell as HTMLElement).flexDirection).toBe('column');
     expect(getComputedStyle(shell as HTMLElement).overflow).toBe('hidden');
+    expect(getComputedStyle(shell as HTMLElement).minHeight).toBe('0px');
+    expect(getComputedStyle(card as HTMLElement).minHeight).toBe('0px');
   });
 
   it('shows a known icon select list and locks saved module codes from editing', () => {

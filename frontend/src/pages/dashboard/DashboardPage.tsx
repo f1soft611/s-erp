@@ -362,11 +362,21 @@ function DashboardPage() {
 
   const content = useMemo(() => {
     const baseContent =
-      pageContentMap[currentPageKey] ?? pageContentMap[defaultMenuId] ?? defaultPage;
+      pageContentMap[currentPageKey] ??
+      pageContentMap[defaultMenuId] ??
+      defaultPage;
     return buildPageContent(baseContent, currentMenu);
   }, [currentMenu, currentPageKey, defaultMenuId]);
 
   const hasAccessibleMenu = moduleItems.length > 0;
+
+  const isRootDashboardAlias =
+    normalizeRoutePath(effectivePath) === '/' ||
+    normalizeRoutePath(effectivePath) === '/dashboard';
+
+  if (!menusLoading && !isValidDashboardRoute && !isRootDashboardAlias) {
+    return <NotFoundPage />;
+  }
 
   if (menusError) {
     return (
@@ -394,10 +404,6 @@ function DashboardPage() {
         </IconButton>
       </Box>
     );
-  }
-
-  if (!menusLoading && !isValidDashboardRoute) {
-    return <NotFoundPage />;
   }
 
   return (

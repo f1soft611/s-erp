@@ -1784,6 +1784,7 @@ F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 
 - `fixedRowHeightThreshold`: 기본값 10,000이며, 이상에서는 행 높이를 고정하고 행 리사이즈 핸들을 비활성화한다.
 - pinned 컬럼, 편집 중 컬럼, 선택 범위의 anchor/focus 컬럼은 viewport 밖이어도 DOM에 유지한다.
 - 스크롤 위치는 `requestAnimationFrame`당 한 번만 React state에 반영한다.
+- 세로 스크롤바가 생기는 대용량 그리드에서는 본문 스크롤 영역의 scrollbar gutter 폭을 헤더 스크롤 영역 끝에도 반영해, 가로 스크롤을 마지막으로 이동해도 헤더와 데이터 셀의 최대 `scrollLeft` 기준이 일치해야 한다.
 - 선택 범위는 셀마다 state를 만들지 않고 `{ anchor, focus }`로 저장한 뒤 숫자 bounds를 한 번 계산해 렌더 셀에서 비교한다.
 - export, validate, 전체 선택, 정렬/필터, dirty/edit 데이터는 virtual window가 아니라 전체 visible rows를 기준으로 동작한다.
 
