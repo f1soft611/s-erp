@@ -121,7 +121,8 @@ function F1GridInner<T extends object>(
     rowKey,
     rowFormPlugin,
     ariaLabel = 'F1-GRID',
-    columnLine = false,
+    columnLine = true,
+    stripeRows = true,
     storageKey,
     height,
     minHeight,
@@ -156,6 +157,7 @@ function F1GridInner<T extends object>(
     disableFiltering = false,
     canExportExcel = false,
     excelFileName,
+    allowAddRootInContextMenu = true,
     allowAddRowInContextMenu = true,
     allowDuplicateRowInContextMenu = true,
     allowDeleteRowInContextMenu = true,
@@ -176,7 +178,13 @@ function F1GridInner<T extends object>(
   const [data, setData] = useState<F1GridData<T>>(() =>
     createGridData(rows, rowKey),
   );
-  const lastRowsPropRef = useRef(rows);
+  const lastRowsPropRef = useRef<T[]>(rows);
+  const rowsHaveEquivalentValues = (left: T[], right: T[]) => {
+    if (left.length !== right.length) return false;
+    return left.every((row, index) => areGridValuesEqual(row, right[index]));
+  };
+  const onChangesChangeRef = useRef(onChangesChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
@@ -1026,7 +1034,7 @@ function F1GridInner<T extends object>(
   }
 
   useEffect(() => {
-    if (lastRowsPropRef.current === rows) return;
+    if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
     lastRowsPropRef.current = rows;
     const changes = getGridChanges(data);
     if (
@@ -1062,13 +1070,18 @@ function F1GridInner<T extends object>(
     cellNode.focus();
   }, [editingCell, focusedCell]);
 
-  useEffect(() => {
-    onChangesChange?.(getGridChanges(data));
-  }, [data, onChangesChange, rowKey]);
+  // Read via refs so unmemoized consumer callbacks can't re-trigger these
+  // effects on every render and form an update loop (data is the real trigger).
+  onChangesChangeRef.current = onChangesChange;
+  onSelectionChangeRef.current = onSelectionChange;
 
   useEffect(() => {
-    onSelectionChange?.(selectedIds);
-  }, [onSelectionChange, selectedIds]);
+    onChangesChangeRef.current?.(getGridChanges(data));
+  }, [data, rowKey]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selectedIds);
+  }, [selectedIds]);
 
   useEffect(() => {
     cellSelectionRef.current = cellSelection;
@@ -2236,6 +2249,7 @@ function F1GridInner<T extends object>(
 
   const selectedAll =
     visibleRows.length > 0 && selectedCount === visibleRows.length;
+  const showAddRootInContextMenu = allowAddRootInContextMenu ?? true;
   const showAddRowInContextMenu = allowAddRowInContextMenu ?? true;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
@@ -2491,6 +2505,7 @@ function F1GridInner<T extends object>(
             renderedColumnIndexes={renderedColumnIndexes}
             rowKey={rowKey}
             columnLine={columnLine}
+            stripeRows={stripeRows}
             columnTracks={columnTracks}
             defaultRowHeight={defaultRowHeight}
             minRowHeight={normalizedMinRowHeight}
@@ -2647,7 +2662,7 @@ function F1GridInner<T extends object>(
           컬럼 길이 자동 조정
         </MenuItem>
         <Divider />
-        {treeContextMenu ? (
+        {treeContextMenu && showAddRootInContextMenu ? (
           <MenuItem onClick={handleAddRootClick}>루트 추가</MenuItem>
         ) : null}
         {showAddRowInContextMenu ? (

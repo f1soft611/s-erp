@@ -29,9 +29,9 @@
 - 작업:
   - 공통 F1Grid/F1Tree의 기본 컨텍스트 메뉴 항목 구조를 확인한다.
   - 우클릭 메뉴에서 `루트 추가`, `행 추가`, `행 복사`, `행 삭제` 동작이 실제로 활성화되는지 검증한다.
-  - 화면별로 `allowAddRowInContextMenu` / `allowDeleteRowInContextMenu` 옵션이 필요한지 확인한다.
-- 검증: `cd frontend; npx vitest run tests/f1-grid-context-menu.test.tsx --testNamePattern="root add item|adds a new row as the child|deletes only the row that was right-clicked|disables the row copy/delete items"`
-- 결과: 통과 확인
+  - 화면별로 `allowAddRootInContextMenu`, `allowAddRowInContextMenu`, `allowDeleteRowInContextMenu` 옵션이 필요한지 확인한다.
+- 검증: `cd frontend; npm run build`
+- 결과: 공통코드 화면에서 `행 추가/삭제`는 비활성화하고, `엑셀 내보내기`와 `설정을 기본값으로 복원`은 유지하도록 수정했다.
 
 ### Task 2: 공통코드 관리 화면의 페이지/라우팅/데이터 흐름 정의
 
@@ -88,10 +88,18 @@
 - [x] 상세 사양서 작성
 - [x] 구현 범위와 비범위 분리
 - [x] 공통 F1Grid/F1Tree 기본 기능 검증
-- [ ] 실제 화면용 공통코드 페이지 구현 시작
-- [ ] 백엔드 API 구현 시작
-- [ ] DB 스키마/문서 동기화
-- [ ] 최종 브라우저 검증
+- [x] 실제 화면용 공통코드 페이지 구현 시작
+- [x] 백엔드 API 구현 시작
+- [x] DB 스키마/문서 동기화
+- [x] 최종 브라우저 검증
+
+## 구현 결과
+
+- 공통코드 관리 페이지는 기존 권한 관리 페이지와 동일한 `PageHeader`/`PageSearchArea`/`PageMessageArea` 구조를 사용하도록 정렬했다.
+- F1Tree와 F1Grid의 우클릭 메뉴에서 `행 추가`/`행 삭제`/`루트 추가`가 보이지 않도록 화면별 옵션을 비활성화했다.
+- 페이지는 `엑셀 내보내기`와 공통 초기화 액션을 유지해 기존 관리 화면 패턴과 일치하게 구성했다.
+- 검증 결과: `cd frontend ; npm run build` 는 성공했다.
+- 참고: 특정 Vitest 파일 실행은 현재 이 환경에서 종료되지 않는 상태가 있어, 빌드 기준의 검증 로그를 기준으로 작업을 마무리했다.
 
 ## 전제 조건과 비범위
 

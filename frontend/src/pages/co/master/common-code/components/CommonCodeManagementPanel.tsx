@@ -1,5 +1,13 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
+import { Box, Card, CardContent, Typography } from '@mui/material';
+import Splitter from '../../../../../shared/components/Splitter';
 import {
   F1Grid,
   F1Tree,
@@ -30,6 +38,7 @@ type CommonCodeManagementPanelProps = {
 export type CommonCodeManagementPanelHandle = {
   saveCurrentChanges: () => Promise<void>;
   exportCurrentRows: () => void;
+  getDirtyState: () => boolean;
 };
 
 const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
@@ -49,19 +58,27 @@ const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
     field: 'groupNm',
     headerName: '그룹명',
     editable: true,
+    pinned: 'left',
     flex: 1,
-    width: 220,
   },
   {
     field: 'groupDc',
     headerName: '그룹 설명',
     editable: true,
     flex: 1,
-    width: 260,
   },
 ];
 
 const itemColumns: F1GridColumn<CommonCodeItemRow>[] = [
+  {
+    field: 'id',
+    type: 'rownumber',
+    width: 60,
+    headerName: '순번',
+    headerAlign: 'center',
+    align: 'center',
+    pinned: 'left',
+  },
   {
     field: 'itemCode',
     headerName: '상세코드',
@@ -123,12 +140,16 @@ export const CommonCodeManagementPanel = forwardRef<
 ) {
   const treeRef = useRef<F1TreeRef<CommonCodeGroupRow>>(null);
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
-  const [groupChanges, setGroupChanges] = useState<F1GridChanges<CommonCodeGroupRow>>({
+  const [groupChanges, setGroupChanges] = useState<
+    F1GridChanges<CommonCodeGroupRow>
+  >({
     insertedRows: [],
     updatedRows: [],
     deletedRows: [],
   });
-  const [itemChanges, setItemChanges] = useState<F1GridChanges<CommonCodeItemRow>>({
+  const [itemChanges, setItemChanges] = useState<
+    F1GridChanges<CommonCodeItemRow>
+  >({
     insertedRows: [],
     updatedRows: [],
     deletedRows: [],
@@ -145,6 +166,22 @@ export const CommonCodeManagementPanel = forwardRef<
 
     onDirtyChange?.(isDirty);
   }, [groupChanges, itemChanges, onDirtyChange]);
+
+  const getDirtyState = useCallback(() => {
+    const nextGroupChanges =
+      treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
+    const nextItemChanges =
+      gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
+
+    return (
+      nextGroupChanges.insertedRows.length > 0 ||
+      nextGroupChanges.updatedRows.length > 0 ||
+      nextGroupChanges.deletedRows.length > 0 ||
+      nextItemChanges.insertedRows.length > 0 ||
+      nextItemChanges.updatedRows.length > 0 ||
+      nextItemChanges.deletedRows.length > 0
+    );
+  }, []);
 
   const saveCurrentChanges = useCallback(async () => {
     const nextGroupChanges =
@@ -164,35 +201,44 @@ export const CommonCodeManagementPanel = forwardRef<
       return;
     }
 
-    const rowsToValidate = [
-      ...nextGroupChanges.insertedRows,
-      ...nextGroupChanges.updatedRows,
-      ...nextItemChanges.insertedRows,
-      ...nextItemChanges.updatedRows,
-    ];
+    try {
+      const rowsToValidate = [
+        ...nextGroupChanges.insertedRows,
+        ...nextGroupChanges.updatedRows,
+        ...nextItemChanges.insertedRows,
+        ...nextItemChanges.updatedRows,
+      ];
 
-    for (const row of rowsToValidate) {
-      if ('groupCode' in row) {
-        if (!String(row.groupCode ?? '').trim()) {
-          throw new Error('그룹 코드는 필수입니다.');
+      for (const row of rowsToValidate) {
+        if ('groupCode' in row) {
+          if (!String(row.groupCode ?? '').trim()) {
+            throw new Error('그룹 코드는 필수입니다.');
+          }
+        }
+        if ('itemCode' in row) {
+          if (!String(row.itemCode ?? '').trim()) {
+            throw new Error('상세코드는 필수입니다.');
+          }
         }
       }
-      if ('itemCode' in row) {
-        if (!String(row.itemCode ?? '').trim()) {
-          throw new Error('상세코드는 필수입니다.');
-        }
-      }
+
+      const nextGroups = treeRef.current?.getActiveRows() ?? groups;
+      const nextItems = gridRef.current?.getActiveRows() ?? items;
+
+      onGroupsSaved?.(nextGroups);
+      onItemsSaved?.(nextItems);
+      setGroupChanges(emptyChanges<CommonCodeGroupRow>());
+      setItemChanges(emptyChanges<CommonCodeItemRow>());
+      onSaveSuccess?.('공통코드를 저장했습니다.');
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : '공통코드 저장에 실패했습니다.';
+      onError?.(message);
+      throw error;
     }
-
-    const nextGroups = treeRef.current?.getActiveRows() ?? groups;
-    const nextItems = gridRef.current?.getActiveRows() ?? items;
-
-    onGroupsSaved?.(nextGroups);
-    onItemsSaved?.(nextItems);
-    setGroupChanges(emptyChanges<CommonCodeGroupRow>());
-    setItemChanges(emptyChanges<CommonCodeItemRow>());
-    onSaveSuccess?.('공통코드를 저장했습니다.');
-  }, [groups, items, onGroupsSaved, onItemsSaved, onSaveSuccess]);
+  }, [groups, items, onError, onGroupsSaved, onItemsSaved, onSaveSuccess]);
 
   useImperativeHandle(
     ref,
@@ -225,8 +271,9 @@ export const CommonCodeManagementPanel = forwardRef<
         anchor.remove();
         URL.revokeObjectURL(url);
       },
+      getDirtyState,
     }),
-    [saveCurrentChanges],
+    [getDirtyState, saveCurrentChanges],
   );
 
   const selectedGroup =
@@ -234,12 +281,6 @@ export const CommonCodeManagementPanel = forwardRef<
   const selectedGroupItems = selectedGroup
     ? items.filter((item) => item.groupId === selectedGroup.id)
     : [];
-  const treeHeight = Math.max(320, Math.min(520, groups.length * 34 + 80));
-  const gridHeight = Math.max(
-    320,
-    Math.min(520, selectedGroupItems.length * 34 + 80),
-  );
-
   return (
     <Box
       sx={{
@@ -247,115 +288,161 @@ export const CommonCodeManagementPanel = forwardRef<
         minHeight: 0,
         flex: 1,
         display: 'flex',
-        gap: 2,
+        flexDirection: 'column',
+        height: '100%',
         overflow: 'hidden',
-        px: { xs: 1, sm: 1.25 },
-        py: 1,
       }}
     >
-      <Box
-        sx={{
-          flex: '0 0 330px',
-          border: '1px solid rgba(148,163,184,0.18)',
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          boxShadow: 'none',
-        }}
+      <Splitter
+        direction="horizontal"
+        mobileMode="stacked"
+        mobileBreakpoint={768}
+        initialSize={600}
+        minSize={400}
+        maxSize={1000}
+        leftFlex={1}
+        rightFlex={2}
+        ariaLabel="공통코드 트리와 상세영역 분리기"
       >
-        <Typography
-          variant="subtitle2"
+        <Card
           sx={{
-            px: 1.5,
-            py: 1.25,
-            fontWeight: 700,
-            borderBottom: '1px solid rgba(148,163,184,0.18)',
-          }}
-        >
-          공통코드 그룹 트리
-        </Typography>
-        <Box sx={{ flex: 1, minHeight: 0 }}>
-          <F1Tree
-            key={commonCodeGridKey}
-            ref={treeRef}
-            rows={groups}
-            columns={groupColumns}
-            rowKey="id"
-            parentKey="parentGroupId"
-            treeColumn="groupNm"
-            height={treeHeight}
-            defaultExpandAll
-            showCheckbox={false}
-            ariaLabel="공통코드 그룹 트리"
-            allowAddRowInContextMenu={true}
-            allowDuplicateRowInContextMenu={false}
-            allowDeleteRowInContextMenu={true}
-            onSelectionChange={(rowIds) => {
-              const nextId = rowIds[0];
-              if (typeof nextId === 'string' || typeof nextId === 'number') {
-                onSelectedGroupChange(String(nextId));
-              }
-            }}
-            onChangesChange={(changes) => {
-              setGroupChanges(changes);
-            }}
-          />
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          flex: 1,
-          border: '1px solid rgba(148,163,184,0.18)',
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          boxShadow: 'none',
-        }}
-      >
-        <Box
-          sx={{
-            px: 1.5,
-            py: 1.25,
-            borderBottom: '1px solid rgba(148,163,184,0.18)',
+            boxShadow: 'none',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            height: '100%',
+            overflow: 'hidden',
           }}
         >
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            선택 그룹 상세코드
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {selectedGroup?.groupNm ?? ''}
-          </Typography>
-        </Box>
-        <Box sx={{ flex: 1, minHeight: 0 }}>
-          <F1Grid
-            key={commonCodeGridKey}
-            ref={gridRef}
-            rows={selectedGroupItems}
-            columns={itemColumns}
-            rowKey="id"
-            ariaLabel="공통코드 상세코드"
-            height={gridHeight}
-            canExportExcel={canExportExcel}
-            allowAddRowInContextMenu={true}
-            allowDuplicateRowInContextMenu={false}
-            allowDeleteRowInContextMenu={true}
-            onChangesChange={(changes) => {
-              setItemChanges(changes);
+          <CardContent
+            sx={{
+              p: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 0,
+              height: '100%',
+              overflow: 'hidden',
+              '&:last-child': { pb: 1 },
             }}
-          />
-        </Box>
-      </Box>
+          >
+            <Box
+              sx={{
+                px: 1,
+                py: 1.2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                공통코드 그룹 관리
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+              <F1Tree
+                key={commonCodeGridKey}
+                ref={treeRef}
+                rows={groups}
+                columns={groupColumns}
+                rowKey="id"
+                parentKey="parentGroupId"
+                treeColumn="groupNm"
+                height="100%"
+                defaultExpandAll
+                showCheckbox={false}
+                ariaLabel="공통코드 그룹 트리"
+                onSelectionChange={(rowIds) => {
+                  const nextId = rowIds[0];
+                  if (
+                    typeof nextId === 'string' ||
+                    typeof nextId === 'number'
+                  ) {
+                    onSelectedGroupChange(String(nextId));
+                  }
+                }}
+                onChangesChange={(changes) => {
+                  setGroupChanges(changes);
+                }}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+        <Card
+          sx={{
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            height: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <CardContent
+            sx={{
+              p: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 0,
+              height: '100%',
+              overflow: 'hidden',
+              '&:last-child': { pb: 1 },
+            }}
+          >
+            <Box
+              sx={{
+                px: 1,
+                py: 1.2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                공통코드 상세 관리
+              </Typography>
+              {selectedGroup ? (
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '60%',
+                    textAlign: 'right',
+                  }}
+                >
+                  선택 그룹: {selectedGroup.groupNm}
+                </Typography>
+              ) : null}
+            </Box>
+            <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+              <F1Grid
+                key={commonCodeGridKey}
+                ref={gridRef}
+                rows={selectedGroupItems}
+                columns={itemColumns}
+                rowKey="id"
+                ariaLabel="공통코드 상세코드"
+                height="100%"
+                canExportExcel={canExportExcel}
+                showCheckbox={false}
+                onChangesChange={(changes) => {
+                  setItemChanges(changes);
+                }}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      </Splitter>
     </Box>
   );
 });

@@ -76,6 +76,8 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 셀 범위 드래그 선택 중에는 행 높이 조절 핸들이 비활성화되어 `rowresize` 동작이 발생하지 않는다.
 - `wrapText: true` 옵션이 있는 컬럼은 행 높이가 커질 때 줄바꿈을 허용하고, 기본 컬럼은 한 줄 말줄임 유지한다.
 - `height`, `minHeight`, `maxHeight`를 통해 Grid 컨테이너의 전체 높이와 최소/최대 높이를 제어한다.
+- `columnLine` 기본값은 `true`이며, 컬럼 사이 세로 구분선을 표시한다.
+- `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `loading` 상태를 사용해 그리드 전체 영역에 로딩 스피너를 표시하고, `minHeight`를 넘겨 부모 영역에서 내부 스크롤이 유지되도록 할 수 있다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.

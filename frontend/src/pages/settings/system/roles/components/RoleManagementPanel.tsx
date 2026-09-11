@@ -29,6 +29,7 @@ import {
   type F1GridColumn,
   type F1GridRef,
 } from '../../../../../shared/components/f1-grid';
+import Splitter from '../../../../../shared/components/Splitter';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { RoleManagementRow } from '../types/roleManagement.types';
 import {
@@ -546,17 +547,16 @@ export const RoleManagementPanel = forwardRef<
         overflow: 'hidden',
       }}
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '1.2fr 1fr' },
-          gap: 2,
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          height: '100%',
-          overflow: 'hidden',
-        }}
+      <Splitter
+        direction="horizontal"
+        mobileMode="stacked"
+        mobileBreakpoint={768}
+        initialSize={520}
+        minSize={400}
+        maxSize={1000}
+        leftFlex={1}
+        rightFlex={1}
+        ariaLabel="권한 관리 영역 분리기"
       >
         <Card
           sx={{
@@ -720,7 +720,7 @@ export const RoleManagementPanel = forwardRef<
             )}
           </CardContent>
         </Card>
-      </Box>
+      </Splitter>
       <Dialog
         open={userDialogOpen}
         onClose={() => setUserDialogOpen(false)}

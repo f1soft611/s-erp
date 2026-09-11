@@ -211,6 +211,7 @@ export type F1GridProps<T extends object> = {
   rowFormPlugin?: F1GridRowFormPlugin<T>;
   ariaLabel?: string;
   columnLine?: boolean;
+  stripeRows?: boolean;
   storageKey?: string;
   height?: number | string;
   minHeight?: number | string;
@@ -245,6 +246,7 @@ export type F1GridProps<T extends object> = {
   disableFiltering?: boolean;
   canExportExcel?: boolean;
   excelFileName?: string;
+  allowAddRootInContextMenu?: boolean;
   allowAddRowInContextMenu?: boolean;
   allowDuplicateRowInContextMenu?: boolean;
   allowDeleteRowInContextMenu?: boolean;

@@ -1,4 +1,4 @@
-﻿import { createRef } from 'react';
+﻿import { createRef, useState } from 'react';
 import {
   act,
   fireEvent,
@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import dayjs from 'dayjs';
-import { describe, expect, it, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 import { AppSettingsProvider } from '../src/shared/context/AppSettingsContext';
 import {
@@ -124,7 +124,74 @@ const columns: F1GridColumn<MenuRow>[] = [
   },
 ];
 
+describe('F1-GRID default prop behavior', () => {
+  it('keeps column lines and alternating row striping enabled by default', () => {
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" ariaLabel="grid" />);
+
+    const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe('true');
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
+  it('allows disabling column lines and row striping explicitly', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid without visual helpers"
+        columnLine={false}
+        stripeRows={false}
+      />,
+    );
+
+    const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe('false');
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('false');
+  });
+});
+
 describe('F1-GRID size props', () => {
+  it('does not recurse when a parent recreates equivalent row arrays on every render', () => {
+    const baseRows = [
+      { id: 'row-1', code: 'A' },
+      { id: 'row-2', code: 'B' },
+    ];
+    const columns: F1GridColumn<(typeof baseRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+
+    function Demo() {
+      const [tick, setTick] = useState(0);
+      const rows = baseRows.filter(() => true);
+
+      return (
+        <>
+          <button type="button" onClick={() => setTick((value) => value + 1)}>
+            rerender
+          </button>
+          <F1Grid
+            rows={rows}
+            columns={columns}
+            rowKey="id"
+            ariaLabel="grid with equivalent row arrays"
+            height={220}
+          />
+          <span>{tick}</span>
+        </>
+      );
+    }
+
+    const { unmount } = render(<Demo />);
+
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'rerender' }));
+    }).not.toThrow();
+
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+    unmount();
+  });
+
   it('keeps cell render work limited when a cell is selected', () => {
     const renderCellSpy = vi.fn(({ value }) => <span>{String(value)}</span>);
     const manyRows = Array.from({ length: 64 }, (_, index) => ({

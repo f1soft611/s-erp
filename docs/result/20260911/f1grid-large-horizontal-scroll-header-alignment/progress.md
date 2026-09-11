@@ -62,6 +62,14 @@ cd "d:/f1soft/dev/react/S-ERP/frontend"; npm run build
 
 결과: TypeScript + Vite production build 성공.
 
+추가 확인:
+
+```bash
+cd "d:/f1soft/dev/react/S-ERP/frontend"; npx vitest run tests/f1-grid.test.tsx
+```
+
+결과: 100개 통과, 45개 실패. 첫 실패는 `tests/f1-grid.test.tsx:3887`의 컬럼 메뉴/로컬스토리지 테스트에서 깨진 라벨 문자열 버튼을 찾지 못하는 문제이며, 이번 스크롤 gutter 수정 범위와 직접 관련된 회귀 테스트는 위의 좁은 패턴 실행에서 통과했다.
+
 브라우저 검증:
 
 - 검증 URL: `http://127.0.0.1:4180/dashboard/settings/system/f1-grid-test`

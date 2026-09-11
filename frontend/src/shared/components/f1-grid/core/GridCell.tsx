@@ -19,6 +19,7 @@ type GridCellProps<T extends object> = {
   columnIndex: number;
   showCheckbox?: boolean;
   columnLine: boolean;
+  stripeRows: boolean;
   focused: boolean;
   editing: boolean;
   selected: boolean;
@@ -82,6 +83,7 @@ const areGridCellPropsEqual = <T extends object>(
     prev.columnIndex === next.columnIndex &&
     prev.showCheckbox === next.showCheckbox &&
     prev.columnLine === next.columnLine &&
+    prev.stripeRows === next.stripeRows &&
     prev.focused === next.focused &&
     prev.editing === next.editing &&
     prev.selected === next.selected &&
@@ -111,6 +113,7 @@ const GridCellInner = <T extends object>({
   columnIndex,
   showCheckbox = true,
   columnLine,
+  stripeRows,
   focused,
   editing,
   selected,
@@ -143,259 +146,261 @@ const GridCellInner = <T extends object>({
   pinOffset,
   adornment,
 }: GridCellProps<T>) => {
-    const value = column.getValue?.(row) ?? row[column.field];
-    const editable = isCellEditable(column, row);
-    const cellRenderContext = useMemo(
-      () => ({
-        row,
-        rowId,
-        column,
-        field: column.field,
-        value,
-        rowIndex,
-      }),
-      [column, row, rowId, rowIndex, value],
-    );
-    const displayValue = useMemo(
-      () =>
-        column.type === 'rownumber'
-          ? String(rowIndex + 1)
-          : getCellDisplayValue(column, value as T[keyof T]),
-      [column, rowIndex, value],
-    );
-    const customCellProps = useMemo(
-      () => column.getCellProps?.(cellRenderContext) ?? {},
-      [cellRenderContext, column],
-    );
-    const customCellStyle = useMemo(
-      () => column.getCellStyle?.(cellRenderContext),
-      [cellRenderContext, column],
-    );
-    const mergedCellStyle = useMemo(
-      () => ({
-        ...(customCellStyle ?? {}),
-        ...(customCellProps.style ?? {}),
-      }),
-      [customCellStyle, customCellProps.style],
-    );
-    const hideRangeStartBorder = rangeStart && !editing;
-    const activeHighlight =
-      !selectionRangeActive &&
-      (focused || editing || mergeGroupActive) &&
-      !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
-    const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
-    const cellClassName = useMemo(
-      () => [customCellProps.className].filter(Boolean).join(' ') || undefined,
-      [customCellProps.className],
-    );
-    const handleBlurCapture = useCallback(
-      (event: FocusEvent<HTMLElement>) => {
-        const nextTarget = event.relatedTarget;
-        if (
-          nextTarget instanceof Node &&
-          event.currentTarget.contains(nextTarget)
-        ) {
-          return;
-        }
-        const hasOpenEditorPopup = Boolean(
-          document.querySelector(
-            '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
-          ),
-        );
-        if (hasOpenEditorPopup) return;
-        onBlur?.();
-      },
-      [onBlur],
-    );
+  const value = column.getValue?.(row) ?? row[column.field];
+  const editable = isCellEditable(column, row);
+  const cellRenderContext = useMemo(
+    () => ({
+      row,
+      rowId,
+      column,
+      field: column.field,
+      value,
+      rowIndex,
+    }),
+    [column, row, rowId, rowIndex, value],
+  );
+  const displayValue = useMemo(
+    () =>
+      column.type === 'rownumber'
+        ? String(rowIndex + 1)
+        : getCellDisplayValue(column, value as T[keyof T]),
+    [column, rowIndex, value],
+  );
+  const customCellProps = useMemo(
+    () => column.getCellProps?.(cellRenderContext) ?? {},
+    [cellRenderContext, column],
+  );
+  const customCellStyle = useMemo(
+    () => column.getCellStyle?.(cellRenderContext),
+    [cellRenderContext, column],
+  );
+  const mergedCellStyle = useMemo(
+    () => ({
+      ...(customCellStyle ?? {}),
+      ...(customCellProps.style ?? {}),
+    }),
+    [customCellStyle, customCellProps.style],
+  );
+  const hideRangeStartBorder = rangeStart && !editing;
+  const activeHighlight =
+    !selectionRangeActive &&
+    (focused || editing || mergeGroupActive) &&
+    !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
+  const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
+  const cellClassName = useMemo(
+    () => [customCellProps.className].filter(Boolean).join(' ') || undefined,
+    [customCellProps.className],
+  );
+  const handleBlurCapture = useCallback(
+    (event: FocusEvent<HTMLElement>) => {
+      const nextTarget = event.relatedTarget;
+      if (
+        nextTarget instanceof Node &&
+        event.currentTarget.contains(nextTarget)
+      ) {
+        return;
+      }
+      const hasOpenEditorPopup = Boolean(
+        document.querySelector(
+          '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
+        ),
+      );
+      if (hasOpenEditorPopup) return;
+      onBlur?.();
+    },
+    [onBlur],
+  );
 
-    return (
-      <Box
-        key={String(column.field)}
-        role="gridcell"
-        aria-label={
-          customCellProps['aria-label'] ??
-          (adornment && !merged ? displayValue : undefined)
-        }
-        data-grid-error={errorMessage}
-        data-dirty-cell={dirtyCell ? 'true' : 'false'}
-        title={customCellProps.title ?? errorMessage ?? undefined}
-        className={cellClassName}
-        style={mergedCellStyle}
-        tabIndex={focused ? 0 : -1}
-        ref={onCellRef}
-        onClick={onFocus}
-        onMouseDown={onMouseDown}
-        onMouseEnter={onMouseEnter}
-        onMouseUp={onMouseUp}
-        onBlurCapture={handleBlurCapture}
-        onDoubleClick={onDoubleClick}
-        onKeyDown={onKeyDown}
-        data-grid-selected={selected ? 'true' : 'false'}
-        sx={{
-          gridColumn: columnIndex + (showCheckbox ? 2 : 1),
-          minHeight: 0,
-          minWidth: 0,
-          width: '100%',
-          maxWidth: '100%',
-          overflow: activeHighlight ? 'visible' : 'hidden',
-          boxSizing: 'border-box',
-          p: column.type === 'checkbox' ? 0.25 : 0.5,
-          display: 'flex',
-          alignItems: 'center',
-          alignSelf: 'stretch',
-          height: '100%',
-          justifyContent: toJustifyContent(
-            column.align ??
-              (column.type === 'number' || column.type === 'rownumber'
-                ? 'right'
-                : 'left'),
-          ),
-          cursor: editing ? 'text' : 'default',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          borderLeft: hideRangeStartBorder
-            ? 0
-            : columnLine && columnIndex > 0
-              ? 1
-              : 0,
-          borderLeftColor:
-            hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
-          gridRow: mergeInfo?.isStart
-            ? `${renderRowIndex + 1} / span ${mergeInfo.span}`
-            : renderRowIndex + 1,
-          borderTop: hideRangeStartBorder ? 0 : merged ? 0 : 1,
-          borderBottom: getGridCellBottomBorder(
-            isLastRow,
-            merged,
-            mergeInfo?.isStart,
-            mergeInfo?.span,
-            mergeEndsAtLastRow,
-          ),
-          borderColor:
-            hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
-          opacity: mergedCellHidden ? 0 : 1,
-          pointerEvents: 'auto',
-          position: pinOffset ? 'sticky' : 'relative',
-          left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
-          right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
-          zIndex: pinOffset ? 2 : undefined,
-          bgcolor: pinOffset
-            ? 'background.paper'
-            : errorMessage
-              ? 'error.lighter'
+  return (
+    <Box
+      key={String(column.field)}
+      role="gridcell"
+      aria-label={
+        customCellProps['aria-label'] ??
+        (adornment && !merged ? displayValue : undefined)
+      }
+      data-grid-error={errorMessage}
+      data-dirty-cell={dirtyCell ? 'true' : 'false'}
+      data-f1-grid-column-line={String(columnLine)}
+      data-f1-grid-striped={String(stripeRows && rowIndex % 2 === 1)}
+      title={customCellProps.title ?? errorMessage ?? undefined}
+      className={cellClassName}
+      style={mergedCellStyle}
+      tabIndex={focused ? 0 : -1}
+      ref={onCellRef}
+      onClick={onFocus}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseUp={onMouseUp}
+      onBlurCapture={handleBlurCapture}
+      onDoubleClick={onDoubleClick}
+      onKeyDown={onKeyDown}
+      data-grid-selected={selected ? 'true' : 'false'}
+      sx={{
+        gridColumn: columnIndex + (showCheckbox ? 2 : 1),
+        minHeight: 0,
+        minWidth: 0,
+        width: '100%',
+        maxWidth: '100%',
+        overflow: activeHighlight ? 'visible' : 'hidden',
+        boxSizing: 'border-box',
+        p: column.type === 'checkbox' ? 0.25 : 0.5,
+        display: 'flex',
+        alignItems: 'center',
+        alignSelf: 'stretch',
+        height: '100%',
+        justifyContent: toJustifyContent(
+          column.align ??
+            (column.type === 'number' || column.type === 'rownumber'
+              ? 'right'
+              : 'left'),
+        ),
+        cursor: editing ? 'text' : 'default',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        borderLeft: hideRangeStartBorder
+          ? 0
+          : columnLine && columnIndex > 0
+            ? 1
+            : 0,
+        borderLeftColor:
+          hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
+        gridRow: mergeInfo?.isStart
+          ? `${renderRowIndex + 1} / span ${mergeInfo.span}`
+          : renderRowIndex + 1,
+        borderTop: hideRangeStartBorder ? 0 : merged ? 0 : 1,
+        borderBottom: getGridCellBottomBorder(
+          isLastRow,
+          merged,
+          mergeInfo?.isStart,
+          mergeInfo?.span,
+          mergeEndsAtLastRow,
+        ),
+        borderColor:
+          hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
+        opacity: mergedCellHidden ? 0 : 1,
+        pointerEvents: 'auto',
+        position: pinOffset ? 'sticky' : 'relative',
+        left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
+        right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
+        zIndex: pinOffset ? 2 : undefined,
+        bgcolor: pinOffset
+          ? 'background.paper'
+          : errorMessage
+            ? 'error.lighter'
+            : undefined,
+        boxShadow: pinOffset
+          ? pinOffset.shadow === false
+            ? undefined
+            : pinOffset.side === 'left'
+              ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+              : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
+          : errorMessage
+            ? 'inset 0 0 0 1px'
+            : undefined,
+        backgroundColor:
+          selected && !focused && !editing
+            ? 'rgba(25, 118, 210, 0.045)'
+            : stripeRows && rowIndex % 2 === 1 && !pinOffset && !errorMessage
+              ? 'rgba(148, 163, 184, 0.04)'
               : undefined,
-          boxShadow: pinOffset
-            ? pinOffset.shadow === false
-              ? undefined
-              : pinOffset.side === 'left'
-                ? '2px 0 4px -2px rgba(0, 0, 0, 0.32)'
-                : '-2px 0 4px -2px rgba(0, 0, 0, 0.32)'
-            : errorMessage
-              ? 'inset 0 0 0 1px'
-              : undefined,
-          backgroundColor:
-            selected && !focused && !editing
-              ? 'rgba(25, 118, 210, 0.045)'
-              : undefined,
-          color: errorMessage ? 'error.main' : undefined,
-          outline: activeHighlight ? '2px solid' : 'none',
-          outlineColor: 'primary.main',
-          outlineOffset: -2,
-          textAlign:
-            column.align ?? (column.type === 'number' ? 'right' : 'left'),
-        }}
-      >
-        {dirtyCell && !editing ? (
+        color: errorMessage ? 'error.main' : undefined,
+        outline: activeHighlight ? '2px solid' : 'none',
+        outlineColor: 'primary.main',
+        outlineOffset: -2,
+        textAlign:
+          column.align ?? (column.type === 'number' ? 'right' : 'left'),
+      }}
+    >
+      {dirtyCell && !editing ? (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            borderTop: '8px solid',
+            borderTopColor: 'error.main',
+            borderRight: '8px solid transparent',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      ) : null}
+      {merged ? null : column.type === 'checkbox' ? (
+        <Checkbox
+          size="small"
+          checked={Boolean(value)}
+          disabled={!editable}
+          slotProps={{
+            input: {
+              'aria-label': `${column.headerName} ${rowId}`,
+            },
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            if (!editable) return;
+            onCheckboxChange(event.target.checked);
+          }}
+        />
+      ) : editing ? (
+        <CellEditor
+          column={column}
+          value={draftValue}
+          onChange={onDraftChange}
+          onKeyDown={onKeyDown}
+          onSelectChange={onSelectChange}
+          onCodePick={onCodePick}
+        />
+      ) : column.renderCell ? (
+        <>
+          {adornment}
+          {column.renderCell(cellRenderContext)}
+        </>
+      ) : (
+        <>
+          {adornment}
           <Box
-            aria-hidden
+            component="span"
+            title={displayValue}
             sx={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: 0,
-              height: 0,
-              borderTop: '8px solid',
-              borderTopColor: 'error.main',
-              borderRight: '8px solid transparent',
-              pointerEvents: 'none',
-              zIndex: 1,
+              display: 'block',
+              flex: '1 1 auto',
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              cursor: 'inherit',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              whiteSpace:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'normal'
+                  : 'nowrap',
+              overflowWrap:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'anywhere'
+                  : 'normal',
+              wordBreak:
+                column.wrapText && rowHeight > defaultRowHeight
+                  ? 'break-word'
+                  : 'normal',
             }}
-          />
-        ) : null}
-        {merged ? null : column.type === 'checkbox' ? (
-          <Checkbox
-            size="small"
-            checked={Boolean(value)}
-            disabled={!editable}
-            slotProps={{
-              input: {
-                'aria-label': `${column.headerName} ${rowId}`,
-              },
-            }}
-            onClick={(event) => event.stopPropagation()}
-            onChange={(event) => {
-              if (!editable) return;
-              onCheckboxChange(event.target.checked);
-            }}
-          />
-        ) : editing ? (
-          <CellEditor
-            column={column}
-            value={draftValue}
-            onChange={onDraftChange}
-            onKeyDown={onKeyDown}
-            onSelectChange={onSelectChange}
-            onCodePick={onCodePick}
-          />
-        ) : column.renderCell ? (
-          <>
-            {adornment}
-            {column.renderCell(cellRenderContext)}
-          </>
-        ) : (
-          <>
-            {adornment}
-            <Box
-              component="span"
-              title={displayValue}
-              sx={{
-                display: 'block',
-                flex: '1 1 auto',
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                cursor: 'inherit',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                whiteSpace:
-                  column.wrapText && rowHeight > defaultRowHeight
-                    ? 'normal'
-                    : 'nowrap',
-                overflowWrap:
-                  column.wrapText && rowHeight > defaultRowHeight
-                    ? 'anywhere'
-                    : 'normal',
-                wordBreak:
-                  column.wrapText && rowHeight > defaultRowHeight
-                    ? 'break-word'
-                    : 'normal',
-              }}
-            >
-              {displayValue}
-            </Box>
-          </>
-        )}
-      </Box>
-    );
+          >
+            {displayValue}
+          </Box>
+        </>
+      )}
+    </Box>
+  );
 };
 
-export const GridCell = memo(
-  GridCellInner as any,
-  (prev: any, next: any) =>
-    areGridCellPropsEqual(
-      prev as GridCellProps<object>,
-      next as GridCellProps<object>,
-    ),
+export const GridCell = memo(GridCellInner as any, (prev: any, next: any) =>
+  areGridCellPropsEqual(
+    prev as GridCellProps<object>,
+    next as GridCellProps<object>,
+  ),
 ) as any;

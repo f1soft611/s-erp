@@ -74,7 +74,16 @@ export const f1GridDocs: F1GridDoc[] = [
             'number | string',
             '그리드 컨테이너 높이와 최소/최대 높이 제한',
           ],
-          ['columnLine', 'boolean', '컬럼 사이 세로 구분선 표시 여부'],
+          [
+            'columnLine',
+            'boolean',
+            '컬럼 사이 세로 구분선 표시 여부 (기본값 true)',
+          ],
+          [
+            'stripeRows',
+            'boolean',
+            '홀수 행 배경 스트라이프 표시 여부 (기본값 true)',
+          ],
           ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
           ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],

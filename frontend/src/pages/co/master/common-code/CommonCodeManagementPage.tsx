@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Box, TextField, Typography } from '@mui/material';
+import { Box, TextField } from '@mui/material';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
@@ -49,7 +49,8 @@ export function CommonCodeManagementPage({
 }: CommonCodeManagementPageProps) {
   const { showSuccess } = useNotification();
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
-  const [groups, setGroups] = useState<CommonCodeGroupRow[]>(commonCodeGroupSeed);
+  const [groups, setGroups] =
+    useState<CommonCodeGroupRow[]>(commonCodeGroupSeed);
   const [items, setItems] = useState<CommonCodeItemRow[]>(commonCodeItemSeed);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState(
@@ -114,7 +115,8 @@ export function CommonCodeManagementPage({
   }, []);
 
   const requestRefresh = useCallback(() => {
-    if (panelDirty) {
+    const liveDirty = panelRef.current?.getDirtyState() ?? panelDirty;
+    if (liveDirty) {
       setRefreshConfirmOpen(true);
       return;
     }
@@ -193,11 +195,6 @@ export function CommonCodeManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
-      <Box sx={{ px: 2, pt: 2, pb: 0.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          공통코드 관리
-        </Typography>
-      </Box>
       <PageSearchArea>
         <TextField
           size="small"
