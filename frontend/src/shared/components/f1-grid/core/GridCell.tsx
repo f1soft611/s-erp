@@ -10,7 +10,11 @@ import {
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
 import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
-import { getCellDisplayValue, isCellEditable } from '../utils/grid.utils';
+import {
+  getCellDisplayValue,
+  isCellEditable,
+  isGridCheckboxChecked,
+} from '../utils/grid.utils';
 
 type GridCellProps<T extends object> = {
   row: T;
@@ -330,7 +334,7 @@ const GridCellInner = <T extends object>({
       {merged ? null : column.type === 'checkbox' ? (
         <Checkbox
           size="small"
-          checked={Boolean(value)}
+          checked={isGridCheckboxChecked(value)}
           disabled={!editable}
           slotProps={{
             input: {

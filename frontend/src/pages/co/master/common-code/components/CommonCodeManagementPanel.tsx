@@ -3,17 +3,10 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
-import {
-  createCommonCodeGroup,
-  createCommonCodeItem,
-  deleteCommonCodeGroup,
-  deleteCommonCodeItem,
-  updateCommonCodeGroup,
-  updateCommonCodeItem,
-} from '../services/commonCodeManagement.service';
 import {
   Box,
   Card,
@@ -26,7 +19,13 @@ import {
   ListItemText,
   Typography,
 } from '@mui/material';
+import {
+  buildCommonCodeBatchPayload,
+  fetchCommonCodeItems,
+  saveCommonCodeBatch,
+} from '../services/commonCodeManagement.service';
 import Splitter from '../../../../../shared/components/Splitter';
+import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import {
   F1Grid,
   F1Tree,
@@ -42,22 +41,21 @@ import type {
 
 type CommonCodeManagementPanelProps = {
   groups: CommonCodeGroupRow[];
-  items: CommonCodeItemRow[];
-  selectedGroupId: string;
-  canExportExcel: boolean;
-  onSelectedGroupChange: (groupId: string) => void;
-  onDirtyChange?: (dirty: boolean) => void;
-  onGroupsSaved?: (groups: CommonCodeGroupRow[]) => void;
-  onItemsSaved?: (items: CommonCodeItemRow[]) => void;
+  searchQuery?: string;
+  canExportExcel?: boolean;
+  onGroupsSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
   onSaveSuccess?: (message: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
   onError?: (message: string) => void;
   commonCodeGridKey?: number;
+  groupsLoading?: boolean;
 };
 
 export type CommonCodeManagementPanelHandle = {
   saveCurrentChanges: () => Promise<void>;
+  deleteSelectedRows?: () => void;
   exportCurrentRows: () => void;
-  getDirtyState: () => boolean;
+  getDirtyState?: () => boolean;
 };
 
 const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
@@ -66,17 +64,94 @@ const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
   deletedRows: [],
 });
 
+function normalizeRowId(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+export function resolveCreatedGroupId(response: unknown): string | null {
+  const candidate = (response as { item?: unknown } | null)?.item ?? response;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const source = candidate as Record<string, unknown>;
+  for (const field of ['commonCodeGroupId', 'groupId', 'id']) {
+    const value = source[field];
+    const normalized = normalizeRowId(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+export function resolveCreatedGroupIdMap(
+  response: unknown,
+  tempGroupIds: Array<string | number | null | undefined>,
+): Map<string, string> {
+  const candidate = (response as { item?: unknown } | null)?.item ?? response;
+  if (!candidate || typeof candidate !== 'object') {
+    return new Map();
+  }
+
+  const source = candidate as Record<string, unknown>;
+  const savedGroups = Array.isArray(source.groups)
+    ? (source.groups as Array<Record<string, unknown>>)
+    : [];
+  const tempIds = tempGroupIds
+    .map((value) => normalizeRowId(value))
+    .filter((value) => value.startsWith('new-common-group-'));
+
+  const result = new Map<string, string>();
+  tempIds.forEach((tempId, index) => {
+    const persistedGroup = savedGroups[index];
+    const persistedId = persistedGroup
+      ? resolveCreatedGroupId(persistedGroup)
+      : null;
+    if (persistedId) {
+      result.set(tempId, persistedId);
+    }
+  });
+
+  return result;
+}
+
+const createGroupRow = (): CommonCodeGroupRow => ({
+  id: `new-common-group-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  groupCode: '',
+  groupNm: '',
+  parentGroupId: null,
+  groupDc: '',
+  sortOrder: 0,
+  useAt: 'Y',
+});
+
+const createItemRow = (groupId: string): CommonCodeItemRow => ({
+  id: `new-common-item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  groupId,
+  itemCode: '',
+  itemNm: '',
+  parentItemId: null,
+  parentItemNm: '',
+  sortOrder: 0,
+  useAt: 'Y',
+  itemDc: '',
+});
+
 const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
   {
     field: 'groupCode',
     headerName: '그룹코드',
     editable: true,
+    required: true,
     width: 120,
   },
   {
     field: 'groupNm',
     headerName: '그룹명',
     editable: true,
+    required: true,
     pinned: 'left',
     flex: 1,
   },
@@ -107,12 +182,14 @@ const itemColumns = (
     field: 'itemCode',
     headerName: '상세코드',
     editable: true,
+    required: true,
     width: 140,
   },
   {
     field: 'itemNm',
     headerName: '상세코드명',
     editable: true,
+    required: true,
     flex: 1,
     width: 220,
   },
@@ -131,7 +208,6 @@ const itemColumns = (
   {
     field: 'useAt',
     headerName: '사용여부',
-    editable: true,
     width: 100,
     type: 'checkbox',
     headerCheckbox: true,
@@ -169,196 +245,180 @@ export const CommonCodeManagementPanel = forwardRef<
 >(function CommonCodeManagementPanel(
   {
     groups,
-    items,
-    selectedGroupId,
-    canExportExcel,
-    onSelectedGroupChange,
-    onDirtyChange,
+    searchQuery = '',
+    canExportExcel = false,
     onGroupsSaved,
-    onItemsSaved,
     onSaveSuccess,
+    onDirtyChange,
     onError,
     commonCodeGridKey = 0,
+    groupsLoading = false,
   },
   ref,
 ) {
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [itemRows, setItemRows] = useState<CommonCodeItemRow[]>([]);
+  const [itemLoading, setItemLoading] = useState(false);
+  const [itemError, setItemError] = useState('');
+  const [itemGridKey, setItemGridKey] = useState(0);
+  const [parentPickerOpen, setParentPickerOpen] = useState(false);
+  const [parentPickerOptions, setParentPickerOptions] = useState<
+    CommonCodeItemRow[]
+  >([]);
+  const [groupGridDirty, setGroupGridDirty] = useState(false);
+  const [itemGridDirty, setItemGridDirty] = useState(false);
+  const [pendingGroupId, setPendingGroupId] = useState<string>();
+  const [groupSwitchDialogOpen, setGroupSwitchDialogOpen] = useState(false);
+  const [_saving, setSaving] = useState(false);
+
   const treeRef = useRef<F1TreeRef<CommonCodeGroupRow>>(null);
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
   const parentPickerApplyRef = useRef<
     ((changes: Partial<CommonCodeItemRow>) => void) | null
   >(null);
-  const [parentPickerOpen, setParentPickerOpen] = useState(false);
-  const [parentPickerOptions, setParentPickerOptions] = useState<
-    CommonCodeItemRow[]
-  >([]);
-  const [groupChanges, setGroupChanges] = useState<
-    F1GridChanges<CommonCodeGroupRow>
-  >({
-    insertedRows: [],
-    updatedRows: [],
-    deletedRows: [],
-  });
-  const [itemChanges, setItemChanges] = useState<
-    F1GridChanges<CommonCodeItemRow>
-  >({
-    insertedRows: [],
-    updatedRows: [],
-    deletedRows: [],
-  });
+  const itemRequestIdRef = useRef(0);
+  const selectedGroupIdRef = useRef(selectedGroupId);
+  const itemGridDirtyRef = useRef(false);
+  const saveInFlightRef = useRef<Promise<void> | undefined>(undefined);
 
   useEffect(() => {
-    const isDirty =
-      groupChanges.insertedRows.length > 0 ||
-      groupChanges.updatedRows.length > 0 ||
-      groupChanges.deletedRows.length > 0 ||
-      itemChanges.insertedRows.length > 0 ||
-      itemChanges.updatedRows.length > 0 ||
-      itemChanges.deletedRows.length > 0;
+    selectedGroupIdRef.current = selectedGroupId;
+  }, [selectedGroupId]);
 
-    onDirtyChange?.(isDirty);
-  }, [groupChanges, itemChanges, onDirtyChange]);
-
-  const getDirtyState = useCallback(() => {
-    const nextGroupChanges =
-      treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
-    const nextItemChanges =
-      gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
-
-    return (
-      nextGroupChanges.insertedRows.length > 0 ||
-      nextGroupChanges.updatedRows.length > 0 ||
-      nextGroupChanges.deletedRows.length > 0 ||
-      nextItemChanges.insertedRows.length > 0 ||
-      nextItemChanges.updatedRows.length > 0 ||
-      nextItemChanges.deletedRows.length > 0
+  const filteredGroups = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return groups;
+    return groups.filter((group) =>
+      [group.groupCode, group.groupNm, group.groupDc]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
     );
-  }, []);
+  }, [groups, searchQuery]);
 
-  const saveCurrentChanges = useCallback(async () => {
-    const nextGroupChanges =
-      treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
-    const nextItemChanges =
-      gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
-    const hasGroupChanges =
-      nextGroupChanges.insertedRows.length > 0 ||
-      nextGroupChanges.updatedRows.length > 0 ||
-      nextGroupChanges.deletedRows.length > 0;
-    const hasItemChanges =
-      nextItemChanges.insertedRows.length > 0 ||
-      nextItemChanges.updatedRows.length > 0 ||
-      nextItemChanges.deletedRows.length > 0;
+  const loadItemRows = useCallback(
+    async (groupId: string, options: { silent?: boolean } = {}) => {
+      const requestId = ++itemRequestIdRef.current;
+      if (!groupId || groupId.startsWith('new-common-group-')) {
+        setItemRows([]);
+        setItemError('');
+        itemGridDirtyRef.current = false;
+        setItemGridDirty(false);
+        setItemGridKey((current) => current + 1);
+        if (!options.silent) {
+          setItemLoading(false);
+        }
+        return;
+      }
 
-    if (!hasGroupChanges && !hasItemChanges) {
+      if (!options.silent) {
+        setItemLoading(true);
+      }
+      setItemError('');
+      try {
+        const result = await fetchCommonCodeItems(groupId);
+        if (
+          requestId !== itemRequestIdRef.current ||
+          selectedGroupIdRef.current !== groupId
+        ) {
+          return;
+        }
+        setItemRows(result);
+        itemGridDirtyRef.current = false;
+        setItemGridDirty(false);
+        setItemGridKey((current) => current + 1);
+      } catch (error) {
+        if (requestId !== itemRequestIdRef.current) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : '공통코드 상세 목록을 불러오지 못했습니다.';
+        setItemRows([]);
+        setItemError(message);
+        onError?.(message);
+      } finally {
+        if (requestId === itemRequestIdRef.current && !options.silent) {
+          setItemLoading(false);
+        }
+      }
+    },
+    [onError],
+  );
+
+  useEffect(() => {
+    if (!filteredGroups.length) {
+      setSelectedGroupId('');
       return;
     }
-
-    try {
-      const rowsToValidate = [
-        ...nextGroupChanges.insertedRows,
-        ...nextGroupChanges.updatedRows,
-        ...nextItemChanges.insertedRows,
-        ...nextItemChanges.updatedRows,
-      ];
-
-      for (const row of rowsToValidate) {
-        if ('groupCode' in row) {
-          if (!String(row.groupCode ?? '').trim()) {
-            throw new Error('그룹 코드는 필수입니다.');
-          }
-        }
-        if ('itemCode' in row) {
-          if (!String(row.itemCode ?? '').trim()) {
-            throw new Error('상세코드는 필수입니다.');
-          }
-        }
-      }
-
-      for (const row of nextGroupChanges.insertedRows) {
-        await createCommonCodeGroup({
-          groupCode: row.groupCode,
-          groupNm: row.groupNm,
-          groupDc: row.groupDc,
-          parentGroupId: row.parentGroupId,
-          sortOrder: row.sortOrder,
-          useAt: row.useAt,
-        });
-      }
-
-      for (const row of nextGroupChanges.updatedRows) {
-        await updateCommonCodeGroup(String(row.id), {
-          groupCode: row.groupCode,
-          groupNm: row.groupNm,
-          groupDc: row.groupDc,
-          parentGroupId: row.parentGroupId,
-          sortOrder: row.sortOrder,
-          useAt: row.useAt,
-        });
-      }
-
-      for (const row of nextGroupChanges.deletedRows) {
-        await deleteCommonCodeGroup(String(row.id));
-      }
-
-      for (const row of nextItemChanges.insertedRows) {
-        await createCommonCodeItem(String(row.groupId), {
-          itemCode: row.itemCode,
-          itemNm: row.itemNm,
-          itemDc: row.itemDc,
-          parentItemId: row.parentItemId,
-          sortOrder: row.sortOrder,
-          useAt: row.useAt,
-        });
-      }
-
-      for (const row of nextItemChanges.updatedRows) {
-        await updateCommonCodeItem(String(row.groupId), String(row.id), {
-          itemCode: row.itemCode,
-          itemNm: row.itemNm,
-          itemDc: row.itemDc,
-          parentItemId: row.parentItemId,
-          sortOrder: row.sortOrder,
-          useAt: row.useAt,
-        });
-      }
-
-      for (const row of nextItemChanges.deletedRows) {
-        await deleteCommonCodeItem(String(row.groupId), String(row.id));
-      }
-
-      const nextGroups = treeRef.current?.getActiveRows() ?? groups;
-      const nextItems = gridRef.current?.getActiveRows() ?? items;
-
-      onGroupsSaved?.(nextGroups);
-      onItemsSaved?.(nextItems);
-      setGroupChanges(emptyChanges<CommonCodeGroupRow>());
-      setItemChanges(emptyChanges<CommonCodeItemRow>());
-      onSaveSuccess?.('공통코드를 저장했습니다.');
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : '공통코드 저장에 실패했습니다.';
-      onError?.(message);
-      throw error;
+    if (selectedGroupId.startsWith('new-common-group-')) {
+      return;
     }
-  }, [groups, items, onError, onGroupsSaved, onItemsSaved, onSaveSuccess]);
+    if (
+      !filteredGroups.some(
+        (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
+      )
+    ) {
+      setSelectedGroupId(String(filteredGroups[0].id));
+    }
+  }, [filteredGroups, selectedGroupId]);
 
-  const selectedGroup =
-    groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? null;
-  const selectedGroupItems = selectedGroup
-    ? items.filter((item) => item.groupId === selectedGroup.id)
-    : [];
+  const selectedGroup = filteredGroups.find(
+    (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
+  );
+
+  useEffect(() => {
+    void loadItemRows(selectedGroupId);
+  }, [loadItemRows, selectedGroupId]);
+
+  const handleGroupSelection = useCallback((rowIds: Array<string | number>) => {
+    const nextGroupId = rowIds[0] == null ? '' : String(rowIds[0]);
+    if (!nextGroupId || nextGroupId === selectedGroupIdRef.current) return;
+    if (itemGridDirtyRef.current) {
+      setPendingGroupId(nextGroupId);
+      setGroupSwitchDialogOpen(true);
+      return;
+    }
+    setSelectedGroupId(nextGroupId);
+  }, []);
+
+  const handleGroupGridChanges = useCallback(
+    (changes: F1GridChanges<CommonCodeGroupRow>) => {
+      setGroupGridDirty(
+        changes.insertedRows.length > 0 ||
+          changes.updatedRows.length > 0 ||
+          changes.deletedRows.length > 0,
+      );
+    },
+    [],
+  );
+
+  const handleItemGridChanges = useCallback(
+    (changes: F1GridChanges<CommonCodeItemRow>) => {
+      const dirty =
+        changes.insertedRows.length > 0 ||
+        changes.updatedRows.length > 0 ||
+        changes.deletedRows.length > 0;
+      itemGridDirtyRef.current = dirty;
+      setItemGridDirty(dirty);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    onDirtyChange?.(groupGridDirty || itemGridDirty);
+  }, [groupGridDirty, itemGridDirty, onDirtyChange]);
+
   const parentGroup =
     selectedGroup && selectedGroup.parentGroupId
-      ? (groups.find((group) => group.id === selectedGroup.parentGroupId) ??
-        null)
+      ? (filteredGroups.find(
+          (group) =>
+            normalizeRowId(group.id) ===
+            normalizeRowId(selectedGroup.parentGroupId),
+        ) ?? null)
       : null;
-  const parentGroupItems = parentGroup
-    ? items.filter((item) => item.groupId === parentGroup.id)
-    : [];
 
   const openParentPicker = useCallback(
-    (
+    async (
       row: CommonCodeItemRow,
       applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
     ) => {
@@ -368,52 +428,196 @@ export const CommonCodeManagementPanel = forwardRef<
       }
 
       parentPickerApplyRef.current = applyPatch;
-      setParentPickerOptions(
-        parentGroupItems.filter((item) => item.id !== row.id),
-      );
-      setParentPickerOpen(true);
+      try {
+        const parentItems = await fetchCommonCodeItems(String(parentGroup.id));
+        setParentPickerOptions(
+          parentItems.filter(
+            (item) => normalizeRowId(item.id) !== normalizeRowId(row.id),
+          ),
+        );
+        setParentPickerOpen(true);
+      } catch (error) {
+        onError?.('상위 그룹의 상세코드를 불러오지 못했습니다.');
+      }
     },
-    [parentGroup, parentGroupItems],
+    [onError, parentGroup],
   );
 
   const itemGridColumns = itemColumns(
     parentGroup ? openParentPicker : undefined,
   );
 
+  const saveCurrentChanges = useCallback(() => {
+    if (saveInFlightRef.current) return saveInFlightRef.current;
+
+    const savePromise = (async () => {
+      setSaving(true);
+      const groupChanges =
+        treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
+      const groupId = selectedGroupIdRef.current;
+      const itemChanges =
+        gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
+
+      const hasGroupChanges =
+        groupChanges.insertedRows.length > 0 ||
+        groupChanges.updatedRows.length > 0 ||
+        groupChanges.deletedRows.length > 0;
+      const hasItemChanges =
+        itemChanges.insertedRows.length > 0 ||
+        itemChanges.updatedRows.length > 0 ||
+        itemChanges.deletedRows.length > 0;
+
+      if (!hasGroupChanges && !hasItemChanges) {
+        return;
+      }
+
+      try {
+        const rowsToValidate = [
+          ...groupChanges.insertedRows,
+          ...groupChanges.updatedRows,
+          ...itemChanges.insertedRows,
+          ...itemChanges.updatedRows,
+        ];
+
+        for (const row of rowsToValidate) {
+          if ('groupCode' in row) {
+            if (!String(row.groupCode ?? '').trim()) {
+              throw new Error('그룹 코드는 필수입니다.');
+            }
+            if (!String(row.groupNm ?? '').trim()) {
+              throw new Error('그룹명은 필수입니다.');
+            }
+          }
+          if ('itemCode' in row) {
+            if (!String(row.itemCode ?? '').trim()) {
+              throw new Error('상세코드는 필수입니다.');
+            }
+            if (!String(row.itemNm ?? '').trim()) {
+              throw new Error('상세코드명은 필수입니다.');
+            }
+          }
+        }
+
+        const batchPayload = buildCommonCodeBatchPayload({
+          groups: groupChanges,
+          items: itemChanges,
+        });
+
+        const response = await saveCommonCodeBatch(batchPayload);
+        const createdGroupIdMap = resolveCreatedGroupIdMap(
+          response,
+          groupChanges.insertedRows.map((row) => row.id),
+        );
+        const persistedGroupId =
+          (groupId && createdGroupIdMap.get(String(groupId))) ?? groupId;
+
+        if (
+          persistedGroupId &&
+          persistedGroupId !== selectedGroupIdRef.current
+        ) {
+          selectedGroupIdRef.current = persistedGroupId;
+          setSelectedGroupId(persistedGroupId);
+        }
+
+        await onGroupsSaved?.();
+
+        if (
+          persistedGroupId &&
+          !persistedGroupId.startsWith('new-common-group-')
+        ) {
+          await loadItemRows(persistedGroupId, { silent: true });
+        }
+
+        onSaveSuccess?.('공통코드를 저장했습니다.');
+        setGroupGridDirty(false);
+        setItemGridDirty(false);
+        itemGridDirtyRef.current = false;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : '공통코드 저장에 실패했습니다.';
+        onError?.(message);
+        throw error;
+      } finally {
+        setSaving(false);
+      }
+    })();
+
+    saveInFlightRef.current = savePromise;
+    void savePromise.then(
+      () => {
+        if (saveInFlightRef.current === savePromise) {
+          saveInFlightRef.current = undefined;
+        }
+      },
+      () => {
+        if (saveInFlightRef.current === savePromise) {
+          saveInFlightRef.current = undefined;
+        }
+      },
+    );
+    return savePromise;
+  }, [loadItemRows, onError, onGroupsSaved, onSaveSuccess]);
+
+  const closeGroupSwitchDialog = useCallback(() => {
+    setGroupSwitchDialogOpen(false);
+    setPendingGroupId(undefined);
+    treeRef.current?.clearSelection();
+  }, []);
+
+  const discardItemsAndMove = useCallback(() => {
+    if (!pendingGroupId) return;
+    ++itemRequestIdRef.current;
+    itemGridDirtyRef.current = false;
+    setGroupGridDirty(false);
+    setItemGridDirty(false);
+    setItemGridKey((current) => current + 1);
+    const nextGroupId = pendingGroupId;
+    closeGroupSwitchDialog();
+    selectedGroupIdRef.current = nextGroupId;
+    setSelectedGroupId(nextGroupId);
+  }, [closeGroupSwitchDialog, pendingGroupId]);
+
+  const exportCurrentRows = useCallback(() => {
+    const rows = gridRef.current?.getActiveRows() ?? [];
+    if (!rows.length) return;
+
+    const csv = [
+      itemGridColumns.map((column) => column.headerName).join(','),
+      ...rows.map((row) =>
+        itemGridColumns
+          .map((column) => {
+            const value = row[column.field as keyof CommonCodeItemRow];
+            const stringValue = value == null ? '' : String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          })
+          .join(','),
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'common-code-export.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, [itemGridColumns]);
+
   useImperativeHandle(
     ref,
     () => ({
       saveCurrentChanges,
-      exportCurrentRows: () => {
-        const rows = gridRef.current?.getActiveRows() ?? [];
-        if (!rows.length) return;
-
-        const csv = [
-          itemGridColumns.map((column) => column.headerName).join(','),
-          ...rows.map((row) =>
-            itemGridColumns
-              .map((column) => {
-                const value = row[column.field as keyof CommonCodeItemRow];
-                const stringValue = value == null ? '' : String(value);
-                return `"${stringValue.replace(/"/g, '""')}"`;
-              })
-              .join(','),
-          ),
-        ].join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'common-code-export.csv';
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(url);
+      deleteSelectedRows: () => {
+        gridRef.current?.deleteSelectedRows();
       },
-      getDirtyState,
+      exportCurrentRows,
+      getDirtyState: () => groupGridDirty || itemGridDirty,
     }),
-    [getDirtyState, itemGridColumns, saveCurrentChanges],
+    [exportCurrentRows, groupGridDirty, itemGridDirty, saveCurrentChanges],
   );
 
   return (
@@ -481,7 +685,7 @@ export const CommonCodeManagementPanel = forwardRef<
               <F1Tree
                 key={commonCodeGridKey}
                 ref={treeRef}
-                rows={groups}
+                rows={filteredGroups}
                 columns={groupColumns}
                 rowKey="id"
                 parentKey="parentGroupId"
@@ -489,21 +693,14 @@ export const CommonCodeManagementPanel = forwardRef<
                 height="100%"
                 defaultExpandAll
                 showCheckbox={false}
-                allowAddRowInContextMenu={false}
-                allowDeleteRowInContextMenu={false}
+                createRow={createGroupRow}
+                loading={groupsLoading}
+                allowAddRootInContextMenu={true}
+                allowAddRowInContextMenu={true}
+                allowDeleteRowInContextMenu={true}
                 ariaLabel="공통코드 그룹 트리"
-                onSelectionChange={(rowIds) => {
-                  const nextId = rowIds[0];
-                  if (
-                    typeof nextId === 'string' ||
-                    typeof nextId === 'number'
-                  ) {
-                    onSelectedGroupChange(String(nextId));
-                  }
-                }}
-                onChangesChange={(changes) => {
-                  setGroupChanges(changes);
-                }}
+                onSelectionChange={handleGroupSelection}
+                onChangesChange={handleGroupGridChanges}
               />
             </Box>
           </CardContent>
@@ -559,25 +756,36 @@ export const CommonCodeManagementPanel = forwardRef<
                 >
                   선택 그룹: {selectedGroup.groupNm}
                 </Typography>
-              ) : null}
+              ) : (
+                <Typography variant="subtitle2" color="text.secondary">
+                  선택 그룹이 없습니다
+                </Typography>
+              )}
             </Box>
             <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
-              <F1Grid
-                key={commonCodeGridKey}
-                ref={gridRef}
-                rows={selectedGroupItems}
-                columns={itemGridColumns}
-                rowKey="id"
-                ariaLabel="공통코드 상세코드"
-                height="100%"
-                canExportExcel={canExportExcel}
-                showCheckbox={false}
-                allowAddRowInContextMenu={false}
-                allowDeleteRowInContextMenu={false}
-                onChangesChange={(changes) => {
-                  setItemChanges(changes);
-                }}
-              />
+              {itemError ? (
+                <Typography variant="body2" color="error.main">
+                  {itemError}
+                </Typography>
+              ) : (
+                <F1Grid
+                  key={itemGridKey}
+                  ref={gridRef}
+                  rows={itemRows}
+                  columns={itemGridColumns}
+                  rowKey="id"
+                  ariaLabel="공통코드 상세코드"
+                  height="100%"
+                  canExportExcel={canExportExcel}
+                  showCheckbox={false}
+                  createRow={() => createItemRow(selectedGroup?.id ?? '')}
+                  loading={itemLoading}
+                  allowAddRowInContextMenu={true}
+                  allowDeleteRowInContextMenu={true}
+                  allowDuplicateRowInContextMenu={false}
+                  onChangesChange={handleItemGridChanges}
+                />
+              )}
             </Box>
             <Dialog
               open={parentPickerOpen}
@@ -618,6 +826,15 @@ export const CommonCodeManagementPanel = forwardRef<
           </CardContent>
         </Card>
       </Splitter>
+      <UnsavedChangesConfirmDialog
+        open={Boolean(groupSwitchDialogOpen && pendingGroupId)}
+        title="저장하지 않은 변경사항"
+        description="현재 그룹의 변경사항을 유지하지 않고 다른 그룹으로 이동하시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={closeGroupSwitchDialog}
+        onContinue={discardItemsAndMove}
+      />
     </Box>
   );
 });

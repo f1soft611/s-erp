@@ -63,6 +63,7 @@ import {
   getGridRowId,
   getStateKey,
   isCellEditable,
+  isGridCheckboxChecked,
 } from '../utils/grid.utils';
 import {
   coerceClipboardValue,
@@ -245,6 +246,7 @@ function F1GridInner<T extends object>(
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
+  const gridContainerWidthRef = useRef(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
     () => {
       if (storageKey) {
@@ -442,14 +444,19 @@ function F1GridInner<T extends object>(
   useLayoutEffect(() => {
     const container = gridContainerRef.current;
     if (!container) return;
+
     const updateWidth = () => {
       const nextWidth = container.clientWidth;
-      setGridContainerWidth((current) =>
-        current === nextWidth ? current : nextWidth,
-      );
+      if (!Number.isFinite(nextWidth)) return;
+      if (Math.abs(gridContainerWidthRef.current - nextWidth) < 1) {
+        return;
+      }
+      gridContainerWidthRef.current = nextWidth;
+      setGridContainerWidth(nextWidth);
     };
 
     updateWidth();
+
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', updateWidth);
       return () => window.removeEventListener('resize', updateWidth);
@@ -457,7 +464,10 @@ function F1GridInner<T extends object>(
 
     const observer = new ResizeObserver(updateWidth);
     observer.observe(container);
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   const activeRows = useMemo(
@@ -1425,7 +1435,7 @@ function F1GridInner<T extends object>(
       isCellEditable(column, row),
     );
     const checkedCount = editableRows.filter((row) =>
-      Boolean(column.getValue?.(row) ?? row[column.field]),
+      isGridCheckboxChecked(column.getValue?.(row) ?? row[column.field]),
     ).length;
 
     return {

@@ -17,7 +17,10 @@ import type {
   F1GridFormMode,
   F1GridOption,
 } from '../types/grid.types';
-import { normalizeGridNumberInput } from '../utils/grid.utils';
+import {
+  isGridCheckboxChecked,
+  normalizeGridNumberInput,
+} from '../utils/grid.utils';
 
 export type GridFormFieldProps<T extends object> = {
   column: F1GridColumn<T>;
@@ -128,7 +131,7 @@ export function GridFormField<T extends object>({
           }}
           control={
             <Checkbox
-              checked={Boolean(displayedValue)}
+              checked={isGridCheckboxChecked(displayedValue)}
               size="small"
               slotProps={{
                 input: {

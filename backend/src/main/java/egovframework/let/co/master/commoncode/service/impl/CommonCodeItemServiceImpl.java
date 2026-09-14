@@ -1,5 +1,6 @@
 package egovframework.let.co.master.commoncode.service.impl;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,7 @@ public class CommonCodeItemServiceImpl extends EgovAbstractServiceImpl implement
         ensureGroupBelongsToTenant(tenantId, groupId);
         CommonCodeGroupVO group = findGroupById(tenantId, groupId);
         if (group.getParentGroupId() == null) {
-            return List.of();
+            return Collections.emptyList();
         }
 
         Map<String, Object> params = new HashMap<>();

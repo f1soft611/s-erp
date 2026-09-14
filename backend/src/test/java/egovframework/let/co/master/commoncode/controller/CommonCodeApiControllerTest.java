@@ -30,6 +30,7 @@ import egovframework.com.cmm.LoginVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
+import egovframework.let.co.master.commoncode.service.CommonCodeBatchService;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
 import egovframework.let.co.master.commoncode.service.CommonCodeItemService;
 
@@ -42,12 +43,15 @@ class CommonCodeApiControllerTest {
     @Mock
     private CommonCodeItemService commonCodeItemService;
 
+    @Mock
+    private CommonCodeBatchService commonCodeBatchService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         CommonCodeGroupApiController controller =
-                new CommonCodeGroupApiController(new ResultVoHelper(), commonCodeGroupService, commonCodeItemService);
+                new CommonCodeGroupApiController(new ResultVoHelper(), commonCodeBatchService, commonCodeGroupService, commonCodeItemService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalResolver())
                 .build();
@@ -59,7 +63,7 @@ class CommonCodeApiControllerTest {
         group.setCommonCodeGroupId(1L);
         group.setGroupCode("ATTACH_DOC");
         group.setGroupNm("첨부문서업무");
-        when(commonCodeGroupService.listGroups(eq(1L))).thenReturn(List.of(group));
+        when(commonCodeGroupService.listGroups(eq(1L))).thenReturn(Collections.singletonList(group));
 
         mockMvc.perform(get("/api/v1/co/master/common-code/groups")
                 .principal(authenticationFor()))

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, TextField } from '@mui/material';
-import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
-import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
+import SaveIcon from '@mui/icons-material/Save';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../shared/context/NotificationContext';
-import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type {
   ModuleItem,
   PageContent,
@@ -17,14 +16,8 @@ import {
   CommonCodeManagementPanel,
   type CommonCodeManagementPanelHandle,
 } from './components/CommonCodeManagementPanel';
-import {
-  fetchCommonCodeGroups,
-  fetchCommonCodeItems,
-} from './services/commonCodeManagement.service';
-import type {
-  CommonCodeGroupRow,
-  CommonCodeItemRow,
-} from './types/commonCodeManagement.types';
+import { fetchCommonCodeGroups } from './services/commonCodeManagement.service';
+import type { CommonCodeGroupRow } from './types/commonCodeManagement.types';
 
 type CommonCodeManagementPageProps = {
   selectedModule: ModuleItem;
@@ -50,88 +43,70 @@ export function CommonCodeManagementPage({
   const { showSuccess } = useNotification();
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
   const [groups, setGroups] = useState<CommonCodeGroupRow[]>([]);
-  const [items, setItems] = useState<CommonCodeItemRow[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [panelDirty, setPanelDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [commonCodeGridKey, setCommonCodeGridKey] = useState(0);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const groupRequestIdRef = useRef(0);
 
-  const pageActionPermissions = useMemo(
-    () => ({
+  const pageActionPermissions = useMemo(() => {
+    const writeAllowed = Boolean(
+      selectedMenuPermissions?.create || selectedMenuPermissions?.update,
+    );
+
+    return {
       read: Boolean(selectedMenuPermissions?.read ?? false),
-      write: Boolean(
-        selectedMenuPermissions?.create || selectedMenuPermissions?.update,
-      ),
+      write: writeAllowed,
       excel: Boolean(selectedMenuPermissions?.excel ?? false),
-    }),
-    [selectedMenuPermissions],
+    };
+  }, [selectedMenuPermissions]);
+
+  const loadGroups = useCallback(
+    async ({ showSkeleton = false }: { showSkeleton?: boolean } = {}) => {
+      const requestId = ++groupRequestIdRef.current;
+      setError('');
+      if (showSkeleton) {
+        setPageLoading(true);
+      }
+      try {
+        const result = await fetchCommonCodeGroups();
+        if (requestId === groupRequestIdRef.current) {
+          setGroups(result);
+        }
+      } catch (requestError) {
+        if (requestId === groupRequestIdRef.current) {
+          setGroups([]);
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : '공통코드 목록을 불러오지 못했습니다.',
+          );
+        }
+        throw requestError;
+      } finally {
+        if (requestId === groupRequestIdRef.current && showSkeleton) {
+          setPageLoading(false);
+        }
+      }
+    },
+    [],
   );
 
-  const loadCommonCodeData = useCallback(async () => {
-    setError('');
-
-    try {
-      const nextGroups = await fetchCommonCodeGroups();
-      setGroups(nextGroups);
-
-      const nextSelectedGroupId =
-        selectedGroupId &&
-        nextGroups.some((group) => group.id === selectedGroupId)
-          ? selectedGroupId
-          : (nextGroups.find((group) => group.parentGroupId === null)?.id ??
-            nextGroups[0]?.id ??
-            '');
-
-      setSelectedGroupId(nextSelectedGroupId);
-
-      if (nextSelectedGroupId) {
-        const nextItems = await fetchCommonCodeItems(nextSelectedGroupId);
-        setItems(nextItems);
-      } else {
-        setItems([]);
-      }
-    } catch (requestError) {
-      setGroups([]);
-      setItems([]);
-      setSelectedGroupId('');
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : '공통코드 목록을 불러오지 못했습니다.',
-      );
-    }
-  }, [selectedGroupId]);
-
   useEffect(() => {
-    void loadCommonCodeData();
-  }, [loadCommonCodeData]);
+    void loadGroups({ showSkeleton: true }).catch(() => undefined);
+  }, [loadGroups]);
 
-  const filteredGroups = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return groups;
-
-    return groups.filter((group) =>
-      [group.groupCode, group.groupNm, group.groupDc]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [groups, searchQuery]);
-
-  const filteredItems = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return items;
-
-    return items.filter((item) =>
-      [item.itemCode, item.itemNm, item.itemDc, item.parentItemNm]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [items, searchQuery]);
+  const handleGroupsSaved = useCallback(
+    async (_options?: { silent?: boolean }) => {
+      await loadGroups();
+      setPanelDirty(false);
+      setCommonCodeGridKey((current) => current + 1);
+    },
+    [loadGroups],
+  );
 
   const handleSaveChanges = useCallback(async () => {
     if (!panelRef.current) return;
@@ -150,22 +125,19 @@ export function CommonCodeManagementPage({
   }, []);
 
   const requestRefresh = useCallback(() => {
-    const liveDirty = panelRef.current?.getDirtyState() ?? panelDirty;
-    if (liveDirty) {
+    if (panelDirty) {
       setRefreshConfirmOpen(true);
       return;
     }
-    setError('');
-    void loadCommonCodeData();
-  }, [loadCommonCodeData, panelDirty]);
+    void loadGroups({ showSkeleton: true });
+  }, [loadGroups, panelDirty]);
 
   const confirmRefresh = useCallback(() => {
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
-    void loadCommonCodeData();
     setCommonCodeGridKey((current) => current + 1);
-    setError('');
-  }, [loadCommonCodeData]);
+    void loadGroups({ showSkeleton: true });
+  }, [loadGroups]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -191,17 +163,6 @@ export function CommonCodeManagementPage({
           onClick: () => {
             void handleSaveChanges();
           },
-        },
-      ],
-    },
-    {
-      key: 'excel',
-      actions: [
-        {
-          label: '엑셀',
-          icon: DownloadOutlined,
-          visible: pageActionPermissions.excel,
-          onClick: () => panelRef.current?.exportCurrentRows(),
         },
       ],
     },
@@ -263,17 +224,15 @@ export function CommonCodeManagementPage({
       <PageMessageArea message={error} onClose={() => setError('')} />
       <CommonCodeManagementPanel
         ref={panelRef}
-        groups={filteredGroups}
-        items={filteredItems}
-        selectedGroupId={selectedGroupId}
+        groups={groups}
+        searchQuery={searchQuery}
         canExportExcel={pageActionPermissions.excel}
-        onSelectedGroupChange={setSelectedGroupId}
-        onDirtyChange={setPanelDirty}
-        onGroupsSaved={setGroups}
-        onItemsSaved={setItems}
+        onGroupsSaved={handleGroupsSaved}
         onSaveSuccess={showSuccess}
+        onDirtyChange={setPanelDirty}
         onError={setError}
         commonCodeGridKey={commonCodeGridKey}
+        groupsLoading={pageLoading}
       />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}

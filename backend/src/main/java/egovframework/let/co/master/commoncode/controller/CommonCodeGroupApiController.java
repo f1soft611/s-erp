@@ -21,10 +21,13 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.EgovAccessControlHelper;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeBatchSaveRequestVO;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeBatchSaveResultVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSaveRequestVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemSaveRequestVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
+import egovframework.let.co.master.commoncode.service.CommonCodeBatchService;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
 import egovframework.let.co.master.commoncode.service.CommonCodeItemService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,8 +45,24 @@ import lombok.RequiredArgsConstructor;
 public class CommonCodeGroupApiController {
 
     private final ResultVoHelper resultVoHelper;
+    private final CommonCodeBatchService commonCodeBatchService;
     private final CommonCodeGroupService commonCodeGroupService;
     private final CommonCodeItemService commonCodeItemService;
+
+    @PostMapping("/save-batch")
+    public ResponseEntity<ResultVO> saveBatch(
+            @RequestBody CommonCodeBatchSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAdmin(user);
+        try {
+            CommonCodeBatchSaveResultVO result = commonCodeBatchService.saveBatch(user.getTenantId(), payload);
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("item", result);
+            return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+        } catch (IllegalArgumentException ex) {
+            return badRequest(ex.getMessage());
+        }
+    }
 
     @GetMapping("/groups")
     public ResultVO listGroups(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {

@@ -1,13 +1,19 @@
-import {
-  apiDelete,
-  apiGet,
-  apiPost,
-  apiPut,
-} from '../../../../../shared/services/apiClient';
+import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
 import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
 } from '../types/commonCodeManagement.types';
+
+export type CommonCodeBatchChangeSet<T> = {
+  insertedRows: Partial<T>[];
+  updatedRows: Partial<T>[];
+  deletedRows: Partial<T>[];
+};
+
+export type CommonCodeBatchPayload = {
+  groups: CommonCodeBatchChangeSet<CommonCodeGroupRow>;
+  items: CommonCodeBatchChangeSet<CommonCodeItemRow>;
+};
 
 interface CommonCodeGroupApiRow {
   commonCodeGroupId?: number | string | null;
@@ -38,7 +44,7 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function toGroupRow(row: CommonCodeGroupApiRow): CommonCodeGroupRow {
+export function toGroupRow(row: CommonCodeGroupApiRow): CommonCodeGroupRow {
   return {
     id: String(row.commonCodeGroupId ?? ''),
     groupCode: String(row.groupCode ?? ''),
@@ -53,7 +59,7 @@ function toGroupRow(row: CommonCodeGroupApiRow): CommonCodeGroupRow {
   };
 }
 
-function toItemRow(row: CommonCodeItemApiRow): CommonCodeItemRow {
+export function toItemRow(row: CommonCodeItemApiRow): CommonCodeItemRow {
   return {
     id: String(row.commonCodeItemId ?? ''),
     groupId: String(row.groupId ?? ''),
@@ -67,6 +73,24 @@ function toItemRow(row: CommonCodeItemApiRow): CommonCodeItemRow {
     sortOrder: toNumber(row.sortOrder),
     useAt: String(row.useAt ?? 'Y') === 'N' ? 'N' : 'Y',
     itemDc: String(row.itemDc ?? ''),
+  };
+}
+
+export function normalizeBatchSaveResponse(response: unknown): {
+  groups: CommonCodeGroupRow[];
+  items: CommonCodeItemRow[];
+} {
+  const payload = (response as { item?: unknown } | null)?.item ?? response;
+  const savedGroups = Array.isArray((payload as { groups?: unknown })?.groups)
+    ? ((payload as { groups?: CommonCodeGroupApiRow[] }).groups ?? [])
+    : [];
+  const savedItems = Array.isArray((payload as { items?: unknown })?.items)
+    ? ((payload as { items?: CommonCodeItemApiRow[] }).items ?? [])
+    : [];
+
+  return {
+    groups: savedGroups.map(toGroupRow),
+    items: savedItems.map(toItemRow),
   };
 }
 
@@ -95,46 +119,24 @@ export async function fetchParentItems(
   return (result.resultList ?? []).map(toItemRow);
 }
 
-export async function createCommonCodeGroup(
-  payload: Partial<CommonCodeGroupRow>,
-) {
-  return apiPost('/api/v1/co/master/common-code/groups', payload);
+export function buildCommonCodeBatchPayload(payload: {
+  groups: CommonCodeBatchChangeSet<CommonCodeGroupRow>;
+  items: CommonCodeBatchChangeSet<CommonCodeItemRow>;
+}): CommonCodeBatchPayload {
+  return {
+    groups: {
+      insertedRows: payload.groups.insertedRows,
+      updatedRows: payload.groups.updatedRows,
+      deletedRows: payload.groups.deletedRows,
+    },
+    items: {
+      insertedRows: payload.items.insertedRows,
+      updatedRows: payload.items.updatedRows,
+      deletedRows: payload.items.deletedRows,
+    },
+  };
 }
 
-export async function updateCommonCodeGroup(
-  groupId: string,
-  payload: Partial<CommonCodeGroupRow>,
-) {
-  return apiPut(`/api/v1/co/master/common-code/groups/${groupId}`, payload);
-}
-
-export async function deleteCommonCodeGroup(groupId: string) {
-  return apiDelete(`/api/v1/co/master/common-code/groups/${groupId}`);
-}
-
-export async function createCommonCodeItem(
-  groupId: string,
-  payload: Partial<CommonCodeItemRow>,
-) {
-  return apiPost(
-    `/api/v1/co/master/common-code/groups/${groupId}/items`,
-    payload,
-  );
-}
-
-export async function updateCommonCodeItem(
-  groupId: string,
-  itemId: string,
-  payload: Partial<CommonCodeItemRow>,
-) {
-  return apiPut(
-    `/api/v1/co/master/common-code/groups/${groupId}/items/${itemId}`,
-    payload,
-  );
-}
-
-export async function deleteCommonCodeItem(groupId: string, itemId: string) {
-  return apiDelete(
-    `/api/v1/co/master/common-code/groups/${groupId}/items/${itemId}`,
-  );
+export async function saveCommonCodeBatch(payload: CommonCodeBatchPayload) {
+  return apiPost('/api/v1/co/master/common-code/save-batch', payload);
 }
