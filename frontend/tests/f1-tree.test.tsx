@@ -218,9 +218,10 @@ describe('F1Tree interaction', () => {
 
     const pinnedStripedCell = screen.getByRole('gridcell', { name: '2' });
     expect(pinnedStripedCell.getAttribute('data-f1-grid-striped')).toBe('true');
-    expect(getComputedStyle(pinnedStripedCell).backgroundColor).not.toBe(
-      'rgb(255, 255, 255)',
+    expect(getComputedStyle(pinnedStripedCell).backgroundImage).toContain(
+      'gradient',
     );
+    expect(pinnedStripedCell).toHaveStyle({ isolation: 'isolate' });
   });
 
   it('expands every parent on first render when defaultExpandAll is enabled', () => {

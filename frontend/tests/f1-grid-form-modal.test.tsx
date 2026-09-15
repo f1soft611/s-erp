@@ -947,6 +947,37 @@ describe('F1-Grid row form integration', () => {
     expect(getComputedStyle(actionCell as Element).position).toBe('sticky');
   });
 
+  it('applies alternating striping to the synthetic action column without overlap', () => {
+    const stripeRows = [
+      { id: 'ROW-001', name: '첫 번째 행', status: '사용' },
+      { id: 'ROW-002', name: '두 번째 행', status: '미사용' },
+    ];
+
+    render(
+      <F1Grid
+        rows={stripeRows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        showCheckbox={false}
+        resizableRows={false}
+      />,
+    );
+
+    const actionCells = screen
+      .getAllByRole('button', { name: / 행 정보 수정$/ })
+      .map((button) => button.closest('[role="gridcell"]') as HTMLElement);
+
+    expect(actionCells).toHaveLength(2);
+    expect(actionCells[0]).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
+    expect(actionCells[1]).toHaveStyle({
+      isolation: 'isolate',
+      backgroundImage: expect.stringContaining('gradient'),
+    });
+  });
+
   it('keeps the action column shadow when it is the only right-pinned column', () => {
     render(
       <F1Grid

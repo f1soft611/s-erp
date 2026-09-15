@@ -6,8 +6,10 @@ import type { F1GridRowId } from '../types/grid.types';
 export type GridFormActionCellProps = {
   rowId: F1GridRowId;
   rowIndex: number;
+  stripeRowIndex?: number;
   columnIndex: number;
   isLastRow: boolean;
+  stripeRows?: boolean;
   pinnedShadow?: boolean;
   onEdit: () => void;
 };
@@ -15,14 +17,17 @@ export type GridFormActionCellProps = {
 export function GridFormActionCell({
   rowId,
   rowIndex,
+  stripeRowIndex = rowIndex,
   columnIndex,
   isLastRow,
+  stripeRows = true,
   pinnedShadow = true,
   onEdit,
 }: GridFormActionCellProps) {
   const stopPropagation = (event: MouseEvent<HTMLElement>) => {
     event.stopPropagation();
   };
+  const isStripedRow = stripeRows && stripeRowIndex % 2 === 1;
 
   return (
     <Box
@@ -35,6 +40,11 @@ export function GridFormActionCell({
         alignItems: 'center',
         alignSelf: 'stretch',
         backgroundColor: 'background.paper',
+        backgroundImage: isStripedRow
+          ? 'linear-gradient(90deg, rgba(148, 163, 184, 0.04), rgba(148, 163, 184, 0.04))'
+          : undefined,
+        backgroundRepeat: isStripedRow ? 'no-repeat' : undefined,
+        backgroundSize: isStripedRow ? '100% 100%' : undefined,
         borderBottom: isLastRow ? 1 : 0,
         borderBottomColor: 'divider',
         borderColor: 'divider',
@@ -52,6 +62,7 @@ export function GridFormActionCell({
         height: '100%',
         justifyContent: 'center',
         minHeight: 0,
+        isolation: 'isolate',
         position: 'sticky',
         right: 0,
         width: 48,

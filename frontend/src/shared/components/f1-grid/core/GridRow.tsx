@@ -598,8 +598,10 @@ const GridRowInner = <T extends object>({
         <GridFormActionCell
           rowId={rowId}
           rowIndex={renderIndex}
+          stripeRowIndex={rowIndex}
           columnIndex={(showCheckbox ? 2 : 1) + columns.length}
           isLastRow={rowIndex === visibleRows.length - 1}
+          stripeRows={stripeRows}
           pinnedShadow={formActionPinnedShadow}
           onEdit={() => onOpenRowForm(row)}
         />
