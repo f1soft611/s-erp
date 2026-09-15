@@ -1,15 +1,26 @@
+import { useState } from 'react';
 import {
   Box,
   Button,
   Dialog,
-  Divider,
+  DialogActions,
   IconButton,
-  Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import ImageOutlined from '@mui/icons-material/ImageOutlined';
+import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
+import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
+import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
+import FormatUnderlinedOutlinedIcon from '@mui/icons-material/FormatUnderlinedOutlined';
+import {
+  F1Editor,
+  createImagePasteExtension,
+  createTableExtension,
+  excelPasteExtension,
+  fontSizeExtension,
+  noticeEditorSchema,
+} from '../../../../../shared/components/f1-editor';
+import type { F1EditorDocument } from '../../../../../shared/components/f1-editor';
 
 type NoticeComposerDialogProps = {
   open: boolean;
@@ -17,40 +28,76 @@ type NoticeComposerDialogProps = {
   onClose: () => void;
 };
 
-const attachmentFiles = [
-  '2026_안내문.pdf',
-  '3분기_일정표.xlsx',
-  '운영가이드.png',
-];
-
 export function NoticeComposerDialog({
   open,
   isDark,
   onClose,
 }: NoticeComposerDialogProps) {
+  const [doc, setDoc] = useState<F1EditorDocument>(
+    noticeEditorSchema.defaultDocument,
+  );
+
+  const editorExtensions = [
+    createImagePasteExtension(async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/uploads/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('이미지 업로드 실패');
+      }
+
+      const payload = await response.json();
+      return payload.url as string;
+    }),
+    excelPasteExtension,
+    fontSizeExtension,
+    createTableExtension(),
+  ];
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="lg"
+      maxWidth="md"
       fullWidth
       slotProps={{
         paper: {
           sx: {
+            width: 'min(820px, calc(100vw - 48px))',
+            maxWidth: '820px',
+            height: 'min(90vh, 880px)',
+            maxHeight: 'calc(100vh - 32px)',
             borderRadius: 3,
             overflow: 'hidden',
             backgroundColor: isDark ? '#0f172a' : '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
           },
         },
       }}
     >
-      <Box sx={{ p: 2.5, bgcolor: isDark ? '#0f172a' : '#f8fafc' }}>
+      <Box
+        sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          bgcolor: isDark ? '#0f172a' : '#f8fafc',
+          minHeight: 0,
+          width: '100%',
+        }}
+      >
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mb: 2,
+            px: 2.5,
+            py: 2,
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
@@ -63,168 +110,119 @@ export function NoticeComposerDialog({
 
         <Box
           sx={{
-            border: `1px solid ${
-              isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
-            }`,
-            borderRadius: 2,
-            bgcolor: isDark ? '#111827' : '#ffffff',
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            px: 2.5,
+            pb: 0,
           }}
         >
-          <TextField
-            label="제목"
-            aria-label="제목"
-            fullWidth
-            variant="outlined"
-            sx={{
-              '& .MuiOutlinedInput-root': { border: 'none', borderRadius: 0 },
-              '& .MuiInputLabel-root': { fontWeight: 700 },
+          <F1Editor
+            schema={noticeEditorSchema}
+            value={doc}
+            onChange={setDoc}
+            onSubmit={(nextDoc: F1EditorDocument) => {
+              console.log('submit notice doc:', nextDoc);
+              onClose();
             }}
+            extensions={editorExtensions}
+            toolbar={false}
+            showFooterActions={false}
           />
-          <Divider />
+        </Box>
 
-          <Box
-            sx={{
-              px: 2,
-              py: 1.5,
-              borderBottom: `1px solid ${
-                isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
-              }`,
-            }}
-          >
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-              {['B', 'I', 'A', '◦', '•', '1.'].map((tool) => (
-                <Button
-                  key={tool}
-                  variant="text"
-                  aria-label={
-                    tool === 'B'
-                      ? '굵게'
-                      : tool === 'I'
-                        ? '기울임'
-                        : tool === 'A'
-                          ? '단락'
-                          : '도구'
-                  }
-                  sx={{
-                    minWidth: 0,
-                    px: 1,
-                    py: 0.5,
-                    color: 'text.primary',
-                    fontWeight: tool === 'B' ? 800 : 600,
-                    fontStyle: tool === 'I' ? 'italic' : 'normal',
-                  }}
-                >
-                  {tool}
-                </Button>
-              ))}
-            </Stack>
-          </Box>
-
-          <TextField
-            label="본문"
-            aria-label="본문"
-            multiline
-            minRows={8}
-            fullWidth
-            variant="outlined"
-            sx={{
-              '& .MuiOutlinedInput-root': { border: 'none', borderRadius: 0 },
-              '& .MuiInputLabel-root': { fontWeight: 700 },
-            }}
-          />
-
-          <Box
-            sx={{
-              p: 2,
-              borderTop: `1px solid ${
-                isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
-              }`,
-            }}
-          >
-            <Button
-              variant="outlined"
-              startIcon={<ImageOutlined />}
-              sx={{ mb: 2, borderRadius: 2 }}
+        <DialogActions
+          sx={{
+            alignItems: 'center',
+            bgcolor: isDark ? '#0f172a' : '#ffffff',
+            borderColor: 'divider',
+            borderTop: 1,
+            borderBottom: 0,
+            flexShrink: 0,
+            gap: 1,
+            justifyContent: 'space-between',
+            px: 2.5,
+            py: 1.25,
+            width: '100%',
+            boxSizing: 'border-box',
+            mx: 0,
+            ml: 0,
+            mr: 0,
+            borderRadius: 0,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton
+              size="small"
+              aria-label="굵게"
+              sx={{
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                borderRadius: 1,
+                width: 32,
+                height: 32,
+                bgcolor: 'background.paper',
+              }}
             >
-              이미지 첨부
-            </Button>
-
-            <Stack spacing={1}>
-              {attachmentFiles.map((file) => {
-                const extension = file.split('.').pop()?.toLowerCase() ?? '';
-                const fileMeta: Record<
-                  string,
-                  { bg: string; color: string; label: string }
-                > = {
-                  pdf: { bg: '#fecaca', color: '#991b1b', label: 'PDF' },
-                  xlsx: { bg: '#bbf7d0', color: '#166534', label: 'XLSX' },
-                  png: { bg: '#ddd6fe', color: '#5b21b6', label: 'PNG' },
-                };
-                const meta = fileMeta[extension] ?? {
-                  bg: '#e2e8f0',
-                  color: '#475569',
-                  label: 'FILE',
-                };
-
-                return (
-                  <Box
-                    key={file}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      border: `1px solid ${
-                        isDark
-                          ? 'rgba(148,163,184,0.18)'
-                          : 'rgba(148,163,184,0.18)'
-                      }`,
-                      borderRadius: 2,
-                      px: 1.25,
-                      py: 0.9,
-                      bgcolor: isDark ? 'rgba(15, 23, 42, 0.6)' : '#f8fafc',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box
-                        sx={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: 1,
-                          backgroundColor: meta.bg,
-                          color: meta.color,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.65rem',
-                          fontWeight: 800,
-                        }}
-                      >
-                        {meta.label}
-                      </Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {file}
-                      </Typography>
-                    </Box>
-                    <Button size="small" variant="text" sx={{ minWidth: 0 }}>
-                      삭제
-                    </Button>
-                  </Box>
-                );
-              })}
-            </Stack>
+              <FormatBoldOutlinedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="기울임"
+              sx={{
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                borderRadius: 1,
+                width: 32,
+                height: 32,
+                bgcolor: 'background.paper',
+              }}
+            >
+              <FormatItalicOutlinedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="밑줄"
+              sx={{
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                borderRadius: 1,
+                width: 32,
+                height: 32,
+                bgcolor: 'background.paper',
+              }}
+            >
+              <FormatUnderlinedOutlinedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="첨부 파일"
+              sx={{
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                borderRadius: 1,
+                width: 32,
+                height: 32,
+                bgcolor: 'background.paper',
+              }}
+            >
+              <AttachFileOutlinedIcon fontSize="small" />
+            </IconButton>
           </Box>
 
-          <Box
-            sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, p: 2 }}
-          >
-            <Button variant="outlined" onClick={onClose}>
-              취소
-            </Button>
-            <Button variant="contained" color="primary">
+          <Box sx={{ display: 'flex', flexShrink: 0, gap: 1 }}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                console.log('submit notice doc:', doc);
+                onClose();
+              }}
+              sx={{ minWidth: 96, fontWeight: 700 }}
+            >
               등록
             </Button>
+            <Button onClick={onClose} sx={{ minWidth: 96, fontWeight: 600 }}>
+              취소
+            </Button>
           </Box>
-        </Box>
+        </DialogActions>
       </Box>
     </Dialog>
   );

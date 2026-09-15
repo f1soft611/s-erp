@@ -168,13 +168,25 @@ export function NoticeFeedList({
                 />
               </Box>
 
-              <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontSize: '1.25rem',
+                  lineHeight: 1.4,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  mb: 1.5,
+                  color: 'text.primary',
+                }}
+              >
                 {item.title}
               </Typography>
 
               <Typography
                 variant="body1"
                 sx={{
+                  fontSize: '1rem',
+                  fontWeight: 400,
                   color: 'text.primary',
                   lineHeight: 1.8,
                   whiteSpace: 'pre-line',
