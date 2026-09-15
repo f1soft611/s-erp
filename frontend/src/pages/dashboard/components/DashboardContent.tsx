@@ -12,6 +12,7 @@ import {
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
+import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
@@ -149,6 +150,16 @@ export function DashboardContent({
   if (selectedModule.id === 'groupware' && currentPageKey === 'documents') {
     return (
       <DocumentsPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'groupware' && currentPageKey === 'notice') {
+    return (
+      <CommunityNoticePage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
