@@ -8,7 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
 
@@ -312,7 +312,7 @@ export function NoticeFeedList({
                   <Button
                     size="small"
                     variant="text"
-                    startIcon={<ThumbUpOutlinedIcon fontSize="small" />}
+                    startIcon={<FavoriteBorderOutlinedIcon fontSize="small" />}
                     sx={{
                       minWidth: 0,
                       px: 1,
@@ -323,15 +323,15 @@ export function NoticeFeedList({
                       transition: 'all 0.2s ease',
                       '& .MuiButton-startIcon': {
                         marginRight: 0.5,
-                        color: isDark ? '#93c5fd' : '#3b82f6',
+                        color: isDark ? '#f472b6' : '#ec4899',
                       },
                       '&:hover': {
                         backgroundColor: isDark
-                          ? 'rgba(96, 165, 250, 0.12)'
-                          : 'rgba(59, 130, 246, 0.08)',
-                        color: isDark ? '#e2e8f0' : '#1d4ed8',
+                          ? 'rgba(244, 114, 182, 0.12)'
+                          : 'rgba(236, 72, 153, 0.08)',
+                        color: isDark ? '#fce7f3' : '#be185d',
                         '& .MuiButton-startIcon': {
-                          color: isDark ? '#60a5fa' : '#2563eb',
+                          color: isDark ? '#f472b6' : '#db2777',
                         },
                       },
                     }}
