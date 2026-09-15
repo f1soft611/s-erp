@@ -1,8 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import {
+  CommonCodeManagementPanel,
+  getGroupDeleteBlockedMessage,
   resolveCreatedGroupId,
   resolveCreatedGroupIdMap,
 } from '../src/pages/co/master/common-code/components/CommonCodeManagementPanel';
@@ -18,7 +26,62 @@ const apiMocks = vi.hoisted(() => ({
   apiDelete: vi.fn(),
 }));
 
+const treeRefState = vi.hoisted(() => ({
+  current: null as {
+    deleteSelectedRows?: () => void;
+  } | null,
+}));
+
 vi.mock('../src/shared/services/apiClient', () => apiMocks);
+
+vi.mock('../src/shared/components/f1-grid', async () => {
+  const actual = await vi.importActual<
+    typeof import('../src/shared/components/f1-grid')
+  >('../src/shared/components/f1-grid');
+  const React = await import('react');
+
+  return {
+    ...actual,
+    F1Tree: React.forwardRef(function MockTree(props: any, ref) {
+      React.useImperativeHandle(ref, () => ({
+        getSelectedRows: () => [],
+        getSelectedRowIds: () => ['1'],
+        clearSelection: vi.fn(),
+        addRow: vi.fn(),
+        addChildRow: vi.fn(),
+        deleteSelectedRows: () => {
+          props.onDeleteBlocked?.(['1']);
+        },
+        restoreDeletedRows: vi.fn(),
+        duplicateSelectedRows: vi.fn(),
+        getRows: () => props.rows ?? [],
+        getActiveRows: () => props.rows ?? [],
+        getChanges: () => ({
+          insertedRows: [],
+          updatedRows: [],
+          deletedRows: [],
+        }),
+        validate: () => true,
+        startEdit: vi.fn(),
+        stopEdit: vi.fn(),
+        setCellValue: vi.fn(),
+        expandRow: vi.fn(),
+        collapseRow: vi.fn(),
+        expandAll: vi.fn(),
+        collapseAll: vi.fn(),
+        isExpanded: () => true,
+      }));
+
+      treeRefState.current = {
+        deleteSelectedRows: () => {
+          props.onDeleteBlocked?.(['1']);
+        },
+      };
+
+      return <div data-testid="mock-f1-tree" />;
+    }),
+  };
+});
 
 const commonCodeGroups = [
   {
@@ -150,6 +213,86 @@ describe('CommonCode management page', () => {
         item: { id: '77' },
       }),
     ).toBe('77');
+  });
+
+  it('allows a group to be deleted when its detail rows are already marked for deletion in the same save batch', () => {
+    const message = getGroupDeleteBlockedMessage({
+      blockedGroupIds: ['1'],
+      groups: [
+        {
+          id: '1',
+          groupCode: 'ROOT',
+          groupNm: '루트 그룹',
+          parentGroupId: null,
+          groupDc: '',
+          sortOrder: 1,
+          useAt: 'Y',
+        },
+      ],
+      itemRows: [
+        {
+          id: '10',
+          groupId: '1',
+          itemCode: 'DOC',
+          itemNm: '문서',
+          parentItemId: null,
+          parentItemNm: '',
+          sortOrder: 1,
+          useAt: 'Y',
+          itemDc: '',
+        },
+      ],
+      deletedGroupIds: [],
+      deletedItemIds: ['10'],
+    });
+
+    expect(message).toBeNull();
+  });
+
+  it('shows an error when a group is blocked from deletion because it still has child content', async () => {
+    const onError = vi.fn();
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <CommonCodeManagementPanel
+          groups={[
+            {
+              id: '1',
+              groupCode: 'ROOT',
+              groupNm: '루트 그룹',
+              parentGroupId: null,
+              groupDc: '',
+              sortOrder: 1,
+              useAt: 'Y',
+            },
+            {
+              id: '2',
+              groupCode: 'CHILD',
+              groupNm: '하위 그룹',
+              parentGroupId: '1',
+              groupDc: '',
+              sortOrder: 2,
+              useAt: 'Y',
+            },
+          ]}
+          onError={onError}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(treeRefState.current).not.toBeNull();
+    });
+
+    act(() => {
+      treeRefState.current?.deleteSelectedRows?.();
+    });
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(
+        '하위 그룹 또는 상세코드가 있는 그룹은 삭제할 수 없습니다.',
+      );
+    });
   });
 
   it('maps a newly created group temp id to the persisted group id after batch save', () => {

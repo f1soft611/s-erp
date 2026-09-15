@@ -250,6 +250,7 @@ export type F1GridProps<T extends object> = {
   allowAddRowInContextMenu?: boolean;
   allowDuplicateRowInContextMenu?: boolean;
   allowDeleteRowInContextMenu?: boolean;
+  deleteMenuDisabled?: boolean;
   loading?: boolean;
   treeContextMenu?: F1GridContextMenuTreeConfig;
 };
@@ -284,6 +285,7 @@ export type F1TreeProps<T extends object> = Omit<
   getRowOrder?: (row: T) => number;
   onDeleteBlocked?: (rowIds: F1GridRowId[]) => void;
   onTreeCheckboxChange?: (rowIds: F1GridRowId[]) => void;
+  isDeleteDisabled?: (row: T) => boolean;
 };
 
 export type F1TreeRef<T extends object> = F1GridRef<T> & {

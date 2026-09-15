@@ -62,7 +62,7 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
 
         for (CommonCodeGroupChangeVO row : groupChanges.getInsertedRows()) {
             validateGroupRow(row);
-            CommonCodeGroupSaveRequestVO groupPayload = toGroupPayload(row);
+            CommonCodeGroupSaveRequestVO groupPayload = toGroupPayload(row, tenantId, tempGroupIdToPersistedGroupId);
             CommonCodeGroupVO created = commonCodeGroupService.createGroup(tenantId, groupPayload);
             tempGroupIdToPersistedGroupId.put(String.valueOf(row.getId()), created.getCommonCodeGroupId());
             savedGroups.add(created);
@@ -74,8 +74,18 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
             if (groupId == null) {
                 throw new IllegalArgumentException("그룹 수정 시 ID가 필요합니다.");
             }
-            CommonCodeGroupVO updated = commonCodeGroupService.updateGroup(tenantId, groupId, toGroupPayload(row));
+            CommonCodeGroupSaveRequestVO groupPayload = toGroupPayload(row, tenantId, tempGroupIdToPersistedGroupId);
+            CommonCodeGroupVO updated = commonCodeGroupService.updateGroup(tenantId, groupId, groupPayload);
             savedGroups.add(updated);
+        }
+
+        for (CommonCodeItemChangeVO row : itemChanges.getDeletedRows()) {
+            Long groupId = resolveGroupId(tenantId, row.getGroupId(), tempGroupIdToPersistedGroupId);
+            Long itemId = toLong(row.getId());
+            if (itemId == null) {
+                throw new IllegalArgumentException("상세 삭제 시 ID가 필요합니다.");
+            }
+            commonCodeItemService.deleteItem(tenantId, groupId, itemId);
         }
 
         for (CommonCodeGroupChangeVO row : groupChanges.getDeletedRows()) {
@@ -103,15 +113,6 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
             }
             CommonCodeItemVO updated = commonCodeItemService.updateItem(tenantId, groupId, itemId, toItemPayload(row));
             savedItems.add(updated);
-        }
-
-        for (CommonCodeItemChangeVO row : itemChanges.getDeletedRows()) {
-            Long groupId = resolveGroupId(tenantId, row.getGroupId(), tempGroupIdToPersistedGroupId);
-            Long itemId = toLong(row.getId());
-            if (itemId == null) {
-                throw new IllegalArgumentException("상세 삭제 시 ID가 필요합니다.");
-            }
-            commonCodeItemService.deleteItem(tenantId, groupId, itemId);
         }
 
         CommonCodeBatchSaveResultVO result = new CommonCodeBatchSaveResultVO();
@@ -144,12 +145,15 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         }
     }
 
-    private CommonCodeGroupSaveRequestVO toGroupPayload(CommonCodeGroupChangeVO row) {
+    private CommonCodeGroupSaveRequestVO toGroupPayload(
+            CommonCodeGroupChangeVO row,
+            Long tenantId,
+            Map<String, Long> tempGroupIdToPersistedGroupId) throws Exception {
         CommonCodeGroupSaveRequestVO payload = new CommonCodeGroupSaveRequestVO();
         payload.setGroupCode(row.getGroupCode());
         payload.setGroupNm(row.getGroupNm());
         payload.setGroupDc(row.getGroupDc());
-        payload.setParentGroupId(toLong(row.getParentGroupId()));
+        payload.setParentGroupId(resolveParentGroupId(tenantId, row.getParentGroupId(), tempGroupIdToPersistedGroupId));
         payload.setSortOrder(row.getSortOrder());
         payload.setUseAt(row.getUseAt());
         return payload;
@@ -164,6 +168,23 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         payload.setSortOrder(row.getSortOrder());
         payload.setUseAt(row.getUseAt());
         return payload;
+    }
+
+    private Long resolveParentGroupId(Long tenantId, String rawParentGroupId, Map<String, Long> tempGroupIdToPersistedGroupId) throws Exception {
+        if (!StringUtils.hasText(rawParentGroupId)) {
+            return null;
+        }
+
+        Long persistedGroupId = tempGroupIdToPersistedGroupId.get(rawParentGroupId);
+        if (persistedGroupId != null) {
+            return persistedGroupId;
+        }
+
+        Long resolved = toLong(rawParentGroupId);
+        if (resolved == null) {
+            throw new IllegalArgumentException("유효하지 않은 상위 그룹 ID입니다: " + rawParentGroupId);
+        }
+        return resolved;
     }
 
     private Long resolveGroupId(Long tenantId, String rawGroupId, Map<String, Long> tempGroupIdToPersistedGroupId) throws Exception {

@@ -162,6 +162,7 @@ function F1GridInner<T extends object>(
     allowAddRowInContextMenu = true,
     allowDuplicateRowInContextMenu = true,
     allowDeleteRowInContextMenu = true,
+    deleteMenuDisabled = false,
     loading = false,
     treeContextMenu,
   }: F1GridProps<T>,
@@ -2705,7 +2706,7 @@ function F1GridInner<T extends object>(
         ) : null}
         {showDeleteRowInContextMenu ? (
           <MenuItem
-            disabled={selectedCount === 0}
+            disabled={selectedCount === 0 || deleteMenuDisabled}
             onClick={handleDeleteContextClick}
           >
             행 삭제

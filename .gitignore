@@ -34,3 +34,5 @@ secrets.json
 frontend/vitest-last.json
 frontend/vitest-router-login.json
 frontend/vitest-summary.txt
+backend/backend-restart.err.log
+backend/backend-restart.out.log

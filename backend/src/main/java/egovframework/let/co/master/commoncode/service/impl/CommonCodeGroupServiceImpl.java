@@ -152,16 +152,21 @@ public class CommonCodeGroupServiceImpl extends EgovAbstractServiceImpl implemen
     }
 
     private boolean isDescendantOf(Long groupId, Long candidateParentGroupId, Long tenantId) throws Exception {
-        Map<String, Object> params = new HashMap<>();
-        params.put("tenantId", tenantId);
-        params.put("groupId", groupId);
-        CommonCodeGroupVO group = commonCodeGroupDAO.selectGroupById(params);
-        if (group == null || group.getParentGroupId() == null) {
-            return false;
+        // candidateParentGroupId가 groupId의 하위 그룹이면(조상 방향으로 올라가다 groupId를 만나면) 순환 참조이다.
+        Long currentId = candidateParentGroupId;
+        while (currentId != null) {
+            if (currentId.equals(groupId)) {
+                return true;
+            }
+            Map<String, Object> params = new HashMap<>();
+            params.put("tenantId", tenantId);
+            params.put("groupId", currentId);
+            CommonCodeGroupVO current = commonCodeGroupDAO.selectGroupById(params);
+            if (current == null) {
+                return false;
+            }
+            currentId = current.getParentGroupId();
         }
-        if (candidateParentGroupId.equals(group.getParentGroupId())) {
-            return true;
-        }
-        return isDescendantOf(group.getParentGroupId(), candidateParentGroupId, tenantId);
+        return false;
     }
 }

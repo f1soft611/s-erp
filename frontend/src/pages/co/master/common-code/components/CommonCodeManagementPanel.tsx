@@ -68,6 +68,54 @@ function normalizeRowId(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+export function getGroupDeleteBlockedMessage({
+  blockedGroupIds,
+  groups,
+  itemRows,
+  deletedGroupIds = [],
+  deletedItemIds = [],
+}: {
+  blockedGroupIds: Array<string | number>;
+  groups: CommonCodeGroupRow[];
+  itemRows: CommonCodeItemRow[];
+  deletedGroupIds?: Array<string | number>;
+  deletedItemIds?: Array<string | number>;
+}): string | null {
+  const blockedIdSet = new Set(
+    blockedGroupIds.map((value) => normalizeRowId(value)),
+  );
+  const deletedGroupIdSet = new Set(
+    deletedGroupIds.map((value) => normalizeRowId(value)),
+  );
+  const deletedItemIdSet = new Set(
+    deletedItemIds.map((value) => normalizeRowId(value)),
+  );
+
+  const hasChildGroup = groups.some((group) => {
+    const parentGroupId = normalizeRowId(group.parentGroupId);
+    const groupId = normalizeRowId(group.id);
+
+    return (
+      parentGroupId &&
+      blockedIdSet.has(parentGroupId) &&
+      !deletedGroupIdSet.has(groupId)
+    );
+  });
+
+  const hasDetailItems = itemRows.some((item) => {
+    const itemGroupId = normalizeRowId(item.groupId);
+    const itemId = normalizeRowId(item.id);
+
+    return blockedIdSet.has(itemGroupId) && !deletedItemIdSet.has(itemId);
+  });
+
+  if (hasChildGroup || hasDetailItems) {
+    return '하위 그룹 또는 상세코드가 있는 그룹은 삭제할 수 없습니다.';
+  }
+
+  return null;
+}
+
 export function resolveCreatedGroupId(response: unknown): string | null {
   const candidate = (response as { item?: unknown } | null)?.item ?? response;
   if (!candidate || typeof candidate !== 'object') {
@@ -447,6 +495,56 @@ export const CommonCodeManagementPanel = forwardRef<
     parentGroup ? openParentPicker : undefined,
   );
 
+  const checkGroupDeleteBlockedMessage = useCallback(
+    (blockedGroupIds: Array<string | number>) => {
+      const currentTreeChanges =
+        treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
+      const currentItemChanges =
+        gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
+
+      return getGroupDeleteBlockedMessage({
+        blockedGroupIds,
+        groups: filteredGroups,
+        itemRows,
+        deletedGroupIds: currentTreeChanges.deletedRows.map((row) => row.id),
+        deletedItemIds: currentItemChanges.deletedRows.map((row) => row.id),
+      });
+    },
+    [filteredGroups, itemRows],
+  );
+
+  const isGroupDeleteDisabled = useCallback(
+    (group: CommonCodeGroupRow) => {
+      const groupId = normalizeRowId(group.id);
+      if (!groupId) return false;
+
+      const currentTreeChanges =
+        treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
+      const currentItemChanges =
+        gridRef.current?.getChanges() ?? emptyChanges<CommonCodeItemRow>();
+      const deletedGroupIds = new Set(
+        currentTreeChanges.deletedRows.map((row) => normalizeRowId(row.id)),
+      );
+      const deletedItemIds = new Set(
+        currentItemChanges.deletedRows.map((row) => normalizeRowId(row.id)),
+      );
+
+      const hasChildGroup = filteredGroups.some(
+        (candidate) =>
+          normalizeRowId(candidate.parentGroupId) === groupId &&
+          !deletedGroupIds.has(normalizeRowId(candidate.id)),
+      );
+      const hasDetailItems = itemRows.some(
+        (item) =>
+          normalizeRowId(item.groupId) === groupId &&
+          !deletedItemIds.has(normalizeRowId(item.id)),
+      );
+
+      return hasChildGroup || hasDetailItems;
+    },
+    [filteredGroups, itemRows],
+  );
+
   const saveCurrentChanges = useCallback(() => {
     if (saveInFlightRef.current) return saveInFlightRef.current;
 
@@ -478,6 +576,27 @@ export const CommonCodeManagementPanel = forwardRef<
           ...itemChanges.insertedRows,
           ...itemChanges.updatedRows,
         ];
+
+        const deletedGroupIds = groupChanges.deletedRows
+          .map((row) => normalizeRowId(row.id))
+          .filter(Boolean);
+        const deletedItemIds = itemChanges.deletedRows
+          .map((row) => normalizeRowId(row.id))
+          .filter(Boolean);
+
+        if (deletedGroupIds.length > 0) {
+          const blockedMessage = getGroupDeleteBlockedMessage({
+            blockedGroupIds: deletedGroupIds,
+            groups: filteredGroups,
+            itemRows,
+            deletedGroupIds,
+            deletedItemIds,
+          });
+
+          if (blockedMessage) {
+            throw new Error(blockedMessage);
+          }
+        }
 
         for (const row of rowsToValidate) {
           if ('groupCode' in row) {
@@ -511,6 +630,13 @@ export const CommonCodeManagementPanel = forwardRef<
         const persistedGroupId =
           (groupId && createdGroupIdMap.get(String(groupId))) ?? groupId;
 
+        // Clear dirty state before switching the selected group ID so that
+        // the group-refresh side effects below can't be misread as an
+        // in-progress (unsaved) group switch and pop the confirm dialog.
+        setGroupGridDirty(false);
+        setItemGridDirty(false);
+        itemGridDirtyRef.current = false;
+
         if (
           persistedGroupId &&
           persistedGroupId !== selectedGroupIdRef.current
@@ -529,9 +655,6 @@ export const CommonCodeManagementPanel = forwardRef<
         }
 
         onSaveSuccess?.('공통코드를 저장했습니다.');
-        setGroupGridDirty(false);
-        setItemGridDirty(false);
-        itemGridDirtyRef.current = false;
       } catch (error) {
         const message =
           error instanceof Error
@@ -558,7 +681,14 @@ export const CommonCodeManagementPanel = forwardRef<
       },
     );
     return savePromise;
-  }, [loadItemRows, onError, onGroupsSaved, onSaveSuccess]);
+  }, [
+    filteredGroups,
+    itemRows,
+    loadItemRows,
+    onError,
+    onGroupsSaved,
+    onSaveSuccess,
+  ]);
 
   const closeGroupSwitchDialog = useCallback(() => {
     setGroupSwitchDialogOpen(false);
@@ -697,10 +827,21 @@ export const CommonCodeManagementPanel = forwardRef<
                 loading={groupsLoading}
                 allowAddRootInContextMenu={true}
                 allowAddRowInContextMenu={true}
+                allowDuplicateRowInContextMenu={false}
                 allowDeleteRowInContextMenu={true}
+                deleteMenuDisabled={Boolean(
+                  selectedGroup && isGroupDeleteDisabled(selectedGroup),
+                )}
                 ariaLabel="공통코드 그룹 트리"
                 onSelectionChange={handleGroupSelection}
                 onChangesChange={handleGroupGridChanges}
+                isDeleteDisabled={isGroupDeleteDisabled}
+                onDeleteBlocked={(blockedIds) => {
+                  const message = checkGroupDeleteBlockedMessage(blockedIds);
+                  if (message) {
+                    onError?.(message);
+                  }
+                }}
               />
             </Box>
           </CardContent>
@@ -778,7 +919,7 @@ export const CommonCodeManagementPanel = forwardRef<
                   height="100%"
                   canExportExcel={canExportExcel}
                   showCheckbox={false}
-                  createRow={() => createItemRow(selectedGroup?.id ?? '')}
+                  createRow={() => createItemRow(selectedGroupId)}
                   loading={itemLoading}
                   allowAddRowInContextMenu={true}
                   allowDeleteRowInContextMenu={true}
