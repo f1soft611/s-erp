@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CommonCommentDAO">
+
+    <resultMap id="commonCommentMap" type="egovframework.com.common.domain.model.CommonCommentVO">
+        <id property="commentId" column="comment_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="ownerType" column="owner_type"/>
+        <result property="ownerId" column="owner_id"/>
+        <result property="parentCommentId" column="parent_comment_id"/>
+        <result property="content" column="content"/>
+        <result property="writerId" column="writer_id"/>
+        <result property="writerName" column="writer_name"/>
+        <result property="deletedYn" column="deleted_yn"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectCommonCommentList" parameterType="map" resultMap="commonCommentMap">
+        SELECT
+            comment_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            parent_comment_id,
+            content,
+            writer_id,
+            writer_name,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = #{ownerType}
+          AND owner_id = #{ownerId}
+          AND deleted_yn = 'N'
+        ORDER BY created_at ASC
+    </select>
+
+    <select id="selectCommonCommentById" parameterType="map" resultMap="commonCommentMap">
+        SELECT
+            comment_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            parent_comment_id,
+            content,
+            writer_id,
+            writer_name,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+          AND deleted_yn = 'N'
+    </select>
+
+    <select id="insertCommonComment" parameterType="map" resultType="long">
+        INSERT INTO tb_common_comment (
+            tenant_id,
+            owner_type,
+            owner_id,
+            parent_comment_id,
+            content,
+            writer_id,
+            writer_name,
+            deleted_yn,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{tenantId},
+            #{ownerType},
+            #{ownerId},
+            #{parentCommentId},
+            #{content},
+            #{writerId},
+            #{writerName},
+            #{deletedYn},
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        )
+        RETURNING comment_id
+    </select>
+
+    <update id="updateCommonComment" parameterType="map">
+        UPDATE tb_common_comment
+        SET content = #{content},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+          AND deleted_yn = 'N'
+    </update>
+
+    <update id="softDeleteCommonComment" parameterType="map">
+        UPDATE tb_common_comment
+        SET deleted_yn = 'Y',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+    </update>
+</mapper>

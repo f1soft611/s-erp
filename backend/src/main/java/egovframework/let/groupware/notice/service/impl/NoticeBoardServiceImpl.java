@@ -19,6 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.attachment.service.AttachmentService;
+import egovframework.com.comment.service.CommentService;
+import egovframework.com.feed.service.FeedService;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
@@ -33,13 +35,18 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
 
     private final NoticeBoardDAO noticeBoardDAO;
     private final AttachmentService attachmentService;
+    private final CommentService commentService;
+    private final FeedService feedService;
 
     @Value("${storage.bucket:document-attachments}")
     private String storageBucket;
 
-    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, AttachmentService attachmentService) {
+    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, AttachmentService attachmentService,
+            CommentService commentService, FeedService feedService) {
         this.noticeBoardDAO = noticeBoardDAO;
         this.attachmentService = attachmentService;
+        this.commentService = commentService;
+        this.feedService = feedService;
     }
 
     @Override
@@ -101,6 +108,19 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 attachParams.put("boardFileId", fileId);
                 noticeBoardDAO.selectNoticeAttachmentById(attachParams);
             }
+        }
+
+        if (feedService != null) {
+            feedService.createFeed(
+                    tenantId,
+                    "NOTICE_CREATED",
+                    BOARD_TYPE_NOTICE,
+                    postId,
+                    StringUtils.hasText(payload.getWriterId()) ? payload.getWriterId() : "unknown",
+                    StringUtils.hasText(payload.getWriterName()) ? payload.getWriterName() : "관리자",
+                    payload.getTitle(),
+                    "{\"title\":\"" + payload.getTitle() + "\"}"
+            );
         }
 
         return getPost(tenantId, postId);
