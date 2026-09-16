@@ -1,14 +1,14 @@
 import { Box, Button, Typography } from '@mui/material';
 
-export type NoticeAttachmentListItem = {
+export type AttachmentListItem = {
   id: string;
   name: string;
   size?: number;
   extension?: string;
 };
 
-type NoticeAttachmentListProps = {
-  files: NoticeAttachmentListItem[];
+export type AttachmentListProps = {
+  files: AttachmentListItem[];
   isDark?: boolean;
   mode?: 'view' | 'edit';
   showActions?: boolean;
@@ -36,14 +36,14 @@ function getFileIconMeta(fileName: string) {
   return map[extension] ?? { bg: '#e2e8f0', color: '#475569', label: 'FILE' };
 }
 
-export function NoticeAttachmentList({
+export function AttachmentList({
   files,
   isDark = false,
   mode = 'view',
   showActions = true,
   onDownload,
   onRemove,
-}: NoticeAttachmentListProps) {
+}: AttachmentListProps) {
   if (files.length === 0) {
     return null;
   }
