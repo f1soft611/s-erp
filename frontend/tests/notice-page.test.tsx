@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 
@@ -75,7 +75,7 @@ describe('Community notice page', () => {
     expect(screen.getAllByText(/댓글/i).length).toBeGreaterThan(0);
   });
 
-  it('opens a composer with title, body, toolbar, and attachment area', () => {
+  it('opens a composer with title, body, toolbar, and attachment area', async () => {
     render(
       <DashboardContent
         selectedModule={{
@@ -102,7 +102,19 @@ describe('Community notice page', () => {
 
     expect(screen.getAllByLabelText(/제목/i)[0]).toBeInTheDocument();
     expect(screen.getAllByLabelText(/본문/i)[0]).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /굵게/i })).toBeInTheDocument();
-    expect(screen.getByText(/이미지 첨부/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /툴바 열기/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /첨부 링크/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /툴바 열기/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^굵게$/i }),
+      ).toBeInTheDocument();
+    });
   });
 });
