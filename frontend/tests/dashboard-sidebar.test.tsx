@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import App from '../src/App';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { DashboardMenuTree } from '../src/pages/dashboard/components/DashboardMenuTree';
 import { buildModuleDescriptors } from '../src/pages/dashboard/services/menuService';
 
 async function loginAsAdmin() {
@@ -74,6 +75,45 @@ describe('Dashboard sidebar', () => {
     expect(
       await screen.findByRole('heading', { name: /^메뉴관리$/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows a submenu indicator for menu groups that contain child items', () => {
+    render(
+      <DashboardMenuTree
+        selectedModule={{
+          id: 'settings',
+          name: '환경설정',
+          icon: <span aria-hidden="true">S</span>,
+          tree: [
+            {
+              id: 'system',
+              name: '시스템 관리',
+              children: [
+                { id: 'roles', name: '권한관리', pageKey: 'roles' },
+                { id: 'menus', name: '메뉴관리', pageKey: 'menus' },
+              ],
+            },
+          ],
+          menus: [],
+        }}
+        expandedItemIds={['system']}
+        selectedMenuId="roles"
+        onMenuSelect={() => undefined}
+        onToggleMenu={() => undefined}
+      />,
+    );
+
+    const systemGroup = screen.getByRole('treeitem', { name: /시스템 관리/i });
+
+    expect(
+      within(systemGroup).getByTestId('ExpandMoreOutlinedIcon'),
+    ).toBeVisible();
+    const branchLines = within(systemGroup).getAllByTestId('submenu-branch');
+    expect(branchLines).toHaveLength(2);
+    branchLines.forEach((branchLine) => {
+      expect(branchLine).toBeVisible();
+      expect(branchLine).toHaveStyle({ borderTopWidth: '1px' });
+    });
   });
 
   it('collapses only the menu panel while keeping module selection visible', async () => {

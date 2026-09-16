@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -10,13 +11,31 @@ import {
 } from '@mui/material';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
+import { type NoticeAttachmentListItem } from '../../../../../shared/components/groupware/NoticeAttachmentList';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
   isDark: boolean;
   expandedNoticeId?: number | null;
+  isRefreshing?: boolean;
   onToggleExpand?: (id: number) => void;
+  onToggleLike?: (id: number) => void;
+  onToggleBookmark?: (id: number) => void;
+  onAddComment?: (noticeId: number, content: string) => void;
+  onDelete?: (noticeId: number) => void;
+  onEdit?: (item: NoticeFeedItem) => void;
+  onDownload?: (
+    noticeId: number,
+    file: {
+      id: string;
+      name: string;
+      size?: number;
+      boardFileId?: number | string | null;
+      objectKey?: string | null;
+      bucketName?: string | null;
+    },
+  ) => void;
 };
 
 function getFileIconMeta(fileName: string) {
@@ -97,13 +116,32 @@ export function NoticeFeedList({
   items,
   isDark,
   expandedNoticeId,
+  isRefreshing,
   onToggleExpand,
+  onToggleLike,
+  onToggleBookmark,
+  onAddComment,
+  onDelete,
+  onEdit,
+  onDownload,
 }: NoticeFeedListProps) {
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>(
+    {},
+  );
+
   return (
     <Stack spacing={2}>
       {items.map((item) => {
         const isExpanded = expandedNoticeId === item.id;
         const displayBody = isExpanded ? item.body : item.summary;
+        const previewHtml = item.bodyHtml ?? item.body;
+        const hasRichHtml = /<[^>]+>/.test(previewHtml);
+        const attachmentFiles =
+          item.attachmentDetails ??
+          ((item.attachments ?? []).map((name, index) => ({
+            id: `${item.id}-${index}`,
+            name,
+          })) as NoticeAttachmentListItem[]);
 
         return (
           <Card
@@ -153,19 +191,42 @@ export function NoticeFeedList({
                     {item.meta}
                   </Typography>
                 </Box>
-                <Chip
-                  label={item.state}
-                  size="small"
-                  sx={{
-                    bgcolor: item.highlight
-                      ? '#f59e0b'
-                      : isDark
-                        ? 'rgba(59,130,246,0.18)'
-                        : '#dbeafe',
-                    color: item.highlight ? '#fff' : '#2563eb',
-                    fontWeight: 700,
-                  }}
-                />
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  sx={{ alignItems: 'center' }}
+                >
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => onEdit?.(item)}
+                    sx={{ minWidth: 0, px: 1 }}
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    color="error"
+                    onClick={() => onDelete?.(item.id)}
+                    sx={{ minWidth: 0, px: 1 }}
+                  >
+                    삭제
+                  </Button>
+                  <Chip
+                    label={item.state}
+                    size="small"
+                    sx={{
+                      bgcolor: item.highlight
+                        ? '#f59e0b'
+                        : isDark
+                          ? 'rgba(59,130,246,0.18)'
+                          : '#dbeafe',
+                      color: item.highlight ? '#fff' : '#2563eb',
+                      fontWeight: 700,
+                    }}
+                  />
+                </Stack>
               </Box>
 
               <Typography
@@ -182,23 +243,53 @@ export function NoticeFeedList({
                 {item.title}
               </Typography>
 
-              <Typography
-                variant="body1"
-                sx={{
-                  fontSize: '1rem',
-                  fontWeight: 400,
-                  color: 'text.primary',
-                  lineHeight: 1.8,
-                  whiteSpace: 'pre-line',
-                  display: isExpanded ? 'block' : '-webkit-box',
-                  WebkitLineClamp: isExpanded ? 'unset' : 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  mb: 1.5,
-                }}
-              >
-                {displayBody}
-              </Typography>
+              {hasRichHtml ? (
+                <Box
+                  data-testid={`notice-preview-${item.id}`}
+                  data-expanded={isExpanded}
+                  sx={{
+                    fontSize: '1rem',
+                    color: 'text.primary',
+                    lineHeight: 1.7,
+                    mb: 1.5,
+                    overflow: isExpanded ? 'visible' : 'hidden',
+                    maxHeight: isExpanded ? 'none' : '220px',
+                    position: 'relative',
+                    maskImage: isExpanded
+                      ? 'none'
+                      : 'linear-gradient(to bottom, black 72%, transparent 100%)',
+                    WebkitMaskImage: isExpanded
+                      ? 'none'
+                      : 'linear-gradient(to bottom, black 72%, transparent 100%)',
+                    '& p': { margin: 0, whiteSpace: 'pre-wrap' },
+                    '& p:empty': { minHeight: '1.7em' },
+                    '& br': { display: 'inline' },
+                    '& ul, & ol': { margin: 0, paddingLeft: '1.5em' },
+                    '& img': { maxWidth: '100%', height: 'auto' },
+                  }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              ) : (
+                <Typography
+                  data-testid={`notice-preview-${item.id}`}
+                  data-expanded={isExpanded}
+                  variant="body1"
+                  sx={{
+                    fontSize: '1rem',
+                    fontWeight: 400,
+                    color: 'text.primary',
+                    lineHeight: 1.8,
+                    whiteSpace: 'pre-line',
+                    display: isExpanded ? 'block' : '-webkit-box',
+                    WebkitLineClamp: isExpanded ? 'unset' : 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    mb: 1.5,
+                  }}
+                >
+                  {displayBody}
+                </Typography>
+              )}
 
               {item.body !== item.summary && (
                 <Button
@@ -217,16 +308,16 @@ export function NoticeFeedList({
                 </Button>
               )}
 
-              {item.attachments && item.attachments.length > 0 && (
+              {attachmentFiles.length > 0 && (
                 <Box sx={{ mt: 1.5 }}>
                   <Divider sx={{ my: 1.5 }} />
                   <Stack spacing={1}>
-                    {item.attachments.map((attachment) => {
-                      const iconMeta = getFileIconMeta(attachment);
+                    {attachmentFiles.map((attachment) => {
+                      const iconMeta = getFileIconMeta(attachment.name);
 
                       return (
                         <Box
-                          key={attachment}
+                          key={attachment.id}
                           sx={{
                             display: 'flex',
                             alignItems: 'center',
@@ -247,6 +338,8 @@ export function NoticeFeedList({
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1,
+                              minWidth: 0,
+                              flex: 1,
                             }}
                           >
                             <Box
@@ -267,15 +360,26 @@ export function NoticeFeedList({
                             </Box>
                             <Typography
                               variant="body2"
-                              sx={{ fontWeight: 600 }}
+                              sx={{
+                                fontWeight: 600,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
                             >
-                              {attachment}
+                              {attachment.name}
                             </Typography>
                           </Box>
                           <Button
                             size="small"
                             variant="outlined"
-                            aria-label={`다운로드: ${attachment}`}
+                            aria-label={`다운로드: ${attachment.name}`}
+                            onClick={() =>
+                              onDownload?.(item.id, {
+                                ...attachment,
+                                name: attachment.name,
+                              })
+                            }
                             sx={{
                               minWidth: 0,
                               width: 32,
@@ -325,6 +429,7 @@ export function NoticeFeedList({
                     size="small"
                     variant="text"
                     startIcon={<FavoriteBorderOutlinedIcon fontSize="small" />}
+                    onClick={() => onToggleLike?.(item.id)}
                     sx={{
                       minWidth: 0,
                       px: 1,
@@ -348,12 +453,14 @@ export function NoticeFeedList({
                       },
                     }}
                   >
-                    좋아요 11
+                    {item.liked ? '좋아요 취소' : '좋아요'}{' '}
+                    {item.likeCount ?? 0}
                   </Button>
                   <Button
                     size="small"
                     variant="text"
                     startIcon={<BookmarkBorderOutlinedIcon fontSize="small" />}
+                    onClick={() => onToggleBookmark?.(item.id)}
                     sx={{
                       minWidth: 0,
                       px: 1,
@@ -377,7 +484,7 @@ export function NoticeFeedList({
                       },
                     }}
                   >
-                    북마크
+                    {item.bookmarked ? '북마크 취소' : '북마크'}
                   </Button>
                 </Stack>
                 <Typography variant="body2">
@@ -428,6 +535,13 @@ export function NoticeFeedList({
                 </Box>
                 <Box
                   component="input"
+                  value={commentDrafts[item.id] ?? ''}
+                  onChange={(event) =>
+                    setCommentDrafts((current) => ({
+                      ...current,
+                      [item.id]: event.target.value,
+                    }))
+                  }
                   placeholder="댓글을 입력하세요"
                   aria-label="댓글 입력"
                   sx={{
@@ -442,11 +556,27 @@ export function NoticeFeedList({
                 <Button
                   size="small"
                   variant="contained"
+                  onClick={() => {
+                    const content = (commentDrafts[item.id] ?? '').trim();
+                    if (!content) {
+                      return;
+                    }
+                    onAddComment?.(item.id, content);
+                    setCommentDrafts((current) => ({
+                      ...current,
+                      [item.id]: '',
+                    }));
+                  }}
                   sx={{ minWidth: 0, px: 1.5 }}
                 >
                   등록
                 </Button>
               </Box>
+              {isRefreshing && (
+                <Typography variant="caption" color="text.secondary">
+                  목록을 새로고침하는 중입니다...
+                </Typography>
+              )}
             </CardContent>
           </Card>
         );

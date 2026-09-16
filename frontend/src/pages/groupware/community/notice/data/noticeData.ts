@@ -12,11 +12,24 @@ export type NoticeFeedItem = {
   meta: string;
   state: string;
   summary: string;
+  summaryHtml?: string;
   body: string;
+  bodyHtml?: string;
   attachments?: string[];
+  attachmentDetails?: Array<{
+    id: string;
+    name: string;
+    size?: number;
+    boardFileId?: number | string | null;
+    objectKey?: string | null;
+    bucketName?: string | null;
+  }>;
   comments?: NoticeCommentItem[];
   commentCount: number;
   highlight: boolean;
+  liked?: boolean;
+  likeCount?: number;
+  bookmarked?: boolean;
 };
 
 export type SummaryStat = {

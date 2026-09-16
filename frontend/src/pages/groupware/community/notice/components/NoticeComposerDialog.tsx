@@ -24,10 +24,31 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 
+export type NoticeComposerDraftAttachment = {
+  id: string;
+  name: string;
+  size?: number;
+  extension?: string;
+  file?: File;
+  boardFileId?: number | string | null;
+  objectKey?: string | null;
+  bucketName?: string | null;
+};
+
 type NoticeComposerDialogProps = {
   open: boolean;
   isDark: boolean;
   onClose: () => void;
+  onSubmit?: (payload: {
+    title: string;
+    body: string;
+    bodyJson?: string;
+    bodyText?: string;
+    attachments: NoticeComposerDraftAttachment[];
+  }) => Promise<unknown> | unknown;
+  defaultTitle?: string;
+  defaultBody?: string;
+  defaultAttachments?: NoticeComposerDraftAttachment[];
 };
 
 const emptyNoticeContent = '<p></p>';
@@ -56,6 +77,10 @@ export function NoticeComposerDialog({
   open,
   isDark,
   onClose,
+  onSubmit,
+  defaultTitle = '',
+  defaultBody,
+  defaultAttachments = [],
 }: NoticeComposerDialogProps) {
   const theme = useTheme();
   const resolvedDark = Boolean(isDark) || theme.palette.mode === 'dark';
@@ -68,12 +93,11 @@ export function NoticeComposerDialog({
   const editorSurfaceBackground = resolvedDark ? '#0f172a' : '#ffffff';
   const headerBackground = resolvedDark ? '#1f2937' : '#f8fafc';
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(defaultTitle);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
-  const [attachments, setAttachments] = useState<
-    Array<{ id: string; name: string; size: number; extension: string }>
-  >([]);
+  const [attachments, setAttachments] =
+    useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
 
   const editorConfig = useMemo(
     () => ({
@@ -84,7 +108,8 @@ export function NoticeComposerDialog({
           emptyEditorClass: 'is-editor-empty',
         }),
       ],
-      content: emptyNoticeContent,
+      content:
+        defaultBody && defaultBody.trim() ? defaultBody : emptyNoticeContent,
       immediatelyRender: false,
       editable: true,
       editorProps: {
@@ -97,10 +122,29 @@ export function NoticeComposerDialog({
         },
       },
     }),
-    [editorSurfaceBackground],
+    [defaultBody, editorSurfaceBackground],
   );
 
   const editor = useEditor(editorConfig);
+
+  useEffect(() => {
+    setTitle(defaultTitle);
+  }, [defaultTitle]);
+
+  useEffect(() => {
+    setAttachments(defaultAttachments);
+  }, [defaultAttachments]);
+
+  useEffect(() => {
+    if (!editor || !open) {
+      return;
+    }
+
+    const nextContent =
+      defaultBody && defaultBody.trim() ? defaultBody : emptyNoticeContent;
+    editor.commands.clearContent();
+    editor.commands.setContent(nextContent);
+  }, [editor, open, defaultBody]);
 
   useEffect(() => {
     if (!editor) {
@@ -174,23 +218,13 @@ export function NoticeComposerDialog({
     },
   ];
 
-  useEffect(() => {
-    if (!editor || !open) {
-      return;
-    }
-
-    editor.commands.clearContent();
-    editor.commands.setContent(emptyNoticeContent);
-    setTitle('');
-  }, [editor, open]);
-
   const handleAttachmentSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFiles = Array.from(event.target.files ?? []);
     if (nextFiles.length === 0) {
       return;
     }
 
-    const mapped = nextFiles.map((file) => {
+    const mapped: NoticeComposerDraftAttachment[] = nextFiles.map((file) => {
       const fileName = file.name || '첨부파일';
       const extension = fileName.includes('.')
         ? fileName.split('.').pop()?.toUpperCase() || 'FILE'
@@ -201,6 +235,7 @@ export function NoticeComposerDialog({
         name: fileName,
         size: file.size,
         extension,
+        file,
       };
     });
 
@@ -210,6 +245,26 @@ export function NoticeComposerDialog({
 
   const removeAttachment = (id: string) => {
     setAttachments((current) => current.filter((file) => file.id !== id));
+  };
+
+  const handleSubmit = async () => {
+    const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
+    const bodyText = body
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (onSubmit) {
+      await onSubmit({
+        title,
+        body,
+        bodyJson: JSON.stringify({ type: 'doc', content: [] }),
+        bodyText,
+        attachments,
+      });
+    }
+
+    onClose();
   };
 
   return (
@@ -669,13 +724,8 @@ export function NoticeComposerDialog({
             <Button
               variant="contained"
               color="primary"
-              onClick={() => {
-                console.log('submit notice doc:', {
-                  title,
-                  content: editor?.getHTML() ?? emptyNoticeContent,
-                });
-                onClose();
-              }}
+              onClick={handleSubmit}
+              disabled={title.trim().length === 0 && editorIsEmpty}
               sx={{
                 borderRadius: 1.5,
                 fontWeight: 700,

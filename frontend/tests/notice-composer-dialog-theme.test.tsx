@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from 'vitest';
 import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
+import { NoticeAttachmentList } from '../src/shared/components/groupware/NoticeAttachmentList';
 import { createAppTheme } from '../src/theme/theme';
 
 describe('NoticeComposerDialog theme handling', () => {
@@ -41,6 +42,49 @@ describe('NoticeComposerDialog theme handling', () => {
     const editorBox = screen.getByRole('textbox', { name: /본문/i });
 
     expect(editorBox).toHaveStyle({ width: '100%' });
+  });
+
+  it('renders the correct action icon for view and edit modes', () => {
+    const downloadSpy = vi.fn();
+    const removeSpy = vi.fn();
+
+    const { rerender } = render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeAttachmentList
+          files={[{ id: 'a1', name: '3분기_업무일정표_v2.pdf' }]}
+          isDark={false}
+          mode="view"
+          onDownload={downloadSpy}
+          showActions
+        />
+      </ThemeProvider>,
+    );
+
+    const downloadButton = screen.getByRole('button', {
+      name: /첨부 파일 다운로드/i,
+    });
+    fireEvent.click(downloadButton);
+
+    expect(downloadSpy).toHaveBeenCalledWith('a1');
+
+    rerender(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeAttachmentList
+          files={[{ id: 'a1', name: '3분기_업무일정표_v2.pdf' }]}
+          isDark={false}
+          mode="edit"
+          onRemove={removeSpy}
+          showActions
+        />
+      </ThemeProvider>,
+    );
+
+    const deleteButton = screen.getByRole('button', {
+      name: /첨부 파일 삭제/i,
+    });
+    fireEvent.click(deleteButton);
+
+    expect(removeSpy).toHaveBeenCalledWith('a1');
   });
 
   it('allows typing in the editor without resetting on title rerenders', async () => {

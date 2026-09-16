@@ -1,0 +1,232 @@
+package egovframework.let.groupware.notice.domain.model;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.util.StringUtils;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Generated;
+
+@Schema(description = "공지사항 응답 모델")
+public class NoticeBoardPostVO implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    @Schema(description = "공지 ID")
+    private Long postId;
+    @Schema(description = "게시판 유형 코드")
+    private String boardTypeCode;
+    @Schema(description = "공지 제목")
+    private String title;
+    @Schema(description = "기존 호환용 본문 HTML")
+    private String contents;
+    @Schema(description = "에디터 HTML 본문")
+    private String contentsHtml;
+    @Schema(description = "에디터 JSON 본문")
+    private String contentsJson;
+    @Schema(description = "본문 텍스트 추출값")
+    private String contentsText;
+    @Schema(description = "작성자 ID")
+    private String writerId;
+    @Schema(description = "작성자명")
+    private String writerName;
+    @Schema(description = "조회 수")
+    private Integer viewCount;
+    @Schema(description = "상단 고정 여부")
+    private String isNotice;
+    @Schema(description = "삭제 여부")
+    private String isDeleted;
+    @Schema(description = "등록 일시")
+    private Date createdAt;
+    @Schema(description = "수정 일시")
+    private Date updatedAt;
+    @Schema(description = "첨부파일 수")
+    private Integer attachmentCount;
+    @Schema(description = "첨부파일 목록")
+    private List<NoticeBoardFileVO> attachments = new ArrayList<>();
+
+    public String getEffectiveContentsHtml() {
+        if (StringUtils.hasText(this.contentsHtml)) {
+            return this.contentsHtml;
+        }
+        return this.contents;
+    }
+
+    public String getEffectiveContentsText() {
+        if (StringUtils.hasText(this.contentsText)) {
+            return this.contentsText.trim();
+        }
+        String html = getEffectiveContentsHtml();
+        if (!StringUtils.hasText(html)) {
+            return "";
+        }
+        String plainText = html.replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replaceAll("<[^>]*>", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return plainText;
+    }
+
+    @Generated
+    public Long getPostId() {
+        return postId;
+    }
+
+    @Generated
+    public void setPostId(Long postId) {
+        this.postId = postId;
+    }
+
+    @Generated
+    public String getBoardTypeCode() {
+        return boardTypeCode;
+    }
+
+    @Generated
+    public void setBoardTypeCode(String boardTypeCode) {
+        this.boardTypeCode = boardTypeCode;
+    }
+
+    @Generated
+    public String getTitle() {
+        return title;
+    }
+
+    @Generated
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    @Generated
+    public String getContents() {
+        return contents;
+    }
+
+    @Generated
+    public void setContents(String contents) {
+        this.contents = contents;
+    }
+
+    @Generated
+    public String getContentsHtml() {
+        return contentsHtml;
+    }
+
+    @Generated
+    public void setContentsHtml(String contentsHtml) {
+        this.contentsHtml = contentsHtml;
+    }
+
+    @Generated
+    public String getContentsJson() {
+        return contentsJson;
+    }
+
+    @Generated
+    public void setContentsJson(String contentsJson) {
+        this.contentsJson = contentsJson;
+    }
+
+    @Generated
+    public String getContentsText() {
+        return contentsText;
+    }
+
+    @Generated
+    public void setContentsText(String contentsText) {
+        this.contentsText = contentsText;
+    }
+
+    @Generated
+    public String getWriterId() {
+        return writerId;
+    }
+
+    @Generated
+    public void setWriterId(String writerId) {
+        this.writerId = writerId;
+    }
+
+    @Generated
+    public String getWriterName() {
+        return writerName;
+    }
+
+    @Generated
+    public void setWriterName(String writerName) {
+        this.writerName = writerName;
+    }
+
+    @Generated
+    public Integer getViewCount() {
+        return viewCount;
+    }
+
+    @Generated
+    public void setViewCount(Integer viewCount) {
+        this.viewCount = viewCount;
+    }
+
+    @Generated
+    public String getIsNotice() {
+        return isNotice;
+    }
+
+    @Generated
+    public void setIsNotice(String isNotice) {
+        this.isNotice = isNotice;
+    }
+
+    @Generated
+    public String getIsDeleted() {
+        return isDeleted;
+    }
+
+    @Generated
+    public void setIsDeleted(String isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    @Generated
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    @Generated
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    @Generated
+    public Date getUpdatedAt() {
+        return updatedAt;
+    }
+
+    @Generated
+    public void setUpdatedAt(Date updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    @Generated
+    public Integer getAttachmentCount() {
+        return attachmentCount;
+    }
+
+    @Generated
+    public void setAttachmentCount(Integer attachmentCount) {
+        this.attachmentCount = attachmentCount;
+    }
+
+    @Generated
+    public List<NoticeBoardFileVO> getAttachments() {
+        return attachments;
+    }
+
+    @Generated
+    public void setAttachments(List<NoticeBoardFileVO> attachments) {
+        this.attachments = attachments;
+    }
+}

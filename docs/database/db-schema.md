@@ -269,10 +269,84 @@
 - 자식 그룹의 상위코드 선택을 제한하는 기준 테이블
 - F1Grid 상세 목록과 상위코드 선택 목록의 백엔드 원천 데이터
 
+### 2-16. tb_board_type
+
+| 컬럼             | 타입      | 설명                                            |
+| ---------------- | --------- | ----------------------------------------------- |
+| board_type_code  | varchar   | 게시판 유형 코드 (`NOTICE`, `BOARD`, `ARCHIVE`) |
+| board_name       | varchar   | 게시판 이름                                     |
+| menu_id          | bigint    | 커뮤니티 메뉴 FK                                |
+| board_kind       | varchar   | 게시판 종류 (`notice`, `board`, `archive`)      |
+| read_auth_level  | varchar   | 읽기 권한 레벨                                  |
+| write_auth_level | varchar   | 쓰기 권한 레벨                                  |
+| file_upload_yn   | char      | 첨부파일 업로드 허용 여부                       |
+| use_yn           | char      | 사용 여부                                       |
+| sort_order       | int       | 정렬 순서                                       |
+| created_at       | timestamp | 생성 일시                                       |
+| updated_at       | timestamp | 수정 일시                                       |
+
+역할:
+
+- 공지사항/게시판/자료실 유형을 통합 관리
+- 게시글 API에서 `board_type_code`를 기준으로 조회 범위 분기
+
+### 2-17. tb_board_post
+
+| 컬럼               | 타입      | 설명                    |
+| ------------------ | --------- | ----------------------- |
+| post_id            | bigint    | 게시글 PK               |
+| board_type_code    | varchar   | 게시판 유형 코드        |
+| title              | varchar   | 제목                    |
+| contents           | text      | legacy 본문 호환용      |
+| contents_html      | text      | 렌더링용 HTML 본문      |
+| contents_json      | json      | Tiptap JSON 본문        |
+| contents_text      | text      | 검색/요약용 평문        |
+| writer_id          | varchar   | 작성자 ID               |
+| writer_name        | varchar   | 작성자 명               |
+| view_count         | int       | 조회수                  |
+| is_notice          | char      | 중요공지 여부 (`Y`/`N`) |
+| is_deleted         | char      | 삭제 여부 (`Y`/`N`)     |
+| created_at         | timestamp | 생성 일시               |
+| updated_at         | timestamp | 수정 일시               |
+| last_modified_by   | varchar   | 마지막 수정자 ID        |
+| last_comment_count | int       | 마지막 댓글 수          |
+
+역할:
+
+- 공지사항/게시판/자료실 게시글의 원본 데이터 저장
+- 목록/상세 조회와 삭제 처리의 기본 테이블
+
+### 2-18. tb_board_file
+
+| 컬럼             | 타입      | 설명                     |
+| ---------------- | --------- | ------------------------ |
+| board_file_id    | bigint    | 첨부 PK                  |
+| post_id          | bigint    | 게시글 FK                |
+| file_name        | varchar   | 원본 파일명              |
+| file_path        | varchar   | legacy 저장 경로(호환용) |
+| file_size        | bigint    | 파일 크기                |
+| mime_type        | varchar   | MIME 타입                |
+| object_key       | varchar   | MinIO object key         |
+| bucket_name      | varchar   | MinIO 버킷명             |
+| storage_provider | varchar   | 저장소 타입 (`minio`)    |
+| checksum_sha256  | varchar   | 파일 해시                |
+| content_type     | varchar   | 파일 컨텐츠 타입         |
+| uploaded_by      | varchar   | 업로더 ID                |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)      |
+| created_at       | timestamp | 생성 일시                |
+| updated_at       | timestamp | 수정 일시                |
+
+역할:
+
+- 첨부 파일 메타데이터를 보관
+- 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
+
 ---
 
 ## 변경 이력
 
+- 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.
 - 2026-09-11: 공통코드 관리 기능을 위한 `tb_common_code_group`, `tb_common_code_item` 신규 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260911](../../backend/DATABASE/20260911) 및 [docs/database/2026-09-11](2026-09-11) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.

@@ -10,10 +10,11 @@ import {
 const API_BASE_URL = resolveApiBaseUrl();
 
 interface ApiEnvelope<T> {
-  resultCode: number | string;
-  resultMessage: string;
-  result: T;
+  resultCode?: number | string;
+  resultMessage?: string;
+  result?: T;
   message?: string;
+  code?: number | string;
 }
 
 export function normalizeApiErrorMessage(
@@ -72,9 +73,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...((init?.headers as Record<string, string>) ?? {}),
   };
+
+  if (!(init?.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (auth.accessToken) {
     headers.Authorization = `Bearer ${auth.accessToken}`;
@@ -85,23 +89,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
   });
 
-  const body = (await response.json()) as ApiEnvelope<T>;
+  const rawText = await response.text();
+  const body = rawText
+    ? ((JSON.parse(rawText) as ApiEnvelope<T>) ?? {})
+    : ({} as ApiEnvelope<T>);
 
-  if (!response.ok || String(body.resultCode) !== '200') {
-    throw new Error(
-      normalizeApiErrorMessage(
-        body.resultMessage || body.message || '요청이 실패했습니다.',
-      ),
-    );
+  const resultCode = body.resultCode ?? body.code ?? '200';
+  const resultMessage =
+    body.resultMessage || body.message || '요청이 실패했습니다.';
+
+  if (!response.ok || String(resultCode) !== '200') {
+    throw new Error(normalizeApiErrorMessage(resultMessage));
   }
 
-  return body.result;
+  return body.result ?? ({} as T);
 }
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
 
 export const apiPost = <T>(path: string, data: unknown): Promise<T> =>
   request<T>(path, { method: 'POST', body: JSON.stringify(data) });
+
+export const apiPostFormData = <T>(
+  path: string,
+  formData: FormData,
+): Promise<T> => request<T>(path, { method: 'POST', body: formData });
 
 export const apiPut = <T>(path: string, data: unknown): Promise<T> =>
   request<T>(path, { method: 'PUT', body: JSON.stringify(data) });
