@@ -23,6 +23,7 @@ import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
+import { noticeContentStyles } from './noticeContentStyles';
 
 export type NoticeComposerDraftAttachment = {
   id: string;
@@ -443,6 +444,7 @@ export function NoticeComposerDialog({
                       flexDirection: 'column',
                     },
                     '& .notice-composer-editor .ProseMirror': {
+                      ...noticeContentStyles,
                       display: 'block',
                       width: '100%',
                       minWidth: 0,
@@ -454,22 +456,14 @@ export function NoticeComposerDialog({
                       px: 2,
                       py: 1.5,
                       color: theme.palette.text.primary,
-                      lineHeight: 1.7,
                       backgroundColor: editorSurfaceBackground,
                       boxSizing: 'border-box',
-                      '& p': { margin: 0 },
                       '& p.is-editor-empty:first-of-type::before': {
                         content: 'attr(data-placeholder)',
                         color: theme.palette.text.disabled,
                         float: 'left',
                         height: 0,
                         pointerEvents: 'none',
-                      },
-                      '& ul, & ol': { margin: '8px 0 8px 18px' },
-                      '& blockquote': {
-                        margin: '8px 0',
-                        paddingLeft: 1.5,
-                        borderLeft: `3px solid ${alpha(theme.palette.primary.main, 0.42)}`,
                       },
                     },
                   }}

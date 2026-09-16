@@ -13,6 +13,7 @@ import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlin
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import { type NoticeAttachmentListItem } from '../../../../../shared/components/groupware/NoticeAttachmentList';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
+import { noticeContentStyles } from './noticeContentStyles';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -248,9 +249,8 @@ export function NoticeFeedList({
                   data-testid={`notice-preview-${item.id}`}
                   data-expanded={isExpanded}
                   sx={{
-                    fontSize: '1rem',
+                    ...noticeContentStyles,
                     color: 'text.primary',
-                    lineHeight: 1.7,
                     mb: 1.5,
                     overflow: isExpanded ? 'visible' : 'hidden',
                     maxHeight: isExpanded ? 'none' : '220px',
@@ -261,11 +261,7 @@ export function NoticeFeedList({
                     WebkitMaskImage: isExpanded
                       ? 'none'
                       : 'linear-gradient(to bottom, black 72%, transparent 100%)',
-                    '& p': { margin: 0, whiteSpace: 'pre-wrap' },
-                    '& p:empty': { minHeight: '1.7em' },
                     '& br': { display: 'inline' },
-                    '& ul, & ol': { margin: 0, paddingLeft: '1.5em' },
-                    '& img': { maxWidth: '100%', height: 'auto' },
                   }}
                   dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
