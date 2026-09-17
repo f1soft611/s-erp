@@ -58,6 +58,14 @@ export type CommentThreadProps = {
 };
 
 export const sanitizeCommentHtml = sanitizeHtml;
+export function isCommentSubmitKey(event: {
+  key: string;
+  shiftKey: boolean;
+  isComposing: boolean;
+}): boolean {
+  return event.key === 'Enter' && !event.shiftKey && !event.isComposing;
+}
+
 function hasCommentText(html: string): boolean {
   if (typeof DOMParser === 'undefined')
     return html.replace(/<[^>]*>/g, '').trim().length > 0;
@@ -87,6 +95,7 @@ function CommentEditor({
   onCancel,
 }: EditorProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const submitRef = useRef<() => void>(() => undefined);
   const [files, setFiles] = useState<File[]>([]);
   const editor = useEditor({
     extensions: [StarterKit, Placeholder.configure({ placeholder })],
@@ -121,6 +130,9 @@ function CommentEditor({
       // Keep the editor content and selected files when the API rejects.
     }
   };
+  submitRef.current = () => {
+    void submit();
+  };
   return (
     <Box
       sx={{
@@ -131,18 +143,36 @@ function CommentEditor({
         bgcolor: isDark ? 'rgba(15,23,42,0.76)' : '#fff',
         overflow: 'hidden',
       }}
+      onKeyDownCapture={(event) => {
+        if (!editor || event.target !== editor.view.dom) {
+          return;
+        }
+        if (
+          !isCommentSubmitKey({
+            key: event.key,
+            shiftKey: event.shiftKey,
+            isComposing: event.nativeEvent.isComposing,
+          })
+        ) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        submitRef.current();
+      }}
     >
       <Box
         sx={{
-          minHeight: 76,
+          minHeight: 42,
           px: 1,
-          py: 0.75,
+          py: 0.5,
           '& .ProseMirror': {
-            minHeight: 60,
+            minHeight: 28,
             outline: 'none',
             fontSize: '0.86rem',
-            lineHeight: 1.55,
+            lineHeight: 1.5,
             color: 'text.primary',
+            '& p': { m: 0 },
             '& p.is-editor-empty:first-of-type::before': {
               content: 'attr(data-placeholder)',
               color: 'text.disabled',
@@ -224,6 +254,7 @@ function CommentEditor({
 type ItemProps = {
   comment: FeedCommentItem;
   depth: number;
+  rootCommentId: string | number;
   props: CommentThreadProps;
   replyTargetId: string | number | null;
   setReplyTargetId: (id: string | number | null) => void;
@@ -233,6 +264,7 @@ type ItemProps = {
 function CommentItem({
   comment,
   depth,
+  rootCommentId,
   props,
   replyTargetId,
   setReplyTargetId,
@@ -243,10 +275,17 @@ function CommentItem({
   const isDark = Boolean(props.isDark);
   const isEditing = editingCommentId === comment.id;
   const isReplying = replyTargetId === comment.id;
+  const replyParentId = rootCommentId ?? comment.id;
   const isDeleted = comment.isDeleted === true;
   const canEditAttachments = isEditing;
   return (
-    <Box sx={{ mt: 1.5, pl: depth ? { xs: 1, sm: 2 } : 0, minWidth: 0 }}>
+    <Box
+      sx={{
+        mt: depth ? 0.75 : 1.25,
+        pl: depth ? { xs: 1.5, sm: 3 } : 0,
+        minWidth: 0,
+      }}
+    >
       <Box
         sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}
       >
@@ -344,7 +383,7 @@ function CommentItem({
               size="small"
               variant="text"
               onClick={() => {
-                props.onReply?.(comment.id);
+                props.onReply?.(replyParentId);
                 setReplyTargetId(isReplying ? null : comment.id);
               }}
               sx={{
@@ -382,7 +421,7 @@ function CommentItem({
               isDark={isDark}
               onCancel={() => setReplyTargetId(null)}
               onSubmit={async (content, files) => {
-                await props.onSubmitReply?.(comment.id, content, files);
+                await props.onSubmitReply?.(replyParentId, content, files);
                 setReplyTargetId(null);
               }}
             />
@@ -392,6 +431,7 @@ function CommentItem({
               key={reply.id}
               comment={reply}
               depth={depth + 1}
+              rootCommentId={rootCommentId}
               props={props}
               replyTargetId={replyTargetId}
               setReplyTargetId={setReplyTargetId}
@@ -403,6 +443,13 @@ function CommentItem({
       </Box>
     </Box>
   );
+}
+
+function flattenReplies(replies: FeedCommentItem[] = []): FeedCommentItem[] {
+  return replies.flatMap((reply) => [
+    { ...reply, replies: [] },
+    ...flattenReplies(reply.replies),
+  ]);
 }
 
 export function TiptapCommentThread({
@@ -455,8 +502,12 @@ export function TiptapCommentThread({
           {comments.map((comment) => (
             <CommentItem
               key={comment.id}
-              comment={comment}
+              comment={{
+                ...comment,
+                replies: flattenReplies(comment.replies),
+              }}
               depth={0}
+              rootCommentId={comment.id}
               props={props}
               replyTargetId={replyTargetId}
               setReplyTargetId={setReplyTargetId}

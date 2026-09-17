@@ -36,6 +36,12 @@
 - Critical/Important 이슈: 없음
 - React `act(...)` 경고와 무관 영역 전체 테스트 실패는 후속 범위로 남겼다.
 
+## 후속 장애 조사
+
+댓글 저장 실패는 `tb_common_comment.parent_comment_id BIGINT`와 MyBatis Map 바인딩 타입 불일치로 확인했다. 공통 댓글 PostgreSQL Mapper에 `jdbcType=BIGINT`를 추가했고 관련 서비스 테스트 16개와 백엔드 컴파일을 통과했다.
+
+첨부 저장 실패는 MinIO 연결 문제다. 현재 `127.0.0.1:9000`이 열려 있지 않고 Docker 및 로컬 MinIO 바이너리가 없어 이 환경에서 MinIO를 기동하지 못했다. MinIO 실행 후 백엔드를 재시작해야 첨부 저장을 재검증할 수 있다.
+
 ## DB 영향
 
 DB 스키마 변경 없음.

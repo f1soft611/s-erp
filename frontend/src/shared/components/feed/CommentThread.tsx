@@ -1,5 +1,6 @@
 export {
   TiptapCommentThread as CommentThread,
+  isCommentSubmitKey,
   sanitizeCommentHtml,
 } from './TiptapCommentThread';
 export type {

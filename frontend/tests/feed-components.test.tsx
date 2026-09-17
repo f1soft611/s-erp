@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
-import { CommentThread } from '../src/shared/components/feed/CommentThread';
+import {
+  CommentThread,
+  isCommentSubmitKey,
+} from '../src/shared/components/feed/CommentThread';
 import { FeedList } from '../src/shared/components/feed/FeedList';
 
 describe('shared feed components', () => {
@@ -65,6 +68,82 @@ describe('shared feed components', () => {
     await waitFor(() => {
       expect(onSubmitComment).toHaveBeenCalledWith('<p>새 댓글</p>', []);
     });
+  });
+
+  it('flattens deep replies and submits replies to the root comment', async () => {
+    const onSubmitReply = vi.fn();
+
+    render(
+      <CommentThread
+        comments={[
+          {
+            id: 1,
+            author: '원댓글 작성자',
+            time: '방금',
+            content: '<p>원댓글</p>',
+            replies: [
+              {
+                id: 2,
+                author: '첫 답글 작성자',
+                time: '방금',
+                content: '<p>첫 답글</p>',
+                replies: [
+                  {
+                    id: 3,
+                    author: '두번째 답글 작성자',
+                    time: '방금',
+                    content: '<p>두번째 답글</p>',
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+        onSubmitReply={onSubmitReply}
+        showComposer={false}
+      />,
+    );
+
+    expect(screen.getByText('두번째 답글')).toBeInTheDocument();
+    const replyButtons = screen.getAllByRole('button', { name: '답글' });
+    expect(replyButtons).toHaveLength(3);
+
+    fireEvent.click(replyButtons[2]);
+    const replyEditor = await screen.findByRole('textbox', {
+      name: '답글 입력',
+    });
+    fireEvent.input(replyEditor, {
+      target: { innerHTML: '<p>새 답글</p>' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
+
+    await waitFor(() => {
+      expect(onSubmitReply).toHaveBeenCalledWith(1, '<p>새 답글</p>', []);
+    });
+  });
+
+  it('registers with Enter and keeps Shift+Enter for a line break', async () => {
+    expect(
+      isCommentSubmitKey({
+        key: 'Enter',
+        shiftKey: false,
+        isComposing: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCommentSubmitKey({
+        key: 'Enter',
+        shiftKey: true,
+        isComposing: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCommentSubmitKey({
+        key: 'Enter',
+        shiftKey: false,
+        isComposing: true,
+      }),
+    ).toBe(false);
   });
 
   it('keeps comment edit and delete actions inside an accessible MoreVert menu', async () => {

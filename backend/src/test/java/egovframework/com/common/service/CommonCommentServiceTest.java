@@ -351,6 +351,10 @@ class CommonCommentServiceTest {
         assertThat(countQuery).contains("deleted_yn = 'N'");
         assertThat(countQuery).doesNotContain("WITH RECURSIVE root_page AS");
         assertThat(countQuery).contains("COUNT(*)");
+        int insertStart = mapperXml.indexOf("<select id=\"insertCommonComment\"");
+        String insertQuery = mapperXml.substring(insertStart,
+            mapperXml.indexOf("</select>", insertStart));
+        assertThat(insertQuery).contains("#{parentCommentId, jdbcType=BIGINT}");
     }
 
     private static CommonCommentVO comment(Long commentId) {

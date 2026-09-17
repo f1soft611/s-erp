@@ -60,3 +60,11 @@
 - 리뷰 보완: 첨부 업로드 실패 시 오류 메시지와 제목 draft 보존 assertion 추가 후 관련 테스트 재통과
 - Critical/Important 이슈: 없음
 - Minor: 전체 테스트의 무관 영역 기존 실패와 React `act(...)` 경고는 범위 밖으로 기록
+
+## 후속 장애 조사
+
+- 댓글 오류 원인: `tb_common_comment.parent_comment_id`는 PostgreSQL `BIGINT`인데 공통 댓글 insert Mapper가 `jdbcType` 없이 Map 값을 바인딩했다.
+- 수정: `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`에서 `parentCommentId`를 `jdbcType=BIGINT`로 명시했다.
+- 검증: `CommonCommentServiceTest` 16개 통과, `mvn -q -DskipTests compile` 성공
+- MinIO 상태: `127.0.0.1:9000` 미청취, Docker 미설치, `C:\Tools\MinIO\minio.exe` 미존재, 공식 바이너리 다운로드 실패
+- MinIO 조치: 코드 오류가 아니라 저장소 서비스 미기동 상태이며, 백엔드 재시작 전 MinIO 실행이 필요하다.

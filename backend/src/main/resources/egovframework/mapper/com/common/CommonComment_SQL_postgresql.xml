@@ -172,7 +172,7 @@
             #{tenantId},
             #{ownerType},
             #{ownerId},
-            #{parentCommentId},
+            #{parentCommentId, jdbcType=BIGINT},
             #{content},
             #{writerId},
             #{writerName},
