@@ -11,6 +11,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +32,7 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
     private final MinioStorageService minioStorageService;
     private final CommonFileDAO commonFileDAO;
 
-    public CommonFileServiceImpl() {
-        this(null, null);
-    }
-
+    @Autowired
     public CommonFileServiceImpl(MinioStorageService minioStorageService, CommonFileDAO commonFileDAO) {
         this.minioStorageService = minioStorageService;
         this.commonFileDAO = commonFileDAO;

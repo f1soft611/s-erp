@@ -3,9 +3,14 @@ package egovframework.let.uat.uia.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,5 +64,26 @@ class EgovLoginServiceImplTest {
 
 		assertNotNull(result);
 		assertNull(result.getId());
+	}
+
+	@DisplayName("tenantId가 없으면 PostgreSQL 로그인 SQL은 tenant 조건을 건너뛴다")
+	@Test
+	void actionLogin_sql_skipsTenantFilterWhenTenantIdMissing() throws IOException {
+		try (InputStream inputStream = getClass().getClassLoader()
+				.getResourceAsStream("egovframework/mapper/let/uat/uia/EgovLoginUsr_SQL_postgresql.xml")) {
+			assertNotNull(inputStream, "로그인 SQL XML 리소스가 존재해야 합니다.");
+			String xml = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			assertTrue(xml.contains("<if test=\"tenantId != null\">"), "tenantId가 있을 때만 테넌트 조건을 추가해야 합니다.");
+			assertTrue(xml.contains("<if test=\"tenantId == null and tenantCode != null and tenantCode != ''\">"), "tenantCode 기반 fallback 조건이 필요합니다.");
+		}
+	}
+
+	@DisplayName("tenantId는 Long 값으로 유지된다")
+	@Test
+	void setTenantId_keepsLongValue() {
+		LoginVO loginVO = new LoginVO();
+		loginVO.setTenantId(42L);
+
+		assertEquals(42L, loginVO.getTenantId());
 	}
 }

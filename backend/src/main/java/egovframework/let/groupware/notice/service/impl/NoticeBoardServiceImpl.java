@@ -18,9 +18,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import egovframework.com.attachment.service.AttachmentService;
-import egovframework.com.comment.service.CommentService;
-import egovframework.com.feed.service.FeedService;
+import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.service.CommonCommentService;
+import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
@@ -34,19 +34,17 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private static final String DEFAULT_BUCKET = "document-attachments";
 
     private final NoticeBoardDAO noticeBoardDAO;
-    private final AttachmentService attachmentService;
-    private final CommentService commentService;
-    private final FeedService feedService;
+    private final CommonFileService commonFileService;
+    private final CommonCommentService commonCommentService;
 
     @Value("${storage.bucket:document-attachments}")
     private String storageBucket;
 
-    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, AttachmentService attachmentService,
-            CommentService commentService, FeedService feedService) {
+    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
+            CommonCommentService commonCommentService) {
         this.noticeBoardDAO = noticeBoardDAO;
-        this.attachmentService = attachmentService;
-        this.commentService = commentService;
-        this.feedService = feedService;
+        this.commonFileService = commonFileService;
+        this.commonCommentService = commonCommentService;
     }
 
     @Override
@@ -110,19 +108,6 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             }
         }
 
-        if (feedService != null) {
-            feedService.createFeed(
-                    tenantId,
-                    "NOTICE_CREATED",
-                    BOARD_TYPE_NOTICE,
-                    postId,
-                    StringUtils.hasText(payload.getWriterId()) ? payload.getWriterId() : "unknown",
-                    StringUtils.hasText(payload.getWriterName()) ? payload.getWriterName() : "관리자",
-                    payload.getTitle(),
-                    "{\"title\":\"" + payload.getTitle() + "\"}"
-            );
-        }
-
         return getPost(tenantId, postId);
     }
 
@@ -173,27 +158,48 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         getPost(tenantId, postId);
 
-        egovframework.com.attachment.domain.model.AttachmentFileVO uploaded =
-                attachmentService.uploadAttachment(tenantId, "NOTICE", postId, file, uploaderId);
-        if (uploaded == null || uploaded.getAttachmentId() == null) {
+        if (commonFileService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "공통 첨부 서비스가 준비되지 않았습니다.");
+        }
+
+        CommonFileVO uploaded = commonFileService.uploadFile(tenantId, "NOTICE", postId, file, uploaderId);
+        if (uploaded == null || uploaded.getFileId() == null) {
             return null;
         }
 
-        HashMap<String, Object> lookup = new HashMap<>();
-        lookup.put("tenantId", tenantId);
-        lookup.put("boardFileId", uploaded.getAttachmentId());
-        return noticeBoardDAO.selectNoticeAttachmentById(lookup);
+        NoticeBoardFileVO noticeBoardFile = new NoticeBoardFileVO();
+        noticeBoardFile.setBoardFileId(uploaded.getFileId());
+        noticeBoardFile.setPostId(postId);
+        noticeBoardFile.setFileName(uploaded.getFileName());
+        noticeBoardFile.setFilePath(uploaded.getFilePath());
+        noticeBoardFile.setObjectKey(uploaded.getObjectKey());
+        noticeBoardFile.setBucketName(uploaded.getBucketName());
+        noticeBoardFile.setStorageProvider(uploaded.getStorageProvider());
+        noticeBoardFile.setFileSize(uploaded.getFileSize());
+        noticeBoardFile.setMimeType(uploaded.getMimeType());
+        noticeBoardFile.setContentType(uploaded.getContentType());
+        noticeBoardFile.setDeletedYn(uploaded.getDeletedYn());
+        noticeBoardFile.setUploadedBy(uploaded.getUploadedBy());
+        noticeBoardFile.setCreatedAt(uploaded.getCreatedAt());
+        noticeBoardFile.setUpdatedAt(uploaded.getUpdatedAt());
+        return noticeBoardFile;
     }
 
     @Override
     @Transactional
     public void deleteAttachment(Long tenantId, Long boardFileId) throws Exception {
-        attachmentService.deleteAttachment(tenantId, boardFileId);
+        if (commonFileService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "공통 첨부 서비스가 준비되지 않았습니다.");
+        }
+        commonFileService.deleteFile(tenantId, boardFileId);
     }
 
     @Override
     public void downloadAttachment(Long tenantId, Long boardFileId, HttpServletResponse response) throws Exception {
-        attachmentService.downloadAttachment(tenantId, boardFileId, response);
+        if (commonFileService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "공통 첨부 서비스가 준비되지 않았습니다.");
+        }
+        commonFileService.downloadFile(tenantId, boardFileId, response);
     }
 
     private void validateCreatePayload(NoticeBoardPostSaveRequestVO payload) {

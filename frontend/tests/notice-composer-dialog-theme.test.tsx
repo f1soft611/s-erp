@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from 'vitest';
 import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
-import { NoticeAttachmentList } from '../src/shared/components/groupware/NoticeAttachmentList';
+import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { createAppTheme } from '../src/theme/theme';
 
 describe('NoticeComposerDialog theme handling', () => {
@@ -50,7 +50,7 @@ describe('NoticeComposerDialog theme handling', () => {
 
     const { rerender } = render(
       <ThemeProvider theme={createAppTheme('light')}>
-        <NoticeAttachmentList
+        <AttachmentList
           files={[{ id: 'a1', name: '3분기_업무일정표_v2.pdf' }]}
           isDark={false}
           mode="view"
@@ -69,7 +69,7 @@ describe('NoticeComposerDialog theme handling', () => {
 
     rerender(
       <ThemeProvider theme={createAppTheme('light')}>
-        <NoticeAttachmentList
+        <AttachmentList
           files={[{ id: 'a1', name: '3분기_업무일정표_v2.pdf' }]}
           isDark={false}
           mode="edit"
