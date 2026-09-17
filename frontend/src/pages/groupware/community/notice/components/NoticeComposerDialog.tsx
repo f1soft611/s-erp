@@ -46,11 +46,18 @@ type NoticeComposerDialogProps = {
     bodyJson?: string;
     bodyText?: string;
     attachments: NoticeComposerDraftAttachment[];
+    removedAttachmentIds: Array<number | string>;
   }) => Promise<unknown> | unknown;
   defaultTitle?: string;
   defaultBody?: string;
   defaultAttachments?: NoticeComposerDraftAttachment[];
 };
+
+export function serializeNoticeEditorJson(
+  editor: { getJSON: () => unknown } | null | undefined,
+): string | undefined {
+  return editor ? JSON.stringify(editor.getJSON()) : undefined;
+}
 
 const emptyNoticeContent = '<p></p>';
 
@@ -254,15 +261,30 @@ export function NoticeComposerDialog({
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+    const currentAttachmentIds = new Set(
+      attachments.map((attachment) => String(attachment.id)),
+    );
+    const removedAttachmentIds = defaultAttachments
+      .filter(
+        (attachment) =>
+          attachment.boardFileId != null &&
+          !currentAttachmentIds.has(String(attachment.id)),
+      )
+      .map((attachment) => attachment.boardFileId as number | string);
 
     if (onSubmit) {
-      await onSubmit({
-        title,
-        body,
-        bodyJson: JSON.stringify({ type: 'doc', content: [] }),
-        bodyText,
-        attachments,
-      });
+      try {
+        await onSubmit({
+          title,
+          body,
+          bodyJson: serializeNoticeEditorJson(editor),
+          bodyText,
+          attachments,
+          removedAttachmentIds,
+        });
+      } catch {
+        return;
+      }
     }
 
     onClose();
@@ -358,7 +380,7 @@ export function NoticeComposerDialog({
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            px: 2.5,
+            px: 2,
             py: 2,
             bgcolor: dialogContentBackground,
             backgroundImage:
@@ -370,7 +392,7 @@ export function NoticeComposerDialog({
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 0.75,
+              // gap: 0.75,
               height: '100%',
             }}
           >

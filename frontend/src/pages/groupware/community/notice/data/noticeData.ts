@@ -3,6 +3,12 @@ export type NoticeCommentItem = {
   author: string;
   time: string;
   content: string;
+  isEditable?: boolean;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    size?: number;
+  }>;
   replies?: NoticeCommentItem[];
 };
 
@@ -25,6 +31,8 @@ export type NoticeFeedItem = {
     bucketName?: string | null;
   }>;
   comments?: NoticeCommentItem[];
+  hasPreviousComments?: boolean;
+  nextBeforeCommentId?: number | string | null;
   commentCount: number;
   highlight: boolean;
   liked?: boolean;

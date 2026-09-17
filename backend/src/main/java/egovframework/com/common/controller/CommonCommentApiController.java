@@ -7,8 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,6 +23,7 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonCommentVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.service.CommonCommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -43,11 +47,17 @@ public class CommonCommentApiController {
     public ResultVO listComments(
             @RequestParam String ownerType,
             @RequestParam Long ownerId,
+            @RequestParam(defaultValue = "3") Integer limit,
+            @RequestParam(required = false) Long beforeCommentId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         HashMap<String, Object> resultMap = new HashMap<>();
-        List<CommonCommentVO> comments = commonCommentService.listComments(user.getTenantId(), ownerType, ownerId);
+        CommonCommentPageVO commentPage = commonCommentService.listComments(user.getTenantId(), ownerType, ownerId, limit, beforeCommentId);
+        List<CommonCommentVO> comments = commentPage.getComments();
         resultMap.put("resultList", comments);
+        resultMap.put("comments", comments);
+        resultMap.put("hasPrevious", commentPage.isHasPrevious());
+        resultMap.put("nextBeforeCommentId", commentPage.getNextBeforeCommentId());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -67,6 +77,36 @@ public class CommonCommentApiController {
         resultMap.put("item", created);
         resultMap.put("message", "댓글이 등록되었습니다.");
         return ResponseEntity.status(HttpStatus.CREATED).body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "공통 댓글 수정", security = @SecurityRequirement(name = "Authorization"))
+    @PutMapping("/common/comments/{commentId}")
+    public ResponseEntity<ResultVO> updateComment(
+            @PathVariable Long commentId,
+            @RequestBody CommonCommentUpdateRequest request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        if (commentId == null || request == null || !StringUtils.hasText(request.getContent())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 수정 정보가 올바르지 않습니다.");
+        }
+
+        CommonCommentVO updated = commonCommentService.updateComment(user.getTenantId(), commentId, request.getContent(), user.getId());
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", updated);
+        resultMap.put("message", "댓글이 수정되었습니다.");
+        return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "공통 댓글 삭제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/common/comments/{commentId}")
+    public ResultVO deleteComment(
+            @PathVariable Long commentId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        commonCommentService.deleteComment(user.getTenantId(), commentId, user.getId());
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "댓글이 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
     private void requireAuthenticated(LoginVO user) {
@@ -89,5 +129,12 @@ public class CommonCommentApiController {
         public void setContent(String content) { this.content = content; }
         public Long getParentCommentId() { return parentCommentId; }
         public void setParentCommentId(Long parentCommentId) { this.parentCommentId = parentCommentId; }
+    }
+
+    public static class CommonCommentUpdateRequest {
+        private String content;
+
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
     }
 }

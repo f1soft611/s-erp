@@ -71,6 +71,32 @@
           AND deleted_yn = 'N'
     </select>
 
+    <select id="selectCommonFileByIdAndOwner" parameterType="map" resultMap="commonFileMap">
+        SELECT
+            file_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            file_name,
+            file_path,
+            object_key,
+            bucket_name,
+            storage_provider,
+            file_size,
+            mime_type,
+            content_type,
+            uploaded_by,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM tb_common_file
+        WHERE tenant_id = #{tenantId}
+          AND file_id = #{fileId}
+          AND owner_type = #{ownerType}
+          AND owner_id = #{ownerId}
+          AND deleted_yn = 'N'
+    </select>
+
     <select id="insertCommonFile" parameterType="map" resultType="long">
         INSERT INTO tb_common_file (
             tenant_id,
@@ -127,5 +153,15 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND file_id = #{fileId}
+    </update>
+
+    <update id="softDeleteCommonFileByOwner" parameterType="map">
+        UPDATE tb_common_file
+        SET deleted_yn = 'Y',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND file_id = #{fileId}
+          AND owner_type = #{ownerType}
+          AND owner_id = #{ownerId}
     </update>
 </mapper>

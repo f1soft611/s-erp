@@ -7,6 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -77,9 +78,18 @@ public class CommonFileApiController {
     @DeleteMapping("/common/files/{fileId}")
     public ResultVO deleteFile(
             @PathVariable Long fileId,
+            @RequestParam(required = false) String ownerType,
+            @RequestParam(required = false) Long ownerId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        commonFileService.deleteFile(user.getTenantId(), fileId);
+        if (hasPartialOwner(ownerType, ownerId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 소유 정보가 올바르지 않습니다.");
+        }
+        if (StringUtils.hasText(ownerType) && ownerId != null) {
+            commonFileService.deleteFile(user.getTenantId(), ownerType, ownerId, fileId);
+        } else {
+            commonFileService.deleteFile(user.getTenantId(), fileId);
+        }
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("message", "첨부파일이 삭제되었습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
@@ -89,15 +99,28 @@ public class CommonFileApiController {
     @GetMapping("/common/files/{fileId}/download")
     public void downloadFile(
             @PathVariable Long fileId,
+            @RequestParam(required = false) String ownerType,
+            @RequestParam(required = false) Long ownerId,
             @AuthenticationPrincipal LoginVO user,
             HttpServletResponse response) throws Exception {
         requireAuthenticated(user);
-        commonFileService.downloadFile(user.getTenantId(), fileId, response);
+        if (hasPartialOwner(ownerType, ownerId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 소유 정보가 올바르지 않습니다.");
+        }
+        if (StringUtils.hasText(ownerType) && ownerId != null) {
+            commonFileService.downloadFile(user.getTenantId(), ownerType, ownerId, fileId, response);
+        } else {
+            commonFileService.downloadFile(user.getTenantId(), fileId, response);
+        }
     }
 
     private void requireAuthenticated(LoginVO user) {
         if (user == null || user.getTenantId() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ResponseCode.AUTH_ERROR.getMessage());
         }
+    }
+
+    private boolean hasPartialOwner(String ownerType, Long ownerId) {
+        return StringUtils.hasText(ownerType) != (ownerId != null);
     }
 }

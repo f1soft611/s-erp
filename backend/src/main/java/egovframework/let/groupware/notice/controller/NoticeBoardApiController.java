@@ -147,9 +147,11 @@ public class NoticeBoardApiController {
         @ApiResponse(responseCode = "404", description = "첨부파일 없음")
     })
     @DeleteMapping("/attachments/{boardFileId}")
-    public ResultVO deleteAttachment(@PathVariable Long boardFileId, @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+    public ResultVO deleteAttachment(@PathVariable Long boardFileId,
+            @RequestParam(required = false) Long postId,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        noticeBoardService.deleteAttachment(user.getTenantId(), boardFileId);
+        noticeBoardService.deleteAttachment(user.getTenantId(), postId, boardFileId);
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("message", "첨부파일이 삭제되었습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
@@ -158,10 +160,11 @@ public class NoticeBoardApiController {
     @Operation(summary = "첨부파일 다운로드", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
     @GetMapping("/attachments/{boardFileId}/download")
     public void downloadAttachment(@PathVariable Long boardFileId,
+            @RequestParam(required = false) Long postId,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user,
             HttpServletResponse response) throws Exception {
         requireAuthenticated(user);
-        noticeBoardService.downloadAttachment(user.getTenantId(), boardFileId, response);
+        noticeBoardService.downloadAttachment(user.getTenantId(), postId, boardFileId, response);
     }
 
     private void requireAuthenticated(LoginVO user) {

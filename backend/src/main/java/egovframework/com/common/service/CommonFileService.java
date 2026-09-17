@@ -12,5 +12,7 @@ public interface CommonFileService {
     List<CommonFileVO> listFiles(Long tenantId, String ownerType, Long ownerId) throws Exception;
     CommonFileVO uploadFile(Long tenantId, String ownerType, Long ownerId, MultipartFile file, String uploaderId) throws Exception;
     void deleteFile(Long tenantId, Long fileId) throws Exception;
+    void deleteFile(Long tenantId, String ownerType, Long ownerId, Long fileId) throws Exception;
     void downloadFile(Long tenantId, Long fileId, HttpServletResponse response) throws Exception;
+    void downloadFile(Long tenantId, String ownerType, Long ownerId, Long fileId, HttpServletResponse response) throws Exception;
 }

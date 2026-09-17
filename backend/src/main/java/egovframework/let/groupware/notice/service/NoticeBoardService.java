@@ -25,5 +25,9 @@ public interface NoticeBoardService {
 
     void deleteAttachment(Long tenantId, Long boardFileId) throws Exception;
 
+    void deleteAttachment(Long tenantId, Long postId, Long boardFileId) throws Exception;
+
     void downloadAttachment(Long tenantId, Long boardFileId, HttpServletResponse response) throws Exception;
+
+    void downloadAttachment(Long tenantId, Long postId, Long boardFileId, HttpServletResponse response) throws Exception;
 }

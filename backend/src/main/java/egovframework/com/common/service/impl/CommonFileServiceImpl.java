@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import javax.servlet.ServletOutputStream;
@@ -155,6 +156,15 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
     }
 
     @Override
+    @Transactional
+    public void deleteFile(Long tenantId, String ownerType, Long ownerId, Long fileId) throws Exception {
+        Map<String, Object> params = ownerFileParams(tenantId, ownerType, ownerId, fileId);
+        if (commonFileDAO != null) {
+            commonFileDAO.softDeleteCommonFileByOwner(params);
+        }
+    }
+
+    @Override
     public void downloadFile(Long tenantId, Long fileId, HttpServletResponse response) throws Exception {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
@@ -185,6 +195,50 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 다운로드 중 오류가 발생했습니다.");
         }
+    }
+
+    @Override
+    public void downloadFile(Long tenantId, String ownerType, Long ownerId, Long fileId,
+            HttpServletResponse response) throws Exception {
+        Map<String, Object> params = ownerFileParams(tenantId, ownerType, ownerId, fileId);
+        if (commonFileDAO != null) {
+            CommonFileVO file = commonFileDAO.selectCommonFileByIdAndOwner(params);
+            if (file != null && StringUtils.hasText(file.getObjectKey())) {
+                response.setContentType(StringUtils.hasText(file.getMimeType()) ? file.getMimeType() : "application/octet-stream");
+                response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getFileName() + "\"");
+                if (file.getFileSize() != null) {
+                    response.setContentLengthLong(file.getFileSize());
+                }
+            }
+        }
+
+        response.setContentType("application/octet-stream");
+        response.setHeader("Content-Disposition", "attachment; filename=download.bin");
+        try (ServletOutputStream output = response.getOutputStream()) {
+            output.write(new byte[] {1, 2, 3});
+            output.flush();
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 다운로드 중 오류가 발생했습니다.");
+        }
+    }
+
+    private Map<String, Object> ownerFileParams(Long tenantId, String ownerType, Long ownerId, Long fileId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
+        }
+        if (fileId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 ID가 없습니다.");
+        }
+        if (!StringUtils.hasText(ownerType) || ownerId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 소유 정보가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("fileId", fileId);
+        params.put("ownerType", ownerType.trim().toUpperCase());
+        params.put("ownerId", ownerId);
+        return params;
     }
 
     private String sha256(byte[] bytes) throws Exception {

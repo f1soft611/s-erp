@@ -32,14 +32,23 @@ import {
   downloadNoticeAttachment,
   fetchNoticePostDetail,
   fetchNoticePosts,
+  deleteNoticeAttachment,
   updateNoticePost,
   uploadNoticeAttachment,
 } from './services/noticeBoardService';
 import type { NoticeBoardPostApi } from './services/noticeBoardService';
+import type { NoticeBoardAttachmentApi } from './services/noticeBoardService';
 import {
   createCommonComment,
+  deleteCommonComment,
+  deleteCommonFile,
+  downloadCommonFile,
   fetchCommonComments,
+  uploadCommonFile,
+  updateCommonComment,
 } from '../../../../shared/services/commonContentApi';
+import type { CommonFileItem } from '../../../../shared/services/commonContentApi';
+import { sanitizeHtml } from '../../../../shared/utils/sanitizeHtml';
 
 type CommunityNoticePageProps = {
   selectedModule: ModuleItem;
@@ -106,6 +115,7 @@ const toNoticeCommentTree = (
     writerId?: string | null;
     content?: string | null;
     createdAt?: string | Date | null;
+    attachments?: CommonFileItem[];
   }> = [],
 ): NoticeCommentItem[] => {
   const commentMap = new Map<number, NoticeCommentItem>();
@@ -122,6 +132,11 @@ const toNoticeCommentTree = (
       author: record.writerName || record.writerId || '사용자',
       time: formatCommentTime(record.createdAt),
       content: record.content ?? '',
+      attachments: (record.attachments ?? []).map((file) => ({
+        id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
+        name: file.fileName ?? '첨부파일',
+        size: Number(file.fileSize ?? 0) || undefined,
+      })),
       replies: [],
     };
 
@@ -157,16 +172,7 @@ const hydrateNoticePost = async (
 ): Promise<NoticeFeedItem> => {
   const postId = Number(post.postId ?? 0);
   const detail = postId > 0 ? await fetchNoticePostDetail(postId) : post;
-  const baseItem = toNoticeFeedItem(detail ?? post);
-  const commentRecords =
-    postId > 0 ? await fetchCommonComments('NOTICE', postId) : [];
-  const comments = toNoticeCommentTree(commentRecords);
-
-  return {
-    ...baseItem,
-    comments,
-    commentCount: countNestedComments(comments),
-  };
+  return toNoticeFeedItem(detail ?? post);
 };
 
 const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
@@ -188,6 +194,7 @@ const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
     objectKey: attachment.objectKey,
     bucketName: attachment.bucketName,
   }));
+  const comments = toNoticeCommentTree(post.comments ?? []);
 
   return {
     id: Number(post.postId ?? 0),
@@ -200,7 +207,13 @@ const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
     bodyHtml,
     attachments: attachments.map((attachment) => attachment.name),
     attachmentDetails: attachments,
-    commentCount: 0,
+    comments,
+    commentCount:
+      post.commentCount == null
+        ? countNestedComments(comments)
+        : Number(post.commentCount) || 0,
+    hasPreviousComments: post.hasPreviousComments,
+    nextBeforeCommentId: post.nextBeforeCommentId,
     likeCount: 0,
     liked: false,
     bookmarked: false,
@@ -208,8 +221,140 @@ const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
   };
 };
 
+const toNoticeAttachmentApi = (
+  attachment: NonNullable<NoticeFeedItem['attachmentDetails']>[number],
+): NoticeBoardPostApi['attachments'] extends Array<infer T> | undefined
+  ? T
+  : never => ({
+  boardFileId: attachment.boardFileId,
+  fileName: attachment.name,
+  fileSize: attachment.size,
+  objectKey: attachment.objectKey,
+  bucketName: attachment.bucketName,
+});
+
+const appendCommentToTree = (
+  comments: NoticeCommentItem[] = [],
+  parentCommentId: number | string | null | undefined,
+  comment: NoticeCommentItem,
+): NoticeCommentItem[] => {
+  if (parentCommentId == null) {
+    return [...comments, comment];
+  }
+
+  return comments.map((current) =>
+    String(current.id) === String(parentCommentId)
+      ? { ...current, replies: [...(current.replies ?? []), comment] }
+      : {
+          ...current,
+          replies: appendCommentToTree(
+            current.replies ?? [],
+            parentCommentId,
+            comment,
+          ),
+        },
+  );
+};
+
+const updateCommentInTree = (
+  comments: NoticeCommentItem[] = [],
+  commentId: number | string,
+  content: string,
+  attachments?: NoticeCommentItem['attachments'],
+): NoticeCommentItem[] =>
+  comments.map((comment) =>
+    String(comment.id) === String(commentId)
+      ? {
+          ...comment,
+          content,
+          ...(attachments
+            ? { attachments: [...(comment.attachments ?? []), ...attachments] }
+            : {}),
+        }
+      : {
+          ...comment,
+          replies: updateCommentInTree(
+            comment.replies ?? [],
+            commentId,
+            content,
+            attachments,
+          ),
+        },
+  );
+
+const deleteCommentFromTree = (
+  comments: NoticeCommentItem[] = [],
+  commentId: number | string,
+): NoticeCommentItem[] =>
+  comments.flatMap((comment) => {
+    if (String(comment.id) === String(commentId)) {
+      return comment.replies ?? [];
+    }
+
+    return [
+      {
+        ...comment,
+        replies: deleteCommentFromTree(comment.replies ?? [], commentId),
+      },
+    ];
+  });
+
+const removeAttachmentFromCommentTree = (
+  comments: NoticeCommentItem[] = [],
+  commentId: number | string,
+  attachmentId: string,
+): NoticeCommentItem[] =>
+  comments.map((comment) =>
+    String(comment.id) === String(commentId)
+      ? {
+          ...comment,
+          attachments: (comment.attachments ?? []).filter(
+            (attachment) => String(attachment.id) !== String(attachmentId),
+          ),
+        }
+      : {
+          ...comment,
+          replies: removeAttachmentFromCommentTree(
+            comment.replies ?? [],
+            commentId,
+            attachmentId,
+          ),
+        },
+  );
+
+const toNoticeCommentItem = (
+  comment: NonNullable<NoticeBoardPostApi['comments']>[number],
+): NoticeCommentItem | undefined => {
+  const mapped = toNoticeCommentTree([comment]);
+  return mapped[0];
+};
+
 const noticeFailureMessage =
   '공지사항 목록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.';
+
+const deleteUploadedNoticeAttachments = async (
+  postId: number,
+  attachments: NoticeBoardAttachmentApi[],
+) => {
+  await Promise.allSettled(
+    attachments
+      .map((attachment) => attachment.boardFileId)
+      .filter((fileId): fileId is number | string => fileId != null)
+      .map((fileId) => deleteNoticeAttachment(fileId, postId)),
+  );
+};
+
+const deleteUploadedCommentFiles = async (
+  commentId: number | string,
+  files: CommonFileItem[],
+) => {
+  await Promise.allSettled(
+    files
+      .map((file) => file.fileId)
+      .filter((fileId): fileId is number | string => fileId != null)
+      .map((fileId) => deleteCommonFile('NOTICE_COMMENT', commentId, fileId)),
+  );
+};
 
 export function CommunityNoticePage({
   selectedModule,
@@ -284,28 +429,31 @@ export function CommunityNoticePage({
     bodyJson,
     bodyText,
     attachments,
+    removedAttachmentIds,
   }: {
     title: string;
     body: string;
     bodyJson?: string;
     bodyText?: string;
     attachments: NoticeComposerDraftAttachment[];
+    removedAttachmentIds: Array<number | string>;
   }) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       return;
     }
 
-    const safeHtml = body || '<p></p>';
+    const safeHtml = sanitizeHtml(body || '<p></p>');
     const safeJson = bodyJson || JSON.stringify({ type: 'doc', content: [] });
     const safeText = (bodyText ?? toPlainText(safeHtml)).trim();
 
     const updatedDraft = { title: trimmedTitle, body: safeHtml, attachments };
     const existingId = editorDraft.id;
+    let attachmentDeletionFailed = false;
 
     try {
       if (existingId) {
-        await updateNoticePost(existingId, {
+        const updated = await updateNoticePost(existingId, {
           title: trimmedTitle,
           contents: safeHtml,
           contentsHtml: safeHtml,
@@ -320,9 +468,59 @@ export function CommunityNoticePage({
           .map((attachment) => attachment.file)
           .filter((file): file is File => Boolean(file));
 
-        for (const file of uploadableFiles) {
-          await uploadNoticeAttachment(existingId, file);
+        const uploadedAttachments: NoticeBoardAttachmentApi[] = [];
+        try {
+          for (const file of uploadableFiles) {
+            uploadedAttachments.push(
+              await uploadNoticeAttachment(existingId, file),
+            );
+          }
+        } catch (error) {
+          await deleteUploadedNoticeAttachments(
+            existingId,
+            uploadedAttachments,
+          );
+          throw error;
         }
+
+        try {
+          for (const boardFileId of removedAttachmentIds) {
+            await deleteNoticeAttachment(boardFileId, existingId);
+          }
+        } catch (error) {
+          attachmentDeletionFailed = true;
+          throw error;
+        }
+
+        setNoticeItems((current) =>
+          current.map((item) => {
+            if (item.id !== existingId) {
+              return item;
+            }
+
+            const nextPost: NoticeBoardPostApi = {
+              ...updated,
+              postId: existingId,
+              attachments: [
+                ...attachments
+                  .filter((attachment) => !attachment.file)
+                  .map(toNoticeAttachmentApi),
+                ...uploadedAttachments,
+              ],
+              comments: updated.comments,
+              commentCount: updated.commentCount ?? item.commentCount,
+            };
+            const nextItem = toNoticeFeedItem(nextPost);
+
+            return {
+              ...nextItem,
+              comments: updated.comments ? nextItem.comments : item.comments,
+              commentCount: updated.comments
+                ? nextItem.commentCount
+                : item.commentCount,
+            };
+          }),
+        );
 
         showSuccess('공지사항이 수정되었습니다.');
       } else {
@@ -338,26 +536,54 @@ export function CommunityNoticePage({
         });
 
         const createdId = Number(created.postId ?? 0);
+        const uploadedAttachments: NoticeBoardAttachmentApi[] = [];
         if (createdId > 0) {
           const uploadableFiles = attachments
             .map((attachment) => attachment.file)
             .filter((file): file is File => Boolean(file));
 
-          for (const file of uploadableFiles) {
-            await uploadNoticeAttachment(createdId, file);
+          try {
+            for (const file of uploadableFiles) {
+              uploadedAttachments.push(
+                await uploadNoticeAttachment(createdId, file),
+              );
+            }
+          } catch (error) {
+            await deleteUploadedNoticeAttachments(
+              createdId,
+              uploadedAttachments,
+            );
+            throw error;
           }
+        }
+
+        if (createdId > 0) {
+          setNoticeItems((current) => [
+            ...current,
+            toNoticeFeedItem({
+              ...created,
+              postId: createdId,
+              attachments: [
+                ...(created.attachments ?? []),
+                ...uploadedAttachments,
+              ],
+            }),
+          ]);
         }
 
         showSuccess('공지사항이 등록되었습니다.');
       }
     } catch (error) {
-      showError('공지사항 저장에 실패했습니다.');
+      showError(
+        attachmentDeletionFailed
+          ? '공지사항 첨부파일 삭제에 실패했습니다.'
+          : '공지사항 저장에 실패했습니다.',
+      );
       throw error;
     }
 
     setEditorDraft({ title: '', body: '', attachments: [] });
     setIsComposerOpen(false);
-    await loadNoticePosts({ silent: true });
     return updatedDraft;
   };
 
@@ -382,10 +608,15 @@ export function CommunityNoticePage({
   );
 
   const handleDeleteNotice = async (noticeId: number) => {
-    await deleteNoticePost(noticeId);
-    setNoticeItems((current) => current.filter((item) => item.id !== noticeId));
-    showSuccess('공지가 삭제되었습니다.');
-    await loadNoticePosts({ silent: true });
+    try {
+      await deleteNoticePost(noticeId);
+      setNoticeItems((current) =>
+        current.filter((item) => item.id !== noticeId),
+      );
+      showSuccess('공지가 삭제되었습니다.');
+    } catch (error) {
+      showError('공지 삭제에 실패했습니다.');
+    }
   };
 
   const handleToggleLike = useCallback(
@@ -431,15 +662,59 @@ export function CommunityNoticePage({
       noticeId: number,
       content: string,
       parentCommentId?: number | string,
+      files: File[] = [],
     ) => {
-      const trimmed = content.trim();
-      if (!trimmed) {
+      if (!toPlainText(content).trim()) {
         return;
       }
 
       try {
-        await createCommonComment('NOTICE', noticeId, trimmed, parentCommentId);
-        await loadNoticePosts({ silent: true });
+        const created = await createCommonComment(
+          'NOTICE',
+          noticeId,
+          content,
+          parentCommentId,
+        );
+        const createdId = Number(created.commentId ?? 0);
+        const uploadedFiles: CommonFileItem[] = [];
+        try {
+          for (const file of files) {
+            if (createdId > 0) {
+              uploadedFiles.push(
+                await uploadCommonFile('NOTICE_COMMENT', createdId, file),
+              );
+            }
+          }
+        } catch (error) {
+          if (createdId > 0) {
+            await deleteUploadedCommentFiles(createdId, uploadedFiles);
+          }
+          throw error;
+        }
+        const nextComment = toNoticeCommentItem({
+          ...created,
+          attachments: uploadedFiles,
+        });
+        if (nextComment) {
+          setNoticeItems((current) =>
+            current.map((item) => {
+              if (item.id !== noticeId) {
+                return item;
+              }
+
+              const comments = appendCommentToTree(
+                item.comments ?? [],
+                parentCommentId,
+                nextComment,
+              );
+              return {
+                ...item,
+                comments,
+                commentCount: countNestedComments(comments),
+              };
+            }),
+          );
+        }
         showSuccess(
           parentCommentId != null
             ? '답글이 등록되었습니다.'
@@ -451,9 +726,152 @@ export function CommunityNoticePage({
             ? '답글 저장에 실패했습니다.'
             : '댓글 저장에 실패했습니다.',
         );
+        throw error;
       }
     },
-    [loadNoticePosts, showError, showSuccess],
+    [showError, showSuccess],
+  );
+
+  const handleUpdateComment = useCallback(
+    async (
+      noticeId: number,
+      commentId: number | string,
+      content: string,
+      files: File[] = [],
+    ) => {
+      if (!toPlainText(content).trim()) {
+        return;
+      }
+
+      try {
+        const updated = await updateCommonComment(
+          'NOTICE',
+          noticeId,
+          commentId,
+          content,
+        );
+        const uploadedFiles: CommonFileItem[] = [];
+        try {
+          for (const file of files) {
+            uploadedFiles.push(
+              await uploadCommonFile('NOTICE_COMMENT', commentId, file),
+            );
+          }
+        } catch (error) {
+          await deleteUploadedCommentFiles(commentId, uploadedFiles);
+          throw error;
+        }
+        const nextAttachments = uploadedFiles.map((file) => ({
+          id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
+          name: file.fileName ?? '첨부파일',
+          size: Number(file.fileSize ?? 0) || undefined,
+        }));
+        const nextContent = updated.content ?? content;
+        setNoticeItems((current) =>
+          current.map((item) =>
+            item.id === noticeId
+              ? {
+                  ...item,
+                  comments: updateCommentInTree(
+                    item.comments ?? [],
+                    commentId,
+                    nextContent,
+                    nextAttachments,
+                  ),
+                }
+              : item,
+          ),
+        );
+        showSuccess('댓글이 수정되었습니다.');
+      } catch (error) {
+        showError('댓글 수정에 실패했습니다.');
+        throw error;
+      }
+    },
+    [showError, showSuccess],
+  );
+
+  const handleDeleteComment = useCallback(
+    async (noticeId: number, commentId: number | string) => {
+      try {
+        await deleteCommonComment('NOTICE', noticeId, commentId);
+        setNoticeItems((current) =>
+          current.map((item) => {
+            if (item.id !== noticeId) {
+              return item;
+            }
+
+            const comments = deleteCommentFromTree(
+              item.comments ?? [],
+              commentId,
+            );
+            return {
+              ...item,
+              comments,
+              commentCount: countNestedComments(comments),
+            };
+          }),
+        );
+        showSuccess('댓글이 삭제되었습니다.');
+      } catch (error) {
+        showError('댓글 삭제에 실패했습니다.');
+        throw error;
+      }
+    },
+    [showError, showSuccess],
+  );
+
+  const handleLoadPreviousComments = useCallback(
+    async (noticeId: number, beforeCommentId: number | string) => {
+      const records = await fetchCommonComments('NOTICE', noticeId, {
+        limit: 3,
+        beforeCommentId,
+      });
+      return {
+        comments: toNoticeCommentTree(records.comments),
+        hasPrevious: records.hasPrevious,
+        nextBeforeCommentId: records.nextBeforeCommentId,
+      };
+    },
+    [],
+  );
+
+  const handleDownloadCommentAttachment = useCallback(
+    (commentId: number | string, attachmentId: string) => {
+      void downloadCommonFile('NOTICE_COMMENT', commentId, attachmentId);
+    },
+    [],
+  );
+
+  const handleDeleteCommentAttachment = useCallback(
+    async (
+      noticeId: number,
+      commentId: number | string,
+      attachmentId: string,
+    ) => {
+      try {
+        await deleteCommonFile('NOTICE_COMMENT', commentId, attachmentId);
+        setNoticeItems((current) =>
+          current.map((item) =>
+            item.id === noticeId
+              ? {
+                  ...item,
+                  comments: removeAttachmentFromCommentTree(
+                    item.comments ?? [],
+                    commentId,
+                    attachmentId,
+                  ),
+                }
+              : item,
+          ),
+        );
+        showSuccess('댓글 첨부파일이 삭제되었습니다.');
+      } catch (error) {
+        showError('댓글 첨부파일 삭제에 실패했습니다.');
+        throw error;
+      }
+    },
+    [showError, showSuccess],
   );
 
   return (
@@ -683,6 +1101,11 @@ export function CommunityNoticePage({
                 onToggleLike={handleToggleLike}
                 onToggleBookmark={handleToggleBookmark}
                 onAddComment={handleAddComment}
+                onEditComment={handleUpdateComment}
+                onDeleteComment={handleDeleteComment}
+                onLoadPreviousComments={handleLoadPreviousComments}
+                onDownloadCommentAttachment={handleDownloadCommentAttachment}
+                onDeleteCommentAttachment={handleDeleteCommentAttachment}
                 onDelete={handleDeleteNotice}
                 onEdit={async (item) => {
                   try {
@@ -705,6 +1128,7 @@ export function CommunityNoticePage({
                         boardFileId: attachment.boardFileId,
                         objectKey: attachment.objectKey,
                         bucketName: attachment.bucketName,
+                        postId: item.id,
                       }),
                     );
 
@@ -736,7 +1160,10 @@ export function CommunityNoticePage({
                     );
 
                     if (nextAttachment) {
-                      await downloadNoticeAttachment(nextAttachment);
+                      await downloadNoticeAttachment({
+                        ...nextAttachment,
+                        postId: noticeId,
+                      });
                     }
                   })();
                 }}

@@ -1,6 +1,19 @@
-import { apiDelete, apiGet, apiPost, apiPostFormData } from './apiClient';
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPostFormData,
+  apiPut,
+} from './apiClient';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
-export type CommonOwnerType = 'NOTICE' | 'BOARD' | 'APPROVAL';
+export type CommonOwnerType =
+  | 'NOTICE'
+  | 'NOTICE_COMMENT'
+  | 'BOARD'
+  | 'APPROVAL';
+
+export const COMMON_COMMENT_OWNER_TYPE = 'NOTICE_COMMENT' as const;
 
 export type CommonFileItem = {
   fileId?: number | string | null;
@@ -25,6 +38,24 @@ export type CommonCommentItem = {
   writerId?: string | null;
   writerName?: string | null;
   deletedYn?: string | null;
+  createdAt?: string | Date | null;
+  attachments?: CommonFileItem[];
+};
+
+export type CommonCommentWritePayload = {
+  content: string;
+  parentCommentId?: number | string;
+};
+
+export type CommonCommentPageOptions = {
+  limit?: number;
+  beforeCommentId?: number | string;
+};
+
+export type CommonCommentPageResult = {
+  comments: CommonCommentItem[];
+  hasPrevious: boolean;
+  nextBeforeCommentId?: number | string | null;
 };
 
 const readItem = <T>(response: unknown): T | undefined => {
@@ -71,14 +102,55 @@ export async function uploadCommonFile(
   );
 }
 
-export async function deleteCommonFile(fileId: number | string): Promise<void> {
-  await apiDelete(`/api/v1/common/files/${fileId}`);
+export function buildCommonFileOwnerQuery(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
+): string {
+  const query = new URLSearchParams({
+    ownerType: String(ownerType),
+    ownerId: String(ownerId),
+  });
+  return query.toString();
 }
 
-export async function downloadCommonFile(
+export function deleteCommonFile(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
   fileId: number | string,
+): Promise<void>;
+export function deleteCommonFile(fileId: number | string): Promise<void>;
+export async function deleteCommonFile(
+  ownerTypeOrFileId: CommonOwnerType | string | number,
+  ownerId?: number | string,
+  fileId?: number | string,
 ): Promise<void> {
-  const url = `/api/v1/common/files/${fileId}/download`;
+  if (fileId === undefined || ownerId === undefined) {
+    await apiDelete(`/api/v1/common/files/${ownerTypeOrFileId}`);
+    return;
+  }
+
+  await apiDelete(
+    `/api/v1/common/files/${fileId}?${buildCommonFileOwnerQuery(String(ownerTypeOrFileId), ownerId)}`,
+  );
+}
+
+export function downloadCommonFile(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
+  fileId: number | string,
+): Promise<void>;
+export function downloadCommonFile(fileId: number | string): Promise<void>;
+export async function downloadCommonFile(
+  ownerTypeOrFileId: CommonOwnerType | string | number,
+  ownerId?: number | string,
+  fileId?: number | string,
+): Promise<void> {
+  const hasOwner = fileId !== undefined && ownerId !== undefined;
+  const targetFileId = hasOwner ? fileId : ownerTypeOrFileId;
+  const ownerQuery = hasOwner
+    ? `?${buildCommonFileOwnerQuery(String(ownerTypeOrFileId), ownerId)}`
+    : '';
+  const url = `/api/v1/common/files/${targetFileId}/download${ownerQuery}`;
   if (typeof window !== 'undefined') {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
@@ -87,33 +159,88 @@ export async function downloadCommonFile(
 export async function fetchCommonComments(
   ownerType: CommonOwnerType | string,
   ownerId: number | string,
-): Promise<CommonCommentItem[]> {
-  const result = await apiGet<{ resultList?: CommonCommentItem[] }>(
-    `/api/v1/common/comments?ownerType=${encodeURIComponent(ownerType)}&ownerId=${encodeURIComponent(String(ownerId))}`,
-  );
-  return result.resultList ?? [];
+  options: CommonCommentPageOptions = {},
+): Promise<CommonCommentPageResult> {
+  const query = new URLSearchParams({
+    ownerType: String(ownerType),
+    ownerId: String(ownerId),
+  });
+  if (options.limit !== undefined) {
+    query.set('limit', String(options.limit));
+  }
+  if (options.beforeCommentId !== undefined) {
+    query.set('beforeCommentId', String(options.beforeCommentId));
+  }
+
+  const result = await apiGet<{
+    resultList?: CommonCommentItem[];
+    comments?: CommonCommentItem[];
+    hasPrevious?: boolean;
+    nextBeforeCommentId?: number | string | null;
+  }>(`/api/v1/common/comments?${query.toString()}`);
+  return {
+    comments: result.comments ?? result.resultList ?? [],
+    hasPrevious: result.hasPrevious === true,
+    nextBeforeCommentId: result.nextBeforeCommentId,
+  };
 }
 
 export async function createCommonComment(
   ownerType: CommonOwnerType | string,
   ownerId: number | string,
-  content: string,
+  content: string | CommonCommentWritePayload,
   parentCommentId?: number | string,
 ): Promise<CommonCommentItem> {
+  const payload =
+    typeof content === 'string'
+      ? { content: sanitizeHtml(content), parentCommentId }
+      : {
+          content: sanitizeHtml(content.content),
+          parentCommentId: content.parentCommentId,
+        };
   const result = await apiPost<{ item?: CommonCommentItem }>(
     '/api/v1/common/comments',
     {
       ownerType,
       ownerId,
-      content,
-      parentCommentId,
+      ...payload,
     },
   );
 
   return (readItem<CommonCommentItem>(result) ?? {
     ownerType,
     ownerId,
-    content,
-    parentCommentId,
+    ...payload,
   }) as CommonCommentItem;
+}
+
+export async function updateCommonComment(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
+  commentId: number | string,
+  content: string | CommonCommentWritePayload,
+): Promise<CommonCommentItem> {
+  const commentContent =
+    typeof content === 'string' ? content : content.content;
+  const result = await apiPut<{ item?: CommonCommentItem }>(
+    `/api/v1/common/comments/${encodeURIComponent(String(commentId))}`,
+    { ownerType, ownerId, content: sanitizeHtml(commentContent) },
+  );
+
+  return (readItem<CommonCommentItem>(result) ?? {
+    ownerType,
+    ownerId,
+    commentId,
+    content: sanitizeHtml(commentContent),
+  }) as CommonCommentItem;
+}
+
+export async function deleteCommonComment(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
+  commentId: number | string,
+): Promise<void> {
+  await apiDelete(
+    `/api/v1/common/comments/${encodeURIComponent(String(commentId))}?ownerType=${encodeURIComponent(String(ownerType))}&ownerId=${encodeURIComponent(String(ownerId))}`,
+  );
 }

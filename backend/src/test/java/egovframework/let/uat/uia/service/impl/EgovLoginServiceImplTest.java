@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -72,10 +73,20 @@ class EgovLoginServiceImplTest {
 		try (InputStream inputStream = getClass().getClassLoader()
 				.getResourceAsStream("egovframework/mapper/let/uat/uia/EgovLoginUsr_SQL_postgresql.xml")) {
 			assertNotNull(inputStream, "로그인 SQL XML 리소스가 존재해야 합니다.");
-			String xml = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			String xml = new String(readAllBytes(inputStream), StandardCharsets.UTF_8);
 			assertTrue(xml.contains("<if test=\"tenantId != null\">"), "tenantId가 있을 때만 테넌트 조건을 추가해야 합니다.");
 			assertTrue(xml.contains("<if test=\"tenantId == null and tenantCode != null and tenantCode != ''\">"), "tenantCode 기반 fallback 조건이 필요합니다.");
 		}
+	}
+
+	private byte[] readAllBytes(InputStream inputStream) throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		byte[] data = new byte[4096];
+		int bytesRead;
+		while ((bytesRead = inputStream.read(data)) != -1) {
+			buffer.write(data, 0, bytesRead);
+		}
+		return buffer.toByteArray();
 	}
 
 	@DisplayName("tenantId는 Long 값으로 유지된다")

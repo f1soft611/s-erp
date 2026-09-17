@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.util.StringUtils;
 
+import egovframework.com.common.domain.model.CommonCommentVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Generated;
 
@@ -46,6 +47,14 @@ public class NoticeBoardPostVO implements Serializable {
     private Integer attachmentCount;
     @Schema(description = "첨부파일 목록")
     private List<NoticeBoardFileVO> attachments = new ArrayList<>();
+    @Schema(description = "댓글 수")
+    private Integer commentCount;
+    @Schema(description = "댓글 목록")
+    private List<CommonCommentVO> comments = new ArrayList<>();
+    @Schema(description = "이전 댓글 존재 여부")
+    private boolean hasPreviousComments;
+    @Schema(description = "이전 댓글 조회용 커서")
+    private Long nextBeforeCommentId;
 
     public String getEffectiveContentsHtml() {
         if (StringUtils.hasText(this.contentsHtml)) {
@@ -228,5 +237,45 @@ public class NoticeBoardPostVO implements Serializable {
     @Generated
     public void setAttachments(List<NoticeBoardFileVO> attachments) {
         this.attachments = attachments;
+    }
+
+    @Generated
+    public Integer getCommentCount() {
+        return commentCount;
+    }
+
+    @Generated
+    public void setCommentCount(Integer commentCount) {
+        this.commentCount = commentCount;
+    }
+
+    @Generated
+    public List<CommonCommentVO> getComments() {
+        return comments;
+    }
+
+    @Generated
+    public void setComments(List<CommonCommentVO> comments) {
+        this.comments = comments;
+    }
+
+    @Generated
+    public boolean isHasPreviousComments() {
+        return hasPreviousComments;
+    }
+
+    @Generated
+    public void setHasPreviousComments(boolean hasPreviousComments) {
+        this.hasPreviousComments = hasPreviousComments;
+    }
+
+    @Generated
+    public Long getNextBeforeCommentId() {
+        return nextBeforeCommentId;
+    }
+
+    @Generated
+    public void setNextBeforeCommentId(Long nextBeforeCommentId) {
+        this.nextBeforeCommentId = nextBeforeCommentId;
     }
 }

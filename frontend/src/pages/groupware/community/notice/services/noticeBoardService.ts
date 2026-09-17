@@ -5,6 +5,7 @@ import {
   apiPostFormData,
   apiPut,
 } from '../../../../../shared/services/apiClient';
+import type { CommonCommentItem } from '../../../../../shared/services/commonContentApi';
 
 export type NoticeBoardAttachmentApi = {
   boardFileId?: number | string | null;
@@ -30,6 +31,14 @@ export type NoticeBoardPostApi = {
   isNotice?: string | null;
   createdAt?: string | Date | null;
   attachments?: NoticeBoardAttachmentApi[];
+  comments?: Array<
+    CommonCommentItem & {
+      createdAt?: string | Date | null;
+    }
+  >;
+  commentCount?: number | string | null;
+  hasPreviousComments?: boolean;
+  nextBeforeCommentId?: number | string | null;
 };
 
 type NoticeBoardListResponse = {
@@ -123,19 +132,23 @@ export async function uploadNoticeAttachment(
 
 export async function deleteNoticeAttachment(
   boardFileId: number | string,
+  postId: number | string,
 ): Promise<void> {
-  await apiDelete(`/api/v1/groupware/boards/notice/attachments/${boardFileId}`);
+  await apiDelete(
+    `/api/v1/groupware/boards/notice/attachments/${boardFileId}?postId=${encodeURIComponent(String(postId))}`,
+  );
 }
 
 export async function downloadNoticeAttachment(
   attachment: NoticeBoardAttachmentApi,
 ): Promise<void> {
   const boardFileId = attachment.boardFileId;
-  if (!boardFileId) {
+  const postId = attachment.postId;
+  if (!boardFileId || postId == null) {
     return;
   }
 
-  const url = `/api/v1/groupware/boards/notice/attachments/${boardFileId}/download`;
+  const url = `/api/v1/groupware/boards/notice/attachments/${boardFileId}/download?postId=${encodeURIComponent(String(postId))}`;
   if (typeof window !== 'undefined') {
     window.open(url, '_blank', 'noopener,noreferrer');
   }

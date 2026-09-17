@@ -37,6 +37,110 @@
         ORDER BY created_at ASC
     </select>
 
+    <select id="selectCommonCommentPage" parameterType="map" resultMap="commonCommentMap">
+        WITH RECURSIVE root_page AS (
+            SELECT
+                comment_id,
+                ROW_NUMBER() OVER (ORDER BY comment_id DESC) AS root_order
+            FROM tb_common_comment
+            WHERE tenant_id = #{tenantId}
+              AND owner_type = #{ownerType}
+              AND owner_id = #{ownerId}
+              AND parent_comment_id IS NULL
+              AND deleted_yn = 'N'
+            <if test="beforeCommentId != null">
+                AND comment_id &lt; #{beforeCommentId}
+            </if>
+            ORDER BY comment_id DESC
+            LIMIT #{limit}
+        ), comment_tree AS (
+            SELECT
+                c.comment_id,
+                c.tenant_id,
+                c.owner_type,
+                c.owner_id,
+                c.parent_comment_id,
+                c.content,
+                c.writer_id,
+                c.writer_name,
+                c.deleted_yn,
+                c.created_at,
+                c.updated_at,
+                rp.root_order,
+                ARRAY[c.comment_id] AS comment_path
+            FROM tb_common_comment c
+            JOIN root_page rp ON rp.comment_id = c.comment_id
+            UNION ALL
+            SELECT
+                child.comment_id,
+                child.tenant_id,
+                child.owner_type,
+                child.owner_id,
+                child.parent_comment_id,
+                child.content,
+                child.writer_id,
+                child.writer_name,
+                child.deleted_yn,
+                child.created_at,
+                child.updated_at,
+                tree.root_order,
+                tree.comment_path || child.comment_id
+            FROM tb_common_comment child
+            JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = #{ownerType}
+              AND child.owner_id = #{ownerId}
+                            AND child.deleted_yn = 'N'
+                            AND NOT child.comment_id = ANY(tree.comment_path)
+        )
+        SELECT
+            comment_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            parent_comment_id,
+            content,
+            writer_id,
+            writer_name,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM comment_tree
+        WHERE deleted_yn = 'N'
+        ORDER BY root_order, comment_path
+    </select>
+
+    <select id="countCommonComments" parameterType="map" resultType="long">
+        WITH RECURSIVE root_page AS (
+            SELECT comment_id
+            FROM tb_common_comment
+            WHERE tenant_id = #{tenantId}
+              AND owner_type = #{ownerType}
+              AND owner_id = #{ownerId}
+              AND parent_comment_id IS NULL
+              AND deleted_yn = 'N'
+        ), comment_tree AS (
+            SELECT
+                c.comment_id,
+                ARRAY[c.comment_id] AS comment_path
+            FROM tb_common_comment c
+            JOIN root_page rp ON rp.comment_id = c.comment_id
+            UNION ALL
+            SELECT
+                child.comment_id,
+                tree.comment_path || child.comment_id
+            FROM tb_common_comment child
+            JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = #{ownerType}
+              AND child.owner_id = #{ownerId}
+              AND child.deleted_yn = 'N'
+              AND NOT child.comment_id = ANY(tree.comment_path)
+        )
+        SELECT COUNT(*)
+        FROM comment_tree
+    </select>
+
     <select id="selectCommonCommentById" parameterType="map" resultMap="commonCommentMap">
         SELECT
             comment_id,
@@ -89,7 +193,8 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND comment_id = #{commentId}
-          AND deleted_yn = 'N'
+                    AND writer_id = #{actorId}
+                    AND deleted_yn = 'N'
     </update>
 
     <update id="softDeleteCommonComment" parameterType="map">
@@ -98,5 +203,7 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND comment_id = #{commentId}
+                    AND writer_id = #{actorId}
+                    AND deleted_yn = 'N'
     </update>
 </mapper>

@@ -1,7 +1,9 @@
 package egovframework.com.common.domain.model;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Generated;
@@ -32,6 +34,8 @@ public class CommonCommentVO implements Serializable {
     private Date createdAt;
     @Schema(description = "수정 일시")
     private Date updatedAt;
+    @Schema(description = "댓글 첨부파일 목록")
+    private List<CommonFileVO> attachments = new ArrayList<>();
 
     @Generated
     public Long getCommentId() { return commentId; }
@@ -77,4 +81,8 @@ public class CommonCommentVO implements Serializable {
     public Date getUpdatedAt() { return updatedAt; }
     @Generated
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    @Generated
+    public List<CommonFileVO> getAttachments() { return attachments; }
+    @Generated
+    public void setAttachments(List<CommonFileVO> attachments) { this.attachments = attachments; }
 }

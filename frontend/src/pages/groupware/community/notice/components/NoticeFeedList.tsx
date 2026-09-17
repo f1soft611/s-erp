@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -6,16 +6,22 @@ import {
   CardContent,
   Chip,
   Divider,
+  IconButton,
+  Menu,
+  MenuItem,
   Stack,
   Typography,
 } from '@mui/material';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
+import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedList } from '../../../../../shared/components/feed/FeedList';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
 import { noticeContentStyles } from './noticeContentStyles';
+import { sanitizeHtml } from '../../../../../shared/utils/sanitizeHtml';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -29,6 +35,17 @@ type NoticeFeedListProps = {
     noticeId: number,
     content: string,
     parentCommentId?: number | string,
+    files?: File[],
+  ) => Promise<void> | void;
+  onEditComment?: (
+    noticeId: number,
+    commentId: number | string,
+    content: string,
+    files?: File[],
+  ) => Promise<void> | void;
+  onDeleteComment?: (
+    noticeId: number,
+    commentId: number | string,
   ) => Promise<void> | void;
   onDelete?: (noticeId: number) => void;
   onEdit?: (item: NoticeFeedItem) => void;
@@ -43,33 +60,75 @@ type NoticeFeedListProps = {
       bucketName?: string | null;
     },
   ) => void;
+  onLoadPreviousComments?: (
+    noticeId: number,
+    beforeCommentId: number | string,
+  ) => Promise<{
+    comments: NoticeCommentItem[];
+    hasPrevious: boolean;
+    nextBeforeCommentId?: number | string | null;
+  }>;
+  onDownloadCommentAttachment?: (
+    commentId: number | string,
+    attachmentId: string,
+  ) => void;
+  onDeleteCommentAttachment?: (
+    noticeId: number,
+    commentId: number | string,
+    attachmentId: string,
+  ) => void;
 };
 
-function normalizeCommentTree(comments: NoticeCommentItem[] = []): Array<{
-  id: number;
-  author: string;
-  time: string;
-  content: string;
-  replies?: Array<{
-    id: number;
-    author: string;
-    time: string;
-    content: string;
-    replies?: Array<{
-      id: number;
-      author: string;
-      time: string;
-      content: string;
-    }>;
-  }>;
-}> {
+function normalizeCommentTree(
+  comments: NoticeCommentItem[] = [],
+): FeedCommentItem[] {
   return comments.map((comment) => ({
     id: comment.id,
     author: comment.author,
     time: comment.time,
     content: comment.content,
+    isEditable: comment.isEditable,
+    attachments: comment.attachments,
     replies: normalizeCommentTree(comment.replies ?? []),
   }));
+}
+
+function countComments(comments: NoticeCommentItem[]): number {
+  return comments.reduce(
+    (total, comment) => total + 1 + countComments(comment.replies ?? []),
+    0,
+  );
+}
+
+function mergeCommentTrees(
+  current: NoticeCommentItem[],
+  incoming: NoticeCommentItem[],
+): NoticeCommentItem[] {
+  const result = incoming.map((comment) => ({
+    ...comment,
+    replies: mergeCommentTrees([], comment.replies ?? []),
+  }));
+  const byId = new Map(result.map((comment) => [String(comment.id), comment]));
+
+  current.forEach((comment) => {
+    const existing = byId.get(String(comment.id));
+    if (!existing) {
+      const copy = {
+        ...comment,
+        replies: mergeCommentTrees([], comment.replies ?? []),
+      };
+      byId.set(String(copy.id), copy);
+      result.push(copy);
+      return;
+    }
+
+    existing.replies = mergeCommentTrees(
+      existing.replies ?? [],
+      comment.replies ?? [],
+    );
+  });
+
+  return result;
 }
 
 export function NoticeFeedList({
@@ -81,95 +140,121 @@ export function NoticeFeedList({
   onToggleLike,
   onToggleBookmark,
   onAddComment,
+  onEditComment,
+  onDeleteComment,
   onDelete,
   onEdit,
   onDownload,
+  onLoadPreviousComments,
+  onDownloadCommentAttachment,
+  onDeleteCommentAttachment,
 }: NoticeFeedListProps) {
-  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>(
-    {},
-  );
   const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
     Record<number, NoticeCommentItem[]>
   >({});
+  const [loadedPreviousByNoticeId, setLoadedPreviousByNoticeId] = useState<
+    Record<number, boolean>
+  >({});
+  const [previousCursorByNoticeId, setPreviousCursorByNoticeId] = useState<
+    Record<number, number | string | undefined>
+  >({});
+  const [loadingPreviousByNoticeId, setLoadingPreviousByNoticeId] = useState<
+    Record<number, boolean>
+  >({});
+  const [exhaustedPreviousByNoticeId, setExhaustedPreviousByNoticeId] =
+    useState<Record<number, boolean>>({});
+  const [noticeMenuAnchor, setNoticeMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
+  const [noticeMenuId, setNoticeMenuId] = useState<number | null>(null);
+  const serverCommentSnapshots = useRef<Record<number, string>>({});
 
   useEffect(() => {
+    const changedByNoticeId = new Map<number, boolean>();
+    items.forEach((item) => {
+      const snapshot = JSON.stringify(item.comments ?? []);
+      changedByNoticeId.set(
+        item.id,
+        serverCommentSnapshots.current[item.id] !== snapshot,
+      );
+    });
+
     setLocalCommentsByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
-        next[item.id] = item.comments ?? [];
+        if (changedByNoticeId.get(item.id)) {
+          next[item.id] = item.comments ?? [];
+        }
       });
       return next;
     });
-  }, [items]);
-
-  const appendReplyToComments = (
-    comments: NoticeCommentItem[] = [],
-    parentCommentId: number | string,
-    reply: NoticeCommentItem,
-  ): NoticeCommentItem[] =>
-    comments.map((comment) => {
-      if (String(comment.id) === String(parentCommentId)) {
-        return {
-          ...comment,
-          replies: [...(comment.replies ?? []), reply],
-        };
-      }
-
-      if ((comment.replies ?? []).length > 0) {
-        return {
-          ...comment,
-          replies: appendReplyToComments(
-            comment.replies ?? [],
-            parentCommentId,
-            reply,
-          ),
-        };
-      }
-
-      return comment;
+    setPreviousCursorByNoticeId((current) => {
+      const next = { ...current };
+      items.forEach((item) => {
+        if (changedByNoticeId.get(item.id)) {
+          next[item.id] = item.nextBeforeCommentId ?? undefined;
+        }
+      });
+      return next;
     });
 
-  const handleLocalCommentAdd = (
+    setLoadedPreviousByNoticeId((current) => {
+      const next = { ...current };
+      items.forEach((item) => {
+        if (changedByNoticeId.get(item.id)) {
+          next[item.id] = false;
+        }
+      });
+      return next;
+    });
+    setExhaustedPreviousByNoticeId((current) => {
+      const next = { ...current };
+      items.forEach((item) => {
+        if (changedByNoticeId.get(item.id)) {
+          next[item.id] = false;
+        }
+      });
+      return next;
+    });
+
+    items.forEach((item) => {
+      serverCommentSnapshots.current[item.id] = JSON.stringify(
+        item.comments ?? [],
+      );
+    });
+  }, [items]);
+
+  const handleLocalCommentAdd = async (
     noticeId: number,
     content: string,
     parentCommentId?: number | string,
+    files: File[] = [],
   ) => {
-    const trimmed = content.trim();
-    if (!trimmed) {
+    if (!content.trim()) {
       return;
     }
 
-    const createdAt = new Date().toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const nextComment: NoticeCommentItem = {
-      id: Date.now(),
-      author: '나',
-      time: createdAt,
-      content: trimmed,
-    };
+    await onAddComment?.(noticeId, content, parentCommentId, files);
+  };
 
-    setLocalCommentsByNoticeId((current) => {
-      const previous =
-        current[noticeId] ??
-        items.find((item) => item.id === noticeId)?.comments ??
-        [];
-      const nextComments =
-        parentCommentId == null
-          ? [...previous, nextComment]
-          : appendReplyToComments(previous, parentCommentId, nextComment);
+  const handleLocalCommentEdit = async (
+    noticeId: number,
+    commentId: number | string,
+    content: string,
+    files: File[] = [],
+  ) => {
+    if (!content.trim()) {
+      return;
+    }
 
-      return {
-        ...current,
-        [noticeId]: nextComments,
-      };
-    });
+    await onEditComment?.(noticeId, commentId, content, files);
+  };
 
-    onAddComment?.(noticeId, content, parentCommentId);
+  const handleLocalCommentDelete = async (
+    noticeId: number,
+    commentId: number | string,
+  ) => {
+    await onDeleteComment?.(noticeId, commentId);
   };
 
   return (
@@ -182,6 +267,13 @@ export function NoticeFeedList({
         const hasRichHtml = /<[^>]+>/.test(previewHtml);
         const itemComments =
           localCommentsByNoticeId[item.id] ?? item.comments ?? [];
+        const visibleComments = loadedPreviousByNoticeId[item.id]
+          ? itemComments
+          : itemComments.slice(0, 3);
+        const canLoadPrevious =
+          !exhaustedPreviousByNoticeId[item.id] &&
+          (item.hasPreviousComments === true ||
+            item.commentCount > countComments(visibleComments));
         const attachmentFiles =
           item.attachmentDetails ??
           ((item.attachments ?? []).map((name, index) => ({
@@ -249,23 +341,43 @@ export function NoticeFeedList({
                   spacing={0.75}
                   sx={{ alignItems: 'center' }}
                 >
-                  <Button
+                  <IconButton
                     size="small"
-                    variant="text"
-                    onClick={() => onEdit?.(item)}
-                    sx={{ minWidth: 0, px: 1 }}
+                    aria-label={`공지 메뉴 ${item.title}`}
+                    onClick={(event) => {
+                      setNoticeMenuId(item.id);
+                      setNoticeMenuAnchor(event.currentTarget);
+                    }}
                   >
-                    수정
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="text"
-                    color="error"
-                    onClick={() => onDelete?.(item.id)}
-                    sx={{ minWidth: 0, px: 1 }}
+                    <MoreVertIcon fontSize="small" />
+                  </IconButton>
+                  <Menu
+                    anchorEl={noticeMenuAnchor}
+                    open={noticeMenuId === item.id}
+                    onClose={() => {
+                      setNoticeMenuAnchor(null);
+                      setNoticeMenuId(null);
+                    }}
                   >
-                    삭제
-                  </Button>
+                    <MenuItem
+                      onClick={() => {
+                        setNoticeMenuAnchor(null);
+                        setNoticeMenuId(null);
+                        onEdit?.(item);
+                      }}
+                    >
+                      공지 수정
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        setNoticeMenuAnchor(null);
+                        setNoticeMenuId(null);
+                        onDelete?.(item.id);
+                      }}
+                    >
+                      공지 삭제
+                    </MenuItem>
+                  </Menu>
                   <Chip
                     label={item.state}
                     size="small"
@@ -315,7 +427,9 @@ export function NoticeFeedList({
                       : 'linear-gradient(to bottom, black 72%, transparent 100%)',
                     '& br': { display: 'inline' },
                   }}
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHtml(previewHtml),
+                  }}
                 />
               ) : (
                 <Typography
@@ -465,61 +579,115 @@ export function NoticeFeedList({
                 </Typography>
               </Box>
 
-              {itemComments.length > 0 && (
-                <CommentThread
-                  comments={normalizeCommentTree(itemComments)}
-                  draft={commentDrafts[item.id] ?? ''}
-                  onDraftChange={(value) =>
-                    setCommentDrafts((current) => ({
+              {canLoadPrevious && (
+                <Button
+                  size="small"
+                  variant="text"
+                  aria-label="이전 댓글 불러오기"
+                  disabled={loadingPreviousByNoticeId[item.id]}
+                  onClick={async () => {
+                    if (loadingPreviousByNoticeId[item.id]) return;
+                    const cursor =
+                      previousCursorByNoticeId[item.id] ??
+                      visibleComments[0]?.id;
+                    if (!cursor || !onLoadPreviousComments) return;
+
+                    setLoadingPreviousByNoticeId((current) => ({
                       ...current,
-                      [item.id]: value,
-                    }))
-                  }
-                  onSubmitComment={(content) => {
-                    handleLocalCommentAdd(item.id, content);
-                    setCommentDrafts((current) => ({
-                      ...current,
-                      [item.id]: '',
+                      [item.id]: true,
                     }));
+                    try {
+                      const previousResult = await onLoadPreviousComments(
+                        item.id,
+                        cursor,
+                      );
+                      const previous = previousResult.comments;
+                      const currentComments =
+                        localCommentsByNoticeId[item.id] ?? itemComments;
+                      const merged = mergeCommentTrees(
+                        currentComments,
+                        previous,
+                      );
+                      const nextCursor = previousResult.nextBeforeCommentId;
+                      const hasNewComments =
+                        countComments(merged) > countComments(currentComments);
+                      setLocalCommentsByNoticeId((current) => ({
+                        ...current,
+                        [item.id]: merged,
+                      }));
+                      setPreviousCursorByNoticeId((cursors) => ({
+                        ...cursors,
+                        [item.id]: nextCursor ?? undefined,
+                      }));
+                      setLoadedPreviousByNoticeId((loaded) => ({
+                        ...loaded,
+                        [item.id]: true,
+                      }));
+                      if (
+                        !previousResult.hasPrevious ||
+                        !hasNewComments ||
+                        nextCursor == null ||
+                        String(nextCursor) === String(cursor)
+                      ) {
+                        setExhaustedPreviousByNoticeId((exhausted) => ({
+                          ...exhausted,
+                          [item.id]: true,
+                        }));
+                      }
+                    } finally {
+                      setLoadingPreviousByNoticeId((current) => ({
+                        ...current,
+                        [item.id]: false,
+                      }));
+                    }
                   }}
-                  onSubmitReply={(commentId, content) => {
-                    handleLocalCommentAdd(item.id, content, commentId);
-                  }}
-                  isDark={isDark}
-                  showComposer
-                  placeholder="댓글을 입력하세요"
-                  composerLabel="댓글 입력"
-                  submitLabel="등록"
-                />
+                  sx={{ mt: 1.5 }}
+                >
+                  이전 댓글 불러오기
+                </Button>
               )}
 
-              {!itemComments.length && (
-                <CommentThread
-                  comments={[]}
-                  draft={commentDrafts[item.id] ?? ''}
-                  onDraftChange={(value) =>
-                    setCommentDrafts((current) => ({
-                      ...current,
-                      [item.id]: value,
-                    }))
-                  }
-                  onSubmitComment={(content) => {
-                    handleLocalCommentAdd(item.id, content);
-                    setCommentDrafts((current) => ({
-                      ...current,
-                      [item.id]: '',
-                    }));
-                  }}
-                  onSubmitReply={(commentId, content) => {
-                    handleLocalCommentAdd(item.id, content, commentId);
-                  }}
-                  isDark={isDark}
-                  showComposer
-                  placeholder="댓글을 입력하세요"
-                  composerLabel="댓글 입력"
-                  submitLabel="등록"
-                />
-              )}
+              <CommentThread
+                comments={normalizeCommentTree(visibleComments)}
+                onSubmitComment={async (content, files) => {
+                  await handleLocalCommentAdd(
+                    item.id,
+                    content,
+                    undefined,
+                    files,
+                  );
+                }}
+                onSubmitReply={async (commentId, content, files) => {
+                  await handleLocalCommentAdd(
+                    item.id,
+                    content,
+                    commentId,
+                    files,
+                  );
+                }}
+                onEditComment={async (commentId, content, files) => {
+                  await handleLocalCommentEdit(
+                    item.id,
+                    commentId,
+                    content,
+                    files,
+                  );
+                }}
+                onDeleteComment={async (commentId) => {
+                  await handleLocalCommentDelete(item.id, commentId);
+                }}
+                onDownloadAttachment={(commentId, attachmentId) =>
+                  onDownloadCommentAttachment?.(commentId, attachmentId)
+                }
+                onDeleteAttachment={(commentId, attachmentId) =>
+                  onDeleteCommentAttachment?.(item.id, commentId, attachmentId)
+                }
+                isDark={isDark}
+                showComposer
+                placeholder="댓글을 입력하세요"
+                composerLabel="댓글 입력"
+                submitLabel="등록"
+              />
 
               {isRefreshing && (
                 <Typography variant="caption" color="text.secondary">

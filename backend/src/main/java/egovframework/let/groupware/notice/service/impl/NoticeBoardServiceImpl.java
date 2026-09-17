@@ -18,6 +18,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import egovframework.com.common.domain.model.CommonCommentVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
@@ -74,6 +76,23 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         fileParams.put("postId", postId);
         List<NoticeBoardFileVO> files = noticeBoardDAO.selectNoticeAttachmentList(fileParams);
         post.setAttachments(files == null ? new ArrayList<>() : files);
+
+        CommonCommentPageVO commentPage = commonCommentService.listComments(tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
+        List<CommonCommentVO> comments = commentPage.getComments() == null
+            ? new ArrayList<>() : commentPage.getComments();
+        for (CommonCommentVO comment : comments) {
+            if (comment.getCommentId() == null) {
+            comment.setAttachments(new ArrayList<>());
+            continue;
+            }
+            List<CommonFileVO> commentFiles = commonFileService.listFiles(
+                tenantId, "NOTICE_COMMENT", comment.getCommentId());
+            comment.setAttachments(commentFiles == null ? new ArrayList<>() : commentFiles);
+        }
+        post.setComments(comments);
+        post.setHasPreviousComments(commentPage.isHasPrevious());
+        post.setNextBeforeCommentId(commentPage.getNextBeforeCommentId());
+        post.setCommentCount(Math.toIntExact(commonCommentService.countComments(tenantId, BOARD_TYPE_NOTICE, postId)));
         return post;
     }
 
@@ -118,7 +137,12 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수정 요청이 비어 있습니다.");
         }
 
-        getPost(tenantId, postId);
+        HashMap<String, Object> existingParams = new HashMap<>();
+        existingParams.put("tenantId", tenantId);
+        existingParams.put("postId", postId);
+        if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
+        }
         String contentsHtml = payload.getEffectiveContentsHtml();
         String contentsText = payload.getEffectiveContentsText();
         String contentsJson = payload.getEffectiveContentsJson();
@@ -146,6 +170,14 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         NoticeBoardPostVO existing = noticeBoardDAO.selectNoticePostById(params);
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
+        }
+        List<CommonFileVO> attachments = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
+        if (attachments != null) {
+            for (CommonFileVO attachment : attachments) {
+                if (attachment.getFileId() != null) {
+                    commonFileService.deleteFile(tenantId, BOARD_TYPE_NOTICE, postId, attachment.getFileId());
+                }
+            }
         }
         noticeBoardDAO.softDeleteNoticePost(params);
     }
@@ -188,18 +220,43 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     @Override
     @Transactional
     public void deleteAttachment(Long tenantId, Long boardFileId) throws Exception {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지사항 첨부파일 소유 정보가 필요합니다.");
+    }
+
+    @Override
+    @Transactional
+    public void deleteAttachment(Long tenantId, Long postId, Long boardFileId) throws Exception {
         if (commonFileService == null) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "공통 첨부 서비스가 준비되지 않았습니다.");
         }
-        commonFileService.deleteFile(tenantId, boardFileId);
+        validateNoticeAttachment(tenantId, postId, boardFileId);
+        commonFileService.deleteFile(tenantId, BOARD_TYPE_NOTICE, postId, boardFileId);
     }
 
     @Override
     public void downloadAttachment(Long tenantId, Long boardFileId, HttpServletResponse response) throws Exception {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지사항 첨부파일 소유 정보가 필요합니다.");
+    }
+
+    @Override
+    public void downloadAttachment(Long tenantId, Long postId, Long boardFileId, HttpServletResponse response) throws Exception {
         if (commonFileService == null) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "공통 첨부 서비스가 준비되지 않았습니다.");
         }
-        commonFileService.downloadFile(tenantId, boardFileId, response);
+        validateNoticeAttachment(tenantId, postId, boardFileId);
+        commonFileService.downloadFile(tenantId, BOARD_TYPE_NOTICE, postId, boardFileId, response);
+    }
+
+    private void validateNoticeAttachment(Long tenantId, Long postId, Long boardFileId) throws Exception {
+        if (postId == null || boardFileId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지사항 첨부파일 소유 정보가 필요합니다.");
+        }
+        List<CommonFileVO> files = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
+        boolean owned = files != null && files.stream()
+            .anyMatch(file -> Objects.equals(file.getFileId(), boardFileId));
+        if (!owned) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항 첨부파일을 찾을 수 없습니다.");
+        }
     }
 
     private void validateCreatePayload(NoticeBoardPostSaveRequestVO payload) {
