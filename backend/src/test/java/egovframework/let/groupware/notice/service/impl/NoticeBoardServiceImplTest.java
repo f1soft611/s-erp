@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -19,10 +21,61 @@ import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
+import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.notice.domain.repository.NoticeBoardDAO;
 
 class NoticeBoardServiceImplTest {
+
+    @Test
+    void listPostsHydratesAttachmentsCommentsAndPaginationMetadata() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        NoticeBoardPostVO firstPost = new NoticeBoardPostVO();
+        firstPost.setPostId(7L);
+        NoticeBoardPostVO secondPost = new NoticeBoardPostVO();
+        secondPost.setPostId(8L);
+        CommonCommentVO comment = new CommonCommentVO();
+        comment.setCommentId(10L);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Arrays.asList(comment));
+        commentPage.setHasPrevious(true);
+        commentPage.setNextBeforeCommentId(9L);
+        CommonFileVO commentFile = new CommonFileVO();
+        commentFile.setFileId(101L);
+        NoticeBoardFileVO postFile = new NoticeBoardFileVO();
+        postFile.setBoardFileId(201L);
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Arrays.asList(firstPost, secondPost));
+        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Arrays.asList(postFile));
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
+            .thenReturn(commentPage);
+        when(commonCommentService.listComments(1L, "NOTICE", 8L, 3, null))
+            .thenReturn(new CommonCommentPageVO());
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(4L);
+        when(commonCommentService.countComments(1L, "NOTICE", 8L)).thenReturn(0L);
+        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L))
+            .thenReturn(Arrays.asList(commentFile));
+
+        List<NoticeBoardPostVO> result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(1L, " keyword ", 1, 20);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getAttachments()).containsExactly(postFile);
+        assertThat(result.get(0).getComments()).containsExactly(comment);
+        assertThat(result.get(0).getCommentCount()).isEqualTo(4);
+        assertThat(result.get(0).isHasPreviousComments()).isTrue();
+        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(9L);
+        assertThat(comment.getAttachments()).containsExactly(commentFile);
+        assertThat(result.get(1).getComments()).isEmpty();
+        assertThat(result.get(1).getCommentCount()).isZero();
+        verify(commonCommentService).listComments(1L, "NOTICE", 7L, 3, null);
+        verify(commonCommentService).listComments(1L, "NOTICE", 8L, 3, null);
+        verify(commonFileService).listFiles(1L, "NOTICE_COMMENT", 10L);
+    }
 
     @Test
     void getPostHydratesAttachmentsForEachNoticeComment() throws Exception {
@@ -35,16 +88,16 @@ class NoticeBoardServiceImplTest {
         CommonCommentVO second = new CommonCommentVO();
         second.setCommentId(11L);
         CommonCommentPageVO commentPage = new CommonCommentPageVO();
-        commentPage.setComments(List.of(first, second));
+        commentPage.setComments(Arrays.asList(first, second));
 
         CommonFileVO firstFile = new CommonFileVO();
         firstFile.setFileId(101L);
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(post);
-        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap())).thenReturn(List.of());
+        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap())).thenReturn(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(2L);
-        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L)).thenReturn(List.of(firstFile));
-        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 11L)).thenReturn(List.of());
+        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L)).thenReturn(Arrays.asList(firstFile));
+        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 11L)).thenReturn(Collections.emptyList());
 
         NoticeBoardPostVO result = new NoticeBoardServiceImpl(
                 noticeBoardDAO, commonFileService, commonCommentService).getPost(1L, 7L);
@@ -63,12 +116,12 @@ class NoticeBoardServiceImplTest {
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(new NoticeBoardPostVO());
         CommonCommentPageVO commentPage = new CommonCommentPageVO();
-        commentPage.setComments(List.of());
+        commentPage.setComments(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
         CommonFileVO attachment = new CommonFileVO();
         attachment.setFileId(8L);
-        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(List.of(attachment));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(attachment));
 
         new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
             .deleteAttachment(1L, 7L, 8L);
@@ -97,12 +150,12 @@ class NoticeBoardServiceImplTest {
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(new NoticeBoardPostVO());
         CommonCommentPageVO commentPage = new CommonCommentPageVO();
-        commentPage.setComments(List.of());
+        commentPage.setComments(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
         CommonFileVO attachment = new CommonFileVO();
         attachment.setFileId(8L);
-        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(List.of(attachment));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(attachment));
 
         new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
             .downloadAttachment(1L, 7L, 8L, new MockHttpServletResponse());
@@ -126,7 +179,7 @@ class NoticeBoardServiceImplTest {
         first.setFileId(21L);
         CommonFileVO second = new CommonFileVO();
         second.setFileId(22L);
-        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(List.of(first, second));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(first, second));
 
         new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
             .deletePost(1L, 7L);

@@ -38,20 +38,40 @@
     </select>
 
     <select id="selectCommonCommentPage" parameterType="map" resultMap="commonCommentMap">
-        WITH RECURSIVE root_page AS (
+        WITH RECURSIVE all_comment_tree AS (
             SELECT
-                comment_id,
-                ROW_NUMBER() OVER (ORDER BY comment_id DESC) AS root_order
-            FROM tb_common_comment
-            WHERE tenant_id = #{tenantId}
-              AND owner_type = #{ownerType}
-              AND owner_id = #{ownerId}
-              AND parent_comment_id IS NULL
-              AND deleted_yn = 'N'
+                c.comment_id,
+                c.parent_comment_id,
+                c.deleted_yn,
+                c.comment_id AS root_comment_id
+            FROM tb_common_comment c
+            WHERE c.tenant_id = #{tenantId}
+              AND c.owner_type = #{ownerType}
+              AND c.owner_id = #{ownerId}
+              AND c.parent_comment_id IS NULL
+            UNION ALL
+            SELECT
+                child.comment_id,
+                child.parent_comment_id,
+                child.deleted_yn,
+                tree.root_comment_id
+            FROM tb_common_comment child
+            JOIN all_comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = #{ownerType}
+              AND child.owner_id = #{ownerId}
+              AND child.comment_id &lt;> ALL(ARRAY[tree.comment_id])
+        ), root_page AS (
+            SELECT
+                root_comment_id AS comment_id,
+                ROW_NUMBER() OVER (ORDER BY root_comment_id DESC) AS root_order
+            FROM all_comment_tree
+            GROUP BY root_comment_id
+            HAVING BOOL_OR(deleted_yn = 'N')
             <if test="beforeCommentId != null">
-                AND comment_id &lt; #{beforeCommentId}
+                AND root_comment_id &lt; #{beforeCommentId}
             </if>
-            ORDER BY comment_id DESC
+            ORDER BY root_comment_id DESC
             LIMIT #{limit}
         ), comment_tree AS (
             SELECT
@@ -90,7 +110,6 @@
             WHERE child.tenant_id = #{tenantId}
               AND child.owner_type = #{ownerType}
               AND child.owner_id = #{ownerId}
-                            AND child.deleted_yn = 'N'
                             AND NOT child.comment_id = ANY(tree.comment_path)
         )
         SELECT
@@ -106,39 +125,16 @@
             created_at,
             updated_at
         FROM comment_tree
-        WHERE deleted_yn = 'N'
         ORDER BY root_order, comment_path
     </select>
 
     <select id="countCommonComments" parameterType="map" resultType="long">
-        WITH RECURSIVE root_page AS (
-            SELECT comment_id
-            FROM tb_common_comment
-            WHERE tenant_id = #{tenantId}
-              AND owner_type = #{ownerType}
-              AND owner_id = #{ownerId}
-              AND parent_comment_id IS NULL
-              AND deleted_yn = 'N'
-        ), comment_tree AS (
-            SELECT
-                c.comment_id,
-                ARRAY[c.comment_id] AS comment_path
-            FROM tb_common_comment c
-            JOIN root_page rp ON rp.comment_id = c.comment_id
-            UNION ALL
-            SELECT
-                child.comment_id,
-                tree.comment_path || child.comment_id
-            FROM tb_common_comment child
-            JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id
-            WHERE child.tenant_id = #{tenantId}
-              AND child.owner_type = #{ownerType}
-              AND child.owner_id = #{ownerId}
-              AND child.deleted_yn = 'N'
-              AND NOT child.comment_id = ANY(tree.comment_path)
-        )
         SELECT COUNT(*)
-        FROM comment_tree
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = #{ownerType}
+          AND owner_id = #{ownerId}
+          AND deleted_yn = 'N'
     </select>
 
     <select id="selectCommonCommentById" parameterType="map" resultMap="commonCommentMap">

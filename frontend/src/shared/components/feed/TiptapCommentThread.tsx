@@ -22,6 +22,7 @@ export type FeedCommentItem = {
   author: string;
   time: string;
   content: string;
+  isDeleted?: boolean;
   isEditable?: boolean;
   attachments?: FeedCommentAttachment[];
   replies?: FeedCommentItem[];
@@ -242,6 +243,7 @@ function CommentItem({
   const isDark = Boolean(props.isDark);
   const isEditing = editingCommentId === comment.id;
   const isReplying = replyTargetId === comment.id;
+  const isDeleted = comment.isDeleted === true;
   const canEditAttachments = isEditing;
   return (
     <Box sx={{ mt: 1.5, pl: depth ? { xs: 1, sm: 2 } : 0, minWidth: 0 }}>
@@ -274,13 +276,15 @@ function CommentItem({
               {comment.time}
             </Typography>
             <Box sx={{ ml: 'auto' }}>
-              <IconButton
-                size="small"
-                aria-label={`댓글 메뉴 ${comment.author}`}
-                onClick={(event) => setMenuAnchor(event.currentTarget)}
-              >
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
+              {!isDeleted && (
+                <IconButton
+                  size="small"
+                  aria-label={`댓글 메뉴 ${comment.author}`}
+                  onClick={(event) => setMenuAnchor(event.currentTarget)}
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              )}
               <Menu
                 anchorEl={menuAnchor}
                 open={Boolean(menuAnchor)}
@@ -335,24 +339,26 @@ function CommentItem({
               />
             </Box>
           )}
-          <Button
-            size="small"
-            variant="text"
-            onClick={() => {
-              props.onReply?.(comment.id);
-              setReplyTargetId(isReplying ? null : comment.id);
-            }}
-            sx={{
-              minWidth: 0,
-              p: 0,
-              mt: 0.5,
-              color: 'text.secondary',
-              fontWeight: 600,
-            }}
-          >
-            답글
-          </Button>
-          {isEditing && (
+          {!isDeleted && (
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                props.onReply?.(comment.id);
+                setReplyTargetId(isReplying ? null : comment.id);
+              }}
+              sx={{
+                minWidth: 0,
+                p: 0,
+                mt: 0.5,
+                color: 'text.secondary',
+                fontWeight: 600,
+              }}
+            >
+              답글
+            </Button>
+          )}
+          {isEditing && !isDeleted && (
             <CommentEditor
               initialContent={comment.content}
               label="댓글 수정 입력"
@@ -367,7 +373,7 @@ function CommentItem({
               }}
             />
           )}
-          {isReplying && (
+          {isReplying && !isDeleted && (
             <CommentEditor
               label="답글 입력"
               fileInputLabel="답글 첨부파일 선택"

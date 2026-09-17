@@ -318,6 +318,50 @@ describe('Community notice page', () => {
     expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 3);
   });
 
+  it('keeps current comments and reports a previous-comments fetch error', async () => {
+    const onLoadPreviousComments = vi
+      .fn()
+      .mockRejectedValue(new Error('previous comments failed'));
+    const onLoadPreviousCommentsError = vi.fn();
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              {
+                id: 9,
+                author: '현재 작성자',
+                time: '오늘',
+                content: '현재 댓글',
+              },
+            ],
+            nextBeforeCommentId: 8,
+            commentCount: 2,
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onLoadPreviousComments={onLoadPreviousComments}
+        onLoadPreviousCommentsError={onLoadPreviousCommentsError}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+
+    await waitFor(() => {
+      expect(onLoadPreviousCommentsError).toHaveBeenCalledWith(
+        expect.any(Error),
+      );
+    });
+    expect(screen.getByText('현재 댓글')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 불러오기' }),
+    ).toBeInTheDocument();
+    expect(onLoadPreviousComments).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to the oldest visible root when cursor metadata is absent', async () => {
     const onLoadPreviousComments = vi.fn().mockResolvedValue({
       comments: [],

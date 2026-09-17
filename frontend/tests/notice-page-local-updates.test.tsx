@@ -6,10 +6,13 @@ import {
   within,
   waitFor,
 } from '@testing-library/react';
+import { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { CommunityNoticePage } from '../src/pages/groupware/community/notice/CommunityNoticePage';
+import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import type { NoticeFeedItem } from '../src/pages/groupware/community/notice/data/noticeData';
 
 const noticeServiceMocks = vi.hoisted(() => ({
   fetchNoticePosts: vi.fn(),
@@ -50,14 +53,12 @@ const selectedModule = {
   menus: [],
   path: '/groupware',
 };
-
 const content = {
   title: '공지사항',
   description: '최근 공지 내용을 빠르게 확인합니다.',
   cards: [],
   items: [],
 };
-
 const detail = {
   postId: 1,
   title: '기존 공지',
@@ -91,7 +92,14 @@ describe('CommunityNoticePage local updates', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     noticeServiceMocks.fetchNoticePosts.mockResolvedValue([
-      { postId: 1, title: '기존 공지' },
+      {
+        ...detail,
+        postId: 1,
+        title: '기존 공지',
+        attachments: [
+          { boardFileId: 101, fileName: '목록 첨부.pdf', fileSize: 12 },
+        ],
+      },
     ]);
     noticeServiceMocks.fetchNoticePostDetail.mockResolvedValue(detail);
     noticeServiceMocks.createNoticePost.mockResolvedValue({
@@ -118,8 +126,9 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
-    expect(noticeServiceMocks.fetchNoticePostDetail).toHaveBeenCalledTimes(1);
+    expect(noticeServiceMocks.fetchNoticePostDetail).not.toHaveBeenCalled();
     expect(commentServiceMocks.fetchCommonComments).not.toHaveBeenCalled();
+    expect(screen.getByText('목록 첨부.pdf')).toBeInTheDocument();
   });
 
   it('removes only the deleted notice without reloading the notice list', async () => {
@@ -170,6 +179,9 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('기존 공지', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /새 공지 작성/i }));
+    fireEvent.change(screen.getByLabelText('제목'), {
+      target: { value: '첨부 rollback 공지' },
+    });
     const input = screen.getByLabelText('첨부 파일 선택');
     fireEvent.change(input, {
       target: {
@@ -216,8 +228,16 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('deletes only an explicitly removed existing attachment while updating a notice', async () => {
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce(detail);
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce({
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        attachments: [
+          { boardFileId: 101, fileName: '삭제할 파일.pdf', fileSize: 12 },
+          { boardFileId: 102, fileName: '유지할 파일.pdf', fileSize: 24 },
+        ],
+      },
+    ]);
+    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValue({
       ...detail,
       attachments: [
         { boardFileId: 101, fileName: '삭제할 파일.pdf', fileSize: 12 },
@@ -236,11 +256,14 @@ describe('CommunityNoticePage local updates', () => {
     );
     fireEvent.click(screen.getByRole('menuitem', { name: '공지 수정' }));
 
-    expect(await screen.findByText('삭제할 파일.pdf')).toBeInTheDocument();
-    expect(screen.getByText('유지할 파일.pdf')).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText('삭제할 파일.pdf')).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('유지할 파일.pdf').length).toBeGreaterThan(0);
     const removedAttachmentCard = screen
-      .getByText('삭제할 파일.pdf')
-      .closest('[data-file-card="true"]');
+      .getAllByText('삭제할 파일.pdf')
+      .at(-1)
+      ?.closest('[data-file-card="true"]');
     expect(removedAttachmentCard).not.toBeNull();
     fireEvent.click(
       within(removedAttachmentCard as HTMLElement).getByRole('button', {
@@ -261,8 +284,15 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('keeps the notice state and edit dialog open when attachment deletion fails', async () => {
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce(detail);
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce({
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        attachments: [
+          { boardFileId: 101, fileName: '삭제 실패 파일.pdf', fileSize: 12 },
+        ],
+      },
+    ]);
+    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValue({
       ...detail,
       attachments: [
         { boardFileId: 101, fileName: '삭제 실패 파일.pdf', fileSize: 12 },
@@ -281,10 +311,13 @@ describe('CommunityNoticePage local updates', () => {
       screen.getByRole('button', { name: /공지 메뉴 기존 공지/i }),
     );
     fireEvent.click(screen.getByRole('menuitem', { name: '공지 수정' }));
-    expect(await screen.findByText('삭제 실패 파일.pdf')).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText('삭제 실패 파일.pdf')).length,
+    ).toBeGreaterThan(0);
     const failedAttachmentCard = screen
-      .getByText('삭제 실패 파일.pdf')
-      .closest('[data-file-card="true"]');
+      .getAllByText('삭제 실패 파일.pdf')
+      .at(-1)
+      ?.closest('[data-file-card="true"]');
     expect(failedAttachmentCard).not.toBeNull();
     fireEvent.click(
       within(failedAttachmentCard as HTMLElement).getByRole('button', {
@@ -328,6 +361,214 @@ describe('CommunityNoticePage local updates', () => {
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
     expect(commentServiceMocks.fetchCommonComments).not.toHaveBeenCalled();
   });
+
+  it('shows a newly created root within the capped visible comments and increments the server count', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        comments: [
+          { commentId: 10, writerName: '첫 작성자', content: '첫 댓글' },
+          { commentId: 9, writerName: '둘째 작성자', content: '둘째 댓글' },
+          { commentId: 8, writerName: '셋째 작성자', content: '셋째 댓글' },
+        ],
+        commentCount: 5,
+      },
+    ]);
+    commentServiceMocks.createCommonComment.mockResolvedValueOnce({
+      commentId: 11,
+      writerName: '나',
+      content: '새 댓글',
+    });
+
+    renderPage();
+    expect(
+      await screen.findByRole(
+        'textbox',
+        { name: '댓글 입력' },
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
+    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(input, { target: { innerHTML: '<p>새 댓글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('새 댓글')).toBeInTheDocument();
+      expect(screen.getByText('댓글 6')).toBeInTheDocument();
+    });
+  });
+
+  it('increments the server count for a locally created reply', async () => {
+    commentServiceMocks.createCommonComment.mockResolvedValueOnce({
+      commentId: 11,
+      writerName: '나',
+      content: '새 답글',
+      parentCommentId: 10,
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole(
+        'textbox',
+        { name: '댓글 입력' },
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '답글' }));
+    const input = screen.getByRole('textbox', { name: '답글 입력' });
+    fireEvent.input(input, { target: { innerHTML: '<p>새 답글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('새 답글')).toBeInTheDocument();
+      expect(screen.getByText('댓글 2')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the continued previous-comment cursor across local comment CRUD', async () => {
+    const loadPreviousComments = vi
+      .fn()
+      .mockResolvedValueOnce({
+        comments: [
+          {
+            id: 7,
+            author: '이전 작성자',
+            time: '방금',
+            content: '처음 불러온 이전 댓글',
+          },
+        ],
+        hasPrevious: true,
+        nextBeforeCommentId: 4,
+      })
+      .mockResolvedValueOnce({
+        comments: [
+          {
+            id: 3,
+            author: '더 이전 작성자',
+            time: '방금',
+            content: '계속 불러온 이전 댓글',
+          },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+      });
+
+    function CursorHarness() {
+      const [items, setItems] = useState<NoticeFeedItem[]>([
+        {
+          id: 1,
+          title: '공지',
+          meta: '관리자 · 방금',
+          state: '공지',
+          summary: '공지',
+          body: '공지',
+          comments: [
+            {
+              id: 10,
+              author: '작성자',
+              time: '방금',
+              content: '현재 댓글',
+            },
+          ],
+          commentCount: 3,
+          hasPreviousComments: true,
+          nextBeforeCommentId: 8,
+          highlight: false,
+        },
+      ]);
+
+      return (
+        <NoticeFeedList
+          items={items}
+          isDark={false}
+          onLoadPreviousComments={loadPreviousComments}
+          onAddComment={async () => {
+            setItems((current) =>
+              current.map((item) => ({
+                ...item,
+                comments: [
+                  ...(item.comments ?? []),
+                  {
+                    id: 11,
+                    author: '나',
+                    time: '방금',
+                    content: '새 댓글',
+                  },
+                ],
+              })),
+            );
+          }}
+          onEditComment={async () => {
+            setItems((current) =>
+              current.map((item) => ({
+                ...item,
+                comments: (item.comments ?? []).map((comment) =>
+                  comment.id === 10
+                    ? { ...comment, content: '수정된 댓글' }
+                    : comment,
+                ),
+              })),
+            );
+          }}
+          onDeleteComment={async () => {
+            setItems((current) =>
+              current.map((item) => ({
+                ...item,
+                comments: (item.comments ?? []).filter(
+                  (comment) => comment.id !== 11,
+                ),
+              })),
+            );
+          }}
+        />
+      );
+    }
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <CursorHarness />
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: '댓글 메뉴 작성자' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    expect(
+      await screen.findByText('처음 불러온 이전 댓글'),
+    ).toBeInTheDocument();
+
+    const composer = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(composer, { target: { innerHTML: '<p>새 댓글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+    await waitFor(() =>
+      expect(screen.getByText('새 댓글')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 수정 작성자' }));
+    const editInput = await screen.findByRole('textbox', {
+      name: '댓글 수정 입력',
+    });
+    fireEvent.input(editInput, { target: { innerHTML: '<p>수정된 댓글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '댓글 수정 완료' }));
+    await waitFor(() =>
+      expect(screen.getByText('수정된 댓글')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 나' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 삭제 나' }));
+    await waitFor(() =>
+      expect(screen.queryByText('새 댓글')).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    await waitFor(() =>
+      expect(loadPreviousComments).toHaveBeenNthCalledWith(2, 1, 4),
+    );
+    expect(screen.getByText('계속 불러온 이전 댓글')).toBeInTheDocument();
+    expect(screen.getAllByText('처음 불러온 이전 댓글')).toHaveLength(1);
+  }, 15000);
 
   it('cleans up already uploaded comment files when a later upload fails', async () => {
     commentServiceMocks.uploadCommonFile
@@ -433,17 +674,19 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('removes a deleted comment attachment from local state after success', async () => {
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce({
-      ...detail,
-      comments: [
-        {
-          commentId: 10,
-          writerName: '작성자',
-          content: '첨부 댓글',
-          attachments: [{ fileId: 'file-1', fileName: '자료.pdf' }],
-        },
-      ],
-    });
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        comments: [
+          {
+            commentId: 10,
+            writerName: '작성자',
+            content: '첨부 댓글',
+            attachments: [{ fileId: 'file-1', fileName: '자료.pdf' }],
+          },
+        ],
+      },
+    ]);
     commentServiceMocks.deleteCommonFile.mockResolvedValueOnce(undefined);
     renderPage();
 
@@ -467,17 +710,19 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('keeps a comment attachment and shows an error when deletion fails', async () => {
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce({
-      ...detail,
-      comments: [
-        {
-          commentId: 10,
-          writerName: '작성자',
-          content: '첨부 댓글',
-          attachments: [{ fileId: 'file-1', fileName: '자료.pdf' }],
-        },
-      ],
-    });
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        comments: [
+          {
+            commentId: 10,
+            writerName: '작성자',
+            content: '첨부 댓글',
+            attachments: [{ fileId: 'file-1', fileName: '자료.pdf' }],
+          },
+        ],
+      },
+    ]);
     commentServiceMocks.deleteCommonFile.mockRejectedValueOnce(
       new Error('attachment delete failed'),
     );
@@ -501,23 +746,25 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('preserves replies when their parent comment is deleted', async () => {
-    noticeServiceMocks.fetchNoticePostDetail.mockResolvedValueOnce({
-      ...detail,
-      comments: [
-        {
-          commentId: 10,
-          writerName: '작성자',
-          content: '부모 댓글',
-        },
-        {
-          commentId: 11,
-          parentCommentId: 10,
-          writerName: '답글 작성자',
-          content: '보존할 답글',
-        },
-      ],
-      commentCount: 2,
-    });
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        comments: [
+          {
+            commentId: 10,
+            writerName: '작성자',
+            content: '부모 댓글',
+          },
+          {
+            commentId: 11,
+            parentCommentId: 10,
+            writerName: '답글 작성자',
+            content: '보존할 답글',
+          },
+        ],
+        commentCount: 2,
+      },
+    ]);
     renderPage();
 
     expect(
@@ -533,8 +780,9 @@ describe('CommunityNoticePage local updates', () => {
         10,
       );
     });
-    expect(screen.queryByText('부모 댓글')).not.toBeInTheDocument();
+    expect(screen.getByText('[삭제된 댓글입니다.]')).toBeInTheDocument();
     expect(screen.getByText('보존할 답글')).toBeInTheDocument();
+    expect(screen.getByText('댓글 1')).toBeInTheDocument();
   });
 
   it('keeps the notice when notice deletion fails', async () => {

@@ -103,14 +103,26 @@ const formatCommentTime = (value: string | Date | null | undefined): string => {
 
 const countNestedComments = (comments: NoticeCommentItem[] = []): number =>
   comments.reduce(
-    (total, comment) => total + 1 + countNestedComments(comment.replies ?? []),
+    (total, comment) =>
+      total +
+      (comment.isDeleted ? 0 : 1) +
+      countNestedComments(comment.replies ?? []),
     0,
   );
+
+const adjustCommentCount = (item: NoticeFeedItem, delta: number): number => {
+  const currentCount =
+    item.commentCount == null
+      ? countNestedComments(item.comments ?? [])
+      : Number(item.commentCount) || 0;
+  return Math.max(0, currentCount + delta);
+};
 
 const toNoticeCommentTree = (
   records: Array<{
     commentId?: number | string | null;
     parentCommentId?: number | string | null;
+    deletedYn?: string | null;
     writerName?: string | null;
     writerId?: string | null;
     content?: string | null;
@@ -129,9 +141,17 @@ const toNoticeCommentTree = (
 
     const item: NoticeCommentItem = {
       id: commentId,
-      author: record.writerName || record.writerId || '사용자',
+      author:
+        record.deletedYn === 'Y'
+          ? '삭제된 댓글'
+          : record.writerName || record.writerId || '사용자',
       time: formatCommentTime(record.createdAt),
-      content: record.content ?? '',
+      content:
+        record.deletedYn === 'Y'
+          ? '[삭제된 댓글입니다.]'
+          : (record.content ?? ''),
+      isDeleted: record.deletedYn === 'Y',
+      isEditable: record.deletedYn !== 'Y',
       attachments: (record.attachments ?? []).map((file) => ({
         id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
         name: file.fileName ?? '첨부파일',
@@ -165,14 +185,6 @@ const toNoticeCommentTree = (
   });
 
   return roots;
-};
-
-const hydrateNoticePost = async (
-  post: NoticeBoardPostApi,
-): Promise<NoticeFeedItem> => {
-  const postId = Number(post.postId ?? 0);
-  const detail = postId > 0 ? await fetchNoticePostDetail(postId) : post;
-  return toNoticeFeedItem(detail ?? post);
 };
 
 const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
@@ -239,7 +251,7 @@ const appendCommentToTree = (
   comment: NoticeCommentItem,
 ): NoticeCommentItem[] => {
   if (parentCommentId == null) {
-    return [...comments, comment];
+    return [comment, ...comments];
   }
 
   return comments.map((current) =>
@@ -286,17 +298,22 @@ const deleteCommentFromTree = (
   comments: NoticeCommentItem[] = [],
   commentId: number | string,
 ): NoticeCommentItem[] =>
-  comments.flatMap((comment) => {
+  comments.map((comment) => {
     if (String(comment.id) === String(commentId)) {
-      return comment.replies ?? [];
+      return {
+        ...comment,
+        author: '삭제된 댓글',
+        content: '[삭제된 댓글입니다.]',
+        isDeleted: true,
+        isEditable: false,
+        attachments: [],
+      };
     }
 
-    return [
-      {
-        ...comment,
-        replies: deleteCommentFromTree(comment.replies ?? [], commentId),
-      },
-    ];
+    return {
+      ...comment,
+      replies: deleteCommentFromTree(comment.replies ?? [], commentId),
+    };
   });
 
 const removeAttachmentFromCommentTree = (
@@ -378,6 +395,7 @@ export function CommunityNoticePage({
     attachments: [],
   });
   const [noticeItems, setNoticeItems] = useState<NoticeFeedItem[]>([]);
+  const [serverItemRevision, setServerItemRevision] = useState(0);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -393,10 +411,8 @@ export function CommunityNoticePage({
 
       try {
         const posts = await fetchNoticePosts(1, 20, '');
-        const hydratedPosts = await Promise.all(
-          posts.map((post) => hydrateNoticePost(post)),
-        );
-        setNoticeItems(hydratedPosts);
+        setNoticeItems(posts.map(toNoticeFeedItem));
+        setServerItemRevision((revision) => revision + 1);
       } catch (error) {
         setErrorMessage(noticeFailureMessage);
         if (!silent) {
@@ -521,6 +537,7 @@ export function CommunityNoticePage({
             };
           }),
         );
+        setServerItemRevision((revision) => revision + 1);
 
         showSuccess('공지사항이 수정되었습니다.');
       } else {
@@ -710,7 +727,7 @@ export function CommunityNoticePage({
               return {
                 ...item,
                 comments,
-                commentCount: countNestedComments(comments),
+                commentCount: adjustCommentCount(item, 1),
               };
             }),
           );
@@ -808,7 +825,7 @@ export function CommunityNoticePage({
             return {
               ...item,
               comments,
-              commentCount: countNestedComments(comments),
+              commentCount: adjustCommentCount(item, -1),
             };
           }),
         );
@@ -1104,50 +1121,40 @@ export function CommunityNoticePage({
                 onEditComment={handleUpdateComment}
                 onDeleteComment={handleDeleteComment}
                 onLoadPreviousComments={handleLoadPreviousComments}
+                onLoadPreviousCommentsError={() =>
+                  showError('이전 댓글을 불러오지 못했습니다.')
+                }
                 onDownloadCommentAttachment={handleDownloadCommentAttachment}
                 onDeleteCommentAttachment={handleDeleteCommentAttachment}
+                serverItemRevision={serverItemRevision}
                 onDelete={handleDeleteNotice}
                 onEdit={async (item) => {
-                  try {
-                    const detail = await fetchNoticePostDetail(item.id);
-                    const mappedAttachments = (detail.attachments ?? []).map(
-                      (attachment) => ({
-                        id: String(
-                          attachment.boardFileId ??
-                            attachment.fileName ??
-                            attachment.objectKey ??
-                            `${item.id}-${Math.random()}`,
-                        ),
-                        name: attachment.fileName ?? '첨부파일',
-                        size: Number(attachment.fileSize ?? 0) || undefined,
-                        extension:
-                          attachment.fileName
-                            ?.split('.')
-                            .pop()
-                            ?.toUpperCase() || undefined,
-                        boardFileId: attachment.boardFileId,
-                        objectKey: attachment.objectKey,
-                        bucketName: attachment.bucketName,
-                        postId: item.id,
-                      }),
-                    );
+                  const mappedAttachments = (item.attachmentDetails ?? []).map(
+                    (attachment) => ({
+                      id: String(
+                        attachment.boardFileId ??
+                          attachment.objectKey ??
+                          `${item.id}-${Math.random()}`,
+                      ),
+                      name: attachment.name,
+                      size: attachment.size,
+                      extension:
+                        attachment.name.split('.').pop()?.toUpperCase() ||
+                        undefined,
+                      boardFileId: attachment.boardFileId,
+                      objectKey: attachment.objectKey,
+                      bucketName: attachment.bucketName,
+                      postId: item.id,
+                    }),
+                  );
 
-                    setEditorDraft({
-                      id: item.id,
-                      title: detail.title ?? item.title,
-                      body: detail.contentsHtml ?? detail.contents ?? item.body,
-                      attachments: mappedAttachments,
-                    });
-                    setIsComposerOpen(true);
-                  } catch {
-                    setEditorDraft({
-                      id: item.id,
-                      title: item.title,
-                      body: item.body,
-                      attachments: [],
-                    });
-                    setIsComposerOpen(true);
-                  }
+                  setEditorDraft({
+                    id: item.id,
+                    title: item.title,
+                    body: item.bodyHtml ?? item.body,
+                    attachments: mappedAttachments,
+                  });
+                  setIsComposerOpen(true);
                 }}
                 onDownload={(noticeId, file) => {
                   void (async () => {

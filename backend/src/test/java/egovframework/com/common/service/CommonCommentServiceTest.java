@@ -3,10 +3,12 @@ package egovframework.com.common.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -242,7 +244,7 @@ class CommonCommentServiceTest {
                 assertThat(params.get("ownerType")).isEqualTo("NOTICE");
                 assertThat(params.get("beforeCommentId")).isEqualTo(20L);
                 assertThat(params.get("limit")).isEqualTo(4);
-                return List.of(comment(20L), comment(19L), comment(18L), comment(17L));
+                return Arrays.asList(comment(20L), comment(19L), comment(18L), comment(17L));
             }
         };
 
@@ -261,7 +263,7 @@ class CommonCommentServiceTest {
             @Override
             public List<CommonCommentVO> selectCommonCommentPage(Map<String, Object> params) {
                 assertThat(params.get("limit")).isEqualTo(2);
-                return List.of(
+                return Arrays.asList(
                     comment(10L, null),
                     comment(11L, 10L),
                     comment(9L, null)
@@ -280,6 +282,30 @@ class CommonCommentServiceTest {
     }
 
     @Test
+    void listCommentsPageMarksDeletedParentsAsTombstones() throws Exception {
+        CommonCommentVO deletedParent = comment(10L, null);
+        deletedParent.setDeletedYn("Y");
+        CommonCommentVO reply = comment(11L, 10L);
+        reply.setDeletedYn("N");
+
+        CommonCommentDAO stubDao = new CommonCommentDAO() {
+            @Override
+            public List<CommonCommentVO> selectCommonCommentPage(Map<String, Object> params) {
+                return Arrays.asList(deletedParent, reply);
+            }
+        };
+
+        CommonCommentPageVO page = new CommonCommentServiceImpl(stubDao)
+            .listComments(1L, "NOTICE", 10L, 3, null);
+
+        assertThat(page.getComments()).extracting(CommonCommentVO::getCommentId)
+            .containsExactly(10L, 11L);
+        assertThat(page.getComments().get(0).getContent()).isEqualTo("[삭제된 댓글입니다.]");
+        assertThat(page.getComments().get(0).getWriterName()).isEqualTo("삭제된 댓글");
+        assertThat(page.getComments().get(1).getParentCommentId()).isEqualTo(10L);
+    }
+
+    @Test
     void countCommentsUsesSeparateDaoCount() throws Exception {
         CommonCommentDAO stubDao = new CommonCommentDAO() {
             @Override
@@ -295,22 +321,35 @@ class CommonCommentServiceTest {
     }
 
     @Test
-    void countQueryUsesSameActiveAncestorVisibilityAsCommentPage() throws IOException {
+        void commentMapperKeepsDeletedAncestorsInTheCommentTreeAndCountsOnlyActiveComments()
+            throws IOException {
         String mapperXml;
         try (InputStream mapper = getClass().getClassLoader().getResourceAsStream(
                 "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml")) {
             assertThat(mapper).isNotNull();
-            mapperXml = new String(mapper.readAllBytes(), StandardCharsets.UTF_8);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = mapper.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
+            }
+            mapperXml = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
         }
 
         int countStart = mapperXml.indexOf("<select id=\"countCommonComments\"");
         String countQuery = mapperXml.substring(countStart,
                 mapperXml.indexOf("</select>", countStart));
 
-        assertThat(countQuery).contains("WITH RECURSIVE root_page AS");
-        assertThat(countQuery).contains("comment_tree AS");
-        assertThat(countQuery).contains("JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id");
-        assertThat(countQuery).contains("child.deleted_yn = 'N'");
+        int pageStart = mapperXml.indexOf("<select id=\"selectCommonCommentPage\"");
+        String pageQuery = mapperXml.substring(pageStart,
+            mapperXml.indexOf("</select>", pageStart));
+
+        assertThat(pageQuery).contains("all_comment_tree");
+        assertThat(pageQuery).contains("HAVING BOOL_OR(deleted_yn = 'N')");
+        assertThat(pageQuery).contains("JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id");
+        assertThat(pageQuery).contains("root_comment_id");
+        assertThat(countQuery).contains("deleted_yn = 'N'");
+        assertThat(countQuery).doesNotContain("WITH RECURSIVE root_page AS");
         assertThat(countQuery).contains("COUNT(*)");
     }
 

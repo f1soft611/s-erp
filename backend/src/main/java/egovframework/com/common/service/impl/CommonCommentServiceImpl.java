@@ -43,6 +43,7 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         params.put("ownerType", ownerType.trim().toUpperCase());
         params.put("ownerId", ownerId);
         List<CommonCommentVO> comments = commonCommentDAO.selectCommonCommentList(params);
+        markDeletedComments(comments);
         return comments == null ? new ArrayList<>() : comments;
     }
 
@@ -81,12 +82,27 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
             comments.addAll(rootGroups.get(groupIndex));
         }
+        markDeletedComments(comments);
 
         CommonCommentPageVO page = new CommonCommentPageVO();
         page.setComments(comments);
         page.setHasPrevious(hasPrevious);
         page.setNextBeforeCommentId(hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
         return page;
+    }
+
+    private void markDeletedComments(List<CommonCommentVO> comments) {
+        if (comments == null) {
+            return;
+        }
+        for (CommonCommentVO comment : comments) {
+            if (comment != null && "Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                comment.setContent("[삭제된 댓글입니다.]");
+                comment.setWriterName("삭제된 댓글");
+                comment.setWriterId(null);
+                comment.setAttachments(new ArrayList<>());
+            }
+        }
     }
 
     @Override

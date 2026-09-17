@@ -58,7 +58,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("offset", Math.max((page - 1) * size, 0));
         params.put("size", size);
         List<NoticeBoardPostVO> posts = noticeBoardDAO.selectNoticePostList(params);
-        return posts == null ? new ArrayList<>() : posts;
+        if (posts == null) {
+            return new ArrayList<>();
+        }
+        for (NoticeBoardPostVO post : posts) {
+            hydratePost(tenantId, post, post.getPostId());
+        }
+        return posts;
     }
 
     @Override
@@ -71,29 +77,35 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
 
+        hydratePost(tenantId, post, postId);
+        return post;
+    }
+
+    private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
         HashMap<String, Object> fileParams = new HashMap<>();
         fileParams.put("tenantId", tenantId);
         fileParams.put("postId", postId);
         List<NoticeBoardFileVO> files = noticeBoardDAO.selectNoticeAttachmentList(fileParams);
         post.setAttachments(files == null ? new ArrayList<>() : files);
 
-        CommonCommentPageVO commentPage = commonCommentService.listComments(tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
-        List<CommonCommentVO> comments = commentPage.getComments() == null
+        CommonCommentPageVO commentPage = commonCommentService.listComments(
+            tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
+        List<CommonCommentVO> comments = commentPage == null || commentPage.getComments() == null
             ? new ArrayList<>() : commentPage.getComments();
         for (CommonCommentVO comment : comments) {
             if (comment.getCommentId() == null) {
-            comment.setAttachments(new ArrayList<>());
-            continue;
+                comment.setAttachments(new ArrayList<>());
+                continue;
             }
             List<CommonFileVO> commentFiles = commonFileService.listFiles(
                 tenantId, "NOTICE_COMMENT", comment.getCommentId());
             comment.setAttachments(commentFiles == null ? new ArrayList<>() : commentFiles);
         }
         post.setComments(comments);
-        post.setHasPreviousComments(commentPage.isHasPrevious());
-        post.setNextBeforeCommentId(commentPage.getNextBeforeCommentId());
-        post.setCommentCount(Math.toIntExact(commonCommentService.countComments(tenantId, BOARD_TYPE_NOTICE, postId)));
-        return post;
+        post.setHasPreviousComments(commentPage != null && commentPage.isHasPrevious());
+        post.setNextBeforeCommentId(commentPage == null ? null : commentPage.getNextBeforeCommentId());
+        post.setCommentCount(Math.toIntExact(
+            commonCommentService.countComments(tenantId, BOARD_TYPE_NOTICE, postId)));
     }
 
     @Override

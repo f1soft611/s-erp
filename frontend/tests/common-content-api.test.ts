@@ -84,19 +84,38 @@ describe('common content API contracts', () => {
     openSpy.mockRestore();
   });
 
-  it('adds optional comment pagination params while keeping resultList responses', async () => {
-    apiMocks.apiGet.mockResolvedValue({ resultList: [{ commentId: 3 }] });
+  it('returns paged comment metadata while accepting the legacy resultList field', async () => {
+    apiMocks.apiGet.mockResolvedValue({
+      resultList: [{ commentId: 3 }],
+      comments: [{ commentId: 3 }],
+      hasPrevious: true,
+      nextBeforeCommentId: 2,
+    });
 
     await expect(
       fetchCommonComments('NOTICE', 42, {
         limit: 10,
         beforeCommentId: 20,
       }),
-    ).resolves.toEqual([{ commentId: 3 }]);
+    ).resolves.toEqual({
+      comments: [{ commentId: 3 }],
+      hasPrevious: true,
+      nextBeforeCommentId: 2,
+    });
 
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
       '/api/v1/common/comments?ownerType=NOTICE&ownerId=42&limit=10&beforeCommentId=20',
     );
+  });
+
+  it('falls back to a legacy resultList-only comment response', async () => {
+    apiMocks.apiGet.mockResolvedValue({ resultList: [{ commentId: 3 }] });
+
+    await expect(fetchCommonComments('NOTICE', 42)).resolves.toEqual({
+      comments: [{ commentId: 3 }],
+      hasPrevious: false,
+      nextBeforeCommentId: undefined,
+    });
   });
 
   it('sends editor HTML unchanged in create and update comment payloads', async () => {

@@ -68,6 +68,7 @@ type NoticeFeedListProps = {
     hasPrevious: boolean;
     nextBeforeCommentId?: number | string | null;
   }>;
+  onLoadPreviousCommentsError?: (error: unknown) => void;
   onDownloadCommentAttachment?: (
     commentId: number | string,
     attachmentId: string,
@@ -77,6 +78,7 @@ type NoticeFeedListProps = {
     commentId: number | string,
     attachmentId: string,
   ) => void;
+  serverItemRevision?: number;
 };
 
 function normalizeCommentTree(
@@ -88,6 +90,7 @@ function normalizeCommentTree(
     time: comment.time,
     content: comment.content,
     isEditable: comment.isEditable,
+    isDeleted: comment.isDeleted,
     attachments: comment.attachments,
     replies: normalizeCommentTree(comment.replies ?? []),
   }));
@@ -95,7 +98,10 @@ function normalizeCommentTree(
 
 function countComments(comments: NoticeCommentItem[]): number {
   return comments.reduce(
-    (total, comment) => total + 1 + countComments(comment.replies ?? []),
+    (total, comment) =>
+      total +
+      (comment.isDeleted ? 0 : 1) +
+      countComments(comment.replies ?? []),
     0,
   );
 }
@@ -131,6 +137,18 @@ function mergeCommentTrees(
   return result;
 }
 
+function collectCommentIds(comments: NoticeCommentItem[]): Set<string> {
+  const ids = new Set<string>();
+  const visit = (items: NoticeCommentItem[]) => {
+    items.forEach((comment) => {
+      ids.add(String(comment.id));
+      visit(comment.replies ?? []);
+    });
+  };
+  visit(comments);
+  return ids;
+}
+
 export function NoticeFeedList({
   items,
   isDark,
@@ -146,8 +164,10 @@ export function NoticeFeedList({
   onEdit,
   onDownload,
   onLoadPreviousComments,
+  onLoadPreviousCommentsError,
   onDownloadCommentAttachment,
   onDeleteCommentAttachment,
+  serverItemRevision = 0,
 }: NoticeFeedListProps) {
   const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
     Record<number, NoticeCommentItem[]>
@@ -168,8 +188,11 @@ export function NoticeFeedList({
   );
   const [noticeMenuId, setNoticeMenuId] = useState<number | null>(null);
   const serverCommentSnapshots = useRef<Record<number, string>>({});
+  const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
+  const serverItemRevisionRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
     const changedByNoticeId = new Map<number, boolean>();
     items.forEach((item) => {
       const snapshot = JSON.stringify(item.comments ?? []);
@@ -177,13 +200,30 @@ export function NoticeFeedList({
         item.id,
         serverCommentSnapshots.current[item.id] !== snapshot,
       );
+      if (isServerReset) {
+        delete previousCommentIdsByNoticeId.current[item.id];
+      }
     });
 
     setLocalCommentsByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
         if (changedByNoticeId.get(item.id)) {
-          next[item.id] = item.comments ?? [];
+          if (isServerReset || !current[item.id]) {
+            next[item.id] = item.comments ?? [];
+          } else {
+            const previousComments = current[item.id];
+            const preservedPreviousComments = previousComments.filter(
+              (comment) =>
+                previousCommentIdsByNoticeId.current[item.id]?.has(
+                  String(comment.id),
+                ),
+            );
+            next[item.id] = mergeCommentTrees(
+              preservedPreviousComments,
+              item.comments ?? [],
+            );
+          }
         }
       });
       return next;
@@ -191,7 +231,10 @@ export function NoticeFeedList({
     setPreviousCursorByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
-        if (changedByNoticeId.get(item.id)) {
+        if (
+          changedByNoticeId.get(item.id) &&
+          (isServerReset || !localCommentsByNoticeId[item.id])
+        ) {
           next[item.id] = item.nextBeforeCommentId ?? undefined;
         }
       });
@@ -201,7 +244,10 @@ export function NoticeFeedList({
     setLoadedPreviousByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
-        if (changedByNoticeId.get(item.id)) {
+        if (
+          changedByNoticeId.get(item.id) &&
+          (isServerReset || !localCommentsByNoticeId[item.id])
+        ) {
           next[item.id] = false;
         }
       });
@@ -210,7 +256,10 @@ export function NoticeFeedList({
     setExhaustedPreviousByNoticeId((current) => {
       const next = { ...current };
       items.forEach((item) => {
-        if (changedByNoticeId.get(item.id)) {
+        if (
+          changedByNoticeId.get(item.id) &&
+          (isServerReset || !localCommentsByNoticeId[item.id])
+        ) {
           next[item.id] = false;
         }
       });
@@ -222,7 +271,8 @@ export function NoticeFeedList({
         item.comments ?? [],
       );
     });
-  }, [items]);
+    serverItemRevisionRef.current = serverItemRevision;
+  }, [items, serverItemRevision]);
 
   const handleLocalCommentAdd = async (
     noticeId: number,
@@ -611,6 +661,12 @@ export function NoticeFeedList({
                       const nextCursor = previousResult.nextBeforeCommentId;
                       const hasNewComments =
                         countComments(merged) > countComments(currentComments);
+                      const previousIds = collectCommentIds(previous);
+                      previousCommentIdsByNoticeId.current[item.id] = new Set([
+                        ...(previousCommentIdsByNoticeId.current[item.id] ??
+                          []),
+                        ...previousIds,
+                      ]);
                       setLocalCommentsByNoticeId((current) => ({
                         ...current,
                         [item.id]: merged,
@@ -634,6 +690,8 @@ export function NoticeFeedList({
                           [item.id]: true,
                         }));
                       }
+                    } catch (error) {
+                      onLoadPreviousCommentsError?.(error);
                     } finally {
                       setLoadingPreviousByNoticeId((current) => ({
                         ...current,

@@ -3,6 +3,7 @@ export type NoticeCommentItem = {
   author: string;
   time: string;
   content: string;
+  isDeleted?: boolean;
   isEditable?: boolean;
   attachments?: Array<{
     id: string;

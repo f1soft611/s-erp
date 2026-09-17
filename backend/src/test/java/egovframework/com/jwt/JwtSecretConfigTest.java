@@ -13,7 +13,7 @@ class JwtSecretConfigTest {
         String secret = EgovProperties.getProperty("Globals.jwt.secret");
 
         assertNotNull(secret);
-        assertFalse(secret.isBlank());
+        assertFalse(secret.trim().isEmpty());
         assertFalse("CHANGE_ME".equals(secret), "JWT secret cannot use the placeholder dev default");
         assertFalse("YOUR_JWT_SECRET_KEY_HERE".equals(secret), "JWT secret cannot use the fallback placeholder");
     }
