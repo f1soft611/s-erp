@@ -149,7 +149,27 @@ describe('CommunityNoticePage local updates', () => {
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
   });
 
-  it('appends the created notice without reloading the notice list', async () => {
+  it('refreshes the created notice using the server list order', async () => {
+    noticeServiceMocks.fetchNoticePosts
+      .mockResolvedValueOnce([
+        {
+          ...detail,
+          postId: 1,
+          title: '기존 공지',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...detail,
+          postId: 2,
+          title: '새 공지',
+        },
+        {
+          ...detail,
+          postId: 1,
+          title: '기존 공지',
+        },
+      ]);
     renderPage();
 
     expect(
@@ -165,7 +185,27 @@ describe('CommunityNoticePage local updates', () => {
       expect(screen.getByText('새 공지')).toBeInTheDocument();
     });
     expect(noticeServiceMocks.createNoticePost).toHaveBeenCalledTimes(1);
-    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(2);
+    expect(noticeServiceMocks.fetchNoticePosts.mock.results).toHaveLength(2);
+  });
+
+  it('clears the notice composer title after a successful save', async () => {
+    renderPage();
+
+    expect(
+      await screen.findByText('기존 공지', {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /새 공지 작성/i }));
+    fireEvent.change(screen.getByLabelText('제목'), {
+      target: { value: '초기화할 제목' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /새 공지 작성/i }));
+    expect(screen.getByLabelText('제목')).toHaveValue('');
   });
 
   it('cleans up already uploaded notice files when a later upload fails', async () => {
@@ -200,6 +240,10 @@ describe('CommunityNoticePage local updates', () => {
         2,
       ),
     );
+    expect(
+      screen.getByText('공지사항 저장에 실패했습니다.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('제목')).toHaveValue('첨부 rollback 공지');
     expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
   });
 
@@ -616,6 +660,7 @@ describe('CommunityNoticePage local updates', () => {
 
     await waitFor(() => {
       expect(commentServiceMocks.createCommonComment).toHaveBeenCalled();
+      expect(screen.getByText('댓글 저장에 실패했습니다.')).toBeInTheDocument();
     });
     expect(input.innerHTML).toContain('저장 실패 댓글');
   });
@@ -643,6 +688,7 @@ describe('CommunityNoticePage local updates', () => {
         '<p>저장 실패 답글</p>',
         10,
       );
+      expect(screen.getByText('답글 저장에 실패했습니다.')).toBeInTheDocument();
     });
     expect(replyInput.innerHTML).toContain('저장 실패 답글');
   });

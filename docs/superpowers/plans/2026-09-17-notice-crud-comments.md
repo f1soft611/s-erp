@@ -1,115 +1,58 @@
-# 공지사항 통합 조회 및 댓글 기능 개선 Implementation Plan
+# 공지사항 오류 수정 상세 실행 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+## 목표
 
-**Goal:** 공지사항 게시글·첨부·댓글을 통합 조회하고, 댓글/답글 에디터·첨부 및 부분 상태 갱신을 제공한다.
+댓글 작성 오류, 첨부파일 포함 저장 오류, 저장 후 목록 맨뒤 이동, 저장 후 제목 잔류를 기존 공지사항 API 계약 안에서 최소 수정으로 해결한다.
 
-**Architecture:** 백엔드는 공지 상세 응답을 조합하는 서비스와 공통 댓글 페이징/첨부 계약을 확장한다. 프론트는 상세 응답을 한 번만 사용하고 CRUD 응답을 해당 피드/댓글 트리에 반영한다. 댓글 첨부는 `NOTICE_COMMENT`와 댓글 ID를 소유 키로 사용한다.
+## 공통 제약
 
-**Tech Stack:** Spring Boot/eGovFrame, MyBatis, PostgreSQL, React, TypeScript, MUI, Tiptap, Vitest.
+- 작업 위치는 현재 브랜치 `socra710`이다.
+- Worktree를 생성하지 않는다.
+- 프론트엔드 공지사항 영역과 관련 테스트만 수정한다.
+- 신규 API, DB 스키마, 권한 정책은 추가하지 않는다.
+- 저장 성공은 서버 응답과 업로드 결과가 모두 확인된 뒤에만 확정한다.
+- 각 태스크 완료 후 지정 검증을 실행하고, 실패 시 같은 태스크 범위에서 수정·재검증한다.
 
----
+## Task 1: 오류 재현과 회귀 테스트 고정
 
-### Task 1: 백엔드 API 계약 테스트 고정
+- 파일: `frontend/tests/notice-page.test.tsx`
+- 파일: `frontend/tests/notice-page-local-updates.test.tsx`
+- 파일: `frontend/tests/notice-composer-payload.test.ts`
+- 작업: 기존 공지 테스트 구조와 mock API 계약을 확인하고, 댓글 실패, 첨부 업로드 실패, 저장 후 목록 위치, 저장 후 draft 초기화의 실패/기대 동작을 가장 가까운 테스트에 고정한다.
+- 검증: `cd frontend; npm run test -- tests/notice-page.test.tsx tests/notice-page-local-updates.test.tsx tests/notice-composer-payload.test.ts`
+- 완료 조건: 수정 전 실패가 재현되거나, 이미 통과하는 항목은 회귀 기준으로 명시된다.
 
-**Files:**
+## Task 2: 공지 저장·첨부·목록 위치·draft 초기화 수정
 
-- Modify: `backend/src/test/**`의 기존 공지/공통 댓글 테스트 위치를 우선 사용
-- Test: 공지 상세 응답, 댓글 페이지 파라미터, `NOTICE_COMMENT` 파일 소유 계약
+- 파일: `frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx`
+- 파일: `frontend/src/pages/groupware/community/notice/components/NoticeComposerDialog.tsx`
+- 파일: `frontend/src/pages/groupware/community/notice/services/noticeBoardService.ts` (응답 계약 보정이 필요한 경우에만)
+- 작업: 생성 응답의 `postId` 확보를 검증하고 첨부 업로드 실패 시 부분 업로드를 정리한다. 저장 성공 후 목록을 서버 정렬 기준으로 반영하며 단순 append를 제거하거나 보정한다. 성공 시 제목·본문·첨부 draft를 명시적으로 초기화하고 실패 시 재시도 가능한 상태를 유지한다.
+- 검증: `cd frontend; npm run test -- tests/notice-page.test.tsx tests/notice-page-local-updates.test.tsx tests/notice-composer-payload.test.ts`
+- 완료 조건: 첨부 포함 저장 성공·실패, 목록 위치, 다음 작성 모달의 빈 제목을 테스트로 확인한다.
 
-- [ ] **Step 1: 기존 테스트 위치와 컨트롤러 생성자 의존성을 확인한다.**
-- [ ] **Step 2: 공지 상세 응답에 댓글 배열과 댓글 수가 포함되어야 하는 실패 테스트를 작성한다.**
-- [ ] **Step 3: 댓글 조회 `limit=3` 및 `beforeCommentId`가 서비스/DAO까지 전달되어야 하는 실패 테스트를 작성한다.**
-- [ ] **Step 4: 테스트를 실행해 새 계약 부재로 실패하는지 확인한다.**
-  - Run: `cd backend; mvn -q -Dtest=<관련 테스트 클래스> test`
+## Task 3: 댓글·답글 작성 실패 상태 수정
 
-### Task 2: 백엔드 공지 상세 통합 조회
+- 파일: `frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx`
+- 파일: `frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx`
+- 파일: `frontend/src/shared/components/feed/TiptapCommentThread.tsx`
+- 파일: `frontend/src/shared/services/commonContentApi.ts` (payload/오류 계약 보정이 필요한 경우에만)
+- 작업: 댓글/답글 API가 실패하면 성공 토스트나 로컬 트리 추가가 발생하지 않도록 한다. 파일 업로드 실패 시 생성된 댓글 첨부를 정리하고 오류 메시지와 재시도 가능한 입력 상태를 유지한다. 성공 시에만 서버 반환 ID와 첨부를 로컬 트리에 반영한다.
+- 검증: `cd frontend; npm run test -- tests/notice-page.test.tsx tests/notice-page-local-updates.test.tsx`
+- 완료 조건: 댓글과 답글의 성공·실패 및 첨부 실패 상태가 모두 회귀 테스트로 확인된다.
 
-**Files:**
+## Task 4: 최종 검증 및 결과 문서
 
-- Modify: `backend/src/main/java/egovframework/let/groupware/notice/domain/model/NoticeBoardPostVO.java`
-- Modify: `backend/src/main/java/egovframework/let/groupware/notice/service/impl/NoticeBoardServiceImpl.java`
-- Modify: `backend/src/main/java/egovframework/let/groupware/notice/service/NoticeBoardService.java` if signatures require it
-- Modify: `backend/src/main/resources/egovframework/mapper/let/groupware/notice/NoticeBoard_SQL_postgresql.xml` only if count/list SQL is required
+- 파일: `docs/result/20260917/notice-crud-errors/progress.md`
+- 파일: `docs/result/20260917/notice-crud-errors/README.md`
+- 파일: `docs/result/20260917/notice-crud-errors/screenshots/`
+- 작업: 태스크별 변경·검증 결과를 원장에 기록한다. 실제 브라우저에서 375px, 768px, 1280px로 공지 저장, 첨부 포함 저장, 댓글/답글 성공·실패, 저장 후 정렬, 제목 초기화를 확인하고 스크린샷을 저장한다.
+- 검증: `cd frontend; npm run build`; `cd frontend; npm run test`; Playwright 브라우저 시나리오
+- 완료 조건: 빌드·관련 테스트·브라우저 검증 결과와 미해결 이슈가 결과 문서에 기록된다.
 
-- [ ] **Step 1: `NoticeBoardPostVO`에 `comments`, `commentCount`, 댓글 페이지 메타 필드를 추가한다.**
-- [ ] **Step 2: `getPost()`에서 게시글·첨부·댓글을 동일 서비스 호출 결과로 조합한다.**
-- [ ] **Step 3: 댓글 트리 변환은 서버 응답의 parent ID를 보존하고, 삭제 댓글은 기존 정책에 맞춰 제외한다.**
-- [ ] **Step 4: Task 1의 상세 조회 테스트를 실행해 통과시킨다.**
-- [ ] **Step 5: `cd backend; mvn -q -DskipTests compile`으로 백엔드 컴파일을 확인한다.**
+## 인터페이스 및 체크포인트
 
-### Task 3: 댓글 최근 목록 및 이전 댓글 조회
-
-**Files:**
-
-- Modify: `backend/src/main/java/egovframework/com/common/controller/CommonCommentApiController.java`
-- Modify: `backend/src/main/java/egovframework/com/common/service/CommonCommentService.java`
-- Modify: `backend/src/main/java/egovframework/com/common/service/impl/CommonCommentServiceImpl.java`
-- Modify: `backend/src/main/java/egovframework/com/common/domain/repository/CommonCommentDAO.java`
-- Modify: `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`
-
-- [ ] **Step 1: `limit` 기본값 3과 `beforeCommentId` 파라미터를 컨트롤러 요청에 추가한다.**
-- [ ] **Step 2: 루트 댓글과 답글의 계층을 깨지 않도록 조회 범위를 계산한다.**
-- [ ] **Step 3: 이전 댓글 응답에 `hasPrevious` 또는 다음 cursor를 포함한다.**
-- [ ] **Step 4: 댓글 페이지 테스트를 실행해 통과시킨다.**
-
-### Task 4: 댓글 첨부파일 계약
-
-**Files:**
-
-- Modify: `backend/src/main/java/egovframework/com/common/controller/CommonFileApiController.java` only if owner type validation is needed
-- Modify: `frontend/src/shared/services/commonContentApi.ts`
-- Test: 공통 파일 owner type 계약 테스트
-
-- [ ] **Step 1: `NOTICE_COMMENT`가 공통 파일 업로드/조회/다운로드/삭제에서 허용되는지 확인한다.**
-- [ ] **Step 2: 댓글 생성 후 반환된 `commentId`로 파일을 업로드하도록 서비스 타입을 확장한다.**
-- [ ] **Step 3: 댓글 응답에 첨부 목록을 포함하거나 댓글 ID 기준으로 필요한 파일만 조회하는 계약을 고정한다.**
-- [ ] **Step 4: 파일 계약 테스트를 실행한다.**
-
-### Task 5: 프론트 공지 조회와 부분 상태 갱신
-
-**Files:**
-
-- Modify: `frontend/src/pages/groupware/community/notice/services/noticeBoardService.ts`
-- Modify: `frontend/src/pages/groupware/community/notice/data/noticeData.ts`
-- Modify: `frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx`
-- Test: `frontend/tests/**`의 공지사항 관련 테스트 위치
-
-- [ ] **Step 1: 통합 상세 응답 타입을 추가하고 `hydrateNoticePost`의 상세/댓글 이중 호출을 제거한다.**
-- [ ] **Step 2: 공지 생성/수정 시 서버 반환값과 업로드 결과를 해당 피드 항목에만 반영한다.**
-- [ ] **Step 3: 공지 삭제 시 삭제 API 성공 후 해당 ID만 제거하고 목록 재조회는 하지 않는다.**
-- [ ] **Step 4: 댓글 생성/수정/삭제 핸들러가 서버 반환값 또는 대상 ID만 로컬 트리에 반영하도록 수정한다.**
-- [ ] **Step 5: 테스트에서 초기 조회 API 호출 수와 CRUD 후 불필요한 목록/상세 재호출이 없는지 검증한다.**
-- [ ] **Step 6: 관련 Vitest를 실행한다.**
-  - Run: `cd frontend; npm run test -- tests/<공지사항 테스트 파일>`
-
-### Task 6: 댓글/답글 에디터 및 첨부 UI
-
-**Files:**
-
-- Modify: `frontend/src/shared/components/feed/CommentThread.tsx`
-- Modify: `frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx`
-- Modify: `frontend/src/pages/groupware/community/notice/data/noticeData.ts`
-- Reuse: `frontend/src/pages/groupware/community/notice/components/NoticeComposerDialog.tsx`의 Tiptap 설정
-
-- [ ] **Step 1: 댓글·답글 작성과 수정을 Tiptap 에디터 입력으로 교체한다.**
-- [ ] **Step 2: 본문 HTML을 공통 댓글 API의 `content`로 전달한다.**
-- [ ] **Step 3: `NOTICE_COMMENT` 첨부 선택/업로드/다운로드 표시를 추가한다.**
-- [ ] **Step 4: 최근 댓글 3건만 표시하고 이전 댓글 버튼으로 cursor 조회 후 기존 트리에 병합한다.**
-- [ ] **Step 5: 게시글·댓글·답글 수정/삭제 액션을 `MoreVert` 메뉴 안으로 이동한다.**
-- [ ] **Step 6: 좁은 화면에서 에디터, 첨부 목록, 메뉴가 겹치지 않는지 375px/768px/1280px 기준으로 확인한다.**
-- [ ] **Step 7: 관련 Vitest를 실행하고 타입 오류를 수정한다.**
-
-### Task 7: 문서화 및 최종 검증
-
-**Files:**
-
-- Create: `docs/result/20260917/notice-crud-comments/README.md`
-- Create: `docs/result/20260917/notice-crud-comments/screenshots/` when browser screenshots are available
-- Modify: relevant `docs/spec/20260917` document if API contract changed
-
-- [ ] **Step 1: `cd frontend; npm run build`를 실행한다.**
-- [ ] **Step 2: `cd frontend; npm run test`를 실행한다.**
-- [ ] **Step 3: `cd backend; mvn test`를 실행한다.**
-- [ ] **Step 4: 공지 CRUD, 댓글/답글 CRUD, 첨부 표시, 이전 댓글 조회 시나리오와 API 호출 수를 결과 문서에 기록한다.**
-- [ ] **Step 5: 실패한 검증은 원인과 미해결 범위를 결과 문서에 명시한다.**
+- Task 1의 테스트 mock 계약은 Task 2와 Task 3의 구현 검증 기준으로 사용한다.
+- Task 2와 Task 3은 서로 다른 주 동작을 가지지만 `CommunityNoticePage.tsx`를 공유하므로 동시에 수정하지 않는다.
+- 각 태스크는 구현자 자기검토, 사양 준수 검토, 코드 품질 검토 후 다음 태스크로 이동한다.
+- 태스크별 커밋은 사용자가 별도 요청하지 않는 한 생성하지 않는다.

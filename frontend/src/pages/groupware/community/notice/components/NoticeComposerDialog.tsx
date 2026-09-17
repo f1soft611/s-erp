@@ -136,12 +136,16 @@ export function NoticeComposerDialog({
   const editor = useEditor(editorConfig);
 
   useEffect(() => {
-    setTitle(defaultTitle);
-  }, [defaultTitle]);
+    if (open) {
+      setTitle(defaultTitle);
+    }
+  }, [defaultTitle, open]);
 
   useEffect(() => {
-    setAttachments(defaultAttachments);
-  }, [defaultAttachments]);
+    if (open) {
+      setAttachments(defaultAttachments);
+    }
+  }, [defaultAttachments, open]);
 
   useEffect(() => {
     if (!editor || !open) {

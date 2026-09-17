@@ -575,17 +575,7 @@ export function CommunityNoticePage({
         }
 
         if (createdId > 0) {
-          setNoticeItems((current) => [
-            ...current,
-            toNoticeFeedItem({
-              ...created,
-              postId: createdId,
-              attachments: [
-                ...(created.attachments ?? []),
-                ...uploadedAttachments,
-              ],
-            }),
-          ]);
+          await loadNoticePosts({ silent: true });
         }
 
         showSuccess('공지사항이 등록되었습니다.');
