@@ -550,7 +550,8 @@ export function NoticeComposerDialog({
                             <Button
                               size="small"
                               variant="outlined"
-                              aria-label={`다운로드: ${file.name}`}
+                              aria-label="첨부 파일 삭제"
+                              title={file.name}
                               onClick={() => removeAttachment(file.id)}
                               sx={{
                                 minWidth: 0,
@@ -591,7 +592,7 @@ export function NoticeComposerDialog({
         <input
           ref={attachmentInputRef}
           type="file"
-          accept="image/*,.xlsx,.xls,.csv,.pdf"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.txt,.csv,.zip,image/*"
           hidden
           onChange={handleAttachmentSelect}
           aria-label="첨부 파일 선택"

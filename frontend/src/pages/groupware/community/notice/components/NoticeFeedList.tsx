@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,7 +25,11 @@ type NoticeFeedListProps = {
   onToggleExpand?: (id: number) => void;
   onToggleLike?: (id: number) => void;
   onToggleBookmark?: (id: number) => void;
-  onAddComment?: (noticeId: number, content: string) => void;
+  onAddComment?: (
+    noticeId: number,
+    content: string,
+    parentCommentId?: number | string,
+  ) => Promise<void> | void;
   onDelete?: (noticeId: number) => void;
   onEdit?: (item: NoticeFeedItem) => void;
   onDownload?: (
@@ -84,6 +88,89 @@ export function NoticeFeedList({
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>(
     {},
   );
+  const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
+    Record<number, NoticeCommentItem[]>
+  >({});
+
+  useEffect(() => {
+    setLocalCommentsByNoticeId((current) => {
+      const next = { ...current };
+      items.forEach((item) => {
+        next[item.id] = item.comments ?? [];
+      });
+      return next;
+    });
+  }, [items]);
+
+  const appendReplyToComments = (
+    comments: NoticeCommentItem[] = [],
+    parentCommentId: number | string,
+    reply: NoticeCommentItem,
+  ): NoticeCommentItem[] =>
+    comments.map((comment) => {
+      if (String(comment.id) === String(parentCommentId)) {
+        return {
+          ...comment,
+          replies: [...(comment.replies ?? []), reply],
+        };
+      }
+
+      if ((comment.replies ?? []).length > 0) {
+        return {
+          ...comment,
+          replies: appendReplyToComments(
+            comment.replies ?? [],
+            parentCommentId,
+            reply,
+          ),
+        };
+      }
+
+      return comment;
+    });
+
+  const handleLocalCommentAdd = (
+    noticeId: number,
+    content: string,
+    parentCommentId?: number | string,
+  ) => {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const createdAt = new Date().toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const nextComment: NoticeCommentItem = {
+      id: Date.now(),
+      author: '나',
+      time: createdAt,
+      content: trimmed,
+    };
+
+    setLocalCommentsByNoticeId((current) => {
+      const previous =
+        current[noticeId] ??
+        items.find((item) => item.id === noticeId)?.comments ??
+        [];
+      const nextComments =
+        parentCommentId == null
+          ? [...previous, nextComment]
+          : appendReplyToComments(previous, parentCommentId, nextComment);
+
+      return {
+        ...current,
+        [noticeId]: nextComments,
+      };
+    });
+
+    onAddComment?.(noticeId, content, parentCommentId);
+  };
 
   return (
     <FeedList
@@ -93,6 +180,8 @@ export function NoticeFeedList({
         const displayBody = isExpanded ? item.body : item.summary;
         const previewHtml = item.bodyHtml ?? item.body;
         const hasRichHtml = /<[^>]+>/.test(previewHtml);
+        const itemComments =
+          localCommentsByNoticeId[item.id] ?? item.comments ?? [];
         const attachmentFiles =
           item.attachmentDetails ??
           ((item.attachments ?? []).map((name, index) => ({
@@ -376,9 +465,9 @@ export function NoticeFeedList({
                 </Typography>
               </Box>
 
-              {item.comments && item.comments.length > 0 && (
+              {itemComments.length > 0 && (
                 <CommentThread
-                  comments={normalizeCommentTree(item.comments)}
+                  comments={normalizeCommentTree(itemComments)}
                   draft={commentDrafts[item.id] ?? ''}
                   onDraftChange={(value) =>
                     setCommentDrafts((current) => ({
@@ -387,11 +476,14 @@ export function NoticeFeedList({
                     }))
                   }
                   onSubmitComment={(content) => {
-                    onAddComment?.(item.id, content);
+                    handleLocalCommentAdd(item.id, content);
                     setCommentDrafts((current) => ({
                       ...current,
                       [item.id]: '',
                     }));
+                  }}
+                  onSubmitReply={(commentId, content) => {
+                    handleLocalCommentAdd(item.id, content, commentId);
                   }}
                   isDark={isDark}
                   showComposer
@@ -401,7 +493,7 @@ export function NoticeFeedList({
                 />
               )}
 
-              {!item.comments?.length && (
+              {!itemComments.length && (
                 <CommentThread
                   comments={[]}
                   draft={commentDrafts[item.id] ?? ''}
@@ -412,11 +504,14 @@ export function NoticeFeedList({
                     }))
                   }
                   onSubmitComment={(content) => {
-                    onAddComment?.(item.id, content);
+                    handleLocalCommentAdd(item.id, content);
                     setCommentDrafts((current) => ({
                       ...current,
                       [item.id]: '',
                     }));
+                  }}
+                  onSubmitReply={(commentId, content) => {
+                    handleLocalCommentAdd(item.id, content, commentId);
                   }}
                   isDark={isDark}
                   showComposer

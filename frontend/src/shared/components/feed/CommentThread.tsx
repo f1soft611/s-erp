@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 
 export type FeedCommentItem = {
@@ -13,6 +14,7 @@ export type CommentThreadProps = {
   draft?: string;
   onDraftChange?: (value: string) => void;
   onSubmitComment?: (content: string) => void;
+  onSubmitReply?: (commentId: string | number, content: string) => void;
   onReply?: (commentId: string | number) => void;
   isDark?: boolean;
   showComposer?: boolean;
@@ -25,6 +27,10 @@ function renderCommentTree(
   comments: FeedCommentItem[] = [],
   depth = 0,
   onReply?: (commentId: string | number) => void,
+  replyTargetId: string | number | null = null,
+  replyingDraft = '',
+  onReplyDraftChange?: (value: string) => void,
+  onSubmitReply?: (commentId: string | number, content: string) => void,
 ) {
   return comments.map((comment) => (
     <Box key={comment.id} sx={{ mt: 1.5, pl: depth ? 2 : 0 }}>
@@ -71,9 +77,57 @@ function renderCommentTree(
           >
             답글
           </Button>
+          {replyTargetId === comment.id && (
+            <Box
+              sx={{ mt: 1.5, display: 'flex', gap: 1, alignItems: 'center' }}
+            >
+              <Box
+                component="input"
+                value={replyingDraft}
+                onChange={(event) => onReplyDraftChange?.(event.target.value)}
+                placeholder="답글을 입력하세요"
+                aria-label="답글 입력"
+                sx={{
+                  flex: 1,
+                  border: `1px solid ${'rgba(148,163,184,0.3)'}`,
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.75,
+                  background: 'transparent',
+                  outline: 'none',
+                  color: 'text.primary',
+                  fontSize: '0.85rem',
+                }}
+              />
+              <Button
+                size="small"
+                variant="contained"
+                aria-label="답글 등록"
+                onClick={() => {
+                  const content = replyingDraft.trim();
+                  if (!content) {
+                    return;
+                  }
+
+                  onSubmitReply?.(comment.id, content);
+                }}
+                sx={{ minWidth: 0, px: 1.25 }}
+              >
+                답글 등록
+              </Button>
+            </Box>
+          )}
           {comment.replies && comment.replies.length > 0 && (
             <Box sx={{ mt: 1 }}>
-              {renderCommentTree(comment.replies, 1, onReply)}
+              {renderCommentTree(
+                comment.replies,
+                1,
+                onReply,
+                replyTargetId,
+                replyingDraft,
+                onReplyDraftChange,
+                onSubmitReply,
+              )}
             </Box>
           )}
         </Box>
@@ -87,6 +141,7 @@ export function CommentThread({
   draft = '',
   onDraftChange,
   onSubmitComment,
+  onSubmitReply,
   onReply,
   isDark = false,
   showComposer = true,
@@ -94,6 +149,22 @@ export function CommentThread({
   composerLabel = '댓글 입력',
   submitLabel = '등록',
 }: CommentThreadProps) {
+  const [replyTargetId, setReplyTargetId] = useState<string | number | null>(
+    null,
+  );
+  const [replyDraft, setReplyDraft] = useState('');
+
+  const submitReply = (commentId: string | number) => {
+    const content = replyDraft.trim();
+    if (!content) {
+      return;
+    }
+
+    onSubmitReply?.(commentId, content);
+    setReplyDraft('');
+    setReplyTargetId(null);
+  };
+
   return (
     <Box>
       {comments.length > 0 && (
@@ -106,7 +177,25 @@ export function CommentThread({
             pt: 1.5,
           }}
         >
-          {renderCommentTree(comments, 0, onReply)}
+          {renderCommentTree(
+            comments,
+            0,
+            (commentId) => {
+              onReply?.(commentId);
+              setReplyTargetId((current) =>
+                current === commentId ? null : commentId,
+              );
+              setReplyDraft('');
+            },
+            replyTargetId,
+            replyDraft,
+            setReplyDraft,
+            (commentId, content) => {
+              onSubmitReply?.(commentId, content);
+              setReplyDraft('');
+              setReplyTargetId(null);
+            },
+          )}
         </Box>
       )}
 

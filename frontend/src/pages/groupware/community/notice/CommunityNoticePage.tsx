@@ -25,7 +25,7 @@ import { NoticeFeedList } from './components/NoticeFeedList';
 import { NoticeFilterBar } from './components/NoticeFilterBar';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import { summaryStats } from './data/noticeData';
-import type { NoticeFeedItem } from './data/noticeData';
+import type { NoticeCommentItem, NoticeFeedItem } from './data/noticeData';
 import {
   createNoticePost,
   deleteNoticePost,
@@ -36,6 +36,10 @@ import {
   uploadNoticeAttachment,
 } from './services/noticeBoardService';
 import type { NoticeBoardPostApi } from './services/noticeBoardService';
+import {
+  createCommonComment,
+  fetchCommonComments,
+} from '../../../../shared/services/commonContentApi';
 
 type CommunityNoticePageProps = {
   selectedModule: ModuleItem;
@@ -67,6 +71,102 @@ const formatNoticeMeta = (post: NoticeBoardPostApi): string => {
     : '날짜 미상';
   const viewCount = Number(post.viewCount ?? 0);
   return `${writerName} · ${createdAt} · 조회 ${viewCount}`;
+};
+
+const formatCommentTime = (value: string | Date | null | undefined): string => {
+  if (!value) {
+    return '방금';
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '방금';
+  }
+
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const countNestedComments = (comments: NoticeCommentItem[] = []): number =>
+  comments.reduce(
+    (total, comment) => total + 1 + countNestedComments(comment.replies ?? []),
+    0,
+  );
+
+const toNoticeCommentTree = (
+  records: Array<{
+    commentId?: number | string | null;
+    parentCommentId?: number | string | null;
+    writerName?: string | null;
+    writerId?: string | null;
+    content?: string | null;
+    createdAt?: string | Date | null;
+  }> = [],
+): NoticeCommentItem[] => {
+  const commentMap = new Map<number, NoticeCommentItem>();
+  const roots: NoticeCommentItem[] = [];
+
+  records.forEach((record) => {
+    const commentId = Number(record.commentId ?? 0);
+    if (!commentId) {
+      return;
+    }
+
+    const item: NoticeCommentItem = {
+      id: commentId,
+      author: record.writerName || record.writerId || '사용자',
+      time: formatCommentTime(record.createdAt),
+      content: record.content ?? '',
+      replies: [],
+    };
+
+    commentMap.set(commentId, item);
+  });
+
+  records.forEach((record) => {
+    const commentId = Number(record.commentId ?? 0);
+    const item = commentMap.get(commentId);
+    if (!item) {
+      return;
+    }
+
+    const parentCommentId =
+      record.parentCommentId == null ? null : Number(record.parentCommentId);
+
+    if (parentCommentId && commentMap.has(parentCommentId)) {
+      const parent = commentMap.get(parentCommentId);
+      if (parent) {
+        parent.replies = [...(parent.replies ?? []), item];
+        return;
+      }
+    }
+
+    roots.push(item);
+  });
+
+  return roots;
+};
+
+const hydrateNoticePost = async (
+  post: NoticeBoardPostApi,
+): Promise<NoticeFeedItem> => {
+  const postId = Number(post.postId ?? 0);
+  const detail = postId > 0 ? await fetchNoticePostDetail(postId) : post;
+  const baseItem = toNoticeFeedItem(detail ?? post);
+  const commentRecords =
+    postId > 0 ? await fetchCommonComments('NOTICE', postId) : [];
+  const comments = toNoticeCommentTree(commentRecords);
+
+  return {
+    ...baseItem,
+    comments,
+    commentCount: countNestedComments(comments),
+  };
 };
 
 const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
@@ -148,7 +248,10 @@ export function CommunityNoticePage({
 
       try {
         const posts = await fetchNoticePosts(1, 20, '');
-        setNoticeItems(posts.map(toNoticeFeedItem));
+        const hydratedPosts = await Promise.all(
+          posts.map((post) => hydrateNoticePost(post)),
+        );
+        setNoticeItems(hydratedPosts);
       } catch (error) {
         setErrorMessage(noticeFailureMessage);
         if (!silent) {
@@ -157,8 +260,6 @@ export function CommunityNoticePage({
       } finally {
         if (silent) {
           setIsRefreshing(false);
-        } else {
-          setIsInitialLoading(false);
         }
       }
     },
@@ -166,7 +267,15 @@ export function CommunityNoticePage({
   );
 
   useEffect(() => {
+    const initialLoadingTimer = window.setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 1500);
+
     void loadNoticePosts();
+
+    return () => {
+      window.clearTimeout(initialLoadingTimer);
+    };
   }, [loadNoticePosts]);
 
   const handleCreateNotice = async ({
@@ -318,44 +427,33 @@ export function CommunityNoticePage({
   );
 
   const handleAddComment = useCallback(
-    (noticeId: number, content: string) => {
+    async (
+      noticeId: number,
+      content: string,
+      parentCommentId?: number | string,
+    ) => {
       const trimmed = content.trim();
       if (!trimmed) {
         return;
       }
 
-      setNoticeItems((current) =>
-        current.map((item) => {
-          if (item.id !== noticeId) {
-            return item;
-          }
-
-          const createdAt = new Date().toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-
-          return {
-            ...item,
-            commentCount: (item.commentCount ?? 0) + 1,
-            comments: [
-              ...(item.comments ?? []),
-              {
-                id: Date.now(),
-                author: '나',
-                time: createdAt,
-                content: trimmed,
-              },
-            ],
-          };
-        }),
-      );
-      showSuccess('댓글이 등록되었습니다.');
+      try {
+        await createCommonComment('NOTICE', noticeId, trimmed, parentCommentId);
+        await loadNoticePosts({ silent: true });
+        showSuccess(
+          parentCommentId != null
+            ? '답글이 등록되었습니다.'
+            : '댓글이 등록되었습니다.',
+        );
+      } catch (error) {
+        showError(
+          parentCommentId != null
+            ? '답글 저장에 실패했습니다.'
+            : '댓글 저장에 실패했습니다.',
+        );
+      }
     },
-    [showSuccess],
+    [loadNoticePosts, showError, showSuccess],
   );
 
   return (

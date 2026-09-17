@@ -130,4 +130,29 @@ describe('Community notice page', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('adds a nested reply to an existing comment thread', async () => {
+    render(
+      <NoticeFeedList
+        items={[noticeFeed[0]]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={() => undefined}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^답글$/i })[0]);
+
+    const replyInput = await screen.findByLabelText(/답글 입력/i);
+    fireEvent.change(replyInput, { target: { value: '확인했습니다.' } });
+    fireEvent.click(screen.getByRole('button', { name: /^답글 등록$/i }));
+
+    expect(screen.getByText('확인했습니다.')).toBeInTheDocument();
+  });
 });
