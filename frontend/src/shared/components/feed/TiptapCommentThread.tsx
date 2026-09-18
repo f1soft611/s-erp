@@ -619,7 +619,7 @@ function CommentItem({
               label="답글 입력"
               fileInputLabel="답글 첨부파일 선택"
               placeholder="줄바꿈 Shift+Enter, 입력 Enter"
-              submitLabel="답글 등록"
+              submitLabel="등록"
               isDark={isDark}
               onCancel={() => setReplyTargetId(null)}
               onSubmit={async (content, files) => {

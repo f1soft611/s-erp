@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
 import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { createAppTheme } from '../src/theme/theme';

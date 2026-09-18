@@ -27,4 +27,20 @@ export const noticeContentStyles = {
     maxWidth: '100%',
     height: 'auto',
   },
+  '& table': {
+    width: 'max-content',
+    minWidth: 'max-content',
+    borderCollapse: 'collapse',
+    tableLayout: 'auto',
+    margin: '8px 0',
+  },
+  '& th, & td': {
+    minWidth: 0,
+    verticalAlign: 'top',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
+  '& th': {
+    fontWeight: 700,
+  },
 };

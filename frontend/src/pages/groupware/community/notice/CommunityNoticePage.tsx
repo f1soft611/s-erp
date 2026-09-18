@@ -3,11 +3,13 @@ import {
   Card,
   CardContent,
   Container,
+  IconButton,
   Skeleton,
   Stack,
   useTheme,
 } from '@mui/material';
 import AddOutlined from '@mui/icons-material/AddOutlined';
+import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -444,6 +446,8 @@ export function CommunityNoticePage({
       } finally {
         if (silent) {
           setIsRefreshing(false);
+        } else {
+          setIsInitialLoading(false);
         }
       }
     },
@@ -451,15 +455,7 @@ export function CommunityNoticePage({
   );
 
   useEffect(() => {
-    const initialLoadingTimer = window.setTimeout(() => {
-      setIsInitialLoading(false);
-    }, 1500);
-
     void loadNoticePosts();
-
-    return () => {
-      window.clearTimeout(initialLoadingTimer);
-    };
   }, [loadNoticePosts]);
 
   const handleCreateNotice = async ({
@@ -935,7 +931,7 @@ export function CommunityNoticePage({
 
       <NoticeFilterBar isDark={isDark} />
       <PageMessageArea
-        message={errorMessage ?? ''}
+        message=""
         onClose={() => setErrorMessage(null)}
       />
 
@@ -1109,9 +1105,29 @@ export function CommunityNoticePage({
                 </Card>
               </Stack>
             </Box>
-          ) : errorMessage &&
-            !isRefreshing &&
-            !hasVisibleNoticeList ? null : noticeItems.length === 0 ? (
+          ) : errorMessage && !isRefreshing && !hasVisibleNoticeList ? (
+            <Box
+              sx={{
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                bgcolor: theme.palette.background.default,
+                color: theme.palette.text.primary,
+              }}
+            >
+              <IconButton
+                aria-label="공지사항 다시 불러오기"
+                onClick={() => {
+                  void loadNoticePosts();
+                }}
+              >
+                <ReplayOutlined />
+              </IconButton>
+            </Box>
+          ) : noticeItems.length === 0 ? (
             <Box
               sx={{
                 py: 6,

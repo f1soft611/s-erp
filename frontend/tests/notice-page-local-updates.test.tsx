@@ -124,6 +124,70 @@ describe('CommunityNoticePage local updates', () => {
     });
   });
 
+  it('keeps the initial skeleton until the notice API resolves', async () => {
+    let resolvePosts: (posts: []) => void = () => undefined;
+    noticeServiceMocks.fetchNoticePosts.mockReturnValueOnce(
+      new Promise<[]>(resolve => {
+        resolvePosts = resolve;
+      }),
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByTestId('notice-feed-skeleton'),
+    ).toBeInTheDocument();
+    await new Promise(resolve => window.setTimeout(resolve, 1600));
+    expect(screen.getByTestId('notice-feed-skeleton')).toBeInTheDocument();
+
+    await act(async () => {
+      resolvePosts([]);
+    });
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('notice-feed-skeleton'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows a centered retry button after an initial notice API failure', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockRejectedValueOnce(
+      new Error('network failure'),
+    );
+
+    renderPage();
+
+    const retryButton = await screen.findByRole('button', {
+      name: '공지사항 다시 불러오기',
+    });
+
+    expect(screen.queryByTestId('notice-feed-skeleton')).not.toBeInTheDocument();
+    expect(screen.queryByText(/공지사항 목록을 불러오지 못했습니다/)).not.toBeInTheDocument();
+    expect(retryButton).toBeInTheDocument();
+  });
+
+  it('reloads the notice list when the retry button is clicked', async () => {
+    noticeServiceMocks.fetchNoticePosts
+      .mockRejectedValueOnce(new Error('network failure'))
+      .mockResolvedValueOnce([
+        {
+          ...detail,
+          postId: 2,
+          title: '재조회된 공지',
+        },
+      ]);
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '공지사항 다시 불러오기' }),
+    );
+
+    expect(screen.getByTestId('notice-feed-skeleton')).toBeInTheDocument();
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('재조회된 공지')).toBeInTheDocument();
+  });
+
   it('inserts a reply directly after its target without adding display depth', () => {
     const comments = [
       {

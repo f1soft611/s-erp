@@ -24,6 +24,12 @@ import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from '@tiptap/extension-table';
 import { noticeContentStyles } from './noticeContentStyles';
 
 export type NoticeComposerDraftAttachment = {
@@ -69,6 +75,200 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
+const allowedCellStyleProperties = new Set([
+  'background',
+  'background-color',
+  'border',
+  'border-bottom',
+  'border-left',
+  'border-right',
+  'border-top',
+  'color',
+  'font-weight',
+  'height',
+  'text-align',
+  'vertical-align',
+  'width',
+]);
+
+function isSafeCellStyleValue(value: string): boolean {
+  return !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(value);
+}
+
+function normalizeCellDimension(value: string | null): string | null {
+  const normalized = value?.trim() ?? '';
+  if (!normalized) {
+    return null;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return `${normalized}px`;
+  }
+
+  return /^(?:\d+(?:\.\d+)?)(?:px|pt|pc|cm|mm|in|em|rem|%|vh|vw)$/.test(
+    normalized,
+  )
+    ? normalized
+    : null;
+}
+
+function sanitizeCellStyle(cell: Element): string | null {
+  const declarations: string[] = [];
+  const style = (cell as HTMLElement).style;
+
+  for (const property of allowedCellStyleProperties) {
+    const value = style.getPropertyValue(property).trim();
+    if (!value || !isSafeCellStyleValue(value)) {
+      continue;
+    }
+
+    const normalizedValue =
+      property === 'width' || property === 'height'
+        ? normalizeCellDimension(value)
+        : value;
+    if (normalizedValue) {
+      declarations.push(`${property}:${normalizedValue}`);
+    }
+  }
+
+  for (const [property, attribute] of [
+    ['width', 'width'],
+    ['height', 'height'],
+  ] as const) {
+    if (
+      declarations.some((declaration) => declaration.startsWith(`${property}:`))
+    ) {
+      continue;
+    }
+
+    const normalizedValue = normalizeCellDimension(
+      cell.getAttribute(attribute),
+    );
+    if (normalizedValue) {
+      declarations.push(`${property}:${normalizedValue}`);
+    }
+  }
+
+  return declarations.length > 0 ? declarations.join(';') : null;
+}
+
+function applyEmbeddedCellStyles(root: HTMLElement): void {
+  const cells = Array.from(root.querySelectorAll('th, td'));
+  const styleProperties = Array.from(allowedCellStyleProperties);
+
+  const applyDeclarationText = (
+    selectorText: string,
+    declarationText: string,
+  ): void => {
+    const declarations = declarationText
+      .split(';')
+      .map((declaration) => declaration.split(':'))
+      .filter(([property, value]) => property && value)
+      .map(
+        ([property, value]) =>
+          [property.trim().toLowerCase(), value.trim()] as const,
+      )
+      .filter(
+        ([property, value]) =>
+          allowedCellStyleProperties.has(property) &&
+          isSafeCellStyleValue(value),
+      );
+
+    for (const selector of selectorText.split(',')) {
+      for (const cell of cells) {
+        try {
+          if (!cell.matches(selector.trim())) {
+            continue;
+          }
+        } catch {
+          continue;
+        }
+
+        for (const [property, value] of declarations) {
+          (cell as HTMLElement).style.setProperty(property, value);
+        }
+      }
+    }
+  };
+
+  const applyRules = (rules: CSSRuleList): void => {
+    Array.from(rules).forEach((rule) => {
+      if (rule.type === CSSRule.STYLE_RULE) {
+        const styleRule = rule as CSSStyleRule;
+        for (const cell of cells) {
+          try {
+            if (!cell.matches(styleRule.selectorText)) {
+              continue;
+            }
+          } catch {
+            continue;
+          }
+
+          for (const property of styleProperties) {
+            const value = styleRule.style.getPropertyValue(property).trim();
+            if (value && isSafeCellStyleValue(value)) {
+              (cell as HTMLElement).style.setProperty(property, value);
+            }
+          }
+        }
+      } else if (rule.type !== CSSRule.IMPORT_RULE) {
+        const nestedRules = (rule as CSSGroupingRule).cssRules;
+        if (nestedRules) {
+          applyRules(nestedRules);
+        }
+      }
+    });
+  };
+
+  root.ownerDocument.querySelectorAll('style').forEach((styleElement) => {
+    const runtimeStyle = document.createElement('style');
+    runtimeStyle.textContent = styleElement.textContent;
+    document.head.appendChild(runtimeStyle);
+
+    if (runtimeStyle.sheet?.cssRules) {
+      applyRules(runtimeStyle.sheet.cssRules);
+    }
+
+    const cssText = styleElement.textContent ?? '';
+    const fallbackRulePattern = /([^{}]+)\{([^{}]*)\}/g;
+    let fallbackMatch = fallbackRulePattern.exec(cssText);
+    while (fallbackMatch) {
+      applyDeclarationText(fallbackMatch[1], fallbackMatch[2]);
+      fallbackMatch = fallbackRulePattern.exec(cssText);
+    }
+
+    runtimeStyle.remove();
+  });
+}
+
+const StyledTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
+        renderHTML: (attributes: { style?: string | null }) =>
+          attributes.style ? { style: attributes.style } : {},
+      },
+    };
+  },
+});
+
+const StyledTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
+        renderHTML: (attributes: { style?: string | null }) =>
+          attributes.style ? { style: attributes.style } : {},
+      },
+    };
+  },
+});
+
 export function normalizeClipboardHtmlForEditor(
   rawHtml: string | null | undefined,
 ): string {
@@ -79,26 +279,63 @@ export function normalizeClipboardHtmlForEditor(
   const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
   const root = doc.body;
 
+  applyEmbeddedCellStyles(root);
+
   root
     .querySelectorAll('script,style,iframe,svg,object,embed,form,meta,link')
     .forEach((node) => node.remove());
 
-  const table = root.querySelector('table');
-  if (table) {
-    const rows = Array.from(table.querySelectorAll('tr'))
+  const tableRows = Array.from(root.querySelectorAll('tr'));
+  if (tableRows.length > 0) {
+    const rows = tableRows
       .map((row) => {
         const cells = Array.from(row.querySelectorAll('th, td'));
-        const values = cells.length
-          ? cells
-              .map((cell) =>
-                (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
-              )
-              .filter(Boolean)
-          : [(row.textContent ?? '').replace(/\s+/g, ' ').trim()].filter(
-              Boolean,
-            );
+        if (cells.length === 0) {
+          return '';
+        }
 
-        return values.length ? values.join(' | ') : '';
+        const normalizedCells = cells.map((cell) => {
+          const value = (cell.textContent ?? '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const tagName = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td';
+          const colspan = Math.max(
+            1,
+            Number(cell.getAttribute('colspan')) || 1,
+          );
+          const rowspan = Math.max(
+            1,
+            Number(cell.getAttribute('rowspan')) || 1,
+          );
+          const spanAttributes = [
+            colspan > 1 ? ` colspan="${colspan}"` : '',
+            rowspan > 1 ? ` rowspan="${rowspan}"` : '',
+          ].join('');
+          const style = sanitizeCellStyle(cell);
+          const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
+
+          return `<${tagName}${spanAttributes}${styleAttribute}>${escapeHtml(value)}</${tagName}>`;
+        });
+
+        return `<tr>${normalizedCells.join('')}</tr>`;
+      })
+      .filter((row) => row !== '');
+
+    if (rows.length > 0) {
+      return `<table><tbody>${rows.join('')}</tbody></table>`;
+    }
+  }
+
+  const textCells = Array.from(root.querySelectorAll('td, th'));
+  if (textCells.length > 0) {
+    const rows = textCells
+      .map((cell) => {
+        const value = (cell.textContent ?? '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return value ? value : '';
       })
       .filter(Boolean);
 
@@ -107,10 +344,11 @@ export function normalizeClipboardHtmlForEditor(
     }
   }
 
-  const fallbackText = root.textContent ?? '';
-  const normalizedText = fallbackText
+  const plainTextCandidate = root.textContent ?? '';
+  const normalizedText = plainTextCandidate
     .replace(/\u00a0/g, ' ')
     .replace(/\r\n/g, '\n')
+    .replace(/\t/g, ' | ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
@@ -120,12 +358,19 @@ export function normalizeClipboardHtmlForEditor(
 
   const blocks = normalizedText
     .split(/\n{2,}|\n/)
-    .map((line) => line.trim())
+    .map((line) => line.replace(/\s+\|\s+/g, ' | ').trim())
     .filter(Boolean)
     .map((line) => `<p>${escapeHtml(line)}</p>`)
     .join('');
 
   return blocks || `<p>${escapeHtml(normalizedText)}</p>`;
+}
+
+function normalizeClipboardTextForEditor(rawText: string): string {
+  return rawText
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\t/g, ' | ');
 }
 
 const emptyNoticeContent = '<p></p>';
@@ -171,9 +416,15 @@ export function NoticeComposerDialog({
   const headerBackground = resolvedDark ? '#1f2937' : '#f8fafc';
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
+  const pasteDebugEnabled =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('noticePasteDebug') === '1';
   const [title, setTitle] = useState(defaultTitle);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
+  const [pasteDebugLog, setPasteDebugLog] = useState<string[]>(() =>
+    pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
+  );
   const [attachments, setAttachments] =
     useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
 
@@ -181,6 +432,10 @@ export function NoticeComposerDialog({
     () => ({
       extensions: [
         StarterKit,
+        Table.configure({ resizable: false }),
+        TableRow,
+        StyledTableHeader,
+        StyledTableCell,
         Placeholder.configure({
           placeholder: '본문을 입력하세요.',
           emptyEditorClass: 'is-editor-empty',
@@ -199,28 +454,42 @@ export function NoticeComposerDialog({
           style: `background-color: ${editorSurfaceBackground}; outline: none; line-height: 1.7;`,
         },
         handlePaste: (_view: unknown, event: ClipboardEvent) => {
-          const clipboardData = event.clipboardData;
-          if (!clipboardData) {
-            return false;
+          if (pasteDebugEnabled) {
+            const data = event.clipboardData;
+            const html = data?.getData('text/html') ?? '';
+            const text = data?.getData('text/plain') ?? '';
+            const normalizedHtml = normalizeClipboardHtmlForEditor(html);
+            setPasteDebugLog((current) => [
+              ...current,
+              `[paste] types=${data ? Array.from(data.types).join(', ') : '(none)'}`,
+              `[paste] htmlLength=${html.length}, textLength=${text.length}`,
+              `[paste] html=${html.slice(0, 500)}`,
+              `[paste] text=${text.slice(0, 500)}`,
+              `[normalized] length=${normalizedHtml.length}`,
+              `[normalized] html=${normalizedHtml.slice(0, 800)}`,
+            ]);
+
+            window.setTimeout(() => {
+              const editorElement = document.querySelector(
+                '.notice-composer-editor .ProseMirror',
+              );
+              setPasteDebugLog((current) => [
+                ...current,
+                `[after 300ms] text=${editorElement?.textContent ?? '(editor not found)'}`,
+                `[after 300ms] html=${editorElement?.innerHTML ?? '(editor not found)'}`,
+              ]);
+            }, 300);
           }
 
-          const pastedHtml = clipboardData.getData('text/html');
-          const pasteText = clipboardData.getData('text/plain');
-          const normalizedHtml = normalizeClipboardHtmlForEditor(
-            pastedHtml || pasteText,
-          );
-
-          if (!normalizedHtml) {
-            return false;
-          }
-
-          event.preventDefault();
-          editorRef.current?.commands.insertContent(normalizedHtml);
-          return true;
+          return false;
         },
+        transformPastedHTML: (html: string) =>
+          normalizeClipboardHtmlForEditor(html),
+        transformPastedText: (text: string) =>
+          normalizeClipboardTextForEditor(text),
       },
     }),
-    [defaultBody, editorSurfaceBackground],
+    [defaultBody, editorSurfaceBackground, pasteDebugEnabled],
   );
 
   const editor = useEditor(editorConfig);
@@ -230,16 +499,16 @@ export function NoticeComposerDialog({
   }, [editor]);
 
   useEffect(() => {
-    if (open) {
-      setTitle(defaultTitle);
+    if (!open) {
+      return;
     }
-  }, [defaultTitle, open]);
 
-  useEffect(() => {
-    if (open) {
-      setAttachments(defaultAttachments);
-    }
-  }, [defaultAttachments, open]);
+    setTitle(defaultTitle);
+    setAttachments(defaultAttachments);
+    setPasteDebugLog(
+      pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
+    );
+  }, [open, pasteDebugEnabled]);
 
   useEffect(() => {
     if (!editor || !open) {
@@ -527,6 +796,29 @@ export function NoticeComposerDialog({
               }}
             />
 
+            {pasteDebugEnabled && (
+              <Box
+                data-testid="notice-paste-debug-panel"
+                sx={{
+                  mt: 1,
+                  px: 1.25,
+                  py: 1,
+                  maxHeight: 180,
+                  overflow: 'auto',
+                  border: '1px solid #60a5fa',
+                  borderRadius: 1,
+                  bgcolor: '#111827',
+                  color: '#e5e7eb',
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {pasteDebugLog.join('\n')}
+              </Box>
+            )}
+
             <Box
               sx={{
                 flex: 1,
@@ -572,6 +864,7 @@ export function NoticeComposerDialog({
                       minHeight: 180,
                       maxHeight: '100%',
                       overflowY: 'auto',
+                      overflowX: 'auto',
                       outline: 'none',
                       px: 2,
                       py: 1.5,
