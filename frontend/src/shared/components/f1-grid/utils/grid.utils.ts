@@ -43,6 +43,20 @@ export function isCellEditable<T extends object>(
     : Boolean(column.editable);
 }
 
+export function isGridCheckboxChecked(value: unknown): boolean {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === '') return false;
+    return ['true', 'y', 'yes', '1', 'on'].includes(normalized);
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  return Boolean(value);
+}
+
 export function normalizeGridNumberInput(
   rawValue: string,
   decimalPlaces?: number,

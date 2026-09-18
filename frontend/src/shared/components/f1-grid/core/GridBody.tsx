@@ -17,6 +17,7 @@ type GridBodyProps<T extends object> = {
   renderedColumnIndexes?: Set<number>;
   rowKey: keyof T;
   columnLine: boolean;
+  stripeRows: boolean;
   columnTracks: string;
   defaultRowHeight: number;
   minRowHeight: number;
@@ -109,6 +110,7 @@ export function GridBody<T extends object>({
   renderedColumnIndexes,
   rowKey,
   columnLine,
+  stripeRows,
   columnTracks,
   defaultRowHeight,
   minRowHeight,
@@ -251,6 +253,7 @@ export function GridBody<T extends object>({
             columns={columns}
             renderedColumnIndexes={renderedColumnIndexes}
             columnLine={columnLine}
+            stripeRows={stripeRows}
             isSelected={isSelected}
             focusedCell={focusedCell}
             editingCell={editingCell}

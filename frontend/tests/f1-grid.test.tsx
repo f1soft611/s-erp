@@ -1,4 +1,4 @@
-﻿import { createRef } from 'react';
+﻿import { createRef, useState } from 'react';
 import {
   act,
   fireEvent,
@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import dayjs from 'dayjs';
-import { describe, expect, it, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 import { AppSettingsProvider } from '../src/shared/context/AppSettingsContext';
 import {
@@ -124,7 +124,82 @@ const columns: F1GridColumn<MenuRow>[] = [
   },
 ];
 
+describe('F1-GRID default prop behavior', () => {
+  it('keeps column lines and alternating row striping enabled by default', () => {
+    render(
+      <F1Grid rows={rows} columns={columns} rowKey="id" ariaLabel="grid" />,
+    );
+
+    const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe(
+      'true',
+    );
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
+  it('allows disabling column lines and row striping explicitly', () => {
+    render(
+      <F1Grid
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        ariaLabel="grid without visual helpers"
+        columnLine={false}
+        stripeRows={false}
+      />,
+    );
+
+    const secondRowCodeCell = screen.getByRole('gridcell', { name: 'SET' });
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-column-line')).toBe(
+      'false',
+    );
+    expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe(
+      'false',
+    );
+  });
+});
+
 describe('F1-GRID size props', () => {
+  it('does not recurse when a parent recreates equivalent row arrays on every render', () => {
+    const baseRows = [
+      { id: 'row-1', code: 'A' },
+      { id: 'row-2', code: 'B' },
+    ];
+    const columns: F1GridColumn<(typeof baseRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+
+    function Demo() {
+      const [tick, setTick] = useState(0);
+      const rows = baseRows.filter(() => true);
+
+      return (
+        <>
+          <button type="button" onClick={() => setTick((value) => value + 1)}>
+            rerender
+          </button>
+          <F1Grid
+            rows={rows}
+            columns={columns}
+            rowKey="id"
+            ariaLabel="grid with equivalent row arrays"
+            height={220}
+          />
+          <span>{tick}</span>
+        </>
+      );
+    }
+
+    const { unmount } = render(<Demo />);
+
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'rerender' }));
+    }).not.toThrow();
+
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+    unmount();
+  });
+
   it('keeps cell render work limited when a cell is selected', () => {
     const renderCellSpy = vi.fn(({ value }) => <span>{String(value)}</span>);
     const manyRows = Array.from({ length: 64 }, (_, index) => ({
@@ -362,14 +437,18 @@ describe('F1-GRID loading overlay', () => {
     fireEvent.mouseEnter(endCell);
 
     await waitFor(() => {
-      expect(document.querySelector('[data-range-overlay="drag"]')).not.toBeNull();
+      expect(
+        document.querySelector('[data-range-overlay="drag"]'),
+      ).not.toBeNull();
     });
 
     const overlay = document.querySelector(
       '[data-range-overlay="drag"]',
     ) as HTMLElement;
     expect(Number.parseFloat(getComputedStyle(overlay).top)).toBeGreaterThan(0);
-    expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeGreaterThanOrEqual(0);
+    expect(
+      Number.parseFloat(getComputedStyle(overlay).left),
+    ).toBeGreaterThanOrEqual(0);
   });
 
   it('positions the selection overlay in scrolled content coordinates', async () => {
@@ -420,59 +499,70 @@ describe('F1-GRID loading overlay', () => {
     const endCell = screen.getByRole('gridcell', { name: 'Beta' });
     Object.defineProperty(startCell, 'getBoundingClientRect', {
       configurable: true,
-      value: () => ({
-        left: 80,
-        top: 220,
-        right: 240,
-        bottom: 260,
-        width: 160,
-        height: 40,
-        x: 80,
-        y: 220,
-        toJSON: () => ({}),
-      } as DOMRect),
+      value: () =>
+        ({
+          left: 80,
+          top: 220,
+          right: 240,
+          bottom: 260,
+          width: 160,
+          height: 40,
+          x: 80,
+          y: 220,
+          toJSON: () => ({}),
+        }) as DOMRect,
     });
     Object.defineProperty(endCell, 'getBoundingClientRect', {
       configurable: true,
-      value: () => ({
-        left: 80,
-        top: 260,
-        right: 240,
-        bottom: 300,
-        width: 160,
-        height: 40,
-        x: 80,
-        y: 260,
-        toJSON: () => ({}),
-      } as DOMRect),
+      value: () =>
+        ({
+          left: 80,
+          top: 260,
+          right: 240,
+          bottom: 300,
+          width: 160,
+          height: 40,
+          x: 80,
+          y: 260,
+          toJSON: () => ({}),
+        }) as DOMRect,
     });
     Object.defineProperty(bodyScroll, 'getBoundingClientRect', {
       configurable: true,
-      value: () => ({
-        left: 20,
-        top: 10,
-        right: 420,
-        bottom: 190,
-        width: 400,
-        height: 180,
-        x: 20,
-        y: 10,
-        toJSON: () => ({}),
-      } as DOMRect),
+      value: () =>
+        ({
+          left: 20,
+          top: 10,
+          right: 420,
+          bottom: 190,
+          width: 400,
+          height: 180,
+          x: 20,
+          y: 10,
+          toJSON: () => ({}),
+        }) as DOMRect,
     });
 
     fireEvent.mouseDown(startCell);
     fireEvent.mouseEnter(endCell);
 
     await waitFor(() => {
-      expect(document.querySelector('[data-range-overlay="drag"]')).not.toBeNull();
+      expect(
+        document.querySelector('[data-range-overlay="drag"]'),
+      ).not.toBeNull();
     });
 
     const overlay = document.querySelector(
       '[data-range-overlay="drag"]',
     ) as HTMLElement;
-    expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeCloseTo(181, 1);
-    expect(Number.parseFloat(getComputedStyle(overlay).top)).toBeCloseTo(421, 1);
+    expect(Number.parseFloat(getComputedStyle(overlay).left)).toBeCloseTo(
+      181,
+      1,
+    );
+    expect(Number.parseFloat(getComputedStyle(overlay).top)).toBeCloseTo(
+      421,
+      1,
+    );
   });
 
   it('continues the range drag after the viewport scrolls while the pointer stays in place', async () => {
@@ -525,7 +615,12 @@ describe('F1-GRID loading overlay', () => {
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
       value: (clientX: number, clientY: number) => {
-        if (clientX >= 20 && clientX <= 140 && clientY >= 90 && clientY <= 130) {
+        if (
+          clientX >= 20 &&
+          clientX <= 140 &&
+          clientY >= 90 &&
+          clientY <= 130
+        ) {
           return endCell;
         }
         return startCell;
@@ -647,10 +742,20 @@ describe('F1-GRID loading overlay', () => {
     Object.defineProperty(document, 'elementsFromPoint', {
       configurable: true,
       value: (clientX: number, clientY: number) => {
-        if (clientX >= 120 && clientX <= 130 && clientY >= 110 && clientY <= 120) {
+        if (
+          clientX >= 120 &&
+          clientX <= 130 &&
+          clientY >= 110 &&
+          clientY <= 120
+        ) {
           return [bodyScroll];
         }
-        if (clientX >= 10 && clientX <= 130 && clientY >= 120 && clientY <= 150) {
+        if (
+          clientX >= 10 &&
+          clientX <= 130 &&
+          clientY >= 120 &&
+          clientY <= 150
+        ) {
           return [nextCell];
         }
         return [startCell];
@@ -708,6 +813,197 @@ describe('F1-GRID loading overlay', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Column 10' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('reserves a stable scrollbar gutter when both vertical and horizontal scrolling are active', () => {
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${index}`,
+      label: `Label ${index}`,
+    }));
+    const columns: F1GridColumn<(typeof rows)[number]>[] = [
+      { field: 'code', headerName: 'Code', width: 160 },
+      { field: 'label', headerName: 'Label', width: 160 },
+    ];
+
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" height={240} />);
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll, bodyScroll] = Array.from(
+      grid.children,
+    ) as HTMLElement[];
+
+    expect(headerScroll).toHaveStyle({ scrollbarGutter: 'stable' });
+    expect(bodyScroll).toHaveStyle({ scrollbarGutter: 'stable' });
+  });
+
+  it('keeps the header scroll range aligned with the body when the vertical scrollbar gutter is present', async () => {
+    type WideRow = { id: string } & Record<string, string>;
+    const wideRows: WideRow[] = Array.from(
+      { length: 80 },
+      (_, rowIndex) =>
+        Object.fromEntries([
+          ['id', `row-${rowIndex}`],
+          ...Array.from({ length: 24 }, (_, columnIndex) => [
+            `field${columnIndex}`,
+            `value-${rowIndex}-${columnIndex}`,
+          ]),
+        ]) as WideRow,
+    );
+    const wideColumns: F1GridColumn<WideRow>[] = Array.from(
+      { length: 24 },
+      (_, index) => ({
+        field: `field${index}`,
+        headerName: `Column ${index}`,
+        width: 120,
+      }),
+    );
+
+    render(
+      <F1Grid rows={wideRows} columns={wideColumns} rowKey="id" height={240} />,
+    );
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll] = Array.from(grid.children) as HTMLElement[];
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(bodyScroll, 'offsetWidth', {
+      configurable: true,
+      value: 377,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    bodyScroll.scrollLeft = 2564;
+    fireEvent.resize(window);
+
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+  });
+
+  it('keeps the action header aligned with the body action cell when vertical scrolling is active', async () => {
+    const rows = Array.from({ length: 80 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${index}`,
+    }));
+
+    render(
+      <F1Grid
+        rows={rows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
+        rowKey="id"
+        height={240}
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll] = Array.from(grid.children) as HTMLElement[];
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(bodyScroll, 'offsetWidth', {
+      configurable: true,
+      value: 377,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    fireEvent.scroll(bodyScroll);
+
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+    expect(screen.getByRole('columnheader', { name: '상세' })).toHaveStyle({
+      width: '65px',
+      right: '-17px',
+    });
+    expect(
+      screen.getByRole('columnheader', { name: '상세' }),
+    ).toBeInTheDocument();
+  });
+
+  it('clears the header scrollbar gutter when rows shrink below the vertical scroll threshold', async () => {
+    const manyRows = Array.from({ length: 80 }, (_, index) => ({
+      id: `row-${index}`,
+      code: `ITEM-${index}`,
+    }));
+    const fewRows = manyRows.slice(0, 2);
+    const { rerender } = render(
+      <F1Grid
+        rows={manyRows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
+        rowKey="id"
+        height={240}
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+
+    const grid = screen.getByRole('grid');
+    const [headerScroll] = Array.from(grid.children) as HTMLElement[];
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    Object.defineProperty(bodyScroll, 'offsetWidth', {
+      configurable: true,
+      value: 377,
+    });
+    fireEvent.scroll(bodyScroll);
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '17px' });
+    });
+
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 377,
+    });
+    Object.defineProperty(bodyScroll, 'scrollHeight', {
+      configurable: true,
+      value: 200,
+    });
+    rerender(
+      <F1Grid
+        rows={fewRows}
+        columns={[{ field: 'code', headerName: 'Code', width: 180 }]}
+        rowKey="id"
+        height={240}
+        rowFormPlugin={{}}
+        showCheckbox={false}
+      />,
+    );
+    fireEvent.resize(window);
+
+    await waitFor(() => {
+      expect(headerScroll).toHaveStyle({ paddingRight: '0px' });
+    });
   });
 
   it('moves the virtual column window on horizontal scroll and selects the mounted cell', async () => {
@@ -1449,6 +1745,30 @@ describe('F1-GRID extended editors', () => {
         itemName: '?占쎌뒪???占쎈ぉ',
       }),
     ]);
+  });
+
+  it('fills the code picker button to the editor cell width', () => {
+    render(
+      <F1Grid
+        rows={[{ id: 'line-1', itemCode: 'ITEM-001' }]}
+        columns={[
+          {
+            field: 'itemCode',
+            headerName: '품목코드',
+            type: 'code',
+            editable: true,
+            onOpenCodePicker: () => ({}),
+          },
+        ]}
+        rowKey="id"
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'ITEM-001' }));
+
+    expect(screen.getByRole('button', { name: '코드 선택' })).toHaveStyle({
+      width: '100%',
+    });
   });
 
   it('stores autocomplete, decimal, datetime, and time editor values', () => {

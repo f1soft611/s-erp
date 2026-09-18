@@ -39,6 +39,7 @@ function F1TreeInner<T extends object>(
     getRowOrder,
     onDeleteBlocked,
     onTreeCheckboxChange,
+    isDeleteDisabled,
     rows,
     rowKey,
     ...gridProps
@@ -313,11 +314,19 @@ function F1TreeInner<T extends object>(
     addChildRow,
     deleteSelectedRows: () => {
       const selectedIds = gridRef.current?.getSelectedRowIds() ?? [];
-      const blockedIds = selectedIds.filter(
-        (rowId) =>
-          currentProjectionRef.current.metaById[getStateKey(rowId)]
-            ?.hasChildren,
-      );
+      const rowsSnapshot = gridRef.current?.getRows() ?? [];
+      const blockedIds = selectedIds.filter((rowId) => {
+        const matchingRow = rowsSnapshot.find(
+          (row) => getGridRowId(row, rowKey) === rowId,
+        );
+        if (!matchingRow) return false;
+        if (
+          currentProjectionRef.current.metaById[getStateKey(rowId)]?.hasChildren
+        ) {
+          return true;
+        }
+        return Boolean(isDeleteDisabled?.(matchingRow));
+      });
       if (blockedIds.length > 0) {
         onDeleteBlocked?.(blockedIds);
         return;

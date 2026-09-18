@@ -139,6 +139,34 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '보안 점검 결과 보고서', meta: 'IT팀 · 3일 전', status: '보관' },
     ],
   },
+  notice: {
+    title: '공지사항',
+    description:
+      '최근 공지 내용을 빠르게 확인하고 주요 업무 안내를 확인합니다.',
+    cards: [
+      { label: '전체 공지', value: '84' },
+      { label: '이번 주', value: '12' },
+      { label: '중요 공지', value: '06' },
+      { label: '첨부 문서', value: '28' },
+    ],
+    items: [
+      {
+        title: '2026년 3분기 업무 일정 변경 안내',
+        meta: '운영팀 · 2026.09.12 · 조회 142',
+        status: '중요 공지',
+      },
+      {
+        title: '시스템 점검으로 인한 일부 서비스 제한 안내',
+        meta: 'IT운영 · 2026.09.10 · 조회 88',
+        status: '운영',
+      },
+      {
+        title: '보안 교육 참여 안내',
+        meta: '인사팀 · 2026.09.08 · 조회 219',
+        status: '필독',
+      },
+    ],
+  },
   roles: {
     title: '권한관리',
     description: '역할별 메뉴 접근 권한과 기능 권한을 설정합니다.',
@@ -203,12 +231,59 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '품질관리 모듈 설정', meta: '품질팀 · 2일 전', status: '신규' },
     ],
   },
-  warehouses: {
-    title: '창고관리',
-    description: '창고명과 사용 여부를 관리합니다.',
-    kind: 'menus',
-    cards: [],
-    items: [],
+  'common-code': {
+    title: '공통코드 관리',
+    description: '공통코드를 그룹과 상세코드로 관리합니다.',
+    cards: [
+      { label: '그룹 수', value: '08' },
+      { label: '상세코드 수', value: '46' },
+      { label: '사용 중', value: '39' },
+      { label: '미사용', value: '07' },
+    ],
+    items: [
+      {
+        title: '첨부문서업무 그룹 정리',
+        meta: '운영팀 · 오늘',
+        status: '정상',
+      },
+      {
+        title: '거래처 구분 코드 확인',
+        meta: '인사팀 · 어제',
+        status: '검토중',
+      },
+      {
+        title: '공통코드 정렬 기준 조정',
+        meta: 'IT팀 · 2일 전',
+        status: '신규',
+      },
+    ],
+  },
+  cmncodes: {
+    title: '공통코드 관리',
+    description: '공통코드를 그룹과 상세코드로 관리합니다.',
+    cards: [
+      { label: '그룹 수', value: '08' },
+      { label: '상세코드 수', value: '46' },
+      { label: '사용 중', value: '39' },
+      { label: '미사용', value: '07' },
+    ],
+    items: [
+      {
+        title: '첨부문서업무 그룹 정리',
+        meta: '운영팀 · 오늘',
+        status: '정상',
+      },
+      {
+        title: '거래처 구분 코드 확인',
+        meta: '인사팀 · 어제',
+        status: '검토중',
+      },
+      {
+        title: '공통코드 정렬 기준 조정',
+        meta: 'IT팀 · 2일 전',
+        status: '신규',
+      },
+    ],
   },
   'f1-grid-test': {
     title: 'F1 Grid 테스트',

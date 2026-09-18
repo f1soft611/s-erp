@@ -92,7 +92,17 @@
           ON d.department_id = u.department_id
         WHERE (li.login_code = #{id} OR u.email_addr = #{id})
           AND li.password_hash = #{password}
-          AND li.tenant_id = #{tenantId}
+        <if test="tenantId != null">
+          AND li.tenant_id = CAST(#{tenantId} AS bigint)
+        </if>
+        <if test="tenantId == null and tenantCode != null and tenantCode != ''">
+          AND li.tenant_id = (
+              SELECT tenant_id
+              FROM tb_tenant
+              WHERE tenant_code = #{tenantCode}
+              LIMIT 1
+          )
+        </if>
           AND COALESCE(li.use_at, 'Y') = 'Y'
           AND COALESCE(u.use_at, 'Y') = 'Y'
           AND COALESCE(d.use_at, 'Y') = 'Y'
@@ -109,7 +119,7 @@
         WHERE u.user_nm = #{name}
           AND u.email_addr = #{email}
         <if test="tenantId != null">
-          AND li.tenant_id = #{tenantId}
+          AND li.tenant_id = CAST(#{tenantId} AS bigint)
         </if>
         <if test="tenantCode != null and tenantCode != ''">
           AND li.tenant_id = (
@@ -135,7 +145,7 @@
           AND u.user_nm = #{name}
           AND u.email_addr = #{email}
         <if test="tenantId != null">
-          AND li.tenant_id = #{tenantId}
+          AND li.tenant_id = CAST(#{tenantId} AS bigint)
         </if>
         <if test="tenantCode != null and tenantCode != ''">
           AND li.tenant_id = (
@@ -154,7 +164,7 @@
         FROM tb_login_account li
         JOIN tb_user u
           ON u.login_id = li.login_id
-        WHERE li.tenant_id = #{tenantId}
+        WHERE li.tenant_id = CAST(#{tenantId} AS bigint)
           AND u.email_addr = #{email}
           AND COALESCE(li.use_at, 'Y') = 'Y'
           AND COALESCE(u.use_at, 'Y') = 'Y'
@@ -176,7 +186,7 @@
             updated_at = now()
         WHERE login_code = #{id}
         <if test="tenantId != null">
-          AND tenant_id = #{tenantId}
+          AND tenant_id = CAST(#{tenantId} AS bigint)
         </if>
         <if test="tenantCode != null and tenantCode != '' and tenantId == null">
           AND tenant_id = (

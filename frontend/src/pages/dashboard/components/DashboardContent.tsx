@@ -12,10 +12,11 @@ import {
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
+import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
-import { WarehouseManagementPage } from '../../settings/system/warehouses/WarehouseManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
+import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
@@ -156,6 +157,16 @@ export function DashboardContent({
     );
   }
 
+  if (selectedModule.id === 'groupware' && currentPageKey === 'notice') {
+    return (
+      <CommunityNoticePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+      />
+    );
+  }
+
   if (selectedModule.id === 'settings' && currentPageKey === 'roles') {
     return (
       <RoleManagementPage
@@ -192,9 +203,12 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'settings' && currentPageKey === 'warehouses') {
+  if (
+    selectedModule.id === 'co' &&
+    (currentPageKey === 'common-code' || currentPageKey === 'cmncodes')
+  ) {
     return (
-      <WarehouseManagementPage
+      <CommonCodeManagementPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
