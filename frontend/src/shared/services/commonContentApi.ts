@@ -139,20 +139,29 @@ export function downloadCommonFile(
   ownerType: CommonOwnerType | string,
   ownerId: number | string,
   fileId: number | string,
+  downloadFileName?: string,
 ): Promise<void>;
-export function downloadCommonFile(fileId: number | string): Promise<void>;
+export function downloadCommonFile(
+  fileId: number | string,
+  downloadFileName?: string,
+): Promise<void>;
 export async function downloadCommonFile(
   ownerTypeOrFileId: CommonOwnerType | string | number,
-  ownerId?: number | string,
-  fileId?: number | string,
+  ownerIdOrDownloadFileName?: number | string,
+  fileIdOrUndefined?: number | string,
+  downloadFileName?: string,
 ): Promise<void> {
-  const hasOwner = fileId !== undefined && ownerId !== undefined;
-  const targetFileId = hasOwner ? fileId : ownerTypeOrFileId;
+  const hasOwner =
+    fileIdOrUndefined !== undefined && ownerIdOrDownloadFileName !== undefined;
+  const targetFileId = hasOwner ? fileIdOrUndefined : ownerTypeOrFileId;
+  const effectiveDownloadName = hasOwner
+    ? downloadFileName
+    : ownerIdOrDownloadFileName;
   const ownerQuery = hasOwner
-    ? `?${buildCommonFileOwnerQuery(String(ownerTypeOrFileId), ownerId)}`
+    ? `?${buildCommonFileOwnerQuery(String(ownerTypeOrFileId), String(ownerIdOrDownloadFileName))}`
     : '';
   const url = `/api/v1/common/files/${targetFileId}/download${ownerQuery}`;
-  await apiDownload(url);
+  await apiDownload(url, effectiveDownloadName as string | undefined);
 }
 
 export async function fetchCommonComments(

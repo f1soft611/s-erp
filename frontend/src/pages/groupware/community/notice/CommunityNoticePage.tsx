@@ -102,13 +102,7 @@ const formatCommentTime = (value: string | Date | null | undefined): string => {
 };
 
 const countNestedComments = (comments: NoticeCommentItem[] = []): number =>
-  comments.reduce(
-    (total, comment) =>
-      total +
-      (comment.isDeleted ? 0 : 1) +
-      countNestedComments(comment.replies ?? []),
-    0,
-  );
+  comments.filter((comment) => !comment.isDeleted).length;
 
 const adjustCommentCount = (item: NoticeFeedItem, delta: number): number => {
   const currentCount =
@@ -148,7 +142,7 @@ const toNoticeCommentTree = (
       time: formatCommentTime(record.createdAt),
       content:
         record.deletedYn === 'Y'
-          ? '[삭제된 댓글입니다.]'
+          ? '[작성자에 의해 삭제 되었습니다.]'
           : (record.content ?? ''),
       isDeleted: record.deletedYn === 'Y',
       isEditable: record.deletedYn !== 'Y',
@@ -332,7 +326,7 @@ const deleteCommentFromTree = (
       return {
         ...comment,
         author: '삭제된 댓글',
-        content: '[삭제된 댓글입니다.]',
+        content: '[작성자에 의해 삭제 되었습니다.]',
         isDeleted: true,
         isEditable: false,
         attachments: [],
@@ -882,8 +876,13 @@ export function CommunityNoticePage({
   );
 
   const handleDownloadCommentAttachment = useCallback(
-    (commentId: number | string, attachmentId: string) => {
-      void downloadCommonFile('NOTICE_COMMENT', commentId, attachmentId);
+    (commentId: number | string, attachmentId: string, fileName?: string) => {
+      void downloadCommonFile(
+        'NOTICE_COMMENT',
+        commentId,
+        attachmentId,
+        fileName,
+      );
     },
     [],
   );

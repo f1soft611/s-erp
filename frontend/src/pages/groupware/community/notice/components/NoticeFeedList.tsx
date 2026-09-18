@@ -73,6 +73,7 @@ type NoticeFeedListProps = {
   onDownloadCommentAttachment?: (
     commentId: number | string,
     attachmentId: string,
+    fileName?: string,
   ) => void;
   onDeleteCommentAttachment?: (
     noticeId: number,
@@ -98,13 +99,7 @@ function normalizeCommentTree(
 }
 
 function countComments(comments: NoticeCommentItem[]): number {
-  return comments.reduce(
-    (total, comment) =>
-      total +
-      (comment.isDeleted ? 0 : 1) +
-      countComments(comment.replies ?? []),
-    0,
-  );
+  return comments.filter((comment) => !comment.isDeleted).length;
 }
 
 function mergeCommentTrees(
@@ -328,7 +323,9 @@ export function NoticeFeedList({
         const visibleComments = loadedPreviousByNoticeId[item.id]
           ? itemComments
           : itemComments.slice(0, 3);
+        const hasAtLeastThreeComments = countComments(itemComments) >= 3;
         const canLoadPrevious =
+          hasAtLeastThreeComments &&
           !exhaustedPreviousByNoticeId[item.id] &&
           (item.hasPreviousComments === true ||
             item.commentCount > countComments(visibleComments));
@@ -424,7 +421,7 @@ export function NoticeFeedList({
                         onEdit?.(item);
                       }}
                     >
-                      공지 수정
+                      수정
                     </MenuItem>
                     <MenuItem
                       onClick={() => {
@@ -433,7 +430,7 @@ export function NoticeFeedList({
                         onDelete?.(item.id);
                       }}
                     >
-                      공지 삭제
+                      삭제
                     </MenuItem>
                   </Menu>
                   <Chip
@@ -748,8 +745,12 @@ export function NoticeFeedList({
                 onDeleteComment={async (commentId) => {
                   await handleLocalCommentDelete(item.id, commentId);
                 }}
-                onDownloadAttachment={(commentId, attachmentId) =>
-                  onDownloadCommentAttachment?.(commentId, attachmentId)
+                onDownloadAttachment={(commentId, attachmentId, fileName) =>
+                  onDownloadCommentAttachment?.(
+                    commentId,
+                    attachmentId,
+                    fileName,
+                  )
                 }
                 onDeleteAttachment={(commentId, attachmentId) =>
                   onDeleteCommentAttachment?.(item.id, commentId, attachmentId)

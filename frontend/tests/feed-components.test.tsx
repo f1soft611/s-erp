@@ -70,7 +70,7 @@ describe('shared feed components', () => {
     });
   });
 
-  it('flattens deep replies and submits replies to the root comment', async () => {
+  it('hides replies by default and expands them from the compact reply summary', async () => {
     const onSubmitReply = vi.fn();
 
     render(
@@ -104,6 +104,12 @@ describe('shared feed components', () => {
       />,
     );
 
+    expect(screen.queryByText('두번째 답글')).not.toBeInTheDocument();
+    expect(screen.getByText('답글 2개')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '답글 2개' }));
+
+    expect(screen.getByText('첫 답글')).toBeInTheDocument();
     expect(screen.getByText('두번째 답글')).toBeInTheDocument();
     const replyButtons = screen.getAllByRole('button', { name: '답글' });
     expect(replyButtons).toHaveLength(3);
@@ -118,7 +124,7 @@ describe('shared feed components', () => {
     fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
 
     await waitFor(() => {
-      expect(onSubmitReply).toHaveBeenCalledWith(1, '<p>새 답글</p>', []);
+      expect(onSubmitReply).toHaveBeenCalledWith(3, '<p>새 답글</p>', [], 3);
     });
   });
 
@@ -146,6 +152,27 @@ describe('shared feed components', () => {
     ).toBe(false);
   });
 
+  it('replaces the comment content with the edit editor instead of appending it', async () => {
+    render(
+      <CommentThread
+        comments={[
+          { id: 1, author: '작성자', time: '방금', content: '<p>댓글</p>' },
+        ]}
+        showComposer={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+
+    expect(
+      screen.getByRole('textbox', { name: '댓글 수정 입력' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '답글' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps comment edit and delete actions inside an accessible MoreVert menu', async () => {
     const onEditComment = vi.fn();
     const onDeleteComment = vi.fn();
@@ -162,12 +189,10 @@ describe('shared feed components', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: /댓글 수정 작성자/i }),
+      screen.queryByRole('menuitem', { name: '수정' }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 삭제 작성자/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '삭제' }));
 
     await waitFor(() => {
       expect(onDeleteComment).toHaveBeenCalledWith(1);
@@ -194,14 +219,93 @@ describe('shared feed components', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 수정 작성자/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
 
     await waitFor(() => {
       expect(onDeleteAttachment).toHaveBeenCalledWith(1, 'file-1');
     });
+  });
+
+  it('shows the deleted comment message when a comment has been removed by its author', () => {
+    render(
+      <CommentThread
+        comments={[
+          {
+            id: 1,
+            author: '삭제된 댓글',
+            time: '방금',
+            content: '[작성자에 의해 삭제 되었습니다.]',
+            isDeleted: true,
+          },
+        ]}
+        showComposer={false}
+      />,
+    );
+
+    expect(
+      screen.getByText('[작성자에 의해 삭제 되었습니다.]'),
+    ).toBeInTheDocument();
+  });
+
+  it('counts only root comments and keeps replies collapsed behind a compact preview', () => {
+    render(
+      <CommentThread
+        comments={[
+          {
+            id: 1,
+            author: '작성자',
+            time: '방금',
+            content: '<p>댓글</p>',
+            replies: [
+              {
+                id: 2,
+                author: '답글 작성자',
+                time: '방금',
+                content: '<p>답글</p>',
+              },
+            ],
+          },
+        ]}
+        showComposer={false}
+      />,
+    );
+
+    expect(screen.getByText('답글')).toBeInTheDocument();
+    expect(screen.getByText('답글 1개')).toBeInTheDocument();
+    expect(screen.queryByText('답글 작성자')).not.toBeInTheDocument();
+  });
+
+  it('keeps the reply summary visible even when the parent comment is deleted', () => {
+    render(
+      <CommentThread
+        comments={[
+          {
+            id: 1,
+            author: '삭제된 댓글',
+            time: '방금',
+            content: '[작성자에 의해 삭제 되었습니다.]',
+            isDeleted: true,
+            replies: [
+              {
+                id: 2,
+                author: '답글 작성자',
+                time: '방금',
+                content: '<p>답글</p>',
+              },
+            ],
+          },
+        ]}
+        showComposer={false}
+      />,
+    );
+
+    expect(
+      screen.getByText('[작성자에 의해 삭제 되었습니다.]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '답글 1개' }),
+    ).toBeInTheDocument();
   });
 
   it('shows attachment deletion only during the explicit comment edit flow', () => {
@@ -231,9 +335,7 @@ describe('shared feed components', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 수정 작성자/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
 
     expect(
       screen.getByRole('button', { name: '첨부 파일 삭제' }),

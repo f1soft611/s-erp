@@ -669,18 +669,18 @@ describe('CommunityNoticePage local updates', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 수정 작성자' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     const editInput = await screen.findByRole('textbox', {
       name: '댓글 수정 입력',
     });
     fireEvent.input(editInput, { target: { innerHTML: '<p>수정된 댓글</p>' } });
-    fireEvent.click(screen.getByRole('button', { name: '댓글 수정 완료' }));
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
     await waitFor(() =>
       expect(screen.getByText('수정된 댓글')).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 나' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 삭제 나' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '삭제' }));
     await waitFor(() =>
       expect(screen.queryByText('새 댓글')).not.toBeInTheDocument(),
     );
@@ -782,14 +782,14 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('서버가 내려준 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 수정 작성자' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     const editInput = await screen.findByRole('textbox', {
       name: '댓글 수정 입력',
     });
     fireEvent.input(editInput, {
       target: { innerHTML: '<p>수정 실패 댓글</p>' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '댓글 수정 완료' }));
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
 
     await waitFor(() => {
       expect(commentServiceMocks.updateCommonComment).toHaveBeenCalled();
@@ -819,9 +819,7 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('첨부 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 수정 작성자/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
 
     await waitFor(() => {
@@ -857,9 +855,7 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('첨부 댓글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 수정 작성자/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
 
     await waitFor(() => {
@@ -896,7 +892,7 @@ describe('CommunityNoticePage local updates', () => {
       await screen.findByText('보존할 답글', {}, { timeout: 3000 }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '댓글 삭제 작성자' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '삭제' }));
 
     await waitFor(() => {
       expect(commentServiceMocks.deleteCommonComment).toHaveBeenCalledWith(

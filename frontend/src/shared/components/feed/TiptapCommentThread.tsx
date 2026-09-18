@@ -10,11 +10,33 @@ import {
 } from '@mui/material';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
+
+function getFileBadgeMeta(fileName: string) {
+  const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    pdf: { bg: '#fecaca', color: '#991b1b', label: 'PDF' },
+    xls: { bg: '#bbf7d0', color: '#166534', label: 'XLS' },
+    xlsx: { bg: '#bbf7d0', color: '#166534', label: 'XLSX' },
+    doc: { bg: '#bfdbfe', color: '#1d4ed8', label: 'DOC' },
+    docx: { bg: '#bfdbfe', color: '#1d4ed8', label: 'DOCX' },
+    ppt: { bg: '#fed7aa', color: '#b45309', label: 'PPT' },
+    pptx: { bg: '#fed7aa', color: '#b45309', label: 'PPTX' },
+    png: { bg: '#ddd6fe', color: '#5b21b6', label: 'PNG' },
+    jpg: { bg: '#d1fae5', color: '#065f46', label: 'JPG' },
+    jpeg: { bg: '#d1fae5', color: '#065f46', label: 'JPG' },
+    zip: { bg: '#e5e7eb', color: '#374151', label: 'ZIP' },
+    hwp: { bg: '#dbeafe', color: '#1d4ed8', label: 'HWP' },
+  };
+
+  return map[extension] ?? { bg: '#e2e8f0', color: '#475569', label: 'FILE' };
+}
 
 export type FeedCommentAttachment = { id: string; name: string; size?: number };
 export type FeedCommentItem = {
@@ -46,6 +68,7 @@ export type CommentThreadProps = {
   onDownloadAttachment?: (
     commentId: string | number,
     attachmentId: string,
+    fileName?: string,
   ) => Promise<void> | void;
   onDeleteAttachment?: (
     commentId: string | number,
@@ -166,7 +189,7 @@ function CommentEditor({
         sx={{
           minHeight: 42,
           px: 1,
-          py: 0.5,
+          py: 1,
           '& .ProseMirror': {
             minHeight: 28,
             outline: 'none',
@@ -187,19 +210,69 @@ function CommentEditor({
         <EditorContent editor={editor} />
       </Box>
       {files.length > 0 && (
-        <Stack
-          direction="row"
-          sx={{ px: 1, pb: 0.75, flexWrap: 'wrap', gap: 0.5 }}
-        >
-          {files.map((file) => (
-            <Typography
-              key={`${file.name}-${file.lastModified}`}
-              variant="caption"
-            >
-              {file.name}
-            </Typography>
-          ))}
-        </Stack>
+        <Box sx={{ px: 1, pb: 0.75, display: 'grid', gap: 0.75 }}>
+          {files.map((file) => {
+            const badge = getFileBadgeMeta(file.name);
+            return (
+              <Box
+                key={`${file.name}-${file.lastModified}`}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: 1.5,
+                  border: `1px solid ${
+                    isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.18)'
+                  }`,
+                  bgcolor: isDark ? 'rgba(30,41,59,0.8)' : '#ffffff',
+                  px: 1.25,
+                  py: 0.9,
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 1,
+                      backgroundColor: badge.bg,
+                      color: badge.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {badge.label}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: isDark ? '#e2e8f0' : '#0f172a',
+                    }}
+                  >
+                    {file.name}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
       )}
       <Stack
         direction="row"
@@ -208,9 +281,11 @@ function CommentEditor({
           py: 0.5,
           borderTop: '1px solid',
           borderColor: 'divider',
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
           alignItems: 'center',
           gap: 0.5,
+          flexWrap: 'nowrap',
+          whiteSpace: 'nowrap',
         }}
       >
         <input
@@ -234,19 +309,21 @@ function CommentEditor({
         >
           <AttachFileOutlinedIcon fontSize="small" />
         </IconButton>
-        {onCancel && (
-          <Button size="small" onClick={onCancel}>
-            취소
+        <Stack direction="row" spacing={0.5} sx={{ ml: 'auto' }}>
+          <Button
+            size="small"
+            variant="contained"
+            aria-label={label === '댓글 수정 입력' ? '수정' : undefined}
+            onClick={() => void submit()}
+          >
+            {submitLabel}
           </Button>
-        )}
-        <Button
-          size="small"
-          variant="contained"
-          aria-label={label === '댓글 수정 입력' ? '댓글 수정 완료' : undefined}
-          onClick={() => void submit()}
-        >
-          {submitLabel}
-        </Button>
+          {onCancel && (
+            <Button size="small" onClick={onCancel}>
+              취소
+            </Button>
+          )}
+        </Stack>
       </Stack>
     </Box>
   );
@@ -273,12 +350,14 @@ function CommentItem({
   setEditingCommentId,
 }: ItemProps) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [showReplies, setShowReplies] = useState(false);
   const isDark = Boolean(props.isDark);
   const isEditing = editingCommentId === comment.id;
   const isReplying = replyTargetId === comment.id;
   const replyParentId = rootCommentId ?? comment.id;
   const isDeleted = comment.isDeleted === true;
   const canEditAttachments = isEditing;
+  const replyCount = comment.replies?.length ?? 0;
   return (
     <Box
       sx={{
@@ -336,7 +415,7 @@ function CommentItem({
                     setMenuAnchor(null);
                   }}
                 >
-                  댓글 수정 {comment.author}
+                  수정
                 </MenuItem>
                 <MenuItem
                   onClick={async () => {
@@ -344,80 +423,202 @@ function CommentItem({
                     await props.onDeleteComment?.(comment.id);
                   }}
                 >
-                  댓글 삭제 {comment.author}
+                  삭제
                 </MenuItem>
               </Menu>
             </Box>
           </Stack>
-          <Box
-            sx={{
-              fontSize: '0.9rem',
-              lineHeight: 1.7,
-              overflowWrap: 'anywhere',
-              '& p': { m: 0 },
-              '& ul, & ol': { pl: 2.5, my: 0.5 },
-            }}
-            dangerouslySetInnerHTML={{
-              __html: sanitizeCommentHtml(comment.content),
-            }}
-          />
-          {comment.attachments && comment.attachments.length > 0 && (
-            <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
-              <AttachmentList
-                files={comment.attachments}
-                isDark={isDark}
-                mode={canEditAttachments ? 'edit' : 'view'}
-                showActions
-                onDownload={(attachmentId) =>
-                  void props.onDownloadAttachment?.(comment.id, attachmentId)
-                }
-                onRemove={(attachmentId) => {
-                  void Promise.resolve(
-                    props.onDeleteAttachment?.(comment.id, attachmentId),
-                  ).catch(() => undefined);
+          {isDeleted && (
+            <>
+              <Box
+                sx={{
+                  fontSize: '0.9rem',
+                  lineHeight: 1.7,
+                  color: 'text.disabled',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                [작성자에 의해 삭제 되었습니다.]
+              </Box>
+              {replyCount > 0 && (
+                <Button
+                  size="small"
+                  variant="text"
+                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  onClick={() => setShowReplies((current) => !current)}
+                  sx={{
+                    mt: 0.5,
+                    minWidth: 0,
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 1.25,
+                    border: `1px solid ${
+                      isDark
+                        ? 'rgba(148,163,184,0.18)'
+                        : 'rgba(148,163,184,0.2)'
+                    }`,
+                    bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
+                    color: isDark ? '#cbd5e1' : '#475569',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    textTransform: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.25,
+                    lineHeight: 1.2,
+                    '& .MuiButton-endIcon': {
+                      marginLeft: 0.25,
+                    },
+                  }}
+                >
+                  답글 {replyCount}개
+                </Button>
+              )}
+            </>
+          )}
+          {!isEditing && !isDeleted && (
+            <>
+              <Box
+                sx={{
+                  fontSize: '0.9rem',
+                  lineHeight: 1.7,
+                  overflowWrap: 'anywhere',
+                  '& p': { m: 0 },
+                  '& ul, & ol': { pl: 2.5, my: 0.5 },
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeCommentHtml(comment.content),
                 }}
               />
-            </Box>
-          )}
-          {!isDeleted && (
-            <Button
-              size="small"
-              variant="text"
-              onClick={() => {
-                props.onReply?.(replyParentId);
-                setReplyTargetId(isReplying ? null : comment.id);
-              }}
-              sx={{
-                minWidth: 0,
-                p: 0,
-                mt: 0.5,
-                color: 'text.secondary',
-                fontWeight: 600,
-              }}
-            >
-              답글
-            </Button>
+              {comment.attachments && comment.attachments.length > 0 && (
+                <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
+                  <AttachmentList
+                    files={comment.attachments}
+                    isDark={isDark}
+                    mode={canEditAttachments ? 'edit' : 'view'}
+                    showActions
+                    onDownload={(attachmentId) => {
+                      const attachment = comment.attachments?.find(
+                        (item) => String(item.id) === String(attachmentId),
+                      );
+                      void props.onDownloadAttachment?.(
+                        comment.id,
+                        attachmentId,
+                        attachment?.name,
+                      );
+                    }}
+                    onRemove={(attachmentId) => {
+                      void Promise.resolve(
+                        props.onDeleteAttachment?.(comment.id, attachmentId),
+                      ).catch(() => undefined);
+                    }}
+                  />
+                </Box>
+              )}
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<SubdirectoryArrowRightIcon fontSize="small" />}
+                onClick={() => {
+                  props.onReply?.(replyParentId);
+                  setReplyTargetId(isReplying ? null : comment.id);
+                }}
+                sx={{
+                  minWidth: 0,
+                  pl: 0,
+                  mt: 0.5,
+                  color: 'text.secondary',
+                  fontWeight: 600,
+                  '& .MuiButton-startIcon': {
+                    marginRight: 0.25,
+                  },
+                }}
+              >
+                답글
+              </Button>
+              {replyCount > 0 && (
+                <Button
+                  size="small"
+                  variant="text"
+                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  onClick={() => setShowReplies((current) => !current)}
+                  sx={{
+                    mt: 0.5,
+                    minWidth: 0,
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 1.25,
+                    border: `1px solid ${
+                      isDark
+                        ? 'rgba(148,163,184,0.18)'
+                        : 'rgba(148,163,184,0.2)'
+                    }`,
+                    bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
+                    color: isDark ? '#cbd5e1' : '#475569',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    textTransform: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.25,
+                    lineHeight: 1.2,
+                    '& .MuiButton-endIcon': {
+                      marginLeft: 0.25,
+                    },
+                  }}
+                >
+                  답글 {replyCount}개
+                </Button>
+              )}
+            </>
           )}
           {isEditing && !isDeleted && (
-            <CommentEditor
-              initialContent={comment.content}
-              label="댓글 수정 입력"
-              fileInputLabel="댓글 수정 첨부파일 선택"
-              placeholder="댓글을 수정하세요"
-              submitLabel="수정 완료"
-              isDark={isDark}
-              onCancel={() => setEditingCommentId(null)}
-              onSubmit={async (content, files) => {
-                await props.onEditComment?.(comment.id, content, files);
-                setEditingCommentId(null);
-              }}
-            />
+            <>
+              {comment.attachments && comment.attachments.length > 0 && (
+                <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
+                  <AttachmentList
+                    files={comment.attachments}
+                    isDark={isDark}
+                    mode="edit"
+                    showActions
+                    onDownload={(attachmentId) => {
+                      const attachment = comment.attachments?.find(
+                        (item) => String(item.id) === String(attachmentId),
+                      );
+                      void props.onDownloadAttachment?.(
+                        comment.id,
+                        attachmentId,
+                        attachment?.name,
+                      );
+                    }}
+                    onRemove={(attachmentId) => {
+                      void Promise.resolve(
+                        props.onDeleteAttachment?.(comment.id, attachmentId),
+                      ).catch(() => undefined);
+                    }}
+                  />
+                </Box>
+              )}
+              <CommentEditor
+                initialContent={comment.content}
+                label="댓글 수정 입력"
+                fileInputLabel="댓글 수정 첨부파일 선택"
+                placeholder="줄바꿈 Shift+Enter, 입력 Enter"
+                submitLabel="수정"
+                isDark={isDark}
+                onCancel={() => setEditingCommentId(null)}
+                onSubmit={async (content, files) => {
+                  await props.onEditComment?.(comment.id, content, files);
+                  setEditingCommentId(null);
+                }}
+              />
+            </>
           )}
           {isReplying && !isDeleted && (
             <CommentEditor
               label="답글 입력"
               fileInputLabel="답글 첨부파일 선택"
-              placeholder="답글을 입력하세요"
+              placeholder="줄바꿈 Shift+Enter, 입력 Enter"
               submitLabel="답글 등록"
               isDark={isDark}
               onCancel={() => setReplyTargetId(null)}
@@ -432,19 +633,33 @@ function CommentItem({
               }}
             />
           )}
-          {comment.replies?.map((reply) => (
-            <CommentItem
-              key={reply.id}
-              comment={reply}
-              depth={depth + 1}
-              rootCommentId={rootCommentId}
-              props={props}
-              replyTargetId={replyTargetId}
-              setReplyTargetId={setReplyTargetId}
-              editingCommentId={editingCommentId}
-              setEditingCommentId={setEditingCommentId}
-            />
-          ))}
+          {showReplies && comment.replies && comment.replies.length > 0 && (
+            <Box
+              sx={{
+                mt: 1.25,
+                pt: 1,
+                borderTop: `1px solid ${
+                  isDark
+                    ? 'rgba(148, 163, 184, 0.18)'
+                    : 'rgba(148, 163, 184, 0.22)'
+                }`,
+              }}
+            >
+              {comment.replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  depth={depth + 1}
+                  rootCommentId={rootCommentId}
+                  props={props}
+                  replyTargetId={replyTargetId}
+                  setReplyTargetId={setReplyTargetId}
+                  editingCommentId={editingCommentId}
+                  setEditingCommentId={setEditingCommentId}
+                />
+              ))}
+            </Box>
+          )}
         </Box>
       </Box>
     </Box>

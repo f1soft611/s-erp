@@ -145,9 +145,15 @@ export function AttachmentList({
                 }}
               >
                 {mode === 'edit' ? (
-                  <DeleteOutlinedIcon fontSize="small" />
+                  <DeleteOutlinedIcon
+                    data-testid="DeleteIcon"
+                    fontSize="small"
+                  />
                 ) : (
-                  <FileDownloadOutlinedIcon fontSize="small" />
+                  <FileDownloadOutlinedIcon
+                    data-testid="FileDownloadOutlinedIcon"
+                    fontSize="small"
+                  />
                 )}
               </IconButton>
             )}

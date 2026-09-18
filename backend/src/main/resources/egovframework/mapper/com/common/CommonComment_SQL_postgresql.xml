@@ -134,6 +134,7 @@
         WHERE tenant_id = #{tenantId}
           AND owner_type = #{ownerType}
           AND owner_id = #{ownerId}
+            AND parent_comment_id IS NULL
           AND deleted_yn = 'N'
     </select>
 

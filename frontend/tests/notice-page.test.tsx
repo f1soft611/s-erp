@@ -174,19 +174,47 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /댓글 메뉴 김영식/i }));
-    fireEvent.click(
-      screen.getByRole('menuitem', { name: /댓글 수정 김영식/i }),
-    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
     const editInput = await screen.findByLabelText(/댓글 수정 입력/i);
     fireEvent.input(editInput, {
       target: { innerHTML: '<p>수정된 코멘트입니다.</p>' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /댓글 수정 완료/i }));
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
 
     fireEvent.click(screen.getByRole('button', { name: /댓글 메뉴 김영식/i }));
+    expect(screen.getByRole('menuitem', { name: '삭제' })).toBeInTheDocument();
+  });
+
+  it('hides the previous-comments loader when there are fewer than three root comments', () => {
+    const onLoadPreviousComments = vi.fn();
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 11, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 12,
+                author: '둘째 댓글',
+                time: '오늘',
+                content: '둘째 댓글',
+              },
+            ],
+            commentCount: 2,
+            hasPreviousComments: true,
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onLoadPreviousComments={onLoadPreviousComments}
+      />,
+    );
+
     expect(
-      screen.getByRole('menuitem', { name: /댓글 삭제 김영식/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: '이전 댓글 불러오기' }),
+    ).not.toBeInTheDocument();
   });
 
   it('requests the previous cursor once and renders merged older comments without duplicates', async () => {
@@ -336,9 +364,21 @@ describe('Community notice page', () => {
                 time: '오늘',
                 content: '현재 댓글',
               },
+              {
+                id: 10,
+                author: '다음 작성자',
+                time: '오늘',
+                content: '둘째 댓글',
+              },
+              {
+                id: 11,
+                author: '세 번째 작성자',
+                time: '오늘',
+                content: '셋째 댓글',
+              },
             ],
             nextBeforeCommentId: 8,
-            commentCount: 2,
+            commentCount: 3,
           },
         ]}
         isDark={false}
@@ -389,8 +429,14 @@ describe('Community notice page', () => {
                 time: '오늘',
                 content: '셋째 댓글',
               },
+              {
+                id: 7,
+                author: '넷째 댓글',
+                time: '오늘',
+                content: '넷째 댓글',
+              },
             ],
-            commentCount: 4,
+            commentCount: 5,
           },
         ]}
         isDark={false}

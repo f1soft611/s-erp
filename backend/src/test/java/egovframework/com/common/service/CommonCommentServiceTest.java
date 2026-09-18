@@ -348,6 +348,7 @@ class CommonCommentServiceTest {
         assertThat(pageQuery).contains("HAVING BOOL_OR(deleted_yn = 'N')");
         assertThat(pageQuery).contains("JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id");
         assertThat(pageQuery).contains("root_comment_id");
+        assertThat(countQuery).contains("parent_comment_id IS NULL");
         assertThat(countQuery).contains("deleted_yn = 'N'");
         assertThat(countQuery).doesNotContain("WITH RECURSIVE root_page AS");
         assertThat(countQuery).contains("COUNT(*)");

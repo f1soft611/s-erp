@@ -21,7 +21,7 @@ import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumber
 import FormatQuoteOutlinedIcon from '@mui/icons-material/FormatQuoteOutlined';
 import RedoOutlinedIcon from '@mui/icons-material/RedoOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { noticeContentStyles } from './noticeContentStyles';
@@ -58,6 +58,74 @@ export function serializeNoticeEditorJson(
   editor: { getJSON: () => unknown } | null | undefined,
 ): string | undefined {
   return editor ? JSON.stringify(editor.getJSON()) : undefined;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function normalizeClipboardHtmlForEditor(
+  rawHtml: string | null | undefined,
+): string {
+  if (!rawHtml || !rawHtml.trim()) {
+    return '';
+  }
+
+  const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+  const root = doc.body;
+
+  root
+    .querySelectorAll('script,style,iframe,svg,object,embed,form,meta,link')
+    .forEach((node) => node.remove());
+
+  const table = root.querySelector('table');
+  if (table) {
+    const rows = Array.from(table.querySelectorAll('tr'))
+      .map((row) => {
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        const values = cells.length
+          ? cells
+              .map((cell) =>
+                (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
+              )
+              .filter(Boolean)
+          : [(row.textContent ?? '').replace(/\s+/g, ' ').trim()].filter(
+              Boolean,
+            );
+
+        return values.length ? values.join(' | ') : '';
+      })
+      .filter(Boolean);
+
+    if (rows.length > 0) {
+      return rows.map((value) => `<p>${escapeHtml(value)}</p>`).join('');
+    }
+  }
+
+  const fallbackText = root.textContent ?? '';
+  const normalizedText = fallbackText
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!normalizedText) {
+    return '';
+  }
+
+  const blocks = normalizedText
+    .split(/\n{2,}|\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+
+  return blocks || `<p>${escapeHtml(normalizedText)}</p>`;
 }
 
 const emptyNoticeContent = '<p></p>';
@@ -102,6 +170,7 @@ export function NoticeComposerDialog({
   const editorSurfaceBackground = resolvedDark ? '#0f172a' : '#ffffff';
   const headerBackground = resolvedDark ? '#1f2937' : '#f8fafc';
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<Editor | null>(null);
   const [title, setTitle] = useState(defaultTitle);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
@@ -129,12 +198,36 @@ export function NoticeComposerDialog({
           spellcheck: 'true',
           style: `background-color: ${editorSurfaceBackground}; outline: none; line-height: 1.7;`,
         },
+        handlePaste: (_view: unknown, event: ClipboardEvent) => {
+          const clipboardData = event.clipboardData;
+          if (!clipboardData) {
+            return false;
+          }
+
+          const pastedHtml = clipboardData.getData('text/html');
+          const pasteText = clipboardData.getData('text/plain');
+          const normalizedHtml = normalizeClipboardHtmlForEditor(
+            pastedHtml || pasteText,
+          );
+
+          if (!normalizedHtml) {
+            return false;
+          }
+
+          event.preventDefault();
+          editorRef.current?.commands.insertContent(normalizedHtml);
+          return true;
+        },
       },
     }),
     [defaultBody, editorSurfaceBackground],
   );
 
   const editor = useEditor(editorConfig);
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     if (open) {
