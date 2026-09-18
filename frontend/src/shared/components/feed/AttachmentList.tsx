@@ -1,5 +1,5 @@
 import { Box, IconButton, Typography } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 
 export type AttachmentListItem = {
@@ -145,7 +145,7 @@ export function AttachmentList({
                 }}
               >
                 {mode === 'edit' ? (
-                  <DeleteIcon fontSize="small" />
+                  <DeleteOutlinedIcon fontSize="small" />
                 ) : (
                   <FileDownloadOutlinedIcon fontSize="small" />
                 )}

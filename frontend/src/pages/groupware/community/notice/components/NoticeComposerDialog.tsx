@@ -12,7 +12,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CloseIcon from '@mui/icons-material/Close';
-import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
 import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
 import StrikethroughSOutlinedIcon from '@mui/icons-material/StrikethroughSOutlined';
@@ -602,7 +602,7 @@ export function NoticeComposerDialog({
                                 },
                               }}
                             >
-                              <DeleteIcon fontSize="small" />
+                              <DeleteOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Box>
                         );
