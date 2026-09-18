@@ -1,6 +1,7 @@
 package egovframework.com.common.service.impl;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -186,22 +187,7 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
             params.put("tenantId", tenantId);
             params.put("fileId", fileId);
             CommonFileVO file = commonFileDAO.selectCommonFileById(params);
-            if (file != null && StringUtils.hasText(file.getObjectKey())) {
-                response.setContentType(StringUtils.hasText(file.getMimeType()) ? file.getMimeType() : "application/octet-stream");
-                response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getFileName() + "\"");
-                if (file.getFileSize() != null) {
-                    response.setContentLengthLong(file.getFileSize());
-                }
-            }
-        }
-
-        response.setContentType("application/octet-stream");
-        response.setHeader("Content-Disposition", "attachment; filename=download.bin");
-        try (ServletOutputStream output = response.getOutputStream()) {
-            output.write(new byte[] {1, 2, 3});
-            output.flush();
-        } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 다운로드 중 오류가 발생했습니다.");
+            streamFile(file, response);
         }
     }
 
@@ -211,19 +197,31 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         Map<String, Object> params = ownerFileParams(tenantId, ownerType, ownerId, fileId);
         if (commonFileDAO != null) {
             CommonFileVO file = commonFileDAO.selectCommonFileByIdAndOwner(params);
-            if (file != null && StringUtils.hasText(file.getObjectKey())) {
-                response.setContentType(StringUtils.hasText(file.getMimeType()) ? file.getMimeType() : "application/octet-stream");
-                response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getFileName() + "\"");
-                if (file.getFileSize() != null) {
-                    response.setContentLengthLong(file.getFileSize());
-                }
-            }
+            streamFile(file, response);
+        }
+    }
+
+    private void streamFile(CommonFileVO file, HttpServletResponse response) throws Exception {
+        if (file == null || !StringUtils.hasText(file.getObjectKey())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일을 찾을 수 없습니다.");
+        }
+        if (minioStorageService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 저장소를 사용할 수 없습니다.");
         }
 
-        response.setContentType("application/octet-stream");
-        response.setHeader("Content-Disposition", "attachment; filename=download.bin");
-        try (ServletOutputStream output = response.getOutputStream()) {
-            output.write(new byte[] {1, 2, 3});
+        response.setContentType(StringUtils.hasText(file.getMimeType()) ? file.getMimeType() : "application/octet-stream");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getFileName() + "\"");
+        if (file.getFileSize() != null) {
+            response.setContentLengthLong(file.getFileSize());
+        }
+
+        try (InputStream input = minioStorageService.download(file.getBucketName(), file.getObjectKey());
+                ServletOutputStream output = response.getOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int length;
+            while ((length = input.read(buffer)) != -1) {
+                output.write(buffer, 0, length);
+            }
             output.flush();
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 다운로드 중 오류가 발생했습니다.");

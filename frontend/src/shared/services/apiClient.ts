@@ -46,7 +46,7 @@ export function normalizeApiErrorMessage(
   return cleaned || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function getAuthorizedAuth() {
   let auth = getStoredAuth();
 
   if (!auth) {
@@ -71,6 +71,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       throw new Error('세션을 갱신할 수 없어 로그아웃됩니다.');
     }
   }
+
+  return auth;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const auth = await getAuthorizedAuth();
 
   const headers: Record<string, string> = {
     ...((init?.headers as Record<string, string>) ?? {}),
@@ -106,6 +112,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
+
+export async function apiDownload(path: string): Promise<void> {
+  const auth = await getAuthorizedAuth();
+  const headers: Record<string, string> = {};
+  if (auth.accessToken) {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(normalizeApiErrorMessage(message));
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  const contentDisposition = response.headers.get('Content-Disposition');
+  const fileName = contentDisposition?.match(/filename="([^"]+)"/i)?.[1];
+  anchor.download = fileName ?? 'download';
+  anchor.click();
+  URL.revokeObjectURL(objectUrl);
+}
 
 export const apiPost = <T>(path: string, data: unknown): Promise<T> =>
   request<T>(path, { method: 'POST', body: JSON.stringify(data) });

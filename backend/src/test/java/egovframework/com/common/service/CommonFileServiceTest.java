@@ -87,16 +87,26 @@ class CommonFileServiceTest {
     @Test
     void downloadFileIncludesOwnerWhenOwnerAwareContractIsUsed() throws Exception {
         Map<String, Object> captured = new HashMap<>();
+        CommonFileVO file = new CommonFileVO();
+        file.setFileName("notice.txt");
+        file.setObjectKey("tenant/1/notice-comment/42/notice.txt");
+        file.setBucketName("tenant-documents");
         CommonFileDAO dao = new CommonFileDAO() {
             @Override
             public CommonFileVO selectCommonFileByIdAndOwner(Map<String, Object> params) {
                 captured.putAll(params);
-                return null;
+                return file;
+            }
+        };
+        MinioStorageService storageService = new MinioStorageService(null) {
+            @Override
+            public InputStream download(String bucketName, String objectKey) {
+                return new java.io.ByteArrayInputStream(new byte[0]);
             }
         };
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        new CommonFileServiceImpl(null, dao)
+        new CommonFileServiceImpl(storageService, dao)
             .downloadFile(1L, "NOTICE_COMMENT", 42L, 8L, response);
 
         assertThat(captured)

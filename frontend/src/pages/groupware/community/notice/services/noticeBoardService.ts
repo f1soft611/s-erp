@@ -1,5 +1,6 @@
 import {
   apiDelete,
+  apiDownload,
   apiGet,
   apiPost,
   apiPostFormData,
@@ -149,7 +150,5 @@ export async function downloadNoticeAttachment(
   }
 
   const url = `/api/v1/groupware/boards/notice/attachments/${boardFileId}/download?postId=${encodeURIComponent(String(postId))}`;
-  if (typeof window !== 'undefined') {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
+  await apiDownload(url);
 }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const apiMocks = vi.hoisted(() => ({
   apiDelete: vi.fn(),
+  apiDownload: vi.fn(),
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPostFormData: vi.fn(),
@@ -52,7 +53,7 @@ describe('common content API contracts', () => {
 
   it('deletes and downloads a file with its owner query contract', async () => {
     apiMocks.apiDelete.mockResolvedValue(undefined);
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    apiMocks.apiDownload.mockResolvedValue(undefined);
 
     await deleteCommonFile('NOTICE_COMMENT', 42, 8);
     await downloadCommonFile('NOTICE_COMMENT', 42, 8);
@@ -60,28 +61,22 @@ describe('common content API contracts', () => {
     expect(apiMocks.apiDelete).toHaveBeenCalledWith(
       '/api/v1/common/files/8?ownerType=NOTICE_COMMENT&ownerId=42',
     );
-    expect(openSpy).toHaveBeenCalledWith(
+    expect(apiMocks.apiDownload).toHaveBeenCalledWith(
       '/api/v1/common/files/8/download?ownerType=NOTICE_COMMENT&ownerId=42',
-      '_blank',
-      'noopener,noreferrer',
     );
-    openSpy.mockRestore();
   });
 
   it('keeps legacy fileId-only delete and download contracts', async () => {
     apiMocks.apiDelete.mockResolvedValue(undefined);
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    apiMocks.apiDownload.mockResolvedValue(undefined);
 
     await deleteCommonFile(8);
     await downloadCommonFile(8);
 
     expect(apiMocks.apiDelete).toHaveBeenCalledWith('/api/v1/common/files/8');
-    expect(openSpy).toHaveBeenCalledWith(
+    expect(apiMocks.apiDownload).toHaveBeenCalledWith(
       '/api/v1/common/files/8/download',
-      '_blank',
-      'noopener,noreferrer',
     );
-    openSpy.mockRestore();
   });
 
   it('returns paged comment metadata while accepting the legacy resultList field', async () => {

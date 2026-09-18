@@ -1,5 +1,6 @@
 import {
   apiDelete,
+  apiDownload,
   apiGet,
   apiPost,
   apiPostFormData,
@@ -151,9 +152,7 @@ export async function downloadCommonFile(
     ? `?${buildCommonFileOwnerQuery(String(ownerTypeOrFileId), ownerId)}`
     : '';
   const url = `/api/v1/common/files/${targetFileId}/download${ownerQuery}`;
-  if (typeof window !== 'undefined') {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
+  await apiDownload(url);
 }
 
 export async function fetchCommonComments(
