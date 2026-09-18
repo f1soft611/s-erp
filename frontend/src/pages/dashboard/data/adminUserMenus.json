@@ -40,19 +40,41 @@
     {
       "menuId": 200,
       "parentMenuId": null,
+      "name": "기준정보",
+      "icon": "Settings",
+      "path": "/co/master",
+      "children": [
+        {
+          "menuId": 210,
+          "parentMenuId": 200,
+          "name": "공통코드 관리",
+          "path": "/co/master/common-code",
+          "permissions": {
+            "read": true,
+            "create": true,
+            "update": true,
+            "delete": true,
+            "excel": true
+          }
+        }
+      ]
+    },
+    {
+      "menuId": 300,
+      "parentMenuId": null,
       "name": "환경설정",
       "icon": "Settings",
       "path": "/settings",
       "children": [
         {
-          "menuId": 210,
-          "parentMenuId": 200,
+          "menuId": 310,
+          "parentMenuId": 300,
           "name": "시스템 관리",
           "path": "/settings/system",
           "children": [
             {
-              "menuId": 211,
-              "parentMenuId": 210,
+              "menuId": 311,
+              "parentMenuId": 310,
               "name": "권한관리",
               "path": "/settings/system/roles",
               "permissions": {
@@ -63,8 +85,8 @@
               }
             },
             {
-              "menuId": 212,
-              "parentMenuId": 210,
+              "menuId": 312,
+              "parentMenuId": 310,
               "name": "메뉴관리",
               "path": "/settings/system/menus",
               "permissions": {
@@ -75,8 +97,8 @@
               }
             },
             {
-              "menuId": 213,
-              "parentMenuId": 210,
+              "menuId": 313,
+              "parentMenuId": 310,
               "name": "모듈관리",
               "path": "/settings/system/modules",
               "permissions": {
@@ -87,8 +109,8 @@
               }
             },
             {
-              "menuId": 214,
-              "parentMenuId": 210,
+              "menuId": 314,
+              "parentMenuId": 310,
               "name": "F1 Grid 테스트",
               "path": "/settings/system/f1-grid-test",
               "permissions": {
@@ -99,8 +121,8 @@
               }
             },
             {
-              "menuId": 214,
-              "parentMenuId": 210,
+              "menuId": 315,
+              "parentMenuId": 310,
               "name": "F1-Grid 문서",
               "path": "/settings/system/f1-grid-docs",
               "permissions": {

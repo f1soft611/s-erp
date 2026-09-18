@@ -1,5 +1,6 @@
 import { config as loadDotenv } from 'dotenv';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface DatabaseConfig {
   host: string;
@@ -22,7 +23,7 @@ const REQUIRED_VARIABLES = [
 
 export function loadEnvironmentFile(
   environment: Environment = process.env,
-  envFilePath = resolve(process.cwd(), '.env'),
+  envFilePath = resolve(fileURLToPath(new URL('../.env', import.meta.url))),
 ): void {
   const result = loadDotenv({
     path: envFilePath,
@@ -34,6 +35,20 @@ export function loadEnvironmentFile(
 
   if (result.error && errorCode !== 'ENOENT') {
     throw new Error('Unable to load local environment file');
+  }
+
+  const parsed =
+    loadDotenv({
+      path: envFilePath,
+      processEnv: {} as Record<string, string>,
+      quiet: true,
+    }).parsed ?? {};
+
+  for (const name of REQUIRED_VARIABLES) {
+    const value = parsed[name]?.trim();
+    if (!environment[name]?.trim() && value) {
+      environment[name] = value;
+    }
   }
 }
 

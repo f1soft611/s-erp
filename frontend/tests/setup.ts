@@ -23,18 +23,81 @@ beforeEach(() => {
   window.history.pushState({}, '', '/login');
   vi.stubGlobal(
     'fetch',
-    vi.fn(
-      async () =>
-        new Response(
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes('/api/v1/menus/my')) {
+        return new Response(
           JSON.stringify({
             resultCode: '200',
-            resultMessage: '성공 !!!',
+            resultMessage: 'OK',
+            result: {
+              user: { userId: 'admin', roles: [] },
+              menus: [
+                {
+                  menuId: 'dashboard',
+                  name: '종합현황',
+                  path: '/',
+                  icon: 'Dashboard',
+                  children: [],
+                  permissions: {
+                    read: true,
+                    create: true,
+                    update: true,
+                    delete: true,
+                    excel: true,
+                  },
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (url.includes('/api/v1/system/modules')) {
+        return new Response(
+          JSON.stringify({
+            resultCode: '200',
+            resultMessage: 'OK',
+            result: {
+              resultList: [
+                {
+                  moduleId: 1,
+                  moduleCode: 'dashboard',
+                  moduleNm: '종합현황',
+                  moduleUrl: '/',
+                  iconNm: 'Dashboard',
+                  useAt: 'Y',
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (url.includes('/auth/login-jwt')) {
+        return new Response(
+          JSON.stringify({
+            resultCode: '200',
+            resultMessage: '로그인 성공',
             jToken: 'test-access-token',
             refreshToken: 'test-refresh-token',
           }),
           { status: 200 },
-        ),
-    ),
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          resultCode: '200',
+          resultMessage: '성공 !!!',
+          result: { ok: true },
+        }),
+        { status: 200 },
+      );
+    }),
   );
 });
 

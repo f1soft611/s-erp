@@ -222,34 +222,183 @@
 - 백엔드 `GET /api/v1/system/menus?moduleId={moduleId}&roleId={roleId}` 및 `PUT /api/v1/system/roles/{roleId}/menu-permissions`의 최종 저장소
 - 대시보드 좌측 메뉴와 페이지 헤더 액션 버튼의 권한 계산이 이 테이블을 기준으로 동기화된다
 
-### 2-14. tb_warehouse
+### 2-14. tb_common_code_group
 
-| 컬럼         | 타입      | 설명                        |
-| ------------ | --------- | --------------------------- |
-| warehouse_id | bigint    | 창고 PK                     |
-| tenant_id    | bigint    | 소속 테넌트 FK              |
-| warehouse_nm | varchar   | 창고명 (테넌트 내 유일)     |
-| use_at       | char      | 사용 여부 (Y/N)             |
-| created_by   | bigint    | 생성자                      |
-| created_at   | timestamp | 생성 일시                   |
-| updated_by   | bigint    | 수정자                      |
-| updated_at   | timestamp | 수정 일시                   |
-
-제약:
-
-- `UNIQUE (tenant_id, warehouse_nm)`
-- `tb_tenant(tenant_id)` 참조, 테넌트 삭제 시 함께 삭제(`ON DELETE CASCADE`)
+| 컬럼                 | 타입      | 설명                   |
+| -------------------- | --------- | ---------------------- |
+| common_code_group_id | bigint    | 공통코드 그룹 PK       |
+| tenant_id            | bigint    | 소속 테넌트            |
+| group_code           | varchar   | 그룹 코드              |
+| group_nm             | varchar   | 그룹명                 |
+| group_dc             | varchar   | 그룹 설명              |
+| parent_group_id      | bigint    | 상위 그룹 FK(자기참조) |
+| sort_order           | int       | 정렬 순서              |
+| use_at               | char      | 사용 여부              |
+| created_at           | timestamp | 생성 일시              |
+| updated_at           | timestamp | 수정 일시              |
+| created_by           | bigint    | 생성자                 |
+| updated_by           | bigint    | 수정자                 |
 
 역할:
 
-- 테넌트별 창고 마스터 관리
+- 공통코드 그룹 계층을 저장하는 기준 테이블
+- 부모-자식 계층을 자기참조로 관리
+- 공통코드 관리 화면의 그룹 트리 원천 데이터
+
+### 2-15. tb_common_code_item
+
+| 컬럼                | 타입      | 설명                       |
+| ------------------- | --------- | -------------------------- |
+| common_code_item_id | bigint    | 공통코드 상세 PK           |
+| tenant_id           | bigint    | 소속 테넌트                |
+| group_id            | bigint    | 그룹 FK                    |
+| item_code           | varchar   | 상세코드                   |
+| item_nm             | varchar   | 상세코드명                 |
+| item_dc             | varchar   | 상세코드 설명              |
+| parent_item_id      | bigint    | 상위 상세코드 FK(자기참조) |
+| sort_order          | int       | 정렬 순서                  |
+| use_at              | char      | 사용 여부                  |
+| created_at          | timestamp | 생성 일시                  |
+| updated_at          | timestamp | 수정 일시                  |
+| created_by          | bigint    | 생성자                     |
+| updated_by          | bigint    | 수정자                     |
+
+역할:
+
+- 그룹 하위 상세코드 데이터를 저장
+- 자식 그룹의 상위코드 선택을 제한하는 기준 테이블
+- F1Grid 상세 목록과 상위코드 선택 목록의 백엔드 원천 데이터
+
+### 2-16. tb_common_file
+
+| 컬럼             | 타입      | 설명                                                |
+| ---------------- | --------- | --------------------------------------------------- |
+| file_id          | bigint    | 공통 첨부 파일 PK                                   |
+| tenant_id        | bigint    | 소속 테넌트                                         |
+| owner_type       | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`, `FEED`) |
+| owner_id         | bigint    | 소유 객체 PK                                        |
+| file_name        | varchar   | 원본 파일명                                         |
+| file_path        | varchar   | 파일 경로/URL                                       |
+| object_key       | varchar   | MinIO object key                                    |
+| bucket_name      | varchar   | MinIO 버킷명                                        |
+| storage_provider | varchar   | 저장소 타입 (`minio`)                               |
+| file_size        | bigint    | 파일 크기                                           |
+| mime_type        | varchar   | MIME 타입                                           |
+| checksum_sha256  | varchar   | 파일 SHA-256 해시                                   |
+| content_type     | varchar   | 파일 content type                                   |
+| uploaded_by      | varchar   | 업로더 ID                                           |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)                                 |
+| created_at       | timestamp | 생성 일시                                           |
+| updated_at       | timestamp | 수정 일시                                           |
+
+역할:
+
+- 공통 첨부 파일 메타데이터를 저장하는 범용 테이블
+- notice, board, approval, feed 등 여러 도메인이 동일한 첨부 API를 공유하도록 설계
+- 실제 바이너리는 MinIO에 저장하고 DB에는 경로와 메타만 보관
+
+### 2-17. tb_common_comment
+
+| 컬럼              | 타입      | 설명                                        |
+| ----------------- | --------- | ------------------------------------------- |
+| comment_id        | bigint    | 공통 댓글 PK                                |
+| tenant_id         | bigint    | 소속 테넌트                                 |
+| owner_type        | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`) |
+| owner_id          | bigint    | 소유 객체 PK                                |
+| parent_comment_id | bigint    | 상위 댓글 FK(대댓글)                        |
+| content           | text      | 댓글 내용                                   |
+| writer_id         | varchar   | 작성자 ID                                   |
+| writer_name       | varchar   | 작성자 이름                                 |
+| deleted_yn        | char      | 삭제 여부 (`Y`/`N`)                         |
+| created_at        | timestamp | 생성 일시                                   |
+| updated_at        | timestamp | 수정 일시                                   |
+
+역할:
+
+- 댓글/답글을 범용적으로 보관하는 공통 테이블
+- 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
+- DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
+
+### 2-18. tb_board_type
+
+| 컬럼             | 타입      | 설명                                            |
+| ---------------- | --------- | ----------------------------------------------- |
+| board_type_code  | varchar   | 게시판 유형 코드 (`NOTICE`, `BOARD`, `ARCHIVE`) |
+| board_name       | varchar   | 게시판 이름                                     |
+| menu_id          | bigint    | 커뮤니티 메뉴 FK                                |
+| board_kind       | varchar   | 게시판 종류 (`notice`, `board`, `archive`)      |
+| read_auth_level  | varchar   | 읽기 권한 레벨                                  |
+| write_auth_level | varchar   | 쓰기 권한 레벨                                  |
+| file_upload_yn   | char      | 첨부파일 업로드 허용 여부                       |
+| use_yn           | char      | 사용 여부                                       |
+| sort_order       | int       | 정렬 순서                                       |
+| created_at       | timestamp | 생성 일시                                       |
+| updated_at       | timestamp | 수정 일시                                       |
+
+역할:
+
+- 공지사항/게시판/자료실 유형을 통합 관리
+- 게시글 API에서 `board_type_code`를 기준으로 조회 범위 분기
+
+### 2-17. tb_board_post
+
+| 컬럼               | 타입      | 설명                    |
+| ------------------ | --------- | ----------------------- |
+| post_id            | bigint    | 게시글 PK               |
+| board_type_code    | varchar   | 게시판 유형 코드        |
+| title              | varchar   | 제목                    |
+| contents           | text      | legacy 본문 호환용      |
+| contents_html      | text      | 렌더링용 HTML 본문      |
+| contents_json      | json      | Tiptap JSON 본문        |
+| contents_text      | text      | 검색/요약용 평문        |
+| writer_id          | varchar   | 작성자 ID               |
+| writer_name        | varchar   | 작성자 명               |
+| view_count         | int       | 조회수                  |
+| is_notice          | char      | 중요공지 여부 (`Y`/`N`) |
+| is_deleted         | char      | 삭제 여부 (`Y`/`N`)     |
+| created_at         | timestamp | 생성 일시               |
+| updated_at         | timestamp | 수정 일시               |
+| last_modified_by   | varchar   | 마지막 수정자 ID        |
+| last_comment_count | int       | 마지막 댓글 수          |
+
+역할:
+
+- 공지사항/게시판/자료실 게시글의 원본 데이터 저장
+- 목록/상세 조회와 삭제 처리의 기본 테이블
+
+### 2-18. tb_board_file
+
+| 컬럼             | 타입      | 설명                     |
+| ---------------- | --------- | ------------------------ |
+| board_file_id    | bigint    | 첨부 PK                  |
+| post_id          | bigint    | 게시글 FK                |
+| file_name        | varchar   | 원본 파일명              |
+| file_path        | varchar   | legacy 저장 경로(호환용) |
+| file_size        | bigint    | 파일 크기                |
+| mime_type        | varchar   | MIME 타입                |
+| object_key       | varchar   | MinIO object key         |
+| bucket_name      | varchar   | MinIO 버킷명             |
+| storage_provider | varchar   | 저장소 타입 (`minio`)    |
+| checksum_sha256  | varchar   | 파일 해시                |
+| content_type     | varchar   | 파일 컨텐츠 타입         |
+| uploaded_by      | varchar   | 업로더 ID                |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)      |
+| created_at       | timestamp | 생성 일시                |
+| updated_at       | timestamp | 수정 일시                |
+
+역할:
+
+- 첨부 파일 메타데이터를 보관
+- 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
 
 ---
 
 ## 변경 이력
 
-- 2026-09-09: 창고 관리 작업으로 `tb_warehouse` 테이블을 신규 추가. 적용 스크립트는 [backend/DATABASE/20260909](../../backend/DATABASE/20260909) 참고.
-- 2026-09-09: 창고관리 화면(`/settings/system/warehouses`)을 T1358606250 테넌트 사이드바에 등록 — `tb_menu`(`ST_WAREHOUSE`, 환경설정 > 시스템 관리 하위) 1건, `tb_menu_permission` 5건, `tb_role_menu_permission`(PLATFORM_ADMIN) 5건 추가. 스키마 변경 없음(seed). 적용 스크립트는 [20260909_002_seed_warehouse_menu.sql](../../backend/DATABASE/20260909/20260909_002_seed_warehouse_menu.sql) 참고.
+- 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.
+- 2026-09-11: 공통코드 관리 기능을 위한 `tb_common_code_group`, `tb_common_code_item` 신규 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260911](../../backend/DATABASE/20260911) 및 [docs/database/2026-09-11](2026-09-11) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.
 - 2026-08-31: 로그인/JWT 연동 작업(`docs/directions/20260831/20260831_001_로그인_JWT_백엔드_연동_작업지시서.md`)으로 `tb_department`, `tb_role`, `tb_login_account_role` 3개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.
 - 2026-08-31: 모듈/메뉴/권한관리 백엔드 연동 작업(`docs/directions/20260831/20260831_002_모듈_메뉴_권한관리_백엔드_연동_작업지시서.md`)으로 `tb_module`, `tb_menu` 2개 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260831](../../backend/DATABASE/20260831) 참고.

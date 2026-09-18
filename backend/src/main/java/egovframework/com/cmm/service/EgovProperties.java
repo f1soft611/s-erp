@@ -65,7 +65,31 @@ public class EgovProperties {
 	//public static final String GLOBALS_PROPERTIES_FILE = RELATIVE_PATH_PREFIX + FILE_SEPARATOR +"egovProps"+ FILE_SEPARATOR + "globals.properties";
 		
 	// /target/classes/application.properties
-	public static final String GLOBALS_PROPERTIES_FILE = "classpath:" + FILE_SEPARATOR + "application.properties";
+	public static final String GLOBALS_PROPERTIES_FILE = resolveGlobalsPropertiesFile();
+
+	private static String resolveGlobalsPropertiesFile() {
+		String activeProfile = System.getProperty("spring.profiles.active");
+		if (activeProfile == null || activeProfile.trim().isEmpty()) {
+			activeProfile = System.getenv("SPRING_PROFILES_ACTIVE");
+		}
+
+		if (activeProfile != null && !activeProfile.trim().isEmpty()) {
+			String[] profiles = activeProfile.split(",");
+			for (String profile : profiles) {
+				String normalizedProfile = profile.trim();
+				if (normalizedProfile.isEmpty()) {
+					continue;
+				}
+				String candidate = "classpath:" + FILE_SEPARATOR + "application-" + normalizedProfile + ".properties";
+				Resource resource = new DefaultResourceLoader().getResource(candidate);
+				if (resource.exists()) {
+					return candidate;
+				}
+			}
+		}
+
+		return "classpath:" + FILE_SEPARATOR + "application.properties";
+	}
 
 	/**
 	 * 인자로 주어진 문자열을 Key값으로 하는 상대경로 프로퍼티 값을 절대경로로 반환한다(Globals.java 전용)

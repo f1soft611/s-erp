@@ -1,0 +1,98 @@
+<h2>공통코드 관리 레이아웃 비교</h2>
+<p class="subtitle">
+  그룹공통코드, 상세공통코드, 부모그룹코드의 관계를 어떤 방식으로 보여줄까요?
+</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A · 레거시 좌우 분할</div>
+    <div class="mockup-body">
+      <div class="mock-nav">공통코드 관리　　조회　저장</div>
+      <div style="display: flex; min-height: 360px">
+        <div class="mock-sidebar" style="width: 38%; padding: 14px">
+          <strong>그룹공통코드</strong>
+          <input
+            class="mock-input"
+            placeholder="그룹코드/명 검색"
+            style="width: 100%; margin: 12px 0"
+          />
+          <div class="placeholder" style="padding: 10px; background: #e8eef4">
+            기본정보<br /><small>고객구분</small>
+          </div>
+          <div class="placeholder" style="padding: 10px">문서상태</div>
+          <div class="placeholder" style="padding: 10px">결재상태</div>
+        </div>
+        <div class="mock-content" style="padding: 14px">
+          <strong>상세공통코드 · 기본정보</strong>
+          <div style="display: flex; gap: 6px; margin: 12px 0">
+            <input
+              class="mock-input"
+              placeholder="상세코드 검색"
+              style="flex: 1"
+            /><button class="mock-button">행 추가</button>
+          </div>
+          <div class="placeholder" style="height: 220px; padding: 12px">
+            코드　　코드명　　부모그룹코드　사용　순서
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">B · 그룹 트리 + 상세 그리드</div>
+    <div class="mockup-body">
+      <div class="mock-nav">공통코드 관리　　조회　저장</div>
+      <div class="placeholder" style="padding: 10px; margin: 12px 0">
+        검색　[전체]　사용여부 [사용중]　　[그룹 추가]
+      </div>
+      <div style="display: flex; min-height: 330px">
+        <div
+          class="mock-sidebar"
+          style="width: 42%; padding: 14px; background: #f7f9fb"
+        >
+          <strong>코드 체계</strong>
+          <div style="padding: 10px 0 4px">▾ 기준정보</div>
+          <div style="padding: 7px 0 7px 18px; background: #e8eef4">
+            ▾ 고객구분
+          </div>
+          <div style="padding: 7px 0 7px 36px">개인</div>
+          <div style="padding: 7px 0 7px 36px">법인</div>
+          <div style="padding: 7px 0 7px 18px">▸ 문서상태</div>
+        </div>
+        <div class="mock-content" style="padding: 14px">
+          <strong>선택 그룹 정보</strong>
+          <div class="placeholder" style="padding: 10px; margin: 12px 0">
+            그룹코드　CUST_TYPE　　그룹명　고객구분　　부모그룹　기준정보
+          </div>
+          <div class="placeholder" style="height: 170px; padding: 12px">
+            상세코드　상세명　사용　순서
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>좌우 분할</h3>
+      <p>레거시와 가장 유사하고 상세 편집 흐름이 빠릅니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>트리 중심</h3>
+      <p>부모그룹과 하위 구조를 한눈에 파악하기 좋습니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>혼합형</h3>
+      <p>좌측은 그룹 목록, 상세 편집은 별도 탭 또는 패널로 분리합니다.</p>
+    </div>
+  </div>
+</div>

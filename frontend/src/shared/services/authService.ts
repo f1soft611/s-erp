@@ -261,7 +261,6 @@ export const login = async (
 
   setSessionNotice(null);
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-  syncBrowserLocation('/');
   notifyAuthChange();
 
   return {

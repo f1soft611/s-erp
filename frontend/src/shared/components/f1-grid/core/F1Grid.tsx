@@ -63,6 +63,7 @@ import {
   getGridRowId,
   getStateKey,
   isCellEditable,
+  isGridCheckboxChecked,
 } from '../utils/grid.utils';
 import {
   coerceClipboardValue,
@@ -121,7 +122,8 @@ function F1GridInner<T extends object>(
     rowKey,
     rowFormPlugin,
     ariaLabel = 'F1-GRID',
-    columnLine = false,
+    columnLine = true,
+    stripeRows = true,
     storageKey,
     height,
     minHeight,
@@ -156,9 +158,11 @@ function F1GridInner<T extends object>(
     disableFiltering = false,
     canExportExcel = false,
     excelFileName,
+    allowAddRootInContextMenu = true,
     allowAddRowInContextMenu = true,
     allowDuplicateRowInContextMenu = true,
     allowDeleteRowInContextMenu = true,
+    deleteMenuDisabled = false,
     loading = false,
     treeContextMenu,
   }: F1GridProps<T>,
@@ -176,7 +180,13 @@ function F1GridInner<T extends object>(
   const [data, setData] = useState<F1GridData<T>>(() =>
     createGridData(rows, rowKey),
   );
-  const lastRowsPropRef = useRef(rows);
+  const lastRowsPropRef = useRef<T[]>(rows);
+  const rowsHaveEquivalentValues = (left: T[], right: T[]) => {
+    if (left.length !== right.length) return false;
+    return left.every((row, index) => areGridValuesEqual(row, right[index]));
+  };
+  const onChangesChangeRef = useRef(onChangesChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
@@ -237,6 +247,7 @@ function F1GridInner<T extends object>(
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
+  const gridContainerWidthRef = useRef(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
     () => {
       if (storageKey) {
@@ -434,14 +445,19 @@ function F1GridInner<T extends object>(
   useLayoutEffect(() => {
     const container = gridContainerRef.current;
     if (!container) return;
+
     const updateWidth = () => {
       const nextWidth = container.clientWidth;
-      setGridContainerWidth((current) =>
-        current === nextWidth ? current : nextWidth,
-      );
+      if (!Number.isFinite(nextWidth)) return;
+      if (Math.abs(gridContainerWidthRef.current - nextWidth) < 1) {
+        return;
+      }
+      gridContainerWidthRef.current = nextWidth;
+      setGridContainerWidth(nextWidth);
     };
 
     updateWidth();
+
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', updateWidth);
       return () => window.removeEventListener('resize', updateWidth);
@@ -449,7 +465,10 @@ function F1GridInner<T extends object>(
 
     const observer = new ResizeObserver(updateWidth);
     observer.observe(container);
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   const activeRows = useMemo(
@@ -633,6 +652,7 @@ function F1GridInner<T extends object>(
       scrollLeft: 0,
       viewportHeight: 0,
       viewportWidth: 0,
+      verticalScrollbarWidth: 0,
     });
   const viewportSchedulerRef = useRef<
     ReturnType<typeof createGridRafScheduler<GridViewportMetrics>> | undefined
@@ -644,7 +664,8 @@ function F1GridInner<T extends object>(
           current.scrollTop === next.scrollTop &&
           current.scrollLeft === next.scrollLeft &&
           current.viewportHeight === next.viewportHeight &&
-          current.viewportWidth === next.viewportWidth
+          current.viewportWidth === next.viewportWidth &&
+          current.verticalScrollbarWidth === next.verticalScrollbarWidth
             ? current
             : next,
         );
@@ -653,11 +674,16 @@ function F1GridInner<T extends object>(
   }
 
   function scheduleViewportMeasure(bodyScroll: HTMLDivElement) {
+    const hasVerticalOverflow =
+      bodyScroll.scrollHeight > bodyScroll.clientHeight;
     viewportSchedulerRef.current?.schedule({
       scrollTop: bodyScroll.scrollTop,
       scrollLeft: bodyScroll.scrollLeft,
       viewportHeight: bodyScroll.clientHeight,
       viewportWidth: bodyScroll.clientWidth,
+      verticalScrollbarWidth: hasVerticalOverflow
+        ? Math.max(0, bodyScroll.offsetWidth - bodyScroll.clientWidth)
+        : 0,
     });
   }
 
@@ -670,9 +696,20 @@ function F1GridInner<T extends object>(
     measureViewport();
     window.addEventListener('resize', measureViewport);
 
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        viewportSchedulerRef.current?.cancel();
+        window.removeEventListener('resize', measureViewport);
+      };
+    }
+
+    const observer = new ResizeObserver(measureViewport);
+    observer.observe(bodyScroll);
+
     return () => {
       viewportSchedulerRef.current?.cancel();
       window.removeEventListener('resize', measureViewport);
+      observer.disconnect();
     };
   }, []);
 
@@ -1020,7 +1057,7 @@ function F1GridInner<T extends object>(
   }
 
   useEffect(() => {
-    if (lastRowsPropRef.current === rows) return;
+    if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
     lastRowsPropRef.current = rows;
     const changes = getGridChanges(data);
     if (
@@ -1056,13 +1093,18 @@ function F1GridInner<T extends object>(
     cellNode.focus();
   }, [editingCell, focusedCell]);
 
-  useEffect(() => {
-    onChangesChange?.(getGridChanges(data));
-  }, [data, onChangesChange, rowKey]);
+  // Read via refs so unmemoized consumer callbacks can't re-trigger these
+  // effects on every render and form an update loop (data is the real trigger).
+  onChangesChangeRef.current = onChangesChange;
+  onSelectionChangeRef.current = onSelectionChange;
 
   useEffect(() => {
-    onSelectionChange?.(selectedIds);
-  }, [onSelectionChange, selectedIds]);
+    onChangesChangeRef.current?.(getGridChanges(data));
+  }, [data, rowKey]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selectedIds);
+  }, [selectedIds]);
 
   useEffect(() => {
     cellSelectionRef.current = cellSelection;
@@ -1394,7 +1436,7 @@ function F1GridInner<T extends object>(
       isCellEditable(column, row),
     );
     const checkedCount = editableRows.filter((row) =>
-      Boolean(column.getValue?.(row) ?? row[column.field]),
+      isGridCheckboxChecked(column.getValue?.(row) ?? row[column.field]),
     ).length;
 
     return {
@@ -2230,6 +2272,7 @@ function F1GridInner<T extends object>(
 
   const selectedAll =
     visibleRows.length > 0 && selectedCount === visibleRows.length;
+  const showAddRootInContextMenu = allowAddRootInContextMenu ?? true;
   const showAddRowInContextMenu = allowAddRowInContextMenu ?? true;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
@@ -2405,9 +2448,12 @@ function F1GridInner<T extends object>(
         sx={{
           width: '100%',
           overflowX: 'auto',
-          overflowY: 'hidden',
+          overflowY: 'auto',
           flex: '0 0 auto',
+          scrollbarGutter: 'stable',
           scrollbarWidth: 'none',
+          boxSizing: 'border-box',
+          paddingRight: `${bodyScrollMetrics.verticalScrollbarWidth}px`,
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
@@ -2443,6 +2489,11 @@ function F1GridInner<T extends object>(
           rightOffsets={rightOffsets}
           editableColumnFields={editableColumnFields}
           showFormAction={rowFormActive}
+          formActionWidth={
+            GRID_ROW_FORM_ACTION_COLUMN_WIDTH +
+            bodyScrollMetrics.verticalScrollbarWidth
+          }
+          formActionRightOffset={bodyScrollMetrics.verticalScrollbarWidth}
           formActionPinnedShadow={formActionPinnedShadow}
           onReorderColumn={reorderColumn}
         />
@@ -2470,6 +2521,7 @@ function F1GridInner<T extends object>(
           overflowY: 'auto',
           overflowX: 'auto',
           overflowAnchor: 'none',
+          scrollbarGutter: 'stable',
         }}
       >
         {!loading ? (
@@ -2481,6 +2533,7 @@ function F1GridInner<T extends object>(
             renderedColumnIndexes={renderedColumnIndexes}
             rowKey={rowKey}
             columnLine={columnLine}
+            stripeRows={stripeRows}
             columnTracks={columnTracks}
             defaultRowHeight={defaultRowHeight}
             minRowHeight={normalizedMinRowHeight}
@@ -2637,7 +2690,7 @@ function F1GridInner<T extends object>(
           컬럼 길이 자동 조정
         </MenuItem>
         <Divider />
-        {treeContextMenu ? (
+        {treeContextMenu && showAddRootInContextMenu ? (
           <MenuItem onClick={handleAddRootClick}>루트 추가</MenuItem>
         ) : null}
         {showAddRowInContextMenu ? (
@@ -2653,7 +2706,7 @@ function F1GridInner<T extends object>(
         ) : null}
         {showDeleteRowInContextMenu ? (
           <MenuItem
-            disabled={selectedCount === 0}
+            disabled={selectedCount === 0 || deleteMenuDisabled}
             onClick={handleDeleteContextClick}
           >
             행 삭제

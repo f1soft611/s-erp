@@ -78,9 +78,9 @@ public class EgovConfigAppMapper {
 		try {
 			sqlSessionFactoryBean.setMapperLocations(
 				pathMatchingResourcePatternResolver
-					.getResources("classpath:/egovframework/mapper/let/**/*_" + dbType + ".xml"));
+					.getResources("classpath*:/egovframework/mapper/**/*_" + dbType + ".xml"));
 		} catch (IOException e) {
-			// TODO Exception 처리 필요
+			throw new IllegalStateException("MyBatis mapper XML 로딩에 실패했습니다.", e);
 		}
 
 		return sqlSessionFactoryBean;
@@ -97,9 +97,9 @@ public class EgovConfigAppMapper {
 		try {
 			sqlSessionFactoryBean.setMapperLocations(
 				pathMatchingResourcePatternResolver
-					.getResources("classpath:/egovframework/mapper/let/**/*_" + dbType + ".xml"));
+					.getResources("classpath*:/egovframework/mapper/**/*_" + dbType + ".xml"));
 		} catch (IOException e) {
-			// TODO Exception 처리 필요
+			throw new IllegalStateException("MyBatis mapper XML 로딩에 실패했습니다.", e);
 		}
 		return sqlSessionFactoryBean;
 	}

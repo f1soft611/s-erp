@@ -189,6 +189,7 @@ export function ModuleManagementPage({
         flexDirection: 'column',
         minHeight: 0,
         height: '100%',
+        overflow: 'hidden',
       }}
     >
       <PageHeader
@@ -238,7 +239,6 @@ export function ModuleManagementPage({
       <ModuleManagementPanel
         ref={modulePanelRef}
         modules={filteredModules}
-        searchQuery={searchQuery}
         canExportExcel={pageActionPermissions.excel}
         onCreateModule={createModule}
         onUpdateModule={updateModule}

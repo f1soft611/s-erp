@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="NoticeBoardDAO">
+
+    <resultMap id="noticePostMap" type="egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO">
+        <id property="postId" column="post_id"/>
+        <result property="boardTypeCode" column="board_type_code"/>
+        <result property="title" column="title"/>
+        <result property="contents" column="contents"/>
+        <result property="contentsHtml" column="contents_html"/>
+        <result property="contentsJson" column="contents_json"/>
+        <result property="contentsText" column="contents_text"/>
+        <result property="writerId" column="writer_id"/>
+        <result property="writerName" column="writer_name"/>
+        <result property="viewCount" column="view_count"/>
+        <result property="isNotice" column="is_notice"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="attachmentCount" column="attachment_count"/>
+    </resultMap>
+
+    <resultMap id="noticeFileMap" type="egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO">
+        <id property="boardFileId" column="board_file_id"/>
+        <result property="postId" column="post_id"/>
+        <result property="fileName" column="file_name"/>
+        <result property="filePath" column="file_path"/>
+        <result property="objectKey" column="object_key"/>
+        <result property="bucketName" column="bucket_name"/>
+        <result property="storageProvider" column="storage_provider"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="mimeType" column="mime_type"/>
+        <result property="checksumSha256" column="checksum_sha256"/>
+        <result property="contentType" column="content_type"/>
+        <result property="deletedYn" column="deleted_yn"/>
+        <result property="uploadedBy" column="uploaded_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectNoticePostList" parameterType="map" resultMap="noticePostMap">
+        SELECT
+            p.post_id,
+            p.board_type_code,
+            p.title,
+            COALESCE(p.contents_html, p.contents, '') AS contents,
+            p.contents_html,
+            p.contents_json,
+            p.contents_text,
+            p.writer_id,
+            p.writer_name,
+            p.view_count,
+            p.is_notice,
+            p.is_deleted,
+            p.created_at,
+            p.updated_at,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM tb_board_file bf
+                WHERE bf.post_id = p.post_id
+                  AND bf.deleted_yn = 'N'
+            ), 0) AS attachment_count
+        FROM tb_board_post p
+        WHERE p.board_type_code = #{boardTypeCode}
+          AND p.is_deleted = 'N'
+        <if test="keyword != null and keyword != ''">
+          AND (
+              p.title ILIKE '%' || #{keyword} || '%'
+              OR p.writer_name ILIKE '%' || #{keyword} || '%'
+              OR p.contents_text ILIKE '%' || #{keyword} || '%'
+          )
+        </if>
+        ORDER BY p.is_notice DESC, p.created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectNoticePostById" parameterType="map" resultMap="noticePostMap">
+        SELECT
+            p.post_id,
+            p.board_type_code,
+            p.title,
+            COALESCE(p.contents_html, p.contents, '') AS contents,
+            p.contents_html,
+            p.contents_json,
+            p.contents_text,
+            p.writer_id,
+            p.writer_name,
+            p.view_count,
+            p.is_notice,
+            p.is_deleted,
+            p.created_at,
+            p.updated_at,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM tb_board_file bf
+                WHERE bf.post_id = p.post_id
+                  AND bf.deleted_yn = 'N'
+            ), 0) AS attachment_count
+        FROM tb_board_post p
+        WHERE p.post_id = #{postId}
+          AND p.is_deleted = 'N'
+    </select>
+
+    <select id="insertNoticePost" parameterType="map" resultType="long">
+        INSERT INTO tb_board_post (
+            board_type_code,
+            title,
+            contents,
+            contents_html,
+            contents_json,
+            contents_text,
+            writer_id,
+            writer_name,
+            view_count,
+            is_notice,
+            is_deleted,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{boardTypeCode},
+            #{title},
+            #{contents},
+            #{contentsHtml},
+            CAST(#{contentsJson} AS json),
+            #{contentsText},
+            #{writerId},
+            #{writerName},
+            0,
+            #{isNotice},
+            'N',
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        )
+        RETURNING post_id
+    </select>
+
+    <update id="updateNoticePost" parameterType="map">
+        UPDATE tb_board_post
+        SET title = #{title},
+            contents = #{contents},
+            contents_html = #{contentsHtml},
+            contents_json = CAST(#{contentsJson} AS json),
+            contents_text = #{contentsText},
+            writer_name = #{writerName},
+            is_notice = #{isNotice},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE post_id = #{postId}
+          AND is_deleted = 'N'
+    </update>
+
+    <update id="softDeleteNoticePost" parameterType="map">
+        UPDATE tb_board_post
+        SET is_deleted = 'Y',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE post_id = #{postId}
+    </update>
+
+    <select id="selectNoticeAttachmentList" parameterType="map" resultMap="noticeFileMap">
+        SELECT
+            bf.board_file_id,
+            bf.post_id,
+            bf.file_name,
+            bf.file_path,
+            bf.object_key,
+            bf.bucket_name,
+            bf.storage_provider,
+            bf.file_size,
+            bf.mime_type,
+            bf.checksum_sha256,
+            bf.content_type,
+            bf.deleted_yn,
+            bf.uploaded_by,
+            bf.created_at,
+            bf.updated_at
+        FROM tb_board_file bf
+        WHERE bf.post_id = #{postId}
+          AND bf.deleted_yn = 'N'
+        ORDER BY bf.created_at DESC
+    </select>
+
+    <select id="selectNoticeAttachmentById" parameterType="map" resultMap="noticeFileMap">
+        SELECT
+            bf.board_file_id,
+            bf.post_id,
+            bf.file_name,
+            bf.file_path,
+            bf.object_key,
+            bf.bucket_name,
+            bf.storage_provider,
+            bf.file_size,
+            bf.mime_type,
+            bf.checksum_sha256,
+            bf.content_type,
+            bf.deleted_yn,
+            bf.uploaded_by,
+            bf.created_at,
+            bf.updated_at
+        FROM tb_board_file bf
+        WHERE bf.board_file_id = #{boardFileId}
+          AND bf.deleted_yn = 'N'
+    </select>
+
+    <select id="insertNoticeAttachment" parameterType="map" resultType="long">
+        INSERT INTO tb_board_file (
+            post_id,
+            file_name,
+            file_path,
+            object_key,
+            bucket_name,
+            storage_provider,
+            file_size,
+            mime_type,
+            checksum_sha256,
+            content_type,
+            deleted_yn,
+            uploaded_by,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{postId},
+            #{fileName},
+            #{filePath},
+            #{objectKey},
+            #{bucketName},
+            #{storageProvider},
+            #{fileSize},
+            #{mimeType},
+            #{checksumSha256},
+            #{contentType},
+            #{deletedYn},
+            #{uploadedBy},
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+        )
+        RETURNING board_file_id
+    </select>
+
+    <update id="softDeleteNoticeAttachment" parameterType="map">
+        UPDATE tb_board_file
+        SET deleted_yn = 'Y',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE board_file_id = #{boardFileId}
+    </update>
+</mapper>
