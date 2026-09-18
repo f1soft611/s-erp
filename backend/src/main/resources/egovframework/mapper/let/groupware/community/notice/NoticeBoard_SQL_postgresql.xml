@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="NoticeBoardDAO">
 
-    <resultMap id="noticePostMap" type="egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO">
+    <resultMap id="noticePostMap" type="egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO">
         <id property="postId" column="post_id"/>
         <result property="boardTypeCode" column="board_type_code"/>
         <result property="title" column="title"/>
@@ -20,7 +20,7 @@
         <result property="attachmentCount" column="attachment_count"/>
     </resultMap>
 
-    <resultMap id="noticeFileMap" type="egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO">
+    <resultMap id="noticeFileMap" type="egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO">
         <id property="boardFileId" column="board_file_id"/>
         <result property="postId" column="post_id"/>
         <result property="fileName" column="file_name"/>

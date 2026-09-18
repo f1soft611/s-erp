@@ -63,7 +63,9 @@ describe('NoticeComposerDialog theme handling', () => {
     const downloadButton = screen.getByRole('button', {
       name: /첨부 파일 다운로드/i,
     });
-    expect(downloadButton.querySelector('[data-testid="FileDownloadOutlinedIcon"]')).toBeInTheDocument();
+    expect(
+      downloadButton.querySelector('[data-testid="FileDownloadOutlinedIcon"]'),
+    ).toBeInTheDocument();
     fireEvent.click(downloadButton);
 
     expect(downloadSpy).toHaveBeenCalledWith('a1');
@@ -83,7 +85,9 @@ describe('NoticeComposerDialog theme handling', () => {
     const deleteButton = screen.getByRole('button', {
       name: /첨부 파일 삭제/i,
     });
-    expect(deleteButton.querySelector('[data-testid="DeleteOutlineIcon"]')).toBeInTheDocument();
+    expect(
+      deleteButton.querySelector('[data-testid="DeleteIcon"]'),
+    ).toBeInTheDocument();
     fireEvent.click(deleteButton);
 
     expect(removeSpy).toHaveBeenCalledWith('a1');

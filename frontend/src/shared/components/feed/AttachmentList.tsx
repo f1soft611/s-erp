@@ -1,4 +1,6 @@
-import { Box, Button, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 
 export type AttachmentListItem = {
   id: string;
@@ -111,9 +113,8 @@ export function AttachmentList({
             </Box>
 
             {showActions && (
-              <Button
+              <IconButton
                 size="small"
-                variant="outlined"
                 aria-label={
                   mode === 'edit' ? '첨부 파일 삭제' : '첨부 파일 다운로드'
                 }
@@ -143,8 +144,12 @@ export function AttachmentList({
                   },
                 }}
               >
-                {mode === 'edit' ? '×' : '↓'}
-              </Button>
+                {mode === 'edit' ? (
+                  <DeleteIcon fontSize="small" />
+                ) : (
+                  <FileDownloadOutlinedIcon fontSize="small" />
+                )}
+              </IconButton>
             )}
           </Box>
         );

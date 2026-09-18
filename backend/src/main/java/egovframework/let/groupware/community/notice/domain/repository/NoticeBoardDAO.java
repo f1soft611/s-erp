@@ -1,4 +1,4 @@
-package egovframework.let.groupware.notice.domain.repository;
+package egovframework.let.groupware.community.notice.domain.repository;
 
 import java.util.List;
 import java.util.Map;
@@ -6,8 +6,8 @@ import java.util.Map;
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
-import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 
 @Repository("noticeBoardDAO")
 public class NoticeBoardDAO extends EgovAbstractMapper {

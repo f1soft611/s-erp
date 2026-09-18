@@ -113,7 +113,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
 
-export async function apiDownload(path: string): Promise<void> {
+export async function apiDownload(
+  path: string,
+  downloadFileName?: string,
+): Promise<void> {
   const auth = await getAuthorizedAuth();
   const headers: Record<string, string> = {};
   if (auth.accessToken) {
@@ -132,7 +135,7 @@ export async function apiDownload(path: string): Promise<void> {
   anchor.href = objectUrl;
   const contentDisposition = response.headers.get('Content-Disposition');
   const fileName = contentDisposition?.match(/filename="([^"]+)"/i)?.[1];
-  anchor.download = fileName ?? 'download';
+  anchor.download = downloadFileName || fileName || 'download';
   anchor.click();
   URL.revokeObjectURL(objectUrl);
 }

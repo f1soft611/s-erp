@@ -1,4 +1,4 @@
-package egovframework.let.groupware.notice.service.impl;
+package egovframework.let.groupware.community.notice.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -21,9 +21,9 @@ import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
-import egovframework.let.groupware.notice.domain.repository.NoticeBoardDAO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 
 class NoticeBoardServiceImplTest {
 

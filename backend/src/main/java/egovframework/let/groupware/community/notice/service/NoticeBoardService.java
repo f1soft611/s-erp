@@ -1,4 +1,4 @@
-package egovframework.let.groupware.notice.service;
+package egovframework.let.groupware.community.notice.service;
 
 import java.util.List;
 
@@ -6,9 +6,9 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.web.multipart.MultipartFile;
 
-import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostSaveRequestVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 
 public interface NoticeBoardService {
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size) throws Exception;

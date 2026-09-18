@@ -12,6 +12,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
 import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
 import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
 import StrikethroughSOutlinedIcon from '@mui/icons-material/StrikethroughSOutlined';
@@ -573,9 +574,8 @@ export function NoticeComposerDialog({
                               </Typography>
                             </Box>
 
-                            <Button
+                            <IconButton
                               size="small"
-                              variant="outlined"
                               aria-label="첨부 파일 삭제"
                               title={file.name}
                               onClick={() => removeAttachment(file.id)}
@@ -602,8 +602,8 @@ export function NoticeComposerDialog({
                                 },
                               }}
                             >
-                              ↓
-                            </Button>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
                           </Box>
                         );
                       })}

@@ -1,4 +1,4 @@
-package egovframework.let.groupware.notice.controller;
+package egovframework.let.groupware.community.notice.controller;
 
 import java.util.HashMap;
 
@@ -23,10 +23,10 @@ import egovframework.com.cmm.LoginVO;
 import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardFileVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostSaveRequestVO;
-import egovframework.let.groupware.notice.domain.model.NoticeBoardPostVO;
-import egovframework.let.groupware.notice.service.NoticeBoardService;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.service.NoticeBoardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

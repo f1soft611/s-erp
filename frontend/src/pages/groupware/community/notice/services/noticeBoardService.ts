@@ -150,5 +150,5 @@ export async function downloadNoticeAttachment(
   }
 
   const url = `/api/v1/groupware/boards/notice/attachments/${boardFileId}/download?postId=${encodeURIComponent(String(postId))}`;
-  await apiDownload(url);
+  await apiDownload(url, attachment.fileName ?? undefined);
 }

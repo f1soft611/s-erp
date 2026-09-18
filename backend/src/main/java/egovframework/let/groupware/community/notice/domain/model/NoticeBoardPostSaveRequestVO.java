@@ -1,4 +1,4 @@
-package egovframework.let.groupware.notice.domain.model;
+package egovframework.let.groupware.community.notice.domain.model;
 
 import java.io.Serializable;
 import java.util.List;

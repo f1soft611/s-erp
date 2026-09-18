@@ -13,6 +13,7 @@
 
 - `apiClient`에 인증 헤더를 포함한 Blob 다운로드 함수 추가
 - 공지사항 및 공통 첨부 다운로드를 인증된 Blob 다운로드 경로로 변경
+- 공지사항 첨부 객체의 `fileName`을 다운로드 링크에 직접 전달하여 업로드 파일명 유지
 - 응답 `Content-Disposition`의 파일명을 브라우저 다운로드 이름에 반영
 - 공통 파일 서비스가 파일 소유자 조건으로 조회한 실제 MinIO 객체를 응답 스트림에 복사하도록 수정
 - 파일이 없거나 저장소를 사용할 수 없는 경우 오류 응답을 반환하도록 수정
@@ -21,6 +22,7 @@
 ## 검증
 
 - `cd frontend; npm run test -- tests/common-content-api.test.ts`: 7개 성공
+- `cd frontend; npm run test -- tests/notice-board-service.test.ts`: 1개 성공
 - `cd frontend; npm run build`: 성공
 - `cd backend; mvn -Dtest=CommonFileServiceTest,NoticeBoardServiceImplTest test`: 11개 성공
 
