@@ -7,12 +7,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,10 @@ import egovframework.com.common.service.CommonFileService;
 public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements CommonFileService {
 
     private static final String DEFAULT_BUCKET = "document-attachments";
+    private static final Logger LOGGER = Logger.getLogger(CommonFileServiceImpl.class.getName());
+
+    @Value("${storage.bucket:${STORAGE_BUCKET:document-attachments}}")
+    private String storageBucket;
 
     private final MinioStorageService minioStorageService;
     private final CommonFileDAO commonFileDAO;
@@ -81,7 +88,7 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         String normalizedOwnerType = ownerType.trim().toUpperCase();
         String normalizedName = originalName.replace("\\", "/");
         String objectKey = "tenant/" + tenantId + "/" + normalizedOwnerType.toLowerCase() + "/" + ownerId + "/" + normalizedName;
-        String bucketName = DEFAULT_BUCKET;
+        String bucketName = StringUtils.hasText(storageBucket) ? storageBucket.trim() : DEFAULT_BUCKET;
 
         try {
             if (minioStorageService != null) {
@@ -133,7 +140,8 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
             uploaded.setFileId(1L);
             return uploaded;
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "MinIO 업로드 중 오류가 발생했습니다.");
+            LOGGER.log(Level.SEVERE, "MinIO upload failed. bucket=" + bucketName + ", objectKey=" + objectKey, ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "MinIO 업로드 중 오류가 발생했습니다.", ex);
         }
     }
 

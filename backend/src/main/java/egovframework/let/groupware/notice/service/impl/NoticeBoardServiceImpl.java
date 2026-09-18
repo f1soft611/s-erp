@@ -10,7 +10,6 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,14 +32,10 @@ import egovframework.let.groupware.notice.service.NoticeBoardService;
 public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements NoticeBoardService {
 
     private static final String BOARD_TYPE_NOTICE = "NOTICE";
-    private static final String DEFAULT_BUCKET = "document-attachments";
 
     private final NoticeBoardDAO noticeBoardDAO;
     private final CommonFileService commonFileService;
     private final CommonCommentService commonCommentService;
-
-    @Value("${storage.bucket:document-attachments}")
-    private String storageBucket;
 
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
             CommonCommentService commonCommentService) {
@@ -82,11 +77,15 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     }
 
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
-        HashMap<String, Object> fileParams = new HashMap<>();
-        fileParams.put("tenantId", tenantId);
-        fileParams.put("postId", postId);
-        List<NoticeBoardFileVO> files = noticeBoardDAO.selectNoticeAttachmentList(fileParams);
-        post.setAttachments(files == null ? new ArrayList<>() : files);
+        List<CommonFileVO> commonFiles = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
+        List<NoticeBoardFileVO> files = new ArrayList<>();
+        if (commonFiles != null) {
+            for (CommonFileVO commonFile : commonFiles) {
+                files.add(toNoticeBoardFile(commonFile));
+            }
+        }
+        post.setAttachments(files);
+        post.setAttachmentCount(files.size());
 
         CommonCommentPageVO commentPage = commonCommentService.listComments(
             tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
@@ -211,22 +210,26 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             return null;
         }
 
-        NoticeBoardFileVO noticeBoardFile = new NoticeBoardFileVO();
-        noticeBoardFile.setBoardFileId(uploaded.getFileId());
-        noticeBoardFile.setPostId(postId);
-        noticeBoardFile.setFileName(uploaded.getFileName());
-        noticeBoardFile.setFilePath(uploaded.getFilePath());
-        noticeBoardFile.setObjectKey(uploaded.getObjectKey());
-        noticeBoardFile.setBucketName(uploaded.getBucketName());
-        noticeBoardFile.setStorageProvider(uploaded.getStorageProvider());
-        noticeBoardFile.setFileSize(uploaded.getFileSize());
-        noticeBoardFile.setMimeType(uploaded.getMimeType());
-        noticeBoardFile.setContentType(uploaded.getContentType());
-        noticeBoardFile.setDeletedYn(uploaded.getDeletedYn());
-        noticeBoardFile.setUploadedBy(uploaded.getUploadedBy());
-        noticeBoardFile.setCreatedAt(uploaded.getCreatedAt());
-        noticeBoardFile.setUpdatedAt(uploaded.getUpdatedAt());
-        return noticeBoardFile;
+        return toNoticeBoardFile(uploaded);
+    }
+
+    private NoticeBoardFileVO toNoticeBoardFile(CommonFileVO source) {
+        NoticeBoardFileVO target = new NoticeBoardFileVO();
+        target.setBoardFileId(source.getFileId());
+        target.setPostId(source.getOwnerId());
+        target.setFileName(source.getFileName());
+        target.setFilePath(source.getFilePath());
+        target.setObjectKey(source.getObjectKey());
+        target.setBucketName(source.getBucketName());
+        target.setStorageProvider(source.getStorageProvider());
+        target.setFileSize(source.getFileSize());
+        target.setMimeType(source.getMimeType());
+        target.setContentType(source.getContentType());
+        target.setDeletedYn(source.getDeletedYn());
+        target.setUploadedBy(source.getUploadedBy());
+        target.setCreatedAt(source.getCreatedAt());
+        target.setUpdatedAt(source.getUpdatedAt());
+        return target;
     }
 
     @Override

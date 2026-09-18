@@ -194,13 +194,12 @@ Tomcat 설치 폴더의 bin\setenv.bat 에 아래를 넣는다.
 @echo off
 set "CATALINA_OPTS=%CATALINA_OPTS% -Dspring.profiles.active=prod"
 set "CATALINA_OPTS=%CATALINA_OPTS% -Dspring.config.additional-location=file:/C:/haccp-cloud/config/"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_ACCESS_KEY=dev-access-key"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_SECRET_KEY=dev-secret-key"
+set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_ACCESS_KEY=f1soft"
+set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_SECRET_KEY=f1soft@96"
 set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_PROVIDER=minio"
 set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_BUCKET=document-attachments"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_ENDPOINT=http://127.0.0.1:9000"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_REGION=us-east-1"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_PRESIGN_EXPIRY_SECONDS=600"
+set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_AUTO_CREATE_BUCKET=false"
+set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_ENDPOINT=http://218.155.74.34:9000"
 ```
 
 운영값으로 바꿀 때는 아래만 변경하면 된다.
@@ -208,13 +207,14 @@ set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_PRESIGN_EXPIRY_SECONDS=600"
 ```bat
 set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_ACCESS_KEY=<운영_액세스키>"
 set "CATALINA_OPTS=%CATALINA_OPTS% -DMINIO_SECRET_KEY=<운영_시크릿키>"
-set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_ENDPOINT=http://127.0.0.1:9000"
+set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_ENDPOINT=http://218.155.74.34:9000"
 ```
 
 주의:
 
-- 운영에서는 dev-access-key, dev-secret-key 를 그대로 쓰지 말고 운영 비밀번호로 바꾼다.
+- 운영에서는 저장소 기본 fallback보다 Tomcat 환경변수로 자격 증명을 주입하는 방식을 권장한다.
 - application-prod.properties 의 기본값은 개발 편의를 위한 안전장치로만 보고, 실제 값은 setenv.bat 또는 환경변수로 덮어쓴다.
+- `STORAGE_AUTO_CREATE_BUCKET=false`가 기본값이다. 운영에서는 버킷을 미리 생성하고 애플리케이션 계정에는 객체 업로드 권한을 부여한다.
 - 이 값은 로컬 전용 테스트 기준이다. 외부/HTTPS 연동 시에는 별도 HTTPS 엔드포인트로 변경해야 한다.
 
 ---
@@ -228,7 +228,8 @@ set "CATALINA_OPTS=%CATALINA_OPTS% -DSTORAGE_ENDPOINT=http://127.0.0.1:9000"
 ```properties
 storage.provider=minio
 storage.bucket=document-attachments
-storage.endpoint=http://127.0.0.1:9000
+storage.autoCreateBucket=false
+storage.endpoint=http://218.155.74.34:9000
 storage.accessKey=...
 storage.secretKey=...
 storage.region=us-east-1

@@ -10,8 +10,12 @@ import { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
-import { CommunityNoticePage } from '../src/pages/groupware/community/notice/CommunityNoticePage';
+import {
+  CommunityNoticePage,
+  insertNoticeReplyAfter,
+} from '../src/pages/groupware/community/notice/CommunityNoticePage';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
 import type { NoticeFeedItem } from '../src/pages/groupware/community/notice/data/noticeData';
 
 const noticeServiceMocks = vi.hoisted(() => ({
@@ -118,6 +122,47 @@ describe('CommunityNoticePage local updates', () => {
       writerName: '나',
       content: '새 댓글',
     });
+  });
+
+  it('inserts a reply directly after its target without adding display depth', () => {
+    const comments = [
+      {
+        id: 1,
+        author: '원댓글',
+        time: '현재',
+        content: '원댓글 내용',
+        replies: [
+          {
+            id: 11,
+            author: '첫 답글',
+            time: '현재',
+            content: '첫 답글 내용',
+            replies: [],
+          },
+          {
+            id: 12,
+            author: '두 번째 답글',
+            time: '현재',
+            content: '두 번째 답글 내용',
+            replies: [],
+          },
+        ],
+      },
+    ];
+    const newReply = {
+      id: 13,
+      author: '새 답글',
+      time: '현재',
+      content: '새 답글 내용',
+      replies: [],
+    };
+
+    const result = insertNoticeReplyAfter(comments, 11, newReply);
+
+    expect(result[0].replies?.map((reply) => reply.id)).toEqual([11, 13, 12]);
+    expect(
+      result[0].replies?.every((reply) => reply.replies?.length === 0),
+    ).toBe(true);
   });
 
   it('uses comments from the integrated detail response without fetching comments per post', async () => {
@@ -466,6 +511,40 @@ describe('CommunityNoticePage local updates', () => {
     await waitFor(() => {
       expect(screen.getByText('새 답글')).toBeInTheDocument();
       expect(screen.getByText('댓글 2')).toBeInTheDocument();
+    });
+  });
+
+  it('sends the clicked nested reply as the server parent while keeping display depth flat', async () => {
+    const onAddComment = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <NoticeFeedList
+        items={[noticeFeed[0]]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={onAddComment}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^답글$/i })[1]);
+    const input = await screen.findByLabelText(/답글 입력/i);
+    fireEvent.input(input, { target: { innerHTML: '<p>중첩 답글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: /^답글 등록$/i }));
+
+    await waitFor(() => {
+      expect(onAddComment).toHaveBeenCalledWith(
+        noticeFeed[0].id,
+        '<p>중첩 답글</p>',
+        2,
+        [],
+        2,
+      );
     });
   });
 

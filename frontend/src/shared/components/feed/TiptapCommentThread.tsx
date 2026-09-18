@@ -34,6 +34,7 @@ export type CommentThreadProps = {
     commentId: string | number,
     content: string,
     files: File[],
+    rootCommentId: string | number,
   ) => Promise<void> | void;
   onReply?: (commentId: string | number) => void;
   onEditComment?: (
@@ -421,7 +422,12 @@ function CommentItem({
               isDark={isDark}
               onCancel={() => setReplyTargetId(null)}
               onSubmit={async (content, files) => {
-                await props.onSubmitReply?.(replyParentId, content, files);
+                await props.onSubmitReply?.(
+                  comment.id,
+                  content,
+                  files,
+                  comment.id,
+                );
                 setReplyTargetId(null);
               }}
             />

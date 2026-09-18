@@ -36,6 +36,7 @@ type NoticeFeedListProps = {
     content: string,
     parentCommentId?: number | string,
     files?: File[],
+    displayParentCommentId?: number | string,
   ) => Promise<void> | void;
   onEditComment?: (
     noticeId: number,
@@ -279,12 +280,19 @@ export function NoticeFeedList({
     content: string,
     parentCommentId?: number | string,
     files: File[] = [],
+    displayParentCommentId?: number | string,
   ) => {
     if (!content.trim()) {
       return;
     }
 
-    await onAddComment?.(noticeId, content, parentCommentId, files);
+    await onAddComment?.(
+      noticeId,
+      content,
+      parentCommentId,
+      files,
+      displayParentCommentId,
+    );
   };
 
   const handleLocalCommentEdit = async (
@@ -715,12 +723,18 @@ export function NoticeFeedList({
                     files,
                   );
                 }}
-                onSubmitReply={async (commentId, content, files) => {
+                onSubmitReply={async (
+                  commentId,
+                  content,
+                  files,
+                  parentCommentId,
+                ) => {
                   await handleLocalCommentAdd(
                     item.id,
                     content,
-                    commentId,
+                    parentCommentId,
                     files,
+                    commentId,
                   );
                 }}
                 onEditComment={async (commentId, content, files) => {

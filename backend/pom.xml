@@ -315,13 +315,6 @@
 			<version>42.6.0</version>
 		</dependency>
 
-		<!-- MinIO client -->
-		<dependency>
-			<groupId>io.minio</groupId>
-			<artifactId>minio</artifactId>
-			<version>8.5.7</version>
-		</dependency>
-
 		<!-- validator -->
 		<dependency>
 			<groupId>org.hibernate.validator</groupId>

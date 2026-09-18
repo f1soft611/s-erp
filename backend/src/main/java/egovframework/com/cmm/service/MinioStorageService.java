@@ -20,6 +20,9 @@ public class MinioStorageService {
     @Value("${storage.bucket:${STORAGE_BUCKET:document-attachments}}")
     private String defaultBucket;
 
+    @Value("${storage.autoCreateBucket:false}")
+    private boolean autoCreateBucket;
+
     public MinioStorageService(MinioClient minioClient) {
         this.minioClient = minioClient;
     }
@@ -34,7 +37,9 @@ public class MinioStorageService {
 
     public void upload(String bucketName, String objectKey, InputStream inputStream, long size, String contentType) throws Exception {
         String targetBucket = bucketName == null || bucketName.trim().isEmpty() ? defaultBucket : bucketName;
-        ensureBucketExists(targetBucket);
+        if (autoCreateBucket) {
+            ensureBucketExists(targetBucket);
+        }
         minioClient.putObject(PutObjectArgs.builder()
                 .bucket(targetBucket)
                 .object(objectKey)

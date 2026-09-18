@@ -268,6 +268,35 @@ const appendCommentToTree = (
   );
 };
 
+export const insertNoticeReplyAfter = (
+  comments: NoticeCommentItem[] = [],
+  targetCommentId: number | string,
+  comment: NoticeCommentItem,
+): NoticeCommentItem[] => {
+  const nextComments: NoticeCommentItem[] = [];
+
+  comments.forEach((current) => {
+    nextComments.push(current);
+    if (String(current.id) === String(targetCommentId)) {
+      nextComments.push({ ...comment, replies: [] });
+      return;
+    }
+
+    if (current.replies?.length) {
+      nextComments[nextComments.length - 1] = {
+        ...current,
+        replies: insertNoticeReplyAfter(
+          current.replies,
+          targetCommentId,
+          comment,
+        ),
+      };
+    }
+  });
+
+  return nextComments;
+};
+
 const updateCommentInTree = (
   comments: NoticeCommentItem[] = [],
   commentId: number | string,
@@ -670,6 +699,7 @@ export function CommunityNoticePage({
       content: string,
       parentCommentId?: number | string,
       files: File[] = [],
+      displayParentCommentId?: number | string,
     ) => {
       if (!toPlainText(content).trim()) {
         return;
@@ -709,11 +739,19 @@ export function CommunityNoticePage({
                 return item;
               }
 
-              const comments = appendCommentToTree(
-                item.comments ?? [],
-                parentCommentId,
-                nextComment,
-              );
+              const comments =
+                displayParentCommentId != null &&
+                String(displayParentCommentId) !== String(parentCommentId)
+                  ? insertNoticeReplyAfter(
+                      item.comments ?? [],
+                      displayParentCommentId,
+                      nextComment,
+                    )
+                  : appendCommentToTree(
+                      item.comments ?? [],
+                      parentCommentId,
+                      nextComment,
+                    );
               return {
                 ...item,
                 comments,

@@ -7,7 +7,8 @@
 ## 주요 변경
 
 - 깊은 답글을 화면 표시용으로 최상위 댓글의 답글 목록에 평탄화했다.
-- 깊은 답글에서 답글을 작성해도 최상위 댓글 ID를 부모 ID로 사용한다.
+- 깊은 답글에서 답글을 작성하면 실제 대상 댓글 ID를 부모 ID로 사용한다.
+- 답글의 답글은 화면상 대상 답글 바로 다음에 표시하고, 들여쓰기는 1단계로 유지한다.
 - 댓글 입력창을 초기 28px 한 줄 높이로 조정했다.
 - 일반 `Enter`는 등록하고 `Shift+Enter`는 줄바꿈하도록 처리했다.
 - IME 조합 중 `Enter`는 등록하지 않도록 했다.
@@ -17,12 +18,16 @@
 
 - `frontend/src/shared/components/feed/TiptapCommentThread.tsx`
 - `frontend/src/shared/components/feed/CommentThread.tsx`
+- `frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx`
+- `frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx`
 - `frontend/tests/feed-components.test.tsx`
+- `frontend/tests/notice-page-local-updates.test.tsx`
 
 ## 검증
 
-- 집중 테스트 38개 통과
+- 공지사항 로컬 갱신 집중 테스트 21개 통과
 - `cd frontend; npm run build` 성공
+- 전체 테스트는 기존 F1-Grid 관련 실패로 122개 실패하여 변경 범위와 분리 확인
 - 실제 브라우저에서 Shift+Enter 줄바꿈 확인
 - 실제 브라우저에서 Enter 등록 및 `POST /api/v1/common/comments` 요청 확인
 - 375px, 768px, 1280px에서 가로 스크롤 없음과 입력 높이 28px 확인

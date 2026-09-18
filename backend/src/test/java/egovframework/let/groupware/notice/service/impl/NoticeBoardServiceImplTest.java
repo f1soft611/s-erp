@@ -44,12 +44,15 @@ class NoticeBoardServiceImplTest {
         commentPage.setNextBeforeCommentId(9L);
         CommonFileVO commentFile = new CommonFileVO();
         commentFile.setFileId(101L);
-        NoticeBoardFileVO postFile = new NoticeBoardFileVO();
-        postFile.setBoardFileId(201L);
+        CommonFileVO postFile = new CommonFileVO();
+        postFile.setFileId(201L);
+        postFile.setOwnerId(7L);
         when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(Arrays.asList(firstPost, secondPost));
-        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap()))
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
             .thenReturn(Arrays.asList(postFile));
+        when(commonFileService.listFiles(1L, "NOTICE", 8L))
+            .thenReturn(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
             .thenReturn(commentPage);
         when(commonCommentService.listComments(1L, "NOTICE", 8L, 3, null))
@@ -64,16 +67,22 @@ class NoticeBoardServiceImplTest {
             .listPosts(1L, " keyword ", 1, 20);
 
         assertThat(result).hasSize(2);
-        assertThat(result.get(0).getAttachments()).containsExactly(postFile);
+        assertThat(result.get(0).getAttachments()).hasSize(1);
+        assertThat(result.get(0).getAttachments().get(0).getBoardFileId()).isEqualTo(201L);
+        assertThat(result.get(0).getAttachmentCount()).isEqualTo(1);
         assertThat(result.get(0).getComments()).containsExactly(comment);
         assertThat(result.get(0).getCommentCount()).isEqualTo(4);
         assertThat(result.get(0).isHasPreviousComments()).isTrue();
         assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(9L);
         assertThat(comment.getAttachments()).containsExactly(commentFile);
+        assertThat(result.get(1).getAttachments()).isEmpty();
+        assertThat(result.get(1).getAttachmentCount()).isEqualTo(0);
         assertThat(result.get(1).getComments()).isEmpty();
         assertThat(result.get(1).getCommentCount()).isZero();
         verify(commonCommentService).listComments(1L, "NOTICE", 7L, 3, null);
         verify(commonCommentService).listComments(1L, "NOTICE", 8L, 3, null);
+        verify(commonFileService).listFiles(1L, "NOTICE", 7L);
+        verify(commonFileService).listFiles(1L, "NOTICE", 8L);
         verify(commonFileService).listFiles(1L, "NOTICE_COMMENT", 10L);
     }
 
@@ -93,7 +102,7 @@ class NoticeBoardServiceImplTest {
         CommonFileVO firstFile = new CommonFileVO();
         firstFile.setFileId(101L);
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(post);
-        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap())).thenReturn(Collections.emptyList());
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(2L);
         when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L)).thenReturn(Arrays.asList(firstFile));
