@@ -47,4 +47,8 @@ public class NoticeBoardDAO extends EgovAbstractMapper {
     public void softDeleteNoticeAttachment(Map<String, Object> params) throws Exception {
         update("NoticeBoardDAO.softDeleteNoticeAttachment", params);
     }
+
+    public void softDeleteEmbeddedNoticeAttachments(Map<String, Object> params) throws Exception {
+        update("NoticeBoardDAO.softDeleteEmbeddedNoticeAttachments", params);
+    }
 }

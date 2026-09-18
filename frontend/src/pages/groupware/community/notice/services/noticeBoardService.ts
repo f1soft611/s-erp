@@ -17,17 +17,56 @@ export type NoticeBoardAttachmentApi = {
   bucketName?: string | null;
   mimeType?: string | null;
   contentType?: string | null;
+  fileUsageType?: string | null;
 };
+
+export type NoticeEmbeddedImageApi = {
+  uploadToken: string;
+  fileId?: number | string | null;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  objectKey: string;
+  bucketName: string;
+  imageUrl: string;
+};
+
+type NoticeEmbeddedImageApiFields = Partial<NoticeEmbeddedImageApi> & {
+  contentType?: string | null;
+};
+
+type NoticeEmbeddedImageApiResponse = NoticeEmbeddedImageApiFields & {
+  item?: NoticeEmbeddedImageApiFields;
+};
+
+export function normalizeNoticeEmbeddedImage(
+  value: NoticeEmbeddedImageApiResponse,
+): NoticeEmbeddedImageApi {
+  const source = value.item ?? value;
+  return {
+    uploadToken: String(source.uploadToken ?? ''),
+    fileId: source.fileId ?? null,
+    fileName: String(source.fileName ?? 'pasted-image'),
+    fileSize: Number(source.fileSize ?? 0) || 0,
+    mimeType: String(source.mimeType ?? source.contentType ?? ''),
+    objectKey: String(source.objectKey ?? ''),
+    bucketName: String(source.bucketName ?? ''),
+    imageUrl: String(source.imageUrl ?? ''),
+  };
+}
 
 export type NoticeBoardPostApi = {
   postId?: number | string | null;
   title?: string | null;
+  noticeGubunCode?: string | null;
   contents?: string | null;
   contentsHtml?: string | null;
   contentsJson?: string | null;
   contentsText?: string | null;
   writerId?: string | null;
   writerName?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByName?: string | null;
   viewCount?: number | string | null;
   isNotice?: string | null;
   createdAt?: string | Date | null;
@@ -40,6 +79,16 @@ export type NoticeBoardPostApi = {
   commentCount?: number | string | null;
   hasPreviousComments?: boolean;
   nextBeforeCommentId?: number | string | null;
+  embeddedImages?: Array<{
+    uploadToken: string;
+    fileId?: number | string | null;
+    objectKey: string;
+    imageUrl: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    width?: number | string | null;
+  }>;
 };
 
 type NoticeBoardListResponse = {
@@ -62,12 +111,16 @@ export async function fetchNoticePosts(
   page: number,
   size: number,
   keyword: string,
+  noticeGubunCode?: string,
 ): Promise<NoticeBoardPostApi[]> {
   const query = new URLSearchParams({
     page: String(page),
     size: String(size),
     keyword: keyword ?? '',
   });
+  if (noticeGubunCode) {
+    query.set('noticeGubunCode', noticeGubunCode);
+  }
 
   const result = await apiGet<NoticeBoardListResponse>(
     `/api/v1/groupware/boards/notice/posts?${query.toString()}`,
@@ -129,6 +182,18 @@ export async function uploadNoticeAttachment(
     fileSize: file.size,
     contentType: file.type,
   }) as NoticeBoardAttachmentApi;
+}
+
+export async function uploadNoticeEmbeddedImage(
+  file: File,
+): Promise<NoticeEmbeddedImageApi> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const result = await apiPostFormData<NoticeEmbeddedImageApiResponse>(
+    '/api/v1/groupware/boards/notice/embedded-images/temp',
+    formData,
+  );
+  return normalizeNoticeEmbeddedImage(result);
 }
 
 export async function deleteNoticeAttachment(

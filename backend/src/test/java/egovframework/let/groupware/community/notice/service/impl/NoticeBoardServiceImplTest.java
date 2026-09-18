@@ -9,9 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -22,10 +24,44 @@ import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 
 class NoticeBoardServiceImplTest {
+
+    @Test
+    void createPostUsesAuthenticatedActorInsteadOfPayloadWriter() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO persisted = new NoticeBoardPostVO();
+        persisted.setPostId(42L);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.insertNoticePost(org.mockito.ArgumentMatchers.anyMap())).thenReturn(42L);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(persisted);
+        when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 42L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 42L)).thenReturn(0L);
+
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContentsHtml("<p>본문</p>");
+        payload.setContentsJson("{\"type\":\"doc\",\"content\":[]}");
+        payload.setWriterId("payload-writer");
+        payload.setWriterName("Payload Writer");
+        payload.setNoticeGubunCode("GENERAL");
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .createPost(1L, payload, "login-user", "로그인 사용자");
+
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).insertNoticePost(paramsCaptor.capture());
+        assertThat(paramsCaptor.getValue()).containsEntry("writerId", "login-user");
+        assertThat(paramsCaptor.getValue()).containsEntry("writerName", "로그인 사용자");
+        assertThat(paramsCaptor.getValue()).containsEntry("noticeGubunCode", "GENERAL");
+    }
 
     @Test
     void listPostsHydratesAttachmentsCommentsAndPaginationMetadata() throws Exception {

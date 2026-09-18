@@ -299,19 +299,21 @@
 
 ### 2-17. tb_common_comment
 
-| 컬럼              | 타입      | 설명                                        |
-| ----------------- | --------- | ------------------------------------------- |
-| comment_id        | bigint    | 공통 댓글 PK                                |
-| tenant_id         | bigint    | 소속 테넌트                                 |
-| owner_type        | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`) |
-| owner_id          | bigint    | 소유 객체 PK                                |
-| parent_comment_id | bigint    | 상위 댓글 FK(대댓글)                        |
-| content           | text      | 댓글 내용                                   |
-| writer_id         | varchar   | 작성자 ID                                   |
-| writer_name       | varchar   | 작성자 이름                                 |
-| deleted_yn        | char      | 삭제 여부 (`Y`/`N`)                         |
-| created_at        | timestamp | 생성 일시                                   |
-| updated_at        | timestamp | 수정 일시                                   |
+| 컬럼                  | 타입      | 설명                                        |
+| --------------------- | --------- | ------------------------------------------- |
+| comment_id            | bigint    | 공통 댓글 PK                                |
+| tenant_id             | bigint    | 소속 테넌트                                 |
+| owner_type            | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`) |
+| owner_id              | bigint    | 소유 객체 PK                                |
+| parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
+| content               | text      | 댓글 내용                                   |
+| writer_id             | varchar   | 작성자 ID                                   |
+| writer_name           | varchar   | 작성자 이름                                 |
+| deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
+| last_modified_by      | varchar   | 마지막 행위자 ID                            |
+| last_modified_by_name | varchar   | 마지막 행위자 이름                          |
+| created_at            | timestamp | 생성 일시                                   |
+| updated_at            | timestamp | 수정 일시                                   |
 
 역할:
 
@@ -342,24 +344,26 @@
 
 ### 2-17. tb_board_post
 
-| 컬럼               | 타입      | 설명                    |
-| ------------------ | --------- | ----------------------- |
-| post_id            | bigint    | 게시글 PK               |
-| board_type_code    | varchar   | 게시판 유형 코드        |
-| title              | varchar   | 제목                    |
-| contents           | text      | legacy 본문 호환용      |
-| contents_html      | text      | 렌더링용 HTML 본문      |
-| contents_json      | json      | Tiptap JSON 본문        |
-| contents_text      | text      | 검색/요약용 평문        |
-| writer_id          | varchar   | 작성자 ID               |
-| writer_name        | varchar   | 작성자 명               |
-| view_count         | int       | 조회수                  |
-| is_notice          | char      | 중요공지 여부 (`Y`/`N`) |
-| is_deleted         | char      | 삭제 여부 (`Y`/`N`)     |
-| created_at         | timestamp | 생성 일시               |
-| updated_at         | timestamp | 수정 일시               |
-| last_modified_by   | varchar   | 마지막 수정자 ID        |
-| last_comment_count | int       | 마지막 댓글 수          |
+| 컬럼                  | 타입      | 설명                         |
+| --------------------- | --------- | ---------------------------- |
+| post_id               | bigint    | 게시글 PK                    |
+| board_type_code       | varchar   | 게시판 유형 코드             |
+| title                 | varchar   | 제목                         |
+| contents              | text      | legacy 본문 호환용           |
+| contents_html         | text      | 렌더링용 HTML 본문           |
+| contents_json         | json      | Tiptap JSON 본문             |
+| contents_text         | text      | 검색/요약용 평문             |
+| writer_id             | varchar   | 작성자 ID                    |
+| writer_name           | varchar   | 작성자 명                    |
+| notice_gubun_code     | varchar   | 공지 구분 공통코드 상세 코드 |
+| view_count            | int       | 조회수                       |
+| is_notice             | char      | 중요공지 여부 (`Y`/`N`)      |
+| is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
+| created_at            | timestamp | 생성 일시                    |
+| updated_at            | timestamp | 수정 일시                    |
+| last_modified_by      | varchar   | 마지막 수정자 ID             |
+| last_modified_by_name | varchar   | 마지막 행위자 이름           |
+| last_comment_count    | int       | 마지막 댓글 수               |
 
 역할:
 
@@ -368,23 +372,24 @@
 
 ### 2-18. tb_board_file
 
-| 컬럼             | 타입      | 설명                     |
-| ---------------- | --------- | ------------------------ |
-| board_file_id    | bigint    | 첨부 PK                  |
-| post_id          | bigint    | 게시글 FK                |
-| file_name        | varchar   | 원본 파일명              |
-| file_path        | varchar   | legacy 저장 경로(호환용) |
-| file_size        | bigint    | 파일 크기                |
-| mime_type        | varchar   | MIME 타입                |
-| object_key       | varchar   | MinIO object key         |
-| bucket_name      | varchar   | MinIO 버킷명             |
-| storage_provider | varchar   | 저장소 타입 (`minio`)    |
-| checksum_sha256  | varchar   | 파일 해시                |
-| content_type     | varchar   | 파일 컨텐츠 타입         |
-| uploaded_by      | varchar   | 업로더 ID                |
-| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)      |
-| created_at       | timestamp | 생성 일시                |
-| updated_at       | timestamp | 수정 일시                |
+| 컬럼             | 타입      | 설명                                                       |
+| ---------------- | --------- | ---------------------------------------------------------- |
+| board_file_id    | bigint    | 첨부 PK                                                    |
+| post_id          | bigint    | 게시글 FK                                                  |
+| file_name        | varchar   | 원본 파일명                                                |
+| file_path        | varchar   | legacy 저장 경로(호환용)                                   |
+| file_size        | bigint    | 파일 크기                                                  |
+| mime_type        | varchar   | MIME 타입                                                  |
+| object_key       | varchar   | MinIO object key                                           |
+| bucket_name      | varchar   | MinIO 버킷명                                               |
+| storage_provider | varchar   | 저장소 타입 (`minio`)                                      |
+| checksum_sha256  | varchar   | 파일 해시                                                  |
+| content_type     | varchar   | 파일 컨텐츠 타입                                           |
+| uploaded_by      | varchar   | 업로더 ID                                                  |
+| file_usage_type  | varchar   | 파일 용도 (`ATTACHMENT` 일반 첨부, `EMBEDDED` 본문 이미지) |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)                                        |
+| created_at       | timestamp | 생성 일시                                                  |
+| updated_at       | timestamp | 수정 일시                                                  |
 
 역할:
 
@@ -396,7 +401,9 @@
 ## 변경 이력
 
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_board_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
+- 2026-09-18: 공지사항 구분 코드와 게시글/댓글 최신 행위자 감사 컬럼을 추가했다. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.
 - 2026-09-11: 공통코드 관리 기능을 위한 `tb_common_code_group`, `tb_common_code_item` 신규 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260911](../../backend/DATABASE/20260911) 및 [docs/database/2026-09-11](2026-09-11) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.

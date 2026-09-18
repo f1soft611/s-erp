@@ -13,13 +13,21 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 public interface NoticeBoardService {
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size) throws Exception;
 
+    List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception;
+
     NoticeBoardPostVO getPost(Long tenantId, Long postId) throws Exception;
 
     NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
+    NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;
+
     NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
+    NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;
+
     void deletePost(Long tenantId, Long postId) throws Exception;
+
+    void deletePost(Long tenantId, Long postId, String actorId, String actorName) throws Exception;
 
     NoticeBoardFileVO uploadAttachment(Long tenantId, Long postId, MultipartFile file, String uploaderId) throws Exception;
 

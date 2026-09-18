@@ -23,6 +23,7 @@ import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
@@ -46,10 +47,16 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
 
     @Override
     public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size) throws Exception {
+        return listPosts(tenantId, keyword, page, size, null);
+    }
+
+    @Override
+    public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception {
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("keyword", StringUtils.hasText(keyword) ? keyword.trim() : null);
+        params.put("noticeGubunCode", StringUtils.hasText(noticeGubunCode) ? noticeGubunCode.trim() : null);
         params.put("offset", Math.max((page - 1) * size, 0));
         params.put("size", size);
         List<NoticeBoardPostVO> posts = noticeBoardDAO.selectNoticePostList(params);
@@ -84,6 +91,12 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 files.add(toNoticeBoardFile(commonFile));
             }
         }
+        HashMap<String, Object> boardFileParams = new HashMap<>();
+        boardFileParams.put("postId", postId);
+        List<NoticeBoardFileVO> embeddedFiles = noticeBoardDAO.selectNoticeAttachmentList(boardFileParams);
+        if (embeddedFiles != null) {
+            files.addAll(embeddedFiles);
+        }
         post.setAttachments(files);
         post.setAttachmentCount(files.size());
 
@@ -110,6 +123,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     @Override
     @Transactional
     public NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload) throws Exception {
+        return createPost(tenantId, payload, null, null);
+        }
+
+        @Override
+        @Transactional
+        public NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload,
+            String actorId, String actorName) throws Exception {
         validateCreatePayload(payload);
         String contentsHtml = payload.getEffectiveContentsHtml();
         String contentsText = payload.getEffectiveContentsText();
@@ -123,8 +143,11 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("contentsHtml", contentsHtml);
         params.put("contentsJson", contentsJson);
         params.put("contentsText", contentsText);
-        params.put("writerId", StringUtils.hasText(payload.getWriterId()) ? payload.getWriterId() : "unknown");
-        params.put("writerName", StringUtils.hasText(payload.getWriterName()) ? payload.getWriterName() : "관리자");
+        params.put("writerId", actorId);
+        params.put("writerName", actorName);
+        params.put("noticeGubunCode", payload.getNoticeGubunCode() == null ? null : payload.getNoticeGubunCode().trim());
+        params.put("lastModifiedBy", actorId);
+        params.put("lastModifiedByName", actorName);
         params.put("isNotice", StringUtils.hasText(payload.getIsNotice()) ? payload.getIsNotice().toUpperCase() : "N");
 
         Long postId = noticeBoardDAO.insertNoticePost(params);
@@ -137,6 +160,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 noticeBoardDAO.selectNoticeAttachmentById(attachParams);
             }
         }
+        persistEmbeddedImages(tenantId, postId, payload.getEmbeddedImages(), payload.getWriterId());
 
         return getPost(tenantId, postId);
     }
@@ -144,6 +168,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     @Override
     @Transactional
     public NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload) throws Exception {
+        return updatePost(tenantId, postId, payload, null, null);
+        }
+
+        @Override
+        @Transactional
+        public NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload,
+            String actorId, String actorName) throws Exception {
         if (payload == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수정 요청이 비어 있습니다.");
         }
@@ -167,14 +198,57 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("contentsJson", contentsJson);
         params.put("contentsText", contentsText);
         params.put("writerName", payload.getWriterName());
+        params.put("noticeGubunCode", payload.getNoticeGubunCode() == null ? null : payload.getNoticeGubunCode().trim());
+        params.put("lastModifiedBy", actorId);
+        params.put("lastModifiedByName", actorName);
         params.put("isNotice", StringUtils.hasText(payload.getIsNotice()) ? payload.getIsNotice().toUpperCase() : "N");
         noticeBoardDAO.updateNoticePost(params);
+        noticeBoardDAO.softDeleteEmbeddedNoticeAttachments(existingParams);
+        persistEmbeddedImages(tenantId, postId, payload.getEmbeddedImages(), payload.getWriterId());
         return getPost(tenantId, postId);
+    }
+
+    private void persistEmbeddedImages(Long tenantId, Long postId, List<NoticeEmbeddedImageVO> images, String uploaderId)
+            throws Exception {
+        if (images == null) {
+            return;
+        }
+        for (NoticeEmbeddedImageVO image : images) {
+            if (image == null || !StringUtils.hasText(image.getObjectKey())
+                    || !StringUtils.hasText(image.getFileName())
+                    || !StringUtils.hasText(image.getUploadToken())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 정보가 올바르지 않습니다.");
+            }
+            String expectedPrefix = "tenant/" + tenantId + "/notice-temp/" + image.getUploadToken() + "/";
+            if (!image.getObjectKey().startsWith(expectedPrefix)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 업로드 소유 정보가 올바르지 않습니다.");
+            }
+            HashMap<String, Object> params = new HashMap<>();
+            params.put("postId", postId);
+            params.put("fileName", image.getFileName());
+            params.put("filePath", "minio://" + image.getBucketName() + "/" + image.getObjectKey());
+            params.put("objectKey", image.getObjectKey());
+            params.put("bucketName", image.getBucketName());
+            params.put("storageProvider", "minio");
+            params.put("fileSize", image.getFileSize() == null ? 0L : image.getFileSize());
+            params.put("mimeType", image.getMimeType());
+            params.put("contentType", image.getMimeType());
+            params.put("fileUsageType", "EMBEDDED");
+            params.put("deletedYn", "N");
+            params.put("uploadedBy", StringUtils.hasText(uploaderId) ? uploaderId : "unknown");
+            noticeBoardDAO.insertNoticeAttachment(params);
+        }
     }
 
     @Override
     @Transactional
     public void deletePost(Long tenantId, Long postId) throws Exception {
+        deletePost(tenantId, postId, null, null);
+    }
+
+    @Override
+    @Transactional
+    public void deletePost(Long tenantId, Long postId, String actorId, String actorName) throws Exception {
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
@@ -182,6 +256,8 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
+        params.put("lastModifiedBy", actorId);
+        params.put("lastModifiedByName", actorName);
         List<CommonFileVO> attachments = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
         if (attachments != null) {
             for (CommonFileVO attachment : attachments) {
@@ -190,6 +266,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 }
             }
         }
+        noticeBoardDAO.softDeleteEmbeddedNoticeAttachments(params);
         noticeBoardDAO.softDeleteNoticePost(params);
     }
 
@@ -225,6 +302,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         target.setFileSize(source.getFileSize());
         target.setMimeType(source.getMimeType());
         target.setContentType(source.getContentType());
+        target.setFileUsageType("ATTACHMENT");
         target.setDeletedYn(source.getDeletedYn());
         target.setUploadedBy(source.getUploadedBy());
         target.setCreatedAt(source.getCreatedAt());
@@ -284,6 +362,9 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         String contentsHtml = payload.getEffectiveContentsHtml();
         if (!StringUtils.hasText(contentsHtml)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "내용은 필수입니다.");
+        }
+        if (!StringUtils.hasText(payload.getNoticeGubunCode())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지 구분은 필수입니다.");
         }
     }
 

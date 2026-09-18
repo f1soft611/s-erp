@@ -16,6 +16,8 @@ export type NoticeCommentItem = {
 export type NoticeFeedItem = {
   id: number;
   title: string;
+  noticeGubunCode?: string;
+  noticeGubunName?: string;
   meta: string;
   state: string;
   summary: string;

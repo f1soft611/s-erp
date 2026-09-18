@@ -34,4 +34,28 @@ describe('sanitizeHtml', () => {
     expect(result).not.toContain('href="vbscript:msgbox(1)"');
     expect(result).toContain('href="/local/path"');
   });
+  it('preserves sanitized table cells and resize attributes', () => {
+    const result = sanitizeHtml(
+      '<table><tbody><tr><td colspan="2" colwidth="120,180" style="width:120px;height:28px;background-color:#fff2cc;border:1px solid #1f2937">셀</td></tr></tbody></table>',
+    );
+
+    expect(result).toContain('<table>');
+    expect(result).toContain('colspan="2"');
+    expect(result).toContain('colwidth="120,180"');
+    expect(result).toContain('width:120px');
+    expect(result).toContain('height:28px');
+    expect(result).toContain('background-color:#fff2cc');
+    expect(result).toContain('border:1px solid #1f2937');
+  });
+
+  it('converts saved colwidth values for feed rendering', () => {
+    const result = sanitizeHtml(
+      '<table><colgroup><col style="min-width:120px"><col style="min-width:180px"></colgroup><tbody><tr><td colwidth="120,180">셀</td></tr></tbody></table>',
+    );
+
+    expect(result).toContain('<colgroup>');
+    expect(result).toContain('<col style="min-width:120px">');
+    expect(result).toContain('colwidth="120,180"');
+    expect(result).toContain('style="width:300px"');
+  });
 });

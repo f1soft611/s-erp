@@ -17,5 +17,7 @@ public interface CommonCommentService {
     long countComments(Long tenantId, String ownerType, Long ownerId) throws Exception;
     CommonCommentVO createComment(Long tenantId, String ownerType, Long ownerId, String content, String writerId, String writerName, Long parentCommentId) throws Exception;
     CommonCommentVO updateComment(Long tenantId, Long commentId, String content, String actorId) throws Exception;
+    CommonCommentVO updateComment(Long tenantId, Long commentId, String content, String actorId, String actorName) throws Exception;
     void deleteComment(Long tenantId, Long commentId, String actorId) throws Exception;
+    void deleteComment(Long tenantId, Long commentId, String actorId, String actorName) throws Exception;
 }

@@ -28,6 +28,10 @@ public class CommonCommentVO implements Serializable {
     private String writerId;
     @Schema(description = "작성자 이름")
     private String writerName;
+    @Schema(description = "마지막 행위자 ID")
+    private String lastModifiedBy;
+    @Schema(description = "마지막 행위자 이름")
+    private String lastModifiedByName;
     @Schema(description = "삭제 여부")
     private String deletedYn;
     @Schema(description = "생성 일시")
@@ -69,6 +73,14 @@ public class CommonCommentVO implements Serializable {
     public String getWriterName() { return writerName; }
     @Generated
     public void setWriterName(String writerName) { this.writerName = writerName; }
+    @Generated
+    public String getLastModifiedBy() { return lastModifiedBy; }
+    @Generated
+    public void setLastModifiedBy(String lastModifiedBy) { this.lastModifiedBy = lastModifiedBy; }
+    @Generated
+    public String getLastModifiedByName() { return lastModifiedByName; }
+    @Generated
+    public void setLastModifiedByName(String lastModifiedByName) { this.lastModifiedByName = lastModifiedByName; }
     @Generated
     public String getDeletedYn() { return deletedYn; }
     @Generated

@@ -21,6 +21,8 @@ public class NoticeBoardPostVO implements Serializable {
     private String boardTypeCode;
     @Schema(description = "공지 제목")
     private String title;
+    @Schema(description = "공지 구분 공통코드")
+    private String noticeGubunCode;
     @Schema(description = "기존 호환용 본문 HTML")
     private String contents;
     @Schema(description = "에디터 HTML 본문")
@@ -33,6 +35,10 @@ public class NoticeBoardPostVO implements Serializable {
     private String writerId;
     @Schema(description = "작성자명")
     private String writerName;
+    @Schema(description = "마지막 행위자 ID")
+    private String lastModifiedBy;
+    @Schema(description = "마지막 행위자명")
+    private String lastModifiedByName;
     @Schema(description = "조회 수")
     private Integer viewCount;
     @Schema(description = "상단 고정 여부")
@@ -110,6 +116,16 @@ public class NoticeBoardPostVO implements Serializable {
     }
 
     @Generated
+    public String getNoticeGubunCode() {
+        return noticeGubunCode;
+    }
+
+    @Generated
+    public void setNoticeGubunCode(String noticeGubunCode) {
+        this.noticeGubunCode = noticeGubunCode;
+    }
+
+    @Generated
     public String getContents() {
         return contents;
     }
@@ -167,6 +183,26 @@ public class NoticeBoardPostVO implements Serializable {
     @Generated
     public void setWriterName(String writerName) {
         this.writerName = writerName;
+    }
+
+    @Generated
+    public String getLastModifiedBy() {
+        return lastModifiedBy;
+    }
+
+    @Generated
+    public void setLastModifiedBy(String lastModifiedBy) {
+        this.lastModifiedBy = lastModifiedBy;
+    }
+
+    @Generated
+    public String getLastModifiedByName() {
+        return lastModifiedByName;
+    }
+
+    @Generated
+    public void setLastModifiedByName(String lastModifiedByName) {
+        this.lastModifiedByName = lastModifiedByName;
     }
 
     @Generated

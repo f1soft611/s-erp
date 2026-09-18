@@ -14,6 +14,8 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
 
     @Schema(description = "공지 제목")
     private String title;
+    @Schema(description = "공지 구분 공통코드")
+    private String noticeGubunCode;
     @Schema(description = "기존 호환용 본문 HTML")
     private String contents;
     @Schema(description = "에디터 HTML 본문")
@@ -30,6 +32,8 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     private String isNotice;
     @Schema(description = "첨부파일 ID 목록")
     private List<Long> attachmentIds;
+    @Schema(description = "본문 임베드 이미지 메타데이터")
+    private List<NoticeEmbeddedImageVO> embeddedImages;
 
     public String getEffectiveContentsHtml() {
         return StringUtils.hasText(this.contentsHtml) ? this.contentsHtml : this.contents;
@@ -63,6 +67,16 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     @Generated
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    @Generated
+    public String getNoticeGubunCode() {
+        return noticeGubunCode;
+    }
+
+    @Generated
+    public void setNoticeGubunCode(String noticeGubunCode) {
+        this.noticeGubunCode = noticeGubunCode;
     }
 
     @Generated
@@ -143,5 +157,13 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     @Generated
     public void setAttachmentIds(List<Long> attachmentIds) {
         this.attachmentIds = attachmentIds;
+    }
+
+    public List<NoticeEmbeddedImageVO> getEmbeddedImages() {
+        return embeddedImages;
+    }
+
+    public void setEmbeddedImages(List<NoticeEmbeddedImageVO> embeddedImages) {
+        this.embeddedImages = embeddedImages;
     }
 }

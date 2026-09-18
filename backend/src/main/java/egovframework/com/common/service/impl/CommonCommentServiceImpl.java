@@ -191,6 +191,12 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
     @Override
     @Transactional
     public CommonCommentVO updateComment(Long tenantId, Long commentId, String content, String actorId) throws Exception {
+        return updateComment(tenantId, commentId, content, actorId, null);
+    }
+
+    @Override
+    @Transactional
+    public CommonCommentVO updateComment(Long tenantId, Long commentId, String content, String actorId, String actorName) throws Exception {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
         }
@@ -209,6 +215,7 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         params.put("commentId", commentId);
         params.put("content", normalizedContent);
         params.put("actorId", actorId);
+        params.put("actorName", actorName);
         if (commonCommentDAO.updateCommonComment(params) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "수정할 댓글을 찾을 수 없습니다.");
         }
@@ -226,6 +233,12 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
     @Override
     @Transactional
     public void deleteComment(Long tenantId, Long commentId, String actorId) throws Exception {
+        deleteComment(tenantId, commentId, actorId, null);
+    }
+
+    @Override
+    @Transactional
+    public void deleteComment(Long tenantId, Long commentId, String actorId, String actorName) throws Exception {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
         }
@@ -238,6 +251,7 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         params.put("tenantId", tenantId);
         params.put("commentId", commentId);
         params.put("actorId", actorId);
+        params.put("actorName", actorName);
         if (commonCommentDAO.softDeleteCommonComment(params) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 댓글을 찾을 수 없습니다.");
         }

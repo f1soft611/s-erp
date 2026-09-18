@@ -217,6 +217,44 @@ describe('Community notice page', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the previous-comments loader from three root comments', () => {
+    const onLoadPreviousComments = vi.fn();
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 11, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 12,
+                author: '둘째 댓글',
+                time: '오늘',
+                content: '둘째 댓글',
+              },
+              {
+                id: 13,
+                author: '셋째 댓글',
+                time: '오늘',
+                content: '셋째 댓글',
+              },
+            ],
+            commentCount: 3,
+            hasPreviousComments: true,
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onLoadPreviousComments={onLoadPreviousComments}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 불러오기' }),
+    ).toBeInTheDocument();
+  });
+
   it('requests the previous cursor once and renders merged older comments without duplicates', async () => {
     const onLoadPreviousComments = vi.fn().mockResolvedValue({
       comments: [
@@ -450,7 +488,7 @@ describe('Community notice page', () => {
     );
 
     await waitFor(() =>
-      expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 4),
+      expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 5),
     );
   });
 

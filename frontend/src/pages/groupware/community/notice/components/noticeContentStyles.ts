@@ -36,11 +36,34 @@ export const noticeContentStyles = {
   },
   '& th, & td': {
     minWidth: 0,
+    border: '1px solid #1f2937',
+    boxSizing: 'border-box',
+    position: 'relative',
     verticalAlign: 'top',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
   },
   '& th': {
     fontWeight: 700,
+  },
+  '& .tableWrapper': {
+    width: 'max-content',
+    maxWidth: '100%',
+    overflowX: 'auto',
+    margin: '8px 0',
+  },
+  '& .column-resize-handle': {
+    position: 'absolute',
+    top: 0,
+    right: -3,
+    bottom: 0,
+    width: 6,
+    zIndex: 10,
+    cursor: 'col-resize',
+    backgroundColor: 'rgba(37, 99, 235, 0.45)',
+    pointerEvents: 'none',
+  },
+  '& .ProseMirror.resize-cursor, &.resize-cursor': {
+    cursor: 'col-resize',
   },
 };

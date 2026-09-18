@@ -22,6 +22,7 @@ import type {
 import {
   NoticeComposerDialog,
   type NoticeComposerDraftAttachment,
+  type NoticeComposerEmbeddedImage,
 } from './components/NoticeComposerDialog';
 import { NoticeFeedList } from './components/NoticeFeedList';
 import { NoticeFilterBar } from './components/NoticeFilterBar';
@@ -51,6 +52,10 @@ import {
 } from '../../../../shared/services/commonContentApi';
 import type { CommonFileItem } from '../../../../shared/services/commonContentApi';
 import { sanitizeHtml } from '../../../../shared/utils/sanitizeHtml';
+import {
+  fetchCommonCodeGroups,
+  fetchCommonCodeItems,
+} from '../../../co/master/common-code/services/commonCodeManagement.service';
 
 type CommunityNoticePageProps = {
   selectedModule: ModuleItem;
@@ -189,24 +194,27 @@ const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
   const normalizedSummary = bodyText.replace(/\s+/g, ' ').trim();
   const summaryText = normalizedSummary || '공지 내용을 확인해 주세요.';
   const bodyHtml = editorHtml.trim();
-  const attachments = (post.attachments ?? []).map((attachment) => ({
-    id: String(
-      attachment.boardFileId ??
-        attachment.fileName ??
-        attachment.objectKey ??
-        Math.random(),
-    ),
-    name: attachment.fileName ?? '첨부파일',
-    size: Number(attachment.fileSize ?? 0) || undefined,
-    boardFileId: attachment.boardFileId,
-    objectKey: attachment.objectKey,
-    bucketName: attachment.bucketName,
-  }));
+  const attachments = (post.attachments ?? [])
+    .filter((attachment) => attachment.fileUsageType !== 'EMBEDDED')
+    .map((attachment) => ({
+      id: String(
+        attachment.boardFileId ??
+          attachment.fileName ??
+          attachment.objectKey ??
+          Math.random(),
+      ),
+      name: attachment.fileName ?? '첨부파일',
+      size: Number(attachment.fileSize ?? 0) || undefined,
+      boardFileId: attachment.boardFileId,
+      objectKey: attachment.objectKey,
+      bucketName: attachment.bucketName,
+    }));
   const comments = toNoticeCommentTree(post.comments ?? []);
 
   return {
     id: Number(post.postId ?? 0),
     title: post.title ?? '제목 없음',
+    noticeGubunCode: post.noticeGubunCode ?? undefined,
     meta: formatNoticeMeta(post),
     state: post.isNotice === 'Y' ? '중요 공지' : '공지',
     summary: summaryText,
@@ -241,13 +249,13 @@ const toNoticeAttachmentApi = (
   bucketName: attachment.bucketName,
 });
 
-const appendCommentToTree = (
+export const appendCommentToTree = (
   comments: NoticeCommentItem[] = [],
   parentCommentId: number | string | null | undefined,
   comment: NoticeCommentItem,
 ): NoticeCommentItem[] => {
   if (parentCommentId == null) {
-    return [comment, ...comments];
+    return [...comments, comment];
   }
 
   return comments.map((current) =>
@@ -413,10 +421,12 @@ export function CommunityNoticePage({
     id?: number;
     title: string;
     body: string;
+    noticeGubunCode?: string;
     attachments: NoticeComposerDraftAttachment[];
   }>({
     title: '',
     body: '',
+    noticeGubunCode: '',
     attachments: [],
   });
   const [noticeItems, setNoticeItems] = useState<NoticeFeedItem[]>([]);
@@ -424,6 +434,10 @@ export function CommunityNoticePage({
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [noticeGubunOptions, setNoticeGubunOptions] = useState<
+    Array<{ code: string; name: string }>
+  >([]);
+  const [selectedNoticeGubunCode, setSelectedNoticeGubunCode] = useState('');
 
   const loadNoticePosts = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -435,7 +449,12 @@ export function CommunityNoticePage({
       setErrorMessage(null);
 
       try {
-        const posts = await fetchNoticePosts(1, 20, '');
+        const posts = await fetchNoticePosts(
+          1,
+          20,
+          '',
+          selectedNoticeGubunCode,
+        );
         setNoticeItems(posts.map(toNoticeFeedItem));
         setServerItemRevision((revision) => revision + 1);
       } catch (error) {
@@ -451,8 +470,28 @@ export function CommunityNoticePage({
         }
       }
     },
-    [],
+    [selectedNoticeGubunCode],
   );
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const groups = await fetchCommonCodeGroups();
+        const group = groups.find((item) => item.groupCode === 'NOTICE_GUBUN');
+        if (!group) {
+          return;
+        }
+        const items = await fetchCommonCodeItems(group.id);
+        setNoticeGubunOptions(
+          items
+            .filter((item) => item.useAt === 'Y')
+            .map((item) => ({ code: item.itemCode, name: item.itemNm })),
+        );
+      } catch {
+        setNoticeGubunOptions([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     void loadNoticePosts();
@@ -463,15 +502,19 @@ export function CommunityNoticePage({
     body,
     bodyJson,
     bodyText,
+    noticeGubunCode,
     attachments,
     removedAttachmentIds,
+    embeddedImages,
   }: {
     title: string;
     body: string;
     bodyJson?: string;
     bodyText?: string;
+    noticeGubunCode?: string;
     attachments: NoticeComposerDraftAttachment[];
     removedAttachmentIds: Array<number | string>;
+    embeddedImages: NoticeComposerEmbeddedImage[];
   }) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
@@ -494,9 +537,9 @@ export function CommunityNoticePage({
           contentsHtml: safeHtml,
           contentsJson: safeJson,
           contentsText: safeText,
-          writerId: 'admin01',
-          writerName: '관리자',
+          noticeGubunCode,
           isNotice: 'Y',
+          embeddedImages,
         });
 
         const uploadableFiles = attachments
@@ -566,9 +609,9 @@ export function CommunityNoticePage({
           contentsHtml: safeHtml,
           contentsJson: safeJson,
           contentsText: safeText,
-          writerId: 'admin01',
-          writerName: '관리자',
+          noticeGubunCode,
           isNotice: 'Y',
+          embeddedImages,
         });
 
         const createdId = Number(created.postId ?? 0);
@@ -608,7 +651,12 @@ export function CommunityNoticePage({
       throw error;
     }
 
-    setEditorDraft({ title: '', body: '', attachments: [] });
+    setEditorDraft({
+      title: '',
+      body: '',
+      noticeGubunCode: '',
+      attachments: [],
+    });
     setIsComposerOpen(false);
     return updatedDraft;
   };
@@ -929,11 +977,13 @@ export function CommunityNoticePage({
         actionGroups={hasCreatePermission ? pageActionGroups : undefined}
       />
 
-      <NoticeFilterBar isDark={isDark} />
-      <PageMessageArea
-        message=""
-        onClose={() => setErrorMessage(null)}
+      <NoticeFilterBar
+        isDark={isDark}
+        filters={noticeGubunOptions}
+        selectedCode={selectedNoticeGubunCode}
+        onChange={setSelectedNoticeGubunCode}
       />
+      <PageMessageArea message="" onClose={() => setErrorMessage(null)} />
 
       <Box
         sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
@@ -1108,7 +1158,8 @@ export function CommunityNoticePage({
           ) : errorMessage && !isRefreshing && !hasVisibleNoticeList ? (
             <Box
               sx={{
-                minHeight: '100vh',
+                minHeight: '100%',
+                boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1195,6 +1246,7 @@ export function CommunityNoticePage({
                     id: item.id,
                     title: item.title,
                     body: item.bodyHtml ?? item.body,
+                    noticeGubunCode: item.noticeGubunCode,
                     attachments: mappedAttachments,
                   });
                   setIsComposerOpen(true);
@@ -1228,11 +1280,18 @@ export function CommunityNoticePage({
         open={isComposerOpen}
         isDark={isDark}
         onClose={() => {
-          setEditorDraft({ title: '', body: '', attachments: [] });
+          setEditorDraft({
+            title: '',
+            body: '',
+            noticeGubunCode: '',
+            attachments: [],
+          });
           setIsComposerOpen(false);
         }}
         onSubmit={handleCreateNotice}
         defaultTitle={editorDraft.title}
+        noticeGubunOptions={noticeGubunOptions}
+        defaultNoticeGubunCode={editorDraft.noticeGubunCode ?? ''}
         defaultBody={editorDraft.body}
         defaultAttachments={editorDraft.attachments}
       />

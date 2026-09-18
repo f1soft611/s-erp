@@ -3,6 +3,8 @@ const allowedTags = new Set([
   'blockquote',
   'br',
   'code',
+  'col',
+  'colgroup',
   'em',
   'h1',
   'h2',
@@ -12,13 +14,107 @@ const allowedTags = new Set([
   'h6',
   'li',
   'ol',
+  'img',
   'p',
   'pre',
   'strong',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
   'ul',
 ]);
 
-const allowedAttributes = new Set(['aria-label', 'href', 'rel', 'target']);
+const allowedAttributes = new Set([
+  'aria-label',
+  'colspan',
+  'colwidth',
+  'height',
+  'href',
+  'alt',
+  'data-file-id',
+  'data-upload-token',
+  'data-upload-state',
+  'rel',
+  'src',
+  'rowspan',
+  'style',
+  'target',
+  'width',
+]);
+
+const allowedStyleProperties = new Set([
+  'background',
+  'background-color',
+  'border',
+  'border-bottom',
+  'border-left',
+  'border-right',
+  'border-top',
+  'color',
+  'font-weight',
+  'height',
+  'min-width',
+  'text-align',
+  'vertical-align',
+  'width',
+]);
+
+function sanitizeStyle(value: string): string {
+  return value
+    .split(';')
+    .map((declaration) => declaration.split(':'))
+    .filter(([property, declarationValue]) => property && declarationValue)
+    .map(([property, declarationValue]) => [
+      property.trim().toLowerCase(),
+      declarationValue.trim(),
+    ])
+    .filter(
+      ([property, declarationValue]) =>
+        allowedStyleProperties.has(property) &&
+        !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(
+          declarationValue,
+        ),
+    )
+    .map(([property, declarationValue]) => `${property}:${declarationValue}`)
+    .join(';');
+}
+
+function appendStyleProperty(
+  element: HTMLElement,
+  property: string,
+  value: string,
+): void {
+  const existing = element.getAttribute('style')?.trim() ?? '';
+  const declarations = existing ? `${existing};` : '';
+  element.setAttribute('style', `${declarations}${property}:${value}`);
+}
+
+function applyColwidthStyle(element: HTMLElement): void {
+  if (!['td', 'th'].includes(element.tagName.toLowerCase())) {
+    return;
+  }
+
+  if (element.style.width) {
+    return;
+  }
+
+  const widths = (element.getAttribute('colwidth') ?? '')
+    .split(',')
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const width = widths.reduce((total, value) => total + value, 0);
+  if (width > 0) {
+    appendStyleProperty(element, 'width', `${Math.round(width)}px`);
+  }
+}
+
+function sanitizeImageDimension(value: string): string | null {
+  const normalized = value.trim();
+  return /^(?:\d+(?:\.\d+)?)(?:px|%)$/.test(normalized) ? normalized : null;
+}
 
 function isSafeUrl(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -65,8 +161,41 @@ export function sanitizeHtml(value: string): string {
         (isUrl && !isSafeUrl(attribute.value))
       ) {
         element.removeAttribute(attribute.name);
+        return;
+      }
+
+      if (name === 'style') {
+        if (
+          !['td', 'th', 'col', 'colgroup'].includes(
+            element.tagName.toLowerCase(),
+          )
+        ) {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+
+        const safeStyle = sanitizeStyle(attribute.value);
+        if (safeStyle) {
+          element.setAttribute('style', safeStyle);
+        } else {
+          element.removeAttribute('style');
+        }
       }
     });
+
+    applyColwidthStyle(element);
+
+    if (element.tagName.toLowerCase() === 'img') {
+      for (const attributeName of ['width', 'height']) {
+        const value = element.getAttribute(attributeName);
+        const safeValue = value ? sanitizeImageDimension(value) : null;
+        if (safeValue) {
+          element.setAttribute(attributeName, safeValue);
+        } else if (value) {
+          element.removeAttribute(attributeName);
+        }
+      }
+    }
 
     if (element.tagName.toLowerCase() === 'a') {
       element.setAttribute('rel', 'noopener noreferrer');

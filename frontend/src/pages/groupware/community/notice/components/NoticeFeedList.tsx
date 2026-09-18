@@ -145,6 +145,39 @@ function collectCommentIds(comments: NoticeCommentItem[]): Set<string> {
   return ids;
 }
 
+export type NoticeEmbeddedImagePreview = {
+  src: string;
+  alt: string;
+};
+
+export function extractNoticeEmbeddedImagePreviews(
+  html: string,
+): NoticeEmbeddedImagePreview[] {
+  if (typeof DOMParser === 'undefined') {
+    return Array.from(
+      html.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi),
+    ).map((match) => ({ src: match[1], alt: '본문 이미지' }));
+  }
+
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  return Array.from(document.querySelectorAll('img'))
+    .map((image) => ({
+      src: image.getAttribute('src') ?? '',
+      alt: image.getAttribute('alt') || '본문 이미지',
+    }))
+    .filter((image) => image.src);
+}
+
+export function removeNoticeEmbeddedImages(html: string): string {
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<img\b[^>]*>/gi, '');
+  }
+
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  document.querySelectorAll('img').forEach((image) => image.remove());
+  return document.body.innerHTML;
+}
+
 export function NoticeFeedList({
   items,
   isDark,
@@ -318,17 +351,25 @@ export function NoticeFeedList({
         const displayBody = isExpanded ? item.body : item.summary;
         const previewHtml = item.bodyHtml ?? item.body;
         const hasRichHtml = /<[^>]+>/.test(previewHtml);
+        const embeddedImagePreviews = extractNoticeEmbeddedImagePreviews(
+          sanitizeHtml(previewHtml),
+        );
+        const collapsedPreviewHtml = removeNoticeEmbeddedImages(
+          sanitizeHtml(previewHtml),
+        );
         const itemComments =
           localCommentsByNoticeId[item.id] ?? item.comments ?? [];
-        const visibleComments = loadedPreviousByNoticeId[item.id]
-          ? itemComments
-          : itemComments.slice(0, 3);
+        const visibleComments =
+          loadedPreviousByNoticeId[item.id] || itemComments.length <= 3
+            ? itemComments
+            : itemComments.slice(-3);
         const hasAtLeastThreeComments = countComments(itemComments) >= 3;
         const canLoadPrevious =
           hasAtLeastThreeComments &&
           !exhaustedPreviousByNoticeId[item.id] &&
           (item.hasPreviousComments === true ||
-            item.commentCount > countComments(visibleComments));
+            item.commentCount > countComments(visibleComments) ||
+            countComments(itemComments) === 3);
         const attachmentFiles =
           item.attachmentDetails ??
           ((item.attachments ?? []).map((name, index) => ({
@@ -483,7 +524,9 @@ export function NoticeFeedList({
                     '& br': { display: 'inline' },
                   }}
                   dangerouslySetInnerHTML={{
-                    __html: sanitizeHtml(previewHtml),
+                    __html: isExpanded
+                      ? sanitizeHtml(previewHtml)
+                      : collapsedPreviewHtml,
                   }}
                 />
               ) : (
@@ -525,9 +568,55 @@ export function NoticeFeedList({
                 </Button>
               )}
 
+              {!isExpanded && embeddedImagePreviews.length > 0 && (
+                <Box
+                  data-testid={`notice-embedded-image-preview-${item.id}`}
+                  sx={{
+                    display: 'flex',
+                    gap: 1,
+                    mb: 1.5,
+                    overflowX: 'auto',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {embeddedImagePreviews.map((image, index) => (
+                    <Box
+                      component="img"
+                      key={`${image.src}-${index}`}
+                      src={image.src}
+                      alt={image.alt}
+                      sx={{
+                        width: 112,
+                        height: 76,
+                        flex: '0 0 auto',
+                        objectFit: 'cover',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: isDark
+                          ? 'rgba(148,163,184,0.24)'
+                          : 'rgba(148,163,184,0.3)',
+                        bgcolor: isDark ? 'rgba(15,23,42,0.7)' : '#f8fafc',
+                      }}
+                      onError={(event) => {
+                        const fallback = document.createElement('span');
+                        fallback.textContent = '이미지를 불러올 수 없습니다.';
+                        fallback.style.display = 'inline-flex';
+                        fallback.style.alignItems = 'center';
+                        fallback.style.justifyContent = 'center';
+                        fallback.style.width = '112px';
+                        fallback.style.height = '76px';
+                        fallback.style.fontSize = '0.72rem';
+                        fallback.style.color = isDark ? '#cbd5e1' : '#64748b';
+                        event.currentTarget.replaceWith(fallback);
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
               {attachmentFiles.length > 0 && (
-                <Box sx={{ mt: 1.5 }}>
-                  <Divider sx={{ my: 1.5 }} />
+                <Box>
+                  {/* <Divider sx={{ my: 1.5 }} /> */}
                   <AttachmentList
                     files={attachmentFiles.map((attachment) => ({
                       id: String(attachment.id),

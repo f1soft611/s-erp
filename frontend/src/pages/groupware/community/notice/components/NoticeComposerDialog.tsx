@@ -6,6 +6,7 @@ import {
   DialogActions,
   DialogContent,
   IconButton,
+  MenuItem,
   TextField,
   Typography,
 } from '@mui/material';
@@ -22,6 +23,7 @@ import FormatQuoteOutlinedIcon from '@mui/icons-material/FormatQuoteOutlined';
 import RedoOutlinedIcon from '@mui/icons-material/RedoOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
+import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import {
@@ -31,6 +33,7 @@ import {
   TableRow,
 } from '@tiptap/extension-table';
 import { noticeContentStyles } from './noticeContentStyles';
+import { uploadNoticeEmbeddedImage } from '../services/noticeBoardService';
 
 export type NoticeComposerDraftAttachment = {
   id: string;
@@ -43,19 +46,34 @@ export type NoticeComposerDraftAttachment = {
   bucketName?: string | null;
 };
 
+export type NoticeComposerEmbeddedImage = {
+  uploadToken: string;
+  fileId?: number | string | null;
+  objectKey: string;
+  imageUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number | string | null;
+};
+
 type NoticeComposerDialogProps = {
   open: boolean;
   isDark: boolean;
   onClose: () => void;
   onSubmit?: (payload: {
     title: string;
+    noticeGubunCode: string;
     body: string;
     bodyJson?: string;
     bodyText?: string;
     attachments: NoticeComposerDraftAttachment[];
     removedAttachmentIds: Array<number | string>;
+    embeddedImages: NoticeComposerEmbeddedImage[];
   }) => Promise<unknown> | unknown;
   defaultTitle?: string;
+  noticeGubunOptions?: Array<{ code: string; name: string }>;
+  defaultNoticeGubunCode?: string;
   defaultBody?: string;
   defaultAttachments?: NoticeComposerDraftAttachment[];
 };
@@ -110,6 +128,11 @@ function normalizeCellDimension(value: string | null): string | null {
   )
     ? normalized
     : null;
+}
+
+function normalizeImageDimension(value: string | null): string | null {
+  const normalized = value?.trim() ?? '';
+  return /^(?:\d+(?:\.\d+)?)(?:px|%)$/.test(normalized) ? normalized : null;
 }
 
 function sanitizeCellStyle(cell: Element): string | null {
@@ -269,6 +292,164 @@ const StyledTableHeader = TableHeader.extend({
   },
 });
 
+const NoticeImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      'data-upload-token': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-upload-token'),
+        renderHTML: (attributes: { 'data-upload-token'?: string | null }) =>
+          attributes['data-upload-token']
+            ? { 'data-upload-token': attributes['data-upload-token'] }
+            : {},
+      },
+      'data-upload-state': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-upload-state'),
+        renderHTML: (attributes: { 'data-upload-state'?: string | null }) =>
+          attributes['data-upload-state']
+            ? { 'data-upload-state': attributes['data-upload-state'] }
+            : {},
+      },
+      'data-file-id': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-file-id'),
+        renderHTML: (attributes: { 'data-file-id'?: string | null }) =>
+          attributes['data-file-id']
+            ? { 'data-file-id': attributes['data-file-id'] }
+            : {},
+      },
+      'data-object-key': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-object-key'),
+        renderHTML: (attributes: { 'data-object-key'?: string | null }) =>
+          attributes['data-object-key']
+            ? { 'data-object-key': attributes['data-object-key'] }
+            : {},
+      },
+      'data-file-size': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-file-size'),
+        renderHTML: (attributes: {
+          'data-file-size'?: number | string | null;
+        }) =>
+          attributes['data-file-size'] != null
+            ? { 'data-file-size': String(attributes['data-file-size']) }
+            : {},
+      },
+      'data-mime-type': {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-mime-type'),
+        renderHTML: (attributes: { 'data-mime-type'?: string | null }) =>
+          attributes['data-mime-type']
+            ? { 'data-mime-type': attributes['data-mime-type'] }
+            : {},
+      },
+    };
+  },
+}).configure({
+  resize: {
+    enabled: true,
+    minWidth: 120,
+    minHeight: 80,
+    alwaysPreserveAspectRatio: true,
+  },
+});
+
+function findEmbeddedImagePosition(
+  editor: Editor,
+  uploadToken: string,
+): number {
+  let position = -1;
+  editor.state.doc.descendants((node, nodePosition) => {
+    if (
+      node.type.name === 'image' &&
+      node.attrs['data-upload-token'] === uploadToken
+    ) {
+      position = nodePosition;
+      return false;
+    }
+    return true;
+  });
+  return position;
+}
+
+function updateEmbeddedImageNode(
+  editor: Editor,
+  uploadToken: string,
+  uploaded: {
+    imageUrl: string;
+    fileName: string;
+    fileId?: number | string | null;
+    objectKey: string;
+    fileSize: number;
+    mimeType: string;
+  },
+): void {
+  const position = findEmbeddedImagePosition(editor, uploadToken);
+  if (position < 0) {
+    return;
+  }
+
+  editor
+    .chain()
+    .setNodeSelection(position)
+    .updateAttributes('image', {
+      src: uploaded.imageUrl,
+      alt: uploaded.fileName,
+      'data-file-id': uploaded.fileId == null ? null : String(uploaded.fileId),
+      'data-object-key': uploaded.objectKey,
+      'data-file-size': String(uploaded.fileSize),
+      'data-mime-type': uploaded.mimeType,
+      'data-upload-token': uploadToken,
+      'data-upload-state': null,
+    })
+    .run();
+}
+
+export function collectNoticeEmbeddedImages(
+  editor: { state: Editor['state'] } | null | undefined,
+): NoticeComposerEmbeddedImage[] {
+  if (!editor) {
+    return [];
+  }
+
+  const images: NoticeComposerEmbeddedImage[] = [];
+  editor.state.doc.descendants((node) => {
+    if (node.type.name !== 'image' || !node.attrs['data-upload-token']) {
+      return true;
+    }
+    images.push({
+      uploadToken: String(node.attrs['data-upload-token']),
+      fileId: node.attrs['data-file-id'] ?? null,
+      objectKey: String(node.attrs['data-object-key'] ?? ''),
+      imageUrl: String(node.attrs.src ?? ''),
+      fileName: String(node.attrs.alt ?? 'pasted-image'),
+      fileSize: Number(node.attrs['data-file-size'] ?? 0) || 0,
+      mimeType: String(node.attrs['data-mime-type'] ?? ''),
+      width: node.attrs.width ?? null,
+    });
+    return true;
+  });
+  return images;
+}
+
+function removeEmbeddedImageNode(editor: Editor, uploadToken: string): void {
+  const position = findEmbeddedImagePosition(editor, uploadToken);
+  if (position < 0) {
+    return;
+  }
+
+  editor.chain().setNodeSelection(position).deleteSelection().run();
+}
+
 export function normalizeClipboardHtmlForEditor(
   rawHtml: string | null | undefined,
 ): string {
@@ -284,6 +465,27 @@ export function normalizeClipboardHtmlForEditor(
   root
     .querySelectorAll('script,style,iframe,svg,object,embed,form,meta,link')
     .forEach((node) => node.remove());
+
+  root.querySelectorAll('img').forEach((image) => {
+    const src = image.getAttribute('src')?.trim() ?? '';
+    if (!/^(?:https?:|\/)(?!\/)/i.test(src) && !/^https?:\/\//i.test(src)) {
+      image.remove();
+      return;
+    }
+    Array.from(image.attributes).forEach((attribute) => {
+      if (
+        !['src', 'alt', 'title', 'width', 'height'].includes(attribute.name)
+      ) {
+        image.removeAttribute(attribute.name);
+      }
+    });
+    const width = normalizeImageDimension(image.getAttribute('width'));
+    const height = normalizeImageDimension(image.getAttribute('height'));
+    if (width) image.setAttribute('width', width);
+    else image.removeAttribute('width');
+    if (height) image.setAttribute('height', height);
+    else image.removeAttribute('height');
+  });
 
   const tableRows = Array.from(root.querySelectorAll('tr'));
   if (tableRows.length > 0) {
@@ -373,6 +575,48 @@ function normalizeClipboardTextForEditor(rawText: string): string {
     .replace(/\t/g, ' | ');
 }
 
+function autoSizeActiveTableCell(editor: Editor): void {
+  const { $from } = editor.state.selection;
+  let cellElement: HTMLElement | null = null;
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') {
+      continue;
+    }
+
+    cellElement = editor.view.nodeDOM(
+      $from.before(depth),
+    ) as HTMLElement | null;
+    break;
+  }
+
+  if (!cellElement) {
+    return;
+  }
+
+  const computedStyle = window.getComputedStyle(cellElement);
+  const measurement = document.createElement('span');
+  measurement.textContent = cellElement.textContent ?? '';
+  measurement.style.position = 'absolute';
+  measurement.style.visibility = 'hidden';
+  measurement.style.whiteSpace = 'nowrap';
+  measurement.style.font = computedStyle.font;
+  measurement.style.letterSpacing = computedStyle.letterSpacing;
+  measurement.style.paddingLeft = computedStyle.paddingLeft;
+  measurement.style.paddingRight = computedStyle.paddingRight;
+  document.body.appendChild(measurement);
+  const measuredWidth = Math.ceil(measurement.getBoundingClientRect().width);
+  measurement.remove();
+
+  const currentWidth = cellElement.getBoundingClientRect().width;
+  if (measuredWidth <= currentWidth + 1) {
+    return;
+  }
+
+  editor.commands.setCellAttribute('colwidth', [measuredWidth]);
+}
+
 const emptyNoticeContent = '<p></p>';
 
 function getFileIconMeta(fileName: string) {
@@ -401,6 +645,8 @@ export function NoticeComposerDialog({
   onClose,
   onSubmit,
   defaultTitle = '',
+  noticeGubunOptions = [],
+  defaultNoticeGubunCode = '',
   defaultBody,
   defaultAttachments = [],
 }: NoticeComposerDialogProps) {
@@ -420,8 +666,12 @@ export function NoticeComposerDialog({
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('noticePasteDebug') === '1';
   const [title, setTitle] = useState(defaultTitle);
+  const [noticeGubunCode, setNoticeGubunCode] = useState(
+    defaultNoticeGubunCode,
+  );
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [pasteDebugLog, setPasteDebugLog] = useState<string[]>(() =>
     pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
   );
@@ -432,7 +682,14 @@ export function NoticeComposerDialog({
     () => ({
       extensions: [
         StarterKit,
-        Table.configure({ resizable: false }),
+        NoticeImage,
+        Table.configure({
+          resizable: true,
+          handleWidth: 6,
+          cellMinWidth: 40,
+          lastColumnResizable: true,
+          renderWrapper: true,
+        }),
         TableRow,
         StyledTableHeader,
         StyledTableCell,
@@ -454,6 +711,51 @@ export function NoticeComposerDialog({
           style: `background-color: ${editorSurfaceBackground}; outline: none; line-height: 1.7;`,
         },
         handlePaste: (_view: unknown, event: ClipboardEvent) => {
+          const imageFiles = Array.from(event.clipboardData?.items ?? [])
+            .filter(
+              (item) => item.kind === 'file' && item.type.startsWith('image/'),
+            )
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => Boolean(file));
+
+          if (imageFiles.length > 0) {
+            event.preventDefault();
+            const activeEditor = editorRef.current;
+            if (!activeEditor) {
+              return true;
+            }
+
+            void (async () => {
+              for (const file of imageFiles) {
+                const placeholderSrc = URL.createObjectURL(file);
+                const uploadToken = `local-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .slice(2)}`;
+                activeEditor
+                  .chain()
+                  .focus()
+                  .setImage({ src: placeholderSrc, alt: '이미지 업로드 중' })
+                  .updateAttributes('image', {
+                    'data-upload-token': uploadToken,
+                    'data-upload-state': 'uploading',
+                  })
+                  .run();
+
+                try {
+                  const uploaded = await uploadNoticeEmbeddedImage(file);
+                  updateEmbeddedImageNode(activeEditor, uploadToken, uploaded);
+                  setImageUploadError(null);
+                } catch {
+                  removeEmbeddedImageNode(activeEditor, uploadToken);
+                  setImageUploadError('본문 이미지 업로드에 실패했습니다.');
+                } finally {
+                  URL.revokeObjectURL(placeholderSrc);
+                }
+              }
+            })();
+            return true;
+          }
+
           if (pasteDebugEnabled) {
             const data = event.clipboardData;
             const html = data?.getData('text/html') ?? '';
@@ -488,6 +790,9 @@ export function NoticeComposerDialog({
         transformPastedText: (text: string) =>
           normalizeClipboardTextForEditor(text),
       },
+      onUpdate: ({ editor }: { editor: Editor }) => {
+        autoSizeActiveTableCell(editor);
+      },
     }),
     [defaultBody, editorSurfaceBackground, pasteDebugEnabled],
   );
@@ -504,7 +809,9 @@ export function NoticeComposerDialog({
     }
 
     setTitle(defaultTitle);
+    setNoticeGubunCode(defaultNoticeGubunCode);
     setAttachments(defaultAttachments);
+    setImageUploadError(null);
     setPasteDebugLog(
       pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
     );
@@ -643,11 +950,13 @@ export function NoticeComposerDialog({
       try {
         await onSubmit({
           title,
+          noticeGubunCode,
           body,
           bodyJson: serializeNoticeEditorJson(editor),
           bodyText,
           attachments,
           removedAttachmentIds,
+          embeddedImages: collectNoticeEmbeddedImages(editor),
         });
       } catch {
         return;
@@ -763,6 +1072,21 @@ export function NoticeComposerDialog({
               height: '100%',
             }}
           >
+            <TextField
+              select
+              label="구분"
+              value={noticeGubunCode}
+              onChange={(event) => setNoticeGubunCode(event.target.value)}
+              required
+              disabled={noticeGubunOptions.length === 0}
+              sx={{ mb: 1 }}
+            >
+              {noticeGubunOptions.map((option) => (
+                <MenuItem key={option.code} value={option.code}>
+                  {option.name}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -885,6 +1209,15 @@ export function NoticeComposerDialog({
                     editor={editor}
                     className="notice-composer-editor"
                   />
+                  {imageUploadError && (
+                    <Typography
+                      role="alert"
+                      variant="caption"
+                      sx={{ px: 2, pb: 1, color: 'error.main' }}
+                    >
+                      {imageUploadError}
+                    </Typography>
+                  )}
                 </Box>
 
                 {attachments.length > 0 && (
