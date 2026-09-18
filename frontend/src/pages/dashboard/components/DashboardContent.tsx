@@ -15,7 +15,6 @@ import { OverviewPage } from '../../groupware/OverviewPage';
 import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
-import { WarehouseManagementPage } from '../../settings/system/warehouses/WarehouseManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
