@@ -52,11 +52,18 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
 
     @Override
     public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception {
+        return listPosts(tenantId, keyword, page, size, noticeGubunCode, null);
+        }
+
+        @Override
+        public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
+            String noticeGubunCode, String isNotice) throws Exception {
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("keyword", StringUtils.hasText(keyword) ? keyword.trim() : null);
         params.put("noticeGubunCode", StringUtils.hasText(noticeGubunCode) ? noticeGubunCode.trim() : null);
+        params.put("isNotice", StringUtils.hasText(isNotice) ? isNotice.trim().toUpperCase() : null);
         params.put("offset", Math.max((page - 1) * size, 0));
         params.put("size", size);
         List<NoticeBoardPostVO> posts = noticeBoardDAO.selectNoticePostList(params);
@@ -92,6 +99,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             }
         }
         HashMap<String, Object> boardFileParams = new HashMap<>();
+        boardFileParams.put("tenantId", tenantId);
         boardFileParams.put("postId", postId);
         List<NoticeBoardFileVO> embeddedFiles = noticeBoardDAO.selectNoticeAttachmentList(boardFileParams);
         if (embeddedFiles != null) {
@@ -225,6 +233,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             }
             HashMap<String, Object> params = new HashMap<>();
             params.put("postId", postId);
+            params.put("tenantId", tenantId);
             params.put("fileName", image.getFileName());
             params.put("filePath", "minio://" + image.getBucketName() + "/" + image.getObjectKey());
             params.put("objectKey", image.getObjectKey());
@@ -302,7 +311,8 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         target.setFileSize(source.getFileSize());
         target.setMimeType(source.getMimeType());
         target.setContentType(source.getContentType());
-        target.setFileUsageType("ATTACHMENT");
+        target.setFileUsageType(StringUtils.hasText(source.getFileUsageType())
+            ? source.getFileUsageType() : "ATTACHMENT");
         target.setDeletedYn(source.getDeletedYn());
         target.setUploadedBy(source.getUploadedBy());
         target.setCreatedAt(source.getCreatedAt());

@@ -18,6 +18,7 @@ export type NoticeFeedItem = {
   title: string;
   noticeGubunCode?: string;
   noticeGubunName?: string;
+  isNotice?: string;
   meta: string;
   state: string;
   summary: string;

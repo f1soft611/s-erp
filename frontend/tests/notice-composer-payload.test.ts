@@ -10,6 +10,44 @@ import {
 } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
 
 describe('NoticeComposerDialog payload', () => {
+  it('saves the important notice checkbox as isNotice', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    const importantCheckbox = screen.getByRole('checkbox', {
+      name: '중요 공지',
+    });
+    expect(importantCheckbox).not.toBeChecked();
+    fireEvent.click(importantCheckbox);
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '중요 공지' },
+    });
+    fireEvent.input(screen.getByRole('textbox', { name: '본문' }), {
+      target: { innerHTML: '<p>본문</p>' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ isNotice: 'Y' }),
+      );
+    });
+  });
+
   it('serializes the editor JSON returned by Tiptap', () => {
     const json = {
       type: 'doc',

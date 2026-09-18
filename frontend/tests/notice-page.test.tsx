@@ -79,6 +79,95 @@ describe('Community notice page', () => {
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
   });
 
+  it('does not render duplicate comment keys when the API repeats a comment', () => {
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 2, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 2,
+                author: '중복 댓글',
+                time: '오늘',
+                content: '중복 댓글',
+              },
+            ],
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+      />,
+    );
+
+    const duplicateKeyWarning = errorSpy.mock.calls.some((call) =>
+      call.some((argument) =>
+        String(argument).includes('Encountered two children with the same key'),
+      ),
+    );
+    expect(duplicateKeyWarning).toBe(false);
+
+    errorSpy.mockRestore();
+  });
+
+  it('does not render duplicate keys when nested replies share an ID', () => {
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              {
+                id: 1,
+                author: '원댓글',
+                time: '오늘',
+                content: '원댓글',
+                replies: [
+                  {
+                    id: 4,
+                    author: '첫 답글',
+                    time: '오늘',
+                    content: '첫 답글',
+                    replies: [
+                      {
+                        id: 4,
+                        author: '중복 답글',
+                        time: '오늘',
+                        content: '중복 답글',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /답글 1개/i }));
+
+    const duplicateKeyWarning = errorSpy.mock.calls.some((call) =>
+      call.some((argument) =>
+        String(argument).includes('Encountered two children with the same key'),
+      ),
+    );
+    expect(duplicateKeyWarning).toBe(false);
+
+    errorSpy.mockRestore();
+  });
+
   it('opens a composer with title, body, toolbar, and attachment area', async () => {
     render(
       <DashboardContent

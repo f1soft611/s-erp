@@ -15,6 +15,7 @@
         <result property="fileSize" column="file_size"/>
         <result property="mimeType" column="mime_type"/>
         <result property="contentType" column="content_type"/>
+        <result property="fileUsageType" column="file_usage_type"/>
         <result property="uploadedBy" column="uploaded_by"/>
         <result property="deletedYn" column="deleted_yn"/>
         <result property="createdAt" column="created_at"/>
@@ -35,6 +36,7 @@
             file_size,
             mime_type,
             content_type,
+            file_usage_type,
             uploaded_by,
             deleted_yn,
             created_at,
@@ -61,6 +63,7 @@
             file_size,
             mime_type,
             content_type,
+            file_usage_type,
             uploaded_by,
             deleted_yn,
             created_at,
@@ -85,6 +88,7 @@
             file_size,
             mime_type,
             content_type,
+            file_usage_type,
             uploaded_by,
             deleted_yn,
             created_at,
@@ -111,6 +115,7 @@
             mime_type,
             checksum_sha256,
             content_type,
+            file_usage_type,
             uploaded_by,
             deleted_yn,
             created_at,
@@ -128,6 +133,7 @@
             #{mimeType},
             #{checksumSha256},
             #{contentType},
+            COALESCE(#{fileUsageType}, 'ATTACHMENT'),
             #{uploadedBy},
             #{deletedYn},
             CURRENT_TIMESTAMP,

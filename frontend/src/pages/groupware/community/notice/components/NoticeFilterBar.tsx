@@ -3,7 +3,7 @@ import FilterListOutlined from '@mui/icons-material/FilterListOutlined';
 
 type NoticeFilterBarProps = {
   isDark: boolean;
-  filters: Array<{ code: string; name: string }>;
+  filters: Array<{ code: string; name: string; isImportant?: boolean }>;
   selectedCode: string;
   onChange: (code: string) => void;
 };
@@ -68,20 +68,18 @@ export function NoticeFilterBar({
             color={selectedCode === filter.code ? 'primary' : 'default'}
             sx={{
               borderRadius: 999,
-              bgcolor:
-                filter.code === 'IMPORTANT'
-                  ? isDark
-                    ? 'rgba(251, 191, 36, 0.18)'
-                    : '#fef3c7'
-                  : isDark
-                    ? 'rgba(15, 23, 42, 0.9)'
-                    : '#f1f5f9',
-              color:
-                filter.code === 'IMPORTANT'
-                  ? '#fbbf24'
-                  : isDark
-                    ? '#e2e8f0'
-                    : 'text.primary',
+              bgcolor: filter.isImportant
+                ? isDark
+                  ? 'rgba(251, 191, 36, 0.18)'
+                  : '#fef3c7'
+                : isDark
+                  ? 'rgba(15, 23, 42, 0.9)'
+                  : '#f1f5f9',
+              color: filter.isImportant
+                ? '#fbbf24'
+                : isDark
+                  ? '#e2e8f0'
+                  : 'text.primary',
               fontWeight: 700,
               border: `1px solid ${
                 isDark ? 'rgba(148,163,184,0.28)' : 'rgba(148,163,184,0.18)'

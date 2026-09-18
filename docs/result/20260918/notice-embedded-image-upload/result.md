@@ -54,3 +54,10 @@
 - 사양 준수: 집중 기능 범위 통과
 - 코드 품질: Critical/Important 지적 반영 후 집중 테스트·빌드·브라우저 재검증 통과
 - 보류 항목: 임시 객체 TTL 및 영속 token 소유권 정책
+
+## 후속 장애 수정
+
+- 증상: Spring 시작 시 `storage.embeddedImageMaxFileSize`를 `long`으로 변환하지 못함.
+- 원인: `NoticeEmbeddedImageServiceImpl` 생성자 `@Value` 중첩 placeholder의 닫는 `}` 누락.
+- 조치: `${storage.embeddedImageMaxFileSize:${STORAGE_EMBEDDED_IMAGE_MAX_FILE_SIZE:10485760}}`로 수정.
+- 검증: `NoticeEmbeddedImageServiceImplTest`, `NoticeBoardServiceImplTest` 9건 통과 및 정적 진단 오류 없음.

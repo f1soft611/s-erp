@@ -271,25 +271,26 @@
 
 ### 2-16. tb_common_file
 
-| 컬럼             | 타입      | 설명                                                |
-| ---------------- | --------- | --------------------------------------------------- |
-| file_id          | bigint    | 공통 첨부 파일 PK                                   |
-| tenant_id        | bigint    | 소속 테넌트                                         |
-| owner_type       | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`, `FEED`) |
-| owner_id         | bigint    | 소유 객체 PK                                        |
-| file_name        | varchar   | 원본 파일명                                         |
-| file_path        | varchar   | 파일 경로/URL                                       |
-| object_key       | varchar   | MinIO object key                                    |
-| bucket_name      | varchar   | MinIO 버킷명                                        |
-| storage_provider | varchar   | 저장소 타입 (`minio`)                               |
-| file_size        | bigint    | 파일 크기                                           |
-| mime_type        | varchar   | MIME 타입                                           |
-| checksum_sha256  | varchar   | 파일 SHA-256 해시                                   |
-| content_type     | varchar   | 파일 content type                                   |
-| uploaded_by      | varchar   | 업로더 ID                                           |
-| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)                                 |
-| created_at       | timestamp | 생성 일시                                           |
-| updated_at       | timestamp | 수정 일시                                           |
+| 컬럼             | 타입      | 설명                                                       |
+| ---------------- | --------- | ---------------------------------------------------------- |
+| file_id          | bigint    | 공통 첨부 파일 PK                                          |
+| tenant_id        | bigint    | 소속 테넌트                                                |
+| owner_type       | varchar   | 소유자 타입 (`NOTICE`, `BOARD`, `APPROVAL`, `FEED`)        |
+| owner_id         | bigint    | 소유 객체 PK                                               |
+| file_name        | varchar   | 원본 파일명                                                |
+| file_path        | varchar   | 파일 경로/URL                                              |
+| object_key       | varchar   | MinIO object key                                           |
+| bucket_name      | varchar   | MinIO 버킷명                                               |
+| storage_provider | varchar   | 저장소 타입 (`minio`)                                      |
+| file_size        | bigint    | 파일 크기                                                  |
+| mime_type        | varchar   | MIME 타입                                                  |
+| checksum_sha256  | varchar   | 파일 SHA-256 해시                                          |
+| content_type     | varchar   | 파일 content type                                          |
+| file_usage_type  | varchar   | 파일 용도 (`ATTACHMENT` 일반 첨부, `EMBEDDED` 본문 이미지) |
+| uploaded_by      | varchar   | 업로더 ID                                                  |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)                                        |
+| created_at       | timestamp | 생성 일시                                                  |
+| updated_at       | timestamp | 수정 일시                                                  |
 
 역할:
 
@@ -372,24 +373,23 @@
 
 ### 2-18. tb_board_file
 
-| 컬럼             | 타입      | 설명                                                       |
-| ---------------- | --------- | ---------------------------------------------------------- |
-| board_file_id    | bigint    | 첨부 PK                                                    |
-| post_id          | bigint    | 게시글 FK                                                  |
-| file_name        | varchar   | 원본 파일명                                                |
-| file_path        | varchar   | legacy 저장 경로(호환용)                                   |
-| file_size        | bigint    | 파일 크기                                                  |
-| mime_type        | varchar   | MIME 타입                                                  |
-| object_key       | varchar   | MinIO object key                                           |
-| bucket_name      | varchar   | MinIO 버킷명                                               |
-| storage_provider | varchar   | 저장소 타입 (`minio`)                                      |
-| checksum_sha256  | varchar   | 파일 해시                                                  |
-| content_type     | varchar   | 파일 컨텐츠 타입                                           |
-| uploaded_by      | varchar   | 업로더 ID                                                  |
-| file_usage_type  | varchar   | 파일 용도 (`ATTACHMENT` 일반 첨부, `EMBEDDED` 본문 이미지) |
-| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)                                        |
-| created_at       | timestamp | 생성 일시                                                  |
-| updated_at       | timestamp | 수정 일시                                                  |
+| 컬럼             | 타입      | 설명                     |
+| ---------------- | --------- | ------------------------ |
+| board_file_id    | bigint    | 첨부 PK                  |
+| post_id          | bigint    | 게시글 FK                |
+| file_name        | varchar   | 원본 파일명              |
+| file_path        | varchar   | legacy 저장 경로(호환용) |
+| file_size        | bigint    | 파일 크기                |
+| mime_type        | varchar   | MIME 타입                |
+| object_key       | varchar   | MinIO object key         |
+| bucket_name      | varchar   | MinIO 버킷명             |
+| storage_provider | varchar   | 저장소 타입 (`minio`)    |
+| checksum_sha256  | varchar   | 파일 해시                |
+| content_type     | varchar   | 파일 컨텐츠 타입         |
+| uploaded_by      | varchar   | 업로더 ID                |
+| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)      |
+| created_at       | timestamp | 생성 일시                |
+| updated_at       | timestamp | 수정 일시                |
 
 역할:
 
@@ -401,7 +401,7 @@
 ## 변경 이력
 
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
-- 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_board_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
+- 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 구분 코드와 게시글/댓글 최신 행위자 감사 컬럼을 추가했다. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.

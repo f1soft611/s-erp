@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,24 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 
 class NoticeBoardServiceImplTest {
+
+    @Test
+    void listPostsPassesImportantNoticeFilterToDao() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenAnswer(invocation -> {
+                Map<String, Object> params = invocation.getArgument(0);
+                assertThat(params.get("isNotice")).isEqualTo("Y");
+                return Collections.emptyList();
+            });
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(1L, "", 1, 20, null, "Y");
+    }
 
     @Test
     void createPostUsesAuthenticatedActorInsteadOfPayloadWriter() throws Exception {

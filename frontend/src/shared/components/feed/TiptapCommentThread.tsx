@@ -667,10 +667,16 @@ function CommentItem({
 }
 
 function flattenReplies(replies: FeedCommentItem[] = []): FeedCommentItem[] {
-  return replies.flatMap((reply) => [
-    { ...reply, replies: [] },
-    ...flattenReplies(reply.replies),
-  ]);
+  const flattenedById = new Map<string, FeedCommentItem>();
+
+  replies.forEach((reply) => {
+    flattenedById.set(String(reply.id), { ...reply, replies: [] });
+    flattenReplies(reply.replies).forEach((nestedReply) => {
+      flattenedById.set(String(nestedReply.id), nestedReply);
+    });
+  });
+
+  return Array.from(flattenedById.values());
 }
 
 export function TiptapCommentThread({

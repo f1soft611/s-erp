@@ -63,8 +63,10 @@
             p.updated_at,
             COALESCE((
                 SELECT COUNT(*)
-                FROM tb_board_file bf
-                WHERE bf.post_id = p.post_id
+                                FROM tb_common_file bf
+                                WHERE bf.tenant_id = #{tenantId}
+                                    AND bf.owner_type = 'NOTICE'
+                                    AND bf.owner_id = p.post_id
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
@@ -79,6 +81,9 @@
         </if>
                 <if test="noticeGubunCode != null and noticeGubunCode != ''">
                     AND p.notice_gubun_code = #{noticeGubunCode}
+                </if>
+                <if test="isNotice != null and isNotice != ''">
+                    AND p.is_notice = #{isNotice}
                 </if>
         ORDER BY p.is_notice DESC, p.created_at DESC
         LIMIT #{size} OFFSET #{offset}
@@ -105,8 +110,10 @@
             p.updated_at,
             COALESCE((
                 SELECT COUNT(*)
-                FROM tb_board_file bf
-                WHERE bf.post_id = p.post_id
+                                FROM tb_common_file bf
+                                WHERE bf.tenant_id = #{tenantId}
+                                    AND bf.owner_type = 'NOTICE'
+                                    AND bf.owner_id = p.post_id
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
@@ -181,8 +188,8 @@
 
     <select id="selectNoticeAttachmentList" parameterType="map" resultMap="noticeFileMap">
         SELECT
-            bf.board_file_id,
-            bf.post_id,
+            bf.file_id AS board_file_id,
+            bf.owner_id AS post_id,
             bf.file_name,
             bf.file_path,
             bf.object_key,
@@ -197,16 +204,18 @@
             bf.uploaded_by,
             bf.created_at,
             bf.updated_at
-        FROM tb_board_file bf
-        WHERE bf.post_id = #{postId}
+                FROM tb_common_file bf
+                WHERE bf.tenant_id = #{tenantId}
+                    AND bf.owner_type = 'NOTICE'
+                    AND bf.owner_id = #{postId}
           AND bf.deleted_yn = 'N'
         ORDER BY bf.created_at DESC
     </select>
 
     <select id="selectNoticeAttachmentById" parameterType="map" resultMap="noticeFileMap">
         SELECT
-            bf.board_file_id,
-            bf.post_id,
+            bf.file_id AS board_file_id,
+            bf.owner_id AS post_id,
             bf.file_name,
             bf.file_path,
             bf.object_key,
@@ -221,14 +230,18 @@
             bf.uploaded_by,
             bf.created_at,
             bf.updated_at
-        FROM tb_board_file bf
-        WHERE bf.board_file_id = #{boardFileId}
+                FROM tb_common_file bf
+                WHERE bf.tenant_id = #{tenantId}
+                    AND bf.file_id = #{boardFileId}
+                    AND bf.owner_type = 'NOTICE'
           AND bf.deleted_yn = 'N'
     </select>
 
     <select id="insertNoticeAttachment" parameterType="map" resultType="long">
-        INSERT INTO tb_board_file (
-            post_id,
+        INSERT INTO tb_common_file (
+            tenant_id,
+            owner_type,
+            owner_id,
             file_name,
             file_path,
             object_key,
@@ -238,12 +251,13 @@
             mime_type,
             checksum_sha256,
             content_type,
-            file_usage_type,
             deleted_yn,
             uploaded_by,
             created_at,
             updated_at
         ) VALUES (
+            #{tenantId},
+            'NOTICE',
             #{postId},
             #{fileName},
             #{filePath},
@@ -260,22 +274,25 @@
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         )
-        RETURNING board_file_id
+        RETURNING file_id
     </select>
 
     <update id="softDeleteNoticeAttachment" parameterType="map">
-        UPDATE tb_board_file
+        UPDATE tb_common_file
         SET deleted_yn = 'Y',
             updated_at = CURRENT_TIMESTAMP
-        WHERE board_file_id = #{boardFileId}
+        WHERE tenant_id = #{tenantId}
+          AND file_id = #{boardFileId}
     </update>
 
     <update id="softDeleteEmbeddedNoticeAttachments" parameterType="map">
-        UPDATE tb_board_file
+                UPDATE tb_common_file
         SET deleted_yn = 'Y',
             updated_at = CURRENT_TIMESTAMP
-        WHERE post_id = #{postId}
-          AND file_usage_type = 'EMBEDDED'
+                WHERE tenant_id = #{tenantId}
+                    AND owner_type = 'NOTICE'
+                    AND owner_id = #{postId}
+                    AND file_usage_type = 'EMBEDDED'
           AND deleted_yn = 'N'
     </update>
 </mapper>

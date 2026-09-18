@@ -112,6 +112,7 @@ export async function fetchNoticePosts(
   size: number,
   keyword: string,
   noticeGubunCode?: string,
+  isNotice?: string,
 ): Promise<NoticeBoardPostApi[]> {
   const query = new URLSearchParams({
     page: String(page),
@@ -120,6 +121,9 @@ export async function fetchNoticePosts(
   });
   if (noticeGubunCode) {
     query.set('noticeGubunCode', noticeGubunCode);
+  }
+  if (isNotice) {
+    query.set('isNotice', isNotice);
   }
 
   const result = await apiGet<NoticeBoardListResponse>(

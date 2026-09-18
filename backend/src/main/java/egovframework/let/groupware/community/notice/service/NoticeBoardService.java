@@ -15,6 +15,9 @@ public interface NoticeBoardService {
 
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception;
 
+        List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
+            String noticeGubunCode, String isNotice) throws Exception;
+
     NoticeBoardPostVO getPost(Long tenantId, Long postId) throws Exception;
 
     NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload) throws Exception;

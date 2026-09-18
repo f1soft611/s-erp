@@ -55,13 +55,14 @@ public class NoticeBoardApiController {
     public ResultVO listPosts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String noticeGubunCode,
+            @RequestParam(required = false) String isNotice,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         String safeKeyword = keyword == null ? "" : keyword;
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", noticeBoardService.listPosts(user.getTenantId(), safeKeyword, page, size, noticeGubunCode));
+        resultMap.put("resultList", noticeBoardService.listPosts(user.getTenantId(), safeKeyword, page, size, noticeGubunCode, isNotice));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

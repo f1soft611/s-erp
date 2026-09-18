@@ -86,16 +86,22 @@ type NoticeFeedListProps = {
 function normalizeCommentTree(
   comments: NoticeCommentItem[] = [],
 ): FeedCommentItem[] {
-  return comments.map((comment) => ({
-    id: comment.id,
-    author: comment.author,
-    time: comment.time,
-    content: comment.content,
-    isEditable: comment.isEditable,
-    isDeleted: comment.isDeleted,
-    attachments: comment.attachments,
-    replies: normalizeCommentTree(comment.replies ?? []),
-  }));
+  const normalizedById = new Map<string, FeedCommentItem>();
+
+  comments.forEach((comment) => {
+    normalizedById.set(String(comment.id), {
+      id: comment.id,
+      author: comment.author,
+      time: comment.time,
+      content: comment.content,
+      isEditable: comment.isEditable,
+      isDeleted: comment.isDeleted,
+      attachments: comment.attachments,
+      replies: normalizeCommentTree(comment.replies ?? []),
+    });
+  });
+
+  return Array.from(normalizedById.values());
 }
 
 function countComments(comments: NoticeCommentItem[]): number {

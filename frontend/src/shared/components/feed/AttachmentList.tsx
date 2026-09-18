@@ -52,12 +52,12 @@ export function AttachmentList({
 
   return (
     <Box data-testid="notice-attachment-list" sx={{ display: 'grid', gap: 1 }}>
-      {files.map((file) => {
+      {files.map((file, index) => {
         const iconMeta = getFileIconMeta(file.name);
 
         return (
           <Box
-            key={file.id}
+            key={`${file.id}-${index}`}
             sx={{
               display: 'flex',
               alignItems: 'center',

@@ -36,6 +36,6 @@
 ## 검증 기록
 
 - 기준선: 기존 변경 파일 다수 확인. 전체 Maven testCompile은 기존 `NoticeEmbeddedImageServiceImplTest`의 누락 클래스 때문에 중단됨.
-- 구현 검증: `CommonCommentServiceTest` 16건, `NoticeBoardServiceImplTest` 7건, `NoticeComposerDialog` payload 테스트 8건, `notice-page-local-updates.test.tsx` 23건 통과. 프론트 `npm run build` 최신 실행 통과. `notice-page.test.tsx` 16건은 기존 댓글 이전 로더 기대 실패.
-- 최종 검증: 부분 완료. 브라우저 로그인 이후 검증은 백엔드 CORS/연결 실패로 차단.
+- 구현 검증: 공지·공통파일·댓글 테스트 총 28건, `NoticeComposerDialog` payload 테스트 8건, `notice-page-local-updates.test.tsx` 23건 통과. 프론트 `npm run build` 최신 실행 통과. `notice-page.test.tsx` 16건은 기존 댓글 이전 로더 기대 실패. `tb_common_file.file_usage_type` 계약 확인 후 공지 첨부 SQL을 정정했고 SQL/XML 오류가 사라짐.
+- 최종 검증: DB 스키마 문서·SQL·롤백 정합성 확인 완료. 핵심 백엔드 테스트 23건 통과. 브라우저 로그인 이후 검증은 백엔드 CORS/연결 실패로 차단.
 - 리뷰: 사양 준수 부분 통과, 코드 품질 부분 통과. 기존 페이지 테스트와 브라우저 검증 잔여.
