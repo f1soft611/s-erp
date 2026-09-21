@@ -44,6 +44,63 @@ describe('NoticeComposerDialog theme handling', () => {
     expect(editorBox).toHaveStyle({ width: '100%' });
   });
 
+  it('matches the feed title typography in the title input', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog open isDark={false} onClose={() => undefined} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveStyle({
+      fontSize: '1.25rem',
+      lineHeight: '1.4',
+      fontWeight: '700',
+      letterSpacing: '-0.02em',
+    });
+  });
+
+  it('removes the image resize overlay when the dialog closes', async () => {
+    const { rerender } = render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog open isDark={false} onClose={() => undefined} />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('.notice-image-resize-overlay'),
+      ).toBeInTheDocument();
+    });
+
+    rerender(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog
+          open={false}
+          isDark={false}
+          onClose={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('.notice-image-resize-overlay'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders the notice title input with feed title weight', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog open isDark={false} onClose={() => undefined} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveStyle({
+      fontWeight: 700,
+    });
+  });
+
   it('renders the correct action icon for view and edit modes', () => {
     const downloadSpy = vi.fn();
     const removeSpy = vi.fn();

@@ -6,11 +6,12 @@ import {
   IconButton,
   Skeleton,
   Stack,
+  Typography,
   useTheme,
 } from '@mui/material';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -22,12 +23,16 @@ import type {
 import {
   NoticeComposerDialog,
   type NoticeComposerDraftAttachment,
+  type NoticeComposerEmbeddedImage,
 } from './components/NoticeComposerDialog';
-import { NoticeFeedList } from './components/NoticeFeedList';
+import {
+  NoticeFeedList,
+  normalizeNoticeEmbeddedImageSources,
+} from './components/NoticeFeedList';
 import { NoticeFilterBar } from './components/NoticeFilterBar';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
-import { summaryStats } from './data/noticeData';
 import type { NoticeCommentItem, NoticeFeedItem } from './data/noticeData';
+import { deriveNoticeSummary } from './data/noticeSummary';
 import {
   createNoticePost,
   deleteNoticePost,
@@ -51,6 +56,10 @@ import {
 } from '../../../../shared/services/commonContentApi';
 import type { CommonFileItem } from '../../../../shared/services/commonContentApi';
 import { sanitizeHtml } from '../../../../shared/utils/sanitizeHtml';
+import {
+  fetchCommonCodeGroups,
+  fetchCommonCodeItems,
+} from '../../../co/master/common-code/services/commonCodeManagement.service';
 
 type CommunityNoticePageProps = {
   selectedModule: ModuleItem;
@@ -183,32 +192,51 @@ const toNoticeCommentTree = (
   return roots;
 };
 
-const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
+const toNoticeFeedItem = (
+  post: NoticeBoardPostApi,
+  noticeGubunNames = new Map<string, string>(),
+): NoticeFeedItem => {
   const editorHtml = post.contentsHtml ?? post.contents ?? '';
   const bodyText = toPlainText(editorHtml || post.contentsText || '');
   const normalizedSummary = bodyText.replace(/\s+/g, ' ').trim();
   const summaryText = normalizedSummary || '공지 내용을 확인해 주세요.';
   const bodyHtml = editorHtml.trim();
-  const attachments = (post.attachments ?? []).map((attachment) => ({
-    id: String(
-      attachment.boardFileId ??
-        attachment.fileName ??
-        attachment.objectKey ??
-        Math.random(),
-    ),
-    name: attachment.fileName ?? '첨부파일',
-    size: Number(attachment.fileSize ?? 0) || undefined,
-    boardFileId: attachment.boardFileId,
-    objectKey: attachment.objectKey,
-    bucketName: attachment.bucketName,
-  }));
+  const attachments = (post.attachments ?? [])
+    .filter((attachment) => attachment.fileUsageType !== 'EMBEDDED')
+    .map((attachment) => ({
+      id: String(
+        attachment.boardFileId ??
+          attachment.fileName ??
+          attachment.objectKey ??
+          Math.random(),
+      ),
+      name: attachment.fileName ?? '첨부파일',
+      size: Number(attachment.fileSize ?? 0) || undefined,
+      boardFileId: attachment.boardFileId,
+      objectKey: attachment.objectKey,
+      bucketName: attachment.bucketName,
+    }));
   const comments = toNoticeCommentTree(post.comments ?? []);
 
   return {
     id: Number(post.postId ?? 0),
     title: post.title ?? '제목 없음',
+    viewCount: Number(post.viewCount ?? 0) || 0,
+    createdAt: post.createdAt,
+    noticeGubunCode: post.noticeGubunCode ?? undefined,
+    noticeGubunName:
+      (post.noticeGubunCode
+        ? noticeGubunNames.get(post.noticeGubunCode)
+        : undefined) ??
+      post.noticeGubunCode ??
+      '공지',
     meta: formatNoticeMeta(post),
-    state: post.isNotice === 'Y' ? '중요 공지' : '공지',
+    state:
+      (post.noticeGubunCode
+        ? noticeGubunNames.get(post.noticeGubunCode)
+        : undefined) ??
+      post.noticeGubunCode ??
+      '공지',
     summary: summaryText,
     summaryHtml: bodyHtml,
     body: bodyText || '공지 내용을 확인해 주세요.',
@@ -226,6 +254,7 @@ const toNoticeFeedItem = (post: NoticeBoardPostApi): NoticeFeedItem => {
     liked: false,
     bookmarked: false,
     highlight: post.isNotice === 'Y',
+    isNotice: post.isNotice ?? 'N',
   };
 };
 
@@ -241,13 +270,13 @@ const toNoticeAttachmentApi = (
   bucketName: attachment.bucketName,
 });
 
-const appendCommentToTree = (
+export const appendCommentToTree = (
   comments: NoticeCommentItem[] = [],
   parentCommentId: number | string | null | undefined,
   comment: NoticeCommentItem,
 ): NoticeCommentItem[] => {
   if (parentCommentId == null) {
-    return [comment, ...comments];
+    return [...comments, comment];
   }
 
   return comments.map((current) =>
@@ -413,10 +442,14 @@ export function CommunityNoticePage({
     id?: number;
     title: string;
     body: string;
+    noticeGubunCode?: string;
+    isNotice: 'Y' | 'N';
     attachments: NoticeComposerDraftAttachment[];
   }>({
     title: '',
     body: '',
+    noticeGubunCode: '',
+    isNotice: 'N',
     attachments: [],
   });
   const [noticeItems, setNoticeItems] = useState<NoticeFeedItem[]>([]);
@@ -424,6 +457,46 @@ export function CommunityNoticePage({
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [noticeGubunOptions, setNoticeGubunOptions] = useState<
+    Array<{ code: string; name: string }>
+  >([]);
+  const [selectedNoticeFilter, setSelectedNoticeFilter] = useState('');
+  const noticeGubunNames = useMemo(
+    () =>
+      new Map(noticeGubunOptions.map((option) => [option.code, option.name])),
+    [noticeGubunOptions],
+  );
+  const noticeGubunNamesRef = useRef(noticeGubunNames);
+  const noticeSummary = useMemo(
+    () =>
+      deriveNoticeSummary(
+        noticeItems.map((item) => ({
+          id: item.id,
+          title: item.title,
+          viewCount: item.viewCount,
+          commentCount: item.commentCount,
+          isNotice: item.isNotice,
+          createdAt: item.createdAt,
+          attachmentCount: item.attachmentDetails?.length ?? 0,
+        })),
+      ),
+    [noticeItems],
+  );
+  useEffect(() => {
+    noticeGubunNamesRef.current = noticeGubunNames;
+    setNoticeItems((current) =>
+      current.map((item) => {
+        const name = item.noticeGubunCode
+          ? noticeGubunNames.get(item.noticeGubunCode)
+          : undefined;
+        return {
+          ...item,
+          noticeGubunName: name ?? item.noticeGubunCode ?? '공지',
+          state: name ?? item.noticeGubunCode ?? '공지',
+        };
+      }),
+    );
+  }, [noticeGubunNames]);
 
   const loadNoticePosts = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -435,8 +508,20 @@ export function CommunityNoticePage({
       setErrorMessage(null);
 
       try {
-        const posts = await fetchNoticePosts(1, 20, '');
-        setNoticeItems(posts.map(toNoticeFeedItem));
+        const posts = await fetchNoticePosts(
+          1,
+          20,
+          '',
+          selectedNoticeFilter === '__IMPORTANT__'
+            ? undefined
+            : selectedNoticeFilter,
+          selectedNoticeFilter === '__IMPORTANT__' ? 'Y' : undefined,
+        );
+        setNoticeItems(
+          posts.map((post) =>
+            toNoticeFeedItem(post, noticeGubunNamesRef.current),
+          ),
+        );
         setServerItemRevision((revision) => revision + 1);
       } catch (error) {
         setErrorMessage(noticeFailureMessage);
@@ -451,8 +536,28 @@ export function CommunityNoticePage({
         }
       }
     },
-    [],
+    [selectedNoticeFilter],
   );
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const groups = await fetchCommonCodeGroups();
+        const group = groups.find((item) => item.groupCode === 'NOTICE_GUBUN');
+        if (!group) {
+          return;
+        }
+        const items = await fetchCommonCodeItems(group.id);
+        setNoticeGubunOptions(
+          items
+            .filter((item) => item.useAt === 'Y')
+            .map((item) => ({ code: item.itemCode, name: item.itemNm })),
+        );
+      } catch {
+        setNoticeGubunOptions([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     void loadNoticePosts();
@@ -463,15 +568,21 @@ export function CommunityNoticePage({
     body,
     bodyJson,
     bodyText,
+    noticeGubunCode,
+    isNotice,
     attachments,
     removedAttachmentIds,
+    embeddedImages,
   }: {
     title: string;
     body: string;
     bodyJson?: string;
     bodyText?: string;
+    noticeGubunCode?: string;
+    isNotice: 'Y' | 'N';
     attachments: NoticeComposerDraftAttachment[];
     removedAttachmentIds: Array<number | string>;
+    embeddedImages: NoticeComposerEmbeddedImage[];
   }) => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
@@ -494,9 +605,9 @@ export function CommunityNoticePage({
           contentsHtml: safeHtml,
           contentsJson: safeJson,
           contentsText: safeText,
-          writerId: 'admin01',
-          writerName: '관리자',
-          isNotice: 'Y',
+          noticeGubunCode,
+          isNotice,
+          embeddedImages,
         });
 
         const uploadableFiles = attachments
@@ -545,7 +656,10 @@ export function CommunityNoticePage({
               comments: updated.comments,
               commentCount: updated.commentCount ?? item.commentCount,
             };
-            const nextItem = toNoticeFeedItem(nextPost);
+            const nextItem = toNoticeFeedItem(
+              nextPost,
+              noticeGubunNamesRef.current,
+            );
 
             return {
               ...nextItem,
@@ -566,9 +680,9 @@ export function CommunityNoticePage({
           contentsHtml: safeHtml,
           contentsJson: safeJson,
           contentsText: safeText,
-          writerId: 'admin01',
-          writerName: '관리자',
-          isNotice: 'Y',
+          noticeGubunCode,
+          isNotice,
+          embeddedImages,
         });
 
         const createdId = Number(created.postId ?? 0);
@@ -608,7 +722,13 @@ export function CommunityNoticePage({
       throw error;
     }
 
-    setEditorDraft({ title: '', body: '', attachments: [] });
+    setEditorDraft({
+      title: '',
+      body: '',
+      noticeGubunCode: '',
+      isNotice: 'N',
+      attachments: [],
+    });
     setIsComposerOpen(false);
     return updatedDraft;
   };
@@ -859,7 +979,7 @@ export function CommunityNoticePage({
   const handleLoadPreviousComments = useCallback(
     async (noticeId: number, beforeCommentId: number | string) => {
       const records = await fetchCommonComments('NOTICE', noticeId, {
-        limit: 3,
+        limit: 100,
         beforeCommentId,
       });
       return {
@@ -914,6 +1034,63 @@ export function CommunityNoticePage({
     [showError, showSuccess],
   );
 
+  const noticeDetailRequests = useRef(new Set<number>());
+  const loadNoticeDetail = useCallback(
+    async (noticeId: number, expand: boolean) => {
+      if (noticeDetailRequests.current.has(noticeId)) {
+        return;
+      }
+      noticeDetailRequests.current.add(noticeId);
+      if (expand) {
+        setExpandedNoticeId(noticeId);
+      }
+
+      try {
+        const detail = await fetchNoticePostDetail(noticeId);
+        const detailItem = toNoticeFeedItem(
+          detail,
+          noticeGubunNamesRef.current,
+        );
+        setNoticeItems((current) =>
+          current.map((item) =>
+            item.id === noticeId
+              ? {
+                  ...item,
+                  ...detailItem,
+                  liked: item.liked,
+                  likeCount: item.likeCount,
+                  bookmarked: item.bookmarked,
+                }
+              : item,
+          ),
+        );
+      } catch {
+        showError('공지사항 상세 정보를 불러오지 못했습니다.');
+      } finally {
+        noticeDetailRequests.current.delete(noticeId);
+      }
+    },
+    [showError],
+  );
+
+  const handleToggleNoticeExpand = useCallback(
+    async (noticeId: number) => {
+      if (expandedNoticeId === noticeId) {
+        setExpandedNoticeId(null);
+        return;
+      }
+      await loadNoticeDetail(noticeId, true);
+    },
+    [expandedNoticeId, loadNoticeDetail],
+  );
+
+  const handleNoticeInteract = useCallback(
+    async (noticeId: number) => {
+      await loadNoticeDetail(noticeId, false);
+    },
+    [loadNoticeDetail],
+  );
+
   return (
     <Box
       sx={{
@@ -929,16 +1106,30 @@ export function CommunityNoticePage({
         actionGroups={hasCreatePermission ? pageActionGroups : undefined}
       />
 
-      <NoticeFilterBar isDark={isDark} />
-      <PageMessageArea
-        message=""
-        onClose={() => setErrorMessage(null)}
+      <NoticeFilterBar
+        isDark={isDark}
+        filters={[
+          { code: '__IMPORTANT__', name: '중요 공지', isImportant: true },
+          ...noticeGubunOptions,
+        ]}
+        selectedCode={selectedNoticeFilter}
+        onChange={setSelectedNoticeFilter}
       />
+      <PageMessageArea message="" onClose={() => setErrorMessage(null)} />
 
       <Box
         sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
       >
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Container
+          maxWidth="xl"
+          sx={{
+            py: 3,
+            minHeight: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {isInitialLoading ? (
             <Box
               sx={{
@@ -1108,7 +1299,9 @@ export function CommunityNoticePage({
           ) : errorMessage && !isRefreshing && !hasVisibleNoticeList ? (
             <Box
               sx={{
-                minHeight: '100vh',
+                flex: 1,
+                minHeight: 0,
+                boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1118,6 +1311,10 @@ export function CommunityNoticePage({
                 color: theme.palette.text.primary,
               }}
             >
+              <Typography variant="body2" color="text.primary" align="center">
+                공지사항을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시
+                시도해 주세요.
+              </Typography>
               <IconButton
                 aria-label="공지사항 다시 불러오기"
                 onClick={() => {
@@ -1155,9 +1352,8 @@ export function CommunityNoticePage({
                 isDark={isDark}
                 isRefreshing={isRefreshing}
                 expandedNoticeId={expandedNoticeId}
-                onToggleExpand={(id) =>
-                  setExpandedNoticeId((current) => (current === id ? null : id))
-                }
+                onToggleExpand={handleToggleNoticeExpand}
+                onNoticeInteract={handleNoticeInteract}
                 onToggleLike={handleToggleLike}
                 onToggleBookmark={handleToggleBookmark}
                 onAddComment={handleAddComment}
@@ -1194,7 +1390,12 @@ export function CommunityNoticePage({
                   setEditorDraft({
                     id: item.id,
                     title: item.title,
-                    body: item.bodyHtml ?? item.body,
+                    body: normalizeNoticeEmbeddedImageSources(
+                      item.bodyHtml ?? item.body,
+                      item.id,
+                    ),
+                    noticeGubunCode: item.noticeGubunCode,
+                    isNotice: item.isNotice === 'Y' ? 'Y' : 'N',
                     attachments: mappedAttachments,
                   });
                   setIsComposerOpen(true);
@@ -1218,7 +1419,11 @@ export function CommunityNoticePage({
                   })();
                 }}
               />
-              <NoticeSummaryPanel stats={summaryStats} isDark={isDark} />
+              <NoticeSummaryPanel
+                stats={noticeSummary.stats}
+                recentIssues={noticeSummary.recentIssues}
+                isDark={isDark}
+              />
             </Box>
           )}
         </Container>
@@ -1228,11 +1433,20 @@ export function CommunityNoticePage({
         open={isComposerOpen}
         isDark={isDark}
         onClose={() => {
-          setEditorDraft({ title: '', body: '', attachments: [] });
+          setEditorDraft({
+            title: '',
+            body: '',
+            noticeGubunCode: '',
+            isNotice: 'N',
+            attachments: [],
+          });
           setIsComposerOpen(false);
         }}
         onSubmit={handleCreateNotice}
         defaultTitle={editorDraft.title}
+        noticeGubunOptions={noticeGubunOptions}
+        defaultNoticeGubunCode={editorDraft.noticeGubunCode ?? ''}
+        defaultIsNotice={editorDraft.isNotice}
         defaultBody={editorDraft.body}
         defaultAttachments={editorDraft.attachments}
       />

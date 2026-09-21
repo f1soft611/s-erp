@@ -26,6 +26,8 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
+import egovframework.let.groupware.community.notice.service.NoticeEmbeddedImageService;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,6 +44,7 @@ public class NoticeBoardApiController {
 
     private final ResultVoHelper resultVoHelper;
     private final NoticeBoardService noticeBoardService;
+    private final NoticeEmbeddedImageService noticeEmbeddedImageService;
 
     @Operation(summary = "공지 목록 조회", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
     @ApiResponses({
@@ -51,13 +54,15 @@ public class NoticeBoardApiController {
     @GetMapping("/posts")
     public ResultVO listPosts(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String noticeGubunCode,
+            @RequestParam(required = false) String isNotice,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         String safeKeyword = keyword == null ? "" : keyword;
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", noticeBoardService.listPosts(user.getTenantId(), safeKeyword, page, size));
+        resultMap.put("resultList", noticeBoardService.listPosts(user.getTenantId(), safeKeyword, page, size, noticeGubunCode, isNotice));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -70,7 +75,7 @@ public class NoticeBoardApiController {
     public ResultVO getPost(@PathVariable Long postId, @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", noticeBoardService.getPost(user.getTenantId(), postId));
+        resultMap.put("item", noticeBoardService.getPost(user.getTenantId(), postId, user.getId()));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -83,7 +88,7 @@ public class NoticeBoardApiController {
     public ResponseEntity<ResultVO> createPost(@RequestBody NoticeBoardPostSaveRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        NoticeBoardPostVO created = noticeBoardService.createPost(user.getTenantId(), payload);
+        NoticeBoardPostVO created = noticeBoardService.createPost(user.getTenantId(), payload, user.getId(), user.getName());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", created);
         resultMap.put("message", "공지사항이 등록되었습니다.");
@@ -100,7 +105,7 @@ public class NoticeBoardApiController {
             @RequestBody NoticeBoardPostSaveRequestVO payload,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        NoticeBoardPostVO updated = noticeBoardService.updatePost(user.getTenantId(), postId, payload);
+        NoticeBoardPostVO updated = noticeBoardService.updatePost(user.getTenantId(), postId, payload, user.getId(), user.getName());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", updated);
         resultMap.put("message", "공지사항이 수정되었습니다.");
@@ -115,7 +120,7 @@ public class NoticeBoardApiController {
     @DeleteMapping("/posts/{postId}")
     public ResultVO deletePost(@PathVariable Long postId, @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        noticeBoardService.deletePost(user.getTenantId(), postId);
+        noticeBoardService.deletePost(user.getTenantId(), postId, user.getId(), user.getName());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("message", "공지사항이 삭제되었습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
@@ -138,6 +143,24 @@ public class NoticeBoardApiController {
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", attachment);
         resultMap.put("message", "첨부파일이 업로드되었습니다.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "공지 본문 이미지 임시 업로드", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "업로드 성공"),
+        @ApiResponse(responseCode = "400", description = "이미지 파일 오류")
+    })
+    @PostMapping("/embedded-images/temp")
+    public ResponseEntity<ResultVO> uploadTemporaryEmbeddedImage(
+            @RequestParam("file") MultipartFile file,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        NoticeEmbeddedImageVO image = noticeEmbeddedImageService.uploadTemporaryImage(
+            user.getTenantId(), user.getId(), file);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", image);
+        resultMap.put("message", "본문 이미지가 업로드되었습니다.");
         return ResponseEntity.status(HttpStatus.CREATED).body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
     }
 
@@ -167,6 +190,14 @@ public class NoticeBoardApiController {
         noticeBoardService.downloadAttachment(user.getTenantId(), postId, boardFileId, response);
     }
 
+    @Operation(summary = "공지 본문 이미지 조회", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
+    @GetMapping("/posts/{postId}/embedded-images")
+    public void streamEmbeddedImage(@PathVariable Long postId,
+            @RequestParam String objectKey,
+            HttpServletResponse response) throws Exception {
+        noticeBoardService.streamEmbeddedImage(postId, objectKey, response);
+    }
+
     private void requireAuthenticated(LoginVO user) {
         if (user == null || user.getTenantId() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ResponseCode.AUTH_ERROR.getMessage());
@@ -174,8 +205,10 @@ public class NoticeBoardApiController {
     }
 
     @Generated
-    public NoticeBoardApiController(ResultVoHelper resultVoHelper, NoticeBoardService noticeBoardService) {
+    public NoticeBoardApiController(ResultVoHelper resultVoHelper, NoticeBoardService noticeBoardService,
+            NoticeEmbeddedImageService noticeEmbeddedImageService) {
         this.resultVoHelper = resultVoHelper;
         this.noticeBoardService = noticeBoardService;
+        this.noticeEmbeddedImageService = noticeEmbeddedImageService;
     }
 }

@@ -11,6 +11,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
+  appendCommentToTree,
   CommunityNoticePage,
   insertNoticeReplyAfter,
 } from '../src/pages/groupware/community/notice/CommunityNoticePage';
@@ -127,7 +128,7 @@ describe('CommunityNoticePage local updates', () => {
   it('keeps the initial skeleton until the notice API resolves', async () => {
     let resolvePosts: (posts: []) => void = () => undefined;
     noticeServiceMocks.fetchNoticePosts.mockReturnValueOnce(
-      new Promise<[]>(resolve => {
+      new Promise<[]>((resolve) => {
         resolvePosts = resolve;
       }),
     );
@@ -137,7 +138,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByTestId('notice-feed-skeleton'),
     ).toBeInTheDocument();
-    await new Promise(resolve => window.setTimeout(resolve, 1600));
+    await new Promise((resolve) => window.setTimeout(resolve, 1600));
     expect(screen.getByTestId('notice-feed-skeleton')).toBeInTheDocument();
 
     await act(async () => {
@@ -161,8 +162,12 @@ describe('CommunityNoticePage local updates', () => {
       name: '공지사항 다시 불러오기',
     });
 
-    expect(screen.queryByTestId('notice-feed-skeleton')).not.toBeInTheDocument();
-    expect(screen.queryByText(/공지사항 목록을 불러오지 못했습니다/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('notice-feed-skeleton'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/공지사항 목록을 불러오지 못했습니다/),
+    ).not.toBeInTheDocument();
     expect(retryButton).toBeInTheDocument();
   });
 
@@ -186,6 +191,36 @@ describe('CommunityNoticePage local updates', () => {
     expect(screen.getByTestId('notice-feed-skeleton')).toBeInTheDocument();
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(2);
     expect(await screen.findByText('재조회된 공지')).toBeInTheDocument();
+  });
+
+  it('appends a new root comment to the end to match server ordering', () => {
+    const comments = [
+      {
+        id: 1,
+        author: '기존 댓글',
+        time: '현재',
+        content: '기존 댓글 내용',
+        replies: [],
+      },
+      {
+        id: 2,
+        author: '이전 댓글',
+        time: '현재',
+        content: '이전 댓글 내용',
+        replies: [],
+      },
+    ];
+    const newComment = {
+      id: 3,
+      author: '새 댓글',
+      time: '현재',
+      content: '새 댓글 내용',
+      replies: [],
+    };
+
+    const result = appendCommentToTree(comments, undefined, newComment);
+
+    expect(result.map((comment) => comment.id)).toEqual([1, 2, 3]);
   });
 
   it('inserts a reply directly after its target without adding display depth', () => {
@@ -612,6 +647,48 @@ describe('CommunityNoticePage local updates', () => {
     });
   });
 
+  it('loads the remaining older comments in one larger batch when expanding the thread', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        postId: 1,
+        title: '이전 댓글 배치 조회 테스트',
+        comments: [
+          { commentId: 10, writerName: '현재 작성자', content: '현재 댓글' },
+          { commentId: 9, writerName: '이전 작성자', content: '이전 댓글1' },
+          { commentId: 8, writerName: '오래된 작성자', content: '이전 댓글2' },
+        ],
+        commentCount: 3,
+        hasPreviousComments: true,
+        nextBeforeCommentId: 7,
+      },
+    ]);
+    commentServiceMocks.fetchCommonComments.mockResolvedValueOnce({
+      comments: [
+        { commentId: 7, writerName: '더 이전 작성자', content: '더 이전 댓글' },
+      ],
+      hasPrevious: false,
+      nextBeforeCommentId: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+    );
+
+    await waitFor(() => {
+      expect(commentServiceMocks.fetchCommonComments).toHaveBeenCalledWith(
+        'NOTICE',
+        1,
+        expect.objectContaining({
+          limit: 100,
+          beforeCommentId: 7,
+        }),
+      );
+    });
+  });
+
   it('keeps the continued previous-comment cursor across local comment CRUD', async () => {
     const loadPreviousComments = vi
       .fn()
@@ -786,6 +863,37 @@ describe('CommunityNoticePage local updates', () => {
         301,
       ),
     );
+  });
+
+  it('shows a newly created comment even when the list already has three comments', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        comments: [
+          { commentId: 10, writerName: '첫 댓글', content: '첫 댓글' },
+          { commentId: 11, writerName: '둘째 댓글', content: '둘째 댓글' },
+          { commentId: 12, writerName: '셋째 댓글', content: '셋째 댓글' },
+        ],
+      },
+    ]);
+    commentServiceMocks.createCommonComment.mockResolvedValueOnce({
+      commentId: 13,
+      writerName: '나',
+      content: '새 댓글',
+    });
+    renderPage();
+
+    expect(
+      (await screen.findAllByText('셋째 댓글', {}, { timeout: 3000 })).length,
+    ).toBeGreaterThan(0);
+
+    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(input, { target: { innerHTML: '<p>새 댓글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('새 댓글')).toBeInTheDocument();
+    });
   });
 
   it('keeps the comment draft and does not render a failed comment', async () => {

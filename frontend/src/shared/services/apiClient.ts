@@ -113,6 +113,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
 
+export async function apiGetBlob(path: string): Promise<Blob> {
+  const auth = await getAuthorizedAuth();
+  const headers: Record<string, string> = {};
+  if (auth.accessToken) {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
+  }
+
+  const requestUrl = /^https?:\/\//i.test(path)
+    ? path
+    : `${API_BASE_URL}${path}`;
+  const response = await fetch(requestUrl, { headers });
+  if (!response.ok) {
+    throw new Error(normalizeApiErrorMessage(await response.text()));
+  }
+
+  return response.blob();
+}
+
 export async function apiDownload(
   path: string,
   downloadFileName?: string,

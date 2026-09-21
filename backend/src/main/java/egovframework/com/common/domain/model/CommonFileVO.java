@@ -34,6 +34,8 @@ public class CommonFileVO implements Serializable {
     private String mimeType;
     @Schema(description = "콘텐츠 타입")
     private String contentType;
+    @Schema(description = "파일 사용 용도")
+    private String fileUsageType;
     @Schema(description = "업로더 ID")
     private String uploadedBy;
     @Schema(description = "삭제 여부")
@@ -91,6 +93,10 @@ public class CommonFileVO implements Serializable {
     public String getContentType() { return contentType; }
     @Generated
     public void setContentType(String contentType) { this.contentType = contentType; }
+    @Generated
+    public String getFileUsageType() { return fileUsageType; }
+    @Generated
+    public void setFileUsageType(String fileUsageType) { this.fileUsageType = fileUsageType; }
     @Generated
     public String getUploadedBy() { return uploadedBy; }
     @Generated

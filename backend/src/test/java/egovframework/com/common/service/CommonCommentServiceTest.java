@@ -158,6 +158,7 @@ class CommonCommentServiceTest {
             @Override
             public int updateCommonComment(Map<String, Object> params) {
                 assertThat(params.get("actorId")).isEqualTo("user-001");
+                assertThat(params.get("actorName")).isEqualTo("홍길동");
                 assertThat(params.get("content")).isEqualTo("수정 댓글");
                 return 1;
             }
@@ -172,7 +173,7 @@ class CommonCommentServiceTest {
         };
 
         CommonCommentVO updated = new CommonCommentServiceImpl(stubDao)
-            .updateComment(1L, 7L, "  수정 댓글  ", "user-001");
+            .updateComment(1L, 7L, "  수정 댓글  ", "user-001", "홍길동");
 
         assertThat(updated.getContent()).isEqualTo("수정 댓글");
         assertThat(updated.getWriterId()).isEqualTo("user-001");
@@ -199,12 +200,13 @@ class CommonCommentServiceTest {
             @Override
             public int softDeleteCommonComment(Map<String, Object> params) {
                 assertThat(params.get("actorId")).isEqualTo("other-user");
+                assertThat(params.get("actorName")).isEqualTo("다른 사용자");
                 return 0;
             }
         };
 
         assertThatThrownBy(() -> new CommonCommentServiceImpl(stubDao)
-            .deleteComment(1L, 7L, "other-user"))
+            .deleteComment(1L, 7L, "other-user", "다른 사용자"))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("찾을 수 없습니다");
     }

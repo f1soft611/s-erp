@@ -32,6 +32,7 @@ public class NoticeBoardFileVO implements Serializable {
     private String checksumSha256;
     @Schema(description = "콘텐츠 타입")
     private String contentType;
+    private String fileUsageType;
     @Schema(description = "삭제 여부")
     private String deletedYn;
     @Schema(description = "업로더 ID")
@@ -149,6 +150,14 @@ public class NoticeBoardFileVO implements Serializable {
     @Generated
     public void setContentType(String contentType) {
         this.contentType = contentType;
+    }
+
+    public String getFileUsageType() {
+        return fileUsageType;
+    }
+
+    public void setFileUsageType(String fileUsageType) {
+        this.fileUsageType = fileUsageType;
     }
 
     @Generated

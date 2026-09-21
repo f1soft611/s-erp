@@ -53,7 +53,9 @@ public class SecurityConfig {
             + "connect-src 'self' https: http:;";
 
     // Http Method : public GET endpoints for the minimal login-only backend
-    private String[] AUTH_GET_WHITELIST = {};
+        private String[] AUTH_GET_WHITELIST = {
+            "/api/v1/groupware/boards/notice/posts/*/embedded-images"
+        };
 
     // 인증 예외 List
     private String[] AUTH_WHITELIST = {

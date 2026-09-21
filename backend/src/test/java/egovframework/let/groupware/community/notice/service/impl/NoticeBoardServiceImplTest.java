@@ -9,9 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -22,10 +25,165 @@ import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 
 class NoticeBoardServiceImplTest {
+
+    @Test
+    void listPostsPassesImportantNoticeFilterToDao() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenAnswer(invocation -> {
+                Map<String, Object> params = invocation.getArgument(0);
+                assertThat(params.get("isNotice")).isEqualTo("Y");
+                return Collections.emptyList();
+            });
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(1L, "", 1, 20, null, "Y");
+    }
+
+    @Test
+    void getPostIncrementsViewCountOnlyForFirstViewByUser() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setViewCount(1);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(11L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(1L);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-a");
+
+        assertThat(result.getViewCount()).isEqualTo(1);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostDoesNotIncrementViewCountForRepeatedViewByUser() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setViewCount(2);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(11L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(null);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-a");
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostUsesLoginAccountAsTheViewHistoryIdentity() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(12L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(12L);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-b");
+
+        ArgumentCaptor<Map<String, Object>> viewParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).insertNoticePostViewHistory(viewParamsCaptor.capture());
+        assertThat(viewParamsCaptor.getValue())
+            .containsEntry("tenantId", 1L)
+            .containsEntry("postId", 7L)
+            .containsEntry("loginId", 12L);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostDoesNotCreateViewHistoryWhenNoticeDoesNotExist() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(null);
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 999L, "user-a"));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap());
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void createPostUsesAuthenticatedActorInsteadOfPayloadWriter() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO persisted = new NoticeBoardPostVO();
+        persisted.setPostId(42L);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.insertNoticePost(org.mockito.ArgumentMatchers.anyMap())).thenReturn(42L);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(persisted);
+        when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 42L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 42L)).thenReturn(0L);
+
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContentsHtml("<p>본문</p>");
+        payload.setContentsJson("{\"type\":\"doc\",\"content\":[]}");
+        payload.setWriterId("payload-writer");
+        payload.setWriterName("Payload Writer");
+        payload.setNoticeGubunCode("GENERAL");
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .createPost(1L, payload, "login-user", "로그인 사용자");
+
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).insertNoticePost(paramsCaptor.capture());
+        assertThat(paramsCaptor.getValue()).containsEntry("writerId", "login-user");
+        assertThat(paramsCaptor.getValue()).containsEntry("writerName", "로그인 사용자");
+        assertThat(paramsCaptor.getValue()).containsEntry("noticeGubunCode", "GENERAL");
+    }
 
     @Test
     void listPostsHydratesAttachmentsCommentsAndPaginationMetadata() throws Exception {
@@ -87,6 +245,40 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void listPostsDoesNotDuplicateCommonFilesOrExposeEmbeddedImagesAsAttachments() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        CommonFileVO attachment = new CommonFileVO();
+        attachment.setFileId(201L);
+        attachment.setFileUsageType("ATTACHMENT");
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(202L);
+        embeddedImage.setFileUsageType("EMBEDDED");
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Arrays.asList(post));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(attachment, embeddedImage));
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
+            .thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(1L, "", 1, 20).get(0);
+
+        assertThat(result.getAttachments()).hasSize(1);
+        assertThat(result.getAttachments().get(0).getBoardFileId()).isEqualTo(201L);
+        assertThat(result.getAttachmentCount()).isEqualTo(1);
+        org.mockito.Mockito.verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void getPostHydratesAttachmentsForEachNoticeComment() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
@@ -118,6 +310,62 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void replacesExpiredEmbeddedImageSourceWithStableNoticeImageUrl() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setContentsHtml("<p><img src=\"https://minio.example/expired\" data-object-key=\"tenant/1/notice-temp/token/image.png\"></p>");
+        NoticeBoardFileVO embeddedImage = new NoticeBoardFileVO();
+        embeddedImage.setBoardFileId(73L);
+        embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedImage.setFileUsageType("EMBEDDED");
+        CommonFileVO embeddedCommonFile = new CommonFileVO();
+        embeddedCommonFile.setFileId(73L);
+        embeddedCommonFile.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedCommonFile.setFileUsageType("EMBEDDED");
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(post);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(embeddedCommonFile));
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService).getPost(1L, 7L);
+
+        assertThat(result.getContentsHtml())
+            .contains("/api/v1/groupware/boards/notice/posts/7/embedded-images?objectKey=")
+            .doesNotContain("https://minio.example/expired");
+    }
+
+    @Test
+    void streamsOnlyEmbeddedImageOwnedByNotice() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(73L);
+        embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedImage.setFileUsageType("EMBEDDED");
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(embeddedImage));
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .streamEmbeddedImage(7L, "tenant/1/notice-temp/token/image.png",
+                new MockHttpServletResponse());
+
+        verify(commonFileService).downloadFile(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.eq("NOTICE"),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq(73L),
+            org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void deleteAttachmentUsesNoticeOwnerAndPostId() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonFileService commonFileService = mock(CommonFileService.class);
@@ -136,6 +384,27 @@ class NoticeBoardServiceImplTest {
             .deleteAttachment(1L, 7L, 8L);
 
         verify(commonFileService).deleteFile(1L, "NOTICE", 7L, 8L);
+    }
+
+    @Test
+    void deleteAttachmentRejectsEmbeddedImageAsGeneralAttachment() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(9L);
+        embeddedImage.setFileUsageType("EMBEDDED");
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(embeddedImage));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+            () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, commonFileService, commonCommentService)
+                .deleteAttachment(1L, 7L, 9L));
+
+        assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        verify(commonFileService, org.mockito.Mockito.never())
+            .deleteFile(1L, "NOTICE", 7L, 9L);
     }
 
     @Test

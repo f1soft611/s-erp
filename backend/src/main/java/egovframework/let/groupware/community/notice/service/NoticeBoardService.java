@@ -13,13 +13,26 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 public interface NoticeBoardService {
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size) throws Exception;
 
+    List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception;
+
+        List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
+            String noticeGubunCode, String isNotice) throws Exception;
+
     NoticeBoardPostVO getPost(Long tenantId, Long postId) throws Exception;
+
+    NoticeBoardPostVO getPost(Long tenantId, Long postId, String loginCode) throws Exception;
 
     NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
+    NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;
+
     NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
+    NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;
+
     void deletePost(Long tenantId, Long postId) throws Exception;
+
+    void deletePost(Long tenantId, Long postId, String actorId, String actorName) throws Exception;
 
     NoticeBoardFileVO uploadAttachment(Long tenantId, Long postId, MultipartFile file, String uploaderId) throws Exception;
 
@@ -30,4 +43,7 @@ public interface NoticeBoardService {
     void downloadAttachment(Long tenantId, Long boardFileId, HttpServletResponse response) throws Exception;
 
     void downloadAttachment(Long tenantId, Long postId, Long boardFileId, HttpServletResponse response) throws Exception;
+
+        void streamEmbeddedImage(Long postId, String objectKey, HttpServletResponse response)
+            throws Exception;
 }

@@ -126,6 +126,7 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
                 params.put("mimeType", file.getContentType());
                 params.put("checksumSha256", sha256);
                 params.put("contentType", file.getContentType());
+                params.put("fileUsageType", "ATTACHMENT");
                 params.put("uploadedBy", uploaderId == null ? "unknown" : uploaderId);
                 params.put("deletedYn", "N");
                 Long fileId = commonFileDAO.insertCommonFile(params);

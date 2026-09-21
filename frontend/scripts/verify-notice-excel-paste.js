@@ -38,7 +38,6 @@ const menuResponse = {
 };
 
 const excelHtml = `
-  <html><head>
     <style>
       .xl65 { background-color:#fff2cc; border:2px solid #1f2937; }
       .xl66 { background-color:#dbeafe; border:1px solid #2563eb; }
@@ -137,9 +136,13 @@ try {
   );
 
   console.log(`Opening ${baseUrl}/groupware/notice ...`);
-  await page.goto(`${baseUrl}/groupware/notice`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/groupware/notice`, {
+    waitUntil: 'domcontentloaded',
+  });
 
-  await page.getByRole('button', { name: '새 공지 작성' }).click();
+  const openComposerButton = page.getByRole('button', { name: '새 공지 작성' });
+  await openComposerButton.waitFor({ state: 'visible' });
+  await openComposerButton.click();
   const editor = page.getByRole('textbox', { name: '본문' });
   await editor.waitFor({ state: 'visible' });
   await editor.click();
@@ -184,6 +187,101 @@ try {
         `셀 스타일이 보존되지 않았습니다: ${value}; actual=${firstCellStyle}`,
       );
     }
+  }
+
+  const cellBorders = await table
+    .locator('td')
+    .evaluateAll((cells) =>
+      cells.map((cell) => getComputedStyle(cell).borderTopStyle),
+    );
+  if (cellBorders.some((borderStyle) => borderStyle === 'none')) {
+    throw new Error(`셀 내부 보더가 끊겼습니다: ${cellBorders.join(', ')}`);
+  }
+
+  const cellLocator = table.locator('td');
+  const cellCountBeforeResize = await cellLocator.count();
+  console.log(
+    `Table cells before interaction: ${cellCountBeforeResize}; html=${(await table.innerHTML()).slice(0, 1200)}`,
+  );
+  if (cellCountBeforeResize < 2) {
+    throw new Error(`자동 폭 검증용 셀이 부족합니다: ${cellCountBeforeResize}`);
+  }
+
+  const autoSizeCell = cellLocator.nth(1);
+  const autoSizeBefore = await autoSizeCell.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+  await autoSizeCell.locator('p').click({ force: true });
+  await page.keyboard.press('End');
+  await page.keyboard.type(
+    '입력에 따라 자연스럽게 넓어지는 셀 내용 확인용 긴 텍스트',
+  );
+  await page.waitForTimeout(100);
+  const autoSizeAfter = await autoSizeCell.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+  if (autoSizeAfter <= autoSizeBefore) {
+    throw new Error(
+      `셀 입력에 따른 자동 폭 조절이 되지 않았습니다: before=${autoSizeBefore}, after=${autoSizeAfter}`,
+    );
+  }
+
+  const firstCell = table.locator('td').first();
+  const cellCount = await table.locator('td').count();
+  if (cellCount === 0) {
+    throw new Error(
+      `표 셀이 렌더링되지 않았습니다: ${await editor.locator('table').innerHTML()}`,
+    );
+  }
+  const firstCellBox = await firstCell.boundingBox();
+  if (!firstCellBox) {
+    throw new Error('첫 번째 셀의 위치를 확인할 수 없습니다.');
+  }
+
+  await page.mouse.move(
+    firstCellBox.x + firstCellBox.width - 1,
+    firstCellBox.y + firstCellBox.height / 2,
+  );
+  const resizeHandle = editor.locator('.column-resize-handle').first();
+  await resizeHandle.waitFor({ state: 'visible' });
+
+  const firstColumnBefore = await table
+    .locator('col')
+    .first()
+    .getAttribute('style');
+  const resizeStartX = firstCellBox.x + firstCellBox.width - 1;
+  const resizeStartY = firstCellBox.y + firstCellBox.height / 2;
+  await page.mouse.move(resizeStartX, resizeStartY);
+  await page.mouse.down();
+  await page.mouse.move(resizeStartX + 40, resizeStartY, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+
+  const firstColumnAfter = await table
+    .locator('col')
+    .first()
+    .getAttribute('style');
+  if (firstColumnBefore === firstColumnAfter) {
+    const resizeState = await editor.evaluate((element) => ({
+      columns: Array.from(element.querySelectorAll('col')).map((column) =>
+        column.getAttribute('style'),
+      ),
+      cells: Array.from(element.querySelectorAll('td'))
+        .slice(0, 3)
+        .map((cell) => cell.getAttribute('colwidth')),
+      html: element.innerHTML.slice(0, 2400),
+    }));
+    throw new Error(
+      `열 너비 드래그가 반영되지 않았습니다: before=${firstColumnBefore}, after=${firstColumnAfter}, state=${JSON.stringify(resizeState)}`,
+    );
+  }
+
+  const resizedCellWidth = await table
+    .locator('td')
+    .first()
+    .getAttribute('colwidth');
+  if (!resizedCellWidth) {
+    throw new Error('드래그한 열 너비가 colwidth로 저장되지 않았습니다.');
   }
 
   const editorText = await editor.innerText();

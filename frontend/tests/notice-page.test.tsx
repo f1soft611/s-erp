@@ -5,12 +5,25 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
 
 describe('Community notice page', () => {
+  it('normalizes legacy MinIO image sources to the stable notice image API', () => {
+    const html =
+      '<p><img src="http://minio.example/expired" data-object-key="tenant/1/notice-temp/token/image.png" /></p>';
+
+    const normalized = normalizeNoticeEmbeddedImageSources(html, 42);
+
+    expect(normalized).toContain(
+      'api/v1/groupware/boards/notice/posts/42/embedded-images?objectKey=tenant%2F1%2Fnotice-temp%2Ftoken%2Fimage.png',
+    );
+    expect(normalized).not.toContain('minio.example');
+  });
+
   it('keeps the initial skeleton loading state without showing a preloaded notice list', async () => {
     await act(async () => {
       render(
@@ -77,6 +90,268 @@ describe('Community notice page', () => {
 
     const commentInput = screen.getByRole('textbox', { name: '댓글 입력' });
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
+  });
+
+  it('uses title and body clicks as the read entry point when more is unavailable', () => {
+    const onToggleExpand = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      title: '짧은 공지 제목',
+      body: '짧은 공지 내용',
+      summary: '짧은 공지 내용',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={onToggleExpand}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('짧은 공지 제목'));
+    fireEvent.click(screen.getByText('짧은 공지 내용'));
+
+    expect(onToggleExpand).toHaveBeenCalledTimes(2);
+    expect(onToggleExpand).toHaveBeenCalledWith(item.id);
+  });
+
+  it('keeps the more button as the only read entry point when more is available', () => {
+    const onToggleExpand = vi.fn();
+    const item = noticeFeed[0];
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={onToggleExpand}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(item.title));
+    fireEvent.click(screen.getByText(item.summary));
+
+    expect(onToggleExpand).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+    expect(onToggleExpand).toHaveBeenCalledWith(item.id);
+  });
+
+  it('opens an image viewer when the user clicks a feed image preview', async () => {
+    const onNoticeInteract = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      bodyHtml:
+        '<p>공지 내용</p><p><img src="https://example.com/notice-image.png" alt="원본 이미지" /></p>',
+      summary: '공지 내용',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        expandedNoticeId={item.id}
+        onNoticeInteract={onNoticeInteract}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={() => undefined}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByAltText('원본 이미지'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: '이미지 보기' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('img', { name: '원본 이미지' }),
+      ).toBeInTheDocument();
+    });
+    expect(onNoticeInteract).not.toHaveBeenCalled();
+  });
+
+  it('records an interaction from image and attachment areas when more is unavailable', () => {
+    const onNoticeInteract = vi.fn();
+    const onDownload = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      body: '짧은 공지',
+      summary: '짧은 공지',
+      bodyHtml:
+        '<p><img src="https://example.com/short-notice.png" alt="공지 이미지" /></p>',
+      attachments: ['안내문.pdf'],
+      attachmentDetails: [{ id: 'file-1', name: '안내문.pdf' }],
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onNoticeInteract={onNoticeInteract}
+        onDownload={onDownload}
+      />,
+    );
+
+    fireEvent.click(screen.getByAltText('공지 이미지'));
+    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 다운로드' }));
+
+    expect(onNoticeInteract).toHaveBeenCalledTimes(2);
+    expect(onNoticeInteract).toHaveBeenCalledWith(item.id);
+    expect(onDownload).toHaveBeenCalledWith(
+      item.id,
+      expect.objectContaining({ name: '안내문.pdf' }),
+    );
+  });
+
+  it('records a comment-area interaction only when more is unavailable', () => {
+    const onNoticeInteract = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      body: '짧은 공지',
+      summary: '짧은 공지',
+      comments: [],
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onNoticeInteract={onNoticeInteract}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('textbox', { name: '댓글 입력' }));
+
+    expect(onNoticeInteract).toHaveBeenCalledTimes(1);
+    expect(onNoticeInteract).toHaveBeenCalledWith(item.id);
+  });
+
+  it('shows multiple embedded images in order without introducing scroll controls', () => {
+    const item = {
+      ...noticeFeed[0],
+      bodyHtml:
+        '<p>공지 내용</p><p><img src="https://example.com/notice-image-1.png" alt="첫 번째 이미지" /><img src="https://example.com/notice-image-2.png" alt="두 번째 이미지" /></p>',
+      summary: '공지 요약',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={() => undefined}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    expect(screen.getByAltText('첫 번째 이미지')).toBeInTheDocument();
+    expect(screen.getByAltText('두 번째 이미지')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '다음 이미지' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '이전 이미지' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render duplicate comment keys when the API repeats a comment', () => {
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 2, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 2,
+                author: '중복 댓글',
+                time: '오늘',
+                content: '중복 댓글',
+              },
+            ],
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+      />,
+    );
+
+    const duplicateKeyWarning = errorSpy.mock.calls.some((call) =>
+      call.some((argument) =>
+        String(argument).includes('Encountered two children with the same key'),
+      ),
+    );
+    expect(duplicateKeyWarning).toBe(false);
+
+    errorSpy.mockRestore();
+  });
+
+  it('does not render duplicate keys when nested replies share an ID', () => {
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              {
+                id: 1,
+                author: '원댓글',
+                time: '오늘',
+                content: '원댓글',
+                replies: [
+                  {
+                    id: 4,
+                    author: '첫 답글',
+                    time: '오늘',
+                    content: '첫 답글',
+                    replies: [
+                      {
+                        id: 4,
+                        author: '중복 답글',
+                        time: '오늘',
+                        content: '중복 답글',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /답글 1개/i }));
+
+    const duplicateKeyWarning = errorSpy.mock.calls.some((call) =>
+      call.some((argument) =>
+        String(argument).includes('Encountered two children with the same key'),
+      ),
+    );
+    expect(duplicateKeyWarning).toBe(false);
+
+    errorSpy.mockRestore();
   });
 
   it('opens a composer with title, body, toolbar, and attachment area', async () => {
@@ -215,6 +490,44 @@ describe('Community notice page', () => {
     expect(
       screen.queryByRole('button', { name: '이전 댓글 불러오기' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the previous-comments loader from three root comments', () => {
+    const onLoadPreviousComments = vi.fn();
+
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 11, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 12,
+                author: '둘째 댓글',
+                time: '오늘',
+                content: '둘째 댓글',
+              },
+              {
+                id: 13,
+                author: '셋째 댓글',
+                time: '오늘',
+                content: '셋째 댓글',
+              },
+            ],
+            commentCount: 3,
+            hasPreviousComments: true,
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+        onLoadPreviousComments={onLoadPreviousComments}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 불러오기' }),
+    ).toBeInTheDocument();
   });
 
   it('requests the previous cursor once and renders merged older comments without duplicates', async () => {
@@ -450,7 +763,7 @@ describe('Community notice page', () => {
     );
 
     await waitFor(() =>
-      expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 4),
+      expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 5),
     );
   });
 

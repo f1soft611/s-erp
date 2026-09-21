@@ -16,6 +16,11 @@ export type NoticeCommentItem = {
 export type NoticeFeedItem = {
   id: number;
   title: string;
+  viewCount?: number;
+  createdAt?: string | Date | null;
+  noticeGubunCode?: string;
+  noticeGubunName?: string;
+  isNotice?: string;
   meta: string;
   state: string;
   summary: string;
@@ -39,11 +44,6 @@ export type NoticeFeedItem = {
   liked?: boolean;
   likeCount?: number;
   bookmarked?: boolean;
-};
-
-export type SummaryStat = {
-  label: string;
-  value: string;
 };
 
 export const noticeFeed: NoticeFeedItem[] = [
@@ -160,11 +160,4 @@ export const noticeFeed: NoticeFeedItem[] = [
     commentCount: 9,
     highlight: false,
   },
-];
-
-export const summaryStats: SummaryStat[] = [
-  { label: '전체 공지', value: '84' },
-  { label: '이번 주', value: '12' },
-  { label: '중요 공지', value: '06' },
-  { label: '첨부 문서', value: '28' },
 ];

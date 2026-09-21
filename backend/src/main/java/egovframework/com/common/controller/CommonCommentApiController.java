@@ -90,7 +90,7 @@ public class CommonCommentApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 수정 정보가 올바르지 않습니다.");
         }
 
-        CommonCommentVO updated = commonCommentService.updateComment(user.getTenantId(), commentId, request.getContent(), user.getId());
+        CommonCommentVO updated = commonCommentService.updateComment(user.getTenantId(), commentId, request.getContent(), user.getId(), user.getName());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", updated);
         resultMap.put("message", "댓글이 수정되었습니다.");
@@ -103,7 +103,7 @@ public class CommonCommentApiController {
             @PathVariable Long commentId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        commonCommentService.deleteComment(user.getTenantId(), commentId, user.getId());
+        commonCommentService.deleteComment(user.getTenantId(), commentId, user.getId(), user.getName());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("message", "댓글이 삭제되었습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
