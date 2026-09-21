@@ -153,6 +153,59 @@ export function calculateNoticeImageResizeWidth(
   return Math.max(120, Math.min(1200, Math.round(safeStartWidth + safeDelta)));
 }
 
+type NoticeImageResizeDirection =
+  | 'n'
+  | 'ne'
+  | 'e'
+  | 'se'
+  | 's'
+  | 'sw'
+  | 'w'
+  | 'nw';
+
+export function calculateNoticeImageResize(
+  startWidth: number,
+  startHeight: number,
+  deltaX: number,
+  deltaY: number,
+  direction: NoticeImageResizeDirection,
+): { width: number; height: number } {
+  const safeStartWidth = Number.isFinite(startWidth) ? startWidth : 320;
+  const safeStartHeight = Number.isFinite(startHeight) ? startHeight : 200;
+  const safeDeltaX = Number.isFinite(deltaX) ? deltaX : 0;
+  const safeDeltaY = Number.isFinite(deltaY) ? deltaY : 0;
+  const isCorner = direction.length === 2;
+  const hasHorizontalAxis = direction.includes('e') || direction.includes('w');
+  const hasVerticalAxis = direction.includes('n') || direction.includes('s');
+  const horizontalDelta = direction.includes('w') ? -safeDeltaX : safeDeltaX;
+  const verticalDelta = direction.includes('n') ? -safeDeltaY : safeDeltaY;
+
+  if (isCorner) {
+    const aspectRatio = Math.max(0.01, safeStartWidth / safeStartHeight);
+    const proposedWidth =
+      Math.abs(horizontalDelta) >= Math.abs(verticalDelta) * aspectRatio
+        ? safeStartWidth + horizontalDelta
+        : safeStartWidth + verticalDelta * aspectRatio;
+    const width = calculateNoticeImageResizeWidth(
+      safeStartWidth,
+      proposedWidth - safeStartWidth,
+    );
+    return {
+      width,
+      height: Math.max(80, Math.round(width / aspectRatio)),
+    };
+  }
+
+  const width = hasHorizontalAxis
+    ? calculateNoticeImageResizeWidth(safeStartWidth, horizontalDelta)
+    : Math.round(safeStartWidth);
+  const height = hasVerticalAxis
+    ? Math.max(80, Math.round(safeStartHeight + verticalDelta))
+    : Math.max(80, Math.round(safeStartHeight));
+
+  return { width, height };
+}
+
 function sanitizeCellStyle(cell: Element): string | null {
   const declarations: string[] = [];
   const style = (cell as HTMLElement).style;
@@ -902,7 +955,7 @@ export function NoticeComposerDialog({
   }, [editor, open, defaultBody]);
 
   useEffect(() => {
-    if (!editor) {
+    if (!editor || !open) {
       return;
     }
 
@@ -910,36 +963,95 @@ export function NoticeComposerDialog({
       setEditorIsEmpty(editor.isEmpty);
     };
 
-    const resizeHandle = document.createElement('button');
-    resizeHandle.type = 'button';
-    resizeHandle.className = 'notice-image-resize-handle';
-    resizeHandle.setAttribute('aria-label', '이미지 너비 조절');
-    resizeHandle.title = '이미지 너비 조절';
-    resizeHandle.style.display = 'none';
-    resizeHandle.style.position = 'fixed';
-    document.body.appendChild(resizeHandle);
+    const resizeOverlay = document.createElement('div');
+    resizeOverlay.className = 'notice-image-resize-overlay';
+    resizeOverlay.setAttribute('aria-label', '이미지 크기 조절 영역');
+    resizeOverlay.style.display = 'none';
+    resizeOverlay.style.position = 'fixed';
+    resizeOverlay.style.zIndex = '1400';
+    resizeOverlay.style.pointerEvents = 'none';
+    resizeOverlay.style.boxSizing = 'border-box';
+    resizeOverlay.style.border = '1px solid #2563eb';
+    resizeOverlay.style.touchAction = 'none';
+
+    const resizeDirections: Array<NoticeImageResizeDirection> = [
+      'nw',
+      'n',
+      'ne',
+      'e',
+      'se',
+      's',
+      'sw',
+      'w',
+    ];
+    const resizeHandles = resizeDirections.map((direction) => {
+      const handle = document.createElement('span');
+      handle.className = `notice-image-resize-handle notice-image-resize-handle-${direction}`;
+      handle.dataset.direction = direction;
+      handle.setAttribute('aria-label', `${direction} 방향 이미지 크기 조절`);
+      handle.style.position = 'absolute';
+      handle.style.width = '10px';
+      handle.style.height = '10px';
+      handle.style.border = '1px solid #1d4ed8';
+      handle.style.borderRadius = '2px';
+      handle.style.backgroundColor = '#ffffff';
+      handle.style.pointerEvents = 'auto';
+      handle.style.touchAction = 'none';
+      handle.style.transform = 'translate(-50%, -50%)';
+      return handle;
+    });
+    resizeHandles.forEach((handle) => resizeOverlay.appendChild(handle));
+    document.body.appendChild(resizeOverlay);
 
     let selectedImage: HTMLImageElement | null = null;
     let selectedImagePosition = -1;
 
-    const syncResizeHandle = () => {
-      const selection = editor.state.selection;
+    const syncResizeOverlay = () => {
       const nodeElement = editor.view.dom.querySelector(
         'img.ProseMirror-selectednode',
       );
       selectedImage =
         nodeElement instanceof HTMLImageElement ? nodeElement : null;
-      selectedImagePosition = selectedImage ? selection.from : -1;
+      selectedImagePosition = selectedImage
+        ? editor.view.posAtDOM(selectedImage, 0)
+        : -1;
 
       if (!selectedImage) {
-        resizeHandle.style.display = 'none';
+        resizeOverlay.style.display = 'none';
         return;
       }
 
       const imageRect = selectedImage.getBoundingClientRect();
-      resizeHandle.style.display = 'block';
-      resizeHandle.style.left = `${imageRect.right - 6}px`;
-      resizeHandle.style.top = `${imageRect.top + imageRect.height / 2 - 18}px`;
+      const editorRect = editor.view.dom.getBoundingClientRect();
+      const clipTop = Math.max(0, editorRect.top - imageRect.top);
+      const clipRight = Math.max(0, imageRect.right - editorRect.right);
+      const clipBottom = Math.max(0, imageRect.bottom - editorRect.bottom);
+      const clipLeft = Math.max(0, editorRect.left - imageRect.left);
+      resizeOverlay.style.display = 'block';
+      resizeOverlay.style.left = `${imageRect.left}px`;
+      resizeOverlay.style.top = `${imageRect.top}px`;
+      resizeOverlay.style.width = `${imageRect.width}px`;
+      resizeOverlay.style.height = `${imageRect.height}px`;
+      resizeOverlay.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)`;
+
+      const positions: Record<NoticeImageResizeDirection, [string, string]> = {
+        nw: ['0%', '0%'],
+        n: ['50%', '0%'],
+        ne: ['100%', '0%'],
+        e: ['100%', '50%'],
+        se: ['100%', '100%'],
+        s: ['50%', '100%'],
+        sw: ['0%', '100%'],
+        w: ['0%', '50%'],
+      };
+      resizeHandles.forEach((handle) => {
+        const direction = handle.dataset
+          .direction as NoticeImageResizeDirection;
+        const [left, top] = positions[direction];
+        handle.style.left = left;
+        handle.style.top = top;
+        handle.style.cursor = `${direction}-resize`;
+      });
     };
 
     const handleImagePointerDown = (event: MouseEvent) => {
@@ -955,32 +1067,45 @@ export function NoticeComposerDialog({
       }
 
       editor.commands.setNodeSelection(imagePos);
-      syncResizeHandle();
+      syncResizeOverlay();
     };
 
     const handleResizePointerDown = (event: PointerEvent) => {
-      if (!selectedImage || selectedImagePosition < 0) {
+      const target = event.target as HTMLElement | null;
+      const direction = target?.dataset.direction as
+        | NoticeImageResizeDirection
+        | undefined;
+      if (!direction || !selectedImage || selectedImagePosition < 0) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
       const resizeStartX = event.clientX;
+      const resizeStartY = event.clientY;
       const resizeStartWidth =
         selectedImage.getBoundingClientRect().width || 320;
+      const resizeStartHeight =
+        selectedImage.getBoundingClientRect().height || 200;
 
       const handlePointerMove = (moveEvent: PointerEvent) => {
-        const nextWidth = calculateNoticeImageResizeWidth(
+        const nextSize = calculateNoticeImageResize(
           resizeStartWidth,
+          resizeStartHeight,
           moveEvent.clientX - resizeStartX,
+          moveEvent.clientY - resizeStartY,
+          direction,
         );
         editor
           .chain()
           .focus()
           .setNodeSelection(selectedImagePosition)
-          .updateAttributes('image', { width: `${nextWidth}px` })
+          .updateAttributes('image', {
+            width: `${nextSize.width}px`,
+            height: `${nextSize.height}px`,
+          })
           .run();
-        syncResizeHandle();
+        syncResizeOverlay();
       };
 
       const handlePointerUp = () => {
@@ -997,26 +1122,37 @@ export function NoticeComposerDialog({
     editor.on('update', syncEditorState);
     editor.on('selectionUpdate', syncEditorState);
     editor.view.dom.addEventListener('mousedown', handleImagePointerDown);
-    resizeHandle.addEventListener('pointerdown', handleResizePointerDown);
-    editor.on('selectionUpdate', syncResizeHandle);
-    editor.on('update', syncResizeHandle);
-    window.addEventListener('resize', syncResizeHandle);
-    window.addEventListener('scroll', syncResizeHandle, true);
-    syncResizeHandle();
+    resizeOverlay.addEventListener('pointerdown', handleResizePointerDown);
+    editor.on('selectionUpdate', syncResizeOverlay);
+    editor.on('update', syncResizeOverlay);
+    window.addEventListener('resize', syncResizeOverlay);
+    window.addEventListener('scroll', syncResizeOverlay, true);
+    editor.view.dom.addEventListener('scroll', syncResizeOverlay, true);
+    syncResizeOverlay();
 
     return () => {
       editor.off('create', syncEditorState);
       editor.off('update', syncEditorState);
       editor.off('selectionUpdate', syncEditorState);
       editor.view.dom.removeEventListener('mousedown', handleImagePointerDown);
-      editor.off('selectionUpdate', syncResizeHandle);
-      editor.off('update', syncResizeHandle);
-      resizeHandle.removeEventListener('pointerdown', handleResizePointerDown);
-      window.removeEventListener('resize', syncResizeHandle);
-      window.removeEventListener('scroll', syncResizeHandle, true);
-      resizeHandle.remove();
+      editor.off('selectionUpdate', syncResizeOverlay);
+      editor.off('update', syncResizeOverlay);
+      resizeOverlay.removeEventListener('pointerdown', handleResizePointerDown);
+      window.removeEventListener('resize', syncResizeOverlay);
+      window.removeEventListener('scroll', syncResizeOverlay, true);
+      editor.view.dom.removeEventListener('scroll', syncResizeOverlay, true);
+      resizeOverlay.remove();
     };
-  }, [editor]);
+  }, [editor, open]);
+
+  useEffect(() => {
+    if (!editor || open) {
+      return;
+    }
+
+    editor.commands.setTextSelection(1);
+    editor.commands.blur();
+  }, [editor, open]);
 
   const toolbarItems = [
     {
@@ -1328,6 +1464,12 @@ export function NoticeComposerDialog({
                   color: theme.palette.text.disabled,
                   opacity: 1,
                 },
+                '& .MuiInputBase-input': {
+                  fontSize: '1.25rem',
+                  lineHeight: 1.4,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                },
                 '& .MuiFormLabel-root': {
                   color: theme.palette.text.secondary,
                 },
@@ -1393,20 +1535,7 @@ export function NoticeComposerDialog({
                       position: 'relative',
                       display: 'flex',
                       flexDirection: 'column',
-                    },
-                    '& .notice-image-resize-handle': {
-                      position: 'absolute',
-                      zIndex: 3,
-                      width: 12,
-                      height: 36,
-                      padding: 0,
-                      border: '1px solid',
-                      borderColor: 'primary.main',
-                      borderRadius: 1,
-                      backgroundColor: 'background.paper',
-                      cursor: 'ew-resize',
-                      boxShadow: 1,
-                      touchAction: 'none',
+                      overflow: 'hidden',
                     },
                     '& .notice-composer-editor .ProseMirror': {
                       ...noticeContentStyles,

@@ -924,7 +924,7 @@ export function NoticeFeedList({
                     }}
                     sx={{ mt: 1.5 }}
                   >
-                    이전 댓글 불러오기
+                    이전 댓글 보기
                   </Button>
                 )}
 
@@ -979,7 +979,7 @@ export function NoticeFeedList({
                   }
                   isDark={isDark}
                   showComposer
-                  placeholder="댓글을 입력하세요"
+                  placeholder="줄바꿈 Shift+Enter, 입력 Enter"
                   composerLabel="댓글 입력"
                   submitLabel="등록"
                 />

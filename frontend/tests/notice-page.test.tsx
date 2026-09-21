@@ -127,6 +127,37 @@ describe('Community notice page', () => {
     });
   });
 
+  it('shows multiple embedded images with horizontal carousel controls', () => {
+    const item = {
+      ...noticeFeed[0],
+      bodyHtml:
+        '<p>공지 내용</p><p><img src="https://example.com/notice-image-1.png" alt="첫 번째 이미지" /><img src="https://example.com/notice-image-2.png" alt="두 번째 이미지" /></p>',
+      summary: '공지 요약',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={() => undefined}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    expect(screen.getByAltText('첫 번째 이미지')).toBeInTheDocument();
+    expect(screen.queryByAltText('두 번째 이미지')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 이미지' }));
+
+    expect(screen.queryByAltText('첫 번째 이미지')).not.toBeInTheDocument();
+    expect(screen.getByAltText('두 번째 이미지')).toBeInTheDocument();
+  });
+
   it('does not render duplicate comment keys when the API repeats a comment', () => {
     const errorSpy = vi
       .spyOn(console, 'error')

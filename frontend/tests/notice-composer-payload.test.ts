@@ -6,6 +6,7 @@ import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/co
 import { createAppTheme } from '../src/theme/theme';
 import {
   normalizeClipboardHtmlForEditor,
+  calculateNoticeImageResize,
   calculateNoticeImageResizeWidth,
   serializeNoticeEditorJson,
 } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
@@ -106,6 +107,32 @@ describe('NoticeComposerDialog payload', () => {
     expect(calculateNoticeImageResizeWidth(320, -500)).toBe(120);
     expect(calculateNoticeImageResizeWidth(320, 100)).toBe(420);
     expect(calculateNoticeImageResizeWidth(1200, 300)).toBe(1200);
+  });
+
+  it('calculates axis-only image resizing for each edge', () => {
+    expect(calculateNoticeImageResize(320, 200, 100, 0, 'e')).toEqual({
+      width: 420,
+      height: 200,
+    });
+    expect(calculateNoticeImageResize(320, 200, 50, 0, 'w')).toEqual({
+      width: 270,
+      height: 200,
+    });
+    expect(calculateNoticeImageResize(320, 200, 0, 50, 's')).toEqual({
+      width: 320,
+      height: 250,
+    });
+    expect(calculateNoticeImageResize(320, 200, 0, 50, 'n')).toEqual({
+      width: 320,
+      height: 150,
+    });
+  });
+
+  it('preserves the aspect ratio while resizing from a corner', () => {
+    expect(calculateNoticeImageResize(320, 200, 100, 0, 'se')).toEqual({
+      width: 420,
+      height: 263,
+    });
   });
 
   it('still mounts the composer when image content is present', async () => {
