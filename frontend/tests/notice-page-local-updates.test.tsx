@@ -154,7 +154,8 @@ describe('CommunityNoticePage local updates', () => {
   it('reloads notices and switches to the selected list view', async () => {
     renderPage();
 
-    expect(await screen.findByText('기존 공지')).toBeInTheDocument();
+    const feedList = await screen.findByTestId('notice-feed-list');
+    expect(within(feedList).getByText('기존 공지')).toBeInTheDocument();
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
@@ -163,8 +164,11 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByRole('region', { name: '리스트형 공지 목록' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('기존 공지')).toBeInTheDocument();
-    expect(screen.getByText('관리자')).toBeInTheDocument();
+    const listRegion = screen.getByRole('region', {
+      name: '리스트형 공지 목록',
+    });
+    expect(within(listRegion).getByText('기존 공지')).toBeInTheDocument();
+    expect(within(listRegion).getByText('관리자')).toBeInTheDocument();
   });
 
   it('shows the list skeleton while the list view reloads', async () => {
@@ -184,7 +188,8 @@ describe('CommunityNoticePage local updates', () => {
       );
 
     renderPage();
-    expect(await screen.findByText('기존 공지')).toBeInTheDocument();
+    const feedList = await screen.findByTestId('notice-feed-list');
+    expect(within(feedList).getByText('기존 공지')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
 

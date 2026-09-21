@@ -47,3 +47,13 @@
 - 최종 공통 테스트: `npm run test -- tests/common-view-mode.test.tsx tests/notice-view-adapter.test.ts` 통과 (2개 파일, 5개 테스트)
 - 최종 빌드: `npm run build` 성공.
 - 결과 문서: [README](./README.md)
+- 레이아웃 확장: 공통 `ContentSplitLayout`, 우측 `SummaryPanelSkeleton`, 문서형 `ListView` 및 리스트 스켈레톤 구현.
+- 핵심 테스트: 공통 셸·문서형 리스트 6개, 공지 모드 전환·리스트 스켈레톤 2개 통과.
+- 레이아웃 빌드: `npm run build` 성공.
+- 브라우저 레이아웃: 좌측 상단 도구·상단 고정 영역·문서형 리스트·우측 요약/최근 이슈 확인.
+- 브라우저 sticky: 우측 슬롯 computed style `position: sticky`, `top: 16px` 확인.
+- 브라우저 리스트 행: 리스트형 공지 9개 행 렌더링 확인.
+- 최신 캡처: `screenshots/list-document-layout.png`
+- 최종 타입 진단: 변경 주요 파일 오류 없음.
+- 최종 핵심 테스트: 8개 통과, 0개 실패, 29개 스킵.
+- 최종 공백 검사: `git diff --check` 통과.

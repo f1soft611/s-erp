@@ -11,21 +11,20 @@ export function ListViewSkeleton() {
           key={index}
           sx={{
             display: 'grid',
-            gridTemplateColumns: {
-              xs: 'minmax(0, 1fr)',
-              sm: 'minmax(0, 1fr) minmax(92px, 0.3fr) minmax(150px, 0.4fr)',
-            },
+            gridTemplateColumns: '24px minmax(0, 1fr)',
             gap: 1.5,
             alignItems: 'center',
-            minHeight: 48,
+            minHeight: 68,
             px: 1.5,
             borderBottom: '1px solid',
             borderColor: 'divider',
           }}
         >
-          <Skeleton variant="text" />
-          <Skeleton variant="text" />
-          <Skeleton variant="text" />
+          <Skeleton variant="rounded" width={18} height={20} />
+          <Box>
+            <Skeleton variant="text" width="70%" />
+            <Skeleton variant="text" width="48%" />
+          </Box>
         </Box>
       ))}
     </Stack>

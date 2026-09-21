@@ -387,7 +387,7 @@ export function NoticeFeedList({
   };
 
   return (
-    <>
+    <Box data-testid="notice-feed-list">
       <FeedView
         items={items}
         renderItem={(item) => {
@@ -1052,6 +1052,6 @@ export function NoticeFeedList({
         alt={viewerImage?.alt ?? '원본 이미지'}
         onClose={() => setViewerImage(null)}
       />
-    </>
+    </Box>
   );
 }

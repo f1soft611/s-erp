@@ -5,6 +5,8 @@ import { FeedViewSkeleton } from '../src/shared/components/view-mode/FeedViewSke
 import { ListView } from '../src/shared/components/view-mode/ListView';
 import { ListViewSkeleton } from '../src/shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../src/shared/components/view-mode/PinnedItemsPanel';
+import { ContentSplitLayout } from '../src/shared/components/view-mode/ContentSplitLayout';
+import { SummaryPanelSkeleton } from '../src/shared/components/view-mode/SummaryPanelSkeleton';
 import { ViewModeToggle } from '../src/shared/components/view-mode/ViewModeToggle';
 import type { CommonViewItem } from '../src/shared/components/view-mode/commonViewTypes';
 
@@ -72,5 +74,26 @@ describe('common notice view mode components', () => {
 
     expect(screen.getByTestId('feed-view-skeleton')).toBeInTheDocument();
     expect(screen.getByTestId('list-view-skeleton')).toBeInTheDocument();
+  });
+
+  it('renders a sticky summary slot beside the list slot', () => {
+    render(
+      <ContentSplitLayout
+        left={<div>목록 영역</div>}
+        right={<div data-testid="summary-slot">요약 영역</div>}
+      />,
+    );
+
+    expect(screen.getByText('목록 영역')).toBeInTheDocument();
+    expect(screen.getByTestId('summary-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('view-mode-right-slot')).toHaveStyle({
+      position: 'sticky',
+    });
+  });
+
+  it('renders the summary skeleton for the right slot', () => {
+    render(<SummaryPanelSkeleton />);
+
+    expect(screen.getByTestId('summary-panel-skeleton')).toBeInTheDocument();
   });
 });

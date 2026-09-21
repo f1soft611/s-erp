@@ -1,11 +1,7 @@
 import {
   Box,
-  Card,
-  CardContent,
   Container,
   IconButton,
-  Skeleton,
-  Stack,
   Typography,
   useTheme,
 } from '@mui/material';
@@ -15,9 +11,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { FeedViewSkeleton } from '../../../../shared/components/view-mode/FeedViewSkeleton';
+import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { ListView } from '../../../../shared/components/view-mode/ListView';
 import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
+import { SummaryPanelSkeleton } from '../../../../shared/components/view-mode/SummaryPanelSkeleton';
 import { ViewModeToggle } from '../../../../shared/components/view-mode/ViewModeToggle';
 import type { CommonViewMode } from '../../../../shared/components/view-mode/commonViewTypes';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -493,6 +491,15 @@ export function CommunityNoticePage({
   const noticeViewItems = useMemo(
     () => toNoticeViewItems(noticeItems),
     [noticeItems],
+  );
+  const unpinnedNoticeItems = useMemo(
+    () =>
+      noticeItems.filter((item) => !item.highlight && item.isNotice !== 'Y'),
+    [noticeItems],
+  );
+  const unpinnedNoticeViewItems = useMemo(
+    () => noticeViewItems.filter((item) => !item.isPinned),
+    [noticeViewItems],
   );
   useEffect(() => {
     noticeGubunNamesRef.current = noticeGubunNames;
@@ -1138,24 +1145,6 @@ export function CommunityNoticePage({
       <PageMessageArea message="" onClose={() => setErrorMessage(null)} />
 
       <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: { xs: 1.5, md: 3 },
-          py: 1,
-          borderBottom: `1px solid ${
-            isDark ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.18)'
-          }`,
-        }}
-      >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <PinnedItemsPanel items={noticeViewItems} />
-        </Box>
-        <ViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
-      </Box>
-
-      <Box
         sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
       >
         <Container
@@ -1168,9 +1157,35 @@ export function CommunityNoticePage({
             flexDirection: 'column',
           }}
         >
-          {isInitialLoading ? (
+          {isInitialLoading || isRefreshing ? (
             viewMode === 'list' ? (
-              <ListViewSkeleton />
+              <ContentSplitLayout
+                left={
+                  <>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2" color="text.secondary">
+                        상단고정 0건
+                      </Typography>
+                      <ViewModeToggle
+                        mode={viewMode}
+                        onChange={handleViewModeChange}
+                      />
+                    </Box>
+                    <PinnedItemsPanel items={[]} />
+                    <Box sx={{ mt: 2 }}>
+                      <ListViewSkeleton />
+                    </Box>
+                  </>
+                }
+                right={<SummaryPanelSkeleton />}
+              />
             ) : (
               <Box
                 sx={{
@@ -1179,98 +1194,11 @@ export function CommunityNoticePage({
                   gap: 2,
                 }}
               >
-                <FeedViewSkeleton />
+                <Box data-testid="notice-feed-skeleton">
+                  <FeedViewSkeleton />
+                </Box>
 
-                <Stack spacing={2} data-testid="notice-summary-skeleton">
-                  <Card
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${
-                        isDark
-                          ? 'rgba(148,163,184,0.18)'
-                          : 'rgba(148,163,184,0.18)'
-                      }`,
-                    }}
-                  >
-                    <CardContent sx={{ p: 2.5 }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          mb: 2,
-                        }}
-                      >
-                        <Skeleton variant="text" width="36%" height={28} />
-                        <Skeleton
-                          variant="rectangular"
-                          width={52}
-                          height={24}
-                          sx={{ borderRadius: 999 }}
-                        />
-                      </Box>
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <Box
-                          key={`summary-row-${index}`}
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            py: 1.2,
-                          }}
-                        >
-                          <Skeleton variant="text" width="38%" height={20} />
-                          <Skeleton variant="text" width="18%" height={20} />
-                        </Box>
-                      ))}
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    sx={{
-                      borderRadius: 3,
-                      border: `1px solid ${
-                        isDark
-                          ? 'rgba(148,163,184,0.18)'
-                          : 'rgba(148,163,184,0.18)'
-                      }`,
-                    }}
-                  >
-                    <CardContent sx={{ p: 2.5 }}>
-                      <Skeleton
-                        variant="text"
-                        width="38%"
-                        height={28}
-                        sx={{ mb: 1.5 }}
-                      />
-                      {Array.from({ length: 3 }).map((_, index) => (
-                        <Box
-                          key={`issue-row-${index}`}
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: 1,
-                            p: 1.2,
-                            borderRadius: 2,
-                            mb: 1.25,
-                            bgcolor: isDark
-                              ? 'rgba(148,163,184,0.06)'
-                              : '#f8fafc',
-                          }}
-                        >
-                          <Skeleton variant="text" width="58%" height={20} />
-                          <Skeleton
-                            variant="rectangular"
-                            width={52}
-                            height={24}
-                            sx={{ borderRadius: 999 }}
-                          />
-                        </Box>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </Stack>
+                <SummaryPanelSkeleton />
               </Box>
             )
           ) : errorMessage && !isRefreshing && !hasVisibleNoticeList ? (
@@ -1317,95 +1245,123 @@ export function CommunityNoticePage({
               등록된 공지가 없습니다.
             </Box>
           ) : (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: '1.7fr 0.9fr' },
-                gap: 2,
-              }}
-            >
-              {viewMode === 'feed' ? (
-                <NoticeFeedList
-                  items={noticeItems}
-                  isDark={isDark}
-                  isRefreshing={isRefreshing}
-                  expandedNoticeId={expandedNoticeId}
-                  onToggleExpand={handleToggleNoticeExpand}
-                  onNoticeInteract={handleNoticeInteract}
-                  onToggleLike={handleToggleLike}
-                  onToggleBookmark={handleToggleBookmark}
-                  onAddComment={handleAddComment}
-                  onEditComment={handleUpdateComment}
-                  onDeleteComment={handleDeleteComment}
-                  onLoadPreviousComments={handleLoadPreviousComments}
-                  onLoadPreviousCommentsError={() =>
-                    showError('이전 댓글을 불러오지 못했습니다.')
-                  }
-                  onDownloadCommentAttachment={handleDownloadCommentAttachment}
-                  onDeleteCommentAttachment={handleDeleteCommentAttachment}
-                  serverItemRevision={serverItemRevision}
-                  onDelete={handleDeleteNotice}
-                  onEdit={async (item) => {
-                    const mappedAttachments = (
-                      item.attachmentDetails ?? []
-                    ).map((attachment) => ({
-                      id: String(
-                        attachment.boardFileId ??
-                          attachment.objectKey ??
-                          `${item.id}-${Math.random()}`,
-                      ),
-                      name: attachment.name,
-                      size: attachment.size,
-                      extension:
-                        attachment.name.split('.').pop()?.toUpperCase() ||
-                        undefined,
-                      boardFileId: attachment.boardFileId,
-                      objectKey: attachment.objectKey,
-                      bucketName: attachment.bucketName,
-                      postId: item.id,
-                    }));
-
-                    setEditorDraft({
-                      id: item.id,
-                      title: item.title,
-                      body: normalizeNoticeEmbeddedImageSources(
-                        item.bodyHtml ?? item.body,
-                        item.id,
-                      ),
-                      noticeGubunCode: item.noticeGubunCode,
-                      isNotice: item.isNotice === 'Y' ? 'Y' : 'N',
-                      attachments: mappedAttachments,
-                    });
-                    setIsComposerOpen(true);
-                  }}
-                  onDownload={(noticeId, file) => {
-                    void (async () => {
-                      const detail = await fetchNoticePostDetail(noticeId);
-                      const nextAttachment = (detail.attachments ?? []).find(
-                        (attachment) =>
-                          String(attachment.boardFileId ?? '') ===
-                            String(file.boardFileId ?? '') ||
-                          (attachment.fileName ?? '') === file.name,
-                      );
-
-                      if (nextAttachment) {
-                        await downloadNoticeAttachment({
-                          ...nextAttachment,
-                          postId: noticeId,
-                        });
+            <ContentSplitLayout
+              left={
+                <>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1.5,
+                      mb: 1.5,
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 700, color: 'text.secondary' }}
+                    >
+                      상단고정{' '}
+                      {noticeViewItems.filter((item) => item.isPinned).length}건
+                    </Typography>
+                    <ViewModeToggle
+                      mode={viewMode}
+                      onChange={handleViewModeChange}
+                    />
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <PinnedItemsPanel items={noticeViewItems} />
+                  </Box>
+                  {viewMode === 'feed' ? (
+                    <NoticeFeedList
+                      items={unpinnedNoticeItems}
+                      isDark={isDark}
+                      isRefreshing={isRefreshing}
+                      expandedNoticeId={expandedNoticeId}
+                      onToggleExpand={handleToggleNoticeExpand}
+                      onNoticeInteract={handleNoticeInteract}
+                      onToggleLike={handleToggleLike}
+                      onToggleBookmark={handleToggleBookmark}
+                      onAddComment={handleAddComment}
+                      onEditComment={handleUpdateComment}
+                      onDeleteComment={handleDeleteComment}
+                      onLoadPreviousComments={handleLoadPreviousComments}
+                      onLoadPreviousCommentsError={() =>
+                        showError('이전 댓글을 불러오지 못했습니다.')
                       }
-                    })();
-                  }}
+                      onDownloadCommentAttachment={
+                        handleDownloadCommentAttachment
+                      }
+                      onDeleteCommentAttachment={handleDeleteCommentAttachment}
+                      serverItemRevision={serverItemRevision}
+                      onDelete={handleDeleteNotice}
+                      onEdit={async (item) => {
+                        const mappedAttachments = (
+                          item.attachmentDetails ?? []
+                        ).map((attachment) => ({
+                          id: String(
+                            attachment.boardFileId ??
+                              attachment.objectKey ??
+                              `${item.id}-${Math.random()}`,
+                          ),
+                          name: attachment.name,
+                          size: attachment.size,
+                          extension:
+                            attachment.name.split('.').pop()?.toUpperCase() ||
+                            undefined,
+                          boardFileId: attachment.boardFileId,
+                          objectKey: attachment.objectKey,
+                          bucketName: attachment.bucketName,
+                          postId: item.id,
+                        }));
+
+                        setEditorDraft({
+                          id: item.id,
+                          title: item.title,
+                          body: normalizeNoticeEmbeddedImageSources(
+                            item.bodyHtml ?? item.body,
+                            item.id,
+                          ),
+                          noticeGubunCode: item.noticeGubunCode,
+                          isNotice: item.isNotice === 'Y' ? 'Y' : 'N',
+                          attachments: mappedAttachments,
+                        });
+                        setIsComposerOpen(true);
+                      }}
+                      onDownload={(noticeId, file) => {
+                        void (async () => {
+                          const detail = await fetchNoticePostDetail(noticeId);
+                          const nextAttachment = (
+                            detail.attachments ?? []
+                          ).find(
+                            (attachment) =>
+                              String(attachment.boardFileId ?? '') ===
+                                String(file.boardFileId ?? '') ||
+                              (attachment.fileName ?? '') === file.name,
+                          );
+
+                          if (nextAttachment) {
+                            await downloadNoticeAttachment({
+                              ...nextAttachment,
+                              postId: noticeId,
+                            });
+                          }
+                        })();
+                      }}
+                    />
+                  ) : (
+                    <ListView items={unpinnedNoticeViewItems} />
+                  )}
+                </>
+              }
+              right={
+                <NoticeSummaryPanel
+                  stats={noticeSummary.stats}
+                  recentIssues={noticeSummary.recentIssues}
+                  isDark={isDark}
                 />
-              ) : (
-                <ListView items={noticeViewItems} />
-              )}
-              <NoticeSummaryPanel
-                stats={noticeSummary.stats}
-                recentIssues={noticeSummary.recentIssues}
-                isDark={isDark}
-              />
-            </Box>
+              }
+            />
           )}
         </Container>
       </Box>
