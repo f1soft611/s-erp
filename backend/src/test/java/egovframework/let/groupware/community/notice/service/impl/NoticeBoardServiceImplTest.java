@@ -142,6 +142,40 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void listPostsDoesNotDuplicateCommonFilesOrExposeEmbeddedImagesAsAttachments() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        CommonFileVO attachment = new CommonFileVO();
+        attachment.setFileId(201L);
+        attachment.setFileUsageType("ATTACHMENT");
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(202L);
+        embeddedImage.setFileUsageType("EMBEDDED");
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Arrays.asList(post));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(attachment, embeddedImage));
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
+            .thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(1L, "", 1, 20).get(0);
+
+        assertThat(result.getAttachments()).hasSize(1);
+        assertThat(result.getAttachments().get(0).getBoardFileId()).isEqualTo(201L);
+        assertThat(result.getAttachmentCount()).isEqualTo(1);
+        org.mockito.Mockito.verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void getPostHydratesAttachmentsForEachNoticeComment() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
@@ -184,13 +218,15 @@ class NoticeBoardServiceImplTest {
         embeddedImage.setBoardFileId(73L);
         embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
         embeddedImage.setFileUsageType("EMBEDDED");
+        CommonFileVO embeddedCommonFile = new CommonFileVO();
+        embeddedCommonFile.setFileId(73L);
+        embeddedCommonFile.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedCommonFile.setFileUsageType("EMBEDDED");
         CommonCommentPageVO commentPage = new CommonCommentPageVO();
         commentPage.setComments(Collections.emptyList());
 
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(post);
-        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap()))
-            .thenReturn(Arrays.asList(embeddedImage));
-        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(embeddedCommonFile));
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
 
@@ -245,6 +281,27 @@ class NoticeBoardServiceImplTest {
             .deleteAttachment(1L, 7L, 8L);
 
         verify(commonFileService).deleteFile(1L, "NOTICE", 7L, 8L);
+    }
+
+    @Test
+    void deleteAttachmentRejectsEmbeddedImageAsGeneralAttachment() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(9L);
+        embeddedImage.setFileUsageType("EMBEDDED");
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(embeddedImage));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+            () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, commonFileService, commonCommentService)
+                .deleteAttachment(1L, 7L, 9L));
+
+        assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        verify(commonFileService, org.mockito.Mockito.never())
+            .deleteFile(1L, "NOTICE", 7L, 9L);
     }
 
     @Test

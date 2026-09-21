@@ -1,6 +1,10 @@
 import { Box, IconButton, Typography } from '@mui/material';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import {
+  getAttachmentExtension,
+  getAttachmentIconMeta,
+} from './attachmentIconMeta';
 
 export type AttachmentListItem = {
   id: string;
@@ -18,26 +22,6 @@ export type AttachmentListProps = {
   onRemove?: (id: string) => void;
 };
 
-function getFileIconMeta(fileName: string) {
-  const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
-  const map: Record<string, { bg: string; color: string; label: string }> = {
-    pdf: { bg: '#fecaca', color: '#991b1b', label: 'PDF' },
-    xls: { bg: '#bbf7d0', color: '#166534', label: 'XLS' },
-    xlsx: { bg: '#bbf7d0', color: '#166534', label: 'XLSX' },
-    doc: { bg: '#bfdbfe', color: '#1d4ed8', label: 'DOC' },
-    docx: { bg: '#bfdbfe', color: '#1d4ed8', label: 'DOCX' },
-    ppt: { bg: '#fed7aa', color: '#b45309', label: 'PPT' },
-    pptx: { bg: '#fed7aa', color: '#b45309', label: 'PPTX' },
-    png: { bg: '#ddd6fe', color: '#5b21b6', label: 'PNG' },
-    jpg: { bg: '#d1fae5', color: '#065f46', label: 'JPG' },
-    jpeg: { bg: '#d1fae5', color: '#065f46', label: 'JPG' },
-    zip: { bg: '#e5e7eb', color: '#374151', label: 'ZIP' },
-    hwp: { bg: '#dbeafe', color: '#1d4ed8', label: 'HWP' },
-  };
-
-  return map[extension] ?? { bg: '#e2e8f0', color: '#475569', label: 'FILE' };
-}
-
 export function AttachmentList({
   files,
   isDark = false,
@@ -53,7 +37,7 @@ export function AttachmentList({
   return (
     <Box data-testid="notice-attachment-list" sx={{ display: 'grid', gap: 1 }}>
       {files.map((file, index) => {
-        const iconMeta = getFileIconMeta(file.name);
+        const iconMeta = getAttachmentIconMeta(file.name);
 
         return (
           <Box
@@ -95,8 +79,12 @@ export function AttachmentList({
                   fontWeight: 800,
                   flexShrink: 0,
                 }}
+                data-testid={`attachment-icon-${getAttachmentExtension(file.name)}`}
               >
-                {iconMeta.label}
+                <iconMeta.icon
+                  fontSize="small"
+                  aria-label={`${iconMeta.label} 파일 아이콘`}
+                />
               </Box>
               <Typography
                 variant="body2"

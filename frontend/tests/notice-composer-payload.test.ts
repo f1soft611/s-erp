@@ -45,6 +45,25 @@ describe('NoticeComposerDialog payload', () => {
     expect(screen.getByText('구분을 선택해 주세요.')).toBeInTheDocument();
   });
 
+  it('renders a file-type icon for an existing spreadsheet attachment', () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          defaultAttachments: [
+            { id: 'file-1', name: '업무일정.xlsx', boardFileId: 101 },
+          ],
+        }),
+      ),
+    );
+
+    expect(screen.getByTestId('attachment-icon-xlsx')).toBeInTheDocument();
+  });
+
   it('saves the important notice checkbox as isNotice', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 

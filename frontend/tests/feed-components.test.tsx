@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
+import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import {
   CommentThread,
   isCommentSubmitKey,
@@ -44,6 +45,23 @@ describe('shared feed components', () => {
     expect(screen.getByText('공지사항 업데이트')).toBeInTheDocument();
     expect(screen.getByText('공지사항_안내.pdf')).toBeInTheDocument();
     expect(screen.getByText('확인했습니다.')).toBeInTheDocument();
+  });
+
+  it('renders a file-type icon for spreadsheet attachments', () => {
+    render(
+      <AttachmentList
+        files={[{ id: 'file-1', name: '업무일정.xlsx' }]}
+        showActions={false}
+      />,
+    );
+
+    expect(screen.getByTestId('attachment-icon-xlsx')).toBeInTheDocument();
+  });
+
+  it('maps known and unknown file extensions to icon metadata', () => {
+    expect(getAttachmentIconMeta('guide.pdf').label).toBe('PDF');
+    expect(getAttachmentIconMeta('archive.unknown').label).toBe('FILE');
+    expect(getAttachmentIconMeta('README').label).toBe('FILE');
   });
 
   it('uses a Tiptap editor and submits sanitized HTML for a comment', async () => {

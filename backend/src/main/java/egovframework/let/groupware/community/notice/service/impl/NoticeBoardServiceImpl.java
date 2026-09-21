@@ -96,17 +96,18 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
         List<CommonFileVO> commonFiles = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
         List<NoticeBoardFileVO> files = new ArrayList<>();
+        List<NoticeBoardFileVO> embeddedFiles = new ArrayList<>();
         if (commonFiles != null) {
             for (CommonFileVO commonFile : commonFiles) {
-                files.add(toNoticeBoardFile(commonFile));
+                NoticeBoardFileVO noticeFile = toNoticeBoardFile(commonFile);
+                if ("EMBEDDED".equalsIgnoreCase(commonFile.getFileUsageType())) {
+                    embeddedFiles.add(noticeFile);
+                } else {
+                    files.add(noticeFile);
+                }
             }
         }
-        HashMap<String, Object> boardFileParams = new HashMap<>();
-        boardFileParams.put("tenantId", tenantId);
-        boardFileParams.put("postId", postId);
-        List<NoticeBoardFileVO> embeddedFiles = noticeBoardDAO.selectNoticeAttachmentList(boardFileParams);
-        if (embeddedFiles != null) {
-            files.addAll(embeddedFiles);
+        if (!embeddedFiles.isEmpty()) {
             String stableContentsHtml = rewriteEmbeddedImageSources(
                 post.getEffectiveContentsHtml(), postId, embeddedFiles);
             post.setContentsHtml(stableContentsHtml);
@@ -441,7 +442,8 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         List<CommonFileVO> files = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
         boolean owned = files != null && files.stream()
-            .anyMatch(file -> Objects.equals(file.getFileId(), boardFileId));
+            .anyMatch(file -> Objects.equals(file.getFileId(), boardFileId)
+                && !"EMBEDDED".equalsIgnoreCase(file.getFileUsageType()));
         if (!owned) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항 첨부파일을 찾을 수 없습니다.");
         }
