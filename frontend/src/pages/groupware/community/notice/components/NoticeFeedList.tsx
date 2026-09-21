@@ -19,7 +19,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
-import { FeedList } from '../../../../../shared/components/feed/FeedList';
+import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
 import { noticeContentStyles } from './noticeContentStyles';
@@ -388,7 +388,7 @@ export function NoticeFeedList({
 
   return (
     <>
-      <FeedList
+      <FeedView
         items={items}
         renderItem={(item) => {
           const isExpanded = expandedNoticeId === item.id;

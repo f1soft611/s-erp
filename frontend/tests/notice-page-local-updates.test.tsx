@@ -151,6 +151,50 @@ describe('CommunityNoticePage local updates', () => {
     });
   });
 
+  it('reloads notices and switches to the selected list view', async () => {
+    renderPage();
+
+    expect(await screen.findByText('기존 공지')).toBeInTheDocument();
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
+
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByRole('region', { name: '리스트형 공지 목록' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('기존 공지')).toBeInTheDocument();
+    expect(screen.getByText('관리자')).toBeInTheDocument();
+  });
+
+  it('shows the list skeleton while the list view reloads', async () => {
+    let resolveReload: (posts: []) => void = () => undefined;
+    noticeServiceMocks.fetchNoticePosts
+      .mockResolvedValueOnce([
+        {
+          ...detail,
+          postId: 1,
+          title: '기존 공지',
+        },
+      ])
+      .mockReturnValueOnce(
+        new Promise<[]>((resolve) => {
+          resolveReload = resolve;
+        }),
+      );
+
+    renderPage();
+    expect(await screen.findByText('기존 공지')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
+
+    expect(await screen.findByTestId('list-view-skeleton')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveReload([]);
+    });
+  });
+
   it('shows a centered retry button after an initial notice API failure', async () => {
     noticeServiceMocks.fetchNoticePosts.mockRejectedValueOnce(
       new Error('network failure'),
