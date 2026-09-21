@@ -26,6 +26,14 @@ export const noticeContentStyles = {
   '& img': {
     maxWidth: '100%',
     height: 'auto',
+    display: 'block',
+    cursor: 'pointer',
+    margin: '8px 0',
+    transition: 'outline 0.15s ease, box-shadow 0.15s ease',
+  },
+  '& img.ProseMirror-selectednode': {
+    outline: '2px solid rgba(59,130,246,0.9)',
+    boxShadow: '0 0 0 2px rgba(96,165,250,0.35)',
   },
   '& table': {
     width: 'max-content',

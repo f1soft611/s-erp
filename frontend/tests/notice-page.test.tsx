@@ -5,12 +5,25 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
 
 describe('Community notice page', () => {
+  it('normalizes legacy MinIO image sources to the stable notice image API', () => {
+    const html =
+      '<p><img src="http://minio.example/expired" data-object-key="tenant/1/notice-temp/token/image.png" /></p>';
+
+    const normalized = normalizeNoticeEmbeddedImageSources(html, 42);
+
+    expect(normalized).toContain(
+      'api/v1/groupware/boards/notice/posts/42/embedded-images?objectKey=tenant%2F1%2Fnotice-temp%2Ftoken%2Fimage.png',
+    );
+    expect(normalized).not.toContain('minio.example');
+  });
+
   it('keeps the initial skeleton loading state without showing a preloaded notice list', async () => {
     await act(async () => {
       render(
@@ -77,6 +90,41 @@ describe('Community notice page', () => {
 
     const commentInput = screen.getByRole('textbox', { name: '댓글 입력' });
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
+  });
+
+  it('opens an image viewer when the user clicks a feed image preview', async () => {
+    const item = {
+      ...noticeFeed[0],
+      bodyHtml:
+        '<p>공지 내용</p><p><img src="https://example.com/notice-image.png" alt="원본 이미지" /></p>',
+      summary: '공지 내용',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        expandedNoticeId={item.id}
+        onToggleExpand={() => undefined}
+        onToggleLike={() => undefined}
+        onToggleBookmark={() => undefined}
+        onAddComment={() => undefined}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+        onDownload={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByAltText('원본 이미지'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('dialog', { name: '이미지 보기' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('img', { name: '원본 이미지' }),
+      ).toBeInTheDocument();
+    });
   });
 
   it('does not render duplicate comment keys when the API repeats a comment', () => {

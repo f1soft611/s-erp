@@ -6,10 +6,45 @@ import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/co
 import { createAppTheme } from '../src/theme/theme';
 import {
   normalizeClipboardHtmlForEditor,
+  calculateNoticeImageResizeWidth,
   serializeNoticeEditorJson,
 } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
+import { uploadNoticeEmbeddedImage } from '../src/pages/groupware/community/notice/services/noticeBoardService';
+
+vi.mock(
+  '../src/pages/groupware/community/notice/services/noticeBoardService',
+  () => ({
+    uploadNoticeEmbeddedImage: vi.fn(),
+  }),
+);
 
 describe('NoticeComposerDialog payload', () => {
+  it('blocks saving when the notice category is not selected', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+        }),
+      ),
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '구분 필수 검증' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('구분을 선택해 주세요.')).toBeInTheDocument();
+  });
+
   it('saves the important notice checkbox as isNotice', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -45,6 +80,42 @@ describe('NoticeComposerDialog payload', () => {
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({ isNotice: 'Y' }),
       );
+    });
+  });
+
+  it('keeps the resize width calculation bounded for image dragging', () => {
+    expect(calculateNoticeImageResizeWidth(320, -500)).toBe(120);
+    expect(calculateNoticeImageResizeWidth(320, 100)).toBe(420);
+    expect(calculateNoticeImageResizeWidth(1200, 300)).toBe(1200);
+  });
+
+  it('still mounts the composer when image content is present', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    const editor = screen.getByRole('textbox', { name: /본문/i });
+    fireEvent.input(editor, {
+      target: {
+        innerHTML:
+          '<p><img src="https://example.com/image.png" alt="이미지" /></p>',
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('textbox', { name: /본문/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -178,6 +249,65 @@ describe('NoticeComposerDialog payload', () => {
     });
 
     await waitFor(() => {
+      expect(editor).toHaveTextContent('업무');
+      expect(editor).toHaveTextContent('담당');
+      expect(editor).toHaveTextContent('공지 작성');
+      expect(editor).toHaveTextContent('홍길동');
+    });
+  });
+
+  it('does not convert Excel clipboard table data into an embedded image upload', async () => {
+    vi.mocked(uploadNoticeEmbeddedImage).mockResolvedValue({
+      imageUrl: 'https://example.com/pasted.png',
+      fileName: 'sheet.png',
+      objectKey: 'notice/sheet.png',
+      fileSize: 100,
+      mimeType: 'image/png',
+    });
+
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+        }),
+      ),
+    );
+
+    const editor = screen.getByRole('textbox', { name: /본문/i });
+    const html = `
+      <table>
+        <tbody>
+          <tr><td>업무</td><td>담당</td></tr>
+          <tr><td>공지 작성</td><td>홍길동</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () =>
+              new File(['png'], 'sheet.png', { type: 'image/png' }),
+          },
+        ],
+        getData: (type: string) => {
+          if (type === 'text/html') return html;
+          if (type === 'text/plain') return '업무\t담당\n공지 작성\t홍길동';
+          return '';
+        },
+      },
+      preventDefault: vi.fn(),
+    });
+
+    await waitFor(() => {
+      expect(uploadNoticeEmbeddedImage).not.toHaveBeenCalled();
       expect(editor).toHaveTextContent('업무');
       expect(editor).toHaveTextContent('담당');
       expect(editor).toHaveTextContent('공지 작성');

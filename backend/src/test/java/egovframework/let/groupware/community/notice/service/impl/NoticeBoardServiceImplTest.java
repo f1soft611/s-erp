@@ -173,6 +173,60 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void replacesExpiredEmbeddedImageSourceWithStableNoticeImageUrl() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setContentsHtml("<p><img src=\"https://minio.example/expired\" data-object-key=\"tenant/1/notice-temp/token/image.png\"></p>");
+        NoticeBoardFileVO embeddedImage = new NoticeBoardFileVO();
+        embeddedImage.setBoardFileId(73L);
+        embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedImage.setFileUsageType("EMBEDDED");
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(post);
+        when(noticeBoardDAO.selectNoticeAttachmentList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Arrays.asList(embeddedImage));
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService).getPost(1L, 7L);
+
+        assertThat(result.getContentsHtml())
+            .contains("/api/v1/groupware/boards/notice/posts/7/embedded-images?objectKey=")
+            .doesNotContain("https://minio.example/expired");
+    }
+
+    @Test
+    void streamsOnlyEmbeddedImageOwnedByNotice() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(73L);
+        embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
+        embeddedImage.setFileUsageType("EMBEDDED");
+        when(commonFileService.listFiles(1L, "NOTICE", 7L))
+            .thenReturn(Arrays.asList(embeddedImage));
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .streamEmbeddedImage(7L, "tenant/1/notice-temp/token/image.png",
+                new MockHttpServletResponse());
+
+        verify(commonFileService).downloadFile(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.eq("NOTICE"),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq(73L),
+            org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void deleteAttachmentUsesNoticeOwnerAndPostId() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonFileService commonFileService = mock(CommonFileService.class);

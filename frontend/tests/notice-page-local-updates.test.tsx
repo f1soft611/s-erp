@@ -647,6 +647,48 @@ describe('CommunityNoticePage local updates', () => {
     });
   });
 
+  it('loads the remaining older comments in one larger batch when expanding the thread', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        postId: 1,
+        title: '이전 댓글 배치 조회 테스트',
+        comments: [
+          { commentId: 10, writerName: '현재 작성자', content: '현재 댓글' },
+          { commentId: 9, writerName: '이전 작성자', content: '이전 댓글1' },
+          { commentId: 8, writerName: '오래된 작성자', content: '이전 댓글2' },
+        ],
+        commentCount: 3,
+        hasPreviousComments: true,
+        nextBeforeCommentId: 7,
+      },
+    ]);
+    commentServiceMocks.fetchCommonComments.mockResolvedValueOnce({
+      comments: [
+        { commentId: 7, writerName: '더 이전 작성자', content: '더 이전 댓글' },
+      ],
+      hasPrevious: false,
+      nextBeforeCommentId: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+    );
+
+    await waitFor(() => {
+      expect(commentServiceMocks.fetchCommonComments).toHaveBeenCalledWith(
+        'NOTICE',
+        1,
+        expect.objectContaining({
+          limit: 100,
+          beforeCommentId: 7,
+        }),
+      );
+    });
+  });
+
   it('keeps the continued previous-comment cursor across local comment CRUD', async () => {
     const loadPreviousComments = vi
       .fn()

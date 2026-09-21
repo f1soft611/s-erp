@@ -251,6 +251,7 @@
             mime_type,
             checksum_sha256,
             content_type,
+            file_usage_type,
             deleted_yn,
             uploaded_by,
             created_at,

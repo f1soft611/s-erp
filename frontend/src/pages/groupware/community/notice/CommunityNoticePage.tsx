@@ -25,7 +25,10 @@ import {
   type NoticeComposerDraftAttachment,
   type NoticeComposerEmbeddedImage,
 } from './components/NoticeComposerDialog';
-import { NoticeFeedList } from './components/NoticeFeedList';
+import {
+  NoticeFeedList,
+  normalizeNoticeEmbeddedImageSources,
+} from './components/NoticeFeedList';
 import { NoticeFilterBar } from './components/NoticeFilterBar';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import { summaryStats } from './data/noticeData';
@@ -959,7 +962,7 @@ export function CommunityNoticePage({
   const handleLoadPreviousComments = useCallback(
     async (noticeId: number, beforeCommentId: number | string) => {
       const records = await fetchCommonComments('NOTICE', noticeId, {
-        limit: 3,
+        limit: 100,
         beforeCommentId,
       });
       return {
@@ -1314,7 +1317,10 @@ export function CommunityNoticePage({
                   setEditorDraft({
                     id: item.id,
                     title: item.title,
-                    body: item.bodyHtml ?? item.body,
+                    body: normalizeNoticeEmbeddedImageSources(
+                      item.bodyHtml ?? item.body,
+                      item.id,
+                    ),
                     noticeGubunCode: item.noticeGubunCode,
                     isNotice: item.isNotice === 'Y' ? 'Y' : 'N',
                     attachments: mappedAttachments,

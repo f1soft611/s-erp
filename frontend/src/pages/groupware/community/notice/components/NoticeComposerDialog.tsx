@@ -35,6 +35,7 @@ import {
   TableRow,
 } from '@tiptap/extension-table';
 import { noticeContentStyles } from './noticeContentStyles';
+import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import { uploadNoticeEmbeddedImage } from '../services/noticeBoardService';
 
 export type NoticeComposerDraftAttachment = {
@@ -137,6 +138,15 @@ function normalizeCellDimension(value: string | null): string | null {
 function normalizeImageDimension(value: string | null): string | null {
   const normalized = value?.trim() ?? '';
   return /^(?:\d+(?:\.\d+)?)(?:px|%)$/.test(normalized) ? normalized : null;
+}
+
+export function calculateNoticeImageResizeWidth(
+  startWidth: number,
+  delta: number,
+): number {
+  const safeStartWidth = Number.isFinite(startWidth) ? startWidth : 320;
+  const safeDelta = Number.isFinite(delta) ? delta : 0;
+  return Math.max(120, Math.min(1200, Math.round(safeStartWidth + safeDelta)));
 }
 
 function sanitizeCellStyle(cell: Element): string | null {
@@ -358,24 +368,20 @@ const NoticeImage = Image.extend({
       },
     };
   },
-}).configure({
-  resize: {
-    enabled: true,
-    minWidth: 120,
-    minHeight: 80,
-    alwaysPreserveAspectRatio: true,
-  },
 });
 
 function findEmbeddedImagePosition(
   editor: Editor,
   uploadToken: string,
+  fallbackToken?: string,
 ): number {
   let position = -1;
   editor.state.doc.descendants((node, nodePosition) => {
+    const imageUploadToken = String(node.attrs['data-upload-token'] ?? '');
     if (
       node.type.name === 'image' &&
-      node.attrs['data-upload-token'] === uploadToken
+      (imageUploadToken === uploadToken ||
+        (fallbackToken && imageUploadToken === fallbackToken))
     ) {
       position = nodePosition;
       return false;
@@ -389,6 +395,7 @@ function updateEmbeddedImageNode(
   editor: Editor,
   uploadToken: string,
   uploaded: {
+    uploadToken?: string;
     imageUrl: string;
     fileName: string;
     fileId?: number | string | null;
@@ -397,7 +404,12 @@ function updateEmbeddedImageNode(
     mimeType: string;
   },
 ): void {
-  const position = findEmbeddedImagePosition(editor, uploadToken);
+  const persistedToken = uploaded.uploadToken ?? uploadToken;
+  const position = findEmbeddedImagePosition(
+    editor,
+    uploadToken,
+    uploaded.uploadToken,
+  );
   if (position < 0) {
     return;
   }
@@ -412,7 +424,7 @@ function updateEmbeddedImageNode(
       'data-object-key': uploaded.objectKey,
       'data-file-size': String(uploaded.fileSize),
       'data-mime-type': uploaded.mimeType,
-      'data-upload-token': uploadToken,
+      'data-upload-token': persistedToken,
       'data-upload-state': null,
     })
     .run();
@@ -579,6 +591,28 @@ function normalizeClipboardTextForEditor(rawText: string): string {
     .replace(/\t/g, ' | ');
 }
 
+function hasSpreadsheetClipboardContent(
+  clipboardData: DataTransfer | null | undefined,
+): boolean {
+  if (!clipboardData) {
+    return false;
+  }
+
+  const html = clipboardData.getData('text/html') ?? '';
+  const text = clipboardData.getData('text/plain') ?? '';
+
+  if (/<table\b/i.test(html)) {
+    return true;
+  }
+
+  const normalizedText = text.replace(/\r\n?/g, '\n').trim();
+  if (!normalizedText) {
+    return false;
+  }
+
+  return normalizedText.includes('\t') && normalizedText.includes('\n');
+}
+
 function autoSizeActiveTableCell(editor: Editor): void {
   const { $from } = editor.state.selection;
   let cellElement: HTMLElement | null = null;
@@ -674,6 +708,7 @@ export function NoticeComposerDialog({
   const [noticeGubunCode, setNoticeGubunCode] = useState(
     defaultNoticeGubunCode,
   );
+  const [noticeGubunError, setNoticeGubunError] = useState(false);
   const [isNotice, setIsNotice] = useState(defaultIsNotice === 'Y');
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
@@ -717,6 +752,10 @@ export function NoticeComposerDialog({
           style: `background-color: ${editorSurfaceBackground}; outline: none; line-height: 1.7;`,
         },
         handlePaste: (_view: unknown, event: ClipboardEvent) => {
+          if (hasSpreadsheetClipboardContent(event.clipboardData)) {
+            return false;
+          }
+
           const imageFiles = Array.from(event.clipboardData?.items ?? [])
             .filter(
               (item) => item.kind === 'file' && item.type.startsWith('image/'),
@@ -816,6 +855,7 @@ export function NoticeComposerDialog({
 
     setTitle(defaultTitle);
     setNoticeGubunCode(defaultNoticeGubunCode);
+    setNoticeGubunError(false);
     setIsNotice(defaultIsNotice === 'Y');
     setAttachments(defaultAttachments);
     setImageUploadError(null);
@@ -836,6 +876,48 @@ export function NoticeComposerDialog({
   }, [editor, open, defaultBody]);
 
   useEffect(() => {
+    if (!editor || !open) {
+      return;
+    }
+
+    let cancelled = false;
+    const objectUrls: string[] = [];
+    const resolveEditorImages = async () => {
+      const images = Array.from(
+        editor.view.dom.querySelectorAll<HTMLImageElement>('img'),
+      ).filter((image) =>
+        (image.getAttribute('src') ?? '').includes(
+          '/api/v1/groupware/boards/notice/posts/',
+        ),
+      );
+
+      await Promise.all(
+        images.map(async (image) => {
+          const source = image.getAttribute('src');
+          if (!source) {
+            return;
+          }
+          try {
+            const objectUrl = URL.createObjectURL(await apiGetBlob(source));
+            objectUrls.push(objectUrl);
+            if (!cancelled) {
+              image.src = objectUrl;
+            }
+          } catch {
+            setImageUploadError('본문 이미지를 불러오지 못했습니다.');
+          }
+        }),
+      );
+    };
+
+    void resolveEditorImages();
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [editor, open, defaultBody]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }
@@ -844,15 +926,111 @@ export function NoticeComposerDialog({
       setEditorIsEmpty(editor.isEmpty);
     };
 
+    const resizeHandle = document.createElement('button');
+    resizeHandle.type = 'button';
+    resizeHandle.className = 'notice-image-resize-handle';
+    resizeHandle.setAttribute('aria-label', '이미지 너비 조절');
+    resizeHandle.title = '이미지 너비 조절';
+    resizeHandle.style.display = 'none';
+    resizeHandle.style.position = 'fixed';
+    document.body.appendChild(resizeHandle);
+
+    let selectedImage: HTMLImageElement | null = null;
+    let selectedImagePosition = -1;
+
+    const syncResizeHandle = () => {
+      const selection = editor.state.selection;
+      const nodeElement = editor.view.dom.querySelector(
+        'img.ProseMirror-selectednode',
+      );
+      selectedImage =
+        nodeElement instanceof HTMLImageElement ? nodeElement : null;
+      selectedImagePosition = selectedImage ? selection.from : -1;
+
+      if (!selectedImage) {
+        resizeHandle.style.display = 'none';
+        return;
+      }
+
+      const imageRect = selectedImage.getBoundingClientRect();
+      resizeHandle.style.display = 'block';
+      resizeHandle.style.left = `${imageRect.right - 6}px`;
+      resizeHandle.style.top = `${imageRect.top + imageRect.height / 2 - 18}px`;
+    };
+
+    const handleImagePointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const imageElement = target?.closest('img');
+      if (!imageElement || !editor.view.dom.contains(imageElement)) {
+        return;
+      }
+
+      const imagePos = editor.view.posAtDOM(imageElement, 0);
+      if (!Number.isFinite(imagePos)) {
+        return;
+      }
+
+      editor.commands.setNodeSelection(imagePos);
+      syncResizeHandle();
+    };
+
+    const handleResizePointerDown = (event: PointerEvent) => {
+      if (!selectedImage || selectedImagePosition < 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const resizeStartX = event.clientX;
+      const resizeStartWidth =
+        selectedImage.getBoundingClientRect().width || 320;
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const nextWidth = calculateNoticeImageResizeWidth(
+          resizeStartWidth,
+          moveEvent.clientX - resizeStartX,
+        );
+        editor
+          .chain()
+          .focus()
+          .setNodeSelection(selectedImagePosition)
+          .updateAttributes('image', { width: `${nextWidth}px` })
+          .run();
+        syncResizeHandle();
+      };
+
+      const handlePointerUp = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+    };
+
     syncEditorState();
     editor.on('create', syncEditorState);
     editor.on('update', syncEditorState);
     editor.on('selectionUpdate', syncEditorState);
+    editor.view.dom.addEventListener('mousedown', handleImagePointerDown);
+    resizeHandle.addEventListener('pointerdown', handleResizePointerDown);
+    editor.on('selectionUpdate', syncResizeHandle);
+    editor.on('update', syncResizeHandle);
+    window.addEventListener('resize', syncResizeHandle);
+    window.addEventListener('scroll', syncResizeHandle, true);
+    syncResizeHandle();
 
     return () => {
       editor.off('create', syncEditorState);
       editor.off('update', syncEditorState);
       editor.off('selectionUpdate', syncEditorState);
+      editor.view.dom.removeEventListener('mousedown', handleImagePointerDown);
+      editor.off('selectionUpdate', syncResizeHandle);
+      editor.off('update', syncResizeHandle);
+      resizeHandle.removeEventListener('pointerdown', handleResizePointerDown);
+      window.removeEventListener('resize', syncResizeHandle);
+      window.removeEventListener('scroll', syncResizeHandle, true);
+      resizeHandle.remove();
     };
   }, [editor]);
 
@@ -937,6 +1115,11 @@ export function NoticeComposerDialog({
   };
 
   const handleSubmit = async () => {
+    if (!noticeGubunCode.trim()) {
+      setNoticeGubunError(true);
+      return;
+    }
+
     const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
     const bodyText = body
       .replace(/<[^>]*>/g, ' ')
@@ -1076,25 +1259,10 @@ export function NoticeComposerDialog({
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 1,
+              gap: 1.5,
               height: '100%',
             }}
           >
-            <TextField
-              select
-              label="구분"
-              value={noticeGubunCode}
-              onChange={(event) => setNoticeGubunCode(event.target.value)}
-              required
-              disabled={noticeGubunOptions.length === 0}
-              sx={{ mb: 0 }}
-            >
-              {noticeGubunOptions.map((option) => (
-                <MenuItem key={option.code} value={option.code}>
-                  {option.name}
-                </MenuItem>
-              ))}
-            </TextField>
             <FormControlLabel
               control={
                 <Checkbox
@@ -1106,9 +1274,53 @@ export function NoticeComposerDialog({
               sx={{ alignSelf: 'flex-start', mb: 0 }}
             />
             <TextField
+              select
+              label="구분"
+              value={noticeGubunCode}
+              onChange={(event) => {
+                setNoticeGubunCode(event.target.value);
+                setNoticeGubunError(false);
+              }}
+              required
+              fullWidth
+              margin="none"
+              error={noticeGubunError}
+              helperText={
+                noticeGubunError ? '구분을 선택해 주세요.' : undefined
+              }
+              disabled={noticeGubunOptions.length === 0}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: editorSurfaceBackground,
+                  borderRadius: 1.5,
+                  border: 'none',
+                  '& fieldset': {
+                    border: 'none',
+                  },
+                  '&.Mui-error fieldset': {
+                    border: `1px solid ${theme.palette.error.main}`,
+                  },
+                },
+                '& .MuiInputBase-root': {
+                  bgcolor: editorSurfaceBackground,
+                  borderRadius: 1.5,
+                },
+                '& .MuiFormLabel-root': {
+                  color: theme.palette.text.secondary,
+                },
+              }}
+            >
+              {noticeGubunOptions.map((option) => (
+                <MenuItem key={option.code} value={option.code}>
+                  {option.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               fullWidth
+              margin="none"
               placeholder="제목을 입력하세요."
               slotProps={{
                 input: {
@@ -1194,8 +1406,23 @@ export function NoticeComposerDialog({
                     '& .notice-composer-editor': {
                       width: '100%',
                       minWidth: 0,
+                      position: 'relative',
                       display: 'flex',
                       flexDirection: 'column',
+                    },
+                    '& .notice-image-resize-handle': {
+                      position: 'absolute',
+                      zIndex: 3,
+                      width: 12,
+                      height: 36,
+                      padding: 0,
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      borderRadius: 1,
+                      backgroundColor: 'background.paper',
+                      cursor: 'ew-resize',
+                      boxShadow: 1,
+                      touchAction: 'none',
                     },
                     '& .notice-composer-editor .ProseMirror': {
                       ...noticeContentStyles,

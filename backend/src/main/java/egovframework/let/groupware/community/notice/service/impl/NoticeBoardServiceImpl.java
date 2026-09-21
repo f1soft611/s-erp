@@ -1,10 +1,13 @@
 package egovframework.let.groupware.community.notice.service.impl;
 
 import java.security.MessageDigest;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
@@ -104,6 +107,10 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         List<NoticeBoardFileVO> embeddedFiles = noticeBoardDAO.selectNoticeAttachmentList(boardFileParams);
         if (embeddedFiles != null) {
             files.addAll(embeddedFiles);
+            String stableContentsHtml = rewriteEmbeddedImageSources(
+                post.getEffectiveContentsHtml(), postId, embeddedFiles);
+            post.setContentsHtml(stableContentsHtml);
+            post.setContents(stableContentsHtml);
         }
         post.setAttachments(files);
         post.setAttachmentCount(files.size());
@@ -223,11 +230,18 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         for (NoticeEmbeddedImageVO image : images) {
             if (image == null || !StringUtils.hasText(image.getObjectKey())
-                    || !StringUtils.hasText(image.getFileName())
-                    || !StringUtils.hasText(image.getUploadToken())) {
+                    || !StringUtils.hasText(image.getFileName())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 정보가 올바르지 않습니다.");
             }
-            String expectedPrefix = "tenant/" + tenantId + "/notice-temp/" + image.getUploadToken() + "/";
+
+            String uploadToken = StringUtils.hasText(image.getUploadToken())
+                    ? image.getUploadToken()
+                    : extractUploadTokenFromObjectKey(image.getObjectKey());
+            if (!StringUtils.hasText(uploadToken)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 정보가 올바르지 않습니다.");
+            }
+
+            String expectedPrefix = "tenant/" + tenantId + "/notice-temp/" + uploadToken + "/";
             if (!image.getObjectKey().startsWith(expectedPrefix)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 업로드 소유 정보가 올바르지 않습니다.");
             }
@@ -247,6 +261,20 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             params.put("uploadedBy", StringUtils.hasText(uploaderId) ? uploaderId : "unknown");
             noticeBoardDAO.insertNoticeAttachment(params);
         }
+    }
+
+    private String extractUploadTokenFromObjectKey(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        String normalized = objectKey.replace('\\', '/');
+        String[] segments = normalized.split("/");
+        for (int index = 0; index < segments.length - 1; index++) {
+            if ("notice-temp".equals(segments[index]) && StringUtils.hasText(segments[index + 1])) {
+                return segments[index + 1];
+            }
+        }
+        return null;
     }
 
     @Override
@@ -348,6 +376,63 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         validateNoticeAttachment(tenantId, postId, boardFileId);
         commonFileService.downloadFile(tenantId, BOARD_TYPE_NOTICE, postId, boardFileId, response);
+    }
+
+    @Override
+    public void streamEmbeddedImage(Long postId, String objectKey, HttpServletResponse response)
+            throws Exception {
+        if (!StringUtils.hasText(objectKey)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 경로가 없습니다.");
+        }
+        Matcher tenantMatcher = Pattern.compile("^tenant/(\\d+)/notice-temp/[^/]+/.+$")
+            .matcher(objectKey.replace('\\', '/'));
+        if (!tenantMatcher.matches()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "본문 이미지를 찾을 수 없습니다.");
+        }
+        Long tenantId = Long.valueOf(tenantMatcher.group(1));
+        List<CommonFileVO> files = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
+        if (files == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "본문 이미지를 찾을 수 없습니다.");
+        }
+        for (CommonFileVO file : files) {
+            if (file != null && "EMBEDDED".equalsIgnoreCase(file.getFileUsageType())
+                    && objectKey.equals(file.getObjectKey())) {
+                commonFileService.downloadFile(tenantId, BOARD_TYPE_NOTICE, postId,
+                    file.getFileId(), response);
+                return;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "본문 이미지를 찾을 수 없습니다.");
+    }
+
+    private String rewriteEmbeddedImageSources(String html, Long postId,
+            List<NoticeBoardFileVO> embeddedFiles) throws Exception {
+        if (!StringUtils.hasText(html) || embeddedFiles == null || embeddedFiles.isEmpty()) {
+            return html;
+        }
+        Matcher imageMatcher = Pattern.compile("(?is)<img\\b[^>]*>").matcher(html);
+        StringBuffer rewritten = new StringBuffer();
+        while (imageMatcher.find()) {
+            String imageTag = imageMatcher.group();
+            String replacement = imageTag;
+            for (NoticeBoardFileVO file : embeddedFiles) {
+                if (file == null || !"EMBEDDED".equalsIgnoreCase(file.getFileUsageType())
+                        || !StringUtils.hasText(file.getObjectKey())
+                        || !imageTag.contains("data-object-key=\"" + file.getObjectKey() + "\"")) {
+                    continue;
+                }
+                String stableUrl = "/api/v1/groupware/boards/notice/posts/" + postId
+                    + "/embedded-images?objectKey="
+                    + URLEncoder.encode(file.getObjectKey(), "UTF-8");
+                replacement = replacement.replaceFirst(
+                    "(?i)(src\\s*=\\s*[\"'])[^\"']*([\"'])",
+                    "$1" + Matcher.quoteReplacement(stableUrl) + "$2");
+                break;
+            }
+            imageMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(replacement));
+        }
+        imageMatcher.appendTail(rewritten);
+        return rewritten.toString();
     }
 
     private void validateNoticeAttachment(Long tenantId, Long postId, Long boardFileId) throws Exception {

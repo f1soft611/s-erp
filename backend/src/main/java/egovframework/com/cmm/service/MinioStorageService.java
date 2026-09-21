@@ -7,10 +7,12 @@ import org.springframework.stereotype.Service;
 
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
+import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.http.Method;
 
 @Service
 public class MinioStorageService {
@@ -51,6 +53,17 @@ public class MinioStorageService {
     public InputStream download(String bucketName, String objectKey) throws Exception {
         String targetBucket = bucketName == null || bucketName.trim().isEmpty() ? defaultBucket : bucketName;
         return minioClient.getObject(GetObjectArgs.builder().bucket(targetBucket).object(objectKey).build());
+    }
+
+    public String getPresignedObjectUrl(String bucketName, String objectKey, int expirySeconds) throws Exception {
+        String targetBucket = bucketName == null || bucketName.trim().isEmpty() ? defaultBucket : bucketName;
+        return minioClient.getPresignedObjectUrl(
+            GetPresignedObjectUrlArgs.builder()
+                .method(Method.GET)
+                .bucket(targetBucket)
+                .object(objectKey)
+                .expiry(expirySeconds)
+                .build());
     }
 
     public void delete(String bucketName, String objectKey) throws Exception {

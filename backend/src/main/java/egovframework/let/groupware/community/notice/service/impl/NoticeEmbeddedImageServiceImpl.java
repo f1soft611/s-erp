@@ -18,20 +18,27 @@ import egovframework.let.groupware.community.notice.service.NoticeEmbeddedImageS
 public class NoticeEmbeddedImageServiceImpl implements NoticeEmbeddedImageService {
 
     private static final long DEFAULT_MAX_FILE_SIZE = 10L * 1024L * 1024L;
+    private static final long MAX_PRESIGN_EXPIRY_SECONDS = 7L * 24L * 60L * 60L;
+    private static final long DEFAULT_PRESIGN_EXPIRY_SECONDS = MAX_PRESIGN_EXPIRY_SECONDS;
 
     private final MinioStorageService storageService;
     private final String bucketName;
     private final String publicEndpoint;
     private final long maxFileSize;
+    private final long presignExpirySeconds;
 
-        public NoticeEmbeddedImageServiceImpl(MinioStorageService storageService,
+    public NoticeEmbeddedImageServiceImpl(MinioStorageService storageService,
             @Value("${storage.bucket:${STORAGE_BUCKET:document-attachments}}") String bucketName,
             @Value("${storage.publicEndpoint:${STORAGE_PUBLIC_ENDPOINT:}}") String publicEndpoint,
-            @Value("${storage.embeddedImageMaxFileSize:${STORAGE_EMBEDDED_IMAGE_MAX_FILE_SIZE:10485760}}") long maxFileSize) {
+            @Value("${storage.embeddedImageMaxFileSize:${STORAGE_EMBEDDED_IMAGE_MAX_FILE_SIZE:10485760}}") long maxFileSize,
+            @Value("${storage.presignExpirySeconds:${STORAGE_PRESIGN_EXPIRY_SECONDS:604800}}") long presignExpirySeconds) {
         this.storageService = storageService;
         this.bucketName = StringUtils.hasText(bucketName) ? bucketName.trim() : "document-attachments";
         this.publicEndpoint = trimTrailingSlash(publicEndpoint);
         this.maxFileSize = maxFileSize > 0 ? maxFileSize : DEFAULT_MAX_FILE_SIZE;
+        this.presignExpirySeconds = presignExpirySeconds > 0
+            ? Math.min(presignExpirySeconds, MAX_PRESIGN_EXPIRY_SECONDS)
+            : DEFAULT_PRESIGN_EXPIRY_SECONDS;
     }
 
     @Override
@@ -51,14 +58,12 @@ public class NoticeEmbeddedImageServiceImpl implements NoticeEmbeddedImageServic
         if (!isSupportedImage(mimeType, bytes)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 이미지 파일입니다.");
         }
-        if (!StringUtils.hasText(publicEndpoint)) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 공개 URL 설정이 없습니다.");
-        }
-
         String uploadToken = UUID.randomUUID().toString();
         String fileName = safeFileName(file.getOriginalFilename());
         String objectKey = "tenant/" + tenantId + "/notice-temp/" + uploadToken + "/" + fileName;
         storageService.upload(bucketName, objectKey, file.getInputStream(), file.getSize(), mimeType);
+
+        String imageUrl = resolveEmbeddedImageUrl(bucketName, objectKey);
 
         NoticeEmbeddedImageVO result = new NoticeEmbeddedImageVO();
         result.setUploadToken(uploadToken);
@@ -68,8 +73,20 @@ public class NoticeEmbeddedImageServiceImpl implements NoticeEmbeddedImageServic
         result.setMimeType(mimeType);
         result.setObjectKey(objectKey);
         result.setBucketName(bucketName);
-        result.setImageUrl(publicEndpoint + "/" + bucketName + "/" + objectKey);
+        result.setImageUrl(imageUrl);
         return result;
+    }
+
+    private String resolveEmbeddedImageUrl(String bucketName, String objectKey) throws Exception {
+        if (storageService == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장소를 사용할 수 없습니다.");
+        }
+        try {
+            return storageService.getPresignedObjectUrl(bucketName, objectKey, (int) presignExpirySeconds);
+        } catch (Exception exception) {
+            throw new ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR, "이미지 미리보기 URL을 생성할 수 없습니다.", exception);
+        }
     }
 
     private boolean isSupportedImage(String mimeType, byte[] bytes) {

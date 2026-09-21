@@ -190,6 +190,14 @@ public class NoticeBoardApiController {
         noticeBoardService.downloadAttachment(user.getTenantId(), postId, boardFileId, response);
     }
 
+    @Operation(summary = "공지 본문 이미지 조회", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
+    @GetMapping("/posts/{postId}/embedded-images")
+    public void streamEmbeddedImage(@PathVariable Long postId,
+            @RequestParam String objectKey,
+            HttpServletResponse response) throws Exception {
+        noticeBoardService.streamEmbeddedImage(postId, objectKey, response);
+    }
+
     private void requireAuthenticated(LoginVO user) {
         if (user == null || user.getTenantId() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ResponseCode.AUTH_ERROR.getMessage());
