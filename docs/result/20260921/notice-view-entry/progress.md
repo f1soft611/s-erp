@@ -12,15 +12,21 @@
 
 ## 현재 상태
 
-- 현재 단계: 6단계 구현 준비 완료
+- 현재 단계: 10단계 검증·결과 문서화 완료
 - DB 영향: 없음
-- 구현: 대기
-- 검증: 대기
-- 리뷰: 대기
+- 구현: 더보기 유무별 조회 진입과 공지별 요청 중복 방지 완료
+- 검증: 조건별 Vitest 5개 통과, 프론트 빌드 통과
+- 리뷰: 사양 준수 확인, 코드 범위 최소화
 
 ## 태스크 상태
 
-- [ ] Step 1 RED 회귀 테스트 추가
-- [ ] Step 2 NoticeFeedList 이벤트 연결
-- [ ] Step 3 CommunityNoticePage 콜백 안정화
-- [ ] Step 4 프론트 최종 검증 및 결과 문서
+- [x] Step 1 RED 회귀 테스트 추가
+- [x] Step 2 NoticeFeedList 이벤트 연결
+- [x] Step 3 CommunityNoticePage 콜백 안정화
+- [x] Step 4 프론트 최종 검증 및 결과 문서
+
+## 검증 기록
+
+- 신규 조건 테스트: 5 passed, 16 skipped
+- `npm run build`: 성공
+- 브라우저 캡처: 공유 브라우저 페이지를 도구에서 찾지 못해 결과 문서에 사유 기록
