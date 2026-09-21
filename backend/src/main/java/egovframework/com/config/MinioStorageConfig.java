@@ -13,7 +13,7 @@ public class MinioStorageConfig {
     public MinioClient minioClient(
             @Value("${storage.endpoint:${STORAGE_ENDPOINT:http://218.155.74.34:9000}}") String endpoint,
             @Value("${storage.accessKey:${MINIO_ACCESS_KEY:f1soft}}") String accessKey,
-            @Value("${storage.secretKey:${MINIO_SECRET_KEY:f1soft@96}}") String secretKey,
+            @Value("${storage.secretKey:${MINIO_SECRET_KEY:f1soft@611}}") String secretKey,
             @Value("${storage.region:${STORAGE_REGION:us-east-1}}") String region) {
         return MinioClient.builder()
                 .endpoint(endpoint)

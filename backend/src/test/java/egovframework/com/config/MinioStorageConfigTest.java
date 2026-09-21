@@ -25,7 +25,7 @@ class MinioStorageConfigTest {
                 "Java config should use the project MinIO endpoint fallback");
         assertTrue(configSource.contains("${storage.accessKey:${MINIO_ACCESS_KEY:f1soft}}"),
                 "Java config should use the project MinIO access key fallback");
-        assertTrue(configSource.contains("${storage.secretKey:${MINIO_SECRET_KEY:f1soft@96}}"),
+        assertTrue(configSource.contains("${storage.secretKey:${MINIO_SECRET_KEY:f1soft@611}}"),
                 "Java config should use the project MinIO secret key fallback");
         assertTrue(configSource.contains("${storage.region:${STORAGE_REGION:us-east-1}}"),
                 "Java config should use the project MinIO region fallback");
@@ -54,7 +54,7 @@ class MinioStorageConfigTest {
                 profile + " profile should default to the project MinIO endpoint");
         assertTrue(properties.contains("storage.accessKey=${MINIO_ACCESS_KEY:f1soft}"),
                 profile + " profile should default to the project MinIO access key");
-        assertTrue(properties.contains("storage.secretKey=${MINIO_SECRET_KEY:f1soft@96}"),
+        assertTrue(properties.contains("storage.secretKey=${MINIO_SECRET_KEY:f1soft@611}"),
                 profile + " profile should default to the project MinIO secret key");
         assertTrue(properties.contains("storage.region=us-east-1"),
                 profile + " profile should default to the project MinIO region");

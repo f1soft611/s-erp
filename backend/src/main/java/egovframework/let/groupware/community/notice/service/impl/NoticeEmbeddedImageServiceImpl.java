@@ -31,7 +31,7 @@ public class NoticeEmbeddedImageServiceImpl implements NoticeEmbeddedImageServic
             @Value("${storage.bucket:${STORAGE_BUCKET:document-attachments}}") String bucketName,
             @Value("${storage.publicEndpoint:${STORAGE_PUBLIC_ENDPOINT:}}") String publicEndpoint,
             @Value("${storage.embeddedImageMaxFileSize:${STORAGE_EMBEDDED_IMAGE_MAX_FILE_SIZE:10485760}}") long maxFileSize,
-            @Value("${storage.presignExpirySeconds:${STORAGE_PRESIGN_EXPIRY_SECONDS:604800}}") long presignExpirySeconds) {
+            @Value("${storage.presignExpirySeconds:${STORAGE_PRESIGN_EXPIRY_SECONDS:600}}") long presignExpirySeconds) {
         this.storageService = storageService;
         this.bucketName = StringUtils.hasText(bucketName) ? bucketName.trim() : "document-attachments";
         this.publicEndpoint = trimTrailingSlash(publicEndpoint);
