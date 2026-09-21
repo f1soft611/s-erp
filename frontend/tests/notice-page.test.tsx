@@ -92,7 +92,55 @@ describe('Community notice page', () => {
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
   });
 
+  it('uses title and body clicks as the read entry point when more is unavailable', () => {
+    const onToggleExpand = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      title: '짧은 공지 제목',
+      body: '짧은 공지 내용',
+      summary: '짧은 공지 내용',
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={onToggleExpand}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('짧은 공지 제목'));
+    fireEvent.click(screen.getByText('짧은 공지 내용'));
+
+    expect(onToggleExpand).toHaveBeenCalledTimes(2);
+    expect(onToggleExpand).toHaveBeenCalledWith(item.id);
+  });
+
+  it('keeps the more button as the only read entry point when more is available', () => {
+    const onToggleExpand = vi.fn();
+    const item = noticeFeed[0];
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onToggleExpand={onToggleExpand}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(item.title));
+    fireEvent.click(screen.getByText(item.summary));
+
+    expect(onToggleExpand).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+    expect(onToggleExpand).toHaveBeenCalledWith(item.id);
+  });
+
   it('opens an image viewer when the user clicks a feed image preview', async () => {
+    const onNoticeInteract = vi.fn();
     const item = {
       ...noticeFeed[0],
       bodyHtml:
@@ -105,6 +153,7 @@ describe('Community notice page', () => {
         items={[item]}
         isDark={false}
         expandedNoticeId={item.id}
+        onNoticeInteract={onNoticeInteract}
         onToggleExpand={() => undefined}
         onToggleLike={() => undefined}
         onToggleBookmark={() => undefined}
@@ -125,9 +174,66 @@ describe('Community notice page', () => {
         screen.getByRole('img', { name: '원본 이미지' }),
       ).toBeInTheDocument();
     });
+    expect(onNoticeInteract).not.toHaveBeenCalled();
   });
 
-  it('shows multiple embedded images with horizontal carousel controls', () => {
+  it('records an interaction from image and attachment areas when more is unavailable', () => {
+    const onNoticeInteract = vi.fn();
+    const onDownload = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      body: '짧은 공지',
+      summary: '짧은 공지',
+      bodyHtml:
+        '<p><img src="https://example.com/short-notice.png" alt="공지 이미지" /></p>',
+      attachments: ['안내문.pdf'],
+      attachmentDetails: [{ id: 'file-1', name: '안내문.pdf' }],
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onNoticeInteract={onNoticeInteract}
+        onDownload={onDownload}
+      />,
+    );
+
+    fireEvent.click(screen.getByAltText('공지 이미지'));
+    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 다운로드' }));
+
+    expect(onNoticeInteract).toHaveBeenCalledTimes(2);
+    expect(onNoticeInteract).toHaveBeenCalledWith(item.id);
+    expect(onDownload).toHaveBeenCalledWith(
+      item.id,
+      expect.objectContaining({ name: '안내문.pdf' }),
+    );
+  });
+
+  it('records a comment-area interaction only when more is unavailable', () => {
+    const onNoticeInteract = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      body: '짧은 공지',
+      summary: '짧은 공지',
+      comments: [],
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onNoticeInteract={onNoticeInteract}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('textbox', { name: '댓글 입력' }));
+
+    expect(onNoticeInteract).toHaveBeenCalledTimes(1);
+    expect(onNoticeInteract).toHaveBeenCalledWith(item.id);
+  });
+
+  it('shows multiple embedded images in order without introducing scroll controls', () => {
     const item = {
       ...noticeFeed[0],
       bodyHtml:
@@ -150,12 +256,13 @@ describe('Community notice page', () => {
     );
 
     expect(screen.getByAltText('첫 번째 이미지')).toBeInTheDocument();
-    expect(screen.queryByAltText('두 번째 이미지')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '다음 이미지' }));
-
-    expect(screen.queryByAltText('첫 번째 이미지')).not.toBeInTheDocument();
     expect(screen.getByAltText('두 번째 이미지')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '다음 이미지' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '이전 이미지' }),
+    ).not.toBeInTheDocument();
   });
 
   it('does not render duplicate comment keys when the API repeats a comment', () => {

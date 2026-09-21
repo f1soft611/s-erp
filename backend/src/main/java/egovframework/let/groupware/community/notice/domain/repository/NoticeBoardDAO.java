@@ -20,6 +20,18 @@ public class NoticeBoardDAO extends EgovAbstractMapper {
         return (NoticeBoardPostVO) selectOne("NoticeBoardDAO.selectNoticePostById", params);
     }
 
+    public Long selectLoginIdByLoginCode(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("NoticeBoardDAO.selectLoginIdByLoginCode", params);
+    }
+
+    public Long insertNoticePostViewHistory(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("NoticeBoardDAO.insertNoticePostViewHistory", params);
+    }
+
+    public int incrementNoticePostViewCount(Map<String, Object> params) throws Exception {
+        return update("NoticeBoardDAO.incrementNoticePostViewCount", params);
+    }
+
     public Long insertNoticePost(Map<String, Object> params) throws Exception {
         return (Long) selectOne("NoticeBoardDAO.insertNoticePost", params);
     }

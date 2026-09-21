@@ -50,6 +50,109 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void getPostIncrementsViewCountOnlyForFirstViewByUser() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setViewCount(1);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(11L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(1L);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        NoticeBoardPostVO result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-a");
+
+        assertThat(result.getViewCount()).isEqualTo(1);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostDoesNotIncrementViewCountForRepeatedViewByUser() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        post.setViewCount(2);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(11L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(null);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-a");
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostUsesLoginAccountAsTheViewHistoryIdentity() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO post = new NoticeBoardPostVO();
+        post.setPostId(7L);
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(post);
+        when(noticeBoardDAO.selectLoginIdByLoginCode(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(12L);
+        when(noticeBoardDAO.insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(12L);
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 7L, "user-b");
+
+        ArgumentCaptor<Map<String, Object>> viewParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).insertNoticePostViewHistory(viewParamsCaptor.capture());
+        assertThat(viewParamsCaptor.getValue())
+            .containsEntry("tenantId", 1L)
+            .containsEntry("postId", 7L)
+            .containsEntry("loginId", 12L);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void getPostDoesNotCreateViewHistoryWhenNoticeDoesNotExist() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(null);
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .getPost(1L, 999L, "user-a"));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .insertNoticePostViewHistory(org.mockito.ArgumentMatchers.anyMap());
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void createPostUsesAuthenticatedActorInsteadOfPayloadWriter() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonFileService commonFileService = mock(CommonFileService.class);

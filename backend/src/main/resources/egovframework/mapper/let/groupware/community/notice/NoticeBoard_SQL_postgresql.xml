@@ -121,6 +121,37 @@
           AND p.is_deleted = 'N'
     </select>
 
+    <select id="selectLoginIdByLoginCode" parameterType="map" resultType="long">
+        SELECT login_id
+        FROM tb_login_account
+        WHERE tenant_id = #{tenantId}
+          AND login_code = #{loginCode}
+          AND use_at = 'Y'
+    </select>
+
+    <select id="insertNoticePostViewHistory" parameterType="map" resultType="long">
+        INSERT INTO tb_board_post_view_history (
+            tenant_id,
+            post_id,
+            login_id,
+            viewed_at
+        ) VALUES (
+            #{tenantId},
+            #{postId},
+            #{loginId},
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (tenant_id, post_id, login_id) DO NOTHING
+        RETURNING view_history_id
+    </select>
+
+    <update id="incrementNoticePostViewCount" parameterType="map">
+        UPDATE tb_board_post
+        SET view_count = view_count + 1
+        WHERE post_id = #{postId}
+          AND is_deleted = 'N'
+    </update>
+
     <select id="insertNoticePost" parameterType="map" resultType="long">
         INSERT INTO tb_board_post (
             board_type_code,

@@ -75,7 +75,7 @@ public class NoticeBoardApiController {
     public ResultVO getPost(@PathVariable Long postId, @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", noticeBoardService.getPost(user.getTenantId(), postId));
+        resultMap.put("item", noticeBoardService.getPost(user.getTenantId(), postId, user.getId()));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

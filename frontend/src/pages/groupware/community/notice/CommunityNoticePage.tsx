@@ -31,8 +31,8 @@ import {
 } from './components/NoticeFeedList';
 import { NoticeFilterBar } from './components/NoticeFilterBar';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
-import { summaryStats } from './data/noticeData';
 import type { NoticeCommentItem, NoticeFeedItem } from './data/noticeData';
+import { deriveNoticeSummary } from './data/noticeSummary';
 import {
   createNoticePost,
   deleteNoticePost,
@@ -221,6 +221,8 @@ const toNoticeFeedItem = (
   return {
     id: Number(post.postId ?? 0),
     title: post.title ?? '제목 없음',
+    viewCount: Number(post.viewCount ?? 0) || 0,
+    createdAt: post.createdAt,
     noticeGubunCode: post.noticeGubunCode ?? undefined,
     noticeGubunName:
       (post.noticeGubunCode
@@ -465,6 +467,21 @@ export function CommunityNoticePage({
     [noticeGubunOptions],
   );
   const noticeGubunNamesRef = useRef(noticeGubunNames);
+  const noticeSummary = useMemo(
+    () =>
+      deriveNoticeSummary(
+        noticeItems.map((item) => ({
+          id: item.id,
+          title: item.title,
+          viewCount: item.viewCount,
+          commentCount: item.commentCount,
+          isNotice: item.isNotice,
+          createdAt: item.createdAt,
+          attachmentCount: item.attachmentDetails?.length ?? 0,
+        })),
+      ),
+    [noticeItems],
+  );
   useEffect(() => {
     noticeGubunNamesRef.current = noticeGubunNames;
     setNoticeItems((current) =>
@@ -1017,6 +1034,63 @@ export function CommunityNoticePage({
     [showError, showSuccess],
   );
 
+  const noticeDetailRequests = useRef(new Set<number>());
+  const loadNoticeDetail = useCallback(
+    async (noticeId: number, expand: boolean) => {
+      if (noticeDetailRequests.current.has(noticeId)) {
+        return;
+      }
+      noticeDetailRequests.current.add(noticeId);
+      if (expand) {
+        setExpandedNoticeId(noticeId);
+      }
+
+      try {
+        const detail = await fetchNoticePostDetail(noticeId);
+        const detailItem = toNoticeFeedItem(
+          detail,
+          noticeGubunNamesRef.current,
+        );
+        setNoticeItems((current) =>
+          current.map((item) =>
+            item.id === noticeId
+              ? {
+                  ...item,
+                  ...detailItem,
+                  liked: item.liked,
+                  likeCount: item.likeCount,
+                  bookmarked: item.bookmarked,
+                }
+              : item,
+          ),
+        );
+      } catch {
+        showError('공지사항 상세 정보를 불러오지 못했습니다.');
+      } finally {
+        noticeDetailRequests.current.delete(noticeId);
+      }
+    },
+    [showError],
+  );
+
+  const handleToggleNoticeExpand = useCallback(
+    async (noticeId: number) => {
+      if (expandedNoticeId === noticeId) {
+        setExpandedNoticeId(null);
+        return;
+      }
+      await loadNoticeDetail(noticeId, true);
+    },
+    [expandedNoticeId, loadNoticeDetail],
+  );
+
+  const handleNoticeInteract = useCallback(
+    async (noticeId: number) => {
+      await loadNoticeDetail(noticeId, false);
+    },
+    [loadNoticeDetail],
+  );
+
   return (
     <Box
       sx={{
@@ -1278,9 +1352,8 @@ export function CommunityNoticePage({
                 isDark={isDark}
                 isRefreshing={isRefreshing}
                 expandedNoticeId={expandedNoticeId}
-                onToggleExpand={(id) =>
-                  setExpandedNoticeId((current) => (current === id ? null : id))
-                }
+                onToggleExpand={handleToggleNoticeExpand}
+                onNoticeInteract={handleNoticeInteract}
                 onToggleLike={handleToggleLike}
                 onToggleBookmark={handleToggleBookmark}
                 onAddComment={handleAddComment}
@@ -1346,7 +1419,11 @@ export function CommunityNoticePage({
                   })();
                 }}
               />
-              <NoticeSummaryPanel stats={summaryStats} isDark={isDark} />
+              <NoticeSummaryPanel
+                stats={noticeSummary.stats}
+                recentIssues={noticeSummary.recentIssues}
+                isDark={isDark}
+              />
             </Box>
           )}
         </Container>

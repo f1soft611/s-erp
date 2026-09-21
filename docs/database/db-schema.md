@@ -396,6 +396,26 @@
 - 첨부 파일 메타데이터를 보관
 - 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
 
+### 2-19. tb_board_post_view_history
+
+| 컬럼            | 타입      | 설명           |
+| --------------- | --------- | -------------- |
+| view_history_id | bigserial | 조회 이력 PK   |
+| tenant_id       | bigint    | 테넌트 FK      |
+| post_id         | bigint    | 게시글 FK      |
+| login_id        | bigint    | 로그인 계정 FK |
+| viewed_at       | timestamp | 최초 조회 일시 |
+
+제약:
+
+- 복합 유니크: `(tenant_id, post_id, login_id)`
+- `tb_tenant`, `tb_board_post`, `tb_login_account`를 참조
+
+역할:
+
+- 인증 사용자별 공지사항 최초 조회를 기록
+- 동일 사용자의 반복·동시 조회로 인한 조회수 중복 증가 방지
+
 ---
 
 ## 변경 이력
@@ -404,6 +424,7 @@
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 구분 코드와 게시글/댓글 최신 행위자 감사 컬럼을 추가했다. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
+- 2026-09-21: 공지사항 사용자별 최초 조회수 중복 방지를 위해 `tb_board_post_view_history`를 추가했다. 적용 스크립트는 [backend/DATABASE/20260921](../../backend/DATABASE/20260921) 및 [docs/database/20260921](20260921) 참고.
 - 2026-09-15: 그룹웨어 커뮤니티 게시판 스키마 추가로 `tb_board_type`, `tb_board_post`, `tb_board_file` 신규 테이블 생성. 적용 스크립트는 [backend/DATABASE/20260915](../../backend/DATABASE/20260915) 및 [docs/database/2026-09-15](2026-09-15) 참고.
 - 2026-09-11: 공통코드 관리 기능을 위한 `tb_common_code_group`, `tb_common_code_item` 신규 테이블 추가. 적용 스크립트는 [backend/DATABASE/20260911](../../backend/DATABASE/20260911) 및 [docs/database/2026-09-11](2026-09-11) 참고.
 - 2026-09-01: 메뉴 설명 연동 작업으로 `tb_menu.menu_dc` 컬럼 추가. 적용 스크립트는 [backend/DATABASE/20260901](../../backend/DATABASE/20260901) 참고.

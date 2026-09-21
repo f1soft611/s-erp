@@ -93,6 +93,39 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         return post;
     }
 
+    @Override
+    @Transactional
+    public NoticeBoardPostVO getPost(Long tenantId, Long postId, String loginCode) throws Exception {
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("postId", postId);
+        NoticeBoardPostVO post = noticeBoardDAO.selectNoticePostById(params);
+        if (post == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
+        }
+
+        HashMap<String, Object> loginParams = new HashMap<>();
+        loginParams.put("tenantId", tenantId);
+        loginParams.put("loginCode", loginCode);
+        Long loginId = noticeBoardDAO.selectLoginIdByLoginCode(loginParams);
+        if (loginId == null) {
+            throw new IllegalStateException("인증된 로그인 계정을 찾을 수 없습니다.");
+        }
+
+        HashMap<String, Object> viewParams = new HashMap<>();
+        viewParams.put("tenantId", tenantId);
+        viewParams.put("postId", postId);
+        viewParams.put("loginId", loginId);
+        Long viewHistoryId = noticeBoardDAO.insertNoticePostViewHistory(viewParams);
+        if (viewHistoryId != null) {
+            noticeBoardDAO.incrementNoticePostViewCount(params);
+            post = noticeBoardDAO.selectNoticePostById(params);
+        }
+
+        hydratePost(tenantId, post, postId);
+        return post;
+    }
+
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
         List<CommonFileVO> commonFiles = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
         List<NoticeBoardFileVO> files = new ArrayList<>();

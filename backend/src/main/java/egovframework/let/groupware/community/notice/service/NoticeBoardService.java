@@ -20,6 +20,8 @@ public interface NoticeBoardService {
 
     NoticeBoardPostVO getPost(Long tenantId, Long postId) throws Exception;
 
+    NoticeBoardPostVO getPost(Long tenantId, Long postId, String loginCode) throws Exception;
+
     NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
     NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;

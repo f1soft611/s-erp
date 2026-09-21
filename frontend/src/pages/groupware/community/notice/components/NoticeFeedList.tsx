@@ -31,7 +31,8 @@ type NoticeFeedListProps = {
   isDark: boolean;
   expandedNoticeId?: number | null;
   isRefreshing?: boolean;
-  onToggleExpand?: (id: number) => void;
+  onToggleExpand?: (id: number) => Promise<void> | void;
+  onNoticeInteract?: (id: number) => Promise<void> | void;
   onToggleLike?: (id: number) => void;
   onToggleBookmark?: (id: number) => void;
   onAddComment?: (
@@ -218,6 +219,7 @@ export function NoticeFeedList({
   expandedNoticeId,
   isRefreshing,
   onToggleExpand,
+  onNoticeInteract,
   onToggleLike,
   onToggleBookmark,
   onAddComment,
@@ -260,38 +262,6 @@ export function NoticeFeedList({
   const serverCommentSnapshots = useRef<Record<number, string>>({});
   const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
   const serverItemRevisionRef = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    const viewers = document.querySelectorAll<HTMLElement>(
-      '[data-notice-body-content="true"]',
-    );
-    viewers.forEach((container) => {
-      const onClick = (event: Event) => {
-        const imageElement = (event.target as HTMLElement)?.closest('img');
-        if (!imageElement) {
-          return;
-        }
-
-        const src = imageElement.getAttribute('src');
-        if (!src) {
-          return;
-        }
-
-        setViewerImage({
-          src,
-          alt: imageElement.getAttribute('alt') || '원본 이미지',
-        });
-      };
-
-      container.onclick = onClick;
-    });
-
-    return () => {
-      viewers.forEach((container) => {
-        container.onclick = null;
-      });
-    };
-  }, [items, expandedNoticeId, serverItemRevision]);
 
   useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
@@ -422,6 +392,7 @@ export function NoticeFeedList({
         items={items}
         renderItem={(item) => {
           const isExpanded = expandedNoticeId === item.id;
+          const hasMore = item.body !== item.summary;
           const displayBody = isExpanded ? item.body : item.summary;
           const normalizedPreviewHtml = normalizeNoticeEmbeddedImageSources(
             item.bodyHtml ?? item.body,
@@ -573,6 +544,23 @@ export function NoticeFeedList({
 
                 <Typography
                   variant="h6"
+                  onClick={() => {
+                    if (!hasMore) {
+                      void onToggleExpand?.(item.id);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      !hasMore ||
+                      (event.key !== 'Enter' && event.key !== ' ')
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    void onToggleExpand?.(item.id);
+                  }}
+                  role={!hasMore ? 'button' : undefined}
+                  tabIndex={!hasMore ? 0 : undefined}
                   sx={{
                     fontSize: '1.25rem',
                     lineHeight: 1.4,
@@ -580,6 +568,7 @@ export function NoticeFeedList({
                     letterSpacing: '-0.02em',
                     mb: 1.5,
                     color: 'text.primary',
+                    cursor: !hasMore ? 'pointer' : 'default',
                   }}
                 >
                   {item.title}
@@ -590,6 +579,30 @@ export function NoticeFeedList({
                     data-testid={`notice-preview-${item.id}`}
                     data-expanded={isExpanded}
                     data-notice-body-content="true"
+                    data-notice-id={item.id}
+                    data-has-more={hasMore}
+                    onClick={(event) => {
+                      const imageElement = (
+                        event.target as HTMLElement
+                      ).closest('img');
+                      if (imageElement) {
+                        const src = imageElement.getAttribute('src');
+                        if (src) {
+                          setViewerImage({
+                            src,
+                            alt:
+                              imageElement.getAttribute('alt') || '원본 이미지',
+                          });
+                        }
+                        if (!hasMore) {
+                          void onNoticeInteract?.(item.id);
+                        }
+                        return;
+                      }
+                      if (!hasMore) {
+                        void onToggleExpand?.(item.id);
+                      }
+                    }}
                     sx={{
                       ...noticeContentStyles,
                       color: 'text.primary',
@@ -616,6 +629,11 @@ export function NoticeFeedList({
                   <Typography
                     data-testid={`notice-preview-${item.id}`}
                     data-expanded={isExpanded}
+                    onClick={() => {
+                      if (!hasMore) {
+                        void onToggleExpand?.(item.id);
+                      }
+                    }}
                     variant="body1"
                     sx={{
                       fontSize: '1rem',
@@ -628,13 +646,14 @@ export function NoticeFeedList({
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       mb: 1.5,
+                      cursor: !hasMore ? 'pointer' : 'default',
                     }}
                   >
                     {displayBody}
                   </Typography>
                 )}
 
-                {item.body !== item.summary && (
+                {hasMore && (
                   <Button
                     variant="text"
                     size="small"
@@ -655,88 +674,112 @@ export function NoticeFeedList({
                   <Box
                     data-testid={`notice-embedded-image-preview-${item.id}`}
                     sx={{
-                      display: 'flex',
-                      gap: 1,
+                      width: '100%',
+                      height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                      overflow: 'hidden',
                       mb: 1.5,
-                      overflowX: 'auto',
                       maxWidth: '100%',
                     }}
                   >
-                    {embeddedImagePreviews.map((image, index) => {
-                      const imageKey = `${image.src}-${index}`;
-                      const isLoaded = loadedImageKeys.has(imageKey);
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{
+                        height: '100%',
+                        width: '100%',
+                        overflow: 'hidden',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                      }}
+                    >
+                      {embeddedImagePreviews.map((image, index) => {
+                        const imageKey = `${image.src}-${index}`;
+                        const isLoaded = loadedImageKeys.has(imageKey);
 
-                      return (
-                        <Box
-                          key={imageKey}
-                          sx={{
-                            width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                            height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                            flex: '0 0 auto',
-                            position: 'relative',
-                            borderRadius: 1,
-                          }}
-                        >
-                          {!isLoaded && (
-                            <Skeleton
-                              variant="rounded"
-                              animation="wave"
-                              data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
-                              sx={{
-                                position: 'absolute',
-                                inset: 0,
-                                width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                                height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                                borderRadius: 1,
-                                bgcolor: isDark
-                                  ? 'rgba(51,65,85,0.7)'
-                                  : 'rgba(226,232,240,0.9)',
-                              }}
-                            />
-                          )}
+                        return (
                           <Box
-                            component="img"
-                            src={image.src}
-                            alt={image.alt}
-                            onLoad={() =>
-                              setLoadedImageKeys((current) => {
-                                const next = new Set(current);
-                                next.add(imageKey);
-                                return next;
-                              })
-                            }
-                            onClick={() => {
-                              if (isLoaded) {
-                                setViewerImage({
-                                  src: image.src,
-                                  alt: image.alt,
-                                });
-                              }
-                            }}
+                            key={imageKey}
                             sx={{
+                              position: 'relative',
                               width: NOTICE_IMAGE_PREVIEW_WIDTH,
                               height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                              objectFit: 'cover',
                               borderRadius: 1,
-                              border: '1px solid',
-                              borderColor: isDark
-                                ? 'rgba(148,163,184,0.24)'
-                                : 'rgba(148,163,184,0.3)',
-                              bgcolor: isDark
-                                ? 'rgba(15,23,42,0.7)'
-                                : '#f8fafc',
-                              cursor: isLoaded ? 'pointer' : 'default',
-                              opacity: isLoaded ? 1 : 0,
+                              flexShrink: 0,
                             }}
-                          />
-                        </Box>
-                      );
-                    })}
+                            onClick={() => {
+                              if (!hasMore) {
+                                void onNoticeInteract?.(item.id);
+                              }
+                            }}
+                          >
+                            {!isLoaded && (
+                              <Skeleton
+                                variant="rounded"
+                                animation="wave"
+                                data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
+                                sx={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                  height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                  borderRadius: 1,
+                                  bgcolor: isDark
+                                    ? 'rgba(51,65,85,0.7)'
+                                    : 'rgba(226,232,240,0.9)',
+                                }}
+                              />
+                            )}
+                            <Box
+                              component="img"
+                              src={image.src}
+                              alt={image.alt}
+                              onLoad={() =>
+                                setLoadedImageKeys((current) => {
+                                  const next = new Set(current);
+                                  next.add(imageKey);
+                                  return next;
+                                })
+                              }
+                              onClick={() => {
+                                if (isLoaded) {
+                                  setViewerImage({
+                                    src: image.src,
+                                    alt: image.alt,
+                                  });
+                                }
+                              }}
+                              sx={{
+                                width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                objectFit: 'cover',
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: isDark
+                                  ? 'rgba(148,163,184,0.24)'
+                                  : 'rgba(148,163,184,0.3)',
+                                bgcolor: isDark
+                                  ? 'rgba(15,23,42,0.7)'
+                                  : '#f8fafc',
+                                cursor: isLoaded ? 'pointer' : 'default',
+                                opacity: isLoaded ? 1 : 0,
+                                display: 'block',
+                              }}
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Stack>
                   </Box>
                 )}
 
                 {attachmentFiles.length > 0 && (
-                  <Box>
+                  <Box
+                    onClick={() => {
+                      if (!hasMore) {
+                        void onNoticeInteract?.(item.id);
+                      }
+                    }}
+                  >
                     {/* <Divider sx={{ my: 1.5 }} /> */}
                     <AttachmentList
                       files={attachmentFiles.map((attachment) => ({
@@ -928,61 +971,69 @@ export function NoticeFeedList({
                   </Button>
                 )}
 
-                <CommentThread
-                  comments={normalizeCommentTree(visibleComments)}
-                  onSubmitComment={async (content, files) => {
-                    await handleLocalCommentAdd(
-                      item.id,
-                      content,
-                      undefined,
-                      files,
-                    );
+                <Box
+                  onClick={() => {
+                    if (!hasMore) {
+                      void onNoticeInteract?.(item.id);
+                    }
                   }}
-                  onSubmitReply={async (
-                    commentId,
-                    content,
-                    files,
-                    parentCommentId,
-                  ) => {
-                    await handleLocalCommentAdd(
-                      item.id,
+                >
+                  <CommentThread
+                    comments={normalizeCommentTree(visibleComments)}
+                    onSubmitComment={async (content, files) => {
+                      await handleLocalCommentAdd(
+                        item.id,
+                        content,
+                        undefined,
+                        files,
+                      );
+                    }}
+                    onSubmitReply={async (
+                      commentId,
                       content,
+                      files,
                       parentCommentId,
-                      files,
-                      commentId,
-                    );
-                  }}
-                  onEditComment={async (commentId, content, files) => {
-                    await handleLocalCommentEdit(
-                      item.id,
-                      commentId,
-                      content,
-                      files,
-                    );
-                  }}
-                  onDeleteComment={async (commentId) => {
-                    await handleLocalCommentDelete(item.id, commentId);
-                  }}
-                  onDownloadAttachment={(commentId, attachmentId, fileName) =>
-                    onDownloadCommentAttachment?.(
-                      commentId,
-                      attachmentId,
-                      fileName,
-                    )
-                  }
-                  onDeleteAttachment={(commentId, attachmentId) =>
-                    onDeleteCommentAttachment?.(
-                      item.id,
-                      commentId,
-                      attachmentId,
-                    )
-                  }
-                  isDark={isDark}
-                  showComposer
-                  placeholder="줄바꿈 Shift+Enter, 입력 Enter"
-                  composerLabel="댓글 입력"
-                  submitLabel="등록"
-                />
+                    ) => {
+                      await handleLocalCommentAdd(
+                        item.id,
+                        content,
+                        parentCommentId,
+                        files,
+                        commentId,
+                      );
+                    }}
+                    onEditComment={async (commentId, content, files) => {
+                      await handleLocalCommentEdit(
+                        item.id,
+                        commentId,
+                        content,
+                        files,
+                      );
+                    }}
+                    onDeleteComment={async (commentId) => {
+                      await handleLocalCommentDelete(item.id, commentId);
+                    }}
+                    onDownloadAttachment={(commentId, attachmentId, fileName) =>
+                      onDownloadCommentAttachment?.(
+                        commentId,
+                        attachmentId,
+                        fileName,
+                      )
+                    }
+                    onDeleteAttachment={(commentId, attachmentId) =>
+                      onDeleteCommentAttachment?.(
+                        item.id,
+                        commentId,
+                        attachmentId,
+                      )
+                    }
+                    isDark={isDark}
+                    showComposer
+                    placeholder="줄바꿈 Shift+Enter, 입력 Enter"
+                    composerLabel="댓글 입력"
+                    submitLabel="등록"
+                  />
+                </Box>
 
                 {isRefreshing && (
                   <Typography variant="caption" color="text.secondary">

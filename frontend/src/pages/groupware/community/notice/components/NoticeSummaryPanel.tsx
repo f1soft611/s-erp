@@ -1,20 +1,20 @@
-import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Stack,
-  Typography,
-} from '@mui/material';
-import type { SummaryStat } from '../data/noticeData';
+import { Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import type {
+  NoticeRecentIssue,
+  NoticeSummaryStat,
+} from '../data/noticeSummary';
 
 type NoticeSummaryPanelProps = {
-  stats: SummaryStat[];
+  stats: NoticeSummaryStat[];
+  recentIssues: NoticeRecentIssue[];
   isDark: boolean;
 };
 
-export function NoticeSummaryPanel({ stats, isDark }: NoticeSummaryPanelProps) {
+export function NoticeSummaryPanel({
+  stats,
+  recentIssues,
+  isDark,
+}: NoticeSummaryPanelProps) {
   return (
     <Stack spacing={2}>
       <Card
@@ -81,32 +81,34 @@ export function NoticeSummaryPanel({ stats, isDark }: NoticeSummaryPanelProps) {
             최근 이슈
           </Typography>
           <Stack spacing={1.5}>
-            {['보안 점검 예정', '업무 일정 조정', '새 규정 반영'].map(
-              (item) => (
+            {recentIssues.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                최근 이슈가 없습니다.
+              </Typography>
+            ) : (
+              recentIssues.map((issue) => (
                 <Box
-                  key={item}
+                  key={issue.id}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
+                    display: 'grid',
+                    gap: 0.5,
                     p: 1.2,
                     borderRadius: 2,
                     bgcolor: isDark ? 'rgba(148,163,184,0.06)' : '#f8fafc',
                   }}
                 >
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {item}
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}
+                  >
+                    {issue.title}
                   </Typography>
-                  <Divider orientation="vertical" flexItem />
-                  <Chip
-                    label="확인"
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
+                  <Typography variant="caption" color="text.secondary">
+                    조회 {issue.viewCount} · 댓글 {issue.commentCount} · 점수{' '}
+                    {issue.score}
+                  </Typography>
                 </Box>
-              ),
+              ))
             )}
           </Stack>
         </CardContent>
