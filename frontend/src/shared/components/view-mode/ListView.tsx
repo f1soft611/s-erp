@@ -1,22 +1,28 @@
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography } from '@mui/material';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import type { CommonViewItem } from './commonViewTypes';
 
 type ListViewProps<T extends CommonViewItem> = {
   items: T[];
   onItemClick?: (item: T) => void;
+  ariaLabel?: string;
 };
 
 export function ListView<T extends CommonViewItem>({
   items,
   onItemClick,
+  ariaLabel = '리스트형 목록',
 }: ListViewProps<T>) {
   return (
     <Stack
       component="section"
-      aria-label="리스트형 공지 목록"
-      sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+      aria-label={ariaLabel}
+      sx={{
+        width: '100%',
+        boxSizing: 'border-box',
+        borderTop: '1px solid',
+        borderColor: 'divider',
+      }}
     >
       {items.map((item) => (
         <Box
@@ -37,7 +43,7 @@ export function ListView<T extends CommonViewItem>({
             border: 0,
             borderBottom: '1px solid',
             borderColor: 'divider',
-            bgcolor: item.isPinned ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+            bgcolor: 'background.paper',
             color: 'inherit',
             cursor: onItemClick ? 'pointer' : 'default',
             '&:hover': onItemClick ? { bgcolor: 'action.hover' } : undefined,
@@ -59,6 +65,8 @@ export function ListView<T extends CommonViewItem>({
               <Typography
                 variant="body2"
                 sx={{
+                  minWidth: 0,
+                  flex: 1,
                   fontWeight: 700,
                   color: item.isPinned ? 'primary.main' : 'text.primary',
                   overflow: 'hidden',
@@ -68,10 +76,20 @@ export function ListView<T extends CommonViewItem>({
               >
                 {item.title}
               </Typography>
-              <PeopleAltOutlinedIcon
-                fontSize="inherit"
-                sx={{ color: 'text.disabled', flexShrink: 0 }}
-              />
+              {item.categoryLabel && (
+                <Chip
+                  label={item.categoryLabel}
+                  size="small"
+                  sx={{
+                    flexShrink: 0,
+                    ml: 'auto',
+                    height: 22,
+                    bgcolor: 'rgba(59,130,246,0.18)',
+                    color: '#2563eb',
+                    fontWeight: 700,
+                  }}
+                />
+              )}
             </Box>
             <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0 }}>
               <Typography variant="caption" color="text.secondary" noWrap>

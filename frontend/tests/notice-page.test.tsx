@@ -92,6 +92,30 @@ describe('Community notice page', () => {
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
   });
 
+  it('shows the pin toggle beside the more menu button', () => {
+    const onTogglePinned = vi.fn();
+    const item = { ...noticeFeed[0], isPinned: 'N' };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onTogglePinned={onTogglePinned}
+      />,
+    );
+
+    const pinButton = screen.getByRole('button', {
+      name: `상단 고정 ${item.title}`,
+    });
+    expect(pinButton).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: '상단 고정' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(pinButton);
+    expect(onTogglePinned).toHaveBeenCalledWith(item);
+  });
+
   it('uses title and body clicks as the read entry point when more is unavailable', () => {
     const onToggleExpand = vi.fn();
     const item = {

@@ -16,7 +16,7 @@
         <result property="lastModifiedBy" column="last_modified_by"/>
         <result property="lastModifiedByName" column="last_modified_by_name"/>
         <result property="viewCount" column="view_count"/>
-        <result property="isNotice" column="is_notice"/>
+        <result property="isPinned" column="is_pinned"/>
         <result property="isDeleted" column="is_deleted"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -57,7 +57,7 @@
             p.last_modified_by,
             p.last_modified_by_name,
             p.view_count,
-            p.is_notice,
+            p.is_pinned,
             p.is_deleted,
             p.created_at,
             p.updated_at,
@@ -82,11 +82,31 @@
                 <if test="noticeGubunCode != null and noticeGubunCode != ''">
                     AND p.notice_gubun_code = #{noticeGubunCode}
                 </if>
-                <if test="isNotice != null and isNotice != ''">
-                    AND p.is_notice = #{isNotice}
+                <if test="isPinned != null and isPinned != ''">
+                    AND p.is_pinned = #{isPinned}
                 </if>
-        ORDER BY p.is_notice DESC, p.created_at DESC
-        LIMIT #{size} OFFSET #{offset}
+        ORDER BY p.created_at DESC, p.post_id DESC
+        LIMIT #{recordCountPerPage} OFFSET #{firstIndex}
+    </select>
+
+    <select id="selectNoticePostCount" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_board_post p
+        WHERE p.board_type_code = #{boardTypeCode}
+          AND p.is_deleted = 'N'
+        <if test="keyword != null and keyword != ''">
+          AND (
+              p.title ILIKE '%' || #{keyword} || '%'
+              OR p.writer_name ILIKE '%' || #{keyword} || '%'
+              OR p.contents_text ILIKE '%' || #{keyword} || '%'
+          )
+        </if>
+        <if test="noticeGubunCode != null and noticeGubunCode != ''">
+            AND p.notice_gubun_code = #{noticeGubunCode}
+        </if>
+        <if test="isPinned != null and isPinned != ''">
+            AND p.is_pinned = #{isPinned}
+        </if>
     </select>
 
     <select id="selectNoticePostById" parameterType="map" resultMap="noticePostMap">
@@ -104,7 +124,7 @@
             p.last_modified_by,
             p.last_modified_by_name,
             p.view_count,
-            p.is_notice,
+            p.is_pinned,
             p.is_deleted,
             p.created_at,
             p.updated_at,
@@ -166,7 +186,7 @@
             last_modified_by,
             last_modified_by_name,
             view_count,
-            is_notice,
+            is_pinned,
             is_deleted,
             created_at,
             updated_at
@@ -183,7 +203,7 @@
             #{lastModifiedBy},
             #{lastModifiedByName},
             0,
-            #{isNotice},
+            #{isPinned},
             'N',
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -202,7 +222,17 @@
             writer_name = #{writerName},
             last_modified_by = #{lastModifiedBy},
             last_modified_by_name = #{lastModifiedByName},
-            is_notice = #{isNotice},
+            is_pinned = #{isPinned},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE post_id = #{postId}
+          AND is_deleted = 'N'
+    </update>
+
+    <update id="updateNoticePostPinned" parameterType="map">
+        UPDATE tb_board_post
+        SET is_pinned = #{isPinned},
+            last_modified_by = #{lastModifiedBy},
+            last_modified_by_name = #{lastModifiedByName},
             updated_at = CURRENT_TIMESTAMP
         WHERE post_id = #{postId}
           AND is_deleted = 'N'

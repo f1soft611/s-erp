@@ -3,7 +3,7 @@ export type NoticeSummaryInput = {
   title: string;
   viewCount?: number | string | null;
   commentCount?: number | string | null;
-  isNotice?: string | null;
+  isPinned?: string | null;
   createdAt?: string | Date | null;
   attachmentCount?: number | null;
 };
@@ -101,9 +101,9 @@ export function deriveNoticeSummary(
       { label: '전체 공지', value: String(notices.length) },
       { label: '이번 주', value: String(thisWeekCount) },
       {
-        label: '중요 공지',
+        label: '상단 고정',
         value: String(
-          notices.filter((notice) => notice.isNotice === 'Y').length,
+          notices.filter((notice) => notice.isPinned === 'Y').length,
         ),
       },
       { label: '첨부 문서', value: String(attachmentCount) },

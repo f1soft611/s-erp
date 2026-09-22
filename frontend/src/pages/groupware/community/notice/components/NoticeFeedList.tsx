@@ -16,6 +16,7 @@ import {
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
@@ -53,6 +54,7 @@ type NoticeFeedListProps = {
     commentId: number | string,
   ) => Promise<void> | void;
   onDelete?: (noticeId: number) => void;
+  onTogglePinned?: (item: NoticeFeedItem) => void;
   onEdit?: (item: NoticeFeedItem) => void;
   onDownload?: (
     noticeId: number,
@@ -84,6 +86,7 @@ type NoticeFeedListProps = {
     commentId: number | string,
     attachmentId: string,
   ) => void;
+  onReachEnd?: () => void;
   serverItemRevision?: number;
 };
 
@@ -226,14 +229,17 @@ export function NoticeFeedList({
   onEditComment,
   onDeleteComment,
   onDelete,
+  onTogglePinned,
   onEdit,
   onDownload,
   onLoadPreviousComments,
   onLoadPreviousCommentsError,
   onDownloadCommentAttachment,
   onDeleteCommentAttachment,
+  onReachEnd,
   serverItemRevision = 0,
 }: NoticeFeedListProps) {
+  const endRef = useRef<HTMLDivElement | null>(null);
   const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
     Record<number, NoticeCommentItem[]>
   >({});
@@ -262,6 +268,27 @@ export function NoticeFeedList({
   const serverCommentSnapshots = useRef<Record<number, string>>({});
   const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
   const serverItemRevisionRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const element = endRef.current;
+    if (
+      !element ||
+      !onReachEnd ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onReachEnd();
+        }
+      },
+      { rootMargin: '320px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [onReachEnd]);
 
   useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
@@ -435,27 +462,25 @@ export function NoticeFeedList({
               key={item.id}
               data-notice-id={item.id}
               sx={{
+                width: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box',
                 borderRadius: 3,
                 border: `1px solid ${
                   isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
                 }`,
                 boxShadow: 'none',
-                bgcolor: item.highlight
-                  ? isDark
-                    ? 'rgba(30, 41, 59, 0.9)'
-                    : '#fff7ed'
-                  : isDark
-                    ? 'rgba(15, 23, 42, 0.75)'
-                    : '#ffffff',
+                bgcolor: isDark ? 'rgba(15, 23, 42, 0.75)' : '#ffffff',
               }}
             >
-              <CardContent sx={{ p: 2.5 }}>
+              <CardContent sx={{ p: 2.5, minWidth: 0, overflow: 'hidden' }}>
                 <Box
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.5,
                     mb: 2,
+                    minWidth: 0,
                   }}
                 >
                   <Box
@@ -489,6 +514,19 @@ export function NoticeFeedList({
                     spacing={0.75}
                     sx={{ alignItems: 'center' }}
                   >
+                    <IconButton
+                      size="small"
+                      aria-label={`${item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
+                      title={
+                        item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'
+                      }
+                      onClick={() => onTogglePinned?.(item)}
+                    >
+                      <PushPinOutlinedIcon
+                        fontSize="small"
+                        color={item.isPinned === 'Y' ? 'primary' : 'inherit'}
+                      />
+                    </IconButton>
                     <IconButton
                       size="small"
                       aria-label={`공지 메뉴 ${item.title}`}
@@ -530,12 +568,8 @@ export function NoticeFeedList({
                       label={item.state}
                       size="small"
                       sx={{
-                        bgcolor: item.highlight
-                          ? '#f59e0b'
-                          : isDark
-                            ? 'rgba(59,130,246,0.18)'
-                            : '#dbeafe',
-                        color: item.highlight ? '#fff' : '#2563eb',
+                        bgcolor: isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe',
+                        color: '#2563eb',
                         fontWeight: 700,
                       }}
                     />
@@ -1045,6 +1079,8 @@ export function NoticeFeedList({
           );
         }}
       />
+
+      <Box ref={endRef} sx={{ height: 1 }} aria-hidden="true" />
 
       <ImageViewerDialog
         open={Boolean(viewerImage)}

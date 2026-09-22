@@ -15,8 +15,8 @@ import { ContentSplitLayout } from '../../../../shared/components/view-mode/Cont
 import { ListView } from '../../../../shared/components/view-mode/ListView';
 import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
-import { SummaryPanelSkeleton } from '../../../../shared/components/view-mode/SummaryPanelSkeleton';
-import { ViewModeToggle } from '../../../../shared/components/view-mode/ViewModeToggle';
+import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { CommonViewMode } from '../../../../shared/components/view-mode/commonViewTypes';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { useNotification } from '../../../../shared/context/NotificationContext';
@@ -33,7 +33,8 @@ import {
   NoticeFeedList,
   normalizeNoticeEmbeddedImageSources,
 } from './components/NoticeFeedList';
-import { NoticeFilterBar } from './components/NoticeFilterBar';
+import { NoticeEmptyState } from './components/NoticeEmptyState';
+import { NoticeFilterMenu } from './components/NoticeFilterMenu';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import type { NoticeCommentItem, NoticeFeedItem } from './data/noticeData';
 import { deriveNoticeSummary } from './data/noticeSummary';
@@ -44,8 +45,10 @@ import {
   downloadNoticeAttachment,
   fetchNoticePostDetail,
   fetchNoticePosts,
+  fetchPinnedNoticePosts,
   deleteNoticeAttachment,
   updateNoticePost,
+  updateNoticePinned,
   uploadNoticeAttachment,
 } from './services/noticeBoardService';
 import type { NoticeBoardPostApi } from './services/noticeBoardService';
@@ -258,8 +261,7 @@ const toNoticeFeedItem = (
     likeCount: 0,
     liked: false,
     bookmarked: false,
-    highlight: post.isNotice === 'Y',
-    isNotice: post.isNotice ?? 'N',
+    isPinned: post.isPinned ?? 'N',
   };
 };
 
@@ -408,6 +410,22 @@ const toNoticeCommentItem = (
 const noticeFailureMessage =
   '공지사항 목록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.';
 
+const normalizeNoticeListResponse = (
+  response:
+    | NoticeBoardPostApi[]
+    | { resultList?: NoticeBoardPostApi[]; resultCnt?: number }
+    | null
+    | undefined,
+) => {
+  if (Array.isArray(response)) {
+    return { resultList: response, resultCnt: response.length };
+  }
+  return {
+    resultList: response?.resultList ?? [],
+    resultCnt: Number(response?.resultCnt ?? 0) || 0,
+  };
+};
+
 const deleteUploadedNoticeAttachments = async (
   postId: number,
   attachments: NoticeBoardAttachmentApi[],
@@ -443,21 +461,28 @@ export function CommunityNoticePage({
   const hasCreatePermission = true;
   const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [pendingPinnedNotice, setPendingPinnedNotice] =
+    useState<NoticeFeedItem | null>(null);
   const [editorDraft, setEditorDraft] = useState<{
     id?: number;
     title: string;
     body: string;
     noticeGubunCode?: string;
-    isNotice: 'Y' | 'N';
     attachments: NoticeComposerDraftAttachment[];
   }>({
     title: '',
     body: '',
     noticeGubunCode: '',
-    isNotice: 'N',
     attachments: [],
   });
   const [noticeItems, setNoticeItems] = useState<NoticeFeedItem[]>([]);
+  const [pinnedNoticeItems, setPinnedNoticeItems] = useState<NoticeFeedItem[]>(
+    [],
+  );
+  const [pinnedNoticeCount, setPinnedNoticeCount] = useState(0);
+  const [noticePage, setNoticePage] = useState(1);
+  const [noticeHasMore, setNoticeHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [serverItemRevision, setServerItemRevision] = useState(0);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -481,7 +506,7 @@ export function CommunityNoticePage({
           title: item.title,
           viewCount: item.viewCount,
           commentCount: item.commentCount,
-          isNotice: item.isNotice,
+          isPinned: item.isPinned,
           createdAt: item.createdAt,
           attachmentCount: item.attachmentDetails?.length ?? 0,
         })),
@@ -492,14 +517,11 @@ export function CommunityNoticePage({
     () => toNoticeViewItems(noticeItems),
     [noticeItems],
   );
-  const unpinnedNoticeItems = useMemo(
-    () =>
-      noticeItems.filter((item) => !item.highlight && item.isNotice !== 'Y'),
-    [noticeItems],
-  );
-  const unpinnedNoticeViewItems = useMemo(
-    () => noticeViewItems.filter((item) => !item.isPinned),
-    [noticeViewItems],
+  const unpinnedNoticeItems = noticeItems;
+  const unpinnedNoticeViewItems = noticeViewItems;
+  const pinnedNoticeViewItems = useMemo(
+    () => toNoticeViewItems(pinnedNoticeItems),
+    [pinnedNoticeItems],
   );
   useEffect(() => {
     noticeGubunNamesRef.current = noticeGubunNames;
@@ -518,29 +540,44 @@ export function CommunityNoticePage({
   }, [noticeGubunNames]);
 
   const loadNoticePosts = useCallback(
-    async ({ silent = false }: { silent?: boolean } = {}) => {
-      if (silent) {
+    async ({
+      silent = false,
+      quiet = false,
+    }: { silent?: boolean; quiet?: boolean } = {}) => {
+      if (silent && !quiet) {
         setIsRefreshing(true);
-      } else {
+      } else if (!silent) {
         setIsInitialLoading(true);
       }
       setErrorMessage(null);
 
       try {
-        const posts = await fetchNoticePosts(
-          1,
-          20,
-          '',
-          selectedNoticeFilter === '__IMPORTANT__'
-            ? undefined
-            : selectedNoticeFilter,
-          selectedNoticeFilter === '__IMPORTANT__' ? 'Y' : undefined,
-        );
+        const [postsResponse, pinnedPostsResponse] = await Promise.all([
+          fetchNoticePosts(1, 20, '', selectedNoticeFilter || undefined),
+          typeof fetchPinnedNoticePosts === 'function'
+            ? fetchPinnedNoticePosts(
+                1,
+                20,
+                '',
+                selectedNoticeFilter || undefined,
+              )
+            : Promise.resolve(undefined),
+        ]);
+        const posts = normalizeNoticeListResponse(postsResponse);
+        const pinnedPosts = normalizeNoticeListResponse(pinnedPostsResponse);
         setNoticeItems(
-          posts.map((post) =>
+          posts.resultList.map((post) =>
             toNoticeFeedItem(post, noticeGubunNamesRef.current),
           ),
         );
+        setPinnedNoticeItems(
+          pinnedPosts.resultList.map((post) =>
+            toNoticeFeedItem(post, noticeGubunNamesRef.current),
+          ),
+        );
+        setPinnedNoticeCount(pinnedPosts.resultCnt);
+        setNoticePage(1);
+        setNoticeHasMore(posts.resultList.length < posts.resultCnt);
         setServerItemRevision((revision) => revision + 1);
       } catch (error) {
         setErrorMessage(noticeFailureMessage);
@@ -548,15 +585,52 @@ export function CommunityNoticePage({
           setNoticeItems([]);
         }
       } finally {
-        if (silent) {
+        if (silent && !quiet) {
           setIsRefreshing(false);
-        } else {
+        } else if (!silent) {
           setIsInitialLoading(false);
         }
       }
     },
     [selectedNoticeFilter],
   );
+
+  const loadMoreNoticePosts = useCallback(async () => {
+    if (isLoadingMore || !noticeHasMore || isInitialLoading) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    try {
+      const nextPage = noticePage + 1;
+      const resultResponse = await fetchNoticePosts(
+        nextPage,
+        20,
+        '',
+        selectedNoticeFilter || undefined,
+      );
+      const result = normalizeNoticeListResponse(resultResponse);
+      setNoticeItems((current) => [
+        ...current,
+        ...result.resultList.map((post) =>
+          toNoticeFeedItem(post, noticeGubunNamesRef.current),
+        ),
+      ]);
+      setNoticePage(nextPage);
+      setNoticeHasMore(
+        noticeItems.length + result.resultList.length < result.resultCnt,
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [
+    isInitialLoading,
+    isLoadingMore,
+    noticeHasMore,
+    noticeItems.length,
+    noticePage,
+    selectedNoticeFilter,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -588,7 +662,6 @@ export function CommunityNoticePage({
     bodyJson,
     bodyText,
     noticeGubunCode,
-    isNotice,
     attachments,
     removedAttachmentIds,
     embeddedImages,
@@ -598,7 +671,6 @@ export function CommunityNoticePage({
     bodyJson?: string;
     bodyText?: string;
     noticeGubunCode?: string;
-    isNotice: 'Y' | 'N';
     attachments: NoticeComposerDraftAttachment[];
     removedAttachmentIds: Array<number | string>;
     embeddedImages: NoticeComposerEmbeddedImage[];
@@ -625,7 +697,6 @@ export function CommunityNoticePage({
           contentsJson: safeJson,
           contentsText: safeText,
           noticeGubunCode,
-          isNotice,
           embeddedImages,
         });
 
@@ -700,7 +771,6 @@ export function CommunityNoticePage({
           contentsJson: safeJson,
           contentsText: safeText,
           noticeGubunCode,
-          isNotice,
           embeddedImages,
         });
 
@@ -745,7 +815,6 @@ export function CommunityNoticePage({
       title: '',
       body: '',
       noticeGubunCode: '',
-      isNotice: 'N',
       attachments: [],
     });
     setIsComposerOpen(false);
@@ -781,6 +850,29 @@ export function CommunityNoticePage({
       showSuccess('공지가 삭제되었습니다.');
     } catch (error) {
       showError('공지 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleTogglePinned = (item: NoticeFeedItem) => {
+    setPendingPinnedNotice(item);
+  };
+
+  const handleConfirmTogglePinned = async () => {
+    if (!pendingPinnedNotice) {
+      return;
+    }
+    const item = pendingPinnedNotice;
+    setPendingPinnedNotice(null);
+    try {
+      await updateNoticePinned(item.id, item.isPinned === 'Y' ? 'N' : 'Y');
+      await loadNoticePosts({ silent: true, quiet: true });
+      showSuccess(
+        item.isPinned === 'Y'
+          ? '상단 고정이 해제되었습니다.'
+          : '상단 고정으로 설정되었습니다.',
+      );
+    } catch {
+      showError('상단 고정 상태 변경에 실패했습니다.');
     }
   };
 
@@ -1133,15 +1225,6 @@ export function CommunityNoticePage({
         actionGroups={hasCreatePermission ? pageActionGroups : undefined}
       />
 
-      <NoticeFilterBar
-        isDark={isDark}
-        filters={[
-          { code: '__IMPORTANT__', name: '중요 공지', isImportant: true },
-          ...noticeGubunOptions,
-        ]}
-        selectedCode={selectedNoticeFilter}
-        onChange={setSelectedNoticeFilter}
-      />
       <PageMessageArea message="" onClose={() => setErrorMessage(null)} />
 
       <Box
@@ -1157,50 +1240,49 @@ export function CommunityNoticePage({
             flexDirection: 'column',
           }}
         >
-          {isInitialLoading || isRefreshing ? (
-            viewMode === 'list' ? (
-              <ContentSplitLayout
-                left={
-                  <>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mb: 1.5,
-                      }}
-                    >
-                      <Typography variant="subtitle2" color="text.secondary">
-                        상단고정 0건
-                      </Typography>
-                      <ViewModeToggle
-                        mode={viewMode}
-                        onChange={handleViewModeChange}
+          {isInitialLoading ? (
+            <ContentSplitLayout
+              left={
+                <>
+                  <PinnedViewToolbar
+                    pinnedCount={pinnedNoticeCount}
+                    mode={viewMode}
+                    onChange={handleViewModeChange}
+                    countLabel="상단고정"
+                    modeLabel="공지사항 보기 방식"
+                    filterAction={
+                      <NoticeFilterMenu
+                        filters={noticeGubunOptions}
+                        selectedCode={selectedNoticeFilter}
+                        onChange={setSelectedNoticeFilter}
                       />
-                    </Box>
-                    <PinnedItemsPanel items={[]} />
-                    <Box sx={{ mt: 2 }}>
+                    }
+                  />
+                  {pinnedNoticeCount > 0 && (
+                    <PinnedItemsPanel
+                      items={noticeViewItems}
+                      ariaLabel="상단 고정 공지"
+                    />
+                  )}
+                  <Box sx={{ mt: 2 }}>
+                    {viewMode === 'list' ? (
                       <ListViewSkeleton />
-                    </Box>
-                  </>
-                }
-                right={<SummaryPanelSkeleton />}
-              />
-            ) : (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: '1.7fr 0.9fr' },
-                  gap: 2,
-                }}
-              >
-                <Box data-testid="notice-feed-skeleton">
-                  <FeedViewSkeleton />
-                </Box>
-
-                <SummaryPanelSkeleton />
-              </Box>
-            )
+                    ) : (
+                      <Box data-testid="notice-feed-skeleton">
+                        <FeedViewSkeleton />
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              }
+              right={
+                <NoticeSummaryPanel
+                  stats={noticeSummary.stats}
+                  recentIssues={noticeSummary.recentIssues}
+                  isDark={isDark}
+                />
+              }
+            />
           ) : errorMessage && !isRefreshing && !hasVisibleNoticeList ? (
             <Box
               sx={{
@@ -1230,51 +1312,66 @@ export function CommunityNoticePage({
               </IconButton>
             </Box>
           ) : noticeItems.length === 0 ? (
-            <Box
-              sx={{
-                py: 6,
-                textAlign: 'center',
-                color: 'text.secondary',
-                border: `1px dashed ${isDark ? 'rgba(148,163,184,0.38)' : 'rgba(148,163,184,0.6)'}`,
-                borderRadius: 2,
-                bgcolor: isDark
-                  ? 'rgba(15,23,42,0.35)'
-                  : 'rgba(248,250,252,0.8)',
-              }}
-            >
-              등록된 공지가 없습니다.
-            </Box>
+            <ContentSplitLayout
+              left={
+                <>
+                  <PinnedViewToolbar
+                    pinnedCount={pinnedNoticeCount}
+                    mode={viewMode}
+                    onChange={handleViewModeChange}
+                    countLabel="상단고정"
+                    modeLabel="공지사항 보기 방식"
+                    filterAction={
+                      <NoticeFilterMenu
+                        filters={noticeGubunOptions}
+                        selectedCode={selectedNoticeFilter}
+                        onChange={setSelectedNoticeFilter}
+                      />
+                    }
+                  />
+                  <NoticeEmptyState onCreate={() => setIsComposerOpen(true)} />
+                </>
+              }
+              right={
+                <NoticeSummaryPanel
+                  stats={noticeSummary.stats}
+                  recentIssues={noticeSummary.recentIssues}
+                  isDark={isDark}
+                />
+              }
+            />
           ) : (
             <ContentSplitLayout
               left={
                 <>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 1.5,
-                      mb: 1.5,
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ fontWeight: 700, color: 'text.secondary' }}
-                    >
-                      상단고정{' '}
-                      {noticeViewItems.filter((item) => item.isPinned).length}건
-                    </Typography>
-                    <ViewModeToggle
-                      mode={viewMode}
-                      onChange={handleViewModeChange}
-                    />
-                  </Box>
-                  <Box sx={{ mb: 2 }}>
-                    <PinnedItemsPanel items={noticeViewItems} />
-                  </Box>
+                  <PinnedViewToolbar
+                    pinnedCount={pinnedNoticeCount}
+                    mode={viewMode}
+                    onChange={handleViewModeChange}
+                    countLabel="상단고정"
+                    modeLabel="공지사항 보기 방식"
+                    filterAction={
+                      <NoticeFilterMenu
+                        filters={noticeGubunOptions}
+                        selectedCode={selectedNoticeFilter}
+                        onChange={setSelectedNoticeFilter}
+                      />
+                    }
+                  />
+                  {pinnedNoticeCount > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <PinnedItemsPanel
+                        items={pinnedNoticeViewItems}
+                        ariaLabel="상단 고정 공지"
+                      />
+                    </Box>
+                  )}
                   {viewMode === 'feed' ? (
                     <NoticeFeedList
                       items={unpinnedNoticeItems}
+                      onReachEnd={() => {
+                        void loadMoreNoticePosts();
+                      }}
                       isDark={isDark}
                       isRefreshing={isRefreshing}
                       expandedNoticeId={expandedNoticeId}
@@ -1295,6 +1392,7 @@ export function CommunityNoticePage({
                       onDeleteCommentAttachment={handleDeleteCommentAttachment}
                       serverItemRevision={serverItemRevision}
                       onDelete={handleDeleteNotice}
+                      onTogglePinned={handleTogglePinned}
                       onEdit={async (item) => {
                         const mappedAttachments = (
                           item.attachmentDetails ?? []
@@ -1323,7 +1421,6 @@ export function CommunityNoticePage({
                             item.id,
                           ),
                           noticeGubunCode: item.noticeGubunCode,
-                          isNotice: item.isNotice === 'Y' ? 'Y' : 'N',
                           attachments: mappedAttachments,
                         });
                         setIsComposerOpen(true);
@@ -1350,7 +1447,10 @@ export function CommunityNoticePage({
                       }}
                     />
                   ) : (
-                    <ListView items={unpinnedNoticeViewItems} />
+                    <ListView
+                      items={unpinnedNoticeViewItems}
+                      ariaLabel="리스트형 공지 목록"
+                    />
                   )}
                 </>
               }
@@ -1374,7 +1474,6 @@ export function CommunityNoticePage({
             title: '',
             body: '',
             noticeGubunCode: '',
-            isNotice: 'N',
             attachments: [],
           });
           setIsComposerOpen(false);
@@ -1383,9 +1482,25 @@ export function CommunityNoticePage({
         defaultTitle={editorDraft.title}
         noticeGubunOptions={noticeGubunOptions}
         defaultNoticeGubunCode={editorDraft.noticeGubunCode ?? ''}
-        defaultIsNotice={editorDraft.isNotice}
         defaultBody={editorDraft.body}
         defaultAttachments={editorDraft.attachments}
+      />
+      <UnsavedChangesConfirmDialog
+        open={Boolean(pendingPinnedNotice)}
+        title={
+          pendingPinnedNotice?.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'
+        }
+        description={
+          pendingPinnedNotice?.isPinned === 'Y'
+            ? '이 게시글의 상단 고정을 해제하시겠습니까?'
+            : '이 게시글을 상단에 고정하시겠습니까?'
+        }
+        cancelLabel="취소"
+        continueLabel="확인"
+        onCancel={() => setPendingPinnedNotice(null)}
+        onContinue={() => {
+          void handleConfirmTogglePinned();
+        }}
       />
     </Box>
   );

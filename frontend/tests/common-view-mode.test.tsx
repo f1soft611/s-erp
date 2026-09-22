@@ -17,6 +17,7 @@ const items: CommonViewItem[] = [
     authorLabel: '관리자',
     dateLabel: '2026-09-21 10:00',
     isPinned: true,
+    categoryLabel: '시스템',
   },
   {
     id: 2,
@@ -37,15 +38,19 @@ describe('common notice view mode components', () => {
     expect(onChange).toHaveBeenCalledWith('list');
   });
 
-  it('renders pinned items and an empty state', () => {
-    const { rerender } = render(<PinnedItemsPanel items={items} />);
+  it('renders pinned items and hides the panel when empty', () => {
+    const { rerender } = render(
+      <PinnedItemsPanel items={items} ariaLabel="상단 고정 공지" />,
+    );
 
     expect(screen.getByText('고정 공지')).toBeInTheDocument();
     expect(screen.queryByText('일반 공지')).not.toBeInTheDocument();
 
-    rerender(<PinnedItemsPanel items={[]} />);
+    rerender(<PinnedItemsPanel items={[]} ariaLabel="상단 고정 공지" />);
 
-    expect(screen.getByText('고정된 공지가 없습니다.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: '상단 고정 공지' }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps feed and list item rendering separate', () => {
@@ -62,6 +67,7 @@ describe('common notice view mode components', () => {
     expect(screen.getAllByText('고정 공지')).toHaveLength(2);
     expect(screen.getByText('관리자')).toBeInTheDocument();
     expect(screen.getByText('2026-09-21 10:00')).toBeInTheDocument();
+    expect(screen.getByText('시스템')).toBeInTheDocument();
   });
 
   it('provides mode-specific skeletons', () => {

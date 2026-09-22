@@ -55,7 +55,7 @@ export const noticeContentStyles = {
     fontWeight: 700,
   },
   '& .tableWrapper': {
-    width: 'max-content',
+    width: '100%',
     maxWidth: '100%',
     overflowX: 'auto',
     margin: '8px 0',

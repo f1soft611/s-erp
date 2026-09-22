@@ -2,12 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   IconButton,
-  FormControlLabel,
   MenuItem,
   TextField,
   Typography,
@@ -71,7 +69,6 @@ type NoticeComposerDialogProps = {
   onSubmit?: (payload: {
     title: string;
     noticeGubunCode: string;
-    isNotice: 'Y' | 'N';
     body: string;
     bodyJson?: string;
     bodyText?: string;
@@ -82,7 +79,6 @@ type NoticeComposerDialogProps = {
   defaultTitle?: string;
   noticeGubunOptions?: Array<{ code: string; name: string }>;
   defaultNoticeGubunCode?: string;
-  defaultIsNotice?: string | null;
   defaultBody?: string;
   defaultAttachments?: NoticeComposerDraftAttachment[];
 };
@@ -722,7 +718,6 @@ export function NoticeComposerDialog({
   defaultTitle = '',
   noticeGubunOptions = [],
   defaultNoticeGubunCode = '',
-  defaultIsNotice = 'N',
   defaultBody,
   defaultAttachments = [],
 }: NoticeComposerDialogProps) {
@@ -746,7 +741,6 @@ export function NoticeComposerDialog({
     defaultNoticeGubunCode,
   );
   const [noticeGubunError, setNoticeGubunError] = useState(false);
-  const [isNotice, setIsNotice] = useState(defaultIsNotice === 'Y');
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -893,7 +887,6 @@ export function NoticeComposerDialog({
     setTitle(defaultTitle);
     setNoticeGubunCode(defaultNoticeGubunCode);
     setNoticeGubunError(false);
-    setIsNotice(defaultIsNotice === 'Y');
     setAttachments(defaultAttachments);
     setImageUploadError(null);
     setPasteDebugLog(
@@ -1261,7 +1254,6 @@ export function NoticeComposerDialog({
         await onSubmit({
           title,
           noticeGubunCode,
-          isNotice: isNotice ? 'Y' : 'N',
           body,
           bodyJson: serializeNoticeEditorJson(editor),
           bodyText,
@@ -1383,16 +1375,6 @@ export function NoticeComposerDialog({
               height: '100%',
             }}
           >
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isNotice}
-                  onChange={(event) => setIsNotice(event.target.checked)}
-                />
-              }
-              label="중요 공지"
-              sx={{ alignSelf: 'flex-start', mb: 0 }}
-            />
             <TextField
               select
               label="구분"

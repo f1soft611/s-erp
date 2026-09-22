@@ -358,7 +358,7 @@
 | writer_name           | varchar   | 작성자 명                    |
 | notice_gubun_code     | varchar   | 공지 구분 공통코드 상세 코드 |
 | view_count            | int       | 조회수                       |
-| is_notice             | char      | 중요공지 여부 (`Y`/`N`)      |
+| is_pinned             | char      | 상단 고정 여부 (`Y`/`N`)     |
 | is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
 | created_at            | timestamp | 생성 일시                    |
 | updated_at            | timestamp | 수정 일시                    |

@@ -6,15 +6,20 @@ import type { CommonViewMode } from './commonViewTypes';
 type ViewModeToggleProps = {
   mode: CommonViewMode;
   onChange: (mode: CommonViewMode) => void;
+  ariaLabel?: string;
 };
 
-export function ViewModeToggle({ mode, onChange }: ViewModeToggleProps) {
+export function ViewModeToggle({
+  mode,
+  onChange,
+  ariaLabel = '보기 방식',
+}: ViewModeToggleProps) {
   return (
     <ToggleButtonGroup
       exclusive
       size="small"
       value={mode}
-      aria-label="공지사항 보기 방식"
+      aria-label={ariaLabel}
       onChange={(_, nextMode: CommonViewMode | null) => {
         if (nextMode) {
           onChange(nextMode);

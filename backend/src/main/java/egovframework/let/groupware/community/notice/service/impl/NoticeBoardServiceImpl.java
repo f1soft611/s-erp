@@ -13,12 +13,16 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
+import org.egovframe.rte.fdl.property.EgovPropertyService;
+import org.egovframe.rte.ptl.mvc.tags.ui.pagination.PaginationInfo;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import javax.annotation.Resource;
 
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
@@ -29,8 +33,10 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFile
 import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
+import egovframework.let.common.dto.ListResult;
 
 @Service("noticeBoardService")
 public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements NoticeBoardService {
@@ -41,11 +47,68 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private final CommonFileService commonFileService;
     private final CommonCommentService commonCommentService;
 
+    @Resource(name = "propertiesService")
+    private EgovPropertyService propertyService;
+
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
             CommonCommentService commonCommentService) {
         this.noticeBoardDAO = noticeBoardDAO;
         this.commonFileService = commonFileService;
         this.commonCommentService = commonCommentService;
+    }
+
+    @Override
+    public ListResult<NoticeBoardPostVO> listPosts(NoticeBoardPostSearchVO search) throws Exception {
+        if (search == null) {
+            search = new NoticeBoardPostSearchVO();
+        }
+
+        PaginationInfo paginationInfo = new PaginationInfo();
+        paginationInfo.setCurrentPageNo(Math.max(search.getPageIndex(), 1));
+        paginationInfo.setRecordCountPerPage(
+            search.getPageUnit() > 0
+                ? search.getPageUnit()
+                : getIntProperty("Globals.pageUnit", 20)
+        );
+        paginationInfo.setPageSize(
+            search.getPageSize() > 0
+                ? search.getPageSize()
+                : getIntProperty("Globals.pageSize", 10)
+        );
+
+        search.setFirstIndex(paginationInfo.getFirstRecordIndex());
+        search.setLastIndex(paginationInfo.getLastRecordIndex());
+        search.setRecordCountPerPage(paginationInfo.getRecordCountPerPage());
+
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", search.getTenantId());
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
+        params.put("keyword", StringUtils.hasText(search.getKeyword()) ? search.getKeyword().trim() : null);
+        params.put("noticeGubunCode", StringUtils.hasText(search.getNoticeGubunCode())
+            ? search.getNoticeGubunCode().trim() : null);
+        params.put("isPinned", StringUtils.hasText(search.getIsPinned())
+            ? search.getIsPinned().trim().toUpperCase() : null);
+        params.put("firstIndex", search.getFirstIndex());
+        params.put("lastIndex", search.getLastIndex());
+        params.put("recordCountPerPage", search.getRecordCountPerPage());
+
+        List<NoticeBoardPostVO> posts = noticeBoardDAO.selectNoticePostList(params);
+        Long totalCount = noticeBoardDAO.selectNoticePostCount(params);
+        if (posts == null) {
+            posts = new ArrayList<>();
+        }
+        for (NoticeBoardPostVO post : posts) {
+            hydratePost(search.getTenantId(), post, post.getPostId());
+        }
+        return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
+    }
+
+    private int getIntProperty(String key, int fallback) {
+        if (propertyService == null) {
+            return fallback;
+        }
+        int value = propertyService.getInt(key);
+        return value > 0 ? value : fallback;
     }
 
     @Override
@@ -56,27 +119,19 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     @Override
     public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception {
         return listPosts(tenantId, keyword, page, size, noticeGubunCode, null);
-        }
+    }
 
-        @Override
-        public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
-            String noticeGubunCode, String isNotice) throws Exception {
-        HashMap<String, Object> params = new HashMap<>();
-        params.put("tenantId", tenantId);
-        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
-        params.put("keyword", StringUtils.hasText(keyword) ? keyword.trim() : null);
-        params.put("noticeGubunCode", StringUtils.hasText(noticeGubunCode) ? noticeGubunCode.trim() : null);
-        params.put("isNotice", StringUtils.hasText(isNotice) ? isNotice.trim().toUpperCase() : null);
-        params.put("offset", Math.max((page - 1) * size, 0));
-        params.put("size", size);
-        List<NoticeBoardPostVO> posts = noticeBoardDAO.selectNoticePostList(params);
-        if (posts == null) {
-            return new ArrayList<>();
-        }
-        for (NoticeBoardPostVO post : posts) {
-            hydratePost(tenantId, post, post.getPostId());
-        }
-        return posts;
+    @Override
+    public List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
+            String noticeGubunCode, String isPinned) throws Exception {
+        NoticeBoardPostSearchVO search = new NoticeBoardPostSearchVO();
+        search.setTenantId(tenantId);
+        search.setKeyword(keyword);
+        search.setPageIndex(page);
+        search.setPageUnit(size);
+        search.setNoticeGubunCode(noticeGubunCode);
+        search.setIsPinned(isPinned);
+        return listPosts(search).getResultList();
     }
 
     @Override
@@ -197,7 +252,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("noticeGubunCode", payload.getNoticeGubunCode() == null ? null : payload.getNoticeGubunCode().trim());
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
-        params.put("isNotice", StringUtils.hasText(payload.getIsNotice()) ? payload.getIsNotice().toUpperCase() : "N");
+        params.put("isPinned", StringUtils.hasText(payload.getIsPinned()) ? payload.getIsPinned().toUpperCase() : "N");
 
         Long postId = noticeBoardDAO.insertNoticePost(params);
         if (payload.getAttachmentIds() != null && !payload.getAttachmentIds().isEmpty()) {
@@ -250,11 +305,31 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("noticeGubunCode", payload.getNoticeGubunCode() == null ? null : payload.getNoticeGubunCode().trim());
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
-        params.put("isNotice", StringUtils.hasText(payload.getIsNotice()) ? payload.getIsNotice().toUpperCase() : "N");
+        params.put("isPinned", StringUtils.hasText(payload.getIsPinned()) ? payload.getIsPinned().toUpperCase() : "N");
         noticeBoardDAO.updateNoticePost(params);
         noticeBoardDAO.softDeleteEmbeddedNoticeAttachments(existingParams);
         persistEmbeddedImages(tenantId, postId, payload.getEmbeddedImages(), payload.getWriterId());
         return getPost(tenantId, postId);
+    }
+
+    @Override
+    @Transactional
+    public void updatePinned(Long tenantId, Long postId, String isPinned, String actorId, String actorName)
+            throws Exception {
+        HashMap<String, Object> existingParams = new HashMap<>();
+        existingParams.put("tenantId", tenantId);
+        existingParams.put("postId", postId);
+        if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
+        }
+
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("postId", postId);
+        params.put("isPinned", StringUtils.hasText(isPinned) ? isPinned.trim().toUpperCase() : "N");
+        params.put("lastModifiedBy", actorId);
+        params.put("lastModifiedByName", actorName);
+        noticeBoardDAO.updateNoticePostPinned(params);
     }
 
     private void persistEmbeddedImages(Long tenantId, Long postId, List<NoticeEmbeddedImageVO> images, String uploaderId)

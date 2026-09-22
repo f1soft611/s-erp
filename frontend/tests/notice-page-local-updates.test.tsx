@@ -786,7 +786,7 @@ describe('CommunityNoticePage local updates', () => {
           commentCount: 3,
           hasPreviousComments: true,
           nextBeforeCommentId: 8,
-          highlight: false,
+          isPinned: 'N',
         },
       ]);
 

@@ -8,7 +8,7 @@ type FeedViewProps<T> = {
 
 export function FeedView<T>({ items, renderItem }: FeedViewProps<T>) {
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ width: '100%', boxSizing: 'border-box' }}>
       {items.map((item, index) => (
         <Box key={index}>{renderItem(item, index)}</Box>
       ))}

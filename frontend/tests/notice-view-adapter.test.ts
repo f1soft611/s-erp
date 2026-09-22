@@ -6,12 +6,12 @@ const item: NoticeFeedItem = {
   id: 42,
   title: '시스템 점검 안내',
   meta: '관리자 · 2026. 09. 21. · 조회 3',
-  state: '중요 공지',
+  state: '상단 고정',
   summary: '점검 안내 요약',
   body: '점검 안내 본문',
   createdAt: '2026-09-21T10:30:00+09:00',
-  highlight: true,
-  isNotice: 'Y',
+  isPinned: 'Y',
+  isPinned: 'Y',
   commentCount: 2,
 };
 

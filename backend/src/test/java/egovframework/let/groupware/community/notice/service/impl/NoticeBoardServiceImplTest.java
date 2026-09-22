@@ -27,12 +27,72 @@ import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
+import egovframework.let.common.dto.ListResult;
 
 class NoticeBoardServiceImplTest {
 
     @Test
-    void listPostsPassesImportantNoticeFilterToDao() throws Exception {
+    void updatesPinnedStateWithoutReplacingRequiredPostFields() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        NoticeBoardPostVO existingPost = new NoticeBoardPostVO();
+        existingPost.setPostId(77L);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(existingPost);
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+            .updatePinned(1L, 77L, "Y", "admin", "관리자");
+
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).updateNoticePostPinned(paramsCaptor.capture());
+        assertThat(paramsCaptor.getValue())
+            .containsEntry("tenantId", 1L)
+            .containsEntry("postId", 77L)
+            .containsEntry("isPinned", "Y")
+            .containsEntry("lastModifiedBy", "admin")
+            .containsEntry("lastModifiedByName", "관리자");
+    }
+
+    @Test
+    void listPostsUsesPaginationInfoAndReturnsTotalCount() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(Collections.emptyList());
+        when(noticeBoardDAO.selectNoticePostCount(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(41L);
+
+        NoticeBoardPostSearchVO search = new NoticeBoardPostSearchVO();
+        search.setTenantId(1L);
+        search.setPageIndex(3);
+        search.setPageUnit(20);
+        search.setKeyword(" announcement ");
+        search.setIsPinned("Y");
+
+        ListResult<NoticeBoardPostVO> result = new NoticeBoardServiceImpl(
+            noticeBoardDAO, commonFileService, commonCommentService)
+            .listPosts(search);
+
+        assertThat(result.getResultList()).isEmpty();
+        assertThat(result.getResultCnt()).isEqualTo(41L);
+        assertThat(search.getFirstIndex()).isEqualTo(40);
+        assertThat(search.getRecordCountPerPage()).isEqualTo(20);
+
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).selectNoticePostList(paramsCaptor.capture());
+        assertThat(paramsCaptor.getValue())
+            .containsEntry("tenantId", 1L)
+            .containsEntry("isPinned", "Y")
+            .containsEntry("firstIndex", 40)
+            .containsEntry("recordCountPerPage", 20);
+    }
+
+    @Test
+    void listPostsPassesPinnedFilterToDao() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonFileService commonFileService = mock(CommonFileService.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
@@ -41,7 +101,7 @@ class NoticeBoardServiceImplTest {
         when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
             .thenAnswer(invocation -> {
                 Map<String, Object> params = invocation.getArgument(0);
-                assertThat(params.get("isNotice")).isEqualTo("Y");
+                assertThat(params.get("isPinned")).isEqualTo("Y");
                 return Collections.emptyList();
             });
 

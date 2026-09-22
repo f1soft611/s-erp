@@ -30,7 +30,8 @@ export function toNoticeViewItem(item: NoticeFeedItem): CommonViewItem {
     title: item.title,
     authorLabel: resolveAuthorLabel(item),
     dateLabel: formatNoticeDate(item.createdAt),
-    isPinned: item.highlight || item.isNotice === 'Y',
+    isPinned: item.isPinned === 'Y',
+    categoryLabel: item.noticeGubunName ?? item.noticeGubunCode ?? '공지',
     metaLabel: item.meta,
     summary: item.summary,
   };

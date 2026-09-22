@@ -6,6 +6,7 @@ export type CommonViewItem = {
   authorLabel: string;
   dateLabel: string;
   isPinned?: boolean;
+  categoryLabel?: string;
   metaLabel?: string;
   summary?: string;
 };

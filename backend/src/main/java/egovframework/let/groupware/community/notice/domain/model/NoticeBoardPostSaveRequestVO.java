@@ -29,7 +29,7 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     @Schema(description = "작성자명")
     private String writerName;
     @Schema(description = "상단 고정 여부")
-    private String isNotice;
+    private String isPinned;
     @Schema(description = "첨부파일 ID 목록")
     private List<Long> attachmentIds;
     @Schema(description = "본문 임베드 이미지 메타데이터")
@@ -140,13 +140,13 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     }
 
     @Generated
-    public String getIsNotice() {
-        return isNotice;
+    public String getIsPinned() {
+        return isPinned;
     }
 
     @Generated
-    public void setIsNotice(String isNotice) {
-        this.isNotice = isNotice;
+    public void setIsPinned(String isPinned) {
+        this.isPinned = isPinned;
     }
 
     @Generated
