@@ -25,7 +25,9 @@ import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.common.dto.ListResult;
 import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
 import egovframework.let.groupware.community.notice.service.NoticeEmbeddedImageService;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
@@ -55,14 +57,22 @@ public class NoticeBoardApiController {
     public ResultVO listPosts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String noticeGubunCode,
-            @RequestParam(required = false) String isNotice,
+            @RequestParam(required = false) String isPinned,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        String safeKeyword = keyword == null ? "" : keyword;
+        NoticeBoardPostSearchVO search = new NoticeBoardPostSearchVO();
+        search.setTenantId(user.getTenantId());
+        search.setKeyword(keyword);
+        search.setNoticeGubunCode(noticeGubunCode);
+        search.setIsPinned(isPinned);
+        search.setPageIndex(page);
+        search.setPageUnit(size);
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", noticeBoardService.listPosts(user.getTenantId(), safeKeyword, page, size, noticeGubunCode, isNotice));
+        ListResult<NoticeBoardPostVO> result = noticeBoardService.listPosts(search);
+        resultMap.put("resultList", result.getResultList());
+        resultMap.put("resultCnt", result.getResultCnt());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -109,6 +119,20 @@ public class NoticeBoardApiController {
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", updated);
         resultMap.put("message", "공지사항이 수정되었습니다.");
+        return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "공지 상단 고정 상태 변경", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
+    @PutMapping("/posts/{postId}/pin")
+    public ResponseEntity<ResultVO> updatePinned(@PathVariable Long postId,
+            @RequestBody NoticeBoardPostSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        noticeBoardService.updatePinned(
+            user.getTenantId(), postId, payload == null ? null : payload.getIsPinned(),
+            user.getId(), user.getName());
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "공지 상단 고정 상태가 변경되었습니다.");
         return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
     }
 

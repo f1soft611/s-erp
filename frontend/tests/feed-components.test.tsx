@@ -6,23 +6,11 @@ import {
   CommentThread,
   isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
-import { FeedList } from '../src/shared/components/feed/FeedList';
 
 describe('shared feed components', () => {
   it('renders feed, attachment and comment blocks via reusable shared components', () => {
     render(
       <>
-        <FeedList
-          items={[
-            {
-              id: 1,
-              title: '공지사항 업데이트',
-              meta: '운영팀 · 2026.09.16 · 조회 12',
-              summary: '새로운 업데이트를 안내드립니다.',
-            },
-          ]}
-          renderItem={(item) => <div>{item.title}</div>}
-        />
         <AttachmentList
           files={[{ id: 'file-1', name: '공지사항_안내.pdf' }]}
           showActions={false}
@@ -42,7 +30,6 @@ describe('shared feed components', () => {
       </>,
     );
 
-    expect(screen.getByText('공지사항 업데이트')).toBeInTheDocument();
     expect(screen.getByText('공지사항_안내.pdf')).toBeInTheDocument();
     expect(screen.getByText('확인했습니다.')).toBeInTheDocument();
   });

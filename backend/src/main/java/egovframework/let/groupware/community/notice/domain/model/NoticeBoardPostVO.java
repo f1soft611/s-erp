@@ -42,7 +42,7 @@ public class NoticeBoardPostVO implements Serializable {
     @Schema(description = "조회 수")
     private Integer viewCount;
     @Schema(description = "상단 고정 여부")
-    private String isNotice;
+    private String isPinned;
     @Schema(description = "삭제 여부")
     private String isDeleted;
     @Schema(description = "등록 일시")
@@ -216,13 +216,13 @@ public class NoticeBoardPostVO implements Serializable {
     }
 
     @Generated
-    public String getIsNotice() {
-        return isNotice;
+    public String getIsPinned() {
+        return isPinned;
     }
 
     @Generated
-    public void setIsNotice(String isNotice) {
-        this.isNotice = isNotice;
+    public void setIsPinned(String isPinned) {
+        this.isPinned = isPinned;
     }
 
     @Generated

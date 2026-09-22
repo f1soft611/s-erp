@@ -65,7 +65,7 @@ describe('NoticeComposerDialog payload', () => {
     expect(screen.getByTestId('attachment-icon-xlsx')).toBeInTheDocument();
   });
 
-  it('saves the important notice checkbox as isNotice', async () => {
+  it('does not expose a pin checkbox in the composer', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -83,24 +83,13 @@ describe('NoticeComposerDialog payload', () => {
       ),
     );
 
-    const importantCheckbox = screen.getByRole('checkbox', {
-      name: '중요 공지',
-    });
-    expect(importantCheckbox).not.toBeChecked();
-    fireEvent.click(importantCheckbox);
-    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
-      target: { value: '중요 공지' },
-    });
-    fireEvent.input(screen.getByRole('textbox', { name: '본문' }), {
-      target: { innerHTML: '<p>본문</p>' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ isNotice: 'Y' }),
-      );
-    });
+    expect(
+      screen.queryByRole('checkbox', { name: '중요 공지' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: '상단 고정' }),
+    ).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('keeps the resize width calculation bounded for image dragging', () => {

@@ -10,7 +10,7 @@ const notices: NoticeSummaryInput[] = [
     title: '낮은 점수 공지',
     viewCount: 20,
     commentCount: 2,
-    isNotice: 'N',
+    isPinned: 'N',
     createdAt: '2026-09-21T08:00:00+09:00',
     attachmentCount: 1,
   },
@@ -19,7 +19,7 @@ const notices: NoticeSummaryInput[] = [
     title: '가장 많이 본 공지',
     viewCount: 100,
     commentCount: 4,
-    isNotice: 'Y',
+    isPinned: 'Y',
     createdAt: '2026-09-21T09:00:00+09:00',
     attachmentCount: 2,
   },
@@ -28,7 +28,7 @@ const notices: NoticeSummaryInput[] = [
     title: '댓글이 많은 공지',
     viewCount: 40,
     commentCount: 80,
-    isNotice: 'N',
+    isPinned: 'N',
     createdAt: '2026-09-21T07:00:00+09:00',
     attachmentCount: 0,
   },
@@ -37,7 +37,7 @@ const notices: NoticeSummaryInput[] = [
     title: '동점 최신 공지',
     viewCount: 50,
     commentCount: 10,
-    isNotice: 'N',
+    isPinned: 'N',
     createdAt: '2026-09-20T06:00:00+09:00',
     attachmentCount: 3,
   },
@@ -46,7 +46,7 @@ const notices: NoticeSummaryInput[] = [
     title: '동점 이전 공지',
     viewCount: 50,
     commentCount: 10,
-    isNotice: 'N',
+    isPinned: 'N',
     createdAt: '2026-09-18T09:00:00+09:00',
     attachmentCount: 0,
   },
@@ -61,7 +61,7 @@ describe('deriveNoticeSummary', () => {
     expect(result.stats).toEqual([
       { label: '전체 공지', value: '5' },
       { label: '이번 주', value: '3' },
-      { label: '중요 공지', value: '1' },
+      { label: '상단 고정', value: '1' },
       { label: '첨부 문서', value: '6' },
     ]);
     expect(result.recentIssues).toEqual([
@@ -97,7 +97,7 @@ describe('deriveNoticeSummary', () => {
           title: '누락 데이터',
           viewCount: Number.NaN,
           commentCount: undefined,
-          isNotice: 'N',
+          isPinned: 'N',
           createdAt: 'invalid-date',
         },
       ],
@@ -106,7 +106,7 @@ describe('deriveNoticeSummary', () => {
     expect(result.stats).toEqual([
       { label: '전체 공지', value: '1' },
       { label: '이번 주', value: '0' },
-      { label: '중요 공지', value: '0' },
+      { label: '상단 고정', value: '0' },
       { label: '첨부 문서', value: '0' },
     ]);
     expect(result.recentIssues).toEqual([
@@ -118,7 +118,7 @@ describe('deriveNoticeSummary', () => {
       stats: [
         { label: '전체 공지', value: '0' },
         { label: '이번 주', value: '0' },
-        { label: '중요 공지', value: '0' },
+        { label: '상단 고정', value: '0' },
         { label: '첨부 문서', value: '0' },
       ],
       recentIssues: [],

@@ -16,6 +16,10 @@ public class NoticeBoardDAO extends EgovAbstractMapper {
         return selectList("NoticeBoardDAO.selectNoticePostList", params);
     }
 
+    public Long selectNoticePostCount(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("NoticeBoardDAO.selectNoticePostCount", params);
+    }
+
     public NoticeBoardPostVO selectNoticePostById(Map<String, Object> params) throws Exception {
         return (NoticeBoardPostVO) selectOne("NoticeBoardDAO.selectNoticePostById", params);
     }
@@ -38,6 +42,10 @@ public class NoticeBoardDAO extends EgovAbstractMapper {
 
     public void updateNoticePost(Map<String, Object> params) throws Exception {
         update("NoticeBoardDAO.updateNoticePost", params);
+    }
+
+    public void updateNoticePostPinned(Map<String, Object> params) throws Exception {
+        update("NoticeBoardDAO.updateNoticePostPinned", params);
     }
 
     public void softDeleteNoticePost(Map<String, Object> params) throws Exception {

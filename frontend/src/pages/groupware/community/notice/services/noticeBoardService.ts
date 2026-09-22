@@ -68,7 +68,7 @@ export type NoticeBoardPostApi = {
   lastModifiedBy?: string | null;
   lastModifiedByName?: string | null;
   viewCount?: number | string | null;
-  isNotice?: string | null;
+  isPinned?: string | null;
   createdAt?: string | Date | null;
   attachments?: NoticeBoardAttachmentApi[];
   comments?: Array<
@@ -93,10 +93,23 @@ export type NoticeBoardPostApi = {
 
 type NoticeBoardListResponse = {
   resultList?: NoticeBoardPostApi[];
+  resultCnt?: number;
+  totalCount?: number;
   item?: NoticeBoardPostApi;
   result?: NoticeBoardPostApi | NoticeBoardPostApi[];
   message?: string;
 };
+
+function normalizeNoticePost(post: NoticeBoardPostApi): NoticeBoardPostApi {
+  const legacyPost = post as NoticeBoardPostApi & {
+    is_pinned?: string | null;
+  };
+
+  return {
+    ...post,
+    isPinned: post.isPinned ?? legacyPost.is_pinned ?? 'N',
+  };
+}
 
 function readItem<T>(response: unknown): T | undefined {
   if (!response || typeof response !== 'object') {
@@ -112,8 +125,8 @@ export async function fetchNoticePosts(
   size: number,
   keyword: string,
   noticeGubunCode?: string,
-  isNotice?: string,
-): Promise<NoticeBoardPostApi[]> {
+  isPinned?: string,
+): Promise<{ resultList: NoticeBoardPostApi[]; resultCnt: number }> {
   const query = new URLSearchParams({
     page: String(page),
     size: String(size),
@@ -122,14 +135,26 @@ export async function fetchNoticePosts(
   if (noticeGubunCode) {
     query.set('noticeGubunCode', noticeGubunCode);
   }
-  if (isNotice) {
-    query.set('isNotice', isNotice);
+  if (isPinned) {
+    query.set('isPinned', isPinned);
   }
 
   const result = await apiGet<NoticeBoardListResponse>(
     `/api/v1/groupware/boards/notice/posts?${query.toString()}`,
   );
-  return result.resultList ?? [];
+  return {
+    resultList: (result.resultList ?? []).map(normalizeNoticePost),
+    resultCnt: Number(result.resultCnt ?? result.totalCount ?? 0) || 0,
+  };
+}
+
+export function fetchPinnedNoticePosts(
+  page: number,
+  size: number,
+  keyword: string,
+  noticeGubunCode?: string,
+) {
+  return fetchNoticePosts(page, size, keyword, noticeGubunCode, 'Y');
 }
 
 export async function fetchNoticePostDetail(
@@ -163,6 +188,15 @@ export async function updateNoticePost(
   );
   return (readItem<NoticeBoardPostApi>(result) ??
     (payload as NoticeBoardPostApi)) as NoticeBoardPostApi;
+}
+
+export async function updateNoticePinned(
+  postId: number,
+  isPinned: 'Y' | 'N',
+): Promise<void> {
+  await apiPut(`/api/v1/groupware/boards/notice/posts/${postId}/pin`, {
+    isPinned,
+  });
 }
 
 export async function deleteNoticePost(postId: number): Promise<void> {

@@ -20,7 +20,6 @@ export type NoticeFeedItem = {
   createdAt?: string | Date | null;
   noticeGubunCode?: string;
   noticeGubunName?: string;
-  isNotice?: string;
   meta: string;
   state: string;
   summary: string;
@@ -40,7 +39,7 @@ export type NoticeFeedItem = {
   hasPreviousComments?: boolean;
   nextBeforeCommentId?: number | string | null;
   commentCount: number;
-  highlight: boolean;
+  isPinned?: string;
   liked?: boolean;
   likeCount?: number;
   bookmarked?: boolean;
@@ -51,7 +50,7 @@ export const noticeFeed: NoticeFeedItem[] = [
     id: 1,
     title: '2026년 3분기 업무 일정 변경 안내',
     meta: '운영팀 · 2026.09.12 · 조회 142',
-    state: '중요 공지',
+    state: '상단 고정',
     summary:
       '주요 부서별 일정 조정 사항을 반영하여 3분기 운영 지침을 업데이트하였습니다. 세부 변경사항을 확인해 주세요.',
     body: '3분기 업무 일정을 일부 조정하여 운영 절차와 일정 기준을 재정리하였습니다. 이번 변경은 부서별 협업 일정 연동을 반영한 내용으로, 각 팀은 변경된 일정에 따라 업무를 조정해 주시기 바랍니다.\n\n주요 변경 사항으로는 내부 검토 일정의 조정, 보고 마감일 변경, 협업 회의 배정 시간 조정이 포함됩니다. 세부 일정표는 첨부 문서를 참고해 주세요.\n\n관련 문서와 공지사항은 공유 드라이브와 내부 커뮤니티에 함께 업로드하였으며, 변경사항 확인이 필요한 경우 운영팀 담당자에게 문의해 주세요.',
@@ -73,7 +72,7 @@ export const noticeFeed: NoticeFeedItem[] = [
       },
     ],
     commentCount: 11,
-    highlight: true,
+    isPinned: 'Y',
   },
   {
     id: 2,
@@ -102,7 +101,7 @@ export const noticeFeed: NoticeFeedItem[] = [
       },
     ],
     commentCount: 7,
-    highlight: false,
+    isPinned: 'N',
   },
   {
     id: 3,
@@ -122,7 +121,7 @@ export const noticeFeed: NoticeFeedItem[] = [
       },
     ],
     commentCount: 17,
-    highlight: false,
+    isPinned: 'N',
   },
   {
     id: 4,
@@ -134,7 +133,7 @@ export const noticeFeed: NoticeFeedItem[] = [
     body: '업무 협업 규칙을 정기적으로 재안내드립니다. 문서 작성, 승인 절차, 공유 범위에 대한 기준을 새로 정리하여 운영에 반영하고 있습니다.\n\n이슈가 발생할 경우 담당 부서와 협업 기준을 우선 적용해 주세요. 가이드 문서는 공유 드라이브에서 확인 가능합니다.\n\n정기 점검 결과 필요한 내용은 추가 업데이트를 통해 공지하겠습니다.',
     attachments: ['협업_규칙_가이드.pdf'],
     commentCount: 5,
-    highlight: false,
+    isPinned: 'N',
   },
   {
     id: 5,
@@ -146,7 +145,7 @@ export const noticeFeed: NoticeFeedItem[] = [
     body: '모바일에서 볼 수 있던 일부 결재 화면 레이아웃 문제가 수정되었습니다. 사용 가이드도 최신 화면 기준에 맞춰 설명을 보강하였습니다.\n\n사용자가 확인해야 할 포인트는 승인 버튼 배치, 첨부 문서 확인, 푸시 알림 동작입니다. 자세한 내용은 사용 가이드를 확인해 주세요.\n\n문제가 지속될 경우 운영팀으로 문의해 주시기 바랍니다.',
     attachments: ['모바일_전자결재_가이드_v3.pdf'],
     commentCount: 13,
-    highlight: false,
+    isPinned: 'N',
   },
   {
     id: 6,
@@ -158,6 +157,6 @@ export const noticeFeed: NoticeFeedItem[] = [
     body: '9월 우수 협업 사례를 정리해 공유드립니다. 각 팀에서 실질적으로 적용할 수 있는 협업 개선 사례를 중심으로 구성하였습니다.\n\n사례별로 적용 범위와 기대 효과를 함께 정리해 두었으니, 팀의 업무 프로세스 개선에 참고해 주세요.\n\n우수 사례를 기반으로 다음 달 운영 기준도 함께 정리해 보겠습니다.',
     attachments: ['우수사례_공유집.pdf'],
     commentCount: 9,
-    highlight: false,
+    isPinned: 'N',
   },
 ];

@@ -9,14 +9,18 @@ import org.springframework.web.multipart.MultipartFile;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
+import egovframework.let.common.dto.ListResult;
 
 public interface NoticeBoardService {
+    ListResult<NoticeBoardPostVO> listPosts(NoticeBoardPostSearchVO search) throws Exception;
+
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size) throws Exception;
 
     List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size, String noticeGubunCode) throws Exception;
 
         List<NoticeBoardPostVO> listPosts(Long tenantId, String keyword, int page, int size,
-            String noticeGubunCode, String isNotice) throws Exception;
+            String noticeGubunCode, String isPinned) throws Exception;
 
     NoticeBoardPostVO getPost(Long tenantId, Long postId) throws Exception;
 
@@ -29,6 +33,8 @@ public interface NoticeBoardService {
     NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload) throws Exception;
 
     NoticeBoardPostVO updatePost(Long tenantId, Long postId, NoticeBoardPostSaveRequestVO payload, String actorId, String actorName) throws Exception;
+
+    void updatePinned(Long tenantId, Long postId, String isPinned, String actorId, String actorName) throws Exception;
 
     void deletePost(Long tenantId, Long postId) throws Exception;
 
