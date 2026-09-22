@@ -6,6 +6,7 @@
 - DB 컬럼 변경 SQL과 rollback을 `backend/DATABASE/20260922` 및 `docs/database/20260922`에 기록
 - 공지 검색 VO가 `ComDefaultVO`를 상속하고 `PaginationInfo`로 페이지 인덱스를 계산하도록 구현
 - 공통 `EgovPaginationSupport`를 추가해 레거시 프로젝트와 동일한 `PaginationInfo` 계산을 다른 도메인에서도 재사용 가능하도록 정리
+- 공통 댓글 조회에도 `CommonCommentSearchVO`와 `pageIndex/pageUnit/resultCnt` 계약을 추가하고 기존 커서 방식과 호환 유지
 - `ListResult<T>`의 `resultList`/`resultCnt` 목록 응답 패턴 추가
 - 일반 피드와 상단 고정 피드를 같은 목록 API의 별도 조회로 분리
 - 일반 피드를 20건 단위 무한 스크롤로 누적

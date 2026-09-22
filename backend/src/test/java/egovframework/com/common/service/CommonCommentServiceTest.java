@@ -21,8 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentSearchVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.impl.CommonCommentServiceImpl;
+import egovframework.let.common.dto.ListResult;
 import egovframework.com.config.EgovConfigAppMapper;
 
 class CommonCommentServiceTest {
@@ -257,6 +259,36 @@ class CommonCommentServiceTest {
             .containsExactly(18L, 19L, 20L);
         assertThat(page.isHasPrevious()).isTrue();
         assertThat(page.getNextBeforeCommentId()).isEqualTo(18L);
+    }
+
+    @Test
+    void listCommentsSearchUsesCommonPaginationFieldsAndReturnsCount() throws Exception {
+        CommonCommentDAO stubDao = new CommonCommentDAO() {
+            @Override
+            public List<CommonCommentVO> selectCommonCommentPage(Map<String, Object> params) {
+                assertThat(params.get("limit")).isEqualTo(4);
+                return Arrays.asList(comment(20L));
+            }
+
+            @Override
+            public Long countCommonComments(Map<String, Object> params) {
+                return 6L;
+            }
+        };
+
+        CommonCommentSearchVO search = new CommonCommentSearchVO();
+        search.setTenantId(1L);
+        search.setOwnerType("NOTICE");
+        search.setOwnerId(10L);
+        search.setPageIndex(2);
+        search.setPageUnit(3);
+
+        ListResult<CommonCommentVO> result = new CommonCommentServiceImpl(stubDao)
+            .listComments(search);
+
+        assertThat(result.getResultCnt()).isEqualTo(6L);
+        assertThat(result.getResultList()).hasSize(1);
+        assertThat(search.getFirstIndex()).isEqualTo(3);
     }
 
     @Test
