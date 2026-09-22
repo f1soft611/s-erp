@@ -986,6 +986,7 @@ export function CommunityNoticePage({
             ? '답글이 등록되었습니다.'
             : '댓글이 등록되었습니다.',
         );
+        return nextComment;
       } catch (error) {
         showError(
           parentCommentId != null
