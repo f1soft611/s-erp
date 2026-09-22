@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.egovframe.rte.fdl.property.EgovPropertyService;
-import org.egovframe.rte.ptl.mvc.tags.ui.pagination.PaginationInfo;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +36,7 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
 import egovframework.let.common.dto.ListResult;
+import egovframework.let.common.pagination.EgovPaginationSupport;
 
 @Service("noticeBoardService")
 public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements NoticeBoardService {
@@ -63,22 +63,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             search = new NoticeBoardPostSearchVO();
         }
 
-        PaginationInfo paginationInfo = new PaginationInfo();
-        paginationInfo.setCurrentPageNo(Math.max(search.getPageIndex(), 1));
-        paginationInfo.setRecordCountPerPage(
-            search.getPageUnit() > 0
-                ? search.getPageUnit()
-                : getIntProperty("Globals.pageUnit", 20)
-        );
-        paginationInfo.setPageSize(
-            search.getPageSize() > 0
-                ? search.getPageSize()
-                : getIntProperty("Globals.pageSize", 10)
-        );
-
-        search.setFirstIndex(paginationInfo.getFirstRecordIndex());
-        search.setLastIndex(paginationInfo.getLastRecordIndex());
-        search.setRecordCountPerPage(paginationInfo.getRecordCountPerPage());
+        EgovPaginationSupport.apply(search, propertyService);
 
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", search.getTenantId());
@@ -101,14 +86,6 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             hydratePost(search.getTenantId(), post, post.getPostId());
         }
         return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
-    }
-
-    private int getIntProperty(String key, int fallback) {
-        if (propertyService == null) {
-            return fallback;
-        }
-        int value = propertyService.getInt(key);
-        return value > 0 ? value : fallback;
     }
 
     @Override

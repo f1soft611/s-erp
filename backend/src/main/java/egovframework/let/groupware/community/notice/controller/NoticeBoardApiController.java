@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -55,20 +56,10 @@ public class NoticeBoardApiController {
     })
     @GetMapping("/posts")
     public ResultVO listPosts(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String noticeGubunCode,
-            @RequestParam(required = false) String isPinned,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute NoticeBoardPostSearchVO search,
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        NoticeBoardPostSearchVO search = new NoticeBoardPostSearchVO();
         search.setTenantId(user.getTenantId());
-        search.setKeyword(keyword);
-        search.setNoticeGubunCode(noticeGubunCode);
-        search.setIsPinned(isPinned);
-        search.setPageIndex(page);
-        search.setPageUnit(size);
         HashMap<String, Object> resultMap = new HashMap<>();
         ListResult<NoticeBoardPostVO> result = noticeBoardService.listPosts(search);
         resultMap.put("resultList", result.getResultList());
