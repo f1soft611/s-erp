@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -24,6 +25,7 @@ import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentSearchVO;
 import egovframework.com.common.service.CommonCommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -45,19 +47,28 @@ public class CommonCommentApiController {
     @Operation(summary = "공통 댓글 목록 조회", security = @SecurityRequirement(name = "Authorization"))
     @GetMapping("/common/comments")
     public ResultVO listComments(
-            @RequestParam String ownerType,
-            @RequestParam Long ownerId,
+            @ModelAttribute CommonCommentSearchVO search,
             @RequestParam(defaultValue = "3") Integer limit,
+            @RequestParam(required = false) Integer pageUnit,
             @RequestParam(required = false) Long beforeCommentId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
+        if (search.getOwnerType() == null || search.getOwnerId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 대상 정보가 올바르지 않습니다.");
+        }
+        search.setTenantId(user.getTenantId());
+        search.setPageUnit(pageUnit != null ? pageUnit : limit);
+        search.setBeforeCommentId(beforeCommentId);
         HashMap<String, Object> resultMap = new HashMap<>();
-        CommonCommentPageVO commentPage = commonCommentService.listComments(user.getTenantId(), ownerType, ownerId, limit, beforeCommentId);
+        CommonCommentPageVO commentPage = commonCommentService.listComments(
+            user.getTenantId(), search.getOwnerType(), search.getOwnerId(),
+            search.getRecordCountPerPage(), beforeCommentId);
         List<CommonCommentVO> comments = commentPage.getComments();
         resultMap.put("resultList", comments);
         resultMap.put("comments", comments);
         resultMap.put("hasPrevious", commentPage.isHasPrevious());
         resultMap.put("nextBeforeCommentId", commentPage.getNextBeforeCommentId());
+        resultMap.put("resultCnt", commentPage.getResultCnt());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

@@ -42,7 +42,7 @@ type NoticeFeedListProps = {
     parentCommentId?: number | string,
     files?: File[],
     displayParentCommentId?: number | string,
-  ) => Promise<void> | void;
+  ) => Promise<NoticeCommentItem | void> | NoticeCommentItem | void;
   onEditComment?: (
     noticeId: number,
     commentId: number | string,
@@ -115,17 +115,72 @@ function countComments(comments: NoticeCommentItem[]): number {
   return comments.filter((comment) => !comment.isDeleted).length;
 }
 
-function mergeCommentTrees(
+function appendCommentToTree(
+  comments: NoticeCommentItem[],
+  parentCommentId: number | string | null | undefined,
+  comment: NoticeCommentItem,
+): NoticeCommentItem[] {
+  if (parentCommentId == null) {
+    return [...comments, comment];
+  }
+
+  return comments.map((current) =>
+    String(current.id) === String(parentCommentId)
+      ? { ...current, replies: [...(current.replies ?? []), comment] }
+      : {
+          ...current,
+          replies: appendCommentToTree(
+            current.replies ?? [],
+            parentCommentId,
+            comment,
+          ),
+        },
+  );
+}
+
+function insertNoticeReplyAfter(
+  comments: NoticeCommentItem[],
+  targetCommentId: number | string,
+  comment: NoticeCommentItem,
+): NoticeCommentItem[] {
+  const nextComments: NoticeCommentItem[] = [];
+
+  comments.forEach((current) => {
+    nextComments.push(current);
+    if (String(current.id) === String(targetCommentId)) {
+      nextComments.push({ ...comment, replies: [] });
+      return;
+    }
+
+    if (current.replies?.length) {
+      nextComments[nextComments.length - 1] = {
+        ...current,
+        replies: insertNoticeReplyAfter(
+          current.replies,
+          targetCommentId,
+          comment,
+        ),
+      };
+    }
+  });
+
+  return nextComments;
+}
+
+export function mergeCommentTrees(
   current: NoticeCommentItem[],
   incoming: NoticeCommentItem[],
+  incomingFirst = true,
 ): NoticeCommentItem[] {
-  const result = incoming.map((comment) => ({
+  const primary = incomingFirst ? incoming : current;
+  const secondary = incomingFirst ? current : incoming;
+  const result = primary.map((comment) => ({
     ...comment,
     replies: mergeCommentTrees([], comment.replies ?? []),
   }));
   const byId = new Map(result.map((comment) => [String(comment.id), comment]));
 
-  current.forEach((comment) => {
+  secondary.forEach((comment) => {
     const existing = byId.get(String(comment.id));
     if (!existing) {
       const copy = {
@@ -321,6 +376,7 @@ export function NoticeFeedList({
             next[item.id] = mergeCommentTrees(
               preservedPreviousComments,
               item.comments ?? [],
+              false,
             );
           }
         }
@@ -384,13 +440,30 @@ export function NoticeFeedList({
       return;
     }
 
-    await onAddComment?.(
+    const createdComment = await onAddComment?.(
       noticeId,
       content,
       parentCommentId,
       files,
       displayParentCommentId,
     );
+    if (!createdComment) {
+      return;
+    }
+
+    setLocalCommentsByNoticeId((current) => {
+      const comments = current[noticeId] ?? [];
+      const nextComments =
+        displayParentCommentId != null &&
+        String(displayParentCommentId) !== String(parentCommentId)
+          ? insertNoticeReplyAfter(
+              comments,
+              displayParentCommentId,
+              createdComment,
+            )
+          : appendCommentToTree(comments, parentCommentId, createdComment);
+      return { ...current, [noticeId]: nextComments };
+    });
   };
 
   const handleLocalCommentEdit = async (

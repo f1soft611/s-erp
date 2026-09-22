@@ -14,8 +14,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentSearchVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.CommonCommentService;
+import egovframework.let.common.dto.ListResult;
+import egovframework.let.common.pagination.EgovPaginationSupport;
 
 @Service("commonCommentService")
 public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements CommonCommentService {
@@ -89,6 +92,25 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         page.setHasPrevious(hasPrevious);
         page.setNextBeforeCommentId(hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
         return page;
+    }
+
+    @Override
+    public ListResult<CommonCommentVO> listComments(CommonCommentSearchVO search) throws Exception {
+        if (search == null) {
+            search = new CommonCommentSearchVO();
+        }
+        EgovPaginationSupport.apply(search, null);
+        CommonCommentPageVO page = listComments(
+            search.getTenantId(),
+            search.getOwnerType(),
+            search.getOwnerId(),
+            search.getRecordCountPerPage(),
+            search.getBeforeCommentId()
+        );
+        return new ListResult<>(
+            page.getComments(),
+            countComments(search.getTenantId(), search.getOwnerType(), search.getOwnerId())
+        );
     }
 
     private void markDeletedComments(List<CommonCommentVO> comments) {

@@ -50,6 +50,8 @@ export type CommonCommentWritePayload = {
 
 export type CommonCommentPageOptions = {
   limit?: number;
+  pageIndex?: number;
+  pageUnit?: number;
   beforeCommentId?: number | string;
 };
 
@@ -57,6 +59,7 @@ export type CommonCommentPageResult = {
   comments: CommonCommentItem[];
   hasPrevious: boolean;
   nextBeforeCommentId?: number | string | null;
+  resultCnt?: number;
 };
 
 const readItem = <T>(response: unknown): T | undefined => {
@@ -176,6 +179,12 @@ export async function fetchCommonComments(
   if (options.limit !== undefined) {
     query.set('limit', String(options.limit));
   }
+  if (options.pageIndex !== undefined) {
+    query.set('pageIndex', String(options.pageIndex));
+  }
+  if (options.pageUnit !== undefined) {
+    query.set('pageUnit', String(options.pageUnit));
+  }
   if (options.beforeCommentId !== undefined) {
     query.set('beforeCommentId', String(options.beforeCommentId));
   }
@@ -185,11 +194,13 @@ export async function fetchCommonComments(
     comments?: CommonCommentItem[];
     hasPrevious?: boolean;
     nextBeforeCommentId?: number | string | null;
+    resultCnt?: number | string | null;
   }>(`/api/v1/common/comments?${query.toString()}`);
   return {
     comments: result.comments ?? result.resultList ?? [],
     hasPrevious: result.hasPrevious === true,
     nextBeforeCommentId: result.nextBeforeCommentId,
+    resultCnt: Number(result.resultCnt ?? 0) || 0,
   };
 }
 

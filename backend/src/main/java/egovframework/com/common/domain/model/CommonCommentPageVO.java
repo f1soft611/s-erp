@@ -16,6 +16,8 @@ public class CommonCommentPageVO implements Serializable {
     private boolean hasPrevious;
     @Schema(description = "다음 이전 댓글 조회용 커서")
     private Long nextBeforeCommentId;
+    @Schema(description = "전체 댓글 루트 수")
+    private long resultCnt;
 
     public List<CommonCommentVO> getComments() {
         return comments;
@@ -39,5 +41,13 @@ public class CommonCommentPageVO implements Serializable {
 
     public void setNextBeforeCommentId(Long nextBeforeCommentId) {
         this.nextBeforeCommentId = nextBeforeCommentId;
+    }
+
+    public long getResultCnt() {
+        return resultCnt;
+    }
+
+    public void setResultCnt(long resultCnt) {
+        this.resultCnt = resultCnt;
     }
 }

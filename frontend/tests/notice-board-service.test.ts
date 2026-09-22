@@ -44,7 +44,7 @@ describe('notice board pagination', () => {
     const result = await fetchNoticePosts(2, 20, 'maintenance', undefined, 'Y');
 
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
-      '/api/v1/groupware/boards/notice/posts?page=2&size=20&keyword=maintenance&isPinned=Y',
+      '/api/v1/groupware/boards/notice/posts?pageIndex=2&pageUnit=20&keyword=maintenance&isPinned=Y',
     );
     expect(result).toEqual({
       resultList: [{ postId: 7, isPinned: 'Y' }],

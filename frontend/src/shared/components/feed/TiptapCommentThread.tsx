@@ -629,6 +629,7 @@ function CommentItem({
                   files,
                   comment.id,
                 );
+                setShowReplies(true);
                 setReplyTargetId(null);
               }}
             />

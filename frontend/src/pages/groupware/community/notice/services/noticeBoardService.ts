@@ -128,8 +128,8 @@ export async function fetchNoticePosts(
   isPinned?: string,
 ): Promise<{ resultList: NoticeBoardPostApi[]; resultCnt: number }> {
   const query = new URLSearchParams({
-    page: String(page),
-    size: String(size),
+    pageIndex: String(page),
+    pageUnit: String(size),
     keyword: keyword ?? '',
   });
   if (noticeGubunCode) {
