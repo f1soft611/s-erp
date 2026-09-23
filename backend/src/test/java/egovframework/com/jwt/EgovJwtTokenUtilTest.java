@@ -46,7 +46,7 @@ class EgovJwtTokenUtilTest {
         assertEquals("testUser", result.getId());
         assertEquals("Test User", result.getName());
         assertEquals("test@example.com", result.getEmail());
-        assertEquals("/profile/test.png", result.getProfileImage());
+        assertNull(result.getProfileImage());
         assertEquals("개발팀", result.getDepartmentName());
         assertEquals(123L, result.getLevelId());
         assertEquals("001", result.getLevelCode());
@@ -85,5 +85,27 @@ class EgovJwtTokenUtilTest {
         assertThrows(InvalidJwtException.class, () -> {
             jwtTokenUtil.getLoginVOFromToken(token);
         });
+    }
+
+    @DisplayName("프로필 이미지 본문은 JWT claims에 포함하지 않는다.")
+    @Test
+    void testProfileImageIsNotStoredInTokenClaims() {
+        LoginVO loginVO = new LoginVO();
+        loginVO.setId("testUser");
+        loginVO.setProfileImage("data:image/png;base64," + repeat('A', 200000));
+
+        String token = jwtTokenUtil.generateToken(loginVO);
+        LoginVO result = jwtTokenUtil.getLoginVOFromToken(token);
+
+        assertNull(result.getProfileImage());
+        assertTrue(token.length() < 5000);
+    }
+
+    private static String repeat(char value, int count) {
+        StringBuilder builder = new StringBuilder(count);
+        for (int index = 0; index < count; index++) {
+            builder.append(value);
+        }
+        return builder.toString();
     }
 }

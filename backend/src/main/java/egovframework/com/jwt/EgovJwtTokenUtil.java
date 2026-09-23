@@ -82,7 +82,6 @@ public class EgovJwtTokenUtil implements Serializable{
         claims.put("id", loginVO.getId() );
         claims.put("name", loginVO.getName() );
 		claims.put("email", loginVO.getEmail() );
-		claims.put("profileImage", loginVO.getProfileImage() );
 		claims.put("departmentName", loginVO.getDepartmentName() );
 		claims.put("levelId", loginVO.getLevelId() );
 		claims.put("levelCode", loginVO.getLevelCode() );
@@ -110,7 +109,6 @@ public class EgovJwtTokenUtil implements Serializable{
         claims.put("id", loginVO.getId() );
         claims.put("name", loginVO.getName() );
 		claims.put("email", loginVO.getEmail() );
-		claims.put("profileImage", loginVO.getProfileImage() );
 		claims.put("departmentName", loginVO.getDepartmentName() );
 		claims.put("levelId", loginVO.getLevelId() );
 		claims.put("levelCode", loginVO.getLevelCode() );
@@ -138,7 +136,6 @@ public class EgovJwtTokenUtil implements Serializable{
 		    loginVO.setId(getUserIdFromToken(token));
 			loginVO.setName(getInfoFromToken("name", token));
 			loginVO.setEmail(getInfoFromToken("email", token));
-			loginVO.setProfileImage(getInfoFromToken("profileImage", token));
 			loginVO.setDepartmentName(getInfoFromToken("departmentName", token));
 			loginVO.setLevelCode(getInfoFromToken("levelCode", token));
 			loginVO.setLevelName(getInfoFromToken("levelName", token));

@@ -10,6 +10,8 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.IntermediateResultVO;
 import egovframework.let.system.menus.domain.model.MyMenuResponseVO;
 import egovframework.let.system.menus.service.SystemMenuService;
+import egovframework.let.uat.uia.domain.model.MyProfileVO;
+import egovframework.let.uat.uia.service.ProfileSettingsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 로그인 사용자 기준 모듈-메뉴 트리 조회를 위한 컨트롤러 클래스
@@ -26,11 +29,13 @@ import lombok.RequiredArgsConstructor;
  */
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/v1/menus")
 @Tag(name = "MyMenuApiController", description = "사용자 메뉴 조회")
 public class MyMenuApiController {
 
     private final SystemMenuService systemMenuService;
+    private final ProfileSettingsService profileSettingsService;
 
     @Operation(summary = "내 모듈-메뉴 트리 조회",
             description = "로그인 사용자의 테넌트/역할 기준 모듈-메뉴 트리와 권한을 조회한다",
@@ -54,7 +59,14 @@ public class MyMenuApiController {
         if (response.getUser() != null) {
             response.getUser().setName(user.getName());
             response.getUser().setEmail(user.getEmail());
-            response.getUser().setProfileImage(user.getProfileImage());
+                MyProfileVO profile = null;
+                try {
+                    profile = profileSettingsService.getMyProfile(user);
+                } catch (Exception ex) {
+                    log.warn("Unable to load profile image for menu summary: loginCode={}", user.getId());
+                }
+                response.getUser().setProfileImage(
+                        profile == null ? user.getProfileImage() : profile.getProfileImage());
             response.getUser().setDepartmentName(user.getDepartmentName());
             response.getUser().setLevelId(user.getLevelId());
             response.getUser().setLevelCode(user.getLevelCode());

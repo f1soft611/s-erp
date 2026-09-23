@@ -406,11 +406,11 @@ function DashboardPage() {
     }
 
     if (action === 'profile') {
-      navigate('/dashboard');
+      navigate('/dashboard/profile');
       return;
     }
 
-    navigate('/dashboard');
+    navigate('/dashboard/security');
   };
 
   const handleLogout = () => {
@@ -425,6 +425,7 @@ function DashboardPage() {
   const profileLevel = profile.levelName?.trim() || '직급 정보 없음';
   const profileEmail = profile.email?.trim() || '이메일 정보 없음';
   const profileInitial = profileName.charAt(0).toUpperCase() || 'A';
+  const profileAvatarColor = '#2563eb';
 
   const handleOpenThemeMenu = (event: MouseEvent<HTMLElement>) => {
     setThemeMenuAnchor(event.currentTarget);
@@ -819,11 +820,12 @@ function DashboardPage() {
                       >
                         <Avatar
                           src={profile.profileImage || undefined}
+                          data-testid="profile-avatar"
                           sx={{
                             width: 28,
                             height: 28,
                             fontSize: '0.75rem',
-                            bgcolor: '#2563eb',
+                            bgcolor: profileAvatarColor,
                           }}
                         >
                           {profileInitial}
@@ -868,10 +870,11 @@ function DashboardPage() {
                         >
                           <Avatar
                             src={profile.profileImage || undefined}
+                            data-testid="profile-avatar"
                             sx={{
                               width: 42,
                               height: 42,
-                              bgcolor: '#14877c',
+                              bgcolor: profileAvatarColor,
                               fontWeight: 800,
                             }}
                           >

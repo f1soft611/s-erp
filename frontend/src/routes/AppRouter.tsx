@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
+import ProfileSettingsPage from '../pages/dashboard/ProfileSettingsPage';
+import SecuritySettingsPage from '../pages/dashboard/SecuritySettingsPage';
 import { F1GridDocsPage } from '../pages/f1-grid-docs/F1GridDocsPage';
 import { NotFoundPage } from '../pages/errors/NotFoundPage';
 import {
@@ -56,6 +58,22 @@ function AppRouter() {
         }
       />
       <Route path="/f1-grid-docs" element={<F1GridDocsPage />} />
+      <Route
+        path="/dashboard/profile"
+        element={
+          <ProtectedRoute>
+            <ProfileSettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/security"
+        element={
+          <ProtectedRoute>
+            <SecuritySettingsPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard/*"
         element={

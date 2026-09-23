@@ -131,6 +131,12 @@ describe('Dashboard sidebar', () => {
     expect(screen.getByText(/내 정보 관리/i)).toBeInTheDocument();
     expect(screen.getByText(/보안 설정/i)).toBeInTheDocument();
     expect(screen.getByText(/로그아웃/i)).toBeInTheDocument();
+
+    const profileAvatars = screen.getAllByTestId('profile-avatar');
+    expect(profileAvatars).toHaveLength(2);
+    expect(getComputedStyle(profileAvatars[0]).backgroundColor).toBe(
+      getComputedStyle(profileAvatars[1]).backgroundColor,
+    );
   });
 
   it('shows a submenu indicator for menu groups that contain child items', () => {

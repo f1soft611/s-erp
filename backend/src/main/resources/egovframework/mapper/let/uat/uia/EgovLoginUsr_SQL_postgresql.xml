@@ -190,6 +190,76 @@
         LIMIT 1
     </select>
 
+    <select id="selectMyProfile" parameterType="map" resultType="egovframework.let.uat.uia.domain.model.MyProfileVO">
+        SELECT
+            li.login_code AS userId,
+            u.user_nm AS name,
+            u.email_addr AS email,
+            d.department_nm AS departmentName,
+            lvl.item_nm AS levelName,
+            li.profile_image AS profileImage,
+            li.stamp_image AS stampImage
+        FROM tb_login_account li
+        JOIN tb_user u
+          ON u.login_id = li.login_id
+         AND u.tenant_id = li.tenant_id
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = li.tenant_id
+        LEFT JOIN tb_common_code_group lg
+          ON lg.tenant_id = li.tenant_id
+         AND lg.group_code = 'LEVEL'
+         AND COALESCE(lg.use_at, 'Y') = 'Y'
+        LEFT JOIN tb_common_code_item lvl
+          ON lvl.common_code_item_id = u.level_id
+         AND lvl.group_id = lg.common_code_group_id
+         AND lvl.tenant_id = li.tenant_id
+         AND COALESCE(lvl.use_at, 'Y') = 'Y'
+        WHERE li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND li.login_code = #{loginCode}
+          AND COALESCE(li.use_at, 'Y') = 'Y'
+          AND COALESCE(u.use_at, 'Y') = 'Y'
+        LIMIT 1
+    </select>
+
+    <select id="selectCurrentPasswordHash" parameterType="map" resultType="string">
+        SELECT password_hash
+        FROM tb_login_account
+        WHERE tenant_id = CAST(#{tenantId} AS bigint)
+          AND login_code = #{loginCode}
+          AND COALESCE(use_at, 'Y') = 'Y'
+        LIMIT 1
+    </select>
+
+    <update id="updateUserEmail" parameterType="map">
+        UPDATE tb_user u
+        SET email_addr = #{email},
+            updated_at = now()
+        FROM tb_login_account li
+        WHERE li.login_id = u.login_id
+          AND li.tenant_id = u.tenant_id
+          AND li.tenant_id = CAST(#{tenantId} AS bigint)
+          AND li.login_code = #{loginCode}
+    </update>
+
+    <update id="updateLoginImages" parameterType="map">
+        UPDATE tb_login_account
+        SET profile_image = #{profileImage},
+            stamp_image = #{stampImage},
+            updated_at = now()
+        WHERE tenant_id = CAST(#{tenantId} AS bigint)
+          AND login_code = #{loginCode}
+    </update>
+
+    <update id="updateCurrentPassword" parameterType="map">
+        UPDATE tb_login_account
+        SET password_hash = #{password},
+            password_changed_at = now(),
+            updated_at = now()
+        WHERE tenant_id = CAST(#{tenantId} AS bigint)
+          AND login_code = #{loginCode}
+    </update>
+
     <select id="selectTenantIdByCode" parameterType="string" resultType="long">
         SELECT tenant_id
         FROM tb_tenant
