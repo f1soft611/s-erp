@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, TextField } from '@mui/material';
+import { Box, IconButton, TextField } from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -15,10 +16,18 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import {
   CommonCodeManagementPanel,
+  groupColumns,
   type CommonCodeManagementPanelHandle,
 } from './components/CommonCodeManagementPanel';
-import { fetchCommonCodeGroups } from './services/commonCodeManagement.service';
+import {
+  fetchCommonCodeGroups,
+  type CommonCodeGroupSearchFilters,
+} from './services/commonCodeManagement.service';
 import type { CommonCodeGroupRow } from './types/commonCodeManagement.types';
+import {
+  toPageSearchFields,
+  type PageSearchFieldValue,
+} from '../../../../shared/components/page-search/searchFields';
 
 type CommonCodeManagementPageProps = {
   selectedModule: ModuleItem;
@@ -88,6 +97,12 @@ export function CommonCodeManagementPage({
   const [pageLoading, setPageLoading] = useState(true);
   const [commonCodeGridKey, setCommonCodeGridKey] = useState(0);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [detailValues, setDetailValues] = useState<
+    Record<string, PageSearchFieldValue>
+  >({});
+  const pendingFiltersRef = useRef<CommonCodeGroupSearchFilters | undefined>(
+    undefined,
+  );
   const groupRequestIdRef = useRef(0);
   const handleSelectedGroupChange = useCallback(
     (selectedGroupId: string) => {
@@ -150,20 +165,25 @@ export function CommonCodeManagementPage({
   }, [selectedMenuPermissions]);
 
   const loadGroups = useCallback(
-    async ({ showSkeleton = false }: { showSkeleton?: boolean } = {}) => {
+    async ({
+      filters = {},
+      showSkeleton = false,
+    }: {
+      filters?: CommonCodeGroupSearchFilters;
+      showSkeleton?: boolean;
+    } = {}) => {
       const requestId = ++groupRequestIdRef.current;
       setError('');
       if (showSkeleton) {
         setPageLoading(true);
       }
       try {
-        const result = await fetchCommonCodeGroups();
+        const result = await fetchCommonCodeGroups(filters);
         if (requestId === groupRequestIdRef.current) {
           setGroups(result);
         }
       } catch (requestError) {
         if (requestId === groupRequestIdRef.current) {
-          setGroups([]);
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -209,20 +229,42 @@ export function CommonCodeManagementPage({
     }
   }, []);
 
-  const requestRefresh = useCallback(() => {
-    if (panelDirty) {
-      setRefreshConfirmOpen(true);
-      return;
-    }
-    void loadGroups({ showSkeleton: true });
-  }, [loadGroups, panelDirty]);
+  const requestRefresh = useCallback(
+    (filters: CommonCodeGroupSearchFilters = { keyword: searchQuery }) => {
+      if (panelDirty) {
+        pendingFiltersRef.current = filters;
+        setRefreshConfirmOpen(true);
+        return;
+      }
+      void loadGroups({ filters, showSkeleton: true });
+    },
+    [loadGroups, panelDirty, searchQuery],
+  );
 
   const confirmRefresh = useCallback(() => {
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
     setCommonCodeGridKey((current) => current + 1);
-    void loadGroups({ showSkeleton: true });
-  }, [loadGroups]);
+    const filters = pendingFiltersRef.current ?? { keyword: searchQuery };
+    pendingFiltersRef.current = undefined;
+    void loadGroups({ filters, showSkeleton: true });
+  }, [loadGroups, searchQuery]);
+
+  const detailFields = toPageSearchFields(groupColumns);
+  const handleDetailSearch = useCallback(
+    (values: Record<string, PageSearchFieldValue>) => {
+      const toText = (value: PageSearchFieldValue): string => {
+        if (value == null || typeof value === 'object') return '';
+        return String(value).trim();
+      };
+      requestRefresh({
+        groupCode: toText(values.groupCode),
+        groupNm: toText(values.groupNm),
+        groupDc: toText(values.groupDc),
+      });
+    },
+    [requestRefresh],
+  );
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -272,45 +314,62 @@ export function CommonCodeManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
-      <PageSearchArea>
-        <TextField
-          size="small"
-          margin="none"
-          placeholder="그룹 코드/명/설명 검색"
-          value={searchQuery}
-          onChange={(event) =>
-            setPageSession((current) => ({
-              ...current,
-              searchQuery: event.target.value,
-            }))
-          }
-          slotProps={{
-            htmlInput: { 'aria-label': '공통코드 검색' },
-            input: {
-              startAdornment: (
-                <SearchIcon
-                  fontSize="small"
-                  sx={{ mr: 0.5, color: 'text.secondary' }}
-                />
-              ),
-            },
-          }}
-          sx={(theme) => ({
-            flex: '1 1 240px',
-            minWidth: { xs: '100%', sm: 240 },
-            maxWidth: 360,
-            height: 40,
-            '& .MuiOutlinedInput-root': {
-              height: '100%',
-              borderRadius: 2,
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(15, 23, 42, 0.72)'
-                  : 'rgba(255,255,255,0.72)',
-            },
-          })}
-        />
-      </PageSearchArea>
+      <PageSearchArea
+        searchField={
+          <TextField
+            size="small"
+            margin="none"
+            placeholder="그룹 코드/명/설명 검색"
+            value={searchQuery}
+            onChange={(event) =>
+              setPageSession((current) => ({
+                ...current,
+                searchQuery: event.target.value,
+              }))
+            }
+            slotProps={{
+              htmlInput: { 'aria-label': '공통코드 검색' },
+              input: {
+                endAdornment: searchQuery ? (
+                  <IconButton
+                    type="button"
+                    size="small"
+                    edge="end"
+                    aria-label="공통코드 검색어 초기화"
+                    onClick={() =>
+                      setPageSession((current) => ({
+                        ...current,
+                        searchQuery: '',
+                      }))
+                    }
+                    sx={{ p: 0.25 }}
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                ) : null,
+              },
+            }}
+            sx={(theme) => ({
+              width: '100%',
+              height: 40,
+              '& .MuiOutlinedInput-root': {
+                height: '100%',
+                borderRadius: '0 8px 8px 0',
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(15, 23, 42, 0.72)'
+                    : 'rgba(255,255,255,0.72)',
+              },
+            })}
+          />
+        }
+        onDefaultSearch={() => requestRefresh({ keyword: searchQuery })}
+        detailFields={detailFields}
+        detailValues={detailValues}
+        onDetailValuesChange={setDetailValues}
+        onDetailSearch={handleDetailSearch}
+        detailLoading={pageLoading}
+      />
       <PageMessageArea message={error} onClose={() => setError('')} />
       <CommonCodeManagementPanel
         ref={panelRef}

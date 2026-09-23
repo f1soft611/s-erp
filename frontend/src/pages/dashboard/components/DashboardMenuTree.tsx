@@ -24,6 +24,27 @@ type DashboardMenuTreeProps = {
   onToggleMenu?: () => void;
 };
 
+const formatRecentMenuTime = (visitedAt: number) => {
+  const diffMs = Date.now() - visitedAt;
+
+  if (diffMs < 60 * 1000) {
+    return '방금';
+  }
+
+  const minutes = Math.floor(diffMs / (60 * 1000));
+  if (minutes < 60) {
+    return `${minutes}분 전`;
+  }
+
+  const hours = Math.floor(diffMs / (60 * 60 * 1000));
+  if (hours < 24) {
+    return `${hours}시간 전`;
+  }
+
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  return `${days}일 전`;
+};
+
 export function DashboardMenuTree({
   selectedModule,
   expandedItemIds,
@@ -274,21 +295,44 @@ export function DashboardMenuTree({
                     flexShrink: 0,
                   }}
                 />
-                <Box sx={{ minWidth: 0, display: 'block' }}>
-                  <Typography
-                    component="span"
+                <Box sx={{ minWidth: 0, display: 'block', flex: 1 }}>
+                  <Box
                     sx={{
-                      display: 'block',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      lineHeight: 1.3,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
                     }}
                   >
-                    {item.label}
-                  </Typography>
+                    <Typography
+                      component="span"
+                      sx={{
+                        display: 'block',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        lineHeight: 1.3,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      sx={{
+                        flexShrink: 0,
+                        color: isDark ? '#93c5fd' : '#2563eb',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {formatRecentMenuTime(item.visitedAt)}
+                    </Typography>
+                  </Box>
                   <Typography
                     component="span"
                     sx={{

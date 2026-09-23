@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, TextField } from '@mui/material';
+import { Box, TextField, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -211,12 +212,17 @@ export function ModuleManagementPage({
           slotProps={{
             htmlInput: { 'aria-label': '모듈 검색' },
             input: {
-              startAdornment: (
-                <SearchIcon
-                  fontSize="small"
+              endAdornment: searchQuery ? (
+                <IconButton
+                  size="small"
+                  aria-label="검색어 초기화"
+                  onClick={() => setSearchQuery('')}
+                  edge="end"
                   sx={{ mr: 0.5, color: 'text.secondary' }}
-                />
-              ),
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              ) : null,
             },
           }}
           sx={(theme) => ({

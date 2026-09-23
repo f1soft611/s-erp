@@ -188,14 +188,6 @@ export function WarehouseManagementPage({
           onChange={(event) => setSearchQuery(event.target.value)}
           slotProps={{
             htmlInput: { 'aria-label': '창고 검색' },
-            input: {
-              startAdornment: (
-                <SearchIcon
-                  fontSize="small"
-                  sx={{ mr: 0.5, color: 'text.secondary' }}
-                />
-              ),
-            },
           }}
           sx={(theme) => ({
             flex: '1 1 220px',

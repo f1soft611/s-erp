@@ -195,7 +195,7 @@ const createItemRow = (groupId: string): CommonCodeItemRow => ({
   itemDc: '',
 });
 
-const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
+export const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
   {
     field: 'groupCode',
     headerName: '그룹코드',
@@ -215,6 +215,7 @@ const groupColumns: F1GridColumn<CommonCodeGroupRow>[] = [
     field: 'groupDc',
     headerName: '그룹 설명',
     editable: true,
+    search: { span: 2 },
     flex: 1,
   },
 ];
@@ -363,14 +364,7 @@ export const CommonCodeManagementPanel = forwardRef<
   }, [onSelectedGroupChange, selectedGroupId]);
 
   const filteredGroups = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return groups;
-    return groups.filter((group) =>
-      [group.groupCode, group.groupNm, group.groupDc]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    );
+    return groups;
   }, [groups, searchQuery]);
 
   useEffect(() => {

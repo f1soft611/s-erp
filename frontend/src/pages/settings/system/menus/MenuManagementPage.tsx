@@ -416,14 +416,60 @@ export function MenuManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
-      <PageSearchArea>
+      <PageSearchArea
+        searchField={
+          <TextField
+            size="small"
+            margin="none"
+            placeholder="메뉴명/코드 검색"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && selectedModuleId) {
+                event.preventDefault();
+                void requestRefresh(selectedModuleId, false, true);
+              }
+            }}
+            slotProps={{
+              htmlInput: { 'aria-label': '메뉴 검색' },
+              input: {
+                endAdornment: searchQuery ? (
+                  <IconButton
+                    size="small"
+                    aria-label="검색어 초기화"
+                    onClick={() => setSearchQuery('')}
+                    edge="end"
+                    sx={{ mr: 0.5, color: 'text.secondary' }}
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                ) : null,
+              },
+            }}
+            sx={(theme) => ({
+              flex: '1 1 220px',
+              minWidth: { xs: '100%', sm: 220 },
+              maxWidth: 360,
+              height: 40,
+              '& .MuiOutlinedInput-root': {
+                height: '100%',
+                borderRadius: '0 8px 8px 0',
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(15, 23, 42, 0.72)'
+                    : 'rgba(255,255,255,0.72)',
+              },
+            })}
+          />
+        }
+      >
         <FormControl
           size="small"
           sx={(theme) => ({
-            width: { xs: '100%', sm: 'auto' },
-            minWidth: { sm: 220 },
+            width: { xs: '100%', md: 'auto' },
+            minWidth: { md: 220 },
             maxWidth: '100%',
-            flex: '0 1 280px',
+            flex: { xs: '1 1 100%', md: '0 1 280px' },
             height: 40,
             m: 0,
             '& .MuiOutlinedInput-root': {
@@ -472,10 +518,10 @@ export function MenuManagementPage({
         <FormControl
           size="small"
           sx={(theme) => ({
-            width: { xs: '100%', sm: 'auto' },
-            minWidth: { sm: 220 },
+            width: { xs: '100%', md: 'auto' },
+            minWidth: { md: 220 },
             maxWidth: '100%',
-            flex: '0 1 280px',
+            flex: { xs: '1 1 100%', md: '0 1 280px' },
             height: 40,
             m: 0,
             '& .MuiOutlinedInput-root': {
@@ -518,56 +564,6 @@ export function MenuManagementPage({
             ))}
           </Select>
         </FormControl>
-
-        <TextField
-          size="small"
-          margin="none"
-          placeholder="메뉴명/코드 검색"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && selectedModuleId) {
-              event.preventDefault();
-              void requestRefresh(selectedModuleId, false, true);
-            }
-          }}
-          slotProps={{
-            htmlInput: { 'aria-label': '메뉴 검색' },
-            input: {
-              startAdornment: (
-                <SearchIcon
-                  fontSize="small"
-                  sx={{ mr: 0.5, color: 'text.secondary' }}
-                />
-              ),
-              endAdornment: searchQuery ? (
-                <IconButton
-                  size="small"
-                  aria-label="검색어 초기화"
-                  onClick={() => setSearchQuery('')}
-                  edge="end"
-                  sx={{ p: 0.25 }}
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              ) : null,
-            },
-          }}
-          sx={(theme) => ({
-            flex: '1 1 220px',
-            minWidth: { xs: '100%', sm: 220 },
-            maxWidth: 360,
-            height: 40,
-            '& .MuiOutlinedInput-root': {
-              height: '100%',
-              borderRadius: 2,
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(15, 23, 42, 0.72)'
-                  : 'rgba(255,255,255,0.72)',
-            },
-          })}
-        />
       </PageSearchArea>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {hasRequiredSelection ? (

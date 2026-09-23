@@ -38,6 +38,14 @@ export type F1GridColumnFormOptions<T extends object> = {
   targetLabel?: string;
 };
 
+export type F1GridColumnSearchOptions = {
+  hidden?: boolean;
+  label?: string;
+  group?: string;
+  order?: number;
+  span?: 1 | 2 | 3 | 4 | 5;
+};
+
 export type F1GridRowFormContext<T extends object> = {
   mode: F1GridFormMode;
   row: T;
@@ -101,6 +109,7 @@ export type F1GridColumn<T extends object> = {
   headerName: string;
   headerGroup?: string;
   form?: F1GridColumnFormOptions<T>;
+  search?: F1GridColumnSearchOptions;
   getValue?: (row: T) => unknown;
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;

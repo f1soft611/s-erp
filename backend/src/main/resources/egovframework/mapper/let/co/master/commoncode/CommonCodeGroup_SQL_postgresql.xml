@@ -15,7 +15,7 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <select id="selectGroupList" parameterType="long" resultMap="groupMap">
+    <select id="selectGroupList" parameterType="map" resultMap="groupMap">
         SELECT
             g.common_code_group_id,
             g.tenant_id,
@@ -28,7 +28,23 @@
             g.created_at,
             g.updated_at
         FROM tb_common_code_group g
-        WHERE g.tenant_id = #{value}
+                WHERE g.tenant_id = #{tenantId}
+                <if test='keyword != null and keyword != ""'>
+                    AND (
+                        LOWER(COALESCE(g.group_code, '')) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                        OR LOWER(COALESCE(g.group_nm, '')) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                        OR LOWER(COALESCE(g.group_dc, '')) LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+                    )
+                </if>
+                <if test='groupCode != null and groupCode != ""'>
+                    AND LOWER(COALESCE(g.group_code, '')) LIKE LOWER(CONCAT('%', #{groupCode}, '%'))
+                </if>
+                <if test='groupNm != null and groupNm != ""'>
+                    AND LOWER(COALESCE(g.group_nm, '')) LIKE LOWER(CONCAT('%', #{groupNm}, '%'))
+                </if>
+                <if test='groupDc != null and groupDc != ""'>
+                    AND LOWER(COALESCE(g.group_dc, '')) LIKE LOWER(CONCAT('%', #{groupDc}, '%'))
+                </if>
         ORDER BY g.parent_group_id NULLS FIRST, g.sort_order ASC, g.common_code_group_id ASC
     </select>
 
