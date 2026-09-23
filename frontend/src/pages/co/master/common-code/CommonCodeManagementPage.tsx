@@ -28,6 +28,13 @@ import {
   toPageSearchFields,
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
+import {
+  applyCommonCodeSearchSession,
+  getCommonCodeInitialFilters,
+  initialCommonCodePageSession,
+  isCommonCodePageSession,
+  type CommonCodeSearchMode,
+} from './commonCodePageSession';
 
 type CommonCodeManagementPageProps = {
   selectedModule: ModuleItem;
@@ -43,24 +50,6 @@ type CommonCodeManagementPageProps = {
   };
 };
 
-type CommonCodePageSession = {
-  searchQuery: string;
-  selectedGroupId: string;
-  selectedGroupRowIds: string[];
-  selectedItemRowIds: string[];
-  splitterSize: number;
-  page: number;
-};
-
-const initialPageSession: CommonCodePageSession = {
-  searchQuery: '',
-  selectedGroupId: '',
-  selectedGroupRowIds: [],
-  selectedItemRowIds: [],
-  splitterSize: 600,
-  page: 0,
-};
-
 export function CommonCodeManagementPage({
   selectedModule,
   currentMenuName,
@@ -71,27 +60,16 @@ export function CommonCodeManagementPage({
   const { showSuccess } = useNotification();
   const { state: pageSession, setState: setPageSession } = usePageSessionState(
     's-erp:page:common-code-management',
-    initialPageSession,
+    initialCommonCodePageSession,
     {
-      version: 1,
-      validate: (value): value is CommonCodePageSession => {
-        if (!value || typeof value !== 'object') return false;
-        const candidate = value as Partial<CommonCodePageSession>;
-        return (
-          typeof candidate.searchQuery === 'string' &&
-          typeof candidate.selectedGroupId === 'string' &&
-          Array.isArray(candidate.selectedGroupRowIds) &&
-          Array.isArray(candidate.selectedItemRowIds) &&
-          typeof candidate.splitterSize === 'number' &&
-          typeof candidate.page === 'number'
-        );
-      },
+      version: 2,
+      validate: isCommonCodePageSession,
     },
   );
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
   const [groups, setGroups] = useState<CommonCodeGroupRow[]>([]);
   const [error, setError] = useState('');
-  const searchQuery = pageSession.searchQuery;
+  const [searchQuery, setSearchQuery] = useState(pageSession.searchQuery);
   const [panelDirty, setPanelDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -99,10 +77,13 @@ export function CommonCodeManagementPage({
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >({});
-  const pendingFiltersRef = useRef<CommonCodeGroupSearchFilters | undefined>(
-    undefined,
-  );
+  >(pageSession.detailValues);
+  const pendingSearchRef = useRef<{
+    filters: CommonCodeGroupSearchFilters;
+    mode: CommonCodeSearchMode;
+    searchQuery: string;
+    detailValues: Record<string, PageSearchFieldValue>;
+  } | null>(null);
   const groupRequestIdRef = useRef(0);
   const handleSelectedGroupChange = useCallback(
     (selectedGroupId: string) => {
@@ -201,16 +182,21 @@ export function CommonCodeManagementPage({
   );
 
   useEffect(() => {
-    void loadGroups({ showSkeleton: true }).catch(() => undefined);
+    void loadGroups({
+      filters: getCommonCodeInitialFilters(pageSession),
+      showSkeleton: true,
+    }).catch(() => undefined);
+    // The initial session snapshot must not trigger another load after a search.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadGroups]);
 
   const handleGroupsSaved = useCallback(
     async (_options?: { silent?: boolean }) => {
-      await loadGroups();
+      await loadGroups({ filters: pageSession.appliedFilters });
       setPanelDirty(false);
       setCommonCodeGridKey((current) => current + 1);
     },
-    [loadGroups],
+    [loadGroups, pageSession.appliedFilters],
   );
 
   const handleSaveChanges = useCallback(async () => {
@@ -229,26 +215,68 @@ export function CommonCodeManagementPage({
     }
   }, []);
 
+  const executeRefresh = useCallback(
+    async (
+      filters: CommonCodeGroupSearchFilters,
+      mode: CommonCodeSearchMode,
+      searchQueryValue = searchQuery,
+      detailValuesValue = detailValues,
+    ) => {
+      try {
+        await loadGroups({ filters, showSkeleton: true });
+        setPageSession((current) =>
+          applyCommonCodeSearchSession(current, {
+            mode,
+            searchQuery: searchQueryValue,
+            detailValues: detailValuesValue,
+            filters,
+          }),
+        );
+      } catch {
+        // loadGroups already exposes the request error and keeps the old session.
+      }
+    },
+    [detailValues, loadGroups, searchQuery, setPageSession],
+  );
+
   const requestRefresh = useCallback(
-    (filters: CommonCodeGroupSearchFilters = { keyword: searchQuery }) => {
+    (
+      filters: CommonCodeGroupSearchFilters = { keyword: searchQuery },
+      mode: CommonCodeSearchMode = 'default',
+    ) => {
       if (panelDirty) {
-        pendingFiltersRef.current = filters;
+          pendingSearchRef.current = {
+            filters,
+            mode,
+            searchQuery,
+            detailValues,
+          };
         setRefreshConfirmOpen(true);
         return;
       }
-      void loadGroups({ filters, showSkeleton: true });
+      void executeRefresh(filters, mode);
     },
-    [loadGroups, panelDirty, searchQuery],
+    [executeRefresh, panelDirty, searchQuery],
   );
 
   const confirmRefresh = useCallback(() => {
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
     setCommonCodeGridKey((current) => current + 1);
-    const filters = pendingFiltersRef.current ?? { keyword: searchQuery };
-    pendingFiltersRef.current = undefined;
-    void loadGroups({ filters, showSkeleton: true });
-  }, [loadGroups, searchQuery]);
+    const pendingSearch = pendingSearchRef.current ?? {
+      filters: { keyword: searchQuery },
+      mode: 'default' as const,
+      searchQuery,
+      detailValues,
+    };
+    pendingSearchRef.current = null;
+    void executeRefresh(
+      pendingSearch.filters,
+      pendingSearch.mode,
+      pendingSearch.searchQuery,
+      pendingSearch.detailValues,
+    );
+  }, [executeRefresh, searchQuery, detailValues]);
 
   const detailFields = toPageSearchFields(groupColumns);
   const handleDetailSearch = useCallback(
@@ -257,11 +285,14 @@ export function CommonCodeManagementPage({
         if (value == null || typeof value === 'object') return '';
         return String(value).trim();
       };
-      requestRefresh({
-        groupCode: toText(values.groupCode),
-        groupNm: toText(values.groupNm),
-        groupDc: toText(values.groupDc),
-      });
+      requestRefresh(
+        {
+          groupCode: toText(values.groupCode),
+          groupNm: toText(values.groupNm),
+          groupDc: toText(values.groupDc),
+        },
+        'detail',
+      );
     },
     [requestRefresh],
   );
@@ -321,12 +352,7 @@ export function CommonCodeManagementPage({
             margin="none"
             placeholder="그룹 코드/명/설명 검색"
             value={searchQuery}
-            onChange={(event) =>
-              setPageSession((current) => ({
-                ...current,
-                searchQuery: event.target.value,
-              }))
-            }
+            onChange={(event) => setSearchQuery(event.target.value)}
             slotProps={{
               htmlInput: { 'aria-label': '공통코드 검색' },
               input: {
@@ -336,12 +362,7 @@ export function CommonCodeManagementPage({
                     size="small"
                     edge="end"
                     aria-label="공통코드 검색어 초기화"
-                    onClick={() =>
-                      setPageSession((current) => ({
-                        ...current,
-                        searchQuery: '',
-                      }))
-                    }
+                    onClick={() => setSearchQuery('')}
                     sx={{ p: 0.25 }}
                   >
                     <ClearIcon fontSize="small" />
@@ -363,7 +384,9 @@ export function CommonCodeManagementPage({
             })}
           />
         }
-        onDefaultSearch={() => requestRefresh({ keyword: searchQuery })}
+        onDefaultSearch={() =>
+          requestRefresh({ keyword: searchQuery }, 'default')
+        }
         detailFields={detailFields}
         detailValues={detailValues}
         onDetailValuesChange={setDetailValues}

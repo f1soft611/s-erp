@@ -9,6 +9,9 @@
 - `date` 필드는 `from`/`to` 범위 값으로 전달한다.
 - 공통코드 그룹 검색에 `groupCode`, `groupNm`, `groupDc`, `keyword` API 조건을 연결했다.
 - 백엔드는 tenant 조건과 기존 정렬을 유지한 채 검색 조건을 적용한다.
+- 공통코드 페이지의 입력 중 검색값과 마지막 성공 조회 상태를 분리했다.
+- 조회 성공 시에만 검색어·상세 검색값·적용 필터를 `sessionStorage`에 저장하고, 재진입 시 적용 필터로 최초 조회한다.
+- 상세 검색 초기화는 화면 입력값만 비우며 기존 성공 조회 상태는 변경하지 않는다.
 
 ## 검증 증거
 
@@ -18,6 +21,8 @@
   - 3개 파일, 6개 테스트 통과
 - `npm run build`
   - TypeScript 및 Vite 빌드 성공
+- `npm run test -- tests/common-code-page-session.test.ts`
+  - 검색 세션 복원 및 성공 조회 상태 분리 테스트 2개 통과
 
 ### Backend
 
