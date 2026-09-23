@@ -50,23 +50,25 @@
 
 ### 2-5. tb_user
 
-| 컬럼          | 타입      | 설명           |
-| ------------- | --------- | -------------- |
-| user_id       | bigint    | 사용자 PK      |
-| tenant_id     | bigint    | 소속 테넌트    |
-| login_id      | bigint    | 로그인 계정 FK |
-| user_nm       | varchar   | 사용자명       |
-| email_addr    | varchar   | 이메일         |
-| department_id | bigint    | 부서 FK        |
-| mobile_no     | varchar   | 휴대폰 번호    |
-| use_at        | char      | 사용 여부      |
-| created_at    | timestamp | 생성 일시      |
-| updated_at    | timestamp | 수정 일시      |
+| 컬럼          | 타입      | 설명                  |
+| ------------- | --------- | --------------------- |
+| user_id       | bigint    | 사용자 PK             |
+| tenant_id     | bigint    | 소속 테넌트           |
+| login_id      | bigint    | 로그인 계정 FK        |
+| user_nm       | varchar   | 사용자명              |
+| email_addr    | varchar   | 이메일                |
+| department_id | bigint    | 부서 FK               |
+| level_id      | bigint    | 직급 공통코드 항목 FK |
+| mobile_no     | varchar   | 휴대폰 번호           |
+| use_at        | char      | 사용 여부             |
+| created_at    | timestamp | 생성 일시             |
+| updated_at    | timestamp | 수정 일시             |
 
 역할:
 
 - 사용자 프로필정보
-- 로그인 계정과 사용자 실명/부서 연결
+- 로그인 계정과 사용자 실명/부서/직급 연결
+- `level_id`는 `tb_common_code_item.common_code_item_id`를 참조하며 `LEVEL` 그룹 항목만 사용
 
 ### 2-6. tb_department
 
@@ -85,6 +87,11 @@
 
 - 테넌트별 부서 조직도 관리
 - `tb_user.department_id`가 참조하는 대상
+
+### 2-6-1. tb_common_code_item 직급 참조
+
+- `tb_user.level_id`는 `tb_common_code_item.common_code_item_id`를 참조한다.
+- 직급 항목은 `tb_common_code_group.group_code = 'LEVEL'`인 그룹에 속한 활성 항목을 사용한다.
 
 ### 2-7. tb_role
 

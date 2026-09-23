@@ -1,24 +1,28 @@
 import {
   AppBar,
+  Avatar,
   Box,
   CircularProgress,
   IconButton,
   ListItemIcon,
   Menu,
   MenuItem,
+  Divider,
   Tooltip,
   Typography,
   useTheme,
 } from '@mui/material';
 import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
-import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import MenuOutlined from '@mui/icons-material/MenuOutlined';
 import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
 import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
+import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
+import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { logout } from '../../shared/services/authService';
@@ -30,6 +34,7 @@ import {
 } from './services/dashboardData';
 import {
   buildModuleDescriptors,
+  emptyUserMenuResponse,
   fetchMyMenus,
   hydrateModuleDescriptors,
 } from './services/menuService';
@@ -37,8 +42,13 @@ import { fetchModuleRows } from '../settings/system/modules/services/moduleManag
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
 import { useDashboardResponsive } from './hooks/useDashboardResponsive';
-import type { MenuTreeNode, ModuleItem } from './types/dashboard';
+import type {
+  MenuTreeNode,
+  ModuleItem,
+  UserMenuResponse,
+} from './types/dashboard';
 import { NotFoundPage } from '../errors/NotFoundPage';
+import { usePageSessionState } from '../../shared/hooks/usePageSessionState';
 
 const themeOptions = [
   { value: 'light', label: '밝은 테마' },
@@ -129,13 +139,50 @@ function findMenuPath(
   return undefined;
 }
 
+type RecentMenuEntry = {
+  menuId: string;
+  moduleId: string;
+  moduleName?: string;
+  breadcrumbPath?: string;
+  label: string;
+  path: string;
+  visitedAt: number;
+};
+
+const RECENT_MENU_SESSION_KEY = 's-erp:recent-menu-history';
+const RECENT_MENU_LIMIT = 5;
+
+const writeRecentMenus = (items: RecentMenuEntry[]) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      RECENT_MENU_SESSION_KEY,
+      JSON.stringify(items),
+    );
+  } catch {
+    // Ignore storage errors; the user still gets the current page flow.
+  }
+};
+
 function DashboardPage() {
   console.log('DashboardPage mount', window.location.pathname);
   const navigate = useNavigate();
   const [moduleItems, setModuleItems] = useState<ModuleItem[]>([]);
+  const [profile, setProfile] = useState<UserMenuResponse['user']>(
+    emptyUserMenuResponse.user,
+  );
   const [menusLoading, setMenusLoading] = useState(true);
   const [menusError, setMenusError] = useState(false);
   const [menusReloadToken, setMenusReloadToken] = useState(0);
+  const lastRecordedMenuRef = useRef('');
+  const {
+    state: recentMenuState,
+    setState: setRecentMenuState,
+    resetState: resetRecentMenuState,
+  } = usePageSessionState<RecentMenuEntry[]>(RECENT_MENU_SESSION_KEY, []);
   const defaultModule = moduleItems[0];
   const defaultMenuId = defaultModule?.menus[0]?.id ?? '';
   const emptyModule: ModuleItem = {
@@ -172,6 +219,7 @@ function DashboardPage() {
           return;
         }
 
+        setProfile(response.user ?? emptyUserMenuResponse.user);
         const sourceModules = buildModuleDescriptors(response);
         setModuleItems(
           buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
@@ -199,6 +247,8 @@ function DashboardPage() {
     null,
   );
   const [displayScaleMenuAnchor, setDisplayScaleMenuAnchor] =
+    useState<HTMLElement | null>(null);
+  const [profileMenuAnchor, setProfileMenuAnchor] =
     useState<HTMLElement | null>(null);
   const { themeMode, setThemeMode, displayScale, setDisplayScale } =
     useAppSettings();
@@ -255,6 +305,10 @@ function DashboardPage() {
     ...currentParentNames,
     currentMenu.name,
   ];
+  const recentBreadcrumbItems =
+    selectedModule.id === 'groupware' && currentMenu.id === 'notice'
+      ? [selectedModule.name, '커뮤니티', currentMenu.name]
+      : breadcrumbItems;
 
   const isValidDashboardRoute = useMemo(() => {
     const normalizedPath = normalizeRoutePath(effectivePath);
@@ -335,10 +389,40 @@ function DashboardPage() {
     navigate(targetPath);
   };
 
+  const handleRecentMenuSelect = (path: string) => {
+    if (path) {
+      navigate(path);
+    }
+  };
+
+  const handleProfileAction = (action: 'profile' | 'security' | 'logout') => {
+    if (action === 'logout') {
+      handleLogout();
+      return;
+    }
+
+    if (action === 'profile') {
+      navigate('/dashboard');
+      return;
+    }
+
+    navigate('/dashboard');
+  };
+
   const handleLogout = () => {
+    resetRecentMenuState();
     logout();
     navigate('/login', { replace: true });
   };
+
+  const profileName = profile.name?.trim() || profile.userId || '사용자';
+  const profileRole =
+    profile.groupName?.trim() ||
+    profile.roleName?.trim() ||
+    profile.roles?.[0] ||
+    '사용자';
+  const profileEmail = profile.email?.trim() || '이메일 정보 없음';
+  const profileInitial = profileName.charAt(0).toUpperCase() || 'A';
 
   const handleOpenThemeMenu = (event: MouseEvent<HTMLElement>) => {
     setThemeMenuAnchor(event.currentTarget);
@@ -360,6 +444,115 @@ function DashboardPage() {
     setDisplayScaleMenuAnchor(null);
   };
 
+  const hasAccessibleMenu = moduleItems.length > 0;
+
+  useEffect(() => {
+    if (menusLoading || !hasAccessibleMenu) {
+      return;
+    }
+
+    setRecentMenuState((previousEntries) => {
+      const validEntries = previousEntries
+        .filter(
+          (entry) =>
+            entry.menuId !== 'empty-access' &&
+            entry.label !== '접근 가능한 메뉴 없음',
+        )
+        .map((entry) => {
+          if (entry.moduleId !== 'groupware' || entry.menuId !== 'notice') {
+            return entry;
+          }
+
+          const expectedBreadcrumb = `${entry.moduleName || '그룹웨어'} > 커뮤니티 > ${entry.label}`;
+          return entry.breadcrumbPath === expectedBreadcrumb
+            ? entry
+            : { ...entry, breadcrumbPath: expectedBreadcrumb };
+        });
+
+      return validEntries.length === previousEntries.length
+        ? validEntries.every((entry, index) => entry === previousEntries[index])
+          ? previousEntries
+          : validEntries
+        : validEntries;
+    });
+  }, [hasAccessibleMenu, menusLoading, setRecentMenuState]);
+
+  useEffect(() => {
+    if (
+      menusLoading ||
+      !hasAccessibleMenu ||
+      !selectedModule.id ||
+      selectedMenuId === 'empty-access'
+    ) {
+      return;
+    }
+
+    const nextPath = normalizeRoutePath(
+      location.pathname || getMenuRoutePath(selectedModule, selectedMenuId),
+    );
+    const nextSignature = `${selectedModuleId}:${selectedMenuId}:${nextPath}`;
+
+    if (
+      !selectedMenuId ||
+      !nextPath ||
+      lastRecordedMenuRef.current === nextSignature
+    ) {
+      return;
+    }
+
+    lastRecordedMenuRef.current = nextSignature;
+
+    const nextEntry: RecentMenuEntry = {
+      menuId: selectedMenuId,
+      moduleId: selectedModuleId,
+      moduleName: selectedModule.name,
+      breadcrumbPath: recentBreadcrumbItems.join(' > '),
+      label: currentMenu.name,
+      path: nextPath,
+      visitedAt: Date.now(),
+    };
+
+    setRecentMenuState((previousEntries) => {
+      const normalizedPrevious = Array.isArray(previousEntries)
+        ? previousEntries.filter(
+            (entry) => entry && typeof entry.menuId === 'string',
+          )
+        : [];
+
+      const nextEntries = [
+        nextEntry,
+        ...normalizedPrevious.filter(
+          (entry) => entry.menuId !== nextEntry.menuId,
+        ),
+      ].slice(0, RECENT_MENU_LIMIT);
+
+      const lookup = new Map<string, RecentMenuEntry>();
+      nextEntries.forEach((entry) => {
+        if (entry && entry.menuId) {
+          lookup.set(entry.menuId, entry);
+        }
+      });
+
+      return Array.from(lookup.values()).sort(
+        (left, right) => right.visitedAt - left.visitedAt,
+      );
+    });
+  }, [
+    currentMenu.id,
+    currentMenu.name,
+    hasAccessibleMenu,
+    location.pathname,
+    menusLoading,
+    selectedMenuId,
+    selectedModule,
+    selectedModuleId,
+    setRecentMenuState,
+  ]);
+
+  useEffect(() => {
+    writeRecentMenus(recentMenuState);
+  }, [recentMenuState]);
+
   const content = useMemo(() => {
     const baseContent =
       pageContentMap[currentPageKey] ??
@@ -367,8 +560,6 @@ function DashboardPage() {
       defaultPage;
     return buildPageContent(baseContent, currentMenu);
   }, [currentMenu, currentPageKey, defaultMenuId]);
-
-  const hasAccessibleMenu = moduleItems.length > 0;
 
   const isRootDashboardAlias =
     normalizeRoutePath(effectivePath) === '/' ||
@@ -438,8 +629,10 @@ function DashboardPage() {
             selectedModule={selectedModule}
             expandedItemIds={expandedItemIds}
             selectedMenuId={selectedMenuId}
+            recentMenuItems={recentMenuState}
             onModuleChange={handleModuleChange}
             onMenuSelect={handleMenuSelect}
+            onRecentMenuSelect={handleRecentMenuSelect}
             isMenuPanelCollapsed={isMenuPanelCollapsed}
             isMobile={isMobile}
             isMobileMenuOpen={isMobileMenuOpen}
@@ -612,12 +805,148 @@ function DashboardPage() {
                         <NotificationsOutlined fontSize="small" />
                       </IconButton>
                       <IconButton
-                        aria-label="logout"
-                        sx={{ color: theme.palette.text.secondary }}
-                        onClick={handleLogout}
+                        aria-label="프로필 메뉴 열기"
+                        onClick={(event) =>
+                          setProfileMenuAnchor(event.currentTarget)
+                        }
+                        sx={{
+                          color: theme.palette.text.secondary,
+                          p: 0.5,
+                          borderRadius: '50%',
+                        }}
                       >
-                        <LogoutOutlined fontSize="small" />
+                        <Avatar
+                          src={profile.profileImage || undefined}
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            fontSize: '0.75rem',
+                            bgcolor: '#2563eb',
+                          }}
+                        >
+                          {profileInitial}
+                        </Avatar>
                       </IconButton>
+                      <Menu
+                        anchorEl={profileMenuAnchor}
+                        open={Boolean(profileMenuAnchor)}
+                        onClose={() => setProfileMenuAnchor(null)}
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                          vertical: 'top',
+                          horizontal: 'right',
+                        }}
+                        slotProps={{
+                          paper: {
+                            sx: {
+                              mt: 1,
+                              width: 'min(300px, calc(100vw - 24px))',
+                              borderRadius: 2.5,
+                              border: `1px solid ${theme.palette.divider}`,
+                              boxShadow:
+                                theme.palette.mode === 'dark'
+                                  ? '0 16px 36px rgba(0, 0, 0, 0.38)'
+                                  : '0 16px 36px rgba(15, 23, 42, 0.16)',
+                              overflow: 'hidden',
+                            },
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            px: 2,
+                            py: 1.75,
+                          }}
+                        >
+                          <Avatar
+                            src={profile.profileImage || undefined}
+                            sx={{
+                              width: 42,
+                              height: 42,
+                              bgcolor: '#14877c',
+                              fontWeight: 800,
+                            }}
+                          >
+                            {profileInitial}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 800,
+                                lineHeight: 1.25,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {profileName}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: theme.palette.text.secondary,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {profileRole}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: theme.palette.text.secondary,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                display: 'block',
+                              }}
+                            >
+                              {profileEmail}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Divider />
+                        <MenuItem
+                          onClick={() => {
+                            handleProfileAction('profile');
+                            setProfileMenuAnchor(null);
+                          }}
+                        >
+                          <ListItemIcon>
+                            <ManageAccountsOutlined fontSize="small" />
+                          </ListItemIcon>
+                          내 정보 관리
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            handleProfileAction('security');
+                            setProfileMenuAnchor(null);
+                          }}
+                        >
+                          <ListItemIcon>
+                            <SecurityOutlined fontSize="small" />
+                          </ListItemIcon>
+                          보안 설정
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            handleProfileAction('logout');
+                            setProfileMenuAnchor(null);
+                          }}
+                        >
+                          <ListItemIcon>
+                            <LogoutOutlined fontSize="small" />
+                          </ListItemIcon>
+                          로그아웃
+                        </MenuItem>
+                      </Menu>
                     </Box>
                   </Box>
                 </AppBar>

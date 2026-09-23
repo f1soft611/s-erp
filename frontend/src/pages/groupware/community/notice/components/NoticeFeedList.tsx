@@ -1094,6 +1094,7 @@ export function NoticeFeedList({
                 >
                   <CommentThread
                     comments={normalizeCommentTree(visibleComments)}
+                    expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
                     onSubmitComment={async (content, files) => {
                       await handleLocalCommentAdd(
                         item.id,

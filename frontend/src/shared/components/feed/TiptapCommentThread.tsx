@@ -79,6 +79,7 @@ export type CommentThreadProps = {
   placeholder?: string;
   composerLabel?: string;
   submitLabel?: string;
+  expandReplies?: boolean;
 };
 
 export const sanitizeCommentHtml = sanitizeHtml;
@@ -318,7 +319,7 @@ function CommentEditor({
                 ? '수정'
                 : label === '답글 입력'
                   ? '답글 등록'
-                  : '댓글 등록'
+                  : '등록'
             }
             onClick={() => void submit()}
           >
@@ -356,8 +357,11 @@ function CommentItem({
   setEditingCommentId,
 }: ItemProps) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [showReplies, setShowReplies] = useState(false);
+  const [showReplies, setShowReplies] = useState(Boolean(props.expandReplies));
   const isDark = Boolean(props.isDark);
+  useEffect(() => {
+    setShowReplies(Boolean(props.expandReplies));
+  }, [props.expandReplies]);
   const isEditing = editingCommentId === comment.id;
   const isReplying = replyTargetId === comment.id;
   const replyParentId = rootCommentId ?? comment.id;
@@ -700,6 +704,7 @@ export function TiptapCommentThread({
   placeholder = '댓글을 입력하세요',
   composerLabel = '댓글 입력',
   submitLabel = '등록',
+  expandReplies = false,
 }: CommentThreadProps) {
   const [replyTargetId, setReplyTargetId] = useState<string | number | null>(
     null,
@@ -721,6 +726,7 @@ export function TiptapCommentThread({
     placeholder,
     composerLabel,
     submitLabel,
+    expandReplies,
   };
   return (
     <Box sx={{ minWidth: 0 }}>

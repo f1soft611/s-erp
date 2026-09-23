@@ -51,6 +51,13 @@ public class MyMenuApiController {
                 user.getId(),
                 user.getRoleId(),
                 user.getRoleCode());
+        if (response.getUser() != null) {
+            response.getUser().setName(user.getName());
+            response.getUser().setEmail(user.getEmail());
+            response.getUser().setProfileImage(user.getProfileImage());
+            response.getUser().setGroupName(user.getGroupNm());
+            response.getUser().setRoleName(user.getRoleCode());
+        }
         IntermediateResultVO<MyMenuResponseVO> result = IntermediateResultVO.success(response);
         result.setResultMessage(ResponseCode.SUCCESS.getMessage());
         return result;

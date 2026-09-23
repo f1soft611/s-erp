@@ -32,6 +32,11 @@ export type UserMenuResponse = {
   user: {
     userId: string;
     roles: string[];
+    name?: string | null;
+    email?: string | null;
+    profileImage?: string | null;
+    groupName?: string | null;
+    roleName?: string | null;
   };
   menus: MenuNode[];
 };

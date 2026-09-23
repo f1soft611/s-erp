@@ -17,7 +17,7 @@ async function loginAsAdmin() {
   });
   fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
 
-  await screen.findByRole('heading', { name: /^종합현황$/i });
+  await screen.findByRole('button', { name: /프로필 메뉴 열기/i });
 }
 
 describe('Dashboard sidebar', () => {
@@ -75,6 +75,60 @@ describe('Dashboard sidebar', () => {
     expect(
       await screen.findByRole('heading', { name: /^메뉴관리$/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows recent menu history in the sidebar footer', () => {
+    render(
+      <DashboardMenuTree
+        selectedModule={{
+          id: 'settings',
+          name: '환경설정',
+          icon: <span aria-hidden="true">S</span>,
+          tree: [
+            {
+              id: 'system',
+              name: '시스템 관리',
+              children: [{ id: 'roles', name: '권한관리', pageKey: 'roles' }],
+            },
+          ],
+          menus: [{ id: 'roles', name: '권한관리', pageKey: 'roles' }],
+        }}
+        expandedItemIds={['system']}
+        selectedMenuId="roles"
+        recentMenuItems={[
+          {
+            menuId: 'roles',
+            moduleId: 'settings',
+            moduleName: '환경설정',
+            label: '권한관리',
+            path: '/settings/roles',
+            visitedAt: Date.now(),
+          },
+        ]}
+        onMenuSelect={() => undefined}
+        onRecentMenuSelect={() => undefined}
+        onToggleMenu={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText(/최근 사용/i)).toBeInTheDocument();
+    const recentRoleButton = screen.getByRole('button', { name: /권한관리/i });
+    expect(recentRoleButton).toBeInTheDocument();
+    expect(within(recentRoleButton).getByText(/환경설정/i)).toBeInTheDocument();
+  });
+
+  it('shows a compact profile action menu from the top app bar avatar control', async () => {
+    render(<App />);
+    await loginAsAdmin();
+
+    fireEvent.click(screen.getByRole('button', { name: /프로필 메뉴 열기/i }));
+
+    expect(await screen.findByText(/소크라710/i)).toBeInTheDocument();
+    expect(screen.getByText(/플랫폼관리자/i)).toBeInTheDocument();
+    expect(screen.getByText(/admin@f1soft.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/내 정보 관리/i)).toBeInTheDocument();
+    expect(screen.getByText(/보안 설정/i)).toBeInTheDocument();
+    expect(screen.getByText(/로그아웃/i)).toBeInTheDocument();
   });
 
   it('shows a submenu indicator for menu groups that contain child items', () => {

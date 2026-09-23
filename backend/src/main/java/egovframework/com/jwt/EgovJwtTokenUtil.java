@@ -81,6 +81,8 @@ public class EgovJwtTokenUtil implements Serializable{
         Map<String, Object> claims = new HashMap<>();
         claims.put("id", loginVO.getId() );
         claims.put("name", loginVO.getName() );
+		claims.put("email", loginVO.getEmail() );
+		claims.put("profileImage", loginVO.getProfileImage() );
         claims.put("userSe", loginVO.getUserSe() );
         claims.put("orgnztId", loginVO.getOrgnztId() );
         claims.put("uniqId", loginVO.getUniqId() );
@@ -103,6 +105,8 @@ public class EgovJwtTokenUtil implements Serializable{
         Map<String, Object> claims = new HashMap<>();
         claims.put("id", loginVO.getId() );
         claims.put("name", loginVO.getName() );
+		claims.put("email", loginVO.getEmail() );
+		claims.put("profileImage", loginVO.getProfileImage() );
         claims.put("userSe", loginVO.getUserSe() );
         claims.put("orgnztId", loginVO.getOrgnztId() );
         claims.put("uniqId", loginVO.getUniqId() );
@@ -125,6 +129,8 @@ public class EgovJwtTokenUtil implements Serializable{
         try {
 		    loginVO.setId(getUserIdFromToken(token));
 			loginVO.setName(getInfoFromToken("name", token));
+			loginVO.setEmail(getInfoFromToken("email", token));
+			loginVO.setProfileImage(getInfoFromToken("profileImage", token));
 			loginVO.setUserSe(getUserSeFromToken(token));
 			loginVO.setOrgnztId(getInfoFromToken("orgnztId", token));
 			loginVO.setUniqId(getInfoFromToken("uniqId", token));

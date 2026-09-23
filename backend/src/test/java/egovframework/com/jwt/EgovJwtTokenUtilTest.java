@@ -22,6 +22,12 @@ class EgovJwtTokenUtilTest {
         LoginVO loginVO = new LoginVO();
         loginVO.setId("testUser");
         loginVO.setName("Test User");
+        loginVO.setEmail("test@example.com");
+        loginVO.setProfileImage("/profile/test.png");
+        loginVO.setDepartmentName("개발팀");
+        loginVO.setLevelId(123L);
+        loginVO.setLevelCode("001");
+        loginVO.setLevelName("사원");
         loginVO.setUserSe("USER");
         loginVO.setOrgnztId("testOrg");
         loginVO.setUniqId("testUniqId");
@@ -39,6 +45,12 @@ class EgovJwtTokenUtilTest {
         assertNotNull(result);
         assertEquals("testUser", result.getId());
         assertEquals("Test User", result.getName());
+        assertEquals("test@example.com", result.getEmail());
+        assertEquals("/profile/test.png", result.getProfileImage());
+        assertEquals("개발팀", result.getDepartmentName());
+        assertEquals(123L, result.getLevelId());
+        assertEquals("001", result.getLevelCode());
+        assertEquals("사원", result.getLevelName());
         assertEquals("USER", result.getUserSe());
         assertEquals("testOrg", result.getOrgnztId());
         assertEquals("testUniqId", result.getUniqId());

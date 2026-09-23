@@ -477,6 +477,7 @@ export function CommunityNoticePage({
     id?: number;
     title: string;
     body: string;
+    isPinned?: string;
     noticeGubunCode?: string;
     attachments: NoticeComposerDraftAttachment[];
   }>({
@@ -713,6 +714,7 @@ export function CommunityNoticePage({
           contentsHtml: safeHtml,
           contentsJson: safeJson,
           contentsText: safeText,
+          isPinned: editorDraft.isPinned,
           noticeGubunCode,
           embeddedImages,
         });
@@ -762,6 +764,7 @@ export function CommunityNoticePage({
               ],
               comments: updated.comments,
               commentCount: updated.commentCount ?? item.commentCount,
+              isPinned: updated.isPinned ?? item.isPinned,
             };
             const nextItem = toNoticeFeedItem(
               nextPost,
@@ -1304,6 +1307,7 @@ export function CommunityNoticePage({
               item.bodyHtml ?? item.body,
               item.id,
             ),
+            isPinned: item.isPinned,
             noticeGubunCode: item.noticeGubunCode,
             attachments: mappedAttachments,
           });
@@ -1546,6 +1550,7 @@ export function CommunityNoticePage({
                             item.bodyHtml ?? item.body,
                             item.id,
                           ),
+                          isPinned: item.isPinned,
                           noticeGubunCode: item.noticeGubunCode,
                           attachments: mappedAttachments,
                         });

@@ -1,21 +1,26 @@
-import {
-  Avatar,
-  Box,
-  Card,
-  CardContent,
-  IconButton,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import { Box, Button, IconButton, Typography, useTheme } from '@mui/material';
 import CloseOutlined from '@mui/icons-material/CloseOutlined';
+import HistoryOutlined from '@mui/icons-material/HistoryOutlined';
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import type { MenuTreeNode, ModuleItem } from '../types/dashboard';
+
+type RecentMenuEntry = {
+  menuId: string;
+  moduleId: string;
+  moduleName?: string;
+  breadcrumbPath?: string;
+  label: string;
+  path: string;
+  visitedAt: number;
+};
 
 type DashboardMenuTreeProps = {
   selectedModule: ModuleItem;
   expandedItemIds: string[];
   selectedMenuId: string;
+  recentMenuItems?: RecentMenuEntry[];
   onMenuSelect: (menuId: string) => void;
+  onRecentMenuSelect?: (path: string) => void;
   onToggleMenu?: () => void;
 };
 
@@ -23,7 +28,9 @@ export function DashboardMenuTree({
   selectedModule,
   expandedItemIds,
   selectedMenuId,
+  recentMenuItems = [],
   onMenuSelect,
+  onRecentMenuSelect,
   onToggleMenu,
 }: DashboardMenuTreeProps) {
   const theme = useTheme();
@@ -167,41 +174,144 @@ export function DashboardMenuTree({
           {selectedModule.tree.map(renderMenuNode)}
         </SimpleTreeView>
       </Box>
-      <Box sx={{ px: 1.5, pb: 1.5 }}>
-        <Card
+      <Box
+        sx={{
+          px: 1.5,
+          pt: 1.25,
+          pb: 1.25,
+          borderTop: `1px solid ${theme.palette.divider}`,
+          bgcolor: isDark ? 'rgba(15, 23, 42, 0.62)' : 'rgba(255,255,255,0.62)',
+        }}
+      >
+        <Box
           sx={{
-            bgcolor: isDark ? '#111827' : '#ffffff',
-            color: isDark ? '#e2e8f0' : '#0f172a',
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mb: 0.75,
           }}
         >
-          <CardContent sx={{ p: 2.1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <HistoryOutlined sx={{ fontSize: 16, color: '#60a5fa' }} />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 800,
+                color: isDark ? '#cbd5e1' : '#475569',
+                letterSpacing: '0.06em',
+              }}
+            >
+              최근 사용
+            </Typography>
+          </Box>
+          <Typography
+            variant="caption"
+            sx={{
+              minWidth: 22,
+              px: 0.6,
+              py: 0.15,
+              borderRadius: 10,
+              bgcolor: isDark ? 'rgba(96,165,250,0.18)' : '#dbeafe',
+              color: isDark ? '#bfdbfe' : '#2563eb',
+              fontWeight: 800,
+              textAlign: 'center',
+            }}
+          >
+            {recentMenuItems.length}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {recentMenuItems.length === 0 ? (
+            <Typography
+              variant="caption"
+              sx={{
+                color: isDark ? '#94a3b8' : '#64748b',
+                lineHeight: 1.5,
+              }}
+            >
+              최근 방문한 메뉴가 없습니다.
+            </Typography>
+          ) : (
+            recentMenuItems.map((item) => (
+              <Button
+                key={`${item.moduleId}:${item.menuId}`}
+                variant="text"
+                onClick={() => onRecentMenuSelect?.(item.path)}
                 sx={{
-                  bgcolor: '#2563eb',
-                  width: 30,
-                  height: 30,
-                  fontSize: '0.8rem',
+                  justifyContent: 'flex-start',
+                  alignItems: 'flex-start',
+                  px: 1,
+                  py: 0.7,
+                  minHeight: 46,
+                  borderRadius: 1.5,
+                  color: isDark ? '#dbeafe' : '#1e293b',
+                  bgcolor: isDark
+                    ? 'rgba(96,165,250,0.08)'
+                    : 'rgba(37,99,235,0.04)',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  '&:focus-visible': {
+                    outline: `2px solid ${isDark ? '#93c5fd' : '#2563eb'}`,
+                    outlineOffset: 1,
+                  },
+                  '&:hover': {
+                    bgcolor: isDark
+                      ? 'rgba(96,165,250,0.12)'
+                      : 'rgba(37,99,235,0.08)',
+                  },
                 }}
               >
-                A
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  관리자
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: isDark ? '#94a3b8' : '#64748b' }}
-                >
-                  admin@f1soft.com
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+                <Box
+                  component="span"
+                  sx={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    bgcolor: '#60a5fa',
+                    mr: 1,
+                    mt: 0.6,
+                    flexShrink: 0,
+                  }}
+                />
+                <Box sx={{ minWidth: 0, display: 'block' }}>
+                  <Typography
+                    component="span"
+                    sx={{
+                      display: 'block',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      lineHeight: 1.3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                  <Typography
+                    component="span"
+                    sx={{
+                      display: 'block',
+                      mt: 0.2,
+                      color: isDark ? '#94a3b8' : '#64748b',
+                      fontSize: '0.68rem',
+                      lineHeight: 1.2,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.breadcrumbPath ||
+                      [item.moduleName || item.moduleId, item.label].join(
+                        ' > ',
+                      )}
+                  </Typography>
+                </Box>
+              </Button>
+            ))
+          )}
+        </Box>
       </Box>
     </Box>
   );
