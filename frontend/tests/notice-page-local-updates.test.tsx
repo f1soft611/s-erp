@@ -444,6 +444,14 @@ describe('CommunityNoticePage local updates', () => {
   });
 
   it('replaces the updated notice without reloading the notice list', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValueOnce([
+      {
+        ...detail,
+        postId: 1,
+        title: '기존 공지',
+        isPinned: 'Y',
+      },
+    ]);
     renderPage();
 
     expect(
@@ -462,7 +470,7 @@ describe('CommunityNoticePage local updates', () => {
     });
     expect(noticeServiceMocks.updateNoticePost).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ title: '수정 공지' }),
+      expect.objectContaining({ title: '수정 공지', isPinned: 'Y' }),
     );
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
   });

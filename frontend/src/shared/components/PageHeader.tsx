@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import { useState, type ReactNode } from 'react';
+import { Box, IconButton, Typography, useTheme } from '@mui/material';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
+import RouteRoundedIcon from '@mui/icons-material/RouteRounded';
 import {
   PermissionGroupActionBar,
   type PermissionActionGroupDefinition,
@@ -12,6 +15,9 @@ export type PageHeaderProps = {
   children?: ReactNode;
 };
 
+const PAGE_HEADER_DESCRIPTION_COLLAPSED_KEY =
+  'page-header-description-collapsed';
+
 export function PageHeader({
   breadcrumbItems,
   description,
@@ -20,6 +26,22 @@ export function PageHeader({
 }: PageHeaderProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const [descriptionCollapsed, setDescriptionCollapsed] = useState(
+    () =>
+      window.localStorage.getItem(PAGE_HEADER_DESCRIPTION_COLLAPSED_KEY) ===
+      'true',
+  );
+
+  const handleDescriptionToggle = () => {
+    setDescriptionCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem(
+        PAGE_HEADER_DESCRIPTION_COLLAPSED_KEY,
+        String(next),
+      );
+      return next;
+    });
+  };
 
   const breadcrumbText = breadcrumbItems.join(' > ');
 
@@ -32,15 +54,22 @@ export function PageHeader({
       }}
     >
       <Typography
+        component="div"
         variant="overline"
         sx={{
           color: '#64748b',
           letterSpacing: 1.4,
-          display: 'block',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
           maxWidth: '100%',
           overflowWrap: 'anywhere',
         }}
       >
+        <RouteRoundedIcon
+          aria-hidden="true"
+          sx={{ fontSize: '0.95rem', flexShrink: 0, color: 'text.secondary' }}
+        />
         <Box
           component="span"
           aria-hidden="true"
@@ -66,19 +95,56 @@ export function PageHeader({
               key={`${item}-${index}`}
               sx={
                 isLast
-                  ? { color: 'text.primary', fontWeight: 800 }
+                  ? {
+                      color: 'text.primary',
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                    }
                   : { color: 'text.secondary' }
               }
             >
               {index > 0 ? ' > ' : ''}
               {item}
+              {isLast && (
+                <IconButton
+                  type="button"
+                  size="small"
+                  aria-label={
+                    descriptionCollapsed
+                      ? '페이지 설명 열기'
+                      : '페이지 설명 접기'
+                  }
+                  aria-expanded={!descriptionCollapsed}
+                  onClick={handleDescriptionToggle}
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    p: 0,
+                    color: 'text.secondary',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '50%',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  {descriptionCollapsed ? (
+                    <KeyboardArrowDownRoundedIcon sx={{ fontSize: '1rem' }} />
+                  ) : (
+                    <KeyboardArrowUpRoundedIcon sx={{ fontSize: '1rem' }} />
+                  )}
+                </IconButton>
+              )}
             </Box>
           );
         })}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        {description}
-      </Typography>
+      {!descriptionCollapsed && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {description}
+        </Typography>
+      )}
     </Box>
   );
 

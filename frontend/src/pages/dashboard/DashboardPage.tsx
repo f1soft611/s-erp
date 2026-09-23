@@ -413,6 +413,7 @@ function DashboardPage() {
         height: '100vh',
         minHeight: 0,
         overflow: 'hidden',
+        '--dashboard-header-height': '58px',
         bgcolor: theme.palette.background.default,
         color: theme.palette.text.primary,
       }}
@@ -467,12 +468,14 @@ function DashboardPage() {
                     bgcolor: theme.palette.background.paper,
                     color: theme.palette.text.primary,
                     borderBottom: `1px solid ${theme.palette.divider}`,
+                    height: 'var(--dashboard-header-height)',
+                    boxSizing: 'border-box',
                   }}
                 >
                   <Box
                     sx={{
                       px: { xs: 1, md: 3 },
-                      py: 1.75,
+                      height: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',

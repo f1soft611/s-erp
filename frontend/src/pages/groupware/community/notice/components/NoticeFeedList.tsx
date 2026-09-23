@@ -509,13 +509,16 @@ export function NoticeFeedList({
             loadedPreviousByNoticeId[item.id] || itemComments.length <= 3
               ? itemComments
               : itemComments.slice(-3);
-          const hasAtLeastThreeComments = countComments(itemComments) >= 3;
+          const visibleCommentCount = countComments(visibleComments);
+          const totalCommentCount = countComments(itemComments);
+          const hasMoreCommentsAvailable =
+            item.hasPreviousComments === true ||
+            item.commentCount > visibleCommentCount ||
+            item.nextBeforeCommentId != null;
           const canLoadPrevious =
-            hasAtLeastThreeComments &&
             !exhaustedPreviousByNoticeId[item.id] &&
-            (item.hasPreviousComments === true ||
-              item.commentCount > countComments(visibleComments) ||
-              countComments(itemComments) === 3);
+            hasMoreCommentsAvailable &&
+            (totalCommentCount >= 3 || item.commentCount > visibleCommentCount);
           const attachmentFiles =
             item.attachmentDetails ??
             ((item.attachments ?? []).map((name, index) => ({
@@ -600,43 +603,47 @@ export function NoticeFeedList({
                         color={item.isPinned === 'Y' ? 'primary' : 'inherit'}
                       />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label={`공지 메뉴 ${item.title}`}
-                      onClick={(event) => {
-                        setNoticeMenuId(item.id);
-                        setNoticeMenuAnchor(event.currentTarget);
-                      }}
-                    >
-                      <MoreVertIcon fontSize="small" />
-                    </IconButton>
-                    <Menu
-                      anchorEl={noticeMenuAnchor}
-                      open={noticeMenuId === item.id}
-                      onClose={() => {
-                        setNoticeMenuAnchor(null);
-                        setNoticeMenuId(null);
-                      }}
-                    >
-                      <MenuItem
-                        onClick={() => {
-                          setNoticeMenuAnchor(null);
-                          setNoticeMenuId(null);
-                          onEdit?.(item);
-                        }}
-                      >
-                        수정
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          setNoticeMenuAnchor(null);
-                          setNoticeMenuId(null);
-                          onDelete?.(item.id);
-                        }}
-                      >
-                        삭제
-                      </MenuItem>
-                    </Menu>
+                    {item.isPostOwner !== false && (
+                      <>
+                        <IconButton
+                          size="small"
+                          aria-label={`공지 메뉴 ${item.title}`}
+                          onClick={(event) => {
+                            setNoticeMenuId(item.id);
+                            setNoticeMenuAnchor(event.currentTarget);
+                          }}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                        <Menu
+                          anchorEl={noticeMenuAnchor}
+                          open={noticeMenuId === item.id}
+                          onClose={() => {
+                            setNoticeMenuAnchor(null);
+                            setNoticeMenuId(null);
+                          }}
+                        >
+                          <MenuItem
+                            onClick={() => {
+                              setNoticeMenuAnchor(null);
+                              setNoticeMenuId(null);
+                              onEdit?.(item);
+                            }}
+                          >
+                            수정
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() => {
+                              setNoticeMenuAnchor(null);
+                              setNoticeMenuId(null);
+                              onDelete?.(item.id);
+                            }}
+                          >
+                            삭제
+                          </MenuItem>
+                        </Menu>
+                      </>
+                    )}
                     <Chip
                       label={item.state}
                       size="small"
@@ -1074,7 +1081,7 @@ export function NoticeFeedList({
                     }}
                     sx={{ mt: 1.5 }}
                   >
-                    이전 댓글 보기
+                    이전 댓글 불러오기
                   </Button>
                 )}
 

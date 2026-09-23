@@ -313,7 +313,13 @@ function CommentEditor({
           <Button
             size="small"
             variant="contained"
-            aria-label={label === '댓글 수정 입력' ? '수정' : undefined}
+            aria-label={
+              label === '댓글 수정 입력'
+                ? '수정'
+                : label === '답글 입력'
+                  ? '답글 등록'
+                  : '댓글 등록'
+            }
             onClick={() => void submit()}
           >
             {submitLabel}

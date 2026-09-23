@@ -16,6 +16,8 @@ import { ListView } from '../../../../shared/components/view-mode/ListView';
 import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
 import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
+import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
+import { PostDetailPanel } from '../../../../shared/components/feed/PostDetailPanel';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { CommonViewMode } from '../../../../shared/components/view-mode/commonViewTypes';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -64,6 +66,7 @@ import {
 } from '../../../../shared/services/commonContentApi';
 import type { CommonFileItem } from '../../../../shared/services/commonContentApi';
 import { sanitizeHtml } from '../../../../shared/utils/sanitizeHtml';
+import { getStoredAuth } from '../../../../shared/services/authService';
 import {
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
@@ -228,6 +231,12 @@ const toNoticeFeedItem = (
 
   return {
     id: Number(post.postId ?? 0),
+    writerId: post.writerId ?? undefined,
+    isPostOwner: Boolean(
+      post.writerId &&
+      getStoredAuth()?.userId &&
+      String(post.writerId) === String(getStoredAuth()?.userId),
+    ),
     title: post.title ?? '제목 없음',
     viewCount: Number(post.viewCount ?? 0) || 0,
     createdAt: post.createdAt,
@@ -460,6 +469,7 @@ export function CommunityNoticePage({
   const { showError, showSuccess } = useNotification();
   const hasCreatePermission = true;
   const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(null);
+  const [selectedNoticeId, setSelectedNoticeId] = useState<number | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [pendingPinnedNotice, setPendingPinnedNotice] =
     useState<NoticeFeedItem | null>(null);
@@ -522,6 +532,13 @@ export function CommunityNoticePage({
   const pinnedNoticeViewItems = useMemo(
     () => toNoticeViewItems(pinnedNoticeItems),
     [pinnedNoticeItems],
+  );
+  const selectedNotice = useMemo(
+    () =>
+      [...noticeItems, ...pinnedNoticeItems].find(
+        (item) => item.id === selectedNoticeId,
+      ) ?? null,
+    [noticeItems, pinnedNoticeItems, selectedNoticeId],
   );
   useEffect(() => {
     noticeGubunNamesRef.current = noticeGubunNames;
@@ -1176,6 +1193,19 @@ export function CommunityNoticePage({
               : item,
           ),
         );
+        setPinnedNoticeItems((current) =>
+          current.map((item) =>
+            item.id === noticeId
+              ? {
+                  ...item,
+                  ...detailItem,
+                  liked: item.liked,
+                  likeCount: item.likeCount,
+                  bookmarked: item.bookmarked,
+                }
+              : item,
+          ),
+        );
       } catch {
         showError('공지사항 상세 정보를 불러오지 못했습니다.');
       } finally {
@@ -1203,6 +1233,22 @@ export function CommunityNoticePage({
     [loadNoticeDetail],
   );
 
+  const handleSelectNotice = useCallback(
+    async (item: { id: string | number }) => {
+      const noticeId = Number(item.id);
+      if (!noticeId) {
+        return;
+      }
+      setSelectedNoticeId(noticeId);
+      await loadNoticeDetail(noticeId, true);
+    },
+    [loadNoticeDetail],
+  );
+
+  const handleCloseNoticeDetail = useCallback(() => {
+    setSelectedNoticeId(null);
+  }, []);
+
   const handleViewModeChange = useCallback(
     async (nextMode: CommonViewMode) => {
       setViewMode(nextMode);
@@ -1211,10 +1257,85 @@ export function CommunityNoticePage({
     [loadNoticePosts],
   );
 
+  const selectedNoticePanel = selectedNotice ? (
+    <PostDetailPanel onClose={handleCloseNoticeDetail}>
+      <NoticeFeedList
+        items={[selectedNotice]}
+        isDark={isDark}
+        expandedNoticeId={expandedNoticeId}
+        onToggleExpand={handleToggleNoticeExpand}
+        onNoticeInteract={handleNoticeInteract}
+        onToggleLike={handleToggleLike}
+        onToggleBookmark={handleToggleBookmark}
+        onAddComment={handleAddComment}
+        onEditComment={handleUpdateComment}
+        onDeleteComment={handleDeleteComment}
+        onLoadPreviousComments={handleLoadPreviousComments}
+        onLoadPreviousCommentsError={() =>
+          showError('이전 댓글을 불러오지 못했습니다.')
+        }
+        onDownloadCommentAttachment={handleDownloadCommentAttachment}
+        onDeleteCommentAttachment={handleDeleteCommentAttachment}
+        serverItemRevision={serverItemRevision}
+        onDelete={handleDeleteNotice}
+        onTogglePinned={handleTogglePinned}
+        onEdit={(item) => {
+          const mappedAttachments = (item.attachmentDetails ?? []).map(
+            (attachment) => ({
+              id: String(
+                attachment.boardFileId ??
+                  attachment.objectKey ??
+                  `${item.id}-${Math.random()}`,
+              ),
+              name: attachment.name,
+              size: attachment.size,
+              extension:
+                attachment.name.split('.').pop()?.toUpperCase() || undefined,
+              boardFileId: attachment.boardFileId,
+              objectKey: attachment.objectKey,
+              bucketName: attachment.bucketName,
+              postId: item.id,
+            }),
+          );
+          setEditorDraft({
+            id: item.id,
+            title: item.title,
+            body: normalizeNoticeEmbeddedImageSources(
+              item.bodyHtml ?? item.body,
+              item.id,
+            ),
+            noticeGubunCode: item.noticeGubunCode,
+            attachments: mappedAttachments,
+          });
+          setIsComposerOpen(true);
+        }}
+        onDownload={(noticeId, file) => {
+          void (async () => {
+            const detail = await fetchNoticePostDetail(noticeId);
+            const nextAttachment = (detail.attachments ?? []).find(
+              (attachment) =>
+                String(attachment.boardFileId ?? '') ===
+                  String(file.boardFileId ?? '') ||
+                (attachment.fileName ?? '') === file.name,
+            );
+            if (nextAttachment) {
+              await downloadNoticeAttachment({
+                ...nextAttachment,
+                postId: noticeId,
+              });
+            }
+          })();
+        }}
+      />
+    </PostDetailPanel>
+  ) : null;
+
   return (
     <Box
       sx={{
         flex: 1,
+        position: 'relative',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -1364,6 +1485,10 @@ export function CommunityNoticePage({
                       <PinnedItemsPanel
                         items={pinnedNoticeViewItems}
                         ariaLabel="상단 고정 공지"
+                        selectedItemId={selectedNoticeId}
+                        onItemClick={(item) => {
+                          void handleSelectNotice(item);
+                        }}
                       />
                     </Box>
                   )}
@@ -1451,6 +1576,9 @@ export function CommunityNoticePage({
                     <ListView
                       items={unpinnedNoticeViewItems}
                       ariaLabel="리스트형 공지 목록"
+                      onItemClick={(item) => {
+                        void handleSelectNotice(item);
+                      }}
                     />
                   )}
                 </>
@@ -1466,6 +1594,12 @@ export function CommunityNoticePage({
           )}
         </Container>
       </Box>
+
+      {selectedNotice && (
+        <PageAreaOverlay onClose={handleCloseNoticeDetail}>
+          {selectedNoticePanel}
+        </PageAreaOverlay>
+      )}
 
       <NoticeComposerDialog
         open={isComposerOpen}

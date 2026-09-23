@@ -102,7 +102,8 @@ export function DashboardMenuTree({
       <Box
         sx={{
           px: 2,
-          py: 1.75,
+          height: 'var(--dashboard-header-height)',
+          boxSizing: 'border-box',
           borderBottom: `1px solid ${theme.palette.divider}`,
           display: 'flex',
           alignItems: 'center',
