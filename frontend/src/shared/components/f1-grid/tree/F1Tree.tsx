@@ -307,6 +307,7 @@ function F1TreeInner<T extends object>(
     getSelectedRows: () => gridRef.current?.getSelectedRows() ?? [],
     getSelectedRowIds: () => gridRef.current?.getSelectedRowIds() ?? [],
     clearSelection: () => gridRef.current?.clearSelection(),
+    setSelectedRowIds: (rowIds) => gridRef.current?.setSelectedRowIds(rowIds),
     addRow: (row) => {
       pendingChildInsertRef.current = undefined;
       gridRef.current?.addRow(row);

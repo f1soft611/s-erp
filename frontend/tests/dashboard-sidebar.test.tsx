@@ -124,7 +124,9 @@ describe('Dashboard sidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: /프로필 메뉴 열기/i }));
 
     expect(await screen.findByText(/소크라710/i)).toBeInTheDocument();
-    expect(screen.getByText(/플랫폼관리자/i)).toBeInTheDocument();
+    expect(screen.getByText(/플랫폼개발팀/i)).toBeInTheDocument();
+    expect(screen.getByText(/사원/i)).toBeInTheDocument();
+    expect(screen.queryByText(/플랫폼관리자/i)).not.toBeInTheDocument();
     expect(screen.getByText(/admin@f1soft.com/i)).toBeInTheDocument();
     expect(screen.getByText(/내 정보 관리/i)).toBeInTheDocument();
     expect(screen.getByText(/보안 설정/i)).toBeInTheDocument();

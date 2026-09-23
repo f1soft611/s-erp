@@ -275,7 +275,6 @@ export function NoticeFeedList({
   items,
   isDark,
   expandedNoticeId,
-  isRefreshing,
   onToggleExpand,
   onNoticeInteract,
   onToggleLike,
@@ -1010,7 +1009,7 @@ export function NoticeFeedList({
                   <Button
                     size="small"
                     variant="text"
-                    aria-label="이전 댓글 불러오기"
+                    aria-label="이전 댓글 보기"
                     disabled={loadingPreviousByNoticeId[item.id]}
                     onClick={async () => {
                       if (loadingPreviousByNoticeId[item.id]) return;
@@ -1081,7 +1080,7 @@ export function NoticeFeedList({
                     }}
                     sx={{ mt: 1.5 }}
                   >
-                    이전 댓글 불러오기
+                    이전 댓글 보기
                   </Button>
                 )}
 
@@ -1149,12 +1148,6 @@ export function NoticeFeedList({
                     submitLabel="등록"
                   />
                 </Box>
-
-                {isRefreshing && (
-                  <Typography variant="caption" color="text.secondary">
-                    목록을 새로고침하는 중입니다...
-                  </Typography>
-                )}
               </CardContent>
             </Card>
           );

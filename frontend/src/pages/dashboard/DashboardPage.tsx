@@ -48,7 +48,10 @@ import type {
   UserMenuResponse,
 } from './types/dashboard';
 import { NotFoundPage } from '../errors/NotFoundPage';
-import { usePageSessionState } from '../../shared/hooks/usePageSessionState';
+import {
+  clearPageSessionState,
+  usePageSessionState,
+} from '../../shared/hooks/usePageSessionState';
 
 const themeOptions = [
   { value: 'light', label: '밝은 테마' },
@@ -150,6 +153,7 @@ type RecentMenuEntry = {
 };
 
 const RECENT_MENU_SESSION_KEY = 's-erp:recent-menu-history';
+const COMMON_CODE_PAGE_SESSION_KEY = 's-erp:page:common-code-management';
 const RECENT_MENU_LIMIT = 5;
 
 const writeRecentMenus = (items: RecentMenuEntry[]) => {
@@ -411,16 +415,14 @@ function DashboardPage() {
 
   const handleLogout = () => {
     resetRecentMenuState();
+    clearPageSessionState(COMMON_CODE_PAGE_SESSION_KEY);
     logout();
     navigate('/login', { replace: true });
   };
 
   const profileName = profile.name?.trim() || profile.userId || '사용자';
-  const profileRole =
-    profile.groupName?.trim() ||
-    profile.roleName?.trim() ||
-    profile.roles?.[0] ||
-    '사용자';
+  const profileDepartment = profile.departmentName?.trim() || '부서 정보 없음';
+  const profileLevel = profile.levelName?.trim() || '직급 정보 없음';
   const profileEmail = profile.email?.trim() || '이메일 정보 없음';
   const profileInitial = profileName.charAt(0).toUpperCase() || 'A';
 
@@ -896,7 +898,7 @@ function DashboardPage() {
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              {profileRole}
+                              {profileDepartment} · {profileLevel}
                             </Typography>
                             <Typography
                               variant="caption"

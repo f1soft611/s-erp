@@ -8,6 +8,7 @@ import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../shared/context/NotificationContext';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import type {
   ModuleItem,
   PageContent,
@@ -33,6 +34,24 @@ type CommonCodeManagementPageProps = {
   };
 };
 
+type CommonCodePageSession = {
+  searchQuery: string;
+  selectedGroupId: string;
+  selectedGroupRowIds: string[];
+  selectedItemRowIds: string[];
+  splitterSize: number;
+  page: number;
+};
+
+const initialPageSession: CommonCodePageSession = {
+  searchQuery: '',
+  selectedGroupId: '',
+  selectedGroupRowIds: [],
+  selectedItemRowIds: [],
+  splitterSize: 600,
+  page: 0,
+};
+
 export function CommonCodeManagementPage({
   selectedModule,
   currentMenuName,
@@ -41,16 +60,82 @@ export function CommonCodeManagementPage({
   selectedMenuPermissions,
 }: CommonCodeManagementPageProps) {
   const { showSuccess } = useNotification();
+  const { state: pageSession, setState: setPageSession } = usePageSessionState(
+    's-erp:page:common-code-management',
+    initialPageSession,
+    {
+      version: 1,
+      validate: (value): value is CommonCodePageSession => {
+        if (!value || typeof value !== 'object') return false;
+        const candidate = value as Partial<CommonCodePageSession>;
+        return (
+          typeof candidate.searchQuery === 'string' &&
+          typeof candidate.selectedGroupId === 'string' &&
+          Array.isArray(candidate.selectedGroupRowIds) &&
+          Array.isArray(candidate.selectedItemRowIds) &&
+          typeof candidate.splitterSize === 'number' &&
+          typeof candidate.page === 'number'
+        );
+      },
+    },
+  );
   const panelRef = useRef<CommonCodeManagementPanelHandle>(null);
   const [groups, setGroups] = useState<CommonCodeGroupRow[]>([]);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = pageSession.searchQuery;
   const [panelDirty, setPanelDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [commonCodeGridKey, setCommonCodeGridKey] = useState(0);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const groupRequestIdRef = useRef(0);
+  const handleSelectedGroupChange = useCallback(
+    (selectedGroupId: string) => {
+      setPageSession((current) => {
+        if (current.selectedGroupId === selectedGroupId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          selectedGroupId,
+        };
+      });
+    },
+    [setPageSession],
+  );
+  const handleGroupRowSelectionChange = useCallback(
+    (selectedGroupRowIds: Array<string | number>) => {
+      const nextIds = selectedGroupRowIds.map(String);
+      setPageSession((current) =>
+        JSON.stringify(current.selectedGroupRowIds) === JSON.stringify(nextIds)
+          ? current
+          : { ...current, selectedGroupRowIds: nextIds },
+      );
+    },
+    [setPageSession],
+  );
+  const handleItemRowSelectionChange = useCallback(
+    (selectedItemRowIds: Array<string | number>) => {
+      const nextIds = selectedItemRowIds.map(String);
+      setPageSession((current) =>
+        JSON.stringify(current.selectedItemRowIds) === JSON.stringify(nextIds)
+          ? current
+          : { ...current, selectedItemRowIds: nextIds },
+      );
+    },
+    [setPageSession],
+  );
+  const handleSplitterSizeChange = useCallback(
+    (splitterSize: number) => {
+      setPageSession((current) =>
+        current.splitterSize === splitterSize
+          ? current
+          : { ...current, splitterSize },
+      );
+    },
+    [setPageSession],
+  );
 
   const pageActionPermissions = useMemo(() => {
     const writeAllowed = Boolean(
@@ -193,7 +278,12 @@ export function CommonCodeManagementPage({
           margin="none"
           placeholder="그룹 코드/명/설명 검색"
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          onChange={(event) =>
+            setPageSession((current) => ({
+              ...current,
+              searchQuery: event.target.value,
+            }))
+          }
           slotProps={{
             htmlInput: { 'aria-label': '공통코드 검색' },
             input: {
@@ -233,6 +323,14 @@ export function CommonCodeManagementPage({
         onError={setError}
         commonCodeGridKey={commonCodeGridKey}
         groupsLoading={pageLoading}
+        initialSelectedGroupId={pageSession.selectedGroupId}
+        onSelectedGroupChange={handleSelectedGroupChange}
+        initialSelectedGroupRowIds={pageSession.selectedGroupRowIds}
+        initialSelectedItemRowIds={pageSession.selectedItemRowIds}
+        onGroupRowSelectionChange={handleGroupRowSelectionChange}
+        onItemRowSelectionChange={handleItemRowSelectionChange}
+        initialSplitterSize={pageSession.splitterSize}
+        onSplitterSizeChange={handleSplitterSizeChange}
       />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}

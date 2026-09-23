@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
+export type PageSessionStateOptions<T> = {
+  version?: number;
+  validate?: (value: unknown) => value is T;
+};
+
 const getSessionStorage = (): Storage | null => {
   if (typeof window === 'undefined') {
     return null;
@@ -12,7 +17,11 @@ const getSessionStorage = (): Storage | null => {
   }
 };
 
-export function readPageSessionState<T>(pageKey: string, fallback: T): T {
+export function readPageSessionState<T>(
+  pageKey: string,
+  fallback: T,
+  options: PageSessionStateOptions<T> = {},
+): T {
   const storage = getSessionStorage();
   const key = (pageKey || 'page-session').trim();
 
@@ -26,14 +35,37 @@ export function readPageSessionState<T>(pageKey: string, fallback: T): T {
       return fallback;
     }
 
-    return JSON.parse(rawValue) as T;
+    const parsedValue = JSON.parse(rawValue) as
+      | T
+      | {
+          version?: number;
+          value?: T;
+        };
+    const hasVersionEnvelope = options.version !== undefined;
+    const value = hasVersionEnvelope
+      ? (parsedValue as { version?: number; value?: T }).version ===
+        options.version
+        ? (parsedValue as { value?: T }).value
+        : undefined
+      : parsedValue;
+
+    if (value === undefined || (options.validate && !options.validate(value))) {
+      storage.removeItem(key);
+      return fallback;
+    }
+
+    return value as T;
   } catch {
     storage.removeItem(key);
     return fallback;
   }
 }
 
-export function writePageSessionState<T>(pageKey: string, value: T): void {
+export function writePageSessionState<T>(
+  pageKey: string,
+  value: T,
+  options: PageSessionStateOptions<T> = {},
+): void {
   const storage = getSessionStorage();
   const key = (pageKey || 'page-session').trim();
 
@@ -42,7 +74,11 @@ export function writePageSessionState<T>(pageKey: string, value: T): void {
   }
 
   try {
-    storage.setItem(key, JSON.stringify(value));
+    const nextValue =
+      options.version === undefined
+        ? value
+        : { version: options.version, value };
+    storage.setItem(key, JSON.stringify(nextValue));
   } catch {
     // Ignore quota/storage errors and keep the in-memory state usable.
   }
@@ -57,11 +93,16 @@ export function clearPageSessionState(pageKey: string): void {
   }
 }
 
-export function usePageSessionState<T>(pageKey: string, initialState: T) {
+export function usePageSessionState<T>(
+  pageKey: string,
+  initialState: T,
+  options: PageSessionStateOptions<T> = {},
+) {
   const key = (pageKey || 'page-session').trim();
+  const { version, validate } = options;
   const skipNextPersistRef = useRef(false);
   const [state, setState] = useState<T>(() =>
-    readPageSessionState<T>(key, initialState),
+    readPageSessionState<T>(key, initialState, options),
   );
 
   useEffect(() => {
@@ -70,8 +111,8 @@ export function usePageSessionState<T>(pageKey: string, initialState: T) {
       return;
     }
 
-    writePageSessionState(key, state);
-  }, [key, state]);
+    writePageSessionState(key, state, { version, validate });
+  }, [key, state, validate, version]);
 
   const resetState = () => {
     skipNextPersistRef.current = true;

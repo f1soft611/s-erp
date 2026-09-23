@@ -18,6 +18,25 @@ function SessionStateProbe() {
   );
 }
 
+function VersionedSessionStateProbe() {
+  const { state } = usePageSessionState(
+    'versioned-page',
+    { searchQuery: '' },
+    {
+      version: 2,
+      validate: (value): value is { searchQuery: string } =>
+        Boolean(
+          value &&
+          typeof value === 'object' &&
+          'searchQuery' in value &&
+          typeof value.searchQuery === 'string',
+        ),
+    },
+  );
+
+  return <output data-testid="versioned-state">{JSON.stringify(state)}</output>;
+}
+
 describe('page session state', () => {
   it('clears the persisted recent-menu state when reset', () => {
     window.sessionStorage.setItem(
@@ -36,5 +55,21 @@ describe('page session state', () => {
     expect(
       window.sessionStorage.getItem('s-erp:recent-menu-history'),
     ).toBeNull();
+  });
+
+  it('ignores invalid or stale persisted page state', () => {
+    window.sessionStorage.setItem(
+      'versioned-page',
+      JSON.stringify({ version: 1, value: { searchQuery: 'stale' } }),
+    );
+
+    render(<VersionedSessionStateProbe />);
+
+    expect(screen.getByTestId('versioned-state')).toHaveTextContent(
+      '{"searchQuery":""}',
+    );
+    expect(window.sessionStorage.getItem('versioned-page')).toBe(
+      JSON.stringify({ version: 2, value: { searchQuery: '' } }),
+    );
   });
 });

@@ -55,6 +55,10 @@ public class MyMenuApiController {
             response.getUser().setName(user.getName());
             response.getUser().setEmail(user.getEmail());
             response.getUser().setProfileImage(user.getProfileImage());
+            response.getUser().setDepartmentName(user.getDepartmentName());
+            response.getUser().setLevelId(user.getLevelId());
+            response.getUser().setLevelCode(user.getLevelCode());
+            response.getUser().setLevelName(user.getLevelName());
             response.getUser().setGroupName(user.getGroupNm());
             response.getUser().setRoleName(user.getRoleCode());
         }

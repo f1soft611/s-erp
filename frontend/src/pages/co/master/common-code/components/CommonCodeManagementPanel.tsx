@@ -49,6 +49,14 @@ type CommonCodeManagementPanelProps = {
   onError?: (message: string) => void;
   commonCodeGridKey?: number;
   groupsLoading?: boolean;
+  initialSelectedGroupId?: string;
+  onSelectedGroupChange?: (groupId: string) => void;
+  initialSelectedGroupRowIds?: string[];
+  initialSelectedItemRowIds?: string[];
+  onGroupRowSelectionChange?: (rowIds: Array<string | number>) => void;
+  onItemRowSelectionChange?: (rowIds: Array<string | number>) => void;
+  initialSplitterSize?: number;
+  onSplitterSizeChange?: (size: number) => void;
 };
 
 export type CommonCodeManagementPanelHandle = {
@@ -301,10 +309,20 @@ export const CommonCodeManagementPanel = forwardRef<
     onError,
     commonCodeGridKey = 0,
     groupsLoading = false,
+    initialSelectedGroupId = '',
+    onSelectedGroupChange,
+    initialSelectedGroupRowIds = [],
+    initialSelectedItemRowIds = [],
+    onGroupRowSelectionChange,
+    onItemRowSelectionChange,
+    initialSplitterSize = 600,
+    onSplitterSizeChange,
   },
   ref,
 ) {
-  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState(
+    initialSelectedGroupId,
+  );
   const [itemRows, setItemRows] = useState<CommonCodeItemRow[]>([]);
   const [itemLoading, setItemLoading] = useState(false);
   const [itemError, setItemError] = useState('');
@@ -328,10 +346,21 @@ export const CommonCodeManagementPanel = forwardRef<
   const selectedGroupIdRef = useRef(selectedGroupId);
   const itemGridDirtyRef = useRef(false);
   const saveInFlightRef = useRef<Promise<void> | undefined>(undefined);
+  const groupSelectionRestoredRef = useRef(false);
+  const itemSelectionRestoredRef = useRef(false);
+
+  useEffect(() => {
+    itemSelectionRestoredRef.current = false;
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    groupSelectionRestoredRef.current = false;
+  }, [commonCodeGridKey]);
 
   useEffect(() => {
     selectedGroupIdRef.current = selectedGroupId;
-  }, [selectedGroupId]);
+    onSelectedGroupChange?.(selectedGroupId);
+  }, [onSelectedGroupChange, selectedGroupId]);
 
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -343,6 +372,42 @@ export const CommonCodeManagementPanel = forwardRef<
         .includes(query),
     );
   }, [groups, searchQuery]);
+
+  useEffect(() => {
+    if (!groupSelectionRestoredRef.current) {
+      const selectedIds =
+        initialSelectedGroupRowIds.length > 0
+          ? initialSelectedGroupRowIds
+          : initialSelectedGroupId
+            ? [initialSelectedGroupId]
+            : [];
+      if (selectedIds.length === 0) {
+        groupSelectionRestoredRef.current = true;
+        return undefined;
+      }
+      const timerId = window.setTimeout(() => {
+        treeRef.current?.setSelectedRowIds(selectedIds);
+        groupSelectionRestoredRef.current = true;
+      }, 50);
+      return () => window.clearTimeout(timerId);
+    }
+    return undefined;
+  }, [filteredGroups, initialSelectedGroupId, initialSelectedGroupRowIds]);
+
+  useEffect(() => {
+    if (
+      !itemSelectionRestoredRef.current &&
+      !itemLoading &&
+      initialSelectedItemRowIds.length > 0
+    ) {
+      const timerId = window.setTimeout(() => {
+        gridRef.current?.setSelectedRowIds(initialSelectedItemRowIds);
+        itemSelectionRestoredRef.current = true;
+      }, 50);
+      return () => window.clearTimeout(timerId);
+    }
+    return undefined;
+  }, [initialSelectedItemRowIds, itemLoading, itemRows]);
 
   const loadItemRows = useCallback(
     async (groupId: string, options: { silent?: boolean } = {}) => {
@@ -394,6 +459,9 @@ export const CommonCodeManagementPanel = forwardRef<
   );
 
   useEffect(() => {
+    if (groupsLoading) {
+      return;
+    }
     if (!filteredGroups.length) {
       setSelectedGroupId('');
       return;
@@ -408,7 +476,7 @@ export const CommonCodeManagementPanel = forwardRef<
     ) {
       setSelectedGroupId(String(filteredGroups[0].id));
     }
-  }, [filteredGroups, selectedGroupId]);
+  }, [filteredGroups, groupsLoading, selectedGroupId]);
 
   const selectedGroup = filteredGroups.find(
     (group) => normalizeRowId(group.id) === normalizeRowId(selectedGroupId),
@@ -766,11 +834,10 @@ export const CommonCodeManagementPanel = forwardRef<
         direction="horizontal"
         mobileMode="stacked"
         mobileBreakpoint={768}
-        initialSize={600}
         minSize={400}
         maxSize={1000}
-        leftFlex={1}
-        rightFlex={2}
+        initialSize={initialSplitterSize}
+        onSizeChange={onSplitterSizeChange}
         ariaLabel="공통코드 트리와 상세영역 분리기"
       >
         <Card
@@ -821,6 +888,7 @@ export const CommonCodeManagementPanel = forwardRef<
                 parentKey="parentGroupId"
                 treeColumn="groupNm"
                 height="100%"
+                storageKey="menu-com-common-code-tree"
                 defaultExpandAll
                 showCheckbox={false}
                 createRow={createGroupRow}
@@ -833,7 +901,19 @@ export const CommonCodeManagementPanel = forwardRef<
                   selectedGroup && isGroupDeleteDisabled(selectedGroup),
                 )}
                 ariaLabel="공통코드 그룹 트리"
-                onSelectionChange={handleGroupSelection}
+                initialSelectedRowIds={
+                  initialSelectedGroupRowIds.length > 0
+                    ? initialSelectedGroupRowIds
+                    : initialSelectedGroupId
+                      ? [initialSelectedGroupId]
+                      : []
+                }
+                onSelectionChange={(rowIds) => {
+                  handleGroupSelection(rowIds);
+                  if (groupSelectionRestoredRef.current && rowIds.length > 0) {
+                    onGroupRowSelectionChange?.(rowIds);
+                  }
+                }}
                 onChangesChange={handleGroupGridChanges}
                 isDeleteDisabled={isGroupDeleteDisabled}
                 onDeleteBlocked={(blockedIds) => {
@@ -917,14 +997,21 @@ export const CommonCodeManagementPanel = forwardRef<
                   rowKey="id"
                   ariaLabel="공통코드 상세코드"
                   height="100%"
+                  storageKey="menu-com-common-code-grid"
                   canExportExcel={canExportExcel}
                   showCheckbox={false}
                   createRow={() => createItemRow(selectedGroupId)}
+                  initialSelectedRowIds={initialSelectedItemRowIds}
                   loading={itemLoading}
                   allowAddRowInContextMenu={true}
                   allowDeleteRowInContextMenu={true}
                   allowDuplicateRowInContextMenu={false}
                   onChangesChange={handleItemGridChanges}
+                  onSelectionChange={(rowIds) => {
+                    if (itemSelectionRestoredRef.current) {
+                      onItemRowSelectionChange?.(rowIds);
+                    }
+                  }}
                 />
               )}
             </Box>

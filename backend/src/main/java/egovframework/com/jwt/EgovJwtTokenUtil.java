@@ -83,6 +83,10 @@ public class EgovJwtTokenUtil implements Serializable{
         claims.put("name", loginVO.getName() );
 		claims.put("email", loginVO.getEmail() );
 		claims.put("profileImage", loginVO.getProfileImage() );
+		claims.put("departmentName", loginVO.getDepartmentName() );
+		claims.put("levelId", loginVO.getLevelId() );
+		claims.put("levelCode", loginVO.getLevelCode() );
+		claims.put("levelName", loginVO.getLevelName() );
         claims.put("userSe", loginVO.getUserSe() );
         claims.put("orgnztId", loginVO.getOrgnztId() );
         claims.put("uniqId", loginVO.getUniqId() );
@@ -107,6 +111,10 @@ public class EgovJwtTokenUtil implements Serializable{
         claims.put("name", loginVO.getName() );
 		claims.put("email", loginVO.getEmail() );
 		claims.put("profileImage", loginVO.getProfileImage() );
+		claims.put("departmentName", loginVO.getDepartmentName() );
+		claims.put("levelId", loginVO.getLevelId() );
+		claims.put("levelCode", loginVO.getLevelCode() );
+		claims.put("levelName", loginVO.getLevelName() );
         claims.put("userSe", loginVO.getUserSe() );
         claims.put("orgnztId", loginVO.getOrgnztId() );
         claims.put("uniqId", loginVO.getUniqId() );
@@ -131,6 +139,18 @@ public class EgovJwtTokenUtil implements Serializable{
 			loginVO.setName(getInfoFromToken("name", token));
 			loginVO.setEmail(getInfoFromToken("email", token));
 			loginVO.setProfileImage(getInfoFromToken("profileImage", token));
+			loginVO.setDepartmentName(getInfoFromToken("departmentName", token));
+			loginVO.setLevelCode(getInfoFromToken("levelCode", token));
+			loginVO.setLevelName(getInfoFromToken("levelName", token));
+			Object levelIdValue = getClaimFromToken(token).get("levelId");
+			if (levelIdValue instanceof Number) {
+				loginVO.setLevelId(((Number) levelIdValue).longValue());
+			} else if (levelIdValue instanceof String) {
+				String levelIdText = ((String) levelIdValue).trim();
+				if (!levelIdText.isEmpty()) {
+					loginVO.setLevelId(Long.valueOf(levelIdText));
+				}
+			}
 			loginVO.setUserSe(getUserSeFromToken(token));
 			loginVO.setOrgnztId(getInfoFromToken("orgnztId", token));
 			loginVO.setUniqId(getInfoFromToken("uniqId", token));

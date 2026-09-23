@@ -152,6 +152,7 @@ function F1GridInner<T extends object>(
     afterEdit,
     onChangesChange,
     onSelectionChange,
+    initialSelectedRowIds,
     rowProjection,
     cellAdornment,
     disableSorting = false,
@@ -187,6 +188,7 @@ function F1GridInner<T extends object>(
   };
   const onChangesChangeRef = useRef(onChangesChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const restoredSelectionKeyRef = useRef<string | undefined>(undefined);
   const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
@@ -1105,6 +1107,25 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     onSelectionChangeRef.current?.(selectedIds);
   }, [selectedIds]);
+
+  useEffect(() => {
+    if (!initialSelectedRowIds || initialSelectedRowIds.length === 0) return;
+    const selectionKey = initialSelectedRowIds.map(String).join('|');
+    if (restoredSelectionKeyRef.current === selectionKey) return;
+    const selectedKeys = new Set(
+      initialSelectedRowIds.map((rowId) => String(rowId)),
+    );
+    const nextIds = visibleRowIds.filter((rowId) =>
+      selectedKeys.has(String(rowId)),
+    );
+    if (nextIds.length === 0) return;
+    setRowSelection({
+      allSelected: false,
+      includedIds: new Set(nextIds),
+      excludedIds: new Set(),
+    });
+    restoredSelectionKeyRef.current = selectionKey;
+  }, [initialSelectedRowIds, visibleRowIds]);
 
   useEffect(() => {
     cellSelectionRef.current = cellSelection;
@@ -2222,6 +2243,16 @@ function F1GridInner<T extends object>(
     },
     clearSelection() {
       setRowSelection(createGridRowSelection());
+    },
+    setSelectedRowIds(rowIds) {
+      const selectedKeys = new Set(rowIds.map((rowId) => String(rowId)));
+      setRowSelection({
+        allSelected: false,
+        includedIds: new Set(
+          visibleRowIds.filter((rowId) => selectedKeys.has(String(rowId))),
+        ),
+        excludedIds: new Set(),
+      });
     },
     addRow(row?: Partial<T>) {
       handleAddRow(row);

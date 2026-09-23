@@ -13,6 +13,10 @@
         <result property="stampImage" column="stampImage"/>
         <result property="ihidNum" column="ihidNum"/>
         <result property="email" column="email"/>
+        <result property="departmentName" column="departmentName"/>
+        <result property="levelId" column="levelId"/>
+        <result property="levelCode" column="levelCode"/>
+        <result property="levelName" column="levelName"/>
         <result property="password" column="password"/>
         <result property="userSe" column="userSe"/>
         <result property="orgnztId" column="orgnztId"/>
@@ -45,6 +49,10 @@
             li.password_hash AS password,
             NULL AS ihidNum,
             u.email_addr AS email,
+            d.department_nm AS departmentName,
+            u.level_id AS levelId,
+            lvl.item_code AS levelCode,
+            lvl.item_nm AS levelName,
             CASE
                 WHEN sr.role_code = 'PLATFORM_ADMIN' THEN 'ADM'
                 ELSE 'USR'
@@ -90,6 +98,16 @@
         ) sr ON TRUE
         LEFT JOIN tb_department d
           ON d.department_id = u.department_id
+         AND d.tenant_id = li.tenant_id
+        LEFT JOIN tb_common_code_group lg
+          ON lg.tenant_id = li.tenant_id
+         AND lg.group_code = 'LEVEL'
+         AND COALESCE(lg.use_at, 'Y') = 'Y'
+        LEFT JOIN tb_common_code_item lvl
+          ON lvl.common_code_item_id = u.level_id
+         AND lvl.group_id = lg.common_code_group_id
+         AND lvl.tenant_id = li.tenant_id
+         AND COALESCE(lvl.use_at, 'Y') = 'Y'
         WHERE (li.login_code = #{id} OR u.email_addr = #{id})
           AND li.password_hash = #{password}
         <if test="tenantId != null">

@@ -78,6 +78,18 @@ public class LoginVO implements Serializable{
 	
 	@Schema(description = "조직(부서)명")
 	private String orgnztNm;
+
+	@Schema(description = "부서명")
+	private String departmentName;
+
+	@Schema(description = "직급 ID")
+	private Long levelId;
+
+	@Schema(description = "직급 코드")
+	private String levelCode;
+
+	@Schema(description = "직급명")
+	private String levelName;
 	
 	@Schema(description = "고유아이디")
 	private String uniqId;

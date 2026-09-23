@@ -35,6 +35,10 @@ export type UserMenuResponse = {
     name?: string | null;
     email?: string | null;
     profileImage?: string | null;
+    departmentName?: string | null;
+    levelId?: number | null;
+    levelCode?: string | null;
+    levelName?: string | null;
     groupName?: string | null;
     roleName?: string | null;
   };

@@ -17,6 +17,7 @@ type SplitterProps = {
   mobileMode?: SplitterMode;
   mobileBreakpoint?: number;
   initialSize?: number;
+  onSizeChange?: (size: number) => void;
   minSize?: number;
   maxSize?: number;
   handleSize?: number;
@@ -33,6 +34,7 @@ export function Splitter({
   mobileMode = 'split',
   mobileBreakpoint = 768,
   initialSize = 320,
+  onSizeChange,
   minSize = 180,
   maxSize,
   handleSize = 10,
@@ -152,7 +154,9 @@ export function Splitter({
         return;
       }
 
-      setSize(clampSize(dragRef.current.startSize + delta));
+      const nextSize = clampSize(dragRef.current.startSize + delta);
+      setSize(nextSize);
+      onSizeChange?.(nextSize);
     };
 
     const handlePointerUp = () => {
@@ -176,6 +180,7 @@ export function Splitter({
     leftRatio,
     maxSize,
     minSize,
+    onSizeChange,
     resolvedDirection,
     resolvedMode,
     rightRatio,

@@ -332,6 +332,40 @@ describe('CommonCode management page', () => {
     expect(separator).toHaveAttribute('tabindex', '0');
   });
 
+  it('reports the dragged split size for session persistence', () => {
+    const onSizeChange = vi.fn();
+    render(
+      <Splitter
+        direction="horizontal"
+        initialSize={320}
+        minSize={200}
+        maxSize={420}
+        onSizeChange={onSizeChange}
+        ariaLabel="공통코드 트리와 상세영역 분리기"
+      >
+        <div style={{ width: '100%', height: '100%' }}>left</div>
+        <div style={{ width: '100%', height: '100%' }}>right</div>
+      </Splitter>,
+    );
+
+    const root = screen.getByRole('separator', {
+      name: '공통코드 트리와 상세영역 분리기',
+    }).parentElement as HTMLElement;
+    Object.defineProperty(root, 'clientWidth', {
+      configurable: true,
+      value: 1000,
+    });
+    const separator = screen.getByRole('separator', {
+      name: '공통코드 트리와 상세영역 분리기',
+    });
+
+    fireEvent.pointerDown(separator, { clientX: 320 });
+    fireEvent.pointerMove(window, { clientX: 380 });
+    fireEvent.pointerUp(window);
+
+    expect(onSizeChange).toHaveBeenCalledWith(380);
+  });
+
   it('switches to a stacked mobile layout and hides the separator on narrow widths', () => {
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,

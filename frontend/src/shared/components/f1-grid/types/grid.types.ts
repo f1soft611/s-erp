@@ -240,6 +240,7 @@ export type F1GridProps<T extends object> = {
   afterEdit?: F1GridEditLifecycle<T>;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
   onSelectionChange?: (rowIds: F1GridRowId[]) => void;
+  initialSelectedRowIds?: F1GridRowId[];
   rowProjection?: (rows: T[]) => F1GridRowProjection<T>;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   disableSorting?: boolean;
@@ -259,6 +260,7 @@ export type F1GridRef<T extends object> = {
   getSelectedRows(): T[];
   getSelectedRowIds(): F1GridRowId[];
   clearSelection(): void;
+  setSelectedRowIds(rowIds: F1GridRowId[]): void;
   addRow(row?: Partial<T>): void;
   deleteSelectedRows(): void;
   restoreDeletedRows(): void;

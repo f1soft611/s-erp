@@ -11,6 +11,15 @@ export const emptyUserMenuResponse: UserMenuResponse = {
   user: {
     userId: '',
     roles: [],
+    name: null,
+    email: null,
+    profileImage: null,
+    departmentName: null,
+    levelId: null,
+    levelCode: null,
+    levelName: null,
+    groupName: null,
+    roleName: null,
   },
   menus: [],
 };
