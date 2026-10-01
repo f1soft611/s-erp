@@ -10,10 +10,12 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  CircularProgress,
   Stack,
   Tooltip,
   Typography,
 } from '@mui/material';
+import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
 import {
   F1Grid,
   type F1GridChanges,
@@ -79,6 +81,7 @@ export function CommonCodeItemHelpDialog({
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   const columns = useMemo<F1GridColumn<CommonCodeItemRow>[]>(() => {
     return [
@@ -121,6 +124,7 @@ export function CommonCodeItemHelpDialog({
         headerName: '사용여부',
         width: 80,
         type: 'select',
+        align: 'center',
         options: [
           { value: 'Y', label: '사용' },
           { value: 'N', label: '미사용' },
@@ -137,17 +141,6 @@ export function CommonCodeItemHelpDialog({
       },
     ];
   }, [canEdit]);
-
-  const rowFormPlugin = useMemo(
-    () =>
-      canEdit
-        ? {
-            getTitle: ({ mode }: { mode: 'create' | 'edit' }) =>
-              mode === 'create' ? '분류 추가' : '분류 수정',
-          }
-        : undefined,
-    [canEdit],
-  );
 
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<CommonCodeItemRow>) => {
@@ -190,17 +183,41 @@ export function CommonCodeItemHelpDialog({
     gridRef.current?.addRow();
   };
 
+  const requestClose = () => {
+    if (saving) return;
+    if (hasChanges) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    onClose();
+  };
+
+  const cancelClose = () => setCloseConfirmOpen(false);
+
+  const discardAndClose = () => {
+    setCloseConfirmOpen(false);
+    setHasChanges(false);
+    setGridKey((current) => current + 1);
+    onClose();
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
       fullWidth
       maxWidth="md"
       aria-labelledby="draft-form-category-dialog-title"
       fullScreen={typeof window !== 'undefined' && window.innerWidth < 600}
       slotProps={{
         paper: {
-          sx: { display: 'flex', flexDirection: 'column', minHeight: 0 },
+          sx: {
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            height: { xs: '100%', sm: '60vh' },
+            maxHeight: { xs: '100%', sm: '85vh' },
+          },
         },
       }}
     >
@@ -226,8 +243,9 @@ export function CommonCodeItemHelpDialog({
           <IconButton
             aria-label="분류 설정 닫기"
             edge="end"
-            onClick={onClose}
+            onClick={requestClose}
             size="small"
+            disabled={saving}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
@@ -237,7 +255,7 @@ export function CommonCodeItemHelpDialog({
         dividers
         sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
       >
-        <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0 }}>
+        <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
           {error && <Alert severity="error">{error}</Alert>}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
             {canEdit && (
@@ -250,7 +268,15 @@ export function CommonCodeItemHelpDialog({
               </Button>
             )}
           </Box>
-          <Box sx={{ flex: 1, minHeight: 220, minWidth: 0 }}>
+          <Box
+            sx={{
+              flex: 1,
+              height: '100%',
+              minHeight: 0,
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
             <F1Grid
               key={gridKey}
               ref={gridRef}
@@ -258,7 +284,6 @@ export function CommonCodeItemHelpDialog({
               rows={items}
               columns={columns}
               rowKey="id"
-              //   rowFormPlugin={rowFormPlugin}
               showCheckbox={false}
               createRow={() => createItemRow(groupId)}
               createDuplicate={(row) => ({
@@ -269,8 +294,6 @@ export function CommonCodeItemHelpDialog({
               })}
               onChangesChange={handleChangesChange}
               height="100%"
-              loading={saving}
-              //   allowAddRowInContextMenu={canEdit && Boolean(groupId)}
               allowDuplicateRowInContextMenu={canEdit}
               allowDeleteRowInContextMenu={false}
             />
@@ -291,16 +314,30 @@ export function CommonCodeItemHelpDialog({
         {canEdit && (
           <Button
             variant="contained"
+            startIcon={
+              saving ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : undefined
+            }
             disabled={!hasChanges || saving}
             onClick={() => void handleSave()}
           >
             저장
           </Button>
         )}
-        <Button onClick={onClose} disabled={saving}>
+        <Button onClick={requestClose} disabled={saving}>
           취소
         </Button>
       </DialogActions>
+      <UnsavedChangesConfirmDialog
+        open={closeConfirmOpen}
+        title="저장하지 않은 변경사항"
+        description="분류 변경사항을 버리고 설정 창을 닫으시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={cancelClose}
+        onContinue={discardAndClose}
+      />
     </Dialog>
   );
 }

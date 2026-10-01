@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { Dialog } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -135,6 +136,31 @@ describe('F1-GRID default prop behavior', () => {
       'true',
     );
     expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
+  it('commits an edited cell when focus moves inside its parent dialog', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+
+    render(
+      <Dialog open>
+        <F1Grid
+          ref={gridRef}
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="dialog grid"
+        />
+      </Dialog>,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'DASH' }));
+    const editor = screen.getByDisplayValue('DASH');
+    fireEvent.change(editor, { target: { value: 'DASH-UPDATED' } });
+    fireEvent.click(screen.getByRole('gridcell', { name: 'SET' }));
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'dashboard', code: 'DASH-UPDATED' }),
+    ]);
   });
 
   it('allows disabling column lines and row striping explicitly', () => {

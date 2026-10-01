@@ -28,6 +28,7 @@ function renderDialog(
   const onCreateItem = vi.fn().mockResolvedValue({});
   const onUpdateItem = vi.fn().mockResolvedValue({});
   const onReload = vi.fn().mockResolvedValue(undefined);
+  const onClose = vi.fn();
   render(
     <ThemeProvider theme={createTheme()}>
       <CommonCodeItemHelpDialog
@@ -35,7 +36,7 @@ function renderDialog(
         groupId="11"
         items={[item]}
         canEdit
-        onClose={vi.fn()}
+        onClose={onClose}
         onCreateItem={onCreateItem}
         onUpdateItem={onUpdateItem}
         onReload={onReload}
@@ -43,7 +44,22 @@ function renderDialog(
       />
     </ThemeProvider>,
   );
-  return { onCreateItem, onUpdateItem, onReload };
+  return { onClose, onCreateItem, onUpdateItem, onReload };
+}
+
+async function editCell(cell: HTMLElement, value: string) {
+  const currentValue = cell.textContent?.trim() ?? '';
+  fireEvent.doubleClick(cell);
+  const editor = await screen.findByDisplayValue(currentValue);
+  fireEvent.change(editor, { target: { value } });
+  fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+}
+
+function getLastGridRow() {
+  const rows = within(
+    screen.getByRole('grid', { name: '기안양식 분류 목록' }),
+  ).getAllByRole('row');
+  return rows[rows.length - 1];
 }
 
 describe('CommonCodeItemHelpDialog', () => {
@@ -61,7 +77,7 @@ describe('CommonCodeItemHelpDialog', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps F1-Grid add and copy actions but hides row deletion', async () => {
+  it('keeps context-menu add and copy but hides row deletion', async () => {
     renderDialog();
 
     await screen.findByRole('dialog', { name: '기안양식 분류 설정' });
@@ -74,7 +90,53 @@ describe('CommonCodeItemHelpDialog', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('uses the F1-Grid form modal and keeps dialog actions and close control visible', async () => {
+  it('confirms dirty close and supports canceling or discarding the edits', async () => {
+    const { onClose } = renderDialog();
+    const categoryDialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '점검' }));
+    const editor = await screen.findByDisplayValue('점검');
+    fireEvent.change(editor, { target: { value: '정기점검' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(
+      within(categoryDialog).getByRole('button', { name: '취소' }),
+    );
+
+    const confirmation = await screen.findByRole('dialog', {
+      name: '저장하지 않은 변경사항',
+    });
+    expect(confirmation).toHaveTextContent(
+      '분류 변경사항을 버리고 설정 창을 닫으시겠습니까?',
+    );
+    fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+
+    expect(categoryDialog).toBeInTheDocument();
+    expect(
+      await screen.findByRole('gridcell', { name: '정기점검' }),
+    ).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(categoryDialog).getByRole('button', { name: '분류 설정 닫기' }),
+    );
+    const discardConfirmation = await screen.findByRole('dialog', {
+      name: '저장하지 않은 변경사항',
+    });
+    fireEvent.click(
+      within(discardConfirmation).getByRole('button', { name: '계속' }),
+    );
+
+    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('adds rows inline and keeps dialog actions and close control visible', async () => {
     renderDialog();
 
     const dialog = await screen.findByRole('dialog', {
@@ -96,25 +158,60 @@ describe('CommonCodeItemHelpDialog', () => {
       screen.queryByRole('textbox', { name: '상세코드' }),
     ).not.toBeInTheDocument();
 
+    const grid = within(dialog).getByRole('grid', {
+      name: '기안양식 분류 목록',
+    });
+    const initialRowCount = within(grid).getAllByRole('row').length;
     fireEvent.click(within(dialog).getByRole('button', { name: '분류 추가' }));
 
+    expect(within(grid).getAllByRole('row')).toHaveLength(initialRowCount + 1);
     expect(
-      await screen.findByRole('textbox', { name: '상세코드' }),
+      screen.queryByRole('dialog', { name: '분류 추가' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a quiet save indicator without covering the grid', async () => {
+    let resolveUpdate: (() => void) | undefined;
+    const updatePromise = new Promise<void>((resolve) => {
+      resolveUpdate = resolve;
+    });
+    const onUpdateItem = vi.fn(() => updatePromise);
+    const { onReload } = renderDialog({ onUpdateItem });
+    const categoryDialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+
+    await editCell(screen.getByRole('gridcell', { name: '점검' }), '정기점검');
+    const saveButton = within(categoryDialog).getByRole('button', {
+      name: '저장',
+    });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(onUpdateItem).toHaveBeenCalledOnce());
+    expect(saveButton).toBeDisabled();
+    expect(within(saveButton).getByRole('progressbar')).toBeVisible();
+    expect(
+      screen.queryByTestId('f1-grid-loading-overlay'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(categoryDialog).getByRole('grid', { name: '기안양식 분류 목록' }),
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: '적용' })).toBeVisible();
+
+    resolveUpdate?.();
+    await waitFor(() => expect(onReload).toHaveBeenCalledOnce());
   });
 
   it('creates a classification item and reloads the list after save', async () => {
     const { onCreateItem, onReload } = renderDialog();
 
     fireEvent.click(await screen.findByRole('button', { name: '분류 추가' }));
-    fireEvent.change(screen.getByRole('textbox', { name: '상세코드' }), {
-      target: { value: 'SAFETY' },
-    });
-    fireEvent.change(screen.getByRole('textbox', { name: '상세코드명' }), {
-      target: { value: '안전점검' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    const insertedRow = getLastGridRow();
+    const insertedCells = within(insertedRow).getAllByRole('gridcell');
+    await editCell(insertedCells[1], 'SAFETY');
+    await editCell(
+      within(getLastGridRow()).getAllByRole('gridcell')[2],
+      '안전점검',
+    );
     fireEvent.click(
       within(
         screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
@@ -136,13 +233,10 @@ describe('CommonCodeItemHelpDialog', () => {
   it('updates an existing classification item and reloads the list', async () => {
     const { onUpdateItem, onReload } = renderDialog();
 
-    fireEvent.click(
-      await screen.findByRole('button', { name: '101 행 정보 수정' }),
+    await editCell(
+      await screen.findByRole('gridcell', { name: '점검' }),
+      '정기점검',
     );
-    fireEvent.change(screen.getByRole('textbox', { name: '상세코드명' }), {
-      target: { value: '정기점검' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '적용' }));
     fireEvent.click(
       within(
         screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
@@ -160,6 +254,29 @@ describe('CommonCodeItemHelpDialog', () => {
     expect(onReload).toHaveBeenCalledOnce();
   });
 
+  it('marks an inline edit dirty when focus moves to another grid cell', async () => {
+    const { onUpdateItem } = renderDialog();
+    const categoryDialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '점검' }));
+    const editor = await screen.findByDisplayValue('점검');
+    fireEvent.change(editor, { target: { value: '정기점검' } });
+    fireEvent.click(screen.getByRole('gridcell', { name: 'INSPECTION' }));
+
+    const saveButton = within(categoryDialog).getByRole('button', {
+      name: '저장',
+    });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    expect(
+      await screen.findByRole('gridcell', { name: '정기점검' }),
+    ).toHaveAttribute('data-dirty-cell', 'true');
+
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onUpdateItem).toHaveBeenCalledOnce());
+  });
+
   it('duplicates a row through the F1-Grid context menu and saves the new item', async () => {
     const { onCreateItem, onReload } = renderDialog();
 
@@ -173,26 +290,14 @@ describe('CommonCodeItemHelpDialog', () => {
     });
     const copiedRow = copiedCell.closest('[role="row"]');
     expect(copiedRow).not.toBeNull();
-    fireEvent.click(
-      within(copiedRow as HTMLElement).getByRole('button', {
-        name: /행 정보 수정/,
-      }),
+    const copiedCells = within(copiedRow as HTMLElement).getAllByRole(
+      'gridcell',
     );
-
-    const formDialog = await screen.findByRole('dialog', { name: '분류 수정' });
-    fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '상세코드' }),
-      {
-        target: { value: 'SAFETY' },
-      },
+    await editCell(copiedCells[1], 'SAFETY');
+    await editCell(
+      await screen.findByRole('gridcell', { name: '점검 복사' }),
+      '안전점검',
     );
-    fireEvent.change(
-      within(formDialog).getByRole('textbox', { name: '상세코드명' }),
-      {
-        target: { value: '안전점검' },
-      },
-    );
-    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
     fireEvent.click(
       within(
         screen.getByRole('dialog', { name: '기안양식 분류 설정' }),

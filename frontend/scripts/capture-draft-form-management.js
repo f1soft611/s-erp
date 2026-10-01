@@ -4,8 +4,11 @@ import { chromium } from 'playwright';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:4174';
 const screenshotDir = path.resolve(
-  import.meta.dirname,
-  '../../docs/result/20261001/drafting-work-form-management/screenshots',
+  process.env.SCREENSHOT_DIR ??
+    path.resolve(
+      import.meta.dirname,
+      '../../docs/result/20261001/drafting-work-form-management/screenshots',
+    ),
 );
 const screenshotWidths = [375, 768, 1280];
 const corsHeaders = {
@@ -21,6 +24,15 @@ const browser = await chromium.launch({
   args: ['--disable-web-security'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const duplicateKeyWarnings = [];
+page.on('console', (message) => {
+  if (
+    (message.type() === 'warning' || message.type() === 'error') &&
+    message.text().includes('Encountered two children with the same key')
+  ) {
+    duplicateKeyWarnings.push(message.text());
+  }
+});
 const now = new Date();
 const session = {
   tenantCode: 'VISUAL_TEST',
@@ -120,24 +132,19 @@ await page.route('http://localhost:8080/**', async (route) => {
     };
   } else if (pathname === '/api/v1/co/master/common-code/groups/11/items') {
     result = {
-      resultList: [
-        {
-          commonCodeItemId: 101,
-          groupId: 11,
-          itemCode: 'INSPECTION',
-          itemNm: '점검',
-          sortOrder: 10,
-          useAt: 'Y',
-        },
-        {
-          commonCodeItemId: 102,
-          groupId: 11,
-          itemCode: 'SAFETY',
-          itemNm: '안전',
-          sortOrder: 20,
-          useAt: 'Y',
-        },
-      ],
+      resultList: Array.from({ length: 36 }, (_, index) => ({
+        commonCodeItemId: 101 + index,
+        groupId: 11,
+        itemCode: `CATEGORY_${index + 1}`,
+        itemNm:
+          index === 0
+            ? '점검'
+            : index === 1
+              ? '안전'
+              : `분류 ${String(index + 1).padStart(2, '0')}`,
+        sortOrder: (index + 1) * 10,
+        useAt: 'Y',
+      })),
     };
   } else if (pathname === '/api/v1/co/master/common-code/groups/12/items') {
     result = {
@@ -238,14 +245,28 @@ const measurements = [];
 for (const width of screenshotWidths) {
   await page.setViewportSize({ width, height: 900 });
   await page.waitForTimeout(200);
-  const metrics = await page.evaluate(() => ({
-    viewportWidth: window.innerWidth,
-    documentScrollWidth: document.documentElement.scrollWidth,
-    bodyScrollWidth: document.body.scrollWidth,
-  }));
+  const metrics = await page.evaluate(() => {
+    const grid = document.querySelector(
+      '[role="grid"][aria-label="기안양식 목록"]',
+    );
+    const gridContainer = grid?.parentElement;
+    return {
+      viewportWidth: window.innerWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      gridContainerPaddingTop: gridContainer
+        ? getComputedStyle(gridContainer).paddingTop
+        : null,
+    };
+  });
   if (metrics.documentScrollWidth > width || metrics.bodyScrollWidth > width) {
     throw new Error(
       `Unexpected page overflow at ${width}px: ${JSON.stringify(metrics)}`,
+    );
+  }
+  if (metrics.gridContainerPaddingTop !== '8px') {
+    throw new Error(
+      `Unexpected Grid top padding at ${width}px: ${JSON.stringify(metrics)}`,
     );
   }
   measurements.push(metrics);
@@ -287,6 +308,17 @@ await page.getByRole('button', { name: '분류 설정' }).click();
 const categoryDialog = page.getByRole('dialog', { name: '기안양식 분류 설정' });
 await categoryDialog.waitFor();
 await categoryDialog.getByText('안전', { exact: true }).waitFor();
+const categoryGridBody = categoryDialog.getByTestId('f1-grid-body-scroll');
+const categoryGridScroll = await categoryGridBody.evaluate((element) => ({
+  clientHeight: element.clientHeight,
+  scrollHeight: element.scrollHeight,
+  overflowY: getComputedStyle(element).overflowY,
+}));
+if (categoryGridScroll.scrollHeight <= categoryGridScroll.clientHeight) {
+  throw new Error(
+    `Expected category Grid body to scroll: ${JSON.stringify(categoryGridScroll)}`,
+  );
+}
 await page.screenshot({
   path: path.join(screenshotDir, '1280px-category-dialog.png'),
   fullPage: false,
@@ -306,15 +338,37 @@ if (!isMobileDialogFullScreen) {
     'Classification help dialog did not become full-screen at 375px.',
   );
 }
+const mobileCategoryGridScroll = await mobileCategoryDialog
+  .getByTestId('f1-grid-body-scroll')
+  .evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+  }));
+if (
+  mobileCategoryGridScroll.scrollHeight <= mobileCategoryGridScroll.clientHeight
+) {
+  throw new Error(
+    `Expected mobile category Grid body to scroll: ${JSON.stringify(mobileCategoryGridScroll)}`,
+  );
+}
 await page.screenshot({
   path: path.join(screenshotDir, '375px-category-dialog.png'),
   fullPage: false,
 });
 
+if (duplicateKeyWarnings.length > 0) {
+  throw new Error(
+    `F1-Grid duplicate React keys detected: ${duplicateKeyWarnings[0]}`,
+  );
+}
+
 console.log(
   JSON.stringify(
     {
       measurements,
+      categoryGridScroll,
+      mobileCategoryGridScroll,
       isMobileWorkFormFullScreen,
       isMobileDialogFullScreen,
       screenshots: screenshotDir,

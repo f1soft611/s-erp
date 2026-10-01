@@ -204,11 +204,11 @@ const GridCellInner = <T extends object>({
       ) {
         return;
       }
-      const hasOpenEditorPopup = Boolean(
-        document.querySelector(
+      const hasOpenEditorPopup = Array.from(
+        document.querySelectorAll(
           '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
         ),
-      );
+      ).some((popup) => !popup.contains(event.currentTarget));
       if (hasOpenEditorPopup) return;
       onBlur?.();
     },

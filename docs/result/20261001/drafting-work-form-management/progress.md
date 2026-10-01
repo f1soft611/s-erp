@@ -38,3 +38,41 @@
 - migration SQL은 초안이며 실행하지 않았다. DB-backed mapper 통합 검증은 source tables 배포 후 수행해야 한다.
 - 기존 `20261001_002` 변경 및 무관한 `20260915` SQL 사용자 수정은 보존했다.
 - 결과 스크린샷은 `screenshots/`에 저장했다. 전체 변경 및 검증 상세는 [결과 보고서](./result.md)를 참조한다.
+
+## 후속 화면 보정 작업 (20261001_003)
+
+### 승인 및 실행 방식
+
+- 작업지시서: [20261001_003 작업지시서](../../../../directions/20261001/20261001_003_전자결재_기안양식관리_화면보정_작업지시서.md) (수정 요구 포함 사용자 승인 완료, 2026-10-01)
+- 계획서: [20261001_003 계획서](../../../../plan/20261001/20261001_003_전자결재_기안양식관리_화면보정_계획서.md) (사용자 승인 완료, 2026-10-01)
+- 상세 사양서: [20261001_003 상세 사양서](../../../../spec/20261001/20261001_003_전자결재_기안양식관리_화면보정_사양서.md) (사용자 승인 완료, 2026-10-01)
+- 브랜치: `socra710`; 사용자가 현재 브랜치 진행을 선택함; Worktree 미생성
+- 실행 전략: Inline Execution
+- 승인 범위: 분류 모달 그리드/dirty 저장/이탈 확인, 기안양식 select label/dirty 처리, 조회 dirty 확인, 미선택 결재자 표시, 상단 간격, F1-Grid 문서 및 결과 증거
+- DB/API/백엔드 영향: 없음; `category_item_id` 공통코드 계약 유지
+- 커밋: 별도 요청이 없어 생성하지 않음
+
+### 태스크 상태
+
+- [x] 저장된 select의 label/null 표시, 셀·row-form 미변경 시 dirty 없음 회귀 테스트 및 수정
+- [x] 기본 조회·상세검색 dirty 확인, 취소 시 유지/API 미호출, 계속 시 보류 조회 회귀 테스트 및 구현
+- [x] 분류 모달 inline 추가/수정, dirty 닫기 취소/폐기, 조용한 저장 표시 구현 및 focused tests
+- [x] 분류 모달 Grid 내부 스크롤 및 가용 높이를 브라우저로 검증
+- [x] 모듈관리 기준 상단 간격 브라우저 검증 및 F1-Grid 문서 갱신
+- [x] focused suites/build/375·768·1280px 브라우저 검증과 결과 보고서 갱신
+
+### 검증 및 리뷰
+
+- 계획된 focused 명령: `npm run test -- tests/common-code-item-help-dialog.test.tsx tests/draft-form-management.test.tsx tests/module-management-page.test.tsx`
+- 계획된 빌드: `npm run build`
+- 초기 기준선: 기존 20261001_001 원장의 프론트엔드 전체 테스트/빌드 결과를 참조. 이번 코드 변경 전 새 실행은 아직 없음.
+- 현재 RED/GREEN 증거: dirty 조회 확인은 구현 전 확인창 부재로 실패 후 기본/상세검색 cancel/continue targeted 테스트 통과; 분류 dirty 닫기는 구현 전 확인창 부재로 실패 후 취소/X continue targeted 테스트 통과; select label/null 및 no-op cell/row-form 테스트 통과; quiet save indicator targeted test 통과; 분류 도움창 전체 8/8 통과
+- 알려진 테스트 실패: `draft-form-management.test.tsx`의 기존 `soft-disables a deleted Grid row by saving useAt N`가 구현 전·후 모두 컨텍스트 메뉴의 행 삭제 항목을 찾지 못함. 이번 변경 범위 밖이며 원인 수정은 하지 않음.
+- 최종 focused tests: 3 files, 27 passed, 1 pre-existing unrelated test skipped. 전체 focused run에서는 그 실패를 확인했으며 이 작업에서 제외했다.
+- 최종 `npm run build`: 성공, Vite 1498 modules transformed.
+- 브라우저: 기존 서버 포트 4173/4174/4175/4181을 정리한 후 Vite 4173 하나만 사용. fixture 기반 실제 메뉴 진입 및 캡처 성공.
+- 뷰포트: 375/768/1280px document/body scrollWidth가 각 viewport와 동일; Grid top padding 각 8px.
+- 분류 모달 내부 스크롤: desktop clientHeight 501px / scrollHeight 1152px, mobile 603px / 1152px, `overflowY=auto`; 375px 메인/도움창 full-screen.
+- 스크린샷: [ui-polish-20261001](./screenshots/ui-polish-20261001/) 아래 목록, 기안양식 폼, 분류 도움창 375/768/1280px 캡처.
+- 자체 리뷰: 사양 준수 확인, API/DB/F1-Grid core 변경 없음 및 확인창 상태 흐름 확인.
+- 독립 리뷰: 미수행. Inline Execution 및 현재 실행 제약에서 별도 리뷰어를 위임하지 않았으므로 독립 코드 품질 리뷰는 완료로 주장하지 않음.

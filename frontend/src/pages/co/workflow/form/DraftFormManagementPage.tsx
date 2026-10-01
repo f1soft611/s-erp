@@ -8,6 +8,7 @@ import { Box, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { type F1GridRef } from '../../../../shared/components/f1-grid';
 import {
@@ -59,6 +60,10 @@ export function DraftFormManagementPage({
   >({});
   const [helperOpen, setHelperOpen] = useState(false);
   const [categoryNoticeDismissed, setCategoryNoticeDismissed] = useState(false);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [pendingFilters, setPendingFilters] = useState<DraftFormFilters | null>(
+    null,
+  );
 
   const pagePermissions = {
     read: Boolean(selectedMenuPermissions?.read),
@@ -88,7 +93,12 @@ export function DraftFormManagementPage({
   );
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
 
-  const applySearch = (filters: DraftFormFilters) => {
+  const requestSearch = (filters: DraftFormFilters) => {
+    if (management.hasChanges) {
+      setPendingFilters(filters);
+      setRefreshConfirmOpen(true);
+      return;
+    }
     management.applyFilters(filters);
   };
 
@@ -96,7 +106,7 @@ export function DraftFormManagementPage({
     const selected = (value: PageSearchFieldValue | undefined) =>
       value == null || typeof value === 'object' ? '' : String(value).trim();
     const useAt = selected(values.useAt);
-    applySearch({
+    requestSearch({
       keyword: searchQuery.trim() || undefined,
       categoryItemId: selected(values.categoryItemId)
         ? Number(selected(values.categoryItemId))
@@ -109,10 +119,24 @@ export function DraftFormManagementPage({
   };
 
   const handleDefaultSearch = () => {
-    applySearch({
+    requestSearch({
       ...management.appliedFilters,
       keyword: searchQuery.trim() || undefined,
     });
+  };
+
+  const cancelPendingSearch = () => {
+    setRefreshConfirmOpen(false);
+    setPendingFilters(null);
+  };
+
+  const confirmPendingSearch = () => {
+    const filters = pendingFilters;
+    setRefreshConfirmOpen(false);
+    setPendingFilters(null);
+    if (!filters) return;
+    management.discardChanges();
+    management.applyFilters(filters);
   };
 
   const handleGridSave = () => {
@@ -256,6 +280,7 @@ export function DraftFormManagementPage({
           minHeight: 280,
           minWidth: 0,
           px: { xs: 1, sm: 2 },
+          pt: 1,
           pb: 2,
         }}
       >
@@ -295,6 +320,15 @@ export function DraftFormManagementPage({
           setCategoryNoticeDismissed(false);
         }}
         onError={management.setError}
+      />
+      <UnsavedChangesConfirmDialog
+        open={refreshConfirmOpen}
+        title="저장하지 않은 변경사항"
+        description="변경사항을 버리고 기안양식 목록을 다시 불러오시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="계속"
+        onCancel={cancelPendingSearch}
+        onContinue={confirmPendingSearch}
       />
     </Box>
   );

@@ -62,6 +62,20 @@ export function createDraftFormColumns(
   users: DraftFormUserOption[],
   canEdit: boolean,
 ): F1GridColumn<DraftFormRow>[] {
+  const getCodeLabel = (items: CommonCodeItemRow[], value: unknown) =>
+    items.find((item) => String(item.id) === String(value))?.itemNm ??
+    String(value ?? '');
+  const getUserLabel = (value: unknown) => {
+    if (value == null || value === '') return '선택 안 함';
+    const user = users.find(
+      (option) => String(option.loginId) === String(value),
+    );
+    if (!user) return String(value);
+    return user.departmentNm
+      ? `${user.userNm} (${user.departmentNm})`
+      : user.userNm;
+  };
+
   return [
     {
       field: 'draftingWorkCategoryId',
@@ -103,6 +117,7 @@ export function createDraftFormColumns(
         value: Number(item.id),
         label: item.itemNm,
       })),
+      renderCell: ({ value }) => getCodeLabel(categoryItems, value),
       editable: canEdit,
       required: true,
       form: { group: '기본정보', order: 3 },
@@ -118,6 +133,7 @@ export function createDraftFormColumns(
         value: Number(item.id),
         label: item.itemNm,
       })),
+      renderCell: ({ value }) => getCodeLabel(cycleItems, value),
       editable: canEdit,
       required: true,
       form: { group: '기본정보', order: 4 },
@@ -137,6 +153,7 @@ export function createDraftFormColumns(
             : user.userNm,
         })),
       ],
+      renderCell: ({ value }) => getUserLabel(value),
       onValueChange: (_row, value) => ({
         reviewerId: value === '' || value == null ? null : Number(value),
       }),
@@ -158,6 +175,7 @@ export function createDraftFormColumns(
             : user.userNm,
         })),
       ],
+      renderCell: ({ value }) => getUserLabel(value),
       onValueChange: (_row, value) => ({
         approverId: value === '' || value == null ? null : Number(value),
       }),
@@ -233,7 +251,6 @@ export function DraftFormGrid({
   columns,
   canCreate,
   canUpdate,
-  canExportExcel,
   loading,
   gridKey,
   gridRef,

@@ -9,6 +9,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
+import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -84,6 +85,15 @@ beforeEach(() => {
 });
 
 describe('Draft form management page', () => {
+  it('defines each F1-Grid data column field once with row numbering first', () => {
+    const columns = createDraftFormColumns([], [], [], true);
+    const fields = columns.map((column) => String(column.field));
+
+    expect(fields[0]).toBe('draftingWorkCategoryId');
+    expect(columns[0].type).toBe('rownumber');
+    expect(new Set(fields).size).toBe(fields.length);
+  });
+
   it('renders from the co/form dashboard route with one unified search field', async () => {
     render(
       <ThemeProvider theme={createTheme()}>
@@ -338,6 +348,117 @@ describe('Draft form management page', () => {
     ).toBeInTheDocument();
   });
 
+  it('asks before refreshing a dirty grid and keeps the unsaved row when canceled', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    const initialListCallCount = apiMocks.apiGet.mock.calls.filter(
+      ([path]) => path === '/api/v1/co/workflow/forms',
+    ).length;
+    fireEvent.click(await screen.findByRole('button', { name: '양식 추가' }));
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 등록',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      { target: { value: '미저장 양식' } },
+    );
+    fireEvent.mouseDown(
+      within(formDialog).getByRole('combobox', { name: '분류' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '점검' }));
+    fireEvent.mouseDown(
+      within(formDialog).getByRole('combobox', { name: '등록주기' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '월' }));
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toHaveTextContent(
+      '변경사항을 버리고 기안양식 목록을 다시 불러오시겠습니까?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(
+      await screen.findByRole('gridcell', { name: '미저장 양식' }),
+    ).toBeVisible();
+    expect(
+      apiMocks.apiGet.mock.calls.filter(
+        ([path]) => path === '/api/v1/co/workflow/forms',
+      ),
+    ).toHaveLength(initialListCallCount);
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const detailDialog = await screen.findByRole('dialog', {
+      name: '상세 검색',
+    });
+    fireEvent.mouseDown(
+      within(detailDialog).getByRole('combobox', { name: '분류' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '점검' }));
+    fireEvent.click(within(detailDialog).getByRole('button', { name: '조회' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(
+      await screen.findByRole('gridcell', { name: '미저장 양식' }),
+    ).toBeVisible();
+    expect(
+      apiMocks.apiGet.mock.calls.filter(
+        ([path]) => path === '/api/v1/co/workflow/forms',
+      ),
+    ).toHaveLength(initialListCallCount);
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    await screen.findByRole('dialog', { name: '저장하지 않은 변경사항' });
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
+
+    await waitFor(() =>
+      expect(
+        apiMocks.apiGet.mock.calls.filter(
+          ([path]) => path === '/api/v1/co/workflow/forms',
+        ),
+      ).toHaveLength(initialListCallCount + 1),
+    );
+    expect(
+      screen.queryByRole('gridcell', { name: '미저장 양식' }),
+    ).not.toBeInTheDocument();
+  }, 15000);
+
   it('combines the unified keyword and applied category ID in one list request', async () => {
     render(
       <ThemeProvider theme={createTheme()}>
@@ -571,6 +692,88 @@ describe('Draft form management page', () => {
         }),
       ),
     );
+  });
+
+  it('shows select labels and keeps unchanged cell and form editors clean', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/workflow/forms'
+        ? Promise.resolve({ resultList: [sourceRow] })
+        : originalApiGet?.(path),
+    );
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByRole('gridcell', { name: '점검' })).toBeVisible();
+    expect(
+      screen.getAllByRole('gridcell', { name: '선택 안 함' }),
+    ).toHaveLength(2);
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '점검' }));
+    const cellEditor = screen.getByRole('combobox');
+    expect(cellEditor).toHaveTextContent('점검');
+    fireEvent.keyDown(cellEditor, { key: 'Escape', code: 'Escape' });
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '71 행 정보 수정' }));
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 수정',
+    });
+    expect(
+      within(formDialog).getByRole('combobox', { name: '분류' }),
+    ).toHaveTextContent('점검');
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
   });
 
   it('soft-disables a deleted Grid row by saving useAt N', async () => {

@@ -98,6 +98,11 @@ export function useDraftFormManagement() {
     [loadRows],
   );
 
+  const discardChanges = useCallback(() => {
+    setHasChanges(false);
+    setGridKey((current) => current + 1);
+  }, []);
+
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<DraftFormRow>) => {
       setHasChanges(
@@ -167,6 +172,7 @@ export function useDraftFormManagement() {
     hasChanges,
     setHasChanges,
     gridKey,
+    discardChanges,
     appliedFilters,
     loadRows,
     loadOptions,
