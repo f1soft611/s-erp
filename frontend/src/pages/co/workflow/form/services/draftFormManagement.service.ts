@@ -74,6 +74,8 @@ export async function fetchDraftFormUsers(): Promise<DraftFormUserOption[]> {
     loginId: toNumber(user.loginId),
     userNm: String(user.userNm ?? ''),
     departmentNm: String(user.departmentNm ?? ''),
+    profileImage: user.profileImage == null ? null : String(user.profileImage),
+    levelNm: user.levelNm == null ? null : String(user.levelNm),
   }));
 }
 

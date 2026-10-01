@@ -66,7 +66,7 @@ export function createDraftFormColumns(
     items.find((item) => String(item.id) === String(value))?.itemNm ??
     String(value ?? '');
   const getUserLabel = (value: unknown) => {
-    if (value == null || value === '') return '선택 안 함';
+    if (value == null || value === '') return '';
     const user = users.find(
       (option) => String(option.loginId) === String(value),
     );
@@ -75,6 +75,16 @@ export function createDraftFormColumns(
       ? `${user.userNm} (${user.departmentNm})`
       : user.userNm;
   };
+  const getUserOptions = (
+    getValue: (user: DraftFormUserOption) => string | number,
+  ) =>
+    users.map((user) => ({
+      value: getValue(user),
+      label: user.userNm,
+      avatarUrl: user.profileImage,
+      positionName: user.levelNm,
+      departmentName: user.departmentNm,
+    }));
 
   return [
     {
@@ -143,16 +153,8 @@ export function createDraftFormColumns(
       field: 'reviewerId',
       headerName: '검토자',
       width: 120,
-      type: 'select',
-      options: [
-        { value: '', label: '선택 안 함' },
-        ...users.map((user) => ({
-          value: user.loginId,
-          label: user.departmentNm
-            ? `${user.userNm} (${user.departmentNm})`
-            : user.userNm,
-        })),
-      ],
+      type: 'user',
+      userOptions: getUserOptions((user) => user.loginId),
       renderCell: ({ value }) => getUserLabel(value),
       onValueChange: (_row, value) => ({
         reviewerId: value === '' || value == null ? null : Number(value),
@@ -165,16 +167,8 @@ export function createDraftFormColumns(
       field: 'approverId',
       headerName: '승인자',
       width: 120,
-      type: 'select',
-      options: [
-        { value: '', label: '선택 안 함' },
-        ...users.map((user) => ({
-          value: user.loginId,
-          label: user.departmentNm
-            ? `${user.userNm} (${user.departmentNm})`
-            : user.userNm,
-        })),
-      ],
+      type: 'user',
+      userOptions: getUserOptions((user) => user.loginId),
       renderCell: ({ value }) => getUserLabel(value),
       onValueChange: (_row, value) => ({
         approverId: value === '' || value == null ? null : Number(value),
@@ -187,13 +181,8 @@ export function createDraftFormColumns(
       field: 'assigneeIds',
       headerName: '담당자',
       width: 150,
-      type: 'select',
-      options: users.map((user) => ({
-        value: user.userId,
-        label: user.departmentNm
-          ? `${user.userNm} (${user.departmentNm})`
-          : user.userNm,
-      })),
+      type: 'user',
+      userOptions: getUserOptions((user) => user.userId),
       getValue: (row) => row.assigneeSummary,
       onValueChange: (_row, value) => {
         const assigneeIds = Array.isArray(value) ? value.map(String) : [];
@@ -202,7 +191,7 @@ export function createDraftFormColumns(
         );
         const assigneeSummary =
           names.length === 0
-            ? '-'
+            ? ''
             : names.length === 1
               ? names[0]
               : `${names[0]} 외 ${names.length - 1}명`;
@@ -271,6 +260,7 @@ export function DraftFormGrid({
       key={gridKey}
       ref={gridRef}
       ariaLabel="기안양식 목록"
+      storageKey="co-workflow-draft-form-grid"
       rows={rows}
       columns={columns}
       rowKey="draftingWorkCategoryId"
@@ -278,7 +268,6 @@ export function DraftFormGrid({
       createRow={createDraftFormRow}
       createDuplicate={duplicateDraftFormRow}
       onChangesChange={onChangesChange}
-      onBeforeEdit={({ field }) => field !== 'assigneeIds'}
       loading={loading}
       height="100%"
       showCheckbox={false}

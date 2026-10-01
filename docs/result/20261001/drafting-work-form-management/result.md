@@ -103,3 +103,13 @@
 - `draft-form-management.test.tsx`: 13개 통과, 기존 soft-delete 컨텍스트 메뉴 테스트 1개는 `행 삭제` 메뉴 항목 미노출로 실패했다. 해당 실패는 이번 변경과 무관하게 이전부터 존재한다.
 - `npm --prefix frontend run build`: TypeScript 및 Vite 빌드 성공. `git diff --check`: 오류 없음.
 - 브라우저 확인은 개발 서버 4175에서 시도했으나 fixture API 요청이 정체되어 초기 로딩 이후 진행하지 못했다. 따라서 이번 저장 중 상태의 실제 브라우저 검증 및 전용 스크린샷은 미완료로 남는다.
+
+## 추가 보정: 저장된 select 미변경 편집 종료 dirty
+
+- F1-Grid `commitEdit`이 문자열 draft를 그대로 저장해 숫자 ID 옵션과 원본 행 값의 타입이 달라지는 경우를 확인했다. 기존 테스트에 저장된 분류 select 편집 후 다른 셀로 이동하는 시나리오를 추가했고, 수정 전 저장 버튼 활성화로 RED를 확인했다.
+- commit 시 select option의 원래 value 타입을 복원하고 `column.onValueChange`를 적용하도록 수정했다. 기존값과 같은 표현의 미등록 option 값은 원본 타입을 보존한다.
+- 수정 후 동일 focused test에서 편집기가 종료되고 저장 버튼이 비활성으로 유지되는 것을 확인했다: 1/1 통과.
+- 최신 사용자 변경 포함 focused page test `shows user labels and keeps unchanged cell and form editors clean`: 1/1 통과. F1-Grid select editor focused test: 2/2 통과.
+- 전체 `draft-form-management.test.tsx`: 17개 중 16개 통과. 기존 `soft-disables a deleted Grid row by saving useAt N`는 `행 삭제` context-menu 항목을 찾지 못해 실패했으며 이번 select 수정과 무관하다.
+- 최신 워크트리 `npm --prefix frontend run build`: TypeScript 및 Vite build 성공(1499 modules transformed). `git diff --check`: 오류 없음.
+- 이 수정은 시각 레이아웃 변경이 아니므로 새 스크린샷은 추가하지 않았다.

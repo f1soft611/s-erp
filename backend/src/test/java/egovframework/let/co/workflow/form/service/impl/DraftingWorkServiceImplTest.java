@@ -66,6 +66,18 @@ class DraftingWorkServiceImplTest {
             new XMLMapperBuilder(mapperStream, configuration, resource, configuration.getSqlFragments()).parse();
         }
 
+        String userOptionsSql = configuration
+                .getMappedStatement("DraftingWorkDAO.selectUserOptions")
+                .getBoundSql(9L)
+                .getSql()
+                .toLowerCase()
+                .replaceAll("\\s+", " ");
+        assertTrue(userOptionsSql.contains("la.profile_image"));
+        assertTrue(userOptionsSql.contains("tb_common_code_item"));
+        assertTrue(userOptionsSql.contains("tb_common_code_group"));
+        assertTrue(userOptionsSql.contains("group_code = 'level'"));
+        assertTrue(userOptionsSql.contains("u.tenant_id = ?"));
+
         assertTrue(configuration.hasStatement("DraftingWorkDAO.selectWorkList"));
         assertTrue(configuration.hasStatement("DraftingWorkDAO.selectWorkIdByCode"));
         assertTrue(configuration.hasStatement("DraftingWorkDAO.insertWork"));

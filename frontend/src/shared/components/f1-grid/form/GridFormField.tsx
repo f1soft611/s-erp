@@ -21,6 +21,7 @@ import {
   isGridCheckboxChecked,
   normalizeGridNumberInput,
 } from '../utils/grid.utils';
+import { UserSelectEditor } from '../editing/UserSelectEditor';
 
 export type GridFormFieldProps<T extends object> = {
   column: F1GridColumn<T>;
@@ -61,7 +62,8 @@ export function GridFormField<T extends object>({
   const fieldName = String(column.field);
   const helperTextId = `${fieldName}-form-helper-text`;
   const displayedValue =
-    column.form?.multiple && column.type === 'select'
+    column.type === 'user' ||
+    (column.form?.multiple && column.type === 'select')
       ? value
       : column.getValue
         ? column.getValue(row)
@@ -199,6 +201,31 @@ export function GridFormField<T extends object>({
           </MenuItem>
         ))}
       </TextField>
+    );
+  }
+
+  if (column.type === 'user') {
+    const multiple = Boolean(column.form?.multiple);
+    const userValue = multiple
+      ? Array.isArray(displayedValue)
+        ? (displayedValue as Array<string | number>)
+        : []
+      : typeof displayedValue === 'string' || typeof displayedValue === 'number'
+        ? displayedValue
+        : null;
+
+    return (
+      <UserSelectEditor
+        value={userValue}
+        options={column.userOptions ?? []}
+        multiple={multiple}
+        label={column.headerName}
+        readOnly={readOnly}
+        required={isRequired}
+        error={Boolean(error)}
+        helperText={error}
+        onChange={applyValue}
+      />
     );
   }
 

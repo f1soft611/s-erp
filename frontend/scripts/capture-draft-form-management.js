@@ -11,6 +11,9 @@ const screenshotDir = path.resolve(
     ),
 );
 const screenshotWidths = [375, 768, 1280];
+const avatarImage = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" rx="20" fill="#e76f51"/><text x="20" y="26" text-anchor="middle" fill="#fff" font-size="18">홍</text></svg>',
+)}`;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
@@ -162,7 +165,14 @@ await page.route('http://localhost:8080/**', async (route) => {
   } else if (pathname === '/api/v1/co/workflow/forms/users') {
     result = {
       resultList: [
-        { userId: 110, loginId: 210, userNm: '홍길동', departmentNm: '운영팀' },
+        {
+          userId: 110,
+          loginId: 210,
+          userNm: '홍길동',
+          departmentNm: '운영팀',
+          profileImage: avatarImage,
+          levelNm: '부장',
+        },
       ],
     };
   } else if (pathname === '/api/v1/co/workflow/forms') {
@@ -285,6 +295,108 @@ for (const width of screenshotWidths) {
     fullPage: false,
   });
 }
+
+await page.setViewportSize({ width: 1280, height: 900 });
+await page.getByRole('button', { name: '71 행 정보 수정' }).click();
+const editFormDialog = page.getByRole('dialog', { name: '기안양식 수정' });
+await editFormDialog.waitFor();
+const reviewerFormField = editFormDialog.getByTestId(
+  'f1-grid-form-field-reviewerId',
+);
+await reviewerFormField.getByRole('button', { name: 'Open' }).click();
+const formUserOption = page.getByRole('option', { name: /홍길동/ });
+await formUserOption.waitFor();
+const formUserOptionText = await formUserOption.textContent();
+if (
+  !formUserOptionText?.includes('부장') ||
+  !formUserOptionText.includes('운영팀')
+) {
+  throw new Error(`User option metadata is missing: ${formUserOptionText}`);
+}
+await formUserOption.locator('img').waitFor();
+const userPickerScreenshots = [];
+for (const width of screenshotWidths) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.waitForTimeout(200);
+  const pickerBounds = await page.evaluate(() => {
+    const popper = document.querySelector('.MuiAutocomplete-popper');
+    if (!popper) return null;
+    const bounds = popper.getBoundingClientRect();
+    return { left: bounds.left, right: bounds.right, width: bounds.width };
+  });
+  if (
+    !pickerBounds ||
+    pickerBounds.right > width + 1 ||
+    pickerBounds.width <= 0
+  ) {
+    throw new Error(
+      `User picker is clipped at ${width}px: ${JSON.stringify(pickerBounds)}`,
+    );
+  }
+  const isFullScreen = await editFormDialog.evaluate((dialog) =>
+    dialog.classList.contains('MuiDialog-paperFullScreen'),
+  );
+  if (width === 375 && !isFullScreen) {
+    throw new Error('User row form did not become full-screen at 375px.');
+  }
+  userPickerScreenshots.push({ width, pickerBounds, isFullScreen });
+  await page.screenshot({
+    path: path.join(screenshotDir, `user-form-${width}px.png`),
+    fullPage: false,
+  });
+}
+await page.keyboard.press('Escape');
+await editFormDialog.getByRole('button', { name: '닫기' }).click();
+
+const cellPickerScreenshots = [];
+await page.setViewportSize({ width: 1280, height: 900 });
+const reviewerCell = page
+  .getByRole('grid')
+  .getByRole('row')
+  .nth(1)
+  .getByRole('gridcell')
+  .nth(5);
+await reviewerCell.dblclick();
+await page.getByRole('option', { name: /홍길동/ }).waitFor();
+for (const width of screenshotWidths) {
+  await page.setViewportSize({ width, height: 900 });
+  await reviewerCell.evaluate((cell) => {
+    const scroller = cell.closest('[data-testid="f1-grid-body-scroll"]');
+    if (!scroller) return;
+    const cellLeft = cell.getBoundingClientRect().left;
+    const scrollLeft = scroller.getBoundingClientRect().left;
+    scroller.scrollLeft += cellLeft - scrollLeft - 12;
+  });
+  await page.waitForTimeout(100);
+  await page.getByRole('option', { name: /홍길동/ }).waitFor();
+  const pickerMetrics = await page.evaluate(() => {
+    const popper = document.querySelector('.MuiAutocomplete-popper');
+    if (!popper) return null;
+    const bounds = popper.getBoundingClientRect();
+    return {
+      viewportWidth: document.documentElement.clientWidth,
+      left: bounds.left,
+      right: bounds.right,
+      width: bounds.width,
+    };
+  });
+  if (
+    !pickerMetrics ||
+    pickerMetrics.width < Math.min(280, width - 16) ||
+    pickerMetrics.left < 0 ||
+    pickerMetrics.right > width + 1
+  ) {
+    throw new Error(
+      `Grid user picker is clipped at ${width}px: ${JSON.stringify(pickerMetrics)}`,
+    );
+  }
+  cellPickerScreenshots.push({ width, pickerMetrics });
+  await page.screenshot({
+    path: path.join(screenshotDir, `user-cell-${width}px.png`),
+    fullPage: false,
+  });
+}
+await page.keyboard.press('Escape');
 
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.getByRole('button', { name: '양식 추가' }).click();
@@ -422,6 +534,8 @@ console.log(
       measurements,
       categoryGridScroll,
       mobileCategoryGridScroll,
+      userPickerScreenshots,
+      cellPickerScreenshots,
       categorySuccessToast: true,
       isMobileWorkFormFullScreen,
       isMobileDialogFullScreen,

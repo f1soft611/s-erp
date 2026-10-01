@@ -287,6 +287,7 @@ export function CommonCodeItemHelpDialog({
               rows={items}
               columns={columns}
               rowKey="id"
+              storageKey="co-workflow-draft-form-category-items-grid"
               showCheckbox={false}
               createRow={() => createItemRow(groupId)}
               createDuplicate={(row) => ({

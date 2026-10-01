@@ -9,7 +9,11 @@ import {
 } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
-import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridColumn,
+  F1GridDraftValue,
+  F1GridRowId,
+} from '../types/grid.types';
 import {
   getCellDisplayValue,
   isCellEditable,
@@ -38,7 +42,7 @@ type GridCellProps<T extends object> = {
   rowIndex: number;
   renderRowIndex?: number;
   isLastRow?: boolean;
-  draftValue: string;
+  draftValue: F1GridDraftValue;
   dirtyCell?: boolean;
   onFocus: () => void;
   onMouseDown: (event: MouseEvent<HTMLElement>) => void;
@@ -46,7 +50,7 @@ type GridCellProps<T extends object> = {
   onMouseUp: () => void;
   onBlur?: () => void;
   onDoubleClick: () => void;
-  onDraftChange: (value: string) => void;
+  onDraftChange: (value: F1GridDraftValue) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onSelectChange: (value: unknown) => void;
   onCheckboxChange: (checked: boolean) => void;
@@ -206,7 +210,7 @@ const GridCellInner = <T extends object>({
       }
       const hasOpenEditorPopup = Array.from(
         document.querySelectorAll(
-          '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root',
+          '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root, .MuiAutocomplete-popper',
         ),
       ).some((popup) => !popup.contains(event.currentTarget));
       if (hasOpenEditorPopup) return;
@@ -365,8 +369,11 @@ const GridCellInner = <T extends object>({
       ) : editing ? (
         <CellEditor
           column={column}
-          value={draftValue}
+          value={String(draftValue ?? '')}
+          userValue={draftValue}
           onChange={onDraftChange}
+          onUserChange={onDraftChange}
+          onCommitEdit={() => onBlur?.()}
           onKeyDown={onKeyDown}
           onSelectChange={onSelectChange}
           onCodePick={onCodePick}

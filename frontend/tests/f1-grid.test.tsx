@@ -3039,6 +3039,105 @@ describe('F1-GRID interaction', () => {
     ]);
   });
 
+  it('supports single selection with the user column in a grid cell', () => {
+    type UserSelectionRow = { id: string; reviewerId: number | null };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'reviewerId',
+      headerName: 'Reviewer',
+      editable: true,
+      type: 'user',
+      userOptions: [
+        { value: 12, label: 'Alice Kim', positionName: 'Manager' },
+        { value: 13, label: 'Bob Lee', departmentName: 'Finance' },
+      ],
+    } as unknown as F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', reviewerId: null }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    fireEvent.click(screen.getByRole('option', { name: /Alice Kim/ }));
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      { id: 'form-1', reviewerId: 12 },
+    ]);
+  });
+
+  it('supports multiple selection with the user column in a grid cell', () => {
+    type UserSelectionRow = { id: string; assigneeIds: string[] };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'assigneeIds',
+      headerName: 'Assignees',
+      editable: true,
+      type: 'user',
+      userOptions: [
+        { value: 'u-1', label: 'Alice Kim' },
+        { value: 'u-2', label: 'Bob Lee' },
+      ],
+      form: { multiple: true },
+    } as unknown as F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', assigneeIds: ['u-1'] }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    const input = screen.getByRole('combobox');
+    fireEvent.click(screen.getByRole('option', { name: /Bob Lee/ }));
+    fireEvent.blur(input);
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      { id: 'form-1', assigneeIds: ['u-1', 'u-2'] },
+    ]);
+  });
+
+  it('does not mark an unchanged multiple user selection dirty', () => {
+    type UserSelectionRow = { id: string; assigneeIds: string[] };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'assigneeIds',
+      headerName: 'Assignees',
+      editable: true,
+      type: 'user',
+      userOptions: [{ value: 'u-1', label: 'Alice Kim' }],
+      form: { multiple: true },
+    } satisfies F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', assigneeIds: ['u-1'] }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    fireEvent.blur(screen.getByRole('combobox'));
+
+    expect(gridRef.current?.getChanges()).toEqual({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+  });
+
   it('edits dates as YYYY-MM-DD values', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
 

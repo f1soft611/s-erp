@@ -23,6 +23,8 @@ export type DraftFormUserOption = {
   loginId: number;
   userNm: string;
   departmentNm: string;
+  profileImage: string | null;
+  levelNm: string | null;
 };
 
 export type DraftFormPayload = {

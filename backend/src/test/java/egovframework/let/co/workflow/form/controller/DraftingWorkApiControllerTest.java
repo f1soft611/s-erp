@@ -58,6 +58,8 @@ class DraftingWorkApiControllerTest {
         user.setLoginId(210L);
         user.setUserNm("홍길동");
         user.setDepartmentNm("운영팀");
+        user.setProfileImage("/profiles/fixture.png");
+        user.setLevelNm("부장");
         when(draftingWorkService.listUserOptions(1L))
                 .thenReturn(Collections.singletonList(user));
 
@@ -67,7 +69,9 @@ class DraftingWorkApiControllerTest {
                 .andExpect(jsonPath("$.result.resultList[0].userId").value(110))
                 .andExpect(jsonPath("$.result.resultList[0].loginId").value(210))
                 .andExpect(jsonPath("$.result.resultList[0].userNm").value("홍길동"))
-                .andExpect(jsonPath("$.result.resultList[0].departmentNm").value("운영팀"));
+                .andExpect(jsonPath("$.result.resultList[0].departmentNm").value("운영팀"))
+                .andExpect(jsonPath("$.result.resultList[0].profileImage").value("/profiles/fixture.png"))
+                .andExpect(jsonPath("$.result.resultList[0].levelNm").value("부장"));
 
         verify(draftingWorkService).listUserOptions(1L);
     }

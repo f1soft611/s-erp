@@ -104,3 +104,13 @@
 - focused 회귀 테스트: 1/1 통과. 전체 `draft-form-management.test.tsx`는 13개 통과, 기존 soft-delete 컨텍스트 메뉴 테스트 1개가 `행 삭제` 항목 미노출로 실패했다.
 - `npm --prefix frontend run build`: 통과; TypeScript 및 Vite 빌드 성공. `git diff --check`: 통과.
 - 브라우저 확인은 Vite 4175에서 시도했으나 fixture API 요청이 완료되지 않아 앱이 초기 로딩에 머물렀고, 저장 중 캡처는 확보하지 못했다. 기존 반응형 캡처는 이전 화면 검증 자료이며 이번 transient 상태의 증거로 간주하지 않는다.
+
+### 추가 사용자 요청: 저장된 select 미변경 편집 종료 dirty
+
+- RED: 기안양식의 저장된 숫자 ID select를 편집한 뒤 다른 셀로 이동하면 편집기가 종료되지만 저장 버튼이 활성화되는 현상을 회귀 테스트로 재현했다.
+- 원인: F1-Grid `commitEdit`이 select의 문자열 draft를 그대로 행에 기록해 원본 숫자 ID와 다른 값으로 판정했다.
+- 수정: commit 시 옵션 value의 원래 타입을 복원하고 select 컬럼의 `onValueChange`를 적용한다. 미등록 옵션 값이 기존값과 문자열 표현이 같을 때도 저장 원래 타입을 유지한다.
+- GREEN: `tests/draft-form-management.test.tsx -t "shows select labels and keeps unchanged cell and form editors clean"` 1/1 통과.
+- 최신 사용자 변경 포함 focused test: `shows user labels and keeps unchanged cell and form editors clean` 1/1 통과; `tests/f1-grid.test.tsx -t "selects the current value"` 2/2 통과.
+- 페이지 전체 suite: 17개 중 16개 통과, 기존 `soft-disables a deleted Grid row by saving useAt N` 테스트는 컨텍스트 메뉴 `행 삭제` 항목 미노출로 실패했다. select 회귀는 통과했다.
+- 최신 워크트리 `npm --prefix frontend run build`: TypeScript 및 Vite build 성공(1499 modules transformed). `git diff --check`: 통과.

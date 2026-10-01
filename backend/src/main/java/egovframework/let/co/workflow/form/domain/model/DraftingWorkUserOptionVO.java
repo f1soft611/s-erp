@@ -15,4 +15,6 @@ public class DraftingWorkUserOptionVO implements Serializable {
     private Long loginId;
     private String userNm;
     private String departmentNm;
+    private String profileImage;
+    private String levelNm;
 }

@@ -84,7 +84,11 @@ export const f1GridDocs: F1GridDoc[] = [
             'boolean',
             '홀수 행 배경 스트라이프 표시 여부 (기본값 true)',
           ],
-          ['storageKey', 'string', '컬럼 순서/너비/숨김/고정 상태 저장 키'],
+          [
+            'storageKey',
+            'string',
+            '컬럼 레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
+          ],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
           ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
@@ -468,7 +472,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ['headerGroup', 'string', '헤더 상단 그룹 라벨'],
           ['hidden', 'boolean', '초기 숨김 여부 (헤더 메뉴에서 표시 전환)'],
           ['resizableColumns', 'boolean', '컬럼 크기 조정 허용'],
-          ['storageKey', 'string', '순서/너비/숨김/고정 상태 저장 키'],
+          [
+            'storageKey',
+            'string',
+            '레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
+          ],
         ],
       },
       {
@@ -737,7 +745,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ['rowKey', 'keyof T', '행 식별자'],
           ['ariaLabel', 'string', '접근성 레이블'],
           ['columnLine', 'boolean', '컬럼 세로 구분선'],
-          ['storageKey', 'string', '컬럼 레이아웃 저장 키'],
+          [
+            'storageKey',
+            'string',
+            '컬럼 레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
+          ],
           ['height / maxHeight', 'number | string', '컨테이너 높이 제한'],
           ['rowHeight / minRowHeight / maxRowHeight', 'number', '행 높이 범위'],
           [

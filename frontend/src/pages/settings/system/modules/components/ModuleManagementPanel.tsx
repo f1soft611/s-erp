@@ -431,6 +431,7 @@ export const ModuleManagementPanel = forwardRef<
               rows={modules}
               columns={columns}
               rowKey="id"
+              storageKey="settings-system-module-grid"
               ariaLabel="F1-GRID 모듈 관리"
               height={'100%'}
               rowHeight={32}

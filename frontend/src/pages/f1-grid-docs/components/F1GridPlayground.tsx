@@ -482,6 +482,7 @@ function LargeDataPlayground() {
           rows={rows}
           columns={largeDataColumns}
           rowKey="id"
+          storageKey="f1-grid-docs-large-data"
           ariaLabel="F1-Grid large dataset example"
           height={420}
           showCheckbox
@@ -546,6 +547,7 @@ function ContextMenuPlayground() {
           rows={rows}
           columns={columns}
           rowKey="id"
+          storageKey="f1-grid-docs-context-menu"
           ariaLabel="F1-Grid context menu example"
           height={260}
           showCheckbox
@@ -611,6 +613,7 @@ function RowFormModalPlayground() {
           rows={rows}
           columns={rowFormColumns}
           rowKey="id"
+          storageKey="f1-grid-docs-row-form-modal"
           ariaLabel="F1-Grid row form modal example"
           height={280}
           showCheckbox={false}
@@ -691,6 +694,7 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
             rowKey="id"
             parentKey="parentId"
             treeColumn="name"
+            storageKey="f1-grid-docs-tree"
             defaultExpandAll
             ariaLabel="F1-Tree documentation example"
             height={260}
@@ -771,6 +775,7 @@ export function F1GridPlayground({ kind }: { kind: PlaygroundKind }) {
           rows={displayRows}
           columns={displayColumns}
           rowKey="id"
+          storageKey={`f1-grid-docs-${kind}`}
           ariaLabel="F1-Grid documentation example"
           rowHeight={rowHeight}
           minRowHeight={32}

@@ -190,7 +190,7 @@ describe('typed form field', () => {
   it('renders text with margin none and uses getValue for the displayed value', () => {
     const onPatch = vi.fn();
 
-    render(
+    const { rerender } = render(
       <GridFormField
         column={{
           field: 'name',
@@ -295,6 +295,48 @@ describe('typed form field', () => {
     expect(onPatch).toHaveBeenLastCalledWith({ categoryId: 2 });
   });
 
+  it('supports single user selection in a row form field', () => {
+    const onPatch = vi.fn();
+    const userColumn = {
+      field: 'ownerId',
+      headerName: '담당자',
+      type: 'user',
+      userOptions: [
+        {
+          value: 10,
+          label: '김담당',
+          avatarUrl: '/profiles/fixture.png',
+          positionName: '과장',
+        },
+        { value: 20, label: '이담당', departmentName: '운영팀' },
+      ],
+    } as unknown as F1GridColumn<TypedFormRow>;
+
+    const { container } = render(
+      <GridFormField
+        column={userColumn}
+        row={typedRow}
+        mode="edit"
+        value={typedRow.ownerId}
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    const input = screen.getByRole('combobox', { name: '담당자' });
+    expect(screen.getByText('김담당')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByText('과장')).toBeVisible();
+    expect(screen.getByText('운영팀')).toBeVisible();
+    expect(
+      container.querySelector('img[src="/profiles/fixture.png"]'),
+    ).not.toBeNull();
+    fireEvent.change(input, { target: { value: '운영팀' } });
+    fireEvent.click(screen.getByRole('option', { name: /이담당/ }));
+
+    expect(onPatch).toHaveBeenLastCalledWith({ ownerId: 20 });
+  });
+
   it('supports array values for a multiple select field in the row form', () => {
     const onPatch = vi.fn();
     const row: MultiSelectRow = { id: '1', ownerIds: ['110'] };
@@ -324,6 +366,63 @@ describe('typed form field', () => {
     fireEvent.click(screen.getByRole('option', { name: '김담당' }));
 
     expect(onPatch).toHaveBeenLastCalledWith({ ownerIds: ['110', '111'] });
+  });
+
+  it('supports multiple user selection and chip removal in the row form', () => {
+    const onPatch = vi.fn();
+    const row: MultiSelectRow = { id: '1', ownerIds: ['110'] };
+
+    const { rerender } = render(
+      <GridFormField
+        column={{
+          field: 'ownerIds',
+          headerName: '담당자',
+          type: 'user',
+          userOptions: [
+            { value: '110', label: '홍길동', departmentName: '운영팀' },
+            { value: '111', label: '김담당', positionName: '과장' },
+          ],
+          form: { multiple: true },
+        }}
+        row={row}
+        mode="edit"
+        value={row.ownerIds}
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('option', { name: /김담당/ }));
+    expect(onPatch).toHaveBeenLastCalledWith({ ownerIds: ['110', '111'] });
+
+    rerender(
+      <GridFormField
+        column={{
+          field: 'ownerIds',
+          headerName: '담당자',
+          type: 'user',
+          userOptions: [
+            { value: '110', label: '홍길동', departmentName: '운영팀' },
+            { value: '111', label: '김담당', positionName: '과장' },
+          ],
+          form: { multiple: true },
+        }}
+        row={{ id: '1', ownerIds: ['110', '111'] }}
+        mode="edit"
+        value={['110', '111']}
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    const selectedChip = screen
+      .getByRole('button', { name: /홍길동/ })
+      .closest('.MuiChip-root');
+    const deleteIcon = selectedChip?.querySelector('.MuiChip-deleteIcon');
+    expect(deleteIcon).not.toBeNull();
+    fireEvent.click(deleteIcon!);
+    expect(onPatch).toHaveBeenLastCalledWith({ ownerIds: ['111'] });
   });
 
   it('preserves the original value of autocomplete options', () => {

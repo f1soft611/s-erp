@@ -1,7 +1,11 @@
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { GridRow } from './GridRow';
-import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridColumn,
+  F1GridDraftValue,
+  F1GridRowId,
+} from '../types/grid.types';
 import type {
   F1GridCellRange,
   F1GridCellRangeBounds,
@@ -38,7 +42,7 @@ type GridBodyProps<T extends object> = {
     };
   };
   copiedCellRange?: F1GridCellRange;
-  draftValue: string;
+  draftValue: F1GridDraftValue;
   dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -58,7 +62,7 @@ type GridBodyProps<T extends object> = {
   onCellSelectionEnd: () => void;
   onCommitEdit: () => void;
   onStartEdit: (rowId: F1GridRowId, columnIndex: number) => void;
-  onDraftChange: (value: string) => void;
+  onDraftChange: (value: F1GridDraftValue) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onUpdateRow: (rowId: F1GridRowId, field: keyof T, value: unknown) => void;
   onPatchRow: (rowId: F1GridRowId, changes: Partial<T>) => void;

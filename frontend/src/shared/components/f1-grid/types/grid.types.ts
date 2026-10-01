@@ -15,6 +15,7 @@ export type F1GridEditorType =
   | 'time'
   | 'select'
   | 'autocomplete'
+  | 'user'
   | 'code'
   | 'rownumber';
 
@@ -22,6 +23,16 @@ export type F1GridOption = {
   value: string | number | boolean;
   label: string;
 };
+
+export type F1GridUserOption = {
+  value: string | number;
+  label: string;
+  avatarUrl?: string | null;
+  positionName?: string | null;
+  departmentName?: string | null;
+};
+
+export type F1GridDraftValue = string | number | null | Array<string | number>;
 
 export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
@@ -121,6 +132,7 @@ export type F1GridColumn<T extends object> = {
   format?: F1GridNumberFormat;
   decimalPlaces?: number;
   options?: F1GridOption[];
+  userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
   min?: number;

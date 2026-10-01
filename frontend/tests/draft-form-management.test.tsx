@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
+import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -92,6 +93,69 @@ describe('Draft form management page', () => {
     expect(fields[0]).toBe('draftingWorkCategoryId');
     expect(columns[0].type).toBe('rownumber');
     expect(new Set(fields).size).toBe(fields.length);
+  });
+
+  it('normalizes optional profile and level fields from the user API', async () => {
+    apiMocks.apiGet.mockResolvedValueOnce({
+      resultList: [
+        {
+          userId: 110,
+          loginId: 210,
+          userNm: '홍길동',
+          departmentNm: '운영팀',
+          profileImage: '/profiles/fixture.png',
+          levelNm: '부장',
+        },
+      ],
+    });
+
+    await expect(fetchDraftFormUsers()).resolves.toEqual([
+      {
+        userId: '110',
+        loginId: 210,
+        userNm: '홍길동',
+        departmentNm: '운영팀',
+        profileImage: '/profiles/fixture.png',
+        levelNm: '부장',
+      },
+    ]);
+  });
+
+  it('maps reviewer, approver, and assignee IDs into user column options', () => {
+    const columns = createDraftFormColumns(
+      [],
+      [],
+      [
+        {
+          userId: '110',
+          loginId: 210,
+          userNm: '홍길동',
+          departmentNm: '운영팀',
+          profileImage: '/profiles/fixture.png',
+          levelNm: '부장',
+        },
+      ],
+      true,
+    );
+    const reviewer = columns.find((column) => column.field === 'reviewerId');
+    const approver = columns.find((column) => column.field === 'approverId');
+    const assignee = columns.find((column) => column.field === 'assigneeIds');
+
+    expect(reviewer?.type).toBe('user');
+    expect(reviewer?.userOptions).toEqual([
+      {
+        value: 210,
+        label: '홍길동',
+        avatarUrl: '/profiles/fixture.png',
+        positionName: '부장',
+        departmentName: '운영팀',
+      },
+    ]);
+    expect(approver?.type).toBe('user');
+    expect(approver?.userOptions?.[0].value).toBe(210);
+    expect(assignee?.type).toBe('user');
+    expect(assignee?.userOptions?.[0].value).toBe('110');
+    expect(assignee?.form?.multiple).toBe(true);
   });
 
   it('renders from the co/form dashboard route with one unified search field', async () => {
@@ -730,7 +794,20 @@ describe('Draft form management page', () => {
     apiMocks.apiGet.mockImplementation((path: string) =>
       path === '/api/v1/co/workflow/forms'
         ? Promise.resolve({ resultList: [sourceRow] })
-        : originalApiGet?.(path),
+        : path === '/api/v1/co/workflow/forms/users'
+          ? Promise.resolve({
+              resultList: [
+                {
+                  userId: 110,
+                  loginId: 210,
+                  userNm: '홍길동',
+                  departmentNm: '운영팀',
+                  profileImage: '/profiles/fixture.png',
+                  levelNm: '부장',
+                },
+              ],
+            })
+          : originalApiGet?.(path),
     );
     apiMocks.apiPut.mockResolvedValue({
       item: { ...sourceRow, codeName: '수정양식' },
@@ -768,22 +845,35 @@ describe('Draft form management page', () => {
       </ThemeProvider>,
     );
 
+    expect(
+      await screen.findByRole('gridcell', { name: '홍길동 (운영팀)' }),
+    ).toBeVisible();
     fireEvent.click(
       await screen.findByRole('button', { name: '71 행 정보 수정' }),
     );
     const formDialog = await screen.findByRole('dialog', {
       name: '기안양식 수정',
     });
+    expect(apiMocks.apiGet).toHaveBeenCalledWith(
+      '/api/v1/co/workflow/forms/users',
+    );
+    const reviewerField = within(formDialog).getByTestId(
+      'f1-grid-form-field-reviewerId',
+    );
+    const reviewerChip = within(reviewerField)
+      .getByText('홍길동')
+      .closest('.MuiChip-root');
+    const reviewerDeleteIcon = reviewerChip?.querySelector(
+      '.MuiChip-deleteIcon',
+    );
+    expect(reviewerDeleteIcon).not.toBeNull();
+    fireEvent.click(reviewerDeleteIcon!);
     fireEvent.change(
       within(formDialog).getByRole('textbox', { name: '구분명' }),
       {
         target: { value: '수정양식' },
       },
     );
-    fireEvent.mouseDown(
-      within(formDialog).getByRole('combobox', { name: '검토자' }),
-    );
-    fireEvent.click(await screen.findByRole('option', { name: '선택 안 함' }));
     fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
@@ -803,7 +893,7 @@ describe('Draft form management page', () => {
     );
   });
 
-  it('shows select labels and keeps unchanged cell and form editors clean', async () => {
+  it('shows user labels and keeps unchanged cell and form editors clean', async () => {
     const sourceRow = {
       draftingWorkCategoryId: 71,
       cataTypeCode: '007',
@@ -864,8 +954,8 @@ describe('Draft form management page', () => {
 
     expect(await screen.findByRole('gridcell', { name: '점검' })).toBeVisible();
     expect(
-      screen.getAllByRole('gridcell', { name: '선택 안 함' }),
-    ).toHaveLength(2);
+      screen.getAllByRole('gridcell', { name: '' }).length,
+    ).toBeGreaterThanOrEqual(2);
 
     fireEvent.doubleClick(screen.getByRole('gridcell', { name: '점검' }));
     const cellEditor = screen.getByRole('combobox');

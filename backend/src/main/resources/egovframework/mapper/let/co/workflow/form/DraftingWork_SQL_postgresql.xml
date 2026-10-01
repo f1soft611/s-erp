@@ -7,6 +7,8 @@
         <result property="loginId" column="login_id"/>
         <result property="userNm" column="user_nm"/>
         <result property="departmentNm" column="department_nm"/>
+        <result property="profileImage" column="profile_image"/>
+        <result property="levelNm" column="level_nm"/>
     </resultMap>
 
     <select id="selectUserOptions" parameterType="long" resultMap="userOption">
@@ -14,7 +16,9 @@
             u.user_id,
             u.login_id,
             u.user_nm,
-            d.department_nm
+            d.department_nm,
+            la.profile_image,
+            CASE WHEN lg.group_code = 'LEVEL' THEN li.item_nm END AS level_nm
         FROM tb_user u
         JOIN tb_login_account la
           ON la.login_id = u.login_id
@@ -23,6 +27,15 @@
         LEFT JOIN tb_department d
           ON d.department_id = u.department_id
          AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_item li
+          ON li.common_code_item_id = u.level_id
+         AND li.tenant_id = u.tenant_id
+         AND li.use_at = 'Y'
+        LEFT JOIN tb_common_code_group lg
+          ON lg.common_code_group_id = li.group_id
+         AND lg.tenant_id = u.tenant_id
+         AND lg.group_code = 'LEVEL'
+         AND lg.use_at = 'Y'
         WHERE u.tenant_id = #{value}
           AND u.use_at = 'Y'
         ORDER BY u.user_nm ASC, u.user_id ASC

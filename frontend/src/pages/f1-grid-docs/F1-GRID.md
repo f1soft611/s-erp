@@ -91,12 +91,16 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - `type: 'select'`의 표시 label은 저장값과 `options[].value`가 같은 타입과 값으로 일치할 때 매핑된다. 숫자 ID는 행과 옵션 양쪽에서 같은 숫자 타입으로 정규화한다. null 같은 실제 저장값의 표시 문구가 옵션 값과 다르면 `renderCell`에서만 placeholder를 표현하고 저장값은 변경하지 않는다.
+- select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
 - 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
 - 인라인 편집 중 blur는 Grid 바깥의 실제 editor popup으로 포커스가 이동할 때 보류한다. Grid 자체를 감싸는 상위 MUI Dialog/Modal은 popup으로 오인하지 않으므로, 같은 Dialog 안에서 다른 셀을 클릭하면 현재 edit가 commit되어 dirty 상태에 반영된다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
+- `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
+- user 값은 단일 ID/`null` 또는 다중 ID 배열/`[]`로 저장한다. 옵션에서 선택한 ID의 원래 string/number 타입을 보존하며 표시 metadata는 row 값에 저장하지 않는다. 단일·다중 선택 chip X는 해제 patch를 만들고, 동일한 선택값을 commit해도 배열 내용이 같으면 dirty로 처리하지 않는다.
+- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell anchor가 좁아도 popup은 최소 320px(좁은 viewport에서는 viewport minus 16px)이며 viewport 경계를 넘으면 가로로 이동한다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
 
@@ -1432,6 +1436,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 - **행 복사 / 행 삭제**: 우클릭한 행이 현재 선택에 없으면 그 행만 단일 선택으로 교체한 뒤 기존 복제/삭제 로직을 재사용한다. 대상 행도 선택도 없으면 비활성화된다.
 - **필터 해제 / 정렬 해제**: 각각 `setFilterState([])` / `setSortState([])`.
 - **설정을 기본값으로 복원**: 컬럼 순서/폭/숨김/고정을 컬럼 정의 기준 초기값으로 되돌리고 `storageKey` 로컬 스토리지 값을 제거한다.
+- `storageKey`는 실제 그리드 인스턴스마다 고유한 안정적 값으로 지정한다. 값을 지정한 경우에만 컬럼 레이아웃을 브라우저에 저장하며, 미지정 시 저장하지 않는다.
 
 화면별 Custom Menu 확장은 아직 지원하지 않는다(⚠️ 아직 미구현).
 
