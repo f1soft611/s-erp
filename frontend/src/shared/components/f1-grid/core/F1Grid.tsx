@@ -34,6 +34,7 @@ import {
 } from '../state/GridState';
 import type {
   F1GridColumn,
+  F1GridDraftValue,
   F1GridEditContext,
   F1GridEditLifecycle,
   F1GridFilter,
@@ -152,6 +153,7 @@ function F1GridInner<T extends object>(
     afterEdit,
     onChangesChange,
     onSelectionChange,
+    initialSelectedRowIds,
     rowProjection,
     cellAdornment,
     disableSorting = false,
@@ -187,6 +189,7 @@ function F1GridInner<T extends object>(
   };
   const onChangesChangeRef = useRef(onChangesChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const restoredSelectionKeyRef = useRef<string | undefined>(undefined);
   const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
@@ -212,7 +215,7 @@ function F1GridInner<T extends object>(
     active: false,
     previousCell: null,
   });
-  const [draftValue, setDraftValue] = useState('');
+  const [draftValue, setDraftValue] = useState<F1GridDraftValue>('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [rowFormSession, setRowFormSession] = useState<
     F1GridRowFormSession<T> | undefined
@@ -1107,6 +1110,25 @@ function F1GridInner<T extends object>(
   }, [selectedIds]);
 
   useEffect(() => {
+    if (!initialSelectedRowIds || initialSelectedRowIds.length === 0) return;
+    const selectionKey = initialSelectedRowIds.map(String).join('|');
+    if (restoredSelectionKeyRef.current === selectionKey) return;
+    const selectedKeys = new Set(
+      initialSelectedRowIds.map((rowId) => String(rowId)),
+    );
+    const nextIds = visibleRowIds.filter((rowId) =>
+      selectedKeys.has(String(rowId)),
+    );
+    if (nextIds.length === 0) return;
+    setRowSelection({
+      allSelected: false,
+      includedIds: new Set(nextIds),
+      excludedIds: new Set(),
+    });
+    restoredSelectionKeyRef.current = selectionKey;
+  }, [initialSelectedRowIds, visibleRowIds]);
+
+  useEffect(() => {
     cellSelectionRef.current = cellSelection;
   }, [cellSelection]);
 
@@ -1369,7 +1391,12 @@ function F1GridInner<T extends object>(
 
     setFocusedCell(getCell(rowId, columnIndex));
     setEditingCell(getCell(rowId, columnIndex));
-    setDraftValue(String(row[column.field] ?? ''));
+    setDraftValue(
+      column.type === 'user'
+        ? ((row[column.field] as F1GridDraftValue | undefined) ??
+            (column.form?.multiple ? [] : null))
+        : String(row[column.field] ?? ''),
+    );
     finishEditLifecycle(context);
   }
 
@@ -1393,23 +1420,45 @@ function F1GridInner<T extends object>(
     if (!editingCell) return;
 
     const column = visibleColumns[editingCell.columnIndex];
+    const row = getGridRowById(data, editingCell.rowId);
+    const draftText = String(draftValue ?? '');
     const matchedAutocompleteOption =
       column.type === 'autocomplete'
         ? column.options?.find(
             (option) =>
-              option.label === draftValue ||
-              String(option.value) === draftValue,
+              option.label === draftText || String(option.value) === draftText,
           )
         : undefined;
+    const matchedSelectOption =
+      column.type === 'select'
+        ? column.options?.find((option) => String(option.value) === draftText)
+        : undefined;
+    const restoreUserValue = (selected: string | number) =>
+      column.type === 'user'
+        ? (column.userOptions?.find(
+            (option) => String(option.value) === String(selected),
+          )?.value ?? selected)
+        : selected;
     const value =
-      column.type === 'number' ||
-      column.type === 'decimal' ||
-      column.type === 'currency'
-        ? Number(draftValue)
-        : column.type === 'date'
-          ? normalizeDateInput(draftValue) || draftValue
-          : (matchedAutocompleteOption?.value ?? draftValue);
-    const row = getGridRowById(data, editingCell.rowId);
+      column.type === 'user'
+        ? Array.isArray(draftValue)
+          ? draftValue.map(restoreUserValue)
+          : draftValue == null || draftValue === ''
+            ? null
+            : restoreUserValue(draftValue)
+        : column.type === 'number' ||
+            column.type === 'decimal' ||
+            column.type === 'currency'
+          ? Number(draftText)
+          : column.type === 'date'
+            ? normalizeDateInput(draftText) || draftText
+            : (matchedAutocompleteOption?.value ??
+              matchedSelectOption?.value ??
+              (column.type === 'select' &&
+              row &&
+              String(row[column.field] ?? '') === draftText
+                ? row[column.field]
+                : draftText));
 
     if (
       column &&
@@ -1417,14 +1466,28 @@ function F1GridInner<T extends object>(
       ((column.type !== 'number' &&
         column.type !== 'decimal' &&
         column.type !== 'currency') ||
-        !Number.isNaN(value)) &&
-      !Object.is(row[column.field], value)
+        !Number.isNaN(value))
     ) {
-      setData((current) =>
-        updateGridRow(current, rowKey, editingCell.rowId, {
-          [column.field]: value,
-        } as Partial<T>),
+      const changes =
+        column.type === 'select' || column.type === 'user'
+          ? (column.onValueChange?.(row, value) ?? {
+              [column.field]: value,
+            })
+          : { [column.field]: value };
+      const hasChanges = Object.entries(changes).some(
+        ([field, nextValue]) =>
+          !areGridValuesEqual(row[field as keyof T], nextValue),
       );
+      if (hasChanges) {
+        setData((current) =>
+          updateGridRow(
+            current,
+            rowKey,
+            editingCell.rowId,
+            changes as Partial<T>,
+          ),
+        );
+      }
     }
 
     stopEdit();
@@ -2222,6 +2285,16 @@ function F1GridInner<T extends object>(
     },
     clearSelection() {
       setRowSelection(createGridRowSelection());
+    },
+    setSelectedRowIds(rowIds) {
+      const selectedKeys = new Set(rowIds.map((rowId) => String(rowId)));
+      setRowSelection({
+        allSelected: false,
+        includedIds: new Set(
+          visibleRowIds.filter((rowId) => selectedKeys.has(String(rowId))),
+        ),
+        excludedIds: new Set(),
+      });
     },
     addRow(row?: Partial<T>) {
       handleAddRow(row);

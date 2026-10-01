@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS tb_board_file (
 
 -- 그룹웨어 모듈 기준으로 커뮤니티 중메뉴 생성
 INSERT INTO tb_menu (
-    menu_id,
     tenant_id,
     module_id,
     parent_menu_id,
@@ -68,7 +67,6 @@ INSERT INTO tb_menu (
     menu_dc
 )
 SELECT
-    COALESCE((SELECT MAX(menu_id) + 1 FROM tb_menu), 10000),
     t.tenant_id,
     m.module_id,
     NULL,
@@ -95,7 +93,6 @@ AND NOT EXISTS (
 
 -- 커뮤니티 중메뉴 아래: 공지사항
 INSERT INTO tb_menu (
-    menu_id,
     tenant_id,
     module_id,
     parent_menu_id,
@@ -110,7 +107,6 @@ INSERT INTO tb_menu (
     menu_dc
 )
 SELECT
-    COALESCE((SELECT MAX(menu_id) + 1 FROM tb_menu), 10001),
     t.tenant_id,
     m.module_id,
     p.menu_id,
@@ -138,7 +134,6 @@ AND NOT EXISTS (
 
 -- 커뮤니티 중메뉴 아래: 게시판
 INSERT INTO tb_menu (
-    menu_id,
     tenant_id,
     module_id,
     parent_menu_id,
@@ -153,7 +148,6 @@ INSERT INTO tb_menu (
     menu_dc
 )
 SELECT
-    COALESCE((SELECT MAX(menu_id) + 1 FROM tb_menu), 10002),
     t.tenant_id,
     m.module_id,
     p.menu_id,
@@ -181,7 +175,6 @@ AND NOT EXISTS (
 
 -- 커뮤니티 중메뉴 아래: 자료실
 INSERT INTO tb_menu (
-    menu_id,
     tenant_id,
     module_id,
     parent_menu_id,
@@ -196,7 +189,6 @@ INSERT INTO tb_menu (
     menu_dc
 )
 SELECT
-    COALESCE((SELECT MAX(menu_id) + 1 FROM tb_menu), 10003),
     t.tenant_id,
     m.module_id,
     p.menu_id,

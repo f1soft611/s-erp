@@ -50,23 +50,25 @@
 
 ### 2-5. tb_user
 
-| 컬럼          | 타입      | 설명           |
-| ------------- | --------- | -------------- |
-| user_id       | bigint    | 사용자 PK      |
-| tenant_id     | bigint    | 소속 테넌트    |
-| login_id      | bigint    | 로그인 계정 FK |
-| user_nm       | varchar   | 사용자명       |
-| email_addr    | varchar   | 이메일         |
-| department_id | bigint    | 부서 FK        |
-| mobile_no     | varchar   | 휴대폰 번호    |
-| use_at        | char      | 사용 여부      |
-| created_at    | timestamp | 생성 일시      |
-| updated_at    | timestamp | 수정 일시      |
+| 컬럼          | 타입      | 설명                  |
+| ------------- | --------- | --------------------- |
+| user_id       | bigint    | 사용자 PK             |
+| tenant_id     | bigint    | 소속 테넌트           |
+| login_id      | bigint    | 로그인 계정 FK        |
+| user_nm       | varchar   | 사용자명              |
+| email_addr    | varchar   | 이메일                |
+| department_id | bigint    | 부서 FK               |
+| level_id      | bigint    | 직급 공통코드 항목 FK |
+| mobile_no     | varchar   | 휴대폰 번호           |
+| use_at        | char      | 사용 여부             |
+| created_at    | timestamp | 생성 일시             |
+| updated_at    | timestamp | 수정 일시             |
 
 역할:
 
 - 사용자 프로필정보
-- 로그인 계정과 사용자 실명/부서 연결
+- 로그인 계정과 사용자 실명/부서/직급 연결
+- `level_id`는 `tb_common_code_item.common_code_item_id`를 참조하며 `LEVEL` 그룹 항목만 사용
 
 ### 2-6. tb_department
 
@@ -85,6 +87,11 @@
 
 - 테넌트별 부서 조직도 관리
 - `tb_user.department_id`가 참조하는 대상
+
+### 2-6-1. tb_common_code_item 직급 참조
+
+- `tb_user.level_id`는 `tb_common_code_item.common_code_item_id`를 참조한다.
+- 직급 항목은 `tb_common_code_group.group_code = 'LEVEL'`인 그룹에 속한 활성 항목을 사용한다.
 
 ### 2-7. tb_role
 
@@ -416,10 +423,81 @@
 - 인증 사용자별 공지사항 최초 조회를 기록
 - 동일 사용자의 반복·동시 조회로 인한 조회수 중복 증가 방지
 
+### 2-20. tb_drafting_work_category_group
+
+| 컬럼                            | 타입        | 설명                   |
+| ------------------------------- | ----------- | ---------------------- |
+| drafting_work_category_group_id | bigserial   | 분류 그룹 PK           |
+| tenant_id                       | bigint      | 소속 테넌트 FK         |
+| cata_code                       | varchar(3)  | 분류 그룹 코드         |
+| cata_name                       | varchar(20) | 분류 그룹명            |
+| view_seq                        | integer     | 표시 순서              |
+| use_at                          | char(1)     | 사용 여부 (`Y`/`N`)    |
+| delete_status                   | varchar     | 삭제 상태              |
+| created_by / updated_by         | bigint      | 생성/수정 로그인 ID FK |
+| created_at / updated_at         | timestamp   | 생성/수정 시각         |
+
+제약/역할:
+
+- `tb_tenant`, `tb_login_account` 참조, 테넌트별 `cata_code` unique
+- HACCP 원본 호환용 분류 그룹 테이블. 신규 화면의 분류 옵션은 공통코드 `WF_FORM_CATEGORY`에서 조회
+
+### 2-21. tb_drafting_work_category
+
+| 컬럼                            | 타입         | 설명                                |
+| ------------------------------- | ------------ | ----------------------------------- |
+| drafting_work_category_id       | bigserial    | 기안양식 기준정보 PK                |
+| tenant_id                       | bigint       | 소속 테넌트 FK                      |
+| drafting_work_category_group_id | bigint       | 원본 분류 그룹 FK                   |
+| category_item_id                | bigint       | 분류 공통코드 항목 ID FK (추가)     |
+| cata_type_code                  | varchar(3)   | 양식 구분코드                       |
+| code_name                       | varchar(50)  | 양식명                              |
+| view_seq                        | integer      | 표시 순서                           |
+| type_cnt                        | text         | 원본 업무 텍스트                    |
+| reviewer_id / approver_id       | bigint       | 검토/승인 로그인 ID FK              |
+| user_type                       | varchar(10)  | 원본 사용자 유형                    |
+| haccp_cp_status                 | varchar(10)  | 원본 HACCP 상태                     |
+| reg_term                        | varchar(6)   | 등록주기 표시명 호환 컬럼           |
+| reg_term_id                     | bigint       | 등록주기 공통코드 항목 ID FK (추가) |
+| drafting_work_template_json     | jsonb        | 문서 템플릿 JSON                    |
+| drafting_work_template_html     | text         | 문서 템플릿 HTML                    |
+| duty_charge_code                | varchar(10)  | 원본 담당 코드                      |
+| cata_code                       | varchar(3)   | 원본 분류코드 호환 컬럼             |
+| use_at / delete_status          | char/varchar | 사용/삭제 상태                      |
+| created_by / updated_by         | bigint       | 생성/수정 로그인 ID FK              |
+| created_at / updated_at         | timestamp    | 생성/수정 시각                      |
+
+제약/역할:
+
+- `tb_tenant`, 원본 분류 그룹, `tb_common_code_item`, reviewer/approver 및 감사 사용자 참조
+- `category_item_id`는 `WF_FORM_CATEGORY`, `reg_term_id`는 `WF_FORM_CYCLE` 그룹 항목을 서비스에서 검증
+- `code_name`은 양식명이다. `reg_term`은 `reg_term_id`가 가리키는 항목명과 동기화
+- `cata_type_code`는 기존 `haccpBaseWorkCodeIdGnrService`로 3자리 생성
+
+### 2-22. tb_drafting_work_category_authority
+
+| 컬럼                                | 타입         | 설명                   |
+| ----------------------------------- | ------------ | ---------------------- |
+| drafting_work_category_authority_id | bigserial    | 담당자 매핑 PK         |
+| tenant_id                           | bigint       | 소속 테넌트 FK         |
+| drafting_work_category_id           | bigint       | 기안양식 FK            |
+| cata_type_code                      | varchar(3)   | 원본 양식 구분코드     |
+| employee_no                         | varchar(10)  | 담당 사용자 식별값     |
+| use_at / delete_status              | char/varchar | 사용/삭제 상태         |
+| created_by / updated_by             | bigint       | 생성/수정 로그인 ID FK |
+| created_at / updated_at             | timestamp    | 생성/수정 시각         |
+
+제약/역할:
+
+- `tb_tenant`, `tb_drafting_work_category`, `tb_login_account`를 참조
+- `(tenant_id, drafting_work_category_id, employee_no)` unique
+- 양식 담당자 매핑을 보존하는 HACCP 원본 테이블
+
 ---
 
 ## 변경 이력
 
+- 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.

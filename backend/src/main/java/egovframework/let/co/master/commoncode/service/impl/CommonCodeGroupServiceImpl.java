@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSaveRequestVO;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSearchCondition;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.repository.CommonCodeGroupDAO;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
@@ -28,6 +29,25 @@ public class CommonCodeGroupServiceImpl extends EgovAbstractServiceImpl implemen
     @Override
     public List<CommonCodeGroupVO> listGroups(Long tenantId) throws Exception {
         return commonCodeGroupDAO.selectGroupList(tenantId);
+    }
+
+    @Override
+    public List<CommonCodeGroupVO> listGroups(Long tenantId, CommonCodeGroupSearchCondition condition) throws Exception {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        if (condition != null) {
+            putSearchValue(params, "keyword", condition.getKeyword());
+            putSearchValue(params, "groupCode", condition.getGroupCode());
+            putSearchValue(params, "groupNm", condition.getGroupNm());
+            putSearchValue(params, "groupDc", condition.getGroupDc());
+        }
+        return commonCodeGroupDAO.selectGroupList(params);
+    }
+
+    private void putSearchValue(Map<String, Object> params, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            params.put(key, value.trim());
+        }
     }
 
     @Override

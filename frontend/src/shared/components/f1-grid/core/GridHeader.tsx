@@ -584,7 +584,17 @@ export function GridHeader<T extends object>({
                     }
                   />
                 ) : null}
-                {column.headerName}
+                <Box
+                  component="span"
+                  sx={{
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {column.headerName}
+                </Box>
                 {column.required ? (
                   <Box
                     component="span"

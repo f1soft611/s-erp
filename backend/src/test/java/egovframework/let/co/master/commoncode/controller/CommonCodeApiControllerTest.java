@@ -2,6 +2,7 @@ package egovframework.let.co.master.commoncode.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,6 +29,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.cmm.util.ResultVoHelper;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSearchCondition;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
 import egovframework.let.co.master.commoncode.service.CommonCodeBatchService;
@@ -71,6 +73,25 @@ class CommonCodeApiControllerTest {
                 .andExpect(jsonPath("$.result.resultList[0].commonCodeGroupId").value(1))
                 .andExpect(jsonPath("$.result.resultList[0].groupCode").value("ATTACH_DOC"));
     }
+
+        @Test
+        void listGroupsPassesSearchConditionsToService() throws Exception {
+        when(commonCodeGroupService.listGroups(eq(1L), any(CommonCodeGroupSearchCondition.class)))
+            .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/v1/co/master/common-code/groups")
+            .param("keyword", "공통")
+            .param("groupCode", "DOC")
+            .param("groupNm", "문서")
+            .principal(authenticationFor()))
+            .andExpect(status().isOk());
+
+        verify(commonCodeGroupService).listGroups(eq(1L), org.mockito.ArgumentMatchers.argThat(condition ->
+            "공통".equals(condition.getKeyword())
+                && "DOC".equals(condition.getGroupCode())
+                && "문서".equals(condition.getGroupNm())
+                && condition.getGroupDc() == null));
+        }
 
     @Test
     void createItemRejectsParentOnDifferentGroup() throws Exception {

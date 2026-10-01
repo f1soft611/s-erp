@@ -71,6 +71,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 현재 구현된 `F1Grid`/`F1Tree`는 아래 기능을 실제로 지원한다.
 
 - 헤더 메뉴에서 컬럼 정렬, 필터, 고정, 숨김/표시를 조작할 수 있다.
+- 좁은 컬럼 헤더의 제목은 한 줄로 표시되며, 공간이 부족하면 말줄임표로 축약된다. 전체 제목은 접근성 라벨에 유지되고 hover 시 헤더 높이가 늘어나지 않는다.
 - 컬럼 리사이즈와 컬럼 고정 상태가 동시에 동작하며, 마지막 남은 표시 컬럼은 숨길 수 없다.
 - 행 높이 조절 핸들과 키보드 `ArrowUp`/`ArrowDown`으로 `4px` 단위 조절이 가능하다.
 - 셀 범위 드래그 선택 중에는 행 높이 조절 핸들이 비활성화되어 `rowresize` 동작이 발생하지 않는다.
@@ -89,9 +90,17 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
+- `type: 'select'`의 표시 label은 저장값과 `options[].value`가 같은 타입과 값으로 일치할 때 매핑된다. 숫자 ID는 행과 옵션 양쪽에서 같은 숫자 타입으로 정규화한다. null 같은 실제 저장값의 표시 문구가 옵션 값과 다르면 `renderCell`에서만 placeholder를 표현하고 저장값은 변경하지 않는다.
+- select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
+- F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
+- 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
+- 인라인 편집 중 blur는 Grid 바깥의 실제 editor popup으로 포커스가 이동할 때 보류한다. Grid 자체를 감싸는 상위 MUI Dialog/Modal은 popup으로 오인하지 않으므로, 같은 Dialog 안에서 다른 셀을 클릭하면 현재 edit가 commit되어 dirty 상태에 반영된다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
+- `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
+- user 값은 단일 ID/`null` 또는 다중 ID 배열/`[]`로 저장한다. 옵션에서 선택한 ID의 원래 string/number 타입을 보존하며 표시 metadata는 row 값에 저장하지 않는다. 단일·다중 선택 chip X는 해제 patch를 만들고, 동일한 선택값을 commit해도 배열 내용이 같으면 dirty로 처리하지 않는다.
+- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell anchor가 좁아도 popup은 최소 320px(좁은 viewport에서는 viewport minus 16px)이며 viewport 경계를 넘으면 가로로 이동한다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
 
@@ -339,6 +348,31 @@ const columns: F1GridColumn<Item>[] = [
 
 > ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
 
+## PageSearchArea 상세 검색 연결
+
+페이지의 접이식 상세검색은 F1-Grid 컬럼의 `search` metadata와 `toPageSearchFields(columns)`를 재사용할 수 있다. `search.label`, `search.order`, `search.span`, `search.group`으로 검색 필드 표시를 정하고 `type`/`options`는 해당 Grid 컬럼의 값을 사용한다. `column.hidden` 또는 `search.hidden`인 컬럼은 상세검색에서 제외된다.
+
+```typescript
+const columns: F1GridColumn<DraftFormRow>[] = [
+  {
+    field: 'categoryItemId',
+    headerName: '분류',
+    type: 'select',
+    options: categoryOptions,
+    search: { label: '분류', order: 1 },
+  },
+  {
+    field: 'cataTypeCode',
+    headerName: '구분코드',
+    search: { hidden: true },
+  },
+];
+
+const detailFields = toPageSearchFields(columns);
+```
+
+`toPageSearchFields`는 검색 UI field definitions만 만든다. `PageSearchArea`가 확정한 값은 페이지가 검색 조건으로 변환해 조회 API에 전달하며, F1-Grid 자체가 서버 검색을 수행하지 않는다. `keyword` 등 기본 검색어와 상세 조건의 결합도 페이지가 관리한다.
+
 Row Merge 설정:
 
 ```typescript
@@ -504,6 +538,7 @@ type F1GridColumnFormOptions<T extends object> = {
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
+  multiple?: boolean;
   targetField?: keyof T;
   targetLabel?: string;
 };
@@ -536,6 +571,7 @@ interface F1GridProps<T extends object> {
 - 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
 - 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
 - `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
+- `type: 'select'`에서 `form.multiple: true`를 지정하면 row form은 선택값 배열을 보존한다. Grid 표시용 `getValue`가 요약 문자열을 반환해도 form 입력은 원본 row 배열을 사용한다.
 - `form.targetField`와 `form.targetLabel`로 수정 모달 상단의 메타 정보(`예: 메뉴명: 홍길동`)를 재정의할 수 있으며, 기본값은 `rowKey`와 `대상`이다.
 - `text`, `number`, `decimal`, `currency`, `checkbox`, `date`, `datetime`, `time`, `select`, `autocomplete`, `code` 컬럼은 대응 입력으로 변환된다.
 - `rownumber`, 선택 체크박스, 합성 액션 열, 선언상 숨김 컬럼은 기본 제외한다. `form.hidden: false`이면 숨김 컬럼도 명시적으로 폼에 포함할 수 있다.
@@ -1400,6 +1436,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 - **행 복사 / 행 삭제**: 우클릭한 행이 현재 선택에 없으면 그 행만 단일 선택으로 교체한 뒤 기존 복제/삭제 로직을 재사용한다. 대상 행도 선택도 없으면 비활성화된다.
 - **필터 해제 / 정렬 해제**: 각각 `setFilterState([])` / `setSortState([])`.
 - **설정을 기본값으로 복원**: 컬럼 순서/폭/숨김/고정을 컬럼 정의 기준 초기값으로 되돌리고 `storageKey` 로컬 스토리지 값을 제거한다.
+- `storageKey`는 실제 그리드 인스턴스마다 고유한 안정적 값으로 지정한다. 값을 지정한 경우에만 컬럼 레이아웃을 브라우저에 저장하며, 미지정 시 저장하지 않는다.
 
 화면별 Custom Menu 확장은 아직 지원하지 않는다(⚠️ 아직 미구현).
 

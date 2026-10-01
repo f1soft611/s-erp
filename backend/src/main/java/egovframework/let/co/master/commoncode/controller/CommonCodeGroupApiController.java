@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -24,6 +25,7 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeBatchSaveRequestVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeBatchSaveResultVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSaveRequestVO;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSearchCondition;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemSaveRequestVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
@@ -65,10 +67,28 @@ public class CommonCodeGroupApiController {
     }
 
     @GetMapping("/groups")
-    public ResultVO listGroups(@Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+    public ResultVO listGroups(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String groupCode,
+            @RequestParam(required = false) String groupNm,
+            @RequestParam(required = false) String groupDc,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         Map<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", commonCodeGroupService.listGroups(user.getTenantId()));
+        if (hasSearchValue(keyword) || hasSearchValue(groupCode) || hasSearchValue(groupNm) || hasSearchValue(groupDc)) {
+            CommonCodeGroupSearchCondition condition = new CommonCodeGroupSearchCondition();
+            condition.setKeyword(keyword);
+            condition.setGroupCode(groupCode);
+            condition.setGroupNm(groupNm);
+            condition.setGroupDc(groupDc);
+            resultMap.put("resultList", commonCodeGroupService.listGroups(user.getTenantId(), condition));
+        } else {
+            resultMap.put("resultList", commonCodeGroupService.listGroups(user.getTenantId()));
+        }
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    private boolean hasSearchValue(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     @PostMapping("/groups")

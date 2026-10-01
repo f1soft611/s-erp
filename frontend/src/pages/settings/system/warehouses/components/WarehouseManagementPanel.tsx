@@ -169,8 +169,7 @@ export const WarehouseManagementPanel = forwardRef<
 
     const savePromise = (async () => {
       const nextChanges =
-        gridRef.current?.getChanges() ??
-        emptyChanges<WarehouseManagementRow>();
+        gridRef.current?.getChanges() ?? emptyChanges<WarehouseManagementRow>();
 
       try {
         for (const row of [
@@ -314,6 +313,7 @@ export const WarehouseManagementPanel = forwardRef<
               rows={filteredWarehouses}
               columns={columns}
               rowKey="id"
+              storageKey="settings-system-warehouse-grid"
               ariaLabel="F1-GRID 창고 관리"
               height="100%"
               maxHeight="100%"
@@ -330,10 +330,7 @@ export const WarehouseManagementPanel = forwardRef<
                 },
               ]}
               beforeEdit={({ row, field }) => {
-                if (
-                  field === 'warehouseName' &&
-                  !canEditWarehouseName(row)
-                ) {
+                if (field === 'warehouseName' && !canEditWarehouseName(row)) {
                   return false;
                 }
                 return true;

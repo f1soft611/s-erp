@@ -1,0 +1,56 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import ProfileSettingsPage from '../src/pages/dashboard/ProfileSettingsPage';
+import * as profileService from '../src/pages/dashboard/services/profileSettings.service';
+
+vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
+  fetchMyProfile: vi.fn(),
+  updateMyProfile: vi.fn(),
+}));
+
+describe('ProfileSettingsPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(profileService.fetchMyProfile).mockResolvedValue({
+      userId: 'admin',
+      name: '사용자명',
+      email: 'user@example.com',
+      departmentName: '개발팀',
+      levelName: '사원',
+      profileImage: null,
+      stampImage: null,
+    });
+    vi.mocked(profileService.updateMyProfile).mockResolvedValue({
+      userId: 'admin',
+      name: '사용자명',
+      email: 'new@example.com',
+      departmentName: '개발팀',
+      levelName: '사원',
+      profileImage: null,
+      stampImage: null,
+    });
+  });
+
+  it('loads and saves the authenticated profile email', async () => {
+    render(
+      <MemoryRouter>
+        <ProfileSettingsPage />
+      </MemoryRouter>,
+    );
+
+    const emailInput = await screen.findByLabelText(/이메일/i);
+    expect(emailInput).toHaveValue('user@example.com');
+
+    fireEvent.change(emailInput, { target: { value: 'new@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /저장/i }));
+
+    await vi.waitFor(() => {
+      expect(profileService.updateMyProfile).toHaveBeenCalledWith({
+        email: 'new@example.com',
+        profileImage: null,
+        stampImage: null,
+      });
+    });
+  });
+});

@@ -12,7 +12,13 @@ import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 public class CommonCodeGroupDAO extends EgovAbstractMapper {
 
     public List<CommonCodeGroupVO> selectGroupList(Long tenantId) throws Exception {
-        return selectList("CommonCodeGroupDAO.selectGroupList", tenantId);
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("tenantId", tenantId);
+        return selectGroupList(params);
+    }
+
+    public List<CommonCodeGroupVO> selectGroupList(Map<String, Object> params) throws Exception {
+        return selectList("CommonCodeGroupDAO.selectGroupList", params);
     }
 
     public CommonCodeGroupVO selectGroupById(Map<String, Object> params) throws Exception {

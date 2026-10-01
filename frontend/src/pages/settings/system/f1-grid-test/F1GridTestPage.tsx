@@ -515,6 +515,7 @@ export function F1GridTestPage({
         rows={initialRows}
         columns={columns}
         rowKey="id"
+        storageKey="settings-system-f1-grid-test"
         ariaLabel="F1-GRID 기능 테스트"
         columnLine={columnLine}
         rowHeight={32}

@@ -216,6 +216,22 @@ export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: T[keyof T],
 ): string {
+  if (column.type === 'user') {
+    const selectedValues = Array.isArray(value) ? value : [value];
+    return selectedValues
+      .filter(
+        (selected): selected is string | number =>
+          typeof selected === 'string' || typeof selected === 'number',
+      )
+      .map(
+        (selected) =>
+          column.userOptions?.find(
+            (option) => String(option.value) === String(selected),
+          )?.label ?? String(selected),
+      )
+      .join(', ');
+  }
+
   if (column.type === 'select' || column.type === 'autocomplete') {
     return (
       column.options?.find((option) => Object.is(option.value, value))?.label ??

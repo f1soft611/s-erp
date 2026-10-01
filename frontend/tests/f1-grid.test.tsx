@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { Dialog } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -135,6 +136,31 @@ describe('F1-GRID default prop behavior', () => {
       'true',
     );
     expect(secondRowCodeCell.getAttribute('data-f1-grid-striped')).toBe('true');
+  });
+
+  it('commits an edited cell when focus moves inside its parent dialog', () => {
+    const gridRef = createRef<F1GridRef<MenuRow>>();
+
+    render(
+      <Dialog open>
+        <F1Grid
+          ref={gridRef}
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="dialog grid"
+        />
+      </Dialog>,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'DASH' }));
+    const editor = screen.getByDisplayValue('DASH');
+    fireEvent.change(editor, { target: { value: 'DASH-UPDATED' } });
+    fireEvent.click(screen.getByRole('gridcell', { name: 'SET' }));
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: 'dashboard', code: 'DASH-UPDATED' }),
+    ]);
   });
 
   it('allows disabling column lines and row striping explicitly', () => {
@@ -3013,6 +3039,105 @@ describe('F1-GRID interaction', () => {
     ]);
   });
 
+  it('supports single selection with the user column in a grid cell', () => {
+    type UserSelectionRow = { id: string; reviewerId: number | null };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'reviewerId',
+      headerName: 'Reviewer',
+      editable: true,
+      type: 'user',
+      userOptions: [
+        { value: 12, label: 'Alice Kim', positionName: 'Manager' },
+        { value: 13, label: 'Bob Lee', departmentName: 'Finance' },
+      ],
+    } as unknown as F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', reviewerId: null }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    fireEvent.click(screen.getByRole('option', { name: /Alice Kim/ }));
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      { id: 'form-1', reviewerId: 12 },
+    ]);
+  });
+
+  it('supports multiple selection with the user column in a grid cell', () => {
+    type UserSelectionRow = { id: string; assigneeIds: string[] };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'assigneeIds',
+      headerName: 'Assignees',
+      editable: true,
+      type: 'user',
+      userOptions: [
+        { value: 'u-1', label: 'Alice Kim' },
+        { value: 'u-2', label: 'Bob Lee' },
+      ],
+      form: { multiple: true },
+    } as unknown as F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', assigneeIds: ['u-1'] }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    const input = screen.getByRole('combobox');
+    fireEvent.click(screen.getByRole('option', { name: /Bob Lee/ }));
+    fireEvent.blur(input);
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      { id: 'form-1', assigneeIds: ['u-1', 'u-2'] },
+    ]);
+  });
+
+  it('does not mark an unchanged multiple user selection dirty', () => {
+    type UserSelectionRow = { id: string; assigneeIds: string[] };
+    const gridRef = createRef<F1GridRef<UserSelectionRow>>();
+    const userColumn = {
+      field: 'assigneeIds',
+      headerName: 'Assignees',
+      editable: true,
+      type: 'user',
+      userOptions: [{ value: 'u-1', label: 'Alice Kim' }],
+      form: { multiple: true },
+    } satisfies F1GridColumn<UserSelectionRow>;
+
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'form-1', assigneeIds: ['u-1'] }]}
+        columns={[userColumn]}
+        rowKey="id"
+        showCheckbox={false}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    fireEvent.blur(screen.getByRole('combobox'));
+
+    expect(gridRef.current?.getChanges()).toEqual({
+      insertedRows: [],
+      updatedRows: [],
+      deletedRows: [],
+    });
+  });
+
   it('edits dates as YYYY-MM-DD values', () => {
     const gridRef = createRef<F1GridRef<MenuRow>>();
 
@@ -3426,6 +3551,28 @@ describe('F1-GRID interaction', () => {
 });
 
 describe('F1-GRID header divider', () => {
+  it('truncates narrow header names without changing their accessible name', () => {
+    const headerName = '등록주기 확인';
+
+    render(
+      <F1Grid
+        rows={[{ id: '1', label: '값' }]}
+        columns={[{ field: 'label', headerName, width: 52, minWidth: 52 }]}
+        rowKey="id"
+      />,
+    );
+
+    const columnHeader = screen.getByRole('columnheader', { name: headerName });
+    const headerLabel = screen.getByText(headerName);
+
+    expect(headerLabel).toHaveStyle({
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    });
+    expect(columnHeader).toHaveAttribute('aria-label', headerName);
+  });
+
   it('always renders a vertical divider on header cells regardless of columnLine', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 

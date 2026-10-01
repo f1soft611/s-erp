@@ -15,6 +15,7 @@ export type F1GridEditorType =
   | 'time'
   | 'select'
   | 'autocomplete'
+  | 'user'
   | 'code'
   | 'rownumber';
 
@@ -22,6 +23,16 @@ export type F1GridOption = {
   value: string | number | boolean;
   label: string;
 };
+
+export type F1GridUserOption = {
+  value: string | number;
+  label: string;
+  avatarUrl?: string | null;
+  positionName?: string | null;
+  departmentName?: string | null;
+};
+
+export type F1GridDraftValue = string | number | null | Array<string | number>;
 
 export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
@@ -34,8 +45,17 @@ export type F1GridColumnFormOptions<T extends object> = {
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
+  multiple?: boolean;
   targetField?: keyof T;
   targetLabel?: string;
+};
+
+export type F1GridColumnSearchOptions = {
+  hidden?: boolean;
+  label?: string;
+  group?: string;
+  order?: number;
+  span?: 1 | 2 | 3 | 4 | 5;
 };
 
 export type F1GridRowFormContext<T extends object> = {
@@ -101,6 +121,7 @@ export type F1GridColumn<T extends object> = {
   headerName: string;
   headerGroup?: string;
   form?: F1GridColumnFormOptions<T>;
+  search?: F1GridColumnSearchOptions;
   getValue?: (row: T) => unknown;
   onValueChange?: (row: T, value: unknown) => Partial<T>;
   width?: number;
@@ -111,6 +132,7 @@ export type F1GridColumn<T extends object> = {
   format?: F1GridNumberFormat;
   decimalPlaces?: number;
   options?: F1GridOption[];
+  userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
   min?: number;
@@ -240,6 +262,7 @@ export type F1GridProps<T extends object> = {
   afterEdit?: F1GridEditLifecycle<T>;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
   onSelectionChange?: (rowIds: F1GridRowId[]) => void;
+  initialSelectedRowIds?: F1GridRowId[];
   rowProjection?: (rows: T[]) => F1GridRowProjection<T>;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   disableSorting?: boolean;
@@ -259,6 +282,7 @@ export type F1GridRef<T extends object> = {
   getSelectedRows(): T[];
   getSelectedRowIds(): F1GridRowId[];
   clearSelection(): void;
+  setSelectedRowIds(rowIds: F1GridRowId[]): void;
   addRow(row?: Partial<T>): void;
   deleteSelectedRows(): void;
   restoreDeletedRows(): void;

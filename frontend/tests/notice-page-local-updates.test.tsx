@@ -24,6 +24,7 @@ import type { NoticeFeedItem } from '../src/pages/groupware/community/notice/dat
 
 const noticeServiceMocks = vi.hoisted(() => ({
   fetchNoticePosts: vi.fn(),
+  fetchPinnedNoticePosts: vi.fn(),
   fetchNoticePostDetail: vi.fn(),
   createNoticePost: vi.fn(),
   updateNoticePost: vi.fn(),
@@ -104,11 +105,13 @@ describe('CommunityNoticePage local updates', () => {
         ...detail,
         postId: 1,
         title: '기존 공지',
+        isPinned: 'Y',
         attachments: [
           { boardFileId: 101, fileName: '목록 첨부.pdf', fileSize: 12 },
         ],
       },
     ]);
+    noticeServiceMocks.fetchPinnedNoticePosts.mockResolvedValue([]);
     noticeServiceMocks.fetchNoticePostDetail.mockResolvedValue(detail);
     noticeServiceMocks.createNoticePost.mockResolvedValue({
       ...detail,
@@ -462,7 +465,7 @@ describe('CommunityNoticePage local updates', () => {
     });
     expect(noticeServiceMocks.updateNoticePost).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ title: '수정 공지' }),
+      expect.objectContaining({ title: '수정 공지', isPinned: 'Y' }),
     );
     expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledTimes(1);
   });

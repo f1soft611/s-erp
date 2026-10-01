@@ -32,7 +32,18 @@ beforeEach(() => {
             resultCode: '200',
             resultMessage: 'OK',
             result: {
-              user: { userId: 'admin', roles: [] },
+              user: {
+                userId: 'admin',
+                name: '소크라710',
+                email: 'admin@f1soft.com',
+                departmentName: '플랫폼개발팀',
+                levelId: 123,
+                levelCode: '001',
+                levelName: '사원',
+                groupName: '플랫폼관리자',
+                roleName: 'PLATFORM_ADMIN',
+                roles: ['PLATFORM_ADMIN'],
+              },
               menus: [
                 {
                   menuId: 'dashboard',

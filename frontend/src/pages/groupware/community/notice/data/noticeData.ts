@@ -15,6 +15,8 @@ export type NoticeCommentItem = {
 
 export type NoticeFeedItem = {
   id: number;
+  writerId?: string | null;
+  isPostOwner?: boolean;
   title: string;
   viewCount?: number;
   createdAt?: string | Date | null;

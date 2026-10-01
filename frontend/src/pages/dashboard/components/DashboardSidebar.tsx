@@ -3,14 +3,25 @@ import type { ModuleItem } from '../types/dashboard';
 import { DashboardMenuTree } from './DashboardMenuTree';
 import { DashboardModuleSection } from './DashboardModuleSection';
 
+type RecentMenuEntry = {
+  menuId: string;
+  moduleId: string;
+  breadcrumbPath?: string;
+  label: string;
+  path: string;
+  visitedAt: number;
+};
+
 type DashboardSidebarProps = {
   moduleItems: ModuleItem[];
   selectedModuleId: string;
   selectedModule: ModuleItem;
   expandedItemIds: string[];
   selectedMenuId: string;
+  recentMenuItems?: RecentMenuEntry[];
   onModuleChange: (moduleId: string) => void;
   onMenuSelect: (menuId: string) => void;
+  onRecentMenuSelect?: (path: string) => void;
   isMenuPanelCollapsed: boolean;
   isMobile: boolean;
   isMobileMenuOpen: boolean;
@@ -24,8 +35,10 @@ export function DashboardSidebar({
   selectedModule,
   expandedItemIds,
   selectedMenuId,
+  recentMenuItems = [],
   onModuleChange,
   onMenuSelect,
+  onRecentMenuSelect,
   isMenuPanelCollapsed,
   isMobile,
   isMobileMenuOpen,
@@ -69,7 +82,9 @@ export function DashboardSidebar({
             selectedModule={selectedModule}
             expandedItemIds={expandedItemIds}
             selectedMenuId={selectedMenuId}
+            recentMenuItems={recentMenuItems}
             onMenuSelect={onMenuSelect}
+            onRecentMenuSelect={onRecentMenuSelect}
             onToggleMenu={onToggleMenu}
           />
         </Drawer>

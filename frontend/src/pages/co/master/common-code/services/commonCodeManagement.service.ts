@@ -15,6 +15,13 @@ export type CommonCodeBatchPayload = {
   items: CommonCodeBatchChangeSet<CommonCodeItemRow>;
 };
 
+export type CommonCodeGroupSearchFilters = {
+  keyword?: string;
+  groupCode?: string;
+  groupNm?: string;
+  groupDc?: string;
+};
+
 interface CommonCodeGroupApiRow {
   commonCodeGroupId?: number | string | null;
   tenantId?: number | string | null;
@@ -94,10 +101,17 @@ export function normalizeBatchSaveResponse(response: unknown): {
   };
 }
 
-export async function fetchCommonCodeGroups(): Promise<CommonCodeGroupRow[]> {
-  const result = await apiGet<{ resultList: CommonCodeGroupApiRow[] }>(
-    '/api/v1/co/master/common-code/groups',
-  );
+export async function fetchCommonCodeGroups(
+  filters: CommonCodeGroupSearchFilters = {},
+): Promise<CommonCodeGroupRow[]> {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    const normalized = String(value ?? '').trim();
+    if (normalized) query.set(key, normalized);
+  });
+  const queryString = query.toString();
+  const path = `/api/v1/co/master/common-code/groups${queryString ? `?${queryString}` : ''}`;
+  const result = await apiGet<{ resultList: CommonCodeGroupApiRow[] }>(path);
   return (result.resultList ?? []).map(toGroupRow);
 }
 

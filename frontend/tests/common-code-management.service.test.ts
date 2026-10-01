@@ -3,6 +3,7 @@ import * as apiClient from '../src/shared/services/apiClient';
 import {
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
+  type CommonCodeGroupSearchFilters,
 } from '../src/pages/co/master/common-code/services/commonCodeManagement.service';
 
 vi.mock('../src/shared/services/apiClient', () => ({
@@ -38,6 +39,23 @@ describe('commonCodeManagement.service', () => {
     ]);
     expect(apiClient.apiGet).toHaveBeenCalledWith(
       '/api/v1/co/master/common-code/groups',
+    );
+  });
+
+  it('adds only populated group search filters to the groups request', async () => {
+    vi.mocked(apiClient.apiGet).mockResolvedValue({ resultList: [] });
+
+    const filters: CommonCodeGroupSearchFilters = {
+      keyword: '공통 코드',
+      groupCode: 'DOC',
+      groupNm: '',
+      groupDc: undefined,
+    };
+
+    await fetchCommonCodeGroups(filters);
+
+    expect(apiClient.apiGet).toHaveBeenCalledWith(
+      '/api/v1/co/master/common-code/groups?keyword=%EA%B3%B5%ED%86%B5+%EC%BD%94%EB%93%9C&groupCode=DOC',
     );
   });
 

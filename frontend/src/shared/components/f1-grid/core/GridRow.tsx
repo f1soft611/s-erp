@@ -11,7 +11,11 @@ import {
 import { Box, Checkbox } from '@mui/material';
 import { GridCell } from './GridCell';
 import { GridFormActionCell } from '../form/GridFormActionCell';
-import type { F1GridColumn, F1GridRowId } from '../types/grid.types';
+import type {
+  F1GridColumn,
+  F1GridDraftValue,
+  F1GridRowId,
+} from '../types/grid.types';
 import type {
   F1GridCellRange,
   F1GridCellRangeBounds,
@@ -44,7 +48,7 @@ type GridRowProps<T extends object> = {
     };
   };
   copiedCellRange?: F1GridCellRange;
-  draftValue: string;
+  draftValue: F1GridDraftValue;
   dirtyCellMap?: Record<string, boolean>;
   mergeInfoByColumn: Array<
     Array<{ isStart: boolean; span: number } | undefined>
@@ -66,7 +70,7 @@ type GridRowProps<T extends object> = {
   onCellSelectionEnd: () => void;
   onCommitEdit: () => void;
   onStartEdit: (rowId: F1GridRowId, columnIndex: number) => void;
-  onDraftChange: (value: string) => void;
+  onDraftChange: (value: F1GridDraftValue) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onUpdateCell: (field: keyof T, value: unknown) => void;
   onUpdateRow: (changes: Partial<T>) => void;
@@ -565,6 +569,14 @@ const GridRowInner = <T extends object>({
             onKeyDown={onKeyDown}
             onSelectChange={(selectedValue: unknown) => {
               onDraftChange(String(selectedValue));
+              if (column.type === 'user') {
+                const changes =
+                  column.onValueChange?.(row, selectedValue) ??
+                  ({ [column.field]: selectedValue } as Partial<T>);
+                onUpdateRow(changes);
+                onStopEdit();
+                return;
+              }
               onUpdateCell(column.field, selectedValue);
               onStopEdit();
             }}

@@ -5,13 +5,40 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { useState } from 'react';
 import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
+import { ListView } from '../src/shared/components/view-mode/ListView';
+import { PinnedItemsPanel } from '../src/shared/components/view-mode/PinnedItemsPanel';
 
 describe('Community notice page', () => {
+  it('selects list and pinned items through their common callbacks', () => {
+    const onItemClick = vi.fn();
+    const item = {
+      id: 42,
+      title: '선택할 공지',
+      authorLabel: '운영팀',
+      dateLabel: '2026.09.23',
+      isPinned: true,
+    };
+
+    render(
+      <>
+        <ListView items={[item]} onItemClick={onItemClick} />
+        <PinnedItemsPanel items={[item]} onItemClick={onItemClick} />
+      </>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /선택할 공지/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /선택할 공지/i })[1]);
+
+    expect(onItemClick).toHaveBeenCalledTimes(2);
+    expect(onItemClick).toHaveBeenCalledWith(item);
+  });
+
   it('normalizes legacy MinIO image sources to the stable notice image API', () => {
     const html =
       '<p><img src="http://minio.example/expired" data-object-key="tenant/1/notice-temp/token/image.png" /></p>';
@@ -116,6 +143,23 @@ describe('Community notice page', () => {
     expect(onTogglePinned).toHaveBeenCalledWith(item);
   });
 
+  it('hides post management menu for a notice owned by another user', () => {
+    const item = { ...noticeFeed[0], isPostOwner: false };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: `공지 메뉴 ${item.title}` }),
+    ).not.toBeInTheDocument();
+  });
+
   it('uses title and body clicks as the read entry point when more is unavailable', () => {
     const onToggleExpand = vi.fn();
     const item = {
@@ -161,6 +205,38 @@ describe('Community notice page', () => {
 
     expect(onToggleExpand).toHaveBeenCalledTimes(1);
     expect(onToggleExpand).toHaveBeenCalledWith(item.id);
+  });
+
+  it('allows a controlled expanded notice to collapse after opening', () => {
+    const item = noticeFeed[0];
+
+    function ControlledNotice() {
+      const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(
+        item.id,
+      );
+
+      return (
+        <NoticeFeedList
+          items={[item]}
+          isDark={false}
+          expandedNoticeId={expandedNoticeId}
+          onToggleExpand={(noticeId) => {
+            setExpandedNoticeId((current) =>
+              current === noticeId ? null : noticeId,
+            );
+          }}
+        />
+      );
+    }
+
+    render(<ControlledNotice />);
+
+    fireEvent.click(screen.getByRole('button', { name: '접기' }));
+
+    expect(screen.getByTestId(`notice-preview-${item.id}`)).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
   });
 
   it('opens an image viewer when the user clicks a feed image preview', async () => {

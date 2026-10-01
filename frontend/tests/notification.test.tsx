@@ -41,4 +41,16 @@ describe('shared page notifications', () => {
 
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it('uses the shared message layout with an informational color when requested', () => {
+    render(
+      <PageMessageArea
+        message="분류 항목이 없습니다."
+        onClose={vi.fn()}
+        severity="info"
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveClass('MuiAlert-colorInfo');
+  });
 });
