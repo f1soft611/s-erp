@@ -1,0 +1,652 @@
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
+
+const apiMocks = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  apiPut: vi.fn(),
+}));
+
+vi.mock('../src/shared/services/apiClient', () => apiMocks);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  apiMocks.apiGet.mockImplementation((path: string) => {
+    if (path === '/api/v1/co/master/common-code/groups') {
+      return Promise.resolve({
+        resultList: [
+          {
+            commonCodeGroupId: 11,
+            groupCode: 'WF_FORM_CATEGORY',
+            groupNm: '기안양식 분류',
+            useAt: 'Y',
+          },
+          {
+            commonCodeGroupId: 12,
+            groupCode: 'WF_FORM_CYCLE',
+            groupNm: '기안양식 등록주기',
+            useAt: 'Y',
+          },
+        ],
+      });
+    }
+    if (path === '/api/v1/co/master/common-code/groups/11/items') {
+      return Promise.resolve({
+        resultList: [
+          {
+            commonCodeItemId: 101,
+            groupId: 11,
+            itemCode: 'INSPECTION',
+            itemNm: '점검',
+            sortOrder: 10,
+            useAt: 'Y',
+          },
+        ],
+      });
+    }
+    if (path === '/api/v1/co/master/common-code/groups/12/items') {
+      return Promise.resolve({
+        resultList: [
+          {
+            commonCodeItemId: 201,
+            groupId: 12,
+            itemCode: 'MONTH',
+            itemNm: '월',
+            sortOrder: 30,
+            useAt: 'Y',
+          },
+        ],
+      });
+    }
+    if (path === '/api/v1/co/workflow/forms/users') {
+      return Promise.resolve({
+        resultList: [
+          {
+            userId: 110,
+            loginId: 210,
+            userNm: '홍길동',
+            departmentNm: '운영팀',
+          },
+        ],
+      });
+    }
+    return Promise.resolve({ resultList: [] });
+  });
+});
+
+describe('Draft form management page', () => {
+  it('renders from the co/form dashboard route with one unified search field', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByRole('textbox', { name: '기안양식 검색' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  });
+
+  it('clears the unified search query from its clear action', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    const searchInput = await screen.findByRole('textbox', {
+      name: '기안양식 검색',
+    });
+    fireEvent.change(searchInput, { target: { value: '점검' } });
+    fireEvent.click(
+      screen.getByRole('button', { name: '기안양식 검색어 초기화' }),
+    );
+
+    expect(searchInput).toHaveValue('');
+  });
+
+  it('creates detailed search fields from grid metadata', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole('textbox', { name: '기안양식 검색' });
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+
+    expect(screen.getByRole('combobox', { name: '분류' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: '등록주기' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: '사용여부' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the classification helper without navigating away from the page', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole('textbox', { name: '기안양식 검색' });
+    fireEvent.click(screen.getAllByRole('button', { name: '분류 설정' })[0]);
+
+    expect(
+      await screen.findByRole('dialog', { name: '기안양식 분류 설정' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the missing-category callout in the shared info message area', async () => {
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/master/common-code/groups/11/items'
+        ? Promise.resolve({ resultList: [] })
+        : originalApiGet?.(path),
+    );
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    const message = await screen.findByRole('alert');
+    expect(message).toHaveTextContent('분류 항목이 없습니다.');
+    expect(message).toHaveClass('MuiAlert-colorInfo');
+    expect(screen.getByRole('button', { name: '양식 추가' })).toBeDisabled();
+  });
+
+  it('opens the F1-Grid create form for a create-only menu permission', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: false,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '양식 추가' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: '기안양식 등록' }),
+    ).toBeInTheDocument();
+  });
+
+  it('combines the unified keyword and applied category ID in one list request', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(
+      await screen.findByRole('textbox', { name: '기안양식 검색' }),
+      {
+        target: { value: '정기' },
+      },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const categorySelect = screen.getByRole('combobox', { name: '분류' });
+    fireEvent.mouseDown(categorySelect);
+    fireEvent.click(await screen.findByRole('option', { name: '점검' }));
+    const detailDialog = screen.getByRole('dialog', { name: '상세 검색' });
+    fireEvent.click(within(detailDialog).getByRole('button', { name: '조회' }));
+
+    await waitFor(() => {
+      expect(
+        apiMocks.apiGet.mock.calls.some(([path]) => {
+          if (
+            typeof path !== 'string' ||
+            !path.startsWith('/api/v1/co/workflow/forms?')
+          )
+            return false;
+          const params = new URLSearchParams(path.split('?')[1]);
+          return (
+            params.get('keyword') === '정기' &&
+            params.get('categoryItemId') === '101'
+          );
+        }),
+      ).toBe(true);
+    });
+  });
+
+  it('saves the form with common-code IDs and optional reviewer fields', async () => {
+    apiMocks.apiPost.mockResolvedValue({
+      item: { draftingWorkCategoryId: 1, cataTypeCode: '007' },
+    });
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '양식 추가' }));
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 등록',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      {
+        target: { value: '정기점검' },
+      },
+    );
+    fireEvent.mouseDown(
+      within(formDialog).getByRole('combobox', { name: '분류' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '점검' }));
+    fireEvent.mouseDown(
+      within(formDialog).getByRole('combobox', { name: '등록주기' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '월' }));
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(apiMocks.apiPost).toHaveBeenCalledWith(
+        '/api/v1/co/workflow/forms',
+        expect.objectContaining({
+          cataTypeCode: '',
+          codeName: '정기점검',
+          categoryItemId: 101,
+          regTermId: 201,
+          reviewerId: null,
+          approverId: null,
+          assigneeIds: [],
+          useAt: 'Y',
+        }),
+      ),
+    );
+  });
+
+  it('updates the selected form through the tenant-scoped PUT endpoint', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: 210,
+      reviewerName: '홍길동',
+      approverId: null,
+      approverName: '',
+      assigneeIds: ['110'],
+      assigneeSummary: '홍길동',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/workflow/forms'
+        ? Promise.resolve({ resultList: [sourceRow] })
+        : originalApiGet?.(path),
+    );
+    apiMocks.apiPut.mockResolvedValue({
+      item: { ...sourceRow, codeName: '수정양식' },
+    });
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '71 행 정보 수정' }),
+    );
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 수정',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      {
+        target: { value: '수정양식' },
+      },
+    );
+    fireEvent.mouseDown(
+      within(formDialog).getByRole('combobox', { name: '검토자' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '선택 안 함' }));
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(apiMocks.apiPut).toHaveBeenCalledWith(
+        '/api/v1/co/workflow/forms/71',
+        expect.objectContaining({
+          cataTypeCode: '007',
+          codeName: '수정양식',
+          categoryItemId: 101,
+          regTermId: 201,
+          reviewerId: null,
+          assigneeIds: ['110'],
+          useAt: 'Y',
+        }),
+      ),
+    );
+  });
+
+  it('soft-disables a deleted Grid row by saving useAt N', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    apiMocks.apiGet.mockImplementation((path: string) =>
+      path === '/api/v1/co/workflow/forms'
+        ? Promise.resolve({ resultList: [sourceRow] })
+        : originalApiGet?.(path),
+    );
+    apiMocks.apiPut.mockResolvedValue({ item: { ...sourceRow, useAt: 'N' } });
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.contextMenu(
+      await screen.findByRole('gridcell', { name: '정기점검' }),
+    );
+    expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: '행 복사' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: '행 삭제' })).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: '행 삭제' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(apiMocks.apiPut).toHaveBeenCalledWith(
+        '/api/v1/co/workflow/forms/71',
+        expect.objectContaining({ useAt: 'N' }),
+      ),
+    );
+  });
+});

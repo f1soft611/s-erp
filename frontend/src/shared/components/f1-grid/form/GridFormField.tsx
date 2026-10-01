@@ -60,7 +60,12 @@ export function GridFormField<T extends object>({
 }: GridFormFieldProps<T>) {
   const fieldName = String(column.field);
   const helperTextId = `${fieldName}-form-helper-text`;
-  const displayedValue = column.getValue ? column.getValue(row) : value;
+  const displayedValue =
+    column.form?.multiple && column.type === 'select'
+      ? value
+      : column.getValue
+        ? column.getValue(row)
+        : value;
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
 
@@ -153,16 +158,35 @@ export function GridFormField<T extends object>({
   }
 
   if (column.type === 'select') {
+    const multiple = Boolean(column.form?.multiple);
+    const selectValue = multiple
+      ? Array.isArray(displayedValue)
+        ? displayedValue.map(String)
+        : []
+      : String(displayedValue ?? '');
+
     return (
       <TextField
         {...sharedTextFieldProps}
         select
-        value={String(displayedValue ?? '')}
+        value={selectValue}
         slotProps={{
           ...sharedTextFieldProps.slotProps,
-          select: { readOnly },
+          select: { multiple, readOnly },
         }}
         onChange={(event) => {
+          if (multiple) {
+            const selectedValues = Array.isArray(event.target.value)
+              ? event.target.value.map(String)
+              : String(event.target.value).split(',');
+            const values = selectedValues.map(
+              (selectedValue) =>
+                options.find((option) => String(option.value) === selectedValue)
+                  ?.value ?? selectedValue,
+            );
+            applyValue(values);
+            return;
+          }
           const option = options.find(
             (candidate) => String(candidate.value) === event.target.value,
           );

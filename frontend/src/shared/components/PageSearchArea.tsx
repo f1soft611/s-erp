@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   Box,
   Button,
+  Divider,
   FormControl,
   IconButton,
   InputLabel,
@@ -444,12 +445,16 @@ export function PageSearchArea({
               );
             })}
           </Box>
+          <Divider
+            role="separator"
+            aria-orientation="horizontal"
+            sx={{ my: 2 }}
+          />
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'flex-end',
               gap: 1,
-              mt: 2,
             }}
           >
             <Button

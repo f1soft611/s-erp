@@ -17,6 +17,7 @@ import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPa
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
+import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
 import { PageHeader } from '../../../shared/components/PageHeader';
@@ -34,6 +35,7 @@ type DashboardContentProps = {
   breadcrumbItems: string[];
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
+  isTenantAdmin?: boolean;
 };
 
 export function ComingSoonPage({
@@ -133,6 +135,7 @@ export function DashboardContent({
   breadcrumbItems,
   content,
   selectedMenuPermissions,
+  isTenantAdmin = false,
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -214,6 +217,19 @@ export function DashboardContent({
         content={content}
         breadcrumbItems={breadcrumbItems}
         selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'co' && currentPageKey === 'form') {
+    return (
+      <DraftFormManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
       />
     );
   }

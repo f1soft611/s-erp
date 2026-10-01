@@ -56,7 +56,23 @@ describe('PageSearchArea 상세 검색', () => {
         createdAt: { from: '2026-01-01', to: '2026-12-31' },
       }),
     );
-    expect(screen.queryByRole('button', { name: '검색 닫기' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '검색 닫기' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('상세 검색 필드와 하단 액션 사이에 가로 구분선을 표시한다', () => {
+    render(
+      <PageSearchArea detailFields={fields}>
+        <button type="button">기본 검색</button>
+      </PageSearchArea>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+
+    expect(
+      screen.getByRole('separator', { orientation: 'horizontal' }),
+    ).toBeVisible();
   });
 
   it('검색 닫기는 조회하지 않고 오버레이만 닫는다', () => {

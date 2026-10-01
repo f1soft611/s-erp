@@ -963,6 +963,11 @@ function DashboardPage() {
                   breadcrumbItems={breadcrumbItems}
                   content={content}
                   selectedMenuPermissions={currentMenu.permissions}
+                  isTenantAdmin={[
+                    'TENANT_ADMIN',
+                    'PLATFORM_ADMIN',
+                    'ADMIN',
+                  ].includes((profile.roleName ?? '').trim().toUpperCase())}
                 />
               </>
             ) : (

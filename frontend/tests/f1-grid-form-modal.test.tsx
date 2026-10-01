@@ -27,6 +27,11 @@ type FormRow = {
   secret: string;
 };
 
+type MultiSelectRow = {
+  id: string;
+  ownerIds: string[];
+};
+
 describe('F1-Grid form model', () => {
   it('builds form sections from editable fields only by default', () => {
     const columns: F1GridColumn<FormRow>[] = [
@@ -288,6 +293,37 @@ describe('typed form field', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '분류' }));
     fireEvent.click(screen.getByRole('option', { name: '중요' }));
     expect(onPatch).toHaveBeenLastCalledWith({ categoryId: 2 });
+  });
+
+  it('supports array values for a multiple select field in the row form', () => {
+    const onPatch = vi.fn();
+    const row: MultiSelectRow = { id: '1', ownerIds: ['110'] };
+
+    render(
+      <GridFormField
+        column={{
+          field: 'ownerIds',
+          headerName: '담당자',
+          type: 'select',
+          options: [
+            { value: '110', label: '홍길동' },
+            { value: '111', label: '김담당' },
+          ],
+          getValue: () => '홍길동',
+          form: { multiple: true },
+        }}
+        row={row}
+        mode="edit"
+        value={row.ownerIds}
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '담당자' }));
+    fireEvent.click(screen.getByRole('option', { name: '김담당' }));
+
+    expect(onPatch).toHaveBeenLastCalledWith({ ownerIds: ['110', '111'] });
   });
 
   it('preserves the original value of autocomplete options', () => {

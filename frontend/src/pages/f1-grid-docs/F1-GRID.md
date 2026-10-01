@@ -339,6 +339,31 @@ const columns: F1GridColumn<Item>[] = [
 
 > ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
 
+## PageSearchArea 상세 검색 연결
+
+페이지의 접이식 상세검색은 F1-Grid 컬럼의 `search` metadata와 `toPageSearchFields(columns)`를 재사용할 수 있다. `search.label`, `search.order`, `search.span`, `search.group`으로 검색 필드 표시를 정하고 `type`/`options`는 해당 Grid 컬럼의 값을 사용한다. `column.hidden` 또는 `search.hidden`인 컬럼은 상세검색에서 제외된다.
+
+```typescript
+const columns: F1GridColumn<DraftFormRow>[] = [
+  {
+    field: 'categoryItemId',
+    headerName: '분류',
+    type: 'select',
+    options: categoryOptions,
+    search: { label: '분류', order: 1 },
+  },
+  {
+    field: 'cataTypeCode',
+    headerName: '구분코드',
+    search: { hidden: true },
+  },
+];
+
+const detailFields = toPageSearchFields(columns);
+```
+
+`toPageSearchFields`는 검색 UI field definitions만 만든다. `PageSearchArea`가 확정한 값은 페이지가 검색 조건으로 변환해 조회 API에 전달하며, F1-Grid 자체가 서버 검색을 수행하지 않는다. `keyword` 등 기본 검색어와 상세 조건의 결합도 페이지가 관리한다.
+
 Row Merge 설정:
 
 ```typescript
@@ -504,6 +529,7 @@ type F1GridColumnFormOptions<T extends object> = {
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
+  multiple?: boolean;
   targetField?: keyof T;
   targetLabel?: string;
 };
@@ -536,6 +562,7 @@ interface F1GridProps<T extends object> {
 - 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
 - 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
 - `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
+- `type: 'select'`에서 `form.multiple: true`를 지정하면 row form은 선택값 배열을 보존한다. Grid 표시용 `getValue`가 요약 문자열을 반환해도 form 입력은 원본 row 배열을 사용한다.
 - `form.targetField`와 `form.targetLabel`로 수정 모달 상단의 메타 정보(`예: 메뉴명: 홍길동`)를 재정의할 수 있으며, 기본값은 `rowKey`와 `대상`이다.
 - `text`, `number`, `decimal`, `currency`, `checkbox`, `date`, `datetime`, `time`, `select`, `autocomplete`, `code` 컬럼은 대응 입력으로 변환된다.
 - `rownumber`, 선택 체크박스, 합성 액션 열, 선언상 숨김 컬럼은 기본 제외한다. `form.hidden: false`이면 숨김 컬럼도 명시적으로 폼에 포함할 수 있다.

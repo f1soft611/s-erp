@@ -34,6 +34,7 @@ export type F1GridColumnFormOptions<T extends object> = {
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
+  multiple?: boolean;
   targetField?: keyof T;
   targetLabel?: string;
 };

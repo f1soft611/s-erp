@@ -1,8 +1,9 @@
-import { Alert, Box } from '@mui/material';
+import { Alert, Box, type AlertProps } from '@mui/material';
 
 type PageMessageAreaProps = {
   message: string;
   onClose: () => void;
+  severity?: AlertProps['severity'];
 };
 
 function normalizePageMessage(message: string): string {
@@ -23,7 +24,11 @@ function normalizePageMessage(message: string): string {
   return deduped.join('\n');
 }
 
-export function PageMessageArea({ message, onClose }: PageMessageAreaProps) {
+export function PageMessageArea({
+  message,
+  onClose,
+  severity = 'error',
+}: PageMessageAreaProps) {
   const normalizedMessage = normalizePageMessage(message);
 
   if (!normalizedMessage) return null;
@@ -31,7 +36,7 @@ export function PageMessageArea({ message, onClose }: PageMessageAreaProps) {
   return (
     <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 2, pb: 2 }}>
       <Alert
-        severity="error"
+        severity={severity}
         onClose={onClose}
         sx={{ overflowWrap: 'anywhere', whiteSpace: 'pre-line' }}
       >
