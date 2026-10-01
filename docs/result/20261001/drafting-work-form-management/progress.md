@@ -61,6 +61,8 @@
 - [x] 모듈관리 기준 네 방향 그리드 여백 브라우저 검증 및 F1-Grid 문서 갱신
 - [x] focused suites/build/375·768·1280px 브라우저 검증과 결과 보고서 갱신
 - [x] 부모 Dialog 내 blur commit 누락 RED/GREEN 재현, `GridCell` guard 보정 및 실제 도움창 테스트
+- [x] 분류 저장/reload 성공 시 공용 `공통코드를 저장했습니다.` toast 표시와 브라우저 캡처
+- [x] 분류 저장 후 부모 목록 재조회에서 메인 Grid 전체 로딩 overlay를 억제하고 초기/직접 조회 로딩은 유지
 
 ### 검증 및 리뷰
 
@@ -72,7 +74,11 @@
 - 알려진 테스트 실패: `draft-form-management.test.tsx`의 기존 `soft-disables a deleted Grid row by saving useAt N`가 구현 전·후 모두 컨텍스트 메뉴의 행 삭제 항목을 찾지 못함. 이번 변경 범위 밖이며 원인 수정은 하지 않음.
 - 최종 focused tests: 3 files, 27 passed, 1 pre-existing unrelated test skipped. 전체 focused run에서는 그 실패를 확인했으며 이 작업에서 제외했다.
 - 최종 `npm run build`: 성공, Vite 1498 modules transformed.
-- 후속 blur 검증: 분류 도움창 전체 9/9 통과; F1-Grid blur/date-time targeted 5/5 통과; 최종 build 성공.
+- 후속 저장 알림: RED에서 성공 alert 부재를 재현하고, `NotificationContext.showSuccess` 연결 후 `공통코드를 저장했습니다.` assertion 통과. 실패 경로에서는 error만 보이고 success toast가 없는 것도 확인. 분류 도움창 전체 11/11 통과.
+- 후속 blur 검증: F1-Grid blur/date-time targeted 5/5 통과; 최종 build 성공. 브라우저 저장 토스트 및 전용 screenshot 검증 통과.
+- 후속 분류 재조회 로딩: 지연된 목록 응답 동안 메인 Grid overlay 부재, 기존 row 유지, reload 후 공용 success toast를 확인하는 focused test 통과.
+- 추가 재조회 회귀: `draft-form-management.test.tsx`에서 분류 저장 후 지연된 form-list 응답 중 main Grid overlay가 나타나는 RED를 재현했고, `loadRows(..., { quiet: true })` 연결 후 targeted test 통과.
+- 추가 검증: 기안양식 페이지 suite 14 passed, 기존 soft-delete context-menu test 1 skipped; `npm run build` 성공.
 - F1-Grid 전체 테스트 파일은 153개 중 106 passed / 47 failed로 종료했고, 출력된 실패 사례는 pinned-column persistence 테스트의 accessible-name 조회였다. 전체 suite는 green이 아니며 해당 헤더 메뉴 실패는 이번 blur 변경에서 수정하지 않았다.
 - 브라우저: 기존 서버 포트 4173/4174/4175/4181을 정리한 후 Vite 4173 하나만 사용. fixture 기반 실제 메뉴 진입 및 캡처 성공.
 - 뷰포트: 375/768/1280px document/body scrollWidth가 각 viewport와 동일; Grid top padding 각 8px.
@@ -95,4 +101,6 @@
 - 저장 중에는 메인 Grid 전체 로딩 오버레이를 숨기고 저장 액션의 진행 아이콘과 비활성화로 중복 저장을 막도록 수정했다.
 - 저장 완료 후 목록 재조회에만 quiet 옵션을 적용했으며 초기 진입/직접 조회의 기존 로딩은 유지한다.
 - 회귀 테스트 RED/GREEN: 저장 요청과 지연된 저장 후 재조회 중 Grid 오버레이가 없는지, 진행 아이콘이 표시/해제되는지를 검증한다.
-- 검증 결과는 이 요청의 focused suite와 build 완료 후 업데이트한다.
+- focused 회귀 테스트: 1/1 통과. 전체 `draft-form-management.test.tsx`는 13개 통과, 기존 soft-delete 컨텍스트 메뉴 테스트 1개가 `행 삭제` 항목 미노출로 실패했다.
+- `npm --prefix frontend run build`: 통과; TypeScript 및 Vite 빌드 성공. `git diff --check`: 통과.
+- 브라우저 확인은 Vite 4175에서 시도했으나 fixture API 요청이 완료되지 않아 앱이 초기 로딩에 머물렀고, 저장 중 캡처는 확보하지 못했다. 기존 반응형 캡처는 이전 화면 검증 자료이며 이번 transient 상태의 증거로 간주하지 않는다.

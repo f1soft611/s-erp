@@ -320,7 +320,7 @@ export function DraftFormManagementPage({
         }
         onReload={async () => {
           await management.loadOptions();
-          await management.loadRows(management.appliedFilters);
+          await management.loadRows(management.appliedFilters, { quiet: true });
           setCategoryNoticeDismissed(false);
         }}
         onError={management.setError}

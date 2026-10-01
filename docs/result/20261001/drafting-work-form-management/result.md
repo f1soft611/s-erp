@@ -48,6 +48,8 @@
 - 기안양식 분류/주기 ID는 저장값으로 유지하면서 셀에는 옵션 이름을 표시한다. null 검토자/승인자는 `선택 안 함`으로 표시한다. 셀 및 row-form select를 바꾸지 않은 경우 dirty가 남지 않는 동작을 검증했다.
 - 기안양식 목록 Grid 상단 패딩을 모듈관리와 같은 8px로 맞췄다. F1-GRID 문서에 select label 값 타입 및 페이지 dirty 확인 책임을 추가했다.
 - 분류 모달 내부 셀을 수정한 뒤 다른 셀을 클릭해도 blur commit이 실행되도록 `GridCell` popup guard를 보정했다. 현재 셀을 감싸는 상위 MUI Dialog/Modal은 editor popup으로 오인하지 않고, Grid 외부의 실제 editor popup은 blur 보호를 유지한다.
+- 분류 항목 저장 및 목록 재조회가 성공하면 공용 `NotificationContext`의 `showSuccess('공통코드를 저장했습니다.')`를 호출하도록 연결했다. 실패 경로에서는 success toast를 표시하지 않는다.
+- 분류 설정 저장 후 부모 page가 공통코드 옵션과 기안양식 rows를 다시 읽을 때 rows reload에만 `quiet: true`를 전달한다. 메인 Grid는 기존 행을 유지하고 전체 loading overlay를 띄우지 않으며, 초기 진입/직접 조회 로딩 동작은 그대로 둔다.
 - DB/API/권한 계약 변경 없음. `category_item_id` 및 공통코드 분류 모델을 유지했다.
 
 ### 재실행 검증
@@ -56,6 +58,10 @@
 - Focused tests: `tests/common-code-item-help-dialog.test.tsx`, `tests/draft-form-management.test.tsx`, `tests/module-management-page.test.tsx`; 27 passed, 기존 `soft-disables a deleted Grid row by saving useAt N` 1건은 이전에도 컨텍스트 메뉴 `행 삭제` 항목을 찾지 못해 실패하여 제외했다.
 - Build: `npm run build` 성공 (TypeScript 및 Vite, 1498 modules transformed).
 - 셀 이동 dirty: 구현 전 Dialog wrapper F1-Grid 회귀가 `getChanges()` empty로 실패했고, 수정 후 해당 core regression 및 분류 도움창 셀 이동/save 테스트가 통과했다. 분류 도움창 9/9, F1-Grid blur/date/time targeted 5/5, production build 성공.
+- 저장 toast: RED 테스트에서 저장 성공 alert 부재를 재현했고, 성공 reload 이후 공용 문구 `공통코드를 저장했습니다.` 표시 및 저장 실패 시 success toast 억제를 검증했다. 분류 도움창 전체 11/11 통과.
+- 분류 저장 quiet reload: 지연된 form-list 응답 중 overlay가 나타나는 RED를 재현했다. 부모 reload에서만 `management.loadRows(filters, { quiet: true })`를 전달한 뒤 targeted test에서 기존 행 유지와 overlay 부재, reload 후 성공 토스트를 확인했다.
+- 추가 검증: `draft-form-management.test.tsx` 14 passed, 기존 soft-delete context-menu test 1 skipped; `npm run build` 성공.
+- 분류 저장 재조회 quiet loading: 지연된 form-list 응답 중 `f1-grid-loading-overlay`가 없고 기존 행이 유지되며, reload 완료 후 success toast가 표시되는 `draft-form-management.test.tsx` targeted test 통과.
 - F1-Grid 전체 suite는 153 tests 중 106 passed, 47 failed. 출력된 실패는 pinned-column persistence 테스트의 accessible-name 조회이며 이번 변경에서 수정하지 않았다. 전체 suite pass로 보고하지 않는다.
 - 실제 Chromium 셀 이동 검증: 분류명 셀을 편집하고 같은 행 다른 셀을 클릭한 뒤 dirty 마크 및 저장 버튼 활성화를 확인하고, 닫기 확인에서 변경을 폐기했다.
 - 현재 분류 Grid 스크롤 재측정: desktop `clientHeight=321`, `scrollHeight=1152`; mobile `clientHeight=603`, `scrollHeight=1152`; 두 경우 `overflowY=auto`.
@@ -72,6 +78,7 @@
 - [1280px 기안양식 폼](./screenshots/ui-polish-20261001/1280px-work-form.png)
 - [375px 분류 설정](./screenshots/ui-polish-20261001/375px-category-dialog.png)
 - [1280px 분류 설정](./screenshots/ui-polish-20261001/1280px-category-dialog.png)
+- [1280px 분류 저장 성공 토스트](./screenshots/common-code-toast-20261001/1280px-category-save-toast.png)
 
 ### 리뷰 판정
 
@@ -92,4 +99,7 @@
 
 - 저장 진행 상태와 메인 Grid 로딩 상태를 분리했다. 저장 중 진행 아이콘을 표시하고 저장 액션을 비활성화하며, 저장 API 및 저장 후 목록 재조회 중 Grid 전체 로딩 오버레이는 표시하지 않는다.
 - 저장 후 재조회만 quiet 옵션으로 수행한다. 초기 진입과 사용자가 직접 실행하는 조회/상세검색은 기존 로딩 피드백을 유지한다.
-- 회귀 테스트와 빌드 검증 결과는 완료 후 기록한다.
+- 지연 PUT 및 지연 후속 목록 조회를 사용하는 focused 회귀 테스트에서 진행 아이콘 표시/해제와 Grid overlay 부재를 확인했다: 1/1 통과.
+- `draft-form-management.test.tsx`: 13개 통과, 기존 soft-delete 컨텍스트 메뉴 테스트 1개는 `행 삭제` 메뉴 항목 미노출로 실패했다. 해당 실패는 이번 변경과 무관하게 이전부터 존재한다.
+- `npm --prefix frontend run build`: TypeScript 및 Vite 빌드 성공. `git diff --check`: 오류 없음.
+- 브라우저 확인은 개발 서버 4175에서 시도했으나 fixture API 요청이 정체되어 초기 로딩 이후 진행하지 못했다. 따라서 이번 저장 중 상태의 실제 브라우저 검증 및 전용 스크린샷은 미완료로 남는다.

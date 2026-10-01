@@ -276,6 +276,26 @@ describe('CommonCodeItemHelpDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not show a success toast when saving a classification item fails', async () => {
+    const onUpdateItem = vi.fn().mockRejectedValue(new Error('분류 저장 실패'));
+    renderDialog({ onUpdateItem });
+
+    await editCell(
+      await screen.findByRole('gridcell', { name: '점검' }),
+      '정기점검',
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
+      ).getByRole('button', { name: '저장' }),
+    );
+
+    expect(await screen.findByText('분류 저장 실패')).toBeInTheDocument();
+    expect(
+      screen.queryByText('공통코드를 저장했습니다.'),
+    ).not.toBeInTheDocument();
+  });
+
   it('marks an inline edit dirty when focus moves to another grid cell', async () => {
     const { onUpdateItem } = renderDialog();
     const categoryDialog = await screen.findByRole('dialog', {

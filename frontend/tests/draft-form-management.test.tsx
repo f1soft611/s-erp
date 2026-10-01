@@ -270,6 +270,107 @@ describe('Draft form management page', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the form grid quiet while classification save reloads its rows', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    let formRequestCount = 0;
+    let resolveReload: ((value: unknown) => void) | undefined;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path !== '/api/v1/co/workflow/forms') {
+        return originalApiGet?.(path);
+      }
+      formRequestCount += 1;
+      if (formRequestCount === 1) {
+        return Promise.resolve({ resultList: [sourceRow] });
+      }
+      return new Promise((resolve) => {
+        resolveReload = resolve;
+      });
+    });
+    apiMocks.apiPut.mockResolvedValue({});
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByRole('gridcell', { name: '정기점검' }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '분류 설정' }));
+    const categoryDialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+    fireEvent.doubleClick(
+      within(categoryDialog).getByRole('gridcell', { name: '점검' }),
+    );
+    const categoryEditor = within(categoryDialog).getByDisplayValue('점검');
+    fireEvent.change(categoryEditor, { target: { value: '정기점검 분류' } });
+    fireEvent.keyDown(categoryEditor, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(
+      within(categoryDialog).getByRole('button', { name: '저장' }),
+    );
+
+    await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalled());
+    await waitFor(() => expect(formRequestCount).toBe(2));
+    expect(
+      screen.queryByTestId('f1-grid-loading-overlay'),
+    ).not.toBeInTheDocument();
+
+    resolveReload?.({ resultList: [sourceRow] });
+    await waitFor(() =>
+      expect(screen.getByText('공통코드를 저장했습니다.')).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByTestId('f1-grid-loading-overlay'),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows the missing-category callout in the shared info message area', async () => {
     const originalApiGet = apiMocks.apiGet.getMockImplementation();
     apiMocks.apiGet.mockImplementation((path: string) =>
@@ -781,6 +882,12 @@ describe('Draft form management page', () => {
     ).toHaveTextContent('점검');
     fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
 
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '점검' }));
+    fireEvent.click(screen.getByRole('gridcell', { name: '정기점검' }));
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
   });
 
