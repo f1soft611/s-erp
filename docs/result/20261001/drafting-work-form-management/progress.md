@@ -48,7 +48,7 @@
 - 상세 사양서: [20261001_003 상세 사양서](../../../../spec/20261001/20261001_003_전자결재_기안양식관리_화면보정_사양서.md) (사용자 승인 완료, 2026-10-01)
 - 브랜치: `socra710`; 사용자가 현재 브랜치 진행을 선택함; Worktree 미생성
 - 실행 전략: Inline Execution
-- 승인 범위: 분류 모달 그리드/dirty 저장/이탈 확인, 기안양식 select label/dirty 처리, 조회 dirty 확인, 미선택 결재자 표시, 상단 간격, F1-Grid 문서 및 결과 증거
+- 승인 범위: 분류 모달 그리드/dirty 저장/이탈 확인, 기안양식 select label/dirty 처리, 조회 dirty 확인, 미선택 결재자 표시, 네 방향 그리드 여백, 후속 셀 이동 dirty 수정, F1-Grid 문서 및 결과 증거
 - DB/API/백엔드 영향: 없음; `category_item_id` 공통코드 계약 유지
 - 커밋: 별도 요청이 없어 생성하지 않음
 
@@ -58,8 +58,9 @@
 - [x] 기본 조회·상세검색 dirty 확인, 취소 시 유지/API 미호출, 계속 시 보류 조회 회귀 테스트 및 구현
 - [x] 분류 모달 inline 추가/수정, dirty 닫기 취소/폐기, 조용한 저장 표시 구현 및 focused tests
 - [x] 분류 모달 Grid 내부 스크롤 및 가용 높이를 브라우저로 검증
-- [x] 모듈관리 기준 상단 간격 브라우저 검증 및 F1-Grid 문서 갱신
+- [x] 모듈관리 기준 네 방향 그리드 여백 브라우저 검증 및 F1-Grid 문서 갱신
 - [x] focused suites/build/375·768·1280px 브라우저 검증과 결과 보고서 갱신
+- [x] 부모 Dialog 내 blur commit 누락 RED/GREEN 재현, `GridCell` guard 보정 및 실제 도움창 테스트
 
 ### 검증 및 리뷰
 
@@ -67,12 +68,31 @@
 - 계획된 빌드: `npm run build`
 - 초기 기준선: 기존 20261001_001 원장의 프론트엔드 전체 테스트/빌드 결과를 참조. 이번 코드 변경 전 새 실행은 아직 없음.
 - 현재 RED/GREEN 증거: dirty 조회 확인은 구현 전 확인창 부재로 실패 후 기본/상세검색 cancel/continue targeted 테스트 통과; 분류 dirty 닫기는 구현 전 확인창 부재로 실패 후 취소/X continue targeted 테스트 통과; select label/null 및 no-op cell/row-form 테스트 통과; quiet save indicator targeted test 통과; 분류 도움창 전체 8/8 통과
+- 후속 셀 blur RED/GREEN: `Dialog` 안 Grid에서 편집 후 다른 셀 클릭 시 `getChanges()`가 비어 있음을 RED로 재현했다. `GridCell`이 자신을 감싸는 상위 MUI Dialog를 popup으로 세지 않도록 수정 후 core regression과 실제 분류 도움창 dirty 저장 테스트가 통과했다.
 - 알려진 테스트 실패: `draft-form-management.test.tsx`의 기존 `soft-disables a deleted Grid row by saving useAt N`가 구현 전·후 모두 컨텍스트 메뉴의 행 삭제 항목을 찾지 못함. 이번 변경 범위 밖이며 원인 수정은 하지 않음.
 - 최종 focused tests: 3 files, 27 passed, 1 pre-existing unrelated test skipped. 전체 focused run에서는 그 실패를 확인했으며 이 작업에서 제외했다.
 - 최종 `npm run build`: 성공, Vite 1498 modules transformed.
+- 후속 blur 검증: 분류 도움창 전체 9/9 통과; F1-Grid blur/date-time targeted 5/5 통과; 최종 build 성공.
+- F1-Grid 전체 테스트 파일은 153개 중 106 passed / 47 failed로 종료했고, 출력된 실패 사례는 pinned-column persistence 테스트의 accessible-name 조회였다. 전체 suite는 green이 아니며 해당 헤더 메뉴 실패는 이번 blur 변경에서 수정하지 않았다.
 - 브라우저: 기존 서버 포트 4173/4174/4175/4181을 정리한 후 Vite 4173 하나만 사용. fixture 기반 실제 메뉴 진입 및 캡처 성공.
 - 뷰포트: 375/768/1280px document/body scrollWidth가 각 viewport와 동일; Grid top padding 각 8px.
-- 분류 모달 내부 스크롤: desktop clientHeight 501px / scrollHeight 1152px, mobile 603px / 1152px, `overflowY=auto`; 375px 메인/도움창 full-screen.
+- 분류 모달 내부 스크롤: desktop clientHeight 321px / scrollHeight 1152px, mobile 603px / 1152px, `overflowY=auto`; 375px 메인/도움창 full-screen.
+- 실 Chromium 셀 이동 검증: 분류명 셀 편집 후 같은 행 다른 셀 클릭 시 `data-dirty-cell=true`, 저장 버튼 enabled, 닫기 dirty 확인 표시를 검사하고 변경 폐기까지 수행했다.
 - 스크린샷: [ui-polish-20261001](./screenshots/ui-polish-20261001/) 아래 목록, 기안양식 폼, 분류 도움창 375/768/1280px 캡처.
 - 자체 리뷰: 사양 준수 확인, API/DB/F1-Grid core 변경 없음 및 확인창 상태 흐름 확인.
 - 독립 리뷰: 미수행. Inline Execution 및 현재 실행 제약에서 별도 리뷰어를 위임하지 않았으므로 독립 코드 품질 리뷰는 완료로 주장하지 않음.
+
+### 추가 사용자 요청: 네 방향 그리드 여백 일치
+
+- `DraftFormManagementPage`의 그리드 컨테이너 반응형 좌우 패딩과 별도 상·하 패딩을 `p: 1`로 통일했다. 모듈관리 `CardContent p: 1` 기준과 동일하게 네 방향 모두 8px이다.
+- 회귀 테스트: 기안양식 페이지 테스트의 그리드 컨테이너 상·하·좌·우 패딩 검증 통과. 파일 전체 13개 중 12개 통과, 기존 soft-delete 컨텍스트 메뉴 테스트 1개는 동일한 행 삭제 메뉴 미노출로 실패했다.
+- 브라우저: 375/768/1280px 모두 네 방향 8px, document/body 가로 overflow 없음.
+- 빌드: `npm run build` 성공.
+- 새 스크린샷은 `screenshots/all-sides-spacing-20261001/`에 저장했다.
+
+### 추가 사용자 요청: 기안양식 저장 중 조용한 로딩
+
+- 저장 중에는 메인 Grid 전체 로딩 오버레이를 숨기고 저장 액션의 진행 아이콘과 비활성화로 중복 저장을 막도록 수정했다.
+- 저장 완료 후 목록 재조회에만 quiet 옵션을 적용했으며 초기 진입/직접 조회의 기존 로딩은 유지한다.
+- 회귀 테스트 RED/GREEN: 저장 요청과 지연된 저장 후 재조회 중 Grid 오버레이가 없는지, 진행 아이콘이 표시/해제되는지를 검증한다.
+- 검증 결과는 이 요청의 focused suite와 build 완료 후 업데이트한다.

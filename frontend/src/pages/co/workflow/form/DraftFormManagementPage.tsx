@@ -4,7 +4,7 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, IconButton, TextField } from '@mui/material';
+import { Box, CircularProgress, IconButton, TextField } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -43,6 +43,12 @@ type DraftFormManagementPageProps = {
   selectedMenuPermissions?: MenuPermission;
   isTenantAdmin?: boolean;
 };
+
+function DraftFormSaveProgressIcon() {
+  return (
+    <CircularProgress size={16} color="inherit" aria-label="기안양식 저장 중" />
+  );
+}
 
 export function DraftFormManagementPage({
   selectedModule,
@@ -187,7 +193,7 @@ export function DraftFormManagementPage({
       actions: [
         {
           label: '저장',
-          icon: SaveIcon,
+          icon: management.saving ? DraftFormSaveProgressIcon : SaveIcon,
           visible: canWriteForms,
           disabled: !management.hasChanges || management.saving,
           onClick: handleGridSave,
@@ -279,9 +285,7 @@ export function DraftFormManagementPage({
           flex: 1,
           minHeight: 280,
           minWidth: 0,
-          px: { xs: 1, sm: 2 },
-          pt: 1,
-          pb: 2,
+          p: 1,
         }}
       >
         <DraftFormGrid
@@ -292,7 +296,7 @@ export function DraftFormManagementPage({
           }
           canUpdate={pagePermissions.update}
           canExportExcel={pagePermissions.excel}
-          loading={management.loading || management.saving}
+          loading={management.loading}
           gridKey={management.gridKey}
           gridRef={gridRef}
           onChangesChange={management.handleChangesChange}

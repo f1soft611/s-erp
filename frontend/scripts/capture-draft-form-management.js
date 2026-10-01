@@ -254,8 +254,13 @@ for (const width of screenshotWidths) {
       viewportWidth: window.innerWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
       bodyScrollWidth: document.body.scrollWidth,
-      gridContainerPaddingTop: gridContainer
-        ? getComputedStyle(gridContainer).paddingTop
+      gridContainerPadding: gridContainer
+        ? {
+            top: getComputedStyle(gridContainer).paddingTop,
+            right: getComputedStyle(gridContainer).paddingRight,
+            bottom: getComputedStyle(gridContainer).paddingBottom,
+            left: getComputedStyle(gridContainer).paddingLeft,
+          }
         : null,
     };
   });
@@ -264,9 +269,14 @@ for (const width of screenshotWidths) {
       `Unexpected page overflow at ${width}px: ${JSON.stringify(metrics)}`,
     );
   }
-  if (metrics.gridContainerPaddingTop !== '8px') {
+  if (
+    !metrics.gridContainerPadding ||
+    Object.values(metrics.gridContainerPadding).some(
+      (padding) => padding !== '8px',
+    )
+  ) {
     throw new Error(
-      `Unexpected Grid top padding at ${width}px: ${JSON.stringify(metrics)}`,
+      `Unexpected Grid container padding at ${width}px: ${JSON.stringify(metrics)}`,
     );
   }
   measurements.push(metrics);
@@ -305,7 +315,41 @@ await page.screenshot({
 await page.keyboard.press('Escape');
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.getByRole('button', { name: '분류 설정' }).click();
-const categoryDialog = page.getByRole('dialog', { name: '기안양식 분류 설정' });
+let categoryDialog = page.getByRole('dialog', {
+  name: '기안양식 분류 설정',
+});
+await categoryDialog.waitFor();
+await categoryDialog.getByText('안전', { exact: true }).waitFor();
+await categoryDialog.getByRole('gridcell', { name: '점검' }).dblclick();
+await categoryDialog.getByRole('textbox').fill('점검 브라우저 편집');
+await categoryDialog
+  .getByTestId('f1-grid-body-scroll')
+  .getByRole('gridcell')
+  .nth(3)
+  .click();
+const browserEditedCell = categoryDialog.getByRole('gridcell', {
+  name: '점검 브라우저 편집',
+});
+if ((await browserEditedCell.getAttribute('data-dirty-cell')) !== 'true') {
+  throw new Error(
+    'Clicking another cell did not commit the edited cell as dirty.',
+  );
+}
+if (!(await categoryDialog.getByRole('button', { name: '저장' }).isEnabled())) {
+  throw new Error(
+    'Save did not enable after editing and moving to another cell.',
+  );
+}
+await categoryDialog.getByRole('button', { name: '취소' }).click();
+const discardChangesDialog = page.getByRole('dialog', {
+  name: '저장하지 않은 변경사항',
+});
+await discardChangesDialog.waitFor();
+await discardChangesDialog.getByRole('button', { name: '계속' }).click();
+await page.getByRole('button', { name: '분류 설정' }).click();
+categoryDialog = page.getByRole('dialog', {
+  name: '기안양식 분류 설정',
+});
 await categoryDialog.waitFor();
 await categoryDialog.getByText('안전', { exact: true }).waitFor();
 const categoryGridBody = categoryDialog.getByTestId('f1-grid-body-scroll');
@@ -319,6 +363,15 @@ if (categoryGridScroll.scrollHeight <= categoryGridScroll.clientHeight) {
     `Expected category Grid body to scroll: ${JSON.stringify(categoryGridScroll)}`,
   );
 }
+await categoryDialog.getByRole('gridcell', { name: '점검' }).dblclick();
+await categoryDialog.getByRole('textbox').fill('점검 토스트 검증');
+await categoryGridBody.getByRole('gridcell').nth(3).click();
+await categoryDialog.getByRole('button', { name: '저장' }).click();
+await page.getByText('공통코드를 저장했습니다.', { exact: true }).waitFor();
+await page.screenshot({
+  path: path.join(screenshotDir, '1280px-category-save-toast.png'),
+  fullPage: false,
+});
 await page.screenshot({
   path: path.join(screenshotDir, '1280px-category-dialog.png'),
   fullPage: false,
@@ -369,6 +422,7 @@ console.log(
       measurements,
       categoryGridScroll,
       mobileCategoryGridScroll,
+      categorySuccessToast: true,
       isMobileWorkFormFullScreen,
       isMobileDialogFullScreen,
       screenshots: screenshotDir,

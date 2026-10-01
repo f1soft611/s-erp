@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
+import { useNotification } from '../../context/NotificationContext';
 import {
   F1Grid,
   type F1GridChanges,
@@ -76,6 +77,7 @@ export function CommonCodeItemHelpDialog({
   onReload,
   onError,
 }: CommonCodeItemHelpDialogProps) {
+  const { showSuccess } = useNotification();
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -164,6 +166,7 @@ export function CommonCodeItemHelpDialog({
         await onUpdateItem(row.id, toSavePayload(row));
       }
       await onReload();
+      showSuccess('공통코드를 저장했습니다.');
       setHasChanges(false);
       setGridKey((current) => current + 1);
     } catch (saveError) {

@@ -3452,6 +3452,28 @@ describe('F1-GRID interaction', () => {
 });
 
 describe('F1-GRID header divider', () => {
+  it('truncates narrow header names without changing their accessible name', () => {
+    const headerName = '등록주기 확인';
+
+    render(
+      <F1Grid
+        rows={[{ id: '1', label: '값' }]}
+        columns={[{ field: 'label', headerName, width: 52, minWidth: 52 }]}
+        rowKey="id"
+      />,
+    );
+
+    const columnHeader = screen.getByRole('columnheader', { name: headerName });
+    const headerLabel = screen.getByText(headerName);
+
+    expect(headerLabel).toHaveStyle({
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    });
+    expect(columnHeader).toHaveAttribute('aria-label', headerName);
+  });
+
   it('always renders a vertical divider on header cells regardless of columnLine', () => {
     render(<F1Grid rows={rows} columns={columns} rowKey="id" />);
 

@@ -49,23 +49,29 @@ export function useDraftFormManagement() {
   const [gridKey, setGridKey] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<DraftFormFilters>({});
 
-  const loadRows = useCallback(async (filters: DraftFormFilters = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      setRows(await fetchDraftForms(filters));
-      return true;
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : '기안양식 목록을 불러오지 못했습니다.',
-      );
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadRows = useCallback(
+    async (
+      filters: DraftFormFilters = {},
+      options: { quiet?: boolean } = {},
+    ) => {
+      if (!options.quiet) setLoading(true);
+      setError('');
+      try {
+        setRows(await fetchDraftForms(filters));
+        return true;
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : '기안양식 목록을 불러오지 못했습니다.',
+        );
+        return false;
+      } finally {
+        if (!options.quiet) setLoading(false);
+      }
+    },
+    [],
+  );
 
   const loadOptions = useCallback(async () => {
     setOptionsLoading(true);
@@ -140,7 +146,7 @@ export function useDraftFormManagement() {
             toPayload(row, 'N'),
           );
         }
-        const refreshed = await loadRows(appliedFilters);
+        const refreshed = await loadRows(appliedFilters, { quiet: true });
         if (!refreshed) return;
         setHasChanges(false);
         setGridKey((current) => current + 1);

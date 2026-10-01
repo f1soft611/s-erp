@@ -130,6 +130,14 @@ describe('Draft form management page', () => {
       await screen.findByRole('textbox', { name: '기안양식 검색' }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
+
+    const grid = screen.getByRole('grid', { name: '기안양식 목록' });
+    expect(grid.parentElement).toHaveStyle({
+      paddingTop: '8px',
+      paddingRight: '8px',
+      paddingBottom: '8px',
+      paddingLeft: '8px',
+    });
   });
 
   it('clears the unified search query from its clear action', async () => {
@@ -774,6 +782,120 @@ describe('Draft form management page', () => {
     fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
 
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+  });
+
+  it('keeps the form grid visible and shows quiet progress while saving', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    let formRequestCount = 0;
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path !== '/api/v1/co/workflow/forms') {
+        return originalApiGet?.(path);
+      }
+      formRequestCount += 1;
+      if (formRequestCount === 1) {
+        return Promise.resolve({ resultList: [sourceRow] });
+      }
+      return new Promise((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    let resolveUpdate: ((value: unknown) => void) | undefined;
+    apiMocks.apiPut.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '71 행 정보 수정' }),
+    );
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 수정',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '구분명' }),
+      { target: { value: '수정양식' } },
+    );
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(
+      screen.getByRole('progressbar', { name: '기안양식 저장 중' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByTestId('f1-grid-loading-overlay'),
+    ).not.toBeInTheDocument();
+
+    resolveUpdate?.({ item: { ...sourceRow, codeName: '수정양식' } });
+    await waitFor(() => expect(formRequestCount).toBe(2));
+    expect(
+      screen.queryByTestId('f1-grid-loading-overlay'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: '기안양식 저장 중' }),
+    ).toBeVisible();
+
+    resolveRefresh?.({ resultList: [{ ...sourceRow, codeName: '수정양식' }] });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('progressbar', { name: '기안양식 저장 중' }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('soft-disables a deleted Grid row by saving useAt N', async () => {

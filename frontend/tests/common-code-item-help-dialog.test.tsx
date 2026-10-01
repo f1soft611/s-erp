@@ -9,6 +9,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { describe, expect, it, vi } from 'vitest';
 import { CommonCodeItemHelpDialog } from '../src/shared/components/common-code/CommonCodeItemHelpDialog';
 import type { CommonCodeItemRow } from '../src/pages/co/master/common-code/types/commonCodeManagement.types';
+import { NotificationProvider } from '../src/shared/context/NotificationContext';
 
 const item: CommonCodeItemRow = {
   id: '101',
@@ -31,17 +32,19 @@ function renderDialog(
   const onClose = vi.fn();
   render(
     <ThemeProvider theme={createTheme()}>
-      <CommonCodeItemHelpDialog
-        open
-        groupId="11"
-        items={[item]}
-        canEdit
-        onClose={onClose}
-        onCreateItem={onCreateItem}
-        onUpdateItem={onUpdateItem}
-        onReload={onReload}
-        {...props}
-      />
+      <NotificationProvider>
+        <CommonCodeItemHelpDialog
+          open
+          groupId="11"
+          items={[item]}
+          canEdit
+          onClose={onClose}
+          onCreateItem={onCreateItem}
+          onUpdateItem={onUpdateItem}
+          onReload={onReload}
+          {...props}
+        />
+      </NotificationProvider>
     </ThemeProvider>,
   );
   return { onClose, onCreateItem, onUpdateItem, onReload };
@@ -252,6 +255,25 @@ describe('CommonCodeItemHelpDialog', () => {
       ),
     );
     expect(onReload).toHaveBeenCalledOnce();
+  });
+
+  it('shows the shared success toast after saving a classification item', async () => {
+    const { onUpdateItem } = renderDialog();
+
+    await editCell(
+      await screen.findByRole('gridcell', { name: '점검' }),
+      '정기점검',
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
+      ).getByRole('button', { name: '저장' }),
+    );
+
+    await waitFor(() => expect(onUpdateItem).toHaveBeenCalledOnce());
+    expect(
+      await screen.findByText('공통코드를 저장했습니다.'),
+    ).toBeInTheDocument();
   });
 
   it('marks an inline edit dirty when focus moves to another grid cell', async () => {
