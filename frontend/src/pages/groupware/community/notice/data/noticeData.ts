@@ -1,51 +1,8 @@
-export type NoticeCommentItem = {
-  id: number;
-  author: string;
-  time: string;
-  content: string;
-  isDeleted?: boolean;
-  isEditable?: boolean;
-  attachments?: Array<{
-    id: string;
-    name: string;
-    size?: number;
-  }>;
-  replies?: NoticeCommentItem[];
-};
-
-export type NoticeFeedItem = {
-  id: number;
-  writerId?: string | null;
-  isPostOwner?: boolean;
-  title: string;
-  viewCount?: number;
-  createdAt?: string | Date | null;
-  noticeGubunCode?: string;
-  noticeGubunName?: string;
-  meta: string;
-  state: string;
-  summary: string;
-  summaryHtml?: string;
-  body: string;
-  bodyHtml?: string;
-  attachments?: string[];
-  attachmentDetails?: Array<{
-    id: string;
-    name: string;
-    size?: number;
-    boardFileId?: number | string | null;
-    objectKey?: string | null;
-    bucketName?: string | null;
-  }>;
-  comments?: NoticeCommentItem[];
-  hasPreviousComments?: boolean;
-  nextBeforeCommentId?: number | string | null;
-  commentCount: number;
-  isPinned?: string;
-  liked?: boolean;
-  likeCount?: number;
-  bookmarked?: boolean;
-};
+import type { NoticeFeedItem } from '../types/community.types';
+export type {
+  NoticeCommentItem,
+  NoticeFeedItem,
+} from '../types/community.types';
 
 export const noticeFeed: NoticeFeedItem[] = [
   {

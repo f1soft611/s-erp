@@ -37,7 +37,7 @@ import type { CommonViewMode } from '../../../../shared/components/view-mode/com
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { NoticeFilterMenu } from '../../community/notice/components/NoticeFilterMenu';
-import { noticeContentStyles } from '../../community/notice/components/noticeContentStyles';
+import { richTextContentStyles } from '../../../../shared/components/rich-text-editor/contentStyles';
 import type {
   ModuleItem,
   PageContent,
@@ -835,7 +835,7 @@ export function DocumentWritePage({
                     overflow: 'hidden',
                   },
                   '& .document-composer-editor .ProseMirror': {
-                    ...noticeContentStyles,
+                    ...richTextContentStyles,
                     display: 'block',
                     width: '100%',
                     minWidth: 0,

@@ -114,7 +114,7 @@ describe('NoticeComposerDialog theme handling', () => {
 
     await waitFor(() => {
       expect(
-        document.querySelector('.notice-image-resize-overlay'),
+        document.querySelector('.rich-text-image-resize-overlay'),
       ).toBeInTheDocument();
     });
 

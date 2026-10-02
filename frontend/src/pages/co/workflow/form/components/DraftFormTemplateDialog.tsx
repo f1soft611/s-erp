@@ -1,38 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
-import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
-import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
-import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumberedOutlined';
-import FormatQuoteOutlinedIcon from '@mui/icons-material/FormatQuoteOutlined';
-import RedoOutlinedIcon from '@mui/icons-material/RedoOutlined';
-import StrikethroughSOutlinedIcon from '@mui/icons-material/StrikethroughSOutlined';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  IconButton,
-} from '@mui/material';
+import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import type { JSONContent } from '@tiptap/core';
-import Image from '@tiptap/extension-image';
-import Placeholder from '@tiptap/extension-placeholder';
-import {
-  Table,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from '@tiptap/extension-table';
-import StarterKit from '@tiptap/starter-kit';
-import { EditorContent, useEditor, type Editor } from '@tiptap/react';
+import type { Editor } from '@tiptap/react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import {
-  hasSpreadsheetClipboardContent,
-  normalizeClipboardHtmlForEditor,
-  normalizeClipboardTextForEditor,
-} from '../../../../groupware/community/notice/utils/noticeClipboard';
+  RichTextEditor,
+  RichTextEditorToolbar,
+} from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
 import type { DraftFormRow } from '../types/draftFormManagement.types';
 import {
   deleteDraftFormTemplateImage,
@@ -44,47 +21,7 @@ import {
   type DraftFormTemplateUpload,
 } from '../services/draftFormTemplate.service';
 
-const DraftFormTemplateImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      'data-file-id': {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-file-id'),
-        renderHTML: (attributes) =>
-          attributes['data-file-id']
-            ? { 'data-file-id': attributes['data-file-id'] }
-            : {},
-      },
-      'data-upload-token': {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-upload-token'),
-        renderHTML: (attributes) =>
-          attributes['data-upload-token']
-            ? { 'data-upload-token': attributes['data-upload-token'] }
-            : {},
-      },
-      'data-upload-state': {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-upload-state'),
-        renderHTML: (attributes) =>
-          attributes['data-upload-state']
-            ? { 'data-upload-state': attributes['data-upload-state'] }
-            : {},
-      },
-      'data-client-upload-id': {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-client-upload-id'),
-        renderHTML: (attributes) =>
-          attributes['data-client-upload-id']
-            ? { 'data-client-upload-id': attributes['data-client-upload-id'] }
-            : {},
-      },
-    };
-  },
-});
-
-type PendingImage = DraftFormTemplateUpload & { objectUrl: string };
+type PendingImage = DraftFormTemplateUpload;
 
 export type DraftFormTemplateDialogProps = {
   open: boolean;
@@ -92,21 +29,6 @@ export type DraftFormTemplateDialogProps = {
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 };
-
-function findImagePosition(editor: Editor, clientUploadId: string): number {
-  let found = -1;
-  editor.state.doc.descendants((node, position) => {
-    if (
-      node.type.name === 'image' &&
-      node.attrs['data-client-upload-id'] === clientUploadId
-    ) {
-      found = position;
-      return false;
-    }
-    return found < 0;
-  });
-  return found;
-}
 
 export function DraftFormTemplateDialog({
   open,
@@ -122,11 +44,10 @@ export function DraftFormTemplateDialog({
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
-  const [toolbarOpen, setToolbarOpen] = useState(false);
   const initialHtml = useRef('<p></p>');
   const pendingImages = useRef(new Map<string, PendingImage>());
   const objectUrls = useRef(new Map<string, string>());
-  const editorRef = useRef<Editor | null>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
 
   const finishClose = () => {
     for (const objectUrl of objectUrls.current.values()) {
@@ -169,137 +90,32 @@ export function DraftFormTemplateDialog({
     void cleanupTemporaryImages().finally(finishClose);
   };
 
-  const handleImagePaste = async (
-    clientUploadId: string,
+  const uploadTemplateImage = async (
     file: File,
-    objectUrl: string,
-  ) => {
-    setUploadingCount((count) => count + 1);
-    try {
-      const uploaded = await uploadDraftFormTemplateImage(
-        Number(row.draftingWorkCategoryId),
-        file,
-      );
-      const editor = editorRef.current;
-      const position = editor ? findImagePosition(editor, clientUploadId) : -1;
-      if (!editor || position < 0) {
-        await deleteDraftFormTemplateImage(
-          Number(row.draftingWorkCategoryId),
-          uploaded.uploadToken,
-          uploaded.fileName,
-        );
-        URL.revokeObjectURL(objectUrl);
-        objectUrls.current.delete(clientUploadId);
-        return;
-      }
-      const node = editor.state.doc.nodeAt(position);
-      if (!node) {
-        await deleteDraftFormTemplateImage(
-          Number(row.draftingWorkCategoryId),
-          uploaded.uploadToken,
-          uploaded.fileName,
-        );
-        URL.revokeObjectURL(objectUrl);
-        objectUrls.current.delete(clientUploadId);
-        return;
-      }
-      pendingImages.current.set(uploaded.uploadToken, {
-        ...uploaded,
-        objectUrl,
-      });
-      editor.view.dispatch(
-        editor.state.tr.setNodeMarkup(position, undefined, {
-          ...node.attrs,
-          'data-upload-token': uploaded.uploadToken,
-          'data-upload-state': 'uploaded',
-        }),
-      );
-      setError('');
-    } catch {
-      const editor = editorRef.current;
-      if (editor) {
-        const position = findImagePosition(editor, clientUploadId);
-        const node = position >= 0 ? editor.state.doc.nodeAt(position) : null;
-        if (node) {
-          editor.view.dispatch(
-            editor.state.tr.delete(position, position + node.nodeSize),
-          );
-        }
-      }
-      URL.revokeObjectURL(objectUrl);
-      objectUrls.current.delete(clientUploadId);
-      setError('본문 이미지 업로드에 실패했습니다.');
-    } finally {
-      setUploadingCount((count) => Math.max(0, count - 1));
-    }
+  ): Promise<RichTextEditorImage> => {
+    const uploaded = await uploadDraftFormTemplateImage(
+      Number(row.draftingWorkCategoryId),
+      file,
+    );
+    pendingImages.current.set(uploaded.uploadToken, uploaded);
+    setError('');
+    return {
+      alt: uploaded.fileName,
+      uploadToken: uploaded.uploadToken,
+      fileSize: uploaded.fileSize,
+      mimeType: uploaded.mimeType,
+    };
   };
 
-  const editor = useEditor(
-    {
-      extensions: [
-        StarterKit,
-        DraftFormTemplateImage.configure({ inline: false, allowBase64: false }),
-        Table.configure({ resizable: true, renderWrapper: true }),
-        TableRow,
-        TableHeader,
-        TableCell,
-        Placeholder.configure({
-          placeholder: '본문을 입력하세요.',
-          emptyEditorClass: 'is-editor-empty',
-        }),
-      ],
-      content: '<p></p>',
-      immediatelyRender: false,
-      editorProps: {
-        attributes: {
-          role: 'textbox',
-          'aria-label': '본문',
-          'aria-multiline': 'true',
-          spellcheck: 'true',
-        },
-        handlePaste: (view, event) => {
-          if (hasSpreadsheetClipboardContent(event.clipboardData)) return false;
-          const files = Array.from(event.clipboardData?.items ?? [])
-            .filter(
-              (item) => item.kind === 'file' && item.type.startsWith('image/'),
-            )
-            .map((item) => item.getAsFile())
-            .filter((file): file is File => Boolean(file));
-          if (files.length === 0) return false;
-
-          event.preventDefault();
-          files.forEach((file) => {
-            const clientUploadId = `draft-template-${Date.now()}-${Math.random()
-              .toString(36)
-              .slice(2)}`;
-            const objectUrl = URL.createObjectURL(file);
-            objectUrls.current.set(clientUploadId, objectUrl);
-            const imageNode = view.state.schema.nodes.image.create({
-              src: objectUrl,
-              alt: file.name,
-              'data-client-upload-id': clientUploadId,
-              'data-upload-state': 'uploading',
-            });
-            view.dispatch(
-              view.state.tr.replaceSelectionWith(imageNode).scrollIntoView(),
-            );
-            void handleImagePaste(clientUploadId, file, objectUrl);
-          });
-          return true;
-        },
-        transformPastedHTML: normalizeClipboardHtmlForEditor,
-        transformPastedText: normalizeClipboardTextForEditor,
-      },
-      onUpdate: ({ editor: currentEditor }) => {
-        setHasChanges(currentEditor.getHTML() !== initialHtml.current);
-      },
-    },
-    [row.draftingWorkCategoryId],
-  );
-
-  useEffect(() => {
-    editorRef.current = editor;
-  }, [editor]);
+  const deleteOrphanedTemplateImage = async (image: RichTextEditorImage) => {
+    if (!image.uploadToken || !image.alt) return;
+    await deleteDraftFormTemplateImage(
+      Number(row.draftingWorkCategoryId),
+      image.uploadToken,
+      image.alt,
+    );
+    pendingImages.current.delete(image.uploadToken);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -422,49 +238,6 @@ export function DraftFormTemplateDialog({
     }
   };
 
-  const toolbarItems = [
-    {
-      label: '굵게',
-      icon: <FormatBoldOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleBold().run(),
-    },
-    {
-      label: '기울임',
-      icon: <FormatItalicOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleItalic().run(),
-    },
-    {
-      label: '취소선',
-      icon: <StrikethroughSOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleStrike().run(),
-    },
-    {
-      label: '글머리 기호',
-      icon: <FormatListBulletedOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleBulletList().run(),
-    },
-    {
-      label: '번호 목록',
-      icon: <FormatListNumberedOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleOrderedList().run(),
-    },
-    {
-      label: '인용',
-      icon: <FormatQuoteOutlinedIcon />,
-      run: () => editor?.chain().focus().toggleBlockquote().run(),
-    },
-    {
-      label: '되돌리기',
-      icon: <UndoOutlinedIcon />,
-      run: () => editor?.chain().focus().undo().run(),
-    },
-    {
-      label: '다시 실행',
-      icon: <RedoOutlinedIcon />,
-      run: () => editor?.chain().focus().redo().run(),
-    },
-  ];
-
   return (
     <>
       <CommonDialog
@@ -477,51 +250,10 @@ export function DraftFormTemplateDialog({
         paperHeight="90vh"
         fullScreenOnMobile
         footerStart={
-          <Box
-            sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}
-          >
-            <IconButton
-              size="small"
-              aria-label="툴바 열기"
-              onClick={() => setToolbarOpen((value) => !value)}
-            >
-              <FormatBoldOutlinedIcon fontSize="small" />
-            </IconButton>
-            {toolbarOpen && (
-              <Box
-                data-testid="draft-form-template-toolbar"
-                sx={{
-                  position: 'absolute',
-                  left: 0,
-                  bottom: 'calc(100% + 8px)',
-                  zIndex: 2,
-                  display: 'flex',
-                  gap: 0.5,
-                  p: 0.75,
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  bgcolor: 'background.paper',
-                  maxWidth: 'min(520px, calc(100vw - 48px))',
-                  overflowX: 'auto',
-                }}
-              >
-                {toolbarItems.map((item) => (
-                  <IconButton
-                    key={item.label}
-                    size="small"
-                    aria-label={item.label}
-                    onClick={() => {
-                      item.run();
-                      setToolbarOpen(false);
-                    }}
-                  >
-                    {item.icon}
-                  </IconButton>
-                ))}
-              </Box>
-            )}
-          </Box>
+          <RichTextEditorToolbar
+            editor={editor}
+            panelTestId="draft-form-template-toolbar"
+          />
         }
         actions={
           <>
@@ -582,37 +314,34 @@ export function DraftFormTemplateDialog({
                 borderColor: 'divider',
                 bgcolor: 'background.paper',
                 p: 2,
-                '& .ProseMirror': {
+              }}
+            >
+              <RichTextEditor
+                content="<p></p>"
+                ariaLabel="본문"
+                onEditorReady={setEditor}
+                onContentChange={(currentEditor) =>
+                  setHasChanges(currentEditor.getHTML() !== initialHtml.current)
+                }
+                uploadImage={uploadTemplateImage}
+                onOrphanedImageUpload={deleteOrphanedTemplateImage}
+                onUploadingChange={setUploadingCount}
+                onImageUploadError={setError}
+                className="draft-form-template-rich-text-editor"
+                contentSx={{
                   minHeight: '100%',
                   outline: 'none',
                   lineHeight: 1.7,
                   overflowWrap: 'anywhere',
-                },
-                '& .ProseMirror table': {
-                  width: '100%',
-                  tableLayout: 'fixed',
-                  borderCollapse: 'collapse',
-                },
-                '& .ProseMirror td, & .ProseMirror th': {
-                  border: 1,
-                  borderColor: 'divider',
-                  p: 0.75,
-                  verticalAlign: 'top',
-                },
-                '& .ProseMirror img': {
-                  maxWidth: '100%',
-                  height: 'auto',
-                },
-                '& .ProseMirror p.is-editor-empty:first-of-type::before': {
-                  color: 'text.disabled',
-                  content: 'attr(data-placeholder)',
-                  float: 'left',
-                  height: 0,
-                  pointerEvents: 'none',
-                },
-              }}
-            >
-              <EditorContent editor={editor} />
+                  '& p.is-editor-empty:first-of-type::before': {
+                    color: 'text.disabled',
+                    content: 'attr(data-placeholder)',
+                    float: 'left',
+                    height: 0,
+                    pointerEvents: 'none',
+                  },
+                }}
+              />
             </Box>
           ) : null}
         </Box>

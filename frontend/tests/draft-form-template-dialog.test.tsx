@@ -197,6 +197,43 @@ describe('DraftFormTemplateDialog', () => {
     );
   });
 
+  it('uses the shared toolbar with accessible command state', async () => {
+    renderDialog();
+    await screen.findByRole('textbox', { name: '본문' });
+
+    fireEvent.click(screen.getByRole('button', { name: '툴바 열기' }));
+    expect(screen.getByRole('button', { name: '굵게' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('provides shared font controls and preserves pasted spreadsheet tables', async () => {
+    renderDialog();
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.click(screen.getByRole('button', { name: '툴바 열기' }));
+
+    expect(screen.getByRole('combobox', { name: '글꼴' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: '글자 크기' }),
+    ).toBeInTheDocument();
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === 'text/html'
+            ? '<table><tbody><tr><td>표 셀 A</td><td>표 셀 B</td></tr></tbody></table>'
+            : '',
+      },
+    });
+
+    await waitFor(() => {
+      expect(editor.querySelectorAll('table tr')).toHaveLength(1);
+      expect(editor.querySelector('table')?.textContent).toBe('표 셀 A표 셀 B');
+    });
+  });
+
   it('confirms discarding an uploaded image and deletes its temporary object', async () => {
     vi.stubGlobal('URL', {
       ...URL,

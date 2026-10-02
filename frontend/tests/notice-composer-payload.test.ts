@@ -86,11 +86,17 @@ describe('NoticeComposerDialog payload', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
     expect(saveButton).toBeDisabled();
     expect(within(saveButton).getByRole('progressbar')).toBeVisible();
+    expect(saveButton).toHaveTextContent('저장 중…');
+    const cancelButton = screen.getByRole('button', { name: '취소' });
+    expect(cancelButton).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(saveButton);
     expect(onSubmit).toHaveBeenCalledOnce();
 
     resolveSubmit?.();
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    await waitFor(() => expect(saveButton).toHaveTextContent('저장'));
   });
 
   it('clears save progress and keeps the composer open when submission fails', async () => {
@@ -123,6 +129,7 @@ describe('NoticeComposerDialog payload', () => {
     expect(
       within(saveButton).queryByRole('progressbar'),
     ).not.toBeInTheDocument();
+    expect(saveButton).toHaveTextContent('저장');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -234,6 +241,28 @@ describe('NoticeComposerDialog payload', () => {
     });
   });
 
+  it('allows saving a non-empty initial body even when the title is blank', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          defaultBody: '<p>기존 본문</p>',
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    expect(
+      await screen.findByRole('textbox', { name: '본문' }),
+    ).toHaveTextContent('기존 본문');
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  });
+
   it('serializes the editor JSON returned by Tiptap', () => {
     const json = {
       type: 'doc',
@@ -244,6 +273,28 @@ describe('NoticeComposerDialog payload', () => {
 
     expect(serializeNoticeEditorJson({ getJSON: () => json })).toBe(
       JSON.stringify(json),
+    );
+  });
+
+  it('uses the shared toolbar with accessible command state', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '툴바 열기' }));
+    expect(screen.getByRole('button', { name: '굵게' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
     );
   });
 

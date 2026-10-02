@@ -22,8 +22,11 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
-import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
-import { noticeContentStyles } from './noticeContentStyles';
+import type {
+  NoticeCommentItem,
+  NoticeFeedItem,
+} from '../types/community.types';
+import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 
@@ -717,7 +720,7 @@ export function NoticeFeedList({
                       }
                     }}
                     sx={{
-                      ...noticeContentStyles,
+                      ...richTextContentStyles,
                       color: 'text.primary',
                       mb: 1.5,
                       overflow: isExpanded ? 'visible' : 'hidden',

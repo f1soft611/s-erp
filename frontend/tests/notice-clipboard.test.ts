@@ -3,7 +3,7 @@ import {
   hasSpreadsheetClipboardContent,
   normalizeClipboardHtmlForEditor,
   normalizeClipboardTextForEditor,
-} from '../src/pages/groupware/community/notice/utils/noticeClipboard';
+} from '../src/shared/components/rich-text-editor/clipboard';
 
 describe('notice clipboard normalization', () => {
   it('normalizes embedded cell styles without mutating the global document head', () => {

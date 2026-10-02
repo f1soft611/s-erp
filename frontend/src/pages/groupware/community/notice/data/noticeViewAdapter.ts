@@ -1,5 +1,5 @@
 import type { CommonViewItem } from '../../../../../shared/components/view-mode/commonViewTypes';
-import type { NoticeFeedItem } from './noticeData';
+import type { NoticeFeedItem } from '../types/community.types';
 
 function formatNoticeDate(value: NoticeFeedItem['createdAt']): string {
   if (!value) {
