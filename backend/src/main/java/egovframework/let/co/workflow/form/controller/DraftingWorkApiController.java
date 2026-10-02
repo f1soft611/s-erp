@@ -25,6 +25,8 @@ import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.EgovAccessControlHelper;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkSaveRequestVO;
+import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateSaveRequestVO;
+import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkVO;
 import egovframework.let.co.workflow.form.service.DraftingWorkService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -127,6 +129,53 @@ public class DraftingWorkApiController {
         }
     }
 
+    @Operation(summary = "기안양식 본문 템플릿 조회", security = { @SecurityRequirement(name = "Authorization") })
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "404", description = "기안양식을 찾을 수 없음"),
+        @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
+    })
+    @GetMapping("/{draftingWorkCategoryId}/template")
+    public ResponseEntity<ResultVO> getTemplate(
+            @PathVariable Long draftingWorkCategoryId,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        try {
+            DraftingWorkTemplateVO template = draftingWorkService.getTemplate(
+                    user.getTenantId(), draftingWorkCategoryId);
+            Map<String, Object> resultMap = new HashMap<String, Object>();
+            resultMap.put("item", template);
+            return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+        } catch (NoSuchElementException ex) {
+            return notFound(ex.getMessage());
+        }
+    }
+
+    @Operation(summary = "기안양식 본문 템플릿 저장", security = { @SecurityRequirement(name = "Authorization") })
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "저장 성공"),
+        @ApiResponse(responseCode = "400", description = "템플릿 입력값 오류"),
+        @ApiResponse(responseCode = "403", description = "테넌트 관리자 권한 필요"),
+        @ApiResponse(responseCode = "404", description = "기안양식을 찾을 수 없음")
+    })
+    @PutMapping("/{draftingWorkCategoryId}/template")
+    public ResponseEntity<ResultVO> saveTemplate(
+            @PathVariable Long draftingWorkCategoryId,
+            @RequestBody DraftingWorkTemplateSaveRequestVO payload,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireTenantAdmin(user);
+        try {
+            DraftingWorkTemplateVO template = draftingWorkService.saveTemplate(
+                    user.getTenantId(), draftingWorkCategoryId, payload);
+            Map<String, Object> resultMap = new HashMap<String, Object>();
+            resultMap.put("item", template);
+            return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+        } catch (IllegalArgumentException ex) {
+            return badRequest(ex.getMessage());
+        } catch (NoSuchElementException ex) {
+            return notFound(ex.getMessage());
+        }
+    }
+
     private void requireTenantAdmin(LoginVO user) {
         if (!EgovAccessControlHelper.isTenantAdmin(user)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, ResponseCode.AUTH_ERROR.getMessage());
@@ -137,6 +186,13 @@ public class DraftingWorkApiController {
         Map<String, Object> errorMap = new HashMap<String, Object>();
         errorMap.put("message", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
+    }
+
+    private ResponseEntity<ResultVO> notFound(String message) {
+        Map<String, Object> errorMap = new HashMap<String, Object>();
+        errorMap.put("message", message);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
     }
 

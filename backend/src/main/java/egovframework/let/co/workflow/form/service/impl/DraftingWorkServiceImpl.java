@@ -17,6 +17,8 @@ import egovframework.let.co.workflow.form.domain.model.DraftingWorkUserOptionVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkSearchConditionVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkVO;
 import egovframework.let.co.workflow.form.domain.repository.DraftingWorkDAO;
+import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateSaveRequestVO;
+import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateVO;
 import egovframework.let.co.workflow.form.service.DraftingWorkService;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkSaveRequestVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
@@ -32,6 +34,7 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
     private final EgovIdGnrService codeIdGnrService;
     private final CommonCodeGroupService commonCodeGroupService;
     private final CommonCodeItemService commonCodeItemService;
+    private final DraftingWorkTemplateServiceImpl draftingWorkTemplateService;
 
     public DraftingWorkServiceImpl(
             DraftingWorkDAO draftingWorkDAO,
@@ -43,6 +46,7 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
         this.codeIdGnrService = codeIdGnrService;
         this.commonCodeGroupService = commonCodeGroupService;
         this.commonCodeItemService = commonCodeItemService;
+        this.draftingWorkTemplateService = new DraftingWorkTemplateServiceImpl(draftingWorkDAO);
     }
 
     @Override
@@ -305,6 +309,20 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
             draftingWorkDAO.insertWorkAuthorityMapping(authorityParams);
         }
         return draftingWorkDAO.selectWorkById(tenantId, draftingWorkCategoryId);
+    }
+
+    @Override
+    public DraftingWorkTemplateVO getTemplate(Long tenantId, Long draftingWorkCategoryId) throws Exception {
+        return draftingWorkTemplateService.getTemplate(tenantId, draftingWorkCategoryId);
+    }
+
+    @Override
+    @Transactional
+    public DraftingWorkTemplateVO saveTemplate(
+            Long tenantId,
+            Long draftingWorkCategoryId,
+            DraftingWorkTemplateSaveRequestVO payload) throws Exception {
+        return draftingWorkTemplateService.saveTemplate(tenantId, draftingWorkCategoryId, payload);
     }
 
     private CommonCodeItemVO findActiveItem(Long tenantId, String groupCode, Long itemId) throws Exception {
