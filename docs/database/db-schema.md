@@ -472,7 +472,8 @@
 - `tb_tenant`, 원본 분류 그룹, `tb_common_code_item`, reviewer/approver 및 감사 사용자 참조
 - `category_item_id`는 `WF_FORM_CATEGORY`, `reg_term_id`는 `WF_FORM_CYCLE` 그룹 항목을 서비스에서 검증
 - `code_name`은 양식명이다. `reg_term`은 `reg_term_id`가 가리키는 항목명과 동기화
-- `cata_type_code`는 기존 `haccpBaseWorkCodeIdGnrService`로 3자리 생성
+- `cata_type_code`는 `EgovConfigAppIdGen.codeIdGnrService`의 `tb_drafting_work_category` 3자리 설정으로 생성
+- `(tenant_id, cata_type_code)`는 `delete_status IS DISTINCT FROM 'Y'` 조건의 부분 unique index로 유일성 보장
 
 ### 2-22. tb_drafting_work_category_authority
 
@@ -498,6 +499,7 @@
 ## 변경 이력
 
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
+- 2026-10-02: `tb_drafting_work_category`의 삭제되지 않은 양식 코드에 테넌트별 부분 unique index를 추가하는 SQL 초안을 정의했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고. (미반영 SQL 초안)
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.

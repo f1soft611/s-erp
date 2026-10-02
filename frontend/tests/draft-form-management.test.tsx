@@ -334,6 +334,107 @@ describe('Draft form management page', () => {
     ).toBeInTheDocument();
   });
 
+  it('validates required classification values before calling the create API', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 설정' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '분류 추가' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    expect(
+      await within(dialog).findByText('필수 입력 항목을 확인해 주세요.'),
+    ).toBeInTheDocument();
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+    expect(screen.getAllByText('필수 입력 항목을 확인해 주세요.')).toHaveLength(
+      1,
+    );
+  });
+
+  it('keeps classification save errors inside the helper dialog', async () => {
+    apiMocks.apiPut.mockRejectedValue(new Error('분류 저장 실패'));
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 설정' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+    fireEvent.doubleClick(
+      within(dialog).getByRole('gridcell', { name: '점검' }),
+    );
+    const editor = within(dialog).getByDisplayValue('점검');
+    fireEvent.change(editor, { target: { value: '정기점검' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    expect(
+      await within(dialog).findByText('분류 저장 실패'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('분류 저장 실패')).toHaveLength(1);
+  });
+
   it('keeps the form grid quiet while classification save reloads its rows', async () => {
     const sourceRow = {
       draftingWorkCategoryId: 71,

@@ -6,6 +6,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
+  useRef,
 } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
@@ -154,6 +155,7 @@ const GridCellInner = <T extends object>({
   pinOffset,
   adornment,
 }: GridCellProps<T>) => {
+  const cellAnchorRef = useRef<HTMLDivElement | null>(null);
   const value = column.getValue?.(row) ?? row[column.field];
   const editable = isCellEditable(column, row);
   const cellRenderContext = useMemo(
@@ -218,6 +220,13 @@ const GridCellInner = <T extends object>({
     },
     [onBlur],
   );
+  const handleCellRef = useCallback(
+    (node: HTMLElement | null) => {
+      cellAnchorRef.current = node as HTMLDivElement | null;
+      onCellRef(node);
+    },
+    [onCellRef],
+  );
 
   return (
     <Box
@@ -235,7 +244,7 @@ const GridCellInner = <T extends object>({
       className={cellClassName}
       style={mergedCellStyle}
       tabIndex={focused ? 0 : -1}
-      ref={onCellRef}
+      ref={handleCellRef}
       onClick={onFocus}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
@@ -371,6 +380,7 @@ const GridCellInner = <T extends object>({
           column={column}
           value={String(draftValue ?? '')}
           userValue={draftValue}
+          userAnchorEl={cellAnchorRef.current}
           onChange={onDraftChange}
           onUserChange={onDraftChange}
           onCommitEdit={() => onBlur?.()}

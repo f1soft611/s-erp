@@ -16,6 +16,8 @@ export type UserSelectEditorProps = {
   options: F1GridUserOption[];
   multiple?: boolean;
   autoFocus?: boolean;
+  compact?: boolean;
+  anchorEl?: HTMLElement | null;
   label: string;
   readOnly?: boolean;
   required?: boolean;
@@ -41,6 +43,8 @@ export function UserSelectEditor({
   options,
   multiple = false,
   autoFocus = false,
+  compact = false,
+  anchorEl,
   label,
   readOnly = false,
   required = false,
@@ -61,7 +65,23 @@ export function UserSelectEditor({
   const selectedValue = multiple
     ? selectedOptions
     : (selectedOptions[0] ?? null);
-
+  const popperWidth =
+    compact && anchorEl
+      ? Math.max(
+          0,
+          Math.min(
+            320,
+            anchorEl.ownerDocument.documentElement.clientWidth -
+              anchorEl.getBoundingClientRect().left -
+              8,
+          ),
+        )
+      : 320;
+  const compactAnchorInset =
+    compact && anchorEl
+      ? anchorEl.clientLeft +
+        Number.parseFloat(getComputedStyle(anchorEl).paddingLeft || '0')
+      : 0;
   return (
     <Autocomplete<F1GridUserOption, boolean, false, false>
       data-f1grid-user-picker="true"
@@ -101,7 +121,14 @@ export function UserSelectEditor({
           sx: { maxHeight: 280, overflowY: 'auto' },
         },
         popper: {
+          placement: 'bottom-start',
           modifiers: [
+            {
+              name: 'offset',
+              options: {
+                offset: [-compactAnchorInset, compact ? 6 : 0],
+              },
+            },
             {
               name: 'preventOverflow',
               options: {
@@ -112,7 +139,8 @@ export function UserSelectEditor({
             },
           ],
           sx: {
-            minWidth: 'min(320px, calc(100vw - 16px))',
+            width: popperWidth,
+            minWidth: popperWidth,
             maxWidth: 'calc(100vw - 16px)',
           },
         },
@@ -180,7 +208,8 @@ export function UserSelectEditor({
         <TextField
           {...params}
           autoFocus={autoFocus}
-          label={label}
+          label={compact ? undefined : label}
+          variant={compact ? 'standard' : 'outlined'}
           margin="none"
           required={required}
           error={error}
@@ -191,14 +220,36 @@ export function UserSelectEditor({
             htmlInput: {
               ...params.slotProps.htmlInput,
               readOnly,
+              'aria-label': compact ? label : undefined,
               'aria-required': required,
               'aria-invalid': error,
             },
           }}
           sx={{
-            '& .MuiInputBase-root': { minHeight: 38, py: 0 },
-            '& .MuiInputBase-input': { fontSize: '0.9rem' },
-            '& .MuiInputLabel-root': { fontSize: '0.82rem', fontWeight: 600 },
+            '& .MuiInputBase-root': {
+              minHeight: compact ? 0 : 38,
+              ...(compact ? { height: '100%' } : {}),
+              py: 0,
+            },
+            '& .MuiInputBase-input': {
+              fontSize: compact ? '0.8rem' : '0.9rem',
+              ...(compact ? { padding: '0 !important' } : {}),
+            },
+            ...(compact
+              ? {
+                  '& .MuiAutocomplete-inputRoot': {
+                    flexWrap: 'nowrap',
+                    padding: '0 !important',
+                  },
+                  '& .MuiInput-root::before, & .MuiInput-root::after': {
+                    display: 'none',
+                  },
+                }
+              : {}),
+            '& .MuiInputLabel-root': {
+              fontSize: '0.82rem',
+              fontWeight: 600,
+            },
             '& .MuiFormHelperText-root': { marginLeft: 0, marginTop: 0.5 },
           }}
         />

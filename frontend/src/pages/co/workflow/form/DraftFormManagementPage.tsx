@@ -323,7 +323,6 @@ export function DraftFormManagementPage({
           await management.loadRows(management.appliedFilters, { quiet: true });
           setCategoryNoticeDismissed(false);
         }}
-        onError={management.setError}
       />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}

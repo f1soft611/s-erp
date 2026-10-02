@@ -173,6 +173,14 @@ await page.route('http://localhost:8080/**', async (route) => {
           profileImage: avatarImage,
           levelNm: '부장',
         },
+        {
+          userId: 111,
+          loginId: 211,
+          userNm: '김민지',
+          departmentNm: '기획팀',
+          profileImage: avatarImage,
+          levelNm: '과장',
+        },
       ],
     };
   } else if (pathname === '/api/v1/co/workflow/forms') {
@@ -349,54 +357,95 @@ await page.keyboard.press('Escape');
 await editFormDialog.getByRole('button', { name: '닫기' }).click();
 
 const cellPickerScreenshots = [];
-await page.setViewportSize({ width: 1280, height: 900 });
-const reviewerCell = page
-  .getByRole('grid')
-  .getByRole('row')
-  .nth(1)
-  .getByRole('gridcell')
-  .nth(5);
-await reviewerCell.dblclick();
-await page.getByRole('option', { name: /홍길동/ }).waitFor();
-for (const width of screenshotWidths) {
+for (const width of [593, 1280]) {
   await page.setViewportSize({ width, height: 900 });
-  await reviewerCell.evaluate((cell) => {
-    const scroller = cell.closest('[data-testid="f1-grid-body-scroll"]');
-    if (!scroller) return;
-    const cellLeft = cell.getBoundingClientRect().left;
-    const scrollLeft = scroller.getBoundingClientRect().left;
-    scroller.scrollLeft += cellLeft - scrollLeft - 12;
-  });
-  await page.waitForTimeout(100);
+  const reviewerCell = page
+    .getByRole('gridcell', { name: '홍길동 (운영팀)' })
+    .first();
+  await reviewerCell.scrollIntoViewIfNeeded();
+  const cellBounds = await reviewerCell.boundingBox();
+  await reviewerCell.dispatchEvent('dblclick');
   await page.getByRole('option', { name: /홍길동/ }).waitFor();
   const pickerMetrics = await page.evaluate(() => {
     const popper = document.querySelector('.MuiAutocomplete-popper');
+    const input = document.querySelector(
+      '[data-f1grid-user-picker="true"] input[role="combobox"]',
+    );
     if (!popper) return null;
     const bounds = popper.getBoundingClientRect();
+    const inputBounds = input?.getBoundingClientRect();
     return {
       viewportWidth: document.documentElement.clientWidth,
       left: bounds.left,
       right: bounds.right,
+      top: bounds.top,
       width: bounds.width,
+      inputLeft: inputBounds?.left,
     };
   });
   if (
     !pickerMetrics ||
-    pickerMetrics.width < Math.min(280, width - 16) ||
+    !cellBounds ||
+    pickerMetrics.top < cellBounds.y + cellBounds.height + 2 ||
+    Math.abs(pickerMetrics.width - Math.min(320, width - cellBounds.x - 8)) >
+      1 ||
     pickerMetrics.left < 0 ||
-    pickerMetrics.right > width + 1
+    pickerMetrics.right > width + 1 ||
+    Math.abs(pickerMetrics.left - cellBounds.x) > 1
   ) {
     throw new Error(
-      `Grid user picker is clipped at ${width}px: ${JSON.stringify(pickerMetrics)}`,
+      `Grid user picker is misplaced at ${width}px: ${JSON.stringify({ pickerMetrics, cellBounds })}`,
     );
   }
-  cellPickerScreenshots.push({ width, pickerMetrics });
+  cellPickerScreenshots.push({ width, pickerMetrics, cellBounds });
   await page.screenshot({
     path: path.join(screenshotDir, `user-cell-${width}px.png`),
     fullPage: false,
   });
+  if (width === 593) {
+    const availableUserOptions = await page
+      .getByRole('option')
+      .allTextContents();
+    await page.getByRole('option', { name: /김민지/ }).click();
+    const changedReviewerCell = page.getByRole('gridcell', {
+      name: '김민지 (기획팀)',
+    });
+    await page.waitForTimeout(150);
+    const reviewerEditorCount = await page
+      .getByRole('combobox', { name: '검토자' })
+      .count();
+    const updatedRowText = await page
+      .getByRole('grid')
+      .getByRole('row')
+      .nth(1)
+      .innerText();
+    if (!updatedRowText.includes('김민지 (기획팀)')) {
+      throw new Error(
+        `User selection did not update the visible row: ${JSON.stringify({
+          availableUserOptions,
+          updatedRowText,
+          reviewerEditorCount,
+          saveEnabled: await page
+            .getByRole('button', { name: '저장' })
+            .isEnabled(),
+        })}`,
+      );
+    }
+    if (!(await page.getByRole('button', { name: '저장' }).isEnabled())) {
+      throw new Error(
+        'Selecting a different user did not update the Grid row.',
+      );
+    }
+    await changedReviewerCell.dispatchEvent('dblclick');
+    await page.getByRole('option', { name: /홍길동/ }).waitFor();
+    await page.getByRole('option', { name: /홍길동/ }).click();
+    await page.getByRole('gridcell', { name: '홍길동 (운영팀)' }).waitFor();
+    if (await page.getByRole('button', { name: '저장' }).isEnabled()) {
+      throw new Error('Restoring the original user left the Grid row dirty.');
+    }
+  }
+  await page.keyboard.press('Escape');
 }
-await page.keyboard.press('Escape');
 
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.getByRole('button', { name: '양식 추가' }).click();

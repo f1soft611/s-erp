@@ -3063,9 +3063,12 @@ describe('F1-GRID interaction', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByRole('gridcell'));
+    const reviewerCell = screen.getByRole('gridcell');
+    fireEvent.doubleClick(reviewerCell);
+    expect(reviewerCell.querySelector('fieldset')).toBeNull();
     fireEvent.click(screen.getByRole('option', { name: /Alice Kim/ }));
 
+    expect(screen.getByRole('gridcell', { name: 'Alice Kim' })).toBeVisible();
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       { id: 'form-1', reviewerId: 12 },
     ]);
@@ -3101,6 +3104,9 @@ describe('F1-GRID interaction', () => {
     fireEvent.click(screen.getByRole('option', { name: /Bob Lee/ }));
     fireEvent.blur(input);
 
+    expect(
+      screen.getByRole('gridcell', { name: 'Alice Kim, Bob Lee' }),
+    ).toBeVisible();
     expect(gridRef.current?.getChanges().updatedRows).toEqual([
       { id: 'form-1', assigneeIds: ['u-1', 'u-2'] },
     ]);

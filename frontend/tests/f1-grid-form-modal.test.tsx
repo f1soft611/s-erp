@@ -324,6 +324,9 @@ describe('typed form field', () => {
     );
 
     const input = screen.getByRole('combobox', { name: '담당자' });
+    expect(
+      input.closest('.MuiOutlinedInput-root')?.querySelector('fieldset'),
+    ).not.toBeNull();
     expect(screen.getByText('김담당')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(screen.getByText('과장')).toBeVisible();

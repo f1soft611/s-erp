@@ -1,0 +1,44 @@
+<h2>모달 통일 방향 비교</h2>
+<p class="subtitle">그룹웨어, 기안양식관리, F1-Grid 폼에서 고정할 공통 규칙의 범위를 골라주세요.</p>
+
+<div class="cards">
+  <div class="card" data-choice="shared-shell" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#eef2f3;padding:18px;min-height:300px;display:flex;align-items:center;justify-content:center">
+        <div style="width:100%;max-width:420px;height:258px;background:white;border:1px solid #c9d3d5;border-radius:5px;box-shadow:0 8px 22px #20363a20;display:flex;flex-direction:column;overflow:hidden;color:#172b2e;font:13px Arial,sans-serif">
+          <div style="height:56px;border-bottom:1px solid #dce3e4;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box"><div><b style="font-size:16px">기안양식 편집</b><div style="color:#657477;margin-top:3px;font-size:11px">필수 항목을 입력하세요</div></div><span style="font-size:19px;color:#657477">×</span></div>
+          <div style="flex:1;background:#f7f9f9;padding:16px;overflow:hidden"><div style="height:18px;background:#dce5e5;border-radius:3px;margin-bottom:10px"></div><div style="height:52px;background:white;border:1px solid #e0e7e7;border-radius:3px;margin-bottom:10px"></div><div style="height:52px;background:white;border:1px solid #e0e7e7;border-radius:3px"></div></div>
+          <div style="height:56px;border-top:1px solid #dce3e4;padding:0 16px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box"><span style="font-size:11px;color:#657477">미저장 변경 사항</span><span><button style="padding:7px 14px;border:1px solid #cbd5d6;background:white;border-radius:3px">취소</button> <button style="padding:7px 16px;border:0;background:#176b67;color:white;border-radius:3px">저장</button></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A. 공통 셸 하나</h3><p>헤더·스크롤 본문·하단 액션의 크기와 경계를 모든 모달에서 동일하게 고정. 가장 강한 통일감, 특수 편집기 배치에는 제약이 생길 수 있습니다.</p></div>
+  </div>
+  <div class="card" data-choice="shell-presets" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#eef2f3;padding:18px;min-height:300px;display:flex;align-items:center;justify-content:center">
+        <div style="width:100%;max-width:420px;height:258px;background:white;border:1px solid #c9d3d5;border-radius:5px;box-shadow:0 8px 22px #20363a20;display:flex;flex-direction:column;overflow:hidden;color:#172b2e;font:13px Arial,sans-serif">
+          <div style="height:56px;border-bottom:1px solid #dce3e4;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box"><div><b style="font-size:16px">공지 작성</b><div style="color:#657477;margin-top:3px;font-size:11px">공지 내용과 첨부를 관리합니다</div></div><span style="font-size:19px;color:#657477">×</span></div>
+          <div style="height:34px;background:#f7f9f9;border-bottom:1px solid #dce3e4;padding:0 16px;display:flex;gap:18px;align-items:center;font-size:11px;color:#526467;box-sizing:border-box"><b style="color:#176b67">내용</b><span>첨부파일</span><span style="margin-left:auto">업무별 확장 영역</span></div>
+          <div style="flex:1;background:#fff;padding:14px 16px;overflow:hidden"><div style="height:28px;border:1px solid #dce3e4;border-radius:3px;margin-bottom:9px;padding:6px;box-sizing:border-box;color:#657477;font-size:11px">제목 입력</div><div style="height:67px;border:1px solid #dce3e4;border-radius:3px;padding:8px;color:#657477;font-size:11px">본문 편집기 / F1-Grid 입력 폼 / 업무 전용 콘텐츠</div></div>
+          <div style="height:56px;border-top:1px solid #dce3e4;padding:0 16px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box"><span style="font-size:11px;color:#657477">왼쪽 보조 툴바 슬롯</span><span><button style="padding:7px 14px;border:1px solid #cbd5d6;background:white;border-radius:3px">닫기</button> <button style="padding:7px 16px;border:0;background:#176b67;color:white;border-radius:3px">저장</button></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B. 공통 셸 + 업무 프리셋</h3><p>외곽 규칙은 공유하고 폼·편집기·선택기 프리셋이 본문/보조 툴바 슬롯을 제공. 일관성과 기존 기능 유지의 균형이 좋지만 API 규칙은 정해야 합니다.</p></div>
+  </div>
+  <div class="card" data-choice="theme-only" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#eef2f3;padding:18px;min-height:300px;display:flex;align-items:center;justify-content:center">
+        <div style="width:100%;max-width:420px;height:258px;background:white;border:1px solid #c9d3d5;border-radius:5px;box-shadow:0 8px 22px #20363a20;display:flex;flex-direction:column;overflow:hidden;color:#172b2e;font:13px Arial,sans-serif">
+          <div style="height:62px;border-bottom:1px solid #dce3e4;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box"><b style="font-size:16px">사용자 선택</b><span style="font-size:19px;color:#657477">×</span></div>
+          <div style="flex:1;background:#fff;padding:16px;overflow:hidden"><div style="height:22px;background:#f0f4f4;border-radius:3px;margin-bottom:12px"></div><div style="height:88px;background:#fff;border:1px solid #dce3e4;border-radius:3px"></div></div>
+          <div style="height:50px;background:#f5f8f8;padding:0 16px;display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box"><button style="padding:7px 14px;border:0;background:#176b67;color:white;border-radius:3px">선택</button><button style="padding:7px 14px;border:1px solid #cbd5d6;background:white;border-radius:3px">취소</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>C. 테마 기본값만 통일</h3><p>MUI Dialog 제목/여백/모서리 같은 기본값만 정리하고 각 화면의 구조는 유지. 가장 작은 변경이지만 세 영역의 높이, 스크롤, 액션 배치는 계속 달라질 수 있습니다.</p></div>
+  </div>
+</div>
+
+<p class="subtitle">하나를 클릭해 선호 방향을 표시한 뒤, 채팅에 선택과 필요한 예외를 알려주세요.</p>

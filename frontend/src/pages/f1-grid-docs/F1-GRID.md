@@ -100,7 +100,8 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 - `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
 - user 값은 단일 ID/`null` 또는 다중 ID 배열/`[]`로 저장한다. 옵션에서 선택한 ID의 원래 string/number 타입을 보존하며 표시 metadata는 row 값에 저장하지 않는다. 단일·다중 선택 chip X는 해제 patch를 만들고, 동일한 선택값을 commit해도 배열 내용이 같으면 dirty로 처리하지 않는다.
-- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell anchor가 좁아도 popup은 최소 320px(좁은 viewport에서는 viewport minus 16px)이며 viewport 경계를 넘으면 가로로 이동한다.
+- Grid cell user 편집은 내부 TextField outline/underline을 제거하고 GridCell active focus outline만 사용한다. Row form modal은 기존 form 입력처럼 outlined border를 유지한다.
+- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell 편집 팝업은 cell 왼쪽 경계에 맞춰 시작하며, 최대 320px에서 anchor 오른쪽에 확보 가능한 너비로 줄어든다. 좁은 viewport에서도 화면 경계를 넘지 않는다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
 
@@ -1534,6 +1535,8 @@ F1GridColumn<T>;
 # 29. Public API (⚠️ 목표 API, 현재 구현과 다름)
 
 최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다. 아래 인터페이스는 설계 목표이며, `addRows`, `setRows`, `clearChanges`, `getQuery`, `copy`/`paste`, `refreshRowMerge`/`getRowMergeRanges`, `getLayout`/`setLayout`/`resetLayout`는 현재 `F1GridRef`에 없다. 현재 구현된 실제 `F1GridRef`/`F1TreeRef` 계약은 F1-Grid 문서 포털의 API Reference 또는 `grid.types.ts`를 따른다.
+
+`F1GridRef.validate()`는 현재 구현된 API다. 명시적 저장 액션에서는 API 호출 전에 실행하고, `false`이면 저장을 중단해 셀 오류와 입력 안내를 표시한다. 컬럼의 `required`, `min`, `max`, `validate` 설정을 재사용한다.
 
 ```typescript
 interface F1GridRef<T> {

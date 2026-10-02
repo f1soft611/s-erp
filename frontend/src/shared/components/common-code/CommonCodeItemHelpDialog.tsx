@@ -39,7 +39,6 @@ type CommonCodeItemHelpDialogProps = {
   onCreateItem: (payload: ItemSavePayload) => Promise<unknown>;
   onUpdateItem: (itemId: string, payload: ItemSavePayload) => Promise<unknown>;
   onReload: () => Promise<void>;
-  onError?: (message: string) => void;
 };
 
 function createItemRow(groupId: string): CommonCodeItemRow {
@@ -75,7 +74,6 @@ export function CommonCodeItemHelpDialog({
   onCreateItem,
   onUpdateItem,
   onReload,
-  onError,
 }: CommonCodeItemHelpDialogProps) {
   const { showSuccess } = useNotification();
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
@@ -155,6 +153,10 @@ export function CommonCodeItemHelpDialog({
 
   const handleSave = async () => {
     if (!canEdit || !gridRef.current || !hasChanges) return;
+    if (!gridRef.current.validate()) {
+      setError('필수 입력 항목을 확인해 주세요.');
+      return;
+    }
     const changes = gridRef.current.getChanges();
     setSaving(true);
     setError('');
@@ -175,7 +177,6 @@ export function CommonCodeItemHelpDialog({
           ? saveError.message
           : '분류 항목 저장에 실패했습니다.';
       setError(message);
-      onError?.(message);
     } finally {
       setSaving(false);
     }
