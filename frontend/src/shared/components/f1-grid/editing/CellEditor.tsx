@@ -19,6 +19,7 @@ type CellEditorProps<T extends object> = {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onSelectChange: (value: unknown) => void;
   userValue: F1GridDraftValue;
+  userAnchorEl?: HTMLElement | null;
   onUserChange: (value: F1GridDraftValue) => void;
   onCommitEdit: () => void;
   onCodePick: () => void;
@@ -31,6 +32,7 @@ export function CellEditor<T extends object>({
   onKeyDown,
   onSelectChange,
   userValue,
+  userAnchorEl,
   onUserChange,
   onCommitEdit,
   onCodePick,
@@ -44,6 +46,8 @@ export function CellEditor<T extends object>({
         options={column.userOptions ?? []}
         multiple={Boolean(column.form?.multiple)}
         autoFocus
+        compact
+        anchorEl={userAnchorEl}
         label={column.headerName}
         onChange={(nextValue) => {
           if (column.form?.multiple) onUserChange(nextValue);

@@ -81,7 +81,7 @@
           w.approver_id,
           COALESCE(au.user_nm, '') AS approver_name,
           CASE
-            WHEN COALESCE(am.assignee_count, 0) = 0 THEN '-'
+            WHEN COALESCE(am.assignee_count, 0) = 0 THEN ''
             WHEN am.assignee_count = 1 THEN am.first_assignee_name
             ELSE am.first_assignee_name || ' 외 ' || CAST(am.assignee_count - 1 AS varchar) || '명'
           END AS assignee_summary,
@@ -182,6 +182,9 @@
           #{useAt}, 'N', #{createdBy, jdbcType=BIGINT}, CURRENT_TIMESTAMP,
           #{updatedBy, jdbcType=BIGINT}, CURRENT_TIMESTAMP
         )
+        ON CONFLICT (tenant_id, cata_type_code)
+          WHERE delete_status IS DISTINCT FROM 'Y'
+        DO NOTHING
         RETURNING drafting_work_category_id
       </select>
 

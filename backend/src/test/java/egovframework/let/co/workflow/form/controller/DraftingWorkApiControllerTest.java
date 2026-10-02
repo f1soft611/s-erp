@@ -103,12 +103,13 @@ class DraftingWorkApiControllerTest {
             eq(1L), eq(101L), argThat(payload ->
                 "정기점검".equals(payload.getCodeName())
                     && Long.valueOf(31L).equals(payload.getCategoryItemId())
-                    && Long.valueOf(42L).equals(payload.getRegTermId()))))
+                    && Long.valueOf(42L).equals(payload.getRegTermId())
+                    && payload.getAssigneeIds() == null)))
             .thenReturn(saved);
 
         mockMvc.perform(post("/api/v1/co/workflow/forms")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"codeName\":\"정기점검\",\"categoryItemId\":31,\"regTermId\":42,\"useAt\":\"Y\"}")
+                .content("{\"codeName\":\"정기점검\",\"categoryItemId\":31,\"regTermId\":42,\"assigneeIds\":null,\"useAt\":\"Y\"}")
                 .principal(authenticationForTenant(1L, "TENANT_ADMIN", "101")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.result.item.draftingWorkCategoryId").value(71))
@@ -118,8 +119,21 @@ class DraftingWorkApiControllerTest {
             eq(1L), eq(101L), argThat(payload ->
                 "정기점검".equals(payload.getCodeName())
                     && Long.valueOf(31L).equals(payload.getCategoryItemId())
-                    && Long.valueOf(42L).equals(payload.getRegTermId())));
+                        && Long.valueOf(42L).equals(payload.getRegTermId())
+                        && payload.getAssigneeIds() == null));
         }
+
+    @Test
+    void createWorkReturnsBadRequestWhenTheCodeInsertConflicts() throws Exception {
+        when(draftingWorkService.createWork(eq(1L), eq(101L), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalArgumentException("이미 사용 중인 구분코드입니다."));
+
+        mockMvc.perform(post("/api/v1/co/workflow/forms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cataTypeCode\":\"007\",\"codeName\":\"정기점검\",\"categoryItemId\":31,\"regTermId\":42}")
+                .principal(authenticationForTenant(1L, "TENANT_ADMIN", "101")))
+            .andExpect(status().isBadRequest());
+    }
 
     @Test
     void updateWorkRequiresTenantAdminAndReturnsUpdatedRow() throws Exception {

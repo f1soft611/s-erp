@@ -167,6 +167,7 @@ function mockMenuPageRequests({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  window.sessionStorage.clear();
 });
 
 const modules: MenuModuleOption[] = [

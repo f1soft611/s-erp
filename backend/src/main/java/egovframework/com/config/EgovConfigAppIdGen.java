@@ -1836,4 +1836,16 @@ public class EgovConfigAppIdGen {
 				.setFillChar('0')
 				.build();
 	}
+	@Bean(destroyMethod = "destroy")
+	public EgovTableIdGnrServiceImpl egovCommonCodeItemIdGnrService() {
+		return new EgovIdGnrBuilder().setDataSource(egovDataSource)
+				.setEgovIdGnrStrategyImpl(new EgovIdGnrStrategyImpl())
+				.setBlockSize(1)
+				.setTable("IDS")
+				.setTableName("tb_common_code_item")
+				.setPreFix("")
+				.setCipers(3)
+				.setFillChar('0')
+				.build();
+	}
 }

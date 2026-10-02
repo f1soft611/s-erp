@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
   IconButton,
   MenuItem,
   TextField,
@@ -12,7 +9,6 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
-import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
 import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
@@ -39,6 +35,7 @@ import {
   getAttachmentExtension,
   getAttachmentIconMeta,
 } from '../../../../../shared/components/feed/attachmentIconMeta';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 
 export type NoticeComposerDraftAttachment = {
   id: string;
@@ -726,11 +723,11 @@ export function NoticeComposerDialog({
   const panelBorder = resolvedDark
     ? 'rgba(148, 163, 184, 0.2)'
     : 'rgba(148, 163, 184, 0.22)';
-  const shellBackground = resolvedDark ? '#111827' : '#ffffff';
   const panelBackground = resolvedDark ? '#0f172a' : '#f8fafc';
-  const dialogContentBackground = resolvedDark ? '#0f172a' : '#f4f7fb';
   const editorSurfaceBackground = resolvedDark ? '#0f172a' : '#ffffff';
-  const headerBackground = resolvedDark ? '#1f2937' : '#f8fafc';
+  const fieldSurfaceBackground = resolvedDark
+    ? '#1e293b'
+    : editorSurfaceBackground;
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const pasteDebugEnabled =
@@ -1269,579 +1266,479 @@ export function NoticeComposerDialog({
     onClose();
   };
 
+  const footerStart = (
+    <Box
+      sx={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+      }}
+    >
+      <IconButton
+        size="small"
+        aria-label="툴바 열기"
+        onClick={() => setToolbarOpen((open) => !open)}
+        sx={{
+          border: `1px solid ${panelBorder}`,
+          borderRadius: 1,
+          width: 32,
+          height: 32,
+          bgcolor: panelBackground,
+          color: theme.palette.text.primary,
+        }}
+      >
+        <FormatBoldOutlinedIcon fontSize="small" />
+      </IconButton>
+
+      <IconButton
+        size="small"
+        aria-label="첨부 링크"
+        onClick={() => attachmentInputRef.current?.click()}
+        sx={{
+          border: `1px solid ${panelBorder}`,
+          borderRadius: 1,
+          width: 32,
+          height: 32,
+          bgcolor: panelBackground,
+          color: theme.palette.text.primary,
+        }}
+      >
+        <AttachFileOutlinedIcon fontSize="small" />
+      </IconButton>
+
+      {toolbarOpen && (
+        <Box
+          data-testid="notice-toolbar-popup"
+          sx={{
+            position: 'absolute',
+            left: 0,
+            bottom: 'calc(100% + 8px)',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
+            alignItems: 'center',
+            gap: 0.75,
+            p: 1,
+            borderRadius: 2,
+            border: `1px solid ${panelBorder}`,
+            bgcolor: resolvedDark
+              ? 'rgba(15, 23, 42, 0.96)'
+              : 'rgba(255, 255, 255, 0.98)',
+            boxShadow: resolvedDark
+              ? '0 10px 25px rgba(15, 23, 42, 0.24)'
+              : '0 10px 25px rgba(15, 23, 42, 0.12)',
+            maxWidth: 'min(520px, calc(100vw - 180px))',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {toolbarItems.map(({ label, icon, onClick }) => (
+            <Button
+              key={label}
+              size="small"
+              variant="contained"
+              aria-label={label}
+              onClick={() => {
+                onClick();
+                setToolbarOpen(false);
+              }}
+              sx={{
+                minWidth: 0,
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                p: 0,
+                bgcolor: resolvedDark
+                  ? 'rgba(59, 130, 246, 0.18)'
+                  : 'rgba(59, 130, 246, 0.08)',
+                color: resolvedDark ? '#e2e8f0' : '#0f172a',
+                '&:hover': {
+                  bgcolor: resolvedDark
+                    ? 'rgba(59, 130, 246, 0.3)'
+                    : 'rgba(59, 130, 246, 0.14)',
+                },
+              }}
+            >
+              {icon}
+            </Button>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+
+  const actions = (
+    <>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleSubmit}
+        disabled={title.trim().length === 0 && editorIsEmpty}
+        sx={{
+          borderRadius: 1.5,
+          fontWeight: 700,
+          minWidth: 96,
+          px: 2.5,
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: 'none',
+          },
+        }}
+      >
+        저장
+      </Button>
+      <Button
+        variant="text"
+        color="primary"
+        onClick={onClose}
+        sx={{
+          borderRadius: 1.5,
+          fontWeight: 600,
+          px: 2,
+          backgroundColor: 'transparent',
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.06),
+          },
+        }}
+      >
+        취소
+      </Button>
+    </>
+  );
+
   return (
-    <Dialog
+    <CommonDialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      data-theme-mode={resolvedDark ? 'dark' : 'light'}
-      slotProps={{
-        paper: {
-          sx: {
-            width: 'min(820px, calc(100vw - 48px))',
-            maxWidth: '820px',
-            height: 'min(90vh, 880px)',
-            maxHeight: 'calc(100vh - 32px)',
-            borderRadius: 2,
-            overflow: 'hidden',
-            backgroundColor: shellBackground,
-            border: `1px solid ${alpha(theme.palette.primary.main, resolvedDark ? 0.28 : 0.16)}`,
-            boxShadow: resolvedDark
-              ? '0 18px 48px rgba(15, 23, 42, 0.34)'
-              : '0 18px 50px rgba(15, 23, 42, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            color: theme.palette.text.primary,
-          },
-        },
+      title="새 공지 작성"
+      size="md"
+      bodyMode="fill"
+      footerStart={footerStart}
+      actions={actions}
+      dialogProps={{
+        'data-testid': 'notice-composer-dialog-root',
+        'data-theme-mode': resolvedDark ? 'dark' : 'light',
       }}
     >
       <Box
-        data-testid="notice-composer-dialog-root"
-        data-theme-mode={resolvedDark ? 'dark' : 'light'}
         sx={{
-          height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          bgcolor: shellBackground,
+          gap: 1.5,
+          height: '100%',
           minHeight: 0,
-          width: '100%',
         }}
       >
-        <Box
+        <TextField
+          select
+          label="구분"
+          value={noticeGubunCode}
+          onChange={(event) => {
+            setNoticeGubunCode(event.target.value);
+            setNoticeGubunError(false);
+          }}
+          required
+          fullWidth
+          margin="none"
+          error={noticeGubunError}
+          helperText={noticeGubunError ? '구분을 선택해 주세요.' : undefined}
+          disabled={noticeGubunOptions.length === 0}
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            px: 2.5,
-            py: 2,
-            bgcolor: headerBackground,
-            borderBottom: `1px solid ${panelBorder}`,
+            '& .MuiOutlinedInput-root': {
+              bgcolor: fieldSurfaceBackground,
+              borderRadius: 1.5,
+              border: 'none',
+              '& fieldset': {
+                border: 'none',
+              },
+              '&.Mui-error fieldset': {
+                border: `1px solid ${theme.palette.error.main}`,
+              },
+            },
+            '& .MuiInputBase-root': {
+              bgcolor: fieldSurfaceBackground,
+              borderRadius: 1.5,
+            },
+            '& .MuiFormLabel-root': {
+              color: theme.palette.text.secondary,
+            },
           }}
         >
-          <Typography
-            id="notice-composer-title"
-            variant="h6"
-            sx={{
-              fontWeight: 800,
-              color: theme.palette.text.primary,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            새 공지 작성
-          </Typography>
-          <IconButton
-            onClick={onClose}
-            size="small"
-            aria-label="닫기"
-            sx={{
-              bgcolor: alpha(
-                theme.palette.action.hover,
-                resolvedDark ? 0.12 : 0.08,
-              ),
-              color: theme.palette.text.primary,
-              '&:hover': {
-                bgcolor: alpha(
-                  theme.palette.action.hover,
-                  resolvedDark ? 0.18 : 0.12,
-                ),
+          {noticeGubunOptions.map((option) => (
+            <MenuItem key={option.code} value={option.code}>
+              {option.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          fullWidth
+          margin="none"
+          placeholder="제목을 입력하세요."
+          slotProps={{
+            input: {
+              'aria-label': '제목',
+            },
+          }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              bgcolor: fieldSurfaceBackground,
+              borderRadius: 1.5,
+              border: 'none',
+              '& fieldset': {
+                border: 'none',
               },
+            },
+            '& .MuiInputBase-root': {
+              bgcolor: fieldSurfaceBackground,
+              borderRadius: 1.5,
+            },
+            '& .MuiInputBase-input::placeholder': {
+              color: theme.palette.text.disabled,
+              opacity: 1,
+            },
+            '& .MuiInputBase-input': {
+              fontSize: '1.25rem',
+              lineHeight: 1.4,
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+            },
+            '& .MuiFormLabel-root': {
+              color: theme.palette.text.secondary,
+            },
+          }}
+        />
+
+        {pasteDebugEnabled && (
+          <Box
+            data-testid="notice-paste-debug-panel"
+            sx={{
+              mt: 1,
+              px: 1.25,
+              py: 1,
+              maxHeight: 180,
+              overflow: 'auto',
+              border: '1px solid #60a5fa',
+              borderRadius: 1,
+              bgcolor: '#111827',
+              color: '#e5e7eb',
+              fontFamily: 'monospace',
+              fontSize: 11,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
-            <CloseIcon />
-          </IconButton>
-        </Box>
+            {pasteDebugLog.join('\n')}
+          </Box>
+        )}
 
-        <DialogContent
+        <Box
           sx={{
             flex: 1,
             minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            px: 2,
-            py: 2,
-            bgcolor: dialogContentBackground,
-            backgroundImage:
-              'linear-gradient(180deg, rgba(148, 163, 184, 0.08) 0%, rgba(148, 163, 184, 0) 120px)',
-            borderBottom: `1px solid ${panelBorder}`,
+            width: '100%',
+            minWidth: 0,
+            backgroundColor: editorSurfaceBackground,
+            overflow: 'hidden',
           }}
         >
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 1.5,
               height: '100%',
+              width: '100%',
+              minWidth: 0,
+              borderTop: `1px solid ${panelBorder}`,
+              borderBottom: `1px solid ${panelBorder}`,
             }}
           >
-            <TextField
-              select
-              label="구분"
-              value={noticeGubunCode}
-              onChange={(event) => {
-                setNoticeGubunCode(event.target.value);
-                setNoticeGubunError(false);
-              }}
-              required
-              fullWidth
-              margin="none"
-              error={noticeGubunError}
-              helperText={
-                noticeGubunError ? '구분을 선택해 주세요.' : undefined
-              }
-              disabled={noticeGubunOptions.length === 0}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: editorSurfaceBackground,
-                  borderRadius: 1.5,
-                  border: 'none',
-                  '& fieldset': {
-                    border: 'none',
-                  },
-                  '&.Mui-error fieldset': {
-                    border: `1px solid ${theme.palette.error.main}`,
-                  },
-                },
-                '& .MuiInputBase-root': {
-                  bgcolor: editorSurfaceBackground,
-                  borderRadius: 1.5,
-                },
-                '& .MuiFormLabel-root': {
-                  color: theme.palette.text.secondary,
-                },
-              }}
-            >
-              {noticeGubunOptions.map((option) => (
-                <MenuItem key={option.code} value={option.code}>
-                  {option.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              fullWidth
-              margin="none"
-              placeholder="제목을 입력하세요."
-              slotProps={{
-                input: {
-                  'aria-label': '제목',
-                },
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: editorSurfaceBackground,
-                  borderRadius: 1.5,
-                  border: 'none',
-                  '& fieldset': {
-                    border: 'none',
-                  },
-                },
-                '& .MuiInputBase-root': {
-                  bgcolor: editorSurfaceBackground,
-                  borderRadius: 1.5,
-                },
-                '& .MuiInputBase-input::placeholder': {
-                  color: theme.palette.text.disabled,
-                  opacity: 1,
-                },
-                '& .MuiInputBase-input': {
-                  fontSize: '1.25rem',
-                  lineHeight: 1.4,
-                  fontWeight: 700,
-                  letterSpacing: '-0.02em',
-                },
-                '& .MuiFormLabel-root': {
-                  color: theme.palette.text.secondary,
-                },
-              }}
-            />
-
-            {pasteDebugEnabled && (
-              <Box
-                data-testid="notice-paste-debug-panel"
-                sx={{
-                  mt: 1,
-                  px: 1.25,
-                  py: 1,
-                  maxHeight: 180,
-                  overflow: 'auto',
-                  border: '1px solid #60a5fa',
-                  borderRadius: 1,
-                  bgcolor: '#111827',
-                  color: '#e5e7eb',
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {pasteDebugLog.join('\n')}
-              </Box>
-            )}
-
             <Box
               sx={{
                 flex: 1,
-                minHeight: 0,
+                minHeight: 180,
+                display: 'flex',
                 width: '100%',
                 minWidth: 0,
-                backgroundColor: editorSurfaceBackground,
                 overflow: 'hidden',
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: '100%',
+                backgroundColor: editorSurfaceBackground,
+                '& .notice-composer-editor': {
                   width: '100%',
                   minWidth: 0,
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                },
+                '& .notice-composer-editor .ProseMirror': {
+                  ...noticeContentStyles,
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  flex: 1,
+                  minHeight: 180,
+                  maxHeight: '100%',
+                  overflowY: 'auto',
+                  overflowX: 'auto',
+                  outline: 'none',
+                  px: 2,
+                  py: 1.5,
+                  color: theme.palette.text.primary,
+                  backgroundColor: editorSurfaceBackground,
+                  boxSizing: 'border-box',
+                  '& p.is-editor-empty:first-of-type::before': {
+                    content: 'attr(data-placeholder)',
+                    color: theme.palette.text.disabled,
+                    float: 'left',
+                    height: 0,
+                    pointerEvents: 'none',
+                  },
+                },
+              }}
+            >
+              <EditorContent
+                editor={editor}
+                className="notice-composer-editor"
+              />
+              {imageUploadError && (
+                <Typography
+                  role="alert"
+                  variant="caption"
+                  sx={{ px: 2, pb: 1, color: 'error.main' }}
+                >
+                  {imageUploadError}
+                </Typography>
+              )}
+            </Box>
+
+            {attachments.length > 0 && (
+              <Box
+                data-testid="notice-attachments-list"
+                sx={{
                   borderTop: `1px solid ${panelBorder}`,
-                  borderBottom: `1px solid ${panelBorder}`,
+                  pt: 1.25,
+                  pb: 1,
+                  px: 2,
+                  backgroundColor: editorSurfaceBackground,
                 }}
               >
-                <Box
-                  sx={{
-                    flex: 1,
-                    minHeight: 180,
-                    display: 'flex',
-                    width: '100%',
-                    minWidth: 0,
-                    overflow: 'hidden',
-                    backgroundColor: editorSurfaceBackground,
-                    '& .notice-composer-editor': {
-                      width: '100%',
-                      minWidth: 0,
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                    },
-                    '& .notice-composer-editor .ProseMirror': {
-                      ...noticeContentStyles,
-                      display: 'block',
-                      width: '100%',
-                      minWidth: 0,
-                      flex: 1,
-                      minHeight: 180,
-                      maxHeight: '100%',
-                      overflowY: 'auto',
-                      overflowX: 'auto',
-                      outline: 'none',
-                      px: 2,
-                      py: 1.5,
-                      color: theme.palette.text.primary,
-                      backgroundColor: editorSurfaceBackground,
-                      boxSizing: 'border-box',
-                      '& p.is-editor-empty:first-of-type::before': {
-                        content: 'attr(data-placeholder)',
-                        color: theme.palette.text.disabled,
-                        float: 'left',
-                        height: 0,
-                        pointerEvents: 'none',
-                      },
-                    },
-                  }}
-                >
-                  <EditorContent
-                    editor={editor}
-                    className="notice-composer-editor"
-                  />
-                  {imageUploadError && (
-                    <Typography
-                      role="alert"
-                      variant="caption"
-                      sx={{ px: 2, pb: 1, color: 'error.main' }}
-                    >
-                      {imageUploadError}
-                    </Typography>
-                  )}
-                </Box>
+                <Box sx={{ display: 'grid', gap: 1 }}>
+                  {attachments.map((file, index) => {
+                    const iconMeta = getAttachmentIconMeta(file.name);
 
-                {attachments.length > 0 && (
-                  <Box
-                    data-testid="notice-attachments-list"
-                    sx={{
-                      borderTop: `1px solid ${panelBorder}`,
-                      pt: 1.25,
-                      pb: 1,
-                      px: 2,
-                      backgroundColor: editorSurfaceBackground,
-                    }}
-                  >
-                    <Box sx={{ display: 'grid', gap: 1 }}>
-                      {attachments.map((file, index) => {
-                        const iconMeta = getAttachmentIconMeta(file.name);
-
-                        return (
+                    return (
+                      <Box
+                        key={`${file.id}-${index}`}
+                        data-file-card="true"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderRadius: 1.5,
+                          border: `1px solid ${panelBorder}`,
+                          bgcolor: resolvedDark
+                            ? 'rgba(30,41,59,0.8)'
+                            : '#ffffff',
+                          px: 1.25,
+                          py: 0.9,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            minWidth: 0,
+                            flex: 1,
+                          }}
+                        >
                           <Box
-                            key={`${file.id}-${index}`}
-                            data-file-card="true"
                             sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 1,
+                              backgroundColor: iconMeta.bg,
+                              color: iconMeta.color,
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'space-between',
-                              borderRadius: 1.5,
-                              border: `1px solid ${panelBorder}`,
-                              bgcolor: resolvedDark
-                                ? 'rgba(30,41,59,0.8)'
-                                : '#ffffff',
-                              px: 1.25,
-                              py: 0.9,
+                              justifyContent: 'center',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              flexShrink: 0,
+                            }}
+                            data-testid={`attachment-icon-${getAttachmentExtension(file.name)}`}
+                          >
+                            <iconMeta.icon
+                              fontSize="small"
+                              aria-label={`${iconMeta.label} 파일 아이콘`}
+                            />
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 600,
                               overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              color: theme.palette.text.primary,
                             }}
                           >
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                minWidth: 0,
-                                flex: 1,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  width: 24,
-                                  height: 24,
-                                  borderRadius: 1,
-                                  backgroundColor: iconMeta.bg,
-                                  color: iconMeta.color,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.62rem',
-                                  fontWeight: 800,
-                                  flexShrink: 0,
-                                }}
-                                data-testid={`attachment-icon-${getAttachmentExtension(file.name)}`}
-                              >
-                                <iconMeta.icon
-                                  fontSize="small"
-                                  aria-label={`${iconMeta.label} 파일 아이콘`}
-                                />
-                              </Box>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 600,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  color: theme.palette.text.primary,
-                                }}
-                              >
-                                {file.name}
-                              </Typography>
-                            </Box>
+                            {file.name}
+                          </Typography>
+                        </Box>
 
-                            <IconButton
-                              size="small"
-                              aria-label="첨부 파일 삭제"
-                              title={file.name}
-                              onClick={() => removeAttachment(file.id)}
-                              sx={{
-                                minWidth: 0,
-                                width: 32,
-                                height: 32,
-                                p: 0,
-                                borderRadius: 1.5,
-                                borderColor: resolvedDark
-                                  ? 'rgba(148,163,184,0.28)'
-                                  : 'rgba(148,163,184,0.25)',
-                                color: resolvedDark ? '#e2e8f0' : '#475569',
-                                backgroundColor: resolvedDark
-                                  ? 'rgba(15, 23, 42, 0.7)'
-                                  : '#f8fafc',
-                                '&:hover': {
-                                  borderColor: resolvedDark
-                                    ? 'rgba(96,165,250,0.5)'
-                                    : 'rgba(59,130,246,0.35)',
-                                  backgroundColor: resolvedDark
-                                    ? 'rgba(30,41,59,0.9)'
-                                    : '#f1f5f9',
-                                },
-                              }}
-                            >
-                              <DeleteOutlinedIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        </DialogContent>
-
-        <input
-          ref={attachmentInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.txt,.csv,.zip,image/*"
-          hidden
-          onChange={handleAttachmentSelect}
-          aria-label="첨부 파일 선택"
-        />
-
-        <DialogActions
-          sx={{
-            alignItems: 'center',
-            bgcolor: shellBackground,
-            borderColor: panelBorder,
-            borderTop: `1px solid ${panelBorder}`,
-            borderBottom: 0,
-            flexShrink: 0,
-            gap: 1,
-            justifyContent: 'space-between',
-            px: 3,
-            py: 1.5,
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <Box
-            sx={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-            }}
-          >
-            <IconButton
-              size="small"
-              aria-label="툴바 열기"
-              onClick={() => setToolbarOpen((open) => !open)}
-              sx={{
-                border: `1px solid ${panelBorder}`,
-                borderRadius: 1,
-                width: 32,
-                height: 32,
-                bgcolor: panelBackground,
-                color: theme.palette.text.primary,
-              }}
-            >
-              <FormatBoldOutlinedIcon fontSize="small" />
-            </IconButton>
-
-            <IconButton
-              size="small"
-              aria-label="첨부 링크"
-              onClick={() => attachmentInputRef.current?.click()}
-              sx={{
-                border: `1px solid ${panelBorder}`,
-                borderRadius: 1,
-                width: 32,
-                height: 32,
-                bgcolor: panelBackground,
-                color: theme.palette.text.primary,
-              }}
-            >
-              <AttachFileOutlinedIcon fontSize="small" />
-            </IconButton>
-
-            {toolbarOpen && (
-              <Box
-                data-testid="notice-toolbar-popup"
-                sx={{
-                  position: 'absolute',
-                  left: 0,
-                  bottom: 'calc(100% + 8px)',
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'row',
-                  flexWrap: 'nowrap',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  p: 1,
-                  borderRadius: 2,
-                  border: `1px solid ${panelBorder}`,
-                  bgcolor: resolvedDark
-                    ? 'rgba(15, 23, 42, 0.96)'
-                    : 'rgba(255, 255, 255, 0.98)',
-                  boxShadow: resolvedDark
-                    ? '0 10px 25px rgba(15, 23, 42, 0.24)'
-                    : '0 10px 25px rgba(15, 23, 42, 0.12)',
-                  maxWidth: 'min(520px, calc(100vw - 180px))',
-                  overflowX: 'auto',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {toolbarItems.map(({ label, icon, onClick }) => (
-                  <Button
-                    key={label}
-                    size="small"
-                    variant="contained"
-                    aria-label={label}
-                    onClick={() => {
-                      onClick();
-                      setToolbarOpen(false);
-                    }}
-                    sx={{
-                      minWidth: 0,
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1,
-                      p: 0,
-                      bgcolor: resolvedDark
-                        ? 'rgba(59, 130, 246, 0.18)'
-                        : 'rgba(59, 130, 246, 0.08)',
-                      color: resolvedDark ? '#e2e8f0' : '#0f172a',
-                      '&:hover': {
-                        bgcolor: resolvedDark
-                          ? 'rgba(59, 130, 246, 0.3)'
-                          : 'rgba(59, 130, 246, 0.14)',
-                      },
-                    }}
-                  >
-                    {icon}
-                  </Button>
-                ))}
+                        <IconButton
+                          size="small"
+                          aria-label="첨부 파일 삭제"
+                          title={file.name}
+                          onClick={() => removeAttachment(file.id)}
+                          sx={{
+                            minWidth: 0,
+                            width: 32,
+                            height: 32,
+                            p: 0,
+                            borderRadius: 1.5,
+                            borderColor: resolvedDark
+                              ? 'rgba(148,163,184,0.28)'
+                              : 'rgba(148,163,184,0.25)',
+                            color: resolvedDark ? '#e2e8f0' : '#475569',
+                            backgroundColor: resolvedDark
+                              ? 'rgba(15, 23, 42, 0.7)'
+                              : '#f8fafc',
+                            '&:hover': {
+                              borderColor: resolvedDark
+                                ? 'rgba(96,165,250,0.5)'
+                                : 'rgba(59,130,246,0.35)',
+                              backgroundColor: resolvedDark
+                                ? 'rgba(30,41,59,0.9)'
+                                : '#f1f5f9',
+                            },
+                          }}
+                        >
+                          <DeleteOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
             )}
           </Box>
-
-          <Box sx={{ display: 'flex', flexShrink: 0, gap: 1 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleSubmit}
-              disabled={title.trim().length === 0 && editorIsEmpty}
-              sx={{
-                borderRadius: 1.5,
-                fontWeight: 700,
-                minWidth: 96,
-                px: 2.5,
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: 'none',
-                },
-              }}
-            >
-              저장
-            </Button>
-            <Button
-              variant="text"
-              color="primary"
-              onClick={onClose}
-              sx={{
-                borderRadius: 1.5,
-                fontWeight: 600,
-                px: 2,
-                backgroundColor: 'transparent',
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.06),
-                },
-              }}
-            >
-              취소
-            </Button>
-          </Box>
-        </DialogActions>
+        </Box>
       </Box>
-    </Dialog>
+
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.txt,.csv,.zip,image/*"
+        hidden
+        onChange={handleAttachmentSelect}
+        aria-label="첨부 파일 선택"
+      />
+    </CommonDialog>
   );
 }

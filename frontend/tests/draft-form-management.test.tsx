@@ -11,6 +11,8 @@ import { DashboardContent } from '../src/pages/dashboard/components/DashboardCon
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
 import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
+import { F1Grid } from '../src/shared/components/f1-grid';
+import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -156,6 +158,72 @@ describe('Draft form management page', () => {
     expect(assignee?.type).toBe('user');
     expect(assignee?.userOptions?.[0].value).toBe('110');
     expect(assignee?.form?.multiple).toBe(true);
+  });
+
+  it('applies a selected reviewer to the draft form grid row', async () => {
+    const users = [
+      {
+        userId: '110',
+        loginId: 210,
+        userNm: '홍길동',
+        departmentNm: '운영팀',
+        profileImage: null,
+        levelNm: '부장',
+      },
+      {
+        userId: '111',
+        loginId: 211,
+        userNm: '김민지',
+        departmentNm: '기획팀',
+        profileImage: null,
+        levelNm: '과장',
+      },
+    ];
+    const row: DraftFormRow = {
+      draftingWorkCategoryId: 1,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: 210,
+      reviewerName: '홍길동',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '',
+      createdByName: '홍길동',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const onChangesChange = vi.fn();
+
+    render(
+      <F1Grid
+        rows={[row]}
+        columns={createDraftFormColumns([], [], users, true)}
+        rowKey="draftingWorkCategoryId"
+        onChangesChange={onChangesChange}
+      />,
+    );
+
+    fireEvent.doubleClick(
+      screen.getByRole('gridcell', { name: '홍길동 (운영팀)' }),
+    );
+    const userOption = await screen.findByRole('option', { name: /김민지/ });
+    fireEvent.mouseDown(userOption);
+    fireEvent.mouseUp(userOption);
+    fireEvent.click(userOption);
+
+    expect(
+      await screen.findByRole('gridcell', { name: '김민지 (기획팀)' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(onChangesChange).toHaveBeenCalled());
+    expect(onChangesChange.mock.lastCall?.[0].updatedRows).toEqual([
+      expect.objectContaining({ reviewerId: 211 }),
+    ]);
   });
 
   it('renders from the co/form dashboard route with one unified search field', async () => {
@@ -332,6 +400,166 @@ describe('Draft form management page', () => {
     expect(
       await screen.findByRole('dialog', { name: '기안양식 분류 설정' }),
     ).toBeInTheDocument();
+  });
+
+  it('waits for classification options before showing the empty notice', async () => {
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    let resolveCategoryItems: ((value: unknown) => void) | undefined;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/co/master/common-code/groups/11/items') {
+        return new Promise((resolve) => {
+          resolveCategoryItems = resolve;
+        });
+      }
+      return originalApiGet?.(path);
+    });
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole('textbox', { name: '기안양식 검색' });
+    expect(
+      screen.queryByText(
+        '분류 항목이 없습니다. 분류를 추가한 뒤 기안양식을 등록할 수 있습니다.',
+      ),
+    ).not.toBeInTheDocument();
+
+    resolveCategoryItems?.({ resultList: [] });
+    expect(
+      await screen.findByText(
+        '분류 항목이 없습니다. 분류를 추가한 뒤 기안양식을 등록할 수 있습니다.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('validates required classification values before calling the create API', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 설정' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '분류 추가' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    expect(
+      await within(dialog).findByText('필수 입력 항목을 확인해 주세요.'),
+    ).toBeInTheDocument();
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+    expect(screen.getAllByText('필수 입력 항목을 확인해 주세요.')).toHaveLength(
+      1,
+    );
+  });
+
+  it('keeps classification save errors inside the helper dialog', async () => {
+    apiMocks.apiPut.mockRejectedValue(new Error('분류 저장 실패'));
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 설정' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: '기안양식 분류 설정',
+    });
+    fireEvent.doubleClick(
+      within(dialog).getByRole('gridcell', { name: '점검' }),
+    );
+    const editor = within(dialog).getByDisplayValue('점검');
+    fireEvent.change(editor, { target: { value: '정기점검' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    expect(
+      await within(dialog).findByText('분류 저장 실패'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('분류 저장 실패')).toHaveLength(1);
   });
 
   it('keeps the form grid quiet while classification save reloads its rows', async () => {

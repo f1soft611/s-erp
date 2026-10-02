@@ -8,6 +8,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,6 +35,7 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
 
     public DraftingWorkServiceImpl(
             DraftingWorkDAO draftingWorkDAO,
+            @Qualifier("codeIdGnrService")
             EgovIdGnrService codeIdGnrService,
             CommonCodeGroupService commonCodeGroupService,
             CommonCodeItemService commonCodeItemService) {
@@ -86,6 +88,9 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
             throw new IllegalArgumentException("분류는 필수입니다.");
         }
         String useAt = normalizeUseAt(payload.getUseAt());
+        List<String> assigneeIds = payload.getAssigneeIds() == null
+            ? java.util.Collections.<String>emptyList()
+            : payload.getAssigneeIds();
 
         CommonCodeGroupVO categoryGroup = null;
         for (CommonCodeGroupVO group : commonCodeGroupService.listGroups(tenantId)) {
@@ -147,7 +152,7 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
         if (payload.getApproverId() != null && !containsLoginId(tenantUsers, payload.getApproverId())) {
             throw new IllegalArgumentException("승인자는 현재 테넌트에서 사용 가능한 사용자여야 합니다.");
         }
-        for (String rawAssigneeId : payload.getAssigneeIds()) {
+        for (String rawAssigneeId : assigneeIds) {
             String assigneeId = StringUtils.hasText(rawAssigneeId) ? rawAssigneeId.trim() : "";
             if (assigneeId.length() > 10 || !containsUserId(tenantUsers, assigneeId)) {
                 throw new IllegalArgumentException("담당자는 현재 테넌트에서 사용 가능한 사용자여야 합니다.");
@@ -176,8 +181,11 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
         params.put("updatedBy", actorLoginId);
 
         Long newId = draftingWorkDAO.insertWork(params);
+        if (newId == null) {
+            throw new IllegalArgumentException("이미 사용 중인 구분코드입니다.");
+        }
         Set<String> uniqueAssigneeIds = new LinkedHashSet<String>();
-        for (String assigneeId : payload.getAssigneeIds()) {
+        for (String assigneeId : assigneeIds) {
             uniqueAssigneeIds.add(assigneeId.trim());
         }
         for (String assigneeId : uniqueAssigneeIds) {

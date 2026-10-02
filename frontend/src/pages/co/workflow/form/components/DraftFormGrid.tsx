@@ -100,7 +100,7 @@ export function createDraftFormColumns(
       field: 'cataTypeCode',
       headerName: '구분코드',
       width: 110,
-      editable: canEdit,
+      editable: false,
       align: 'center',
       pinned: 'left',
       form: { group: '기본정보', order: 1, readOnly: true },
@@ -151,6 +151,7 @@ export function createDraftFormColumns(
     },
     {
       field: 'reviewerId',
+      headerGroup: '결재자',
       headerName: '검토자',
       width: 120,
       type: 'user',
@@ -165,6 +166,7 @@ export function createDraftFormColumns(
     },
     {
       field: 'approverId',
+      headerGroup: '결재자',
       headerName: '승인자',
       width: 120,
       type: 'user',

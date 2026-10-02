@@ -1550,7 +1550,9 @@ function F1GridInner<T extends object>(
         return;
       if (
         event.target instanceof Element &&
-        event.target.closest('.MuiPopover-root, .MuiModal-root')
+        event.target.closest(
+          '.MuiPopover-root, .MuiModal-root, .MuiAutocomplete-popper',
+        )
       ) {
         return;
       }

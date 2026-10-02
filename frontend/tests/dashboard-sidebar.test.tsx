@@ -139,6 +139,20 @@ describe('Dashboard sidebar', () => {
     );
   });
 
+  it('clears the menu management page session when logging out', async () => {
+    const menuPageSessionKey = 's-erp:page:menu-management';
+    render(<App />);
+    await loginAsAdmin();
+    window.sessionStorage.setItem(menuPageSessionKey, 'saved-menu-state');
+    await screen.findByRole('button', { name: /프로필 메뉴 열기/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /프로필 메뉴 열기/i }));
+    fireEvent.click(screen.getByText(/로그아웃/i));
+
+    await screen.findByLabelText(/업체코드/i);
+    expect(window.sessionStorage.getItem(menuPageSessionKey)).toBeNull();
+  });
+
   it('shows a submenu indicator for menu groups that contain child items', () => {
     render(
       <DashboardMenuTree

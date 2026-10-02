@@ -9,7 +9,7 @@
 - 분류 상세 도움창은 F1-Grid row form으로 추가/수정하고 context menu copy를 지원한다. 공통코드 행삭제 메뉴는 숨기며 비활성은 `useAt=N`으로 저장한다. 모달은 상단 X와 구분선, 항상 보이는 하단 저장/취소 액션(저장 왼쪽)을 제공한다.
 - 기안양식 목록은 `DraftFormGrid`와 `useDraftFormManagement`로 분리했다. F1-Grid `rowFormPlugin`으로 create/update하고 context menu add/copy/delete 및 Excel/sort/filter/selection을 유지한다. 행삭제는 `useAt=N` update이며 담당자 multi-select은 F1-Grid `form.multiple`로 보존한다.
 - 분류 누락 안내는 shared `PageMessageArea`의 info severity를 사용하고, 분류가 없으면 등록 action을 비활성화한다.
-- 기존 사용자 옵션 API, `haccpBaseWorkCodeIdGnrService`, common-code item CRUD API를 재사용했다. F1-Grid renderer/core는 유지하고 row-form public metadata와 `GridFormField`에 선택적 `form.multiple` 지원을 추가했다.
+- 기존 사용자 옵션 API, `EgovConfigAppIdGen.codeIdGnrService` (`tb_drafting_work_category`, 3자리 설정), common-code item CRUD API를 재사용했다. F1-Grid renderer/core는 유지하고 row-form public metadata와 `GridFormField`에 선택적 `form.multiple` 지원을 추가했다.
 
 ## 검증
 

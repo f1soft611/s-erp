@@ -15,7 +15,7 @@
 - `code_name`은 양식명으로 유지하며 `reg_term`은 `reg_term_id`가 가리키는 공통코드 `item_nm`과 동기화
 - 테넌트별 `WF_FORM_CATEGORY`, `WF_FORM_CYCLE` 공통코드 그룹 seed 및 `DAY`, `WEEK`, `MONTH`, `EVENT` 등록주기 항목 seed
 - 분류 항목은 seed하지 않고 기안양식 페이지의 공통코드 상세 도움창에서 추가/수정
-- `cata_type_code`는 기존 `haccpBaseWorkCodeIdGnrService` eGov generator (3자리) 사용. 새 sequence는 만들지 않음
+- `cata_type_code`는 `EgovConfigAppIdGen.codeIdGnrService`의 `tb_drafting_work_category` eGov generator (3자리) 사용. 새 sequence는 만들지 않음
 
 ## 영향 범위
 

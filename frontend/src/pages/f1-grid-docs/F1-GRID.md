@@ -99,8 +99,10 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 - `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
+- 인라인 user picker option 클릭은 Autocomplete portal의 mousedown이 Grid outside-click commit으로 처리되지 않게 보호한다. 그렇지 않으면 option click보다 먼저 editor가 닫혀 선택값이 셀에 반영되지 않는다.
 - user 값은 단일 ID/`null` 또는 다중 ID 배열/`[]`로 저장한다. 옵션에서 선택한 ID의 원래 string/number 타입을 보존하며 표시 metadata는 row 값에 저장하지 않는다. 단일·다중 선택 chip X는 해제 patch를 만들고, 동일한 선택값을 commit해도 배열 내용이 같으면 dirty로 처리하지 않는다.
-- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell anchor가 좁아도 popup은 최소 320px(좁은 viewport에서는 viewport minus 16px)이며 viewport 경계를 넘으면 가로로 이동한다.
+- Grid cell user 편집은 내부 TextField outline/underline을 제거하고 GridCell active focus outline만 사용한다. Row form modal은 기존 form 입력처럼 outlined border를 유지한다.
+- user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell 편집 팝업은 cell 왼쪽 경계에 맞춰 시작하며, 최대 320px에서 anchor 오른쪽에 확보 가능한 너비로 줄어든다. 좁은 viewport에서도 화면 경계를 넘지 않는다.
 
 이 항목은 초기 사양서의 기본 모델을 넘어, 실제 사용 중인 구현 상태를 기준으로 정리한 요약이다.
 
@@ -590,6 +592,12 @@ interface F1GridProps<T extends object> {
 `F1TreeRef.addRow()`는 부모 기본값을 유지한 루트 draft를 열고, `addChildRow(parentId, partial?)`는 `parentKey` 값을 보존한 하위 draft를 연다. 하위 행은 적용된 뒤에만 추가되고 부모 노드가 펼쳐지며, 취소 시 펼침 상태를 바꾸지 않는다. 트리 펼침 상태와 모달 open 상태는 독립적이다.
 
 1280px 이상에서는 최대 `960px`의 3열 폼, 768px 이상 1280px 미만에서는 2열 폼, 768px 미만에서는 full-screen 1열 폼을 사용한다. `form.span`은 각 뷰포트의 가용 열 수를 넘지 않게 제한된다. 모달은 `background`, `text`, `divider`, `primary`, `action` MUI 테마 토큰을 사용해 라이트·다크 테마에 대응한다.
+
+행 폼 모달의 외곽은 공통 `CommonDialog` 셸을 사용한다. 제목·선택 설명·닫기 동작은 공통 헤더에 배치되고 본문만 세로 스크롤되며 헤더와 푸터는 유지된다. “적용 후 화면의 저장 버튼으로 최종 저장됩니다.” 안내는 선택형 푸터 좌측 슬롯에, 적용/취소는 우측 액션 영역에 표시한다. 기안양식관리처럼 `rowFormPlugin`을 사용하는 화면도 동일한 셸을 공유하며, 폼 필드/그룹 배치는 기존 화면 설정을 따른다.
+
+footer 경계는 공통 셸이 색상 prop 없이 렌더링하는 기본 MUI `Divider` 한 개로 표시한다. 본문이나 호출 화면에서 추가 하단 경계선을 넣지 않는다.
+
+다크 테마에서 모달 외곽·헤더·푸터는 슬레이트 `#1e293b`, 본문은 페이지 바탕인 `background.default`를 사용한다. 폼 내부 그룹은 `background.paper`로 구분하고, 라이트 테마는 기존 paper/본문 배경 조합을 유지한다.
 
 ```tsx
 <F1Grid
@@ -1534,6 +1542,8 @@ F1GridColumn<T>;
 # 29. Public API (⚠️ 목표 API, 현재 구현과 다름)
 
 최종적으로 다음과 같은 API를 제공하는 것을 목표로 한다. 아래 인터페이스는 설계 목표이며, `addRows`, `setRows`, `clearChanges`, `getQuery`, `copy`/`paste`, `refreshRowMerge`/`getRowMergeRanges`, `getLayout`/`setLayout`/`resetLayout`는 현재 `F1GridRef`에 없다. 현재 구현된 실제 `F1GridRef`/`F1TreeRef` 계약은 F1-Grid 문서 포털의 API Reference 또는 `grid.types.ts`를 따른다.
+
+`F1GridRef.validate()`는 현재 구현된 API다. 명시적 저장 액션에서는 API 호출 전에 실행하고, `false`이면 저장을 중단해 셀 오류와 입력 안내를 표시한다. 컬럼의 `required`, `min`, `max`, `validate` 설정을 재사용한다.
 
 ```typescript
 interface F1GridRef<T> {

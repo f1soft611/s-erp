@@ -27,41 +27,64 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkSaveRequestVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkVO;
 import egovframework.let.co.workflow.form.service.DraftingWorkService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/co/workflow/forms")
+@Tag(name = "DraftingWorkApiController", description = "기안양식 관리")
 public class DraftingWorkApiController {
 
     private final ResultVoHelper resultVoHelper;
     private final DraftingWorkService draftingWorkService;
 
-    @GetMapping
+        @Operation(summary = "기안양식 목록 조회", security = { @SecurityRequirement(name = "Authorization") })
+        @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
+        })
+        @GetMapping
     public ResultVO listWorks(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryItemId,
             @RequestParam(required = false) Long regTermId,
             @RequestParam(required = false) String useAt,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         Map<String, Object> resultMap = new HashMap<String, Object>();
         resultMap.put("resultList", draftingWorkService.listWorks(
                 user.getTenantId(), keyword, categoryItemId, regTermId, useAt));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
-    @GetMapping("/users")
+        @Operation(summary = "기안양식 사용자 선택 목록 조회", security = { @SecurityRequirement(name = "Authorization") })
+        @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
+        })
+        @GetMapping("/users")
     public ResultVO listUserOptions(
-            @AuthenticationPrincipal LoginVO user) throws Exception {
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         Map<String, Object> resultMap = new HashMap<String, Object>();
         resultMap.put("resultList", draftingWorkService.listUserOptions(user.getTenantId()));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
-    @PostMapping
+        @Operation(summary = "기안양식 등록", security = { @SecurityRequirement(name = "Authorization") })
+        @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "등록 성공"),
+            @ApiResponse(responseCode = "400", description = "입력값 오류 또는 양식 코드 중복"),
+            @ApiResponse(responseCode = "403", description = "테넌트 관리자 권한 필요")
+        })
+        @PostMapping
     public ResponseEntity<ResultVO> createWork(
             @RequestBody DraftingWorkSaveRequestVO payload,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireTenantAdmin(user);
         try {
             DraftingWorkVO created = draftingWorkService.createWork(
@@ -71,18 +94,22 @@ public class DraftingWorkApiController {
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
         } catch (IllegalArgumentException ex) {
-            Map<String, Object> errorMap = new HashMap<String, Object>();
-            errorMap.put("message", ex.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
+                return badRequest(ex.getMessage());
         }
     }
 
-    @PutMapping("/{draftingWorkCategoryId}")
+            @Operation(summary = "기안양식 수정", security = { @SecurityRequirement(name = "Authorization") })
+            @ApiResponses(value = {
+                @ApiResponse(responseCode = "200", description = "수정 성공"),
+                @ApiResponse(responseCode = "400", description = "입력값 오류"),
+                @ApiResponse(responseCode = "403", description = "테넌트 관리자 권한 필요"),
+                @ApiResponse(responseCode = "404", description = "수정 대상 없음")
+            })
+            @PutMapping("/{draftingWorkCategoryId}")
     public ResponseEntity<ResultVO> updateWork(
             @PathVariable Long draftingWorkCategoryId,
             @RequestBody DraftingWorkSaveRequestVO payload,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireTenantAdmin(user);
         try {
             DraftingWorkVO updated = draftingWorkService.updateWork(
@@ -91,10 +118,7 @@ public class DraftingWorkApiController {
             resultMap.put("item", updated);
             return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
         } catch (IllegalArgumentException ex) {
-            Map<String, Object> errorMap = new HashMap<String, Object>();
-            errorMap.put("message", ex.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
+                return badRequest(ex.getMessage());
         } catch (NoSuchElementException ex) {
             Map<String, Object> errorMap = new HashMap<String, Object>();
             errorMap.put("message", ex.getMessage());
@@ -107,6 +131,13 @@ public class DraftingWorkApiController {
         if (!EgovAccessControlHelper.isTenantAdmin(user)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, ResponseCode.AUTH_ERROR.getMessage());
         }
+    }
+
+    private ResponseEntity<ResultVO> badRequest(String message) {
+        Map<String, Object> errorMap = new HashMap<String, Object>();
+        errorMap.put("message", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
     }
 
     private Long resolveUserId(LoginVO user) {

@@ -83,6 +83,12 @@ class DraftingWorkServiceImplTest {
         assertTrue(configuration.hasStatement("DraftingWorkDAO.insertWork"));
         assertEquals(SqlCommandType.SELECT,
             configuration.getMappedStatement("DraftingWorkDAO.insertWork").getSqlCommandType());
+        String insertWorkSql = configuration.getMappedStatement("DraftingWorkDAO.insertWork")
+            .getBoundSql(new java.util.HashMap<String, Object>())
+            .getSql().toLowerCase().replaceAll("\\s+", " ");
+        assertTrue(insertWorkSql.contains("on conflict (tenant_id, cata_type_code)"));
+        assertTrue(insertWorkSql.contains("where delete_status is distinct from 'y' do nothing"));
+        assertTrue(insertWorkSql.contains("returning drafting_work_category_id"));
         assertTrue(configuration.hasStatement("DraftingWorkDAO.insertWorkAuthorityMapping"));
         assertTrue(configuration.hasStatement("DraftingWorkDAO.selectAssigneeIds"));
         assertTrue(configuration.hasStatement("DraftingWorkDAO.updateWork"));
@@ -121,6 +127,56 @@ class DraftingWorkServiceImplTest {
                         && Long.valueOf(31L).equals(condition.getCategoryItemId())
                         && Long.valueOf(42L).equals(condition.getRegTermId())
                         && "Y".equals(condition.getUseAt())));
+    }
+
+    @Test
+    void createWorkTreatsExplicitNullAssigneesAsAnEmptyList() throws Exception {
+        when(codeIdGnrService.getNextStringId()).thenReturn("014");
+        when(commonCodeGroupService.listGroups(9L)).thenReturn(java.util.Arrays.asList(
+            activeGroup(31L, "WF_FORM_CATEGORY"), activeGroup(32L, "WF_FORM_CYCLE")));
+        when(commonCodeItemService.listItems(9L, 31L))
+            .thenReturn(Collections.singletonList(activeItem(42L, "INSPECTION", "점검")));
+        when(commonCodeItemService.listItems(9L, 32L))
+            .thenReturn(Collections.singletonList(activeItem(55L, "MONTH", "월")));
+        when(draftingWorkDAO.selectUserOptions(9L)).thenReturn(Collections.emptyList());
+        when(draftingWorkDAO.selectWorkIdByCode(9L, "014")).thenReturn(null);
+        when(draftingWorkDAO.insertWork(any())).thenReturn(77L);
+
+        DraftingWorkSaveRequestVO payload = new DraftingWorkSaveRequestVO();
+        payload.setCodeName("점검양식");
+        payload.setCategoryItemId(42L);
+        payload.setRegTermId(55L);
+        payload.setAssigneeIds(null);
+
+        DraftingWorkVO result = draftingWorkService.createWork(9L, 101L, payload);
+
+        assertEquals(Collections.emptyList(), result.getAssigneeIds());
+        verify(draftingWorkDAO, never()).insertWorkAuthorityMapping(any());
+    }
+
+    @Test
+    void createWorkRejectsCodeWhenInsertLosesConcurrentUniqueConflict() throws Exception {
+        when(commonCodeGroupService.listGroups(9L)).thenReturn(java.util.Arrays.asList(
+            activeGroup(31L, "WF_FORM_CATEGORY"), activeGroup(32L, "WF_FORM_CYCLE")));
+        when(commonCodeItemService.listItems(9L, 31L))
+            .thenReturn(Collections.singletonList(activeItem(42L, "INSPECTION", "점검")));
+        when(commonCodeItemService.listItems(9L, 32L))
+            .thenReturn(Collections.singletonList(activeItem(55L, "MONTH", "월")));
+        when(draftingWorkDAO.selectUserOptions(9L)).thenReturn(Collections.emptyList());
+        when(draftingWorkDAO.selectWorkIdByCode(9L, "007")).thenReturn(null);
+        when(draftingWorkDAO.insertWork(any())).thenReturn(null);
+
+        DraftingWorkSaveRequestVO payload = new DraftingWorkSaveRequestVO();
+        payload.setCataTypeCode("007");
+        payload.setCodeName("점검양식");
+        payload.setCategoryItemId(42L);
+        payload.setRegTermId(55L);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> draftingWorkService.createWork(9L, 101L, payload));
+
+        assertEquals("이미 사용 중인 구분코드입니다.", error.getMessage());
+        verify(draftingWorkDAO, never()).insertWorkAuthorityMapping(any());
     }
 
                 @Test

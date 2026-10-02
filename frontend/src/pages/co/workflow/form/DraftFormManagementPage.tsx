@@ -273,7 +273,9 @@ export function DraftFormManagementPage({
       />
       <PageMessageArea
         message={
-          management.categoryItems.length === 0 && !categoryNoticeDismissed
+          management.optionsLoaded &&
+          management.categoryItems.length === 0 &&
+          !categoryNoticeDismissed
             ? '분류 항목이 없습니다. 분류를 추가한 뒤 기안양식을 등록할 수 있습니다.'
             : ''
         }
@@ -323,7 +325,6 @@ export function DraftFormManagementPage({
           await management.loadRows(management.appliedFilters, { quiet: true });
           setCategoryNoticeDismissed(false);
         }}
-        onError={management.setError}
       />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}

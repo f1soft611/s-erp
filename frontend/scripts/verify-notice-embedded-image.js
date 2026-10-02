@@ -3,8 +3,11 @@ import path from 'path';
 import { chromium } from 'playwright';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:4173';
+const captureModalOnly = process.env.CAPTURE_MODAL_ONLY === 'true';
+const themeMode = process.env.THEME_MODE === 'dark' ? 'dark' : 'light';
 const screenshotDir = path.resolve(
-  '../docs/result/20260918/notice-embedded-image-upload/screenshots',
+  process.env.SCREENSHOT_DIR ??
+    '../docs/result/20260918/notice-embedded-image-upload/screenshots',
 );
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -74,7 +77,8 @@ const context = await browser.newContext({
 const page = await context.newPage();
 
 try {
-  await page.addInitScript(() => {
+  await page.addInitScript((mode) => {
+    window.localStorage.setItem('erp-theme', mode);
     window.localStorage.setItem(
       's-erp-auth',
       JSON.stringify({
@@ -85,7 +89,7 @@ try {
         expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }),
     );
-  });
+  }, themeMode);
 
   await page.route('**/api/v1/menus/my', async (route) =>
     route.fulfill({
@@ -177,51 +181,161 @@ try {
   const insertedImage = editor.locator('img[src^="https://cdn.example.com"]');
   if ((await insertedImage.count()) !== 1)
     throw new Error('이미지 URL 노드가 삽입되지 않았습니다.');
-  await page.screenshot({
-    path: path.join(screenshotDir, '01_composer-embedded-image.png'),
-    fullPage: true,
-  });
-
-  await page.getByRole('button', { name: '닫기' }).click();
-  const previewStrip = page.getByTestId('notice-embedded-image-preview-1');
-  await previewStrip.locator('img').waitFor({ state: 'visible' });
-  if (
-    (await page
-      .getByTestId('notice-attachment-list')
-      .getByText('본문 이미지.png')
-      .count()) !== 0
-  ) {
-    throw new Error('EMBEDDED 이미지가 일반 첨부파일 목록에 표시되었습니다.');
+  const composerDialog = page.getByRole('dialog', { name: '새 공지 작성' });
+  const composerMeasurements = [];
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(100);
+    const measurement = await composerDialog.evaluate((dialog) => {
+      const paper = dialog.getBoundingClientRect();
+      const footer = dialog.querySelector('.MuiDialogActions-root');
+      const header = dialog.querySelector('.MuiDialogTitle-root')?.parentElement
+        ?.parentElement;
+      const content = dialog.querySelector('.MuiDialogContent-root');
+      const footerStart = dialog.querySelector(
+        '[data-testid="common-dialog-footer-start"]',
+      );
+      const actions = dialog.querySelector(
+        '[data-testid="common-dialog-actions"]',
+      );
+      const rect = (element) => {
+        const bounds = element?.getBoundingClientRect();
+        return bounds
+          ? {
+              left: bounds.left,
+              right: bounds.right,
+              top: bounds.top,
+              bottom: bounds.bottom,
+            }
+          : null;
+      };
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        paperBackgroundColor: getComputedStyle(dialog).backgroundColor,
+        headerBackgroundColor: header
+          ? getComputedStyle(header).backgroundColor
+          : null,
+        contentBackgroundColor: content
+          ? getComputedStyle(content).backgroundColor
+          : null,
+        footerBackgroundColor: footer
+          ? getComputedStyle(footer).backgroundColor
+          : null,
+        paper: rect(dialog),
+        footer: rect(footer),
+        footerStart: rect(footerStart),
+        actions: rect(actions),
+      };
+    });
+    if (
+      !measurement.paper ||
+      measurement.paper.left < 0 ||
+      measurement.paper.right > width + 1 ||
+      !measurement.footerStart ||
+      !measurement.actions
+    ) {
+      throw new Error(
+        `공지 작성 모달이 ${width}px 뷰포트에서 잘리거나 슬롯이 없습니다: ${JSON.stringify(measurement)}`,
+      );
+    }
+    const { footerStart, actions } = measurement;
+    const expectedPaperColor =
+      themeMode === 'dark' ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)';
+    const expectedContentColor =
+      themeMode === 'dark' ? 'rgb(15, 23, 42)' : 'rgb(244, 247, 251)';
+    if (
+      measurement.paperBackgroundColor !== expectedPaperColor ||
+      measurement.headerBackgroundColor !== expectedPaperColor ||
+      measurement.contentBackgroundColor !== expectedContentColor ||
+      measurement.footerBackgroundColor !== expectedPaperColor
+    ) {
+      throw new Error(
+        `공지 모달 배경색이 ${themeMode} 테마 계약과 다릅니다: ${JSON.stringify(measurement)}`,
+      );
+    }
+    const overlaps =
+      footerStart.left < actions.right &&
+      actions.left < footerStart.right &&
+      footerStart.top < actions.bottom &&
+      actions.top < footerStart.bottom;
+    if (overlaps) {
+      throw new Error(
+        `공지 작성 푸터 슬롯이 ${width}px에서 겹칩니다: ${JSON.stringify(measurement)}`,
+      );
+    }
+    composerMeasurements.push(measurement);
+    await page.screenshot({
+      path: path.join(screenshotDir, `notice-composer-${width}.png`),
+      fullPage: false,
+    });
   }
-  await page.screenshot({
-    path: path.join(screenshotDir, '02_feed-collapsed-desktop.png'),
-    fullPage: true,
-  });
+  console.log(
+    JSON.stringify(
+      {
+        message: 'Notice composer responsive modal verification passed.',
+        themeMode,
+        composerMeasurements,
+        screenshotDir,
+      },
+      null,
+      2,
+    ),
+  );
 
-  await page.getByRole('button', { name: '더보기' }).click();
-  const expanded = page.getByTestId('notice-preview-1');
-  await expanded
-    .locator('img[alt="안내 이미지"]')
-    .waitFor({ state: 'visible' });
-  await page.screenshot({
-    path: path.join(screenshotDir, '03_feed-expanded-desktop.png'),
-    fullPage: true,
-  });
+  if (!captureModalOnly) {
+    await page.setViewportSize({ width: 1280, height: 900 });
 
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.waitForTimeout(100);
-  const expandedImage = page
-    .getByTestId('notice-preview-1')
-    .locator('img[alt="안내 이미지"]');
-  await expandedImage.scrollIntoViewIfNeeded();
-  const box = await expandedImage.boundingBox();
-  if (!box || box.width > 375)
-    throw new Error(`모바일 이미지가 부모 폭을 초과했습니다: ${box?.width}`);
-  await page.screenshot({
-    path: path.join(screenshotDir, '04_feed-expanded-mobile.png'),
-    fullPage: true,
-  });
-  console.log('Embedded image browser verification passed.');
+    await page.getByRole('button', { name: '닫기' }).click();
+    const previewStrip = page.getByTestId('notice-embedded-image-preview-1');
+    await previewStrip.locator('img').waitFor({ state: 'visible' });
+    if (
+      (await page
+        .getByTestId('notice-attachment-list')
+        .getByText('본문 이미지.png')
+        .count()) !== 0
+    ) {
+      throw new Error('EMBEDDED 이미지가 일반 첨부파일 목록에 표시되었습니다.');
+    }
+    await page.screenshot({
+      path: path.join(screenshotDir, '02_feed-collapsed-desktop.png'),
+      fullPage: true,
+    });
+
+    await page.getByRole('button', { name: '더보기' }).click();
+    const expanded = page.getByTestId('notice-preview-1');
+    await expanded
+      .locator('img[alt="안내 이미지"]')
+      .waitFor({ state: 'visible' });
+    await page.screenshot({
+      path: path.join(screenshotDir, '03_feed-expanded-desktop.png'),
+      fullPage: true,
+    });
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForTimeout(100);
+    const expandedImage = page
+      .getByTestId('notice-preview-1')
+      .locator('img[alt="안내 이미지"]');
+    await expandedImage.scrollIntoViewIfNeeded();
+    const box = await expandedImage.boundingBox();
+    if (!box || box.width > 375)
+      throw new Error(`모바일 이미지가 부모 폭을 초과했습니다: ${box?.width}`);
+    await page.screenshot({
+      path: path.join(screenshotDir, '04_feed-expanded-mobile.png'),
+      fullPage: true,
+    });
+    console.log(
+      JSON.stringify(
+        {
+          message: 'Embedded image browser verification passed.',
+          composerMeasurements,
+          screenshotDir,
+        },
+        null,
+        2,
+      ),
+    );
+  }
 } finally {
   await browser.close();
 }
