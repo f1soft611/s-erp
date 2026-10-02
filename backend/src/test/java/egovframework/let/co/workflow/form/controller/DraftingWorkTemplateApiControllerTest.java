@@ -1,6 +1,7 @@
 package egovframework.let.co.workflow.form.controller;
 
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -70,22 +71,32 @@ class DraftingWorkTemplateApiControllerTest {
 
     @Test
     void putTemplateRequiresTenantAdminAndPassesAuthenticatedTenantAndBody() throws Exception {
-        when(draftingWorkService.saveTemplate(eq(9L), eq(77L), argThat(payload ->
-                "doc".equals(payload.getTemplateJson().path("type").asText())
-                        && "<p>저장 본문</p>".equals(payload.getTemplateHtml()))))
+        when(draftingWorkService.saveTemplate(eq(9L), eq(77L), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(template());
 
         mockMvc.perform(put("/api/v1/co/workflow/forms/77/template")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"templateJson\":{\"type\":\"doc\",\"content\":[]},"
-                                + "\"templateHtml\":\"<p>저장 본문</p>\"}")
+                                + "\"templateHtml\":\"<p>저장 본문</p>\","
+                                + "\"embeddedImages\":[{\"uploadToken\":\"upload-token\","
+                                + "\"fileName\":\"image.png\",\"objectKey\":\"untrusted/key\","
+                                + "\"bucketName\":\"untrusted-bucket\",\"mimeType\":\"image/svg+xml\","
+                                + "\"fileSize\":999999}]}")
                         .principal(authenticationForTenant(9L, "TENANT_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.item.draftingWorkCategoryId").value(77));
 
-        verify(draftingWorkService).saveTemplate(eq(9L), eq(77L), argThat(payload ->
-                "doc".equals(payload.getTemplateJson().path("type").asText())
-                        && "<p>저장 본문</p>".equals(payload.getTemplateHtml())));
+        org.mockito.ArgumentCaptor<DraftingWorkTemplateSaveRequestVO> payloadCaptor =
+                org.mockito.ArgumentCaptor.forClass(DraftingWorkTemplateSaveRequestVO.class);
+        verify(draftingWorkService).saveTemplate(eq(9L), eq(77L), payloadCaptor.capture());
+        com.fasterxml.jackson.databind.JsonNode boundPayload =
+                OBJECT_MAPPER.valueToTree(payloadCaptor.getValue());
+        assertEquals("upload-token", boundPayload.path("embeddedImages").path(0).path("uploadToken").asText());
+        assertEquals("image.png", boundPayload.path("embeddedImages").path(0).path("fileName").asText());
+        assertFalse(boundPayload.path("embeddedImages").path(0).has("objectKey"));
+        assertFalse(boundPayload.path("embeddedImages").path(0).has("bucketName"));
+        assertFalse(boundPayload.path("embeddedImages").path(0).has("mimeType"));
+        assertFalse(boundPayload.path("embeddedImages").path(0).has("fileSize"));
     }
 
     @Test

@@ -10,8 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
 import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.stereotype.Service;
 
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateSaveRequestVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateVO;
@@ -56,7 +58,8 @@ class DraftingWorkTemplateServiceImplTest {
     @BeforeEach
     void setUp() {
         draftingWorkTemplateService = new DraftingWorkServiceImpl(
-                draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService);
+                draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService,
+                new DraftingWorkTemplateServiceImpl(draftingWorkDAO));
     }
 
     @Test
@@ -86,6 +89,62 @@ class DraftingWorkTemplateServiceImplTest {
         assertTrue(imageAttributes.path("src").isMissingNode());
         assertTrue(imageAttributes.path("onerror").isMissingNode());
         assertEquals("<p>안전</p>", result.getTemplateHtml());
+    }
+
+    @Test
+    void getTemplateOnlyRetainsImageSourcesForTheCurrentForm() throws Exception {
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+                "{\"type\":\"doc\",\"content\":["
+                        + "{\"type\":\"image\",\"attrs\":{\"src\":\"https://remote.example/image.png\"}},"
+                        + "{\"type\":\"image\",\"attrs\":{\"src\":\"//remote.example/image.png\"}},"
+                        + "{\"type\":\"image\",\"attrs\":{\"src\":\"/api/v1/co/workflow/forms/78/template-images/12\"}},"
+                        + "{\"type\":\"image\",\"attrs\":{\"src\":\"/api/v1/co/workflow/forms/77/template-images/12\"}}]}",
+                "<p>본문</p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
+
+        JsonNode images = result.getTemplateJson().path("content");
+        assertTrue(images.get(0).path("attrs").path("src").isMissingNode());
+        assertTrue(images.get(1).path("attrs").path("src").isMissingNode());
+        assertTrue(images.get(2).path("attrs").path("src").isMissingNode());
+        assertEquals("/api/v1/co/workflow/forms/77/template-images/12",
+                images.get(3).path("attrs").path("src").asText());
+    }
+
+    @Test
+    void getTemplateRetainsOnlySameFormImagesInHtml() throws Exception {
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+                "{\"type\":\"doc\",\"content\":[]}",
+                "<img src=\"/api/v1/co/workflow/forms/77/template-images/12\" alt=\"safe\" "
+                        + "title=\"title\" width=\"320\" height=\"180\" onclick=\"alert(1)\">"
+                        + "<img src=\"https://remote.example/image.png\" alt=\"remote\">"
+                        + "<img src=\"/api/v1/co/workflow/forms/78/template-images/12\" alt=\"other\">"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
+
+        assertTrue(result.getTemplateHtml().contains("src=\"/api/v1/co/workflow/forms/77/template-images/12\""));
+        assertTrue(result.getTemplateHtml().contains("alt=\"safe\""));
+        assertTrue(result.getTemplateHtml().contains("title=\"title\""));
+        assertTrue(result.getTemplateHtml().contains("width=\"320\""));
+        assertTrue(result.getTemplateHtml().contains("height=\"180\""));
+        assertFalse(result.getTemplateHtml().contains("onclick"));
+        assertFalse(result.getTemplateHtml().contains("remote.example"));
+        assertFalse(result.getTemplateHtml().contains("forms/78/"));
+    }
+
+    @Test
+    void templateServiceIsSpringManagedAndInjectedByConstructor() {
+        assertTrue(DraftingWorkTemplateServiceImpl.class.isAnnotationPresent(Service.class));
+
+        boolean acceptsTemplateService = false;
+        for (Constructor<?> constructor : DraftingWorkServiceImpl.class.getConstructors()) {
+            for (Class<?> parameterType : constructor.getParameterTypes()) {
+                if (parameterType == DraftingWorkTemplateServiceImpl.class) {
+                    acceptsTemplateService = true;
+                }
+            }
+        }
+        assertTrue(acceptsTemplateService);
     }
 
     @Test

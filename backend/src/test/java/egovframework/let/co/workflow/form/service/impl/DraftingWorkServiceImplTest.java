@@ -54,7 +54,8 @@ class DraftingWorkServiceImplTest {
     @BeforeEach
     void setUp() {
         draftingWorkService = new DraftingWorkServiceImpl(
-            draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService);
+            draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService,
+            new DraftingWorkTemplateServiceImpl(draftingWorkDAO));
     }
 
     @Test

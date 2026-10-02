@@ -41,12 +41,14 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
             @Qualifier("codeIdGnrService")
             EgovIdGnrService codeIdGnrService,
             CommonCodeGroupService commonCodeGroupService,
-            CommonCodeItemService commonCodeItemService) {
+            CommonCodeItemService commonCodeItemService,
+            @Qualifier("draftingWorkTemplateService")
+            DraftingWorkTemplateServiceImpl draftingWorkTemplateService) {
         this.draftingWorkDAO = draftingWorkDAO;
         this.codeIdGnrService = codeIdGnrService;
         this.commonCodeGroupService = commonCodeGroupService;
         this.commonCodeItemService = commonCodeItemService;
-        this.draftingWorkTemplateService = new DraftingWorkTemplateServiceImpl(draftingWorkDAO);
+        this.draftingWorkTemplateService = draftingWorkTemplateService;
     }
 
     @Override
