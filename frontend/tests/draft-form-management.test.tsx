@@ -11,6 +11,8 @@ import { DashboardContent } from '../src/pages/dashboard/components/DashboardCon
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
 import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
+import { F1Grid } from '../src/shared/components/f1-grid';
+import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';
 
 const apiMocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -156,6 +158,72 @@ describe('Draft form management page', () => {
     expect(assignee?.type).toBe('user');
     expect(assignee?.userOptions?.[0].value).toBe('110');
     expect(assignee?.form?.multiple).toBe(true);
+  });
+
+  it('applies a selected reviewer to the draft form grid row', async () => {
+    const users = [
+      {
+        userId: '110',
+        loginId: 210,
+        userNm: '홍길동',
+        departmentNm: '운영팀',
+        profileImage: null,
+        levelNm: '부장',
+      },
+      {
+        userId: '111',
+        loginId: 211,
+        userNm: '김민지',
+        departmentNm: '기획팀',
+        profileImage: null,
+        levelNm: '과장',
+      },
+    ];
+    const row: DraftFormRow = {
+      draftingWorkCategoryId: 1,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: 210,
+      reviewerName: '홍길동',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '',
+      createdByName: '홍길동',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const onChangesChange = vi.fn();
+
+    render(
+      <F1Grid
+        rows={[row]}
+        columns={createDraftFormColumns([], [], users, true)}
+        rowKey="draftingWorkCategoryId"
+        onChangesChange={onChangesChange}
+      />,
+    );
+
+    fireEvent.doubleClick(
+      screen.getByRole('gridcell', { name: '홍길동 (운영팀)' }),
+    );
+    const userOption = await screen.findByRole('option', { name: /김민지/ });
+    fireEvent.mouseDown(userOption);
+    fireEvent.mouseUp(userOption);
+    fireEvent.click(userOption);
+
+    expect(
+      await screen.findByRole('gridcell', { name: '김민지 (기획팀)' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(onChangesChange).toHaveBeenCalled());
+    expect(onChangesChange.mock.lastCall?.[0].updatedRows).toEqual([
+      expect.objectContaining({ reviewerId: 211 }),
+    ]);
   });
 
   it('renders from the co/form dashboard route with one unified search field', async () => {

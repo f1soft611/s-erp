@@ -439,7 +439,12 @@ for (const width of [593, 1280]) {
     await changedReviewerCell.dispatchEvent('dblclick');
     await page.getByRole('option', { name: /홍길동/ }).waitFor();
     await page.getByRole('option', { name: /홍길동/ }).click();
-    await page.getByRole('gridcell', { name: '홍길동 (운영팀)' }).waitFor();
+    await page
+      .getByRole('grid')
+      .getByRole('row')
+      .nth(1)
+      .getByRole('gridcell', { name: '홍길동 (운영팀)' })
+      .waitFor();
     if (await page.getByRole('button', { name: '저장' }).isEnabled()) {
       throw new Error('Restoring the original user left the Grid row dirty.');
     }

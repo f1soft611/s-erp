@@ -99,6 +99,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
 - `type: 'user'` 컬럼은 `userOptions`의 사용자 항목(`value`, `label`, `avatarUrl`, `positionName`, `departmentName`)을 검색/선택한다. 셀 편집과 row form modal은 같은 avatar/name/position/department 선택 UI를 사용하고, `form.multiple: true`면 선택 ID 배열과 개별 chip 해제를 제공한다.
+- 인라인 user picker option 클릭은 Autocomplete portal의 mousedown이 Grid outside-click commit으로 처리되지 않게 보호한다. 그렇지 않으면 option click보다 먼저 editor가 닫혀 선택값이 셀에 반영되지 않는다.
 - user 값은 단일 ID/`null` 또는 다중 ID 배열/`[]`로 저장한다. 옵션에서 선택한 ID의 원래 string/number 타입을 보존하며 표시 metadata는 row 값에 저장하지 않는다. 단일·다중 선택 chip X는 해제 patch를 만들고, 동일한 선택값을 commit해도 배열 내용이 같으면 dirty로 처리하지 않는다.
 - Grid cell user 편집은 내부 TextField outline/underline을 제거하고 GridCell active focus outline만 사용한다. Row form modal은 기존 form 입력처럼 outlined border를 유지한다.
 - user 옵션 검색은 사용자 표시명, 직급, 부서에 적용한다. 프로필 사진이 없는 경우 이름 이니셜 avatar를 표시하고, 팝업 목록은 내부 스크롤 및 viewport 너비를 따른다. Grid cell 편집 팝업은 cell 왼쪽 경계에 맞춰 시작하며, 최대 320px에서 anchor 오른쪽에 확보 가능한 너비로 줄어든다. 좁은 viewport에서도 화면 경계를 넘지 않는다.
