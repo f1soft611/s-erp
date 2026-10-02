@@ -71,7 +71,8 @@ class DraftingWorkTemplateApiControllerTest {
 
     @Test
     void putTemplateRequiresTenantAdminAndPassesAuthenticatedTenantAndBody() throws Exception {
-        when(draftingWorkService.saveTemplate(eq(9L), eq(77L), org.mockito.ArgumentMatchers.any()))
+        when(draftingWorkService.saveTemplate(
+                eq(9L), eq(77L), eq("actor-9"), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(template());
 
         mockMvc.perform(put("/api/v1/co/workflow/forms/77/template")
@@ -88,7 +89,8 @@ class DraftingWorkTemplateApiControllerTest {
 
         org.mockito.ArgumentCaptor<DraftingWorkTemplateSaveRequestVO> payloadCaptor =
                 org.mockito.ArgumentCaptor.forClass(DraftingWorkTemplateSaveRequestVO.class);
-        verify(draftingWorkService).saveTemplate(eq(9L), eq(77L), payloadCaptor.capture());
+        verify(draftingWorkService).saveTemplate(
+                eq(9L), eq(77L), eq("actor-9"), payloadCaptor.capture());
         com.fasterxml.jackson.databind.JsonNode boundPayload =
                 OBJECT_MAPPER.valueToTree(payloadCaptor.getValue());
         assertEquals("upload-token", boundPayload.path("embeddedImages").path(0).path("uploadToken").asText());
@@ -125,7 +127,8 @@ class DraftingWorkTemplateApiControllerTest {
 
     @Test
     void putTemplateReturnsNotFoundWhenFormIsOutsideTenantOrDeleted() throws Exception {
-        when(draftingWorkService.saveTemplate(eq(9L), eq(77L), org.mockito.ArgumentMatchers.any()))
+        when(draftingWorkService.saveTemplate(
+                eq(9L), eq(77L), eq("actor-9"), org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new NoSuchElementException("기안양식을 찾을 수 없습니다."));
 
         mockMvc.perform(put("/api/v1/co/workflow/forms/77/template")
@@ -165,6 +168,7 @@ class DraftingWorkTemplateApiControllerTest {
         LoginVO user = new LoginVO();
         user.setTenantId(tenantId);
         user.setRoleCode(roleCode);
+        user.setId("actor-9");
         return new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
     }
 

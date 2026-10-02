@@ -288,6 +288,9 @@ describe('NoticeComposerDialog payload', () => {
       expect(editor).toHaveTextContent('담당');
       expect(editor).toHaveTextContent('공지 작성');
       expect(editor).toHaveTextContent('홍길동');
+      expect(editor.querySelector('table')?.getAttribute('style')).toContain(
+        'min-width: 32px',
+      );
     });
   });
 
@@ -367,9 +370,14 @@ describe('NoticeComposerDialog payload', () => {
     const excelHtml = `
       <html><body>
         <table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+          <colgroup>
+            <col style="width:120px;" />
+            <col style="width:160px;" />
+            <col width="140" />
+          </colgroup>
           <tbody>
             <tr>
-              <td style="padding:2px 4px;">업무</td>
+              <td style="padding:2px 4px;width:120px;height:28px;font-size:10pt;font-family:Arial;">업무</td>
               <td style="padding:2px 4px;">담당</td>
               <td style="padding:2px 4px;">일자</td>
             </tr>
@@ -380,7 +388,7 @@ describe('NoticeComposerDialog payload', () => {
             </tr>
             <tr>
               <td style="padding:2px 4px;">비고</td>
-              <td colspan="2" style="padding:2px 4px;">Excel 붙여넣기 검증&nbsp;<br>테스트</td>
+              <td colspan="2" style="padding:2px 4px;"><span style="font-size:8pt;font-family:Arial;color:#ff0000;"><strong>Excel 붙여넣기 검증</strong></span>&nbsp;<br>테스트</td>
             </tr>
           </tbody>
         </table>
@@ -407,6 +415,67 @@ describe('NoticeComposerDialog payload', () => {
       expect(editor).toHaveTextContent('2026-09-18');
       expect(editor).toHaveTextContent('Excel 붙여넣기 검증');
       expect(editor).not.toHaveTextContent('border-collapse');
+      const rows = editor.querySelectorAll('table tr');
+      expect(rows).toHaveLength(3);
+      expect(rows[2].querySelectorAll('td')).toHaveLength(2);
+      expect(
+        (rows[2].querySelectorAll('td')[1] as HTMLTableCellElement).colSpan,
+      ).toBe(2);
+      expect(rows[2].querySelector('br')).toBeInTheDocument();
+      expect(rows[0].querySelectorAll('td')[0].getAttribute('colwidth')).toBe(
+        '120',
+      );
+      expect(rows[2].querySelectorAll('td')[1].getAttribute('colwidth')).toBe(
+        '160,140',
+      );
+      expect(
+        Array.from(editor.querySelectorAll('table col')).map((column) =>
+          column.getAttribute('style'),
+        ),
+      ).toEqual(['width: 120px;', 'width: 160px;', 'width: 140px;']);
+      expect(editor.querySelector('table')?.getAttribute('style')).toContain(
+        'width: 420px',
+      );
+      expect(editor.querySelector('span[style*="font-size"]')).toHaveStyle({
+        fontSize: '8pt',
+        fontFamily: 'Arial',
+        color: 'rgb(255, 0, 0)',
+      });
+      expect(editor.querySelector('strong')).toHaveTextContent(
+        'Excel 붙여넣기 검증',
+      );
+    });
+  });
+
+  it('keeps footer rows below a vertically merged section when Excel includes empty rows', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+        }),
+      ),
+    );
+
+    const editor = screen.getByRole('textbox', { name: /본문/i });
+    const html =
+      '<table><tbody><tr><td rowspan="3">개선조치 방법</td><td rowspan="3">조치 내용</td></tr><tr></tr><tr></tr><tr><td>이탈일자</td><td>이탈사항</td></tr></tbody></table>';
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text/html' ? html : ''),
+      },
+      preventDefault: vi.fn(),
+    });
+
+    await waitFor(() => {
+      const rows = editor.querySelectorAll('table tr');
+      expect(rows).toHaveLength(4);
+      expect(rows[3].querySelector('td')?.textContent).toBe('이탈일자');
+      expect(rows[3].querySelectorAll('td')).toHaveLength(2);
     });
   });
 });

@@ -169,6 +169,15 @@
           AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
       </select>
 
+      <select id="lockTemplate" parameterType="map" resultType="long">
+        SELECT drafting_work_category_id
+        FROM public.tb_drafting_work_category
+        WHERE tenant_id = #{tenantId}
+          AND drafting_work_category_id = #{workId}
+          AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
+        FOR UPDATE
+      </select>
+
       <select id="selectAssigneeIds" parameterType="map" resultType="string">
           SELECT employee_no
           FROM public.tb_drafting_work_category_authority

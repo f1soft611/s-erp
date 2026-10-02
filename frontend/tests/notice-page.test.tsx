@@ -239,6 +239,40 @@ describe('Community notice page', () => {
     );
   });
 
+  it('preserves notice typography and wraps wide tables in collapsed and expanded previews', () => {
+    const item = {
+      ...noticeFeed[0],
+      body: '긴 표가 포함된 공지 전체 내용',
+      summary: '긴 표가 포함된 공지',
+      bodyHtml:
+        '<p><span style="font-family:Arial;font-size:10pt">중요 안내</span></p><table><tbody><tr><td>첫 번째 열</td><td>두 번째 열</td></tr></tbody></table>',
+    };
+    const renderPreview = (expandedNoticeId: number | null) => (
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        expandedNoticeId={expandedNoticeId}
+      />
+    );
+    const { rerender } = render(renderPreview(null));
+
+    const collapsedPreview = screen.getByTestId(`notice-preview-${item.id}`);
+    expect(collapsedPreview).toHaveAttribute('data-expanded', 'false');
+    expect(collapsedPreview.querySelector('.tableWrapper > table')).not.toBeNull();
+    expect(collapsedPreview.querySelector('span')?.getAttribute('style')).toBe(
+      'font-family:Arial;font-size:10pt',
+    );
+
+    rerender(renderPreview(item.id));
+
+    const expandedPreview = screen.getByTestId(`notice-preview-${item.id}`);
+    expect(expandedPreview).toHaveAttribute('data-expanded', 'true');
+    expect(expandedPreview.querySelector('.tableWrapper > table')).not.toBeNull();
+    expect(expandedPreview.querySelector('span')?.getAttribute('style')).toBe(
+      'font-family:Arial;font-size:10pt',
+    );
+  });
+
   it('opens an image viewer when the user clicks a feed image preview', async () => {
     const onNoticeInteract = vi.fn();
     const item = {

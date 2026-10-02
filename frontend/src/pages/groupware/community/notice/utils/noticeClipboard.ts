@@ -7,11 +7,27 @@ const allowedCellStyleProperties = new Set([
   'border-right',
   'border-top',
   'color',
+  'font-family',
+  'font-size',
+  'font-style',
   'font-weight',
   'height',
+  'line-height',
   'text-align',
+  'text-decoration',
   'vertical-align',
   'width',
+]);
+
+const allowedTextStyleProperties = new Set([
+  'background-color',
+  'color',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'line-height',
+  'text-decoration',
 ]);
 
 function escapeHtml(value: string): string {
@@ -49,18 +65,66 @@ function normalizeImageDimension(value: string | null): string | null {
   return /^(?:\d+(?:\.\d+)?)(?:px|%)$/.test(normalized) ? normalized : null;
 }
 
-function sanitizeCellStyle(cell: Element): string | null {
+function normalizeColumnWidth(value: string | null): number | null {
+  const normalized = normalizeCellDimension(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const match = normalized.match(/^(\d+(?:\.\d+)?)(px|pt|pc|in|cm|mm)?$/);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2] ?? 'px';
+  const pixels =
+    unit === 'pt'
+      ? (amount * 96) / 72
+      : unit === 'pc'
+        ? amount * 16
+        : unit === 'in'
+          ? amount * 96
+          : unit === 'cm'
+            ? (amount * 96) / 2.54
+            : unit === 'mm'
+              ? (amount * 96) / 25.4
+              : amount;
+
+  return Number.isFinite(pixels) && pixels > 0 && pixels <= 2000
+    ? Math.max(1, Math.round(pixels))
+    : null;
+}
+
+function getClipboardTableColumnWidths(table: Element): number[] {
+  const columns = Array.from(table.querySelectorAll(':scope > colgroup > col'));
+
+  return columns.flatMap((column) => {
+    const width = normalizeColumnWidth(
+      (column as HTMLElement).style.getPropertyValue('width') ||
+        column.getAttribute('width'),
+    );
+    const span = Math.max(1, Number(column.getAttribute('span')) || 1);
+    return Array.from({ length: span }, () => width ?? 0);
+  });
+}
+
+function sanitizeCellStyle(cell: Element, omitWidth = false): string | null {
   const declarations: string[] = [];
   const style = (cell as HTMLElement).style;
 
   for (const property of allowedCellStyleProperties) {
+    if (omitWidth && property === 'width') {
+      continue;
+    }
+
     const value = style.getPropertyValue(property).trim();
     if (!value || !isSafeCellStyleValue(value)) {
       continue;
     }
 
     const normalizedValue =
-      property === 'width' || property === 'height'
+      property === 'width' || property === 'height' || property === 'font-size'
         ? normalizeCellDimension(value)
         : value;
     if (normalizedValue) {
@@ -72,6 +136,10 @@ function sanitizeCellStyle(cell: Element): string | null {
     ['width', 'width'],
     ['height', 'height'],
   ] as const) {
+    if (omitWidth && property === 'width') {
+      continue;
+    }
+
     if (
       declarations.some((declaration) => declaration.startsWith(`${property}:`))
     ) {
@@ -89,8 +157,192 @@ function sanitizeCellStyle(cell: Element): string | null {
   return declarations.length > 0 ? declarations.join(';') : null;
 }
 
+function sanitizeTextStyle(element: Element): string | null {
+  const declarations: string[] = [];
+  const style = (element as HTMLElement).style;
+
+  for (const property of allowedTextStyleProperties) {
+    const value = style.getPropertyValue(property).trim();
+    if (!value || !isSafeCellStyleValue(value)) {
+      continue;
+    }
+
+    const normalizedValue =
+      property === 'font-size' ? normalizeCellDimension(value) : value;
+    if (normalizedValue) {
+      declarations.push(`${property}:${normalizedValue}`);
+    }
+  }
+
+  if (element.tagName.toLowerCase() === 'font') {
+    const legacyAttributes = [
+      ['face', 'font-family'],
+      ['color', 'color'],
+    ] as const;
+    for (const [attribute, property] of legacyAttributes) {
+      const value = element.getAttribute(attribute)?.trim() ?? '';
+      if (
+        value &&
+        !declarations.some((declaration) =>
+          declaration.startsWith(`${property}:`),
+        ) &&
+        isSafeCellStyleValue(value) &&
+        !value.includes(';')
+      ) {
+        declarations.push(`${property}:${value}`);
+      }
+    }
+
+    const legacySize = element.getAttribute('size')?.trim() ?? '';
+    const legacyFontSizes: Record<string, string> = {
+      '1': '8pt',
+      '2': '10pt',
+      '3': '12pt',
+      '4': '14pt',
+      '5': '18pt',
+      '6': '24pt',
+      '7': '36pt',
+    };
+    const fontSize =
+      legacyFontSizes[legacySize] ?? normalizeCellDimension(legacySize);
+    if (
+      fontSize &&
+      !declarations.some((declaration) => declaration.startsWith('font-size:'))
+    ) {
+      declarations.push(`font-size:${fontSize}`);
+    }
+  }
+
+  return declarations.length > 0 ? declarations.join(';') : null;
+}
+
+function normalizeClipboardTable(table: Element): string {
+  const rows = Array.from(table.querySelectorAll('tr')).filter(
+    (row) => row.closest('table') === table,
+  );
+  const columnWidths = getClipboardTableColumnWidths(table);
+  const occupiedUntil: number[] = [];
+  const normalizedRows = rows
+    .map((row, rowIndex) => {
+      const cells = Array.from(row.children).filter(
+        (cell) =>
+          cell.tagName.toLowerCase() === 'td' ||
+          cell.tagName.toLowerCase() === 'th',
+      );
+      if (cells.length === 0) {
+        return '<tr></tr>';
+      }
+
+      let columnIndex = 0;
+      const normalizedCells = cells.map((cell) => {
+        const tagName = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td';
+        const colspan = Math.max(1, Number(cell.getAttribute('colspan')) || 1);
+        const rowspan = Math.max(1, Number(cell.getAttribute('rowspan')) || 1);
+        while ((occupiedUntil[columnIndex] ?? 0) > rowIndex) {
+          columnIndex += 1;
+        }
+        const cellColumn = columnIndex;
+        const cellColumnWidths = columnWidths.slice(
+          cellColumn,
+          cellColumn + colspan,
+        );
+        const colwidthAttribute =
+          cellColumnWidths.length === colspan &&
+          cellColumnWidths.every((width) => width > 0)
+            ? ` colwidth="${cellColumnWidths.join(',')}"`
+            : '';
+        const spanAttributes = [
+          colspan > 1 ? ` colspan="${colspan}"` : '',
+          rowspan > 1 ? ` rowspan="${rowspan}"` : '',
+        ].join('');
+        for (
+          let spanColumn = cellColumn;
+          spanColumn < cellColumn + colspan;
+          spanColumn += 1
+        ) {
+          occupiedUntil[spanColumn] = Math.max(
+            occupiedUntil[spanColumn] ?? 0,
+            rowIndex + rowspan,
+          );
+        }
+        columnIndex += colspan;
+        const style = sanitizeCellStyle(cell, Boolean(colwidthAttribute));
+        const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
+        const content = Array.from(cell.childNodes)
+          .map(serializeClipboardCellNode)
+          .join('')
+          .trim();
+
+        return `<${tagName}${spanAttributes}${colwidthAttribute}${styleAttribute}>${content}</${tagName}>`;
+      });
+
+      return `<tr>${normalizedCells.join('')}</tr>`;
+    })
+    .filter(Boolean);
+
+  return normalizedRows.length > 0
+    ? `<table><tbody>${normalizedRows.join('')}</tbody></table>`
+    : '';
+}
+
+function serializeClipboardCellNode(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = (node.textContent ?? '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r\n?/g, '\n');
+    if (!text.trim() && text.includes('\n')) {
+      return '';
+    }
+
+    return escapeHtml(text.replace(/[\t\f\v ]+/g, ' ')).replace(/\n/g, '<br>');
+  }
+
+  if (!(node instanceof Element)) {
+    return '';
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  if (tagName === 'br') {
+    return '<br>';
+  }
+  if (tagName === 'table') {
+    return normalizeClipboardTable(node);
+  }
+
+  const content = Array.from(node.childNodes)
+    .map(serializeClipboardCellNode)
+    .join('');
+  const style = sanitizeTextStyle(node);
+  const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
+  const styledContent = style
+    ? `<span${styleAttribute}>${content}</span>`
+    : content;
+
+  if (tagName === 'strong' || tagName === 'b') {
+    return `<strong>${styledContent}</strong>`;
+  }
+  if (tagName === 'em' || tagName === 'i') {
+    return `<em>${styledContent}</em>`;
+  }
+  if (tagName === 's' || tagName === 'strike' || tagName === 'del') {
+    return `<s>${styledContent}</s>`;
+  }
+  if (tagName === 'p' || tagName === 'div') {
+    return `<p>${styledContent}</p>`;
+  }
+  if (tagName === 'span' || tagName === 'font') {
+    return style ? `<span${styleAttribute}>${content}</span>` : content;
+  }
+
+  return content;
+}
+
 function applyEmbeddedCellStyles(root: HTMLElement): void {
-  const cells = Array.from(root.querySelectorAll('th, td'));
+  const styleTargets = Array.from(
+    root.querySelectorAll(
+      'th, td, span, p, div, font, strong, b, em, i, s, del',
+    ),
+  );
   const styleProperties = Array.from(allowedCellStyleProperties);
 
   const applyDeclarationText = (
@@ -112,17 +364,22 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
       );
 
     for (const selector of selectorText.split(',')) {
-      for (const cell of cells) {
+      for (const element of styleTargets) {
         try {
-          if (!cell.matches(selector.trim())) {
+          if (!element.matches(selector.trim())) {
             continue;
           }
         } catch {
           continue;
         }
 
+        const allowedProperties = element.matches('td, th')
+          ? allowedCellStyleProperties
+          : allowedTextStyleProperties;
         for (const [property, value] of declarations) {
-          (cell as HTMLElement).style.setProperty(property, value);
+          if (allowedProperties.has(property)) {
+            (element as HTMLElement).style.setProperty(property, value);
+          }
         }
       }
     }
@@ -132,19 +389,22 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
     Array.from(rules).forEach((rule) => {
       if (rule.type === CSSRule.STYLE_RULE) {
         const styleRule = rule as CSSStyleRule;
-        for (const cell of cells) {
+        for (const element of styleTargets) {
           try {
-            if (!cell.matches(styleRule.selectorText)) {
+            if (!element.matches(styleRule.selectorText)) {
               continue;
             }
           } catch {
             continue;
           }
 
-          for (const property of styleProperties) {
+          const allowedProperties = element.matches('td, th')
+            ? styleProperties
+            : Array.from(allowedTextStyleProperties);
+          for (const property of allowedProperties) {
             const value = styleRule.style.getPropertyValue(property).trim();
             if (value && isSafeCellStyleValue(value)) {
-              (cell as HTMLElement).style.setProperty(property, value);
+              (element as HTMLElement).style.setProperty(property, value);
             }
           }
         }
@@ -215,46 +475,12 @@ export function normalizeClipboardHtmlForEditor(
     else image.removeAttribute('height');
   });
 
-  const tableRows = Array.from(root.querySelectorAll('tr'));
-  if (tableRows.length > 0) {
-    const rows = tableRows
-      .map((row) => {
-        const cells = Array.from(row.querySelectorAll('th, td'));
-        if (cells.length === 0) {
-          return '';
-        }
-
-        const normalizedCells = cells.map((cell) => {
-          const value = (cell.textContent ?? '')
-            .replace(/\u00a0/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          const tagName = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td';
-          const colspan = Math.max(
-            1,
-            Number(cell.getAttribute('colspan')) || 1,
-          );
-          const rowspan = Math.max(
-            1,
-            Number(cell.getAttribute('rowspan')) || 1,
-          );
-          const spanAttributes = [
-            colspan > 1 ? ` colspan="${colspan}"` : '',
-            rowspan > 1 ? ` rowspan="${rowspan}"` : '',
-          ].join('');
-          const style = sanitizeCellStyle(cell);
-          const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
-
-          return `<${tagName}${spanAttributes}${styleAttribute}>${escapeHtml(value)}</${tagName}>`;
-        });
-
-        return `<tr>${normalizedCells.join('')}</tr>`;
-      })
-      .filter((row) => row !== '');
-
-    if (rows.length > 0) {
-      return `<table><tbody>${rows.join('')}</tbody></table>`;
-    }
+  const tables = Array.from(root.querySelectorAll('table')).filter(
+    (table) => !table.parentElement?.closest('table'),
+  );
+  const normalizedTables = tables.map(normalizeClipboardTable).filter(Boolean);
+  if (normalizedTables.length > 0) {
+    return normalizedTables.join('');
   }
 
   const textCells = Array.from(root.querySelectorAll('td, th'));

@@ -165,7 +165,7 @@ public class DraftingWorkApiController {
         requireTenantAdmin(user);
         try {
             DraftingWorkTemplateVO template = draftingWorkService.saveTemplate(
-                    user.getTenantId(), draftingWorkCategoryId, payload);
+                    user.getTenantId(), draftingWorkCategoryId, user.getId(), payload);
             Map<String, Object> resultMap = new HashMap<String, Object>();
             resultMap.put("item", template);
             return ResponseEntity.ok(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));

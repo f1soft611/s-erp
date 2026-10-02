@@ -90,6 +90,19 @@ export function ListView<T extends CommonViewItem>({
                   }}
                 />
               )}
+              {item.statusLabel && (
+                <Chip
+                  label={item.statusLabel}
+                  size="small"
+                  color={item.statusColor ?? 'default'}
+                  variant="outlined"
+                  sx={{
+                    flexShrink: 0,
+                    height: 22,
+                    fontWeight: 700,
+                  }}
+                />
+              )}
             </Box>
             <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0 }}>
               <Typography variant="caption" color="text.secondary" noWrap>

@@ -186,6 +186,28 @@ MinIO Client로 버킷을 만든다.
 
 ---
 
+## 6-1. 기안양식 임시 이미지 7일 만료
+
+기안양식 본문 이미지는 기존 `document-attachments` 버킷에 다음 key를 사용한다.
+
+- 임시: `tenant/{tenantId}/drafting-work-form-temp/{formId}/{uploadToken}/{fileName}`
+- 영구: `tenant/{tenantId}/drafting-work-form/{formId}/{uploadToken}/{fileName}`
+
+임시 객체에는 `s-erp-temp-owner=drafting-work-form` object tag를 기록한다. MinIO lifecycle은 `tenant/` prefix와 tag를 모두 만족하는 객체에만 7일 expiration을 적용한다. 저장·취소 시 앱이 사용 완료/미사용 임시 객체를 바로 정리하고, lifecycle은 브라우저 종료 등으로 남은 객체를 위한 안전망이다.
+
+`mc` alias가 `local`인 경우 운영자 권한으로 아래 rule을 적용한다. 버킷 전체나 `tenant/` prefix 전체에 tag 없이 만료 규칙을 적용하지 않는다.
+
+```powershell
+& 'C:\Tools\MinIO\mc.exe' ilm rule add --prefix 'tenant/' --tags 's-erp-temp-owner=drafting-work-form' --expire-days '7' local/document-attachments
+& 'C:\Tools\MinIO\mc.exe' ilm rule ls local/document-attachments
+```
+
+검증 시 rule 목록에서 prefix, tag, 7일 expiration이 함께 표시되는지 확인한다. promotion은 server-side copy에서 tagging directive를 `REPLACE`로 지정해 임시 lifecycle tag를 영구 객체에 복사하지 않는다. 따라서 이 rule은 `drafting-work-form/` 영구 이미지와 공지사항 객체에 적용되지 않는다.
+
+버킷 versioning을 켠 환경은 current version expiration만으로 과거 버전이 제거되지 않을 수 있으므로, 별도 noncurrent retention 정책을 검토한다. 사용자 승인 없이 버킷 전체 version purge를 추가하지 않는다.
+
+---
+
 ## 7. Tomcat용 setenv.bat
 
 Tomcat 설치 폴더의 bin\setenv.bat 에 아래를 넣는다.

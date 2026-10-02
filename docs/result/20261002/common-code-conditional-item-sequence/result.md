@@ -19,7 +19,7 @@ PostgreSQL 읽기 전용 집계에서 그룹 24는 숫자 코드 최댓값 999, 
 
 - `mvn -q test`: 통과
 - `npx vitest run tests/common-code-management-page.test.tsx -t "allows an empty item code only" --reporter=dot`: 통과
-- `npx vitest run tests/common-code-item-help-dialog.test.tsx -t "allows a new classification item without a code" --reporter=dot`: 통과
+- `npx vitest run tests/common-code-item-help-dialog.test.tsx --reporter=dot`: 12개 통과
 - `npm run build`: 통과
 - `get_errors`: 변경한 Java/TypeScript 파일 진단 오류 없음
 - SQL/이력/롤백의 backend 및 docs 사본 해시 비교: 모두 동일

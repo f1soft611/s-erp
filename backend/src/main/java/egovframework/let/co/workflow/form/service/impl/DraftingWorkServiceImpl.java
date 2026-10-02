@@ -319,12 +319,22 @@ public class DraftingWorkServiceImpl extends EgovAbstractServiceImpl implements 
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public DraftingWorkTemplateVO saveTemplate(
             Long tenantId,
             Long draftingWorkCategoryId,
             DraftingWorkTemplateSaveRequestVO payload) throws Exception {
-        return draftingWorkTemplateService.saveTemplate(tenantId, draftingWorkCategoryId, payload);
+        return saveTemplate(tenantId, draftingWorkCategoryId, null, payload);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DraftingWorkTemplateVO saveTemplate(
+            Long tenantId,
+            Long draftingWorkCategoryId,
+            String uploadedBy,
+            DraftingWorkTemplateSaveRequestVO payload) throws Exception {
+        return draftingWorkTemplateService.saveTemplate(tenantId, draftingWorkCategoryId, uploadedBy, payload);
     }
 
     private CommonCodeItemVO findActiveItem(Long tenantId, String groupCode, Long itemId) throws Exception {

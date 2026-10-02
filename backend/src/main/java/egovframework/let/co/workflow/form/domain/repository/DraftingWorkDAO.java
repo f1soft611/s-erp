@@ -36,6 +36,13 @@ public class DraftingWorkDAO extends EgovAbstractMapper {
         return selectOne("DraftingWorkDAO.selectTemplate", params);
     }
 
+    public void lockTemplate(Long tenantId, Long workId) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("workId", workId);
+        selectOne("DraftingWorkDAO.lockTemplate", params);
+    }
+
     public int updateTemplate(Map<String, Object> params) throws Exception {
         return update("DraftingWorkDAO.updateTemplate", params);
     }

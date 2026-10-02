@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
+import java.util.Collections;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,8 +32,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.stereotype.Service;
 
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateSaveRequestVO;
+import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateEmbeddedImageVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateVO;
 import egovframework.let.co.workflow.form.domain.repository.DraftingWorkDAO;
+import egovframework.let.co.workflow.form.service.DraftingWorkTemplateImageService;
 import egovframework.let.co.workflow.form.service.impl.DraftingWorkTemplateServiceImpl;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
 import egovframework.let.co.master.commoncode.service.CommonCodeItemService;
@@ -53,13 +58,18 @@ class DraftingWorkTemplateServiceImplTest {
     @Mock
     private CommonCodeItemService commonCodeItemService;
 
+    @Mock
+    private DraftingWorkTemplateImageService templateImageService;
+
     private DraftingWorkServiceImpl draftingWorkTemplateService;
+    private DraftingWorkTemplateServiceImpl templateService;
 
     @BeforeEach
     void setUp() {
+        templateService = new DraftingWorkTemplateServiceImpl(draftingWorkDAO, templateImageService);
         draftingWorkTemplateService = new DraftingWorkServiceImpl(
                 draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService,
-                new DraftingWorkTemplateServiceImpl(draftingWorkDAO));
+            templateService);
     }
 
     @Test
@@ -281,6 +291,120 @@ class DraftingWorkTemplateServiceImplTest {
         assertFalse(result.getTemplateHtml().contains("<script"));
     }
 
+        @Test
+        void saveTemplatePromotesEmbeddedImageTokenAndRewritesJsonAndHtml() throws Exception {
+        String uploadToken = "bde1fdec-5d22-487a-a254-2b9547cd32b3";
+        String imageUrl = "/api/v1/co/workflow/forms/77/template-images/901";
+        JsonNode document = OBJECT_MAPPER.readTree("{\"type\":\"doc\",\"content\":["
+            + "{\"type\":\"image\",\"attrs\":{\"src\":\"blob:http://localhost/image\","
+            + "\"data-upload-token\":\"" + uploadToken + "\",\"alt\":\"chart\"}}]}");
+        DraftingWorkTemplateSaveRequestVO request = new DraftingWorkTemplateSaveRequestVO();
+        request.setTemplateJson(document);
+        request.setTemplateHtml("<p><img src=\"blob:http://localhost/image\" data-upload-token=\""
+            + uploadToken + "\" alt=\"chart\"></p>");
+        DraftingWorkTemplateEmbeddedImageVO embeddedImage = new DraftingWorkTemplateEmbeddedImageVO();
+        embeddedImage.setUploadToken(uploadToken);
+        embeddedImage.setFileName("chart.png");
+        request.setEmbeddedImages(Collections.singletonList(embeddedImage));
+        egovframework.com.common.domain.model.CommonFileVO promoted = new egovframework.com.common.domain.model.CommonFileVO();
+        promoted.setFileId(901L);
+        promoted.setFileUsageType("EMBEDDED");
+        promoted.setOwnerType("DRAFTING_WORK_TEMPLATE");
+        promoted.setOwnerId(77L);
+        promoted.setObjectKey("tenant/9/drafting-work-form/77/" + uploadToken + "/chart.png");
+        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
+        when(templateImageService.promoteTemporaryImage(9L, 77L, uploadToken, "chart.png", "login-9"))
+            .thenReturn(promoted);
+        when(draftingWorkDAO.updateTemplate(any())).thenReturn(1);
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+            "{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
+                + "\"src\":\"" + imageUrl + "\",\"data-file-id\":\"901\",\"alt\":\"chart\"}}]}",
+            "<p><img src=\"" + imageUrl + "\" data-file-id=\"901\" alt=\"chart\"></p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.saveTemplate(9L, 77L, "login-9", request);
+
+        assertEquals(imageUrl, result.getTemplateJson().path("content").get(0).path("attrs").path("src").asText());
+        org.mockito.InOrder saveOrder = inOrder(draftingWorkDAO, templateImageService);
+        saveOrder.verify(draftingWorkDAO).lockTemplate(9L, 77L);
+        saveOrder.verify(templateImageService).listTemplateImages(9L, 77L);
+        saveOrder.verify(templateImageService).promoteTemporaryImage(
+            9L, 77L, uploadToken, "chart.png", "login-9");
+        assertEquals(imageUrl, result.getTemplateHtml().substring(
+            result.getTemplateHtml().indexOf("src=\"") + 5,
+            result.getTemplateHtml().indexOf("\"", result.getTemplateHtml().indexOf("src=\"") + 5)));
+        verify(templateImageService).promoteTemporaryImage(9L, 77L, uploadToken, "chart.png", "login-9");
+        verify(templateImageService).completeTemplateSave(
+            eq(9L), eq(77L), eq(request.getEmbeddedImages()), any());
+        verify(draftingWorkDAO).updateTemplate(argThat(params ->
+            params.get("templateJson").toString().contains(imageUrl)
+                && !params.get("templateJson").toString().contains("data-upload-token")
+                && params.get("templateHtml").toString().contains(imageUrl)
+                && !params.get("templateHtml").toString().contains("data-upload-token")));
+        }
+
+        @Test
+        void saveTemplateRejectsImageFileIdNotOwnedByCurrentForm() throws Exception {
+        DraftingWorkTemplateSaveRequestVO request = validRequest();
+        request.setTemplateJson(OBJECT_MAPPER.readTree("{\"type\":\"doc\",\"content\":["
+            + "{\"type\":\"image\",\"attrs\":{\"src\":"
+            + "\"/api/v1/co/workflow/forms/77/template-images/901\"}}]}"));
+        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
+
+        assertThrows(IllegalArgumentException.class,
+            () -> draftingWorkTemplateService.saveTemplate(9L, 77L, "login-9", request));
+
+        verify(draftingWorkDAO, never()).updateTemplate(any());
+        }
+
+        @Test
+        void saveTemplateRewritesFileIdOnlyWhenItBelongsToCurrentForm() throws Exception {
+        String imageUrl = "/api/v1/co/workflow/forms/77/template-images/901";
+        DraftingWorkTemplateSaveRequestVO request = new DraftingWorkTemplateSaveRequestVO();
+        request.setTemplateJson(OBJECT_MAPPER.readTree("{\"type\":\"doc\",\"content\":["
+            + "{\"type\":\"image\",\"attrs\":{\"src\":\"blob:http://localhost/preview\","
+            + "\"data-file-id\":\"901\"}}]}"));
+        request.setTemplateHtml("<p><img src=\"blob:http://localhost/preview\" data-file-id=\"901\"></p>");
+        egovframework.com.common.domain.model.CommonFileVO ownedImage =
+            new egovframework.com.common.domain.model.CommonFileVO();
+        ownedImage.setFileId(901L);
+        ownedImage.setTenantId(9L);
+        ownedImage.setOwnerType("DRAFTING_WORK_TEMPLATE");
+        ownedImage.setOwnerId(77L);
+        ownedImage.setFileUsageType("EMBEDDED");
+        ownedImage.setDeletedYn("N");
+        ownedImage.setObjectKey("tenant/9/drafting-work-form/77/"
+            + "bde1fdec-5d22-487a-a254-2b9547cd32b3/existing.png");
+        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.singletonList(ownedImage));
+        when(draftingWorkDAO.updateTemplate(any())).thenReturn(1);
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+            "{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
+                + "\"src\":\"" + imageUrl + "\",\"data-file-id\":\"901\"}}]}",
+            "<p><img src=\"" + imageUrl + "\" data-file-id=\"901\"></p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.saveTemplate(9L, 77L, "actor-9", request);
+
+        assertEquals(imageUrl, result.getTemplateJson().path("content").get(0).path("attrs").path("src").asText());
+        verify(templateImageService, never()).promoteTemporaryImage(any(), any(), any(), any(), any());
+        verify(draftingWorkDAO).updateTemplate(argThat(params ->
+            params.get("templateJson").toString().contains(imageUrl)
+                && params.get("templateHtml").toString().contains(imageUrl)));
+        }
+
+        @Test
+        void saveTemplateRejectsUnownedFileIdWhenSourceIsOnlyLocalPreview() throws Exception {
+        DraftingWorkTemplateSaveRequestVO request = new DraftingWorkTemplateSaveRequestVO();
+        request.setTemplateJson(OBJECT_MAPPER.readTree("{\"type\":\"doc\",\"content\":["
+            + "{\"type\":\"image\",\"attrs\":{\"src\":\"blob:http://localhost/preview\","
+            + "\"data-file-id\":\"901\"}}]}"));
+        request.setTemplateHtml("<p><img src=\"blob:http://localhost/preview\" data-file-id=\"901\"></p>");
+        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
+
+        assertThrows(IllegalArgumentException.class,
+            () -> draftingWorkTemplateService.saveTemplate(9L, 77L, "actor-9", request));
+
+        verify(draftingWorkDAO, never()).updateTemplate(any());
+        }
+
     @Test
     void saveTemplateRejectsNonDocumentJsonBeforeDatabaseWrite() throws Exception {
         DraftingWorkTemplateSaveRequestVO request = new DraftingWorkTemplateSaveRequestVO();
@@ -344,6 +468,13 @@ class DraftingWorkTemplateServiceImplTest {
             assertTrue(updateSql.contains("where tenant_id = ?"));
             assertTrue(updateSql.contains("drafting_work_category_id = ?"));
             assertFalse(updateSql.contains("drafting_work_template_text"));
+            assertEquals(SqlCommandType.SELECT,
+                configuration.getMappedStatement("DraftingWorkDAO.lockTemplate").getSqlCommandType());
+            String lockSql = configuration.getMappedStatement("DraftingWorkDAO.lockTemplate")
+                .getBoundSql(params).getSql().toLowerCase().replaceAll("\\s+", " ");
+            assertTrue(lockSql.contains("where tenant_id = ?"));
+            assertTrue(lockSql.contains("drafting_work_category_id = ?"));
+            assertTrue(lockSql.contains("for update"));
             }
 
     private DraftingWorkTemplateSaveRequestVO validRequest() throws Exception {

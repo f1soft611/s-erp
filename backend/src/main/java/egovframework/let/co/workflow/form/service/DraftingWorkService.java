@@ -28,4 +28,10 @@ public interface DraftingWorkService {
 
     DraftingWorkTemplateVO saveTemplate(
             Long tenantId, Long draftingWorkCategoryId, DraftingWorkTemplateSaveRequestVO payload) throws Exception;
+
+    DraftingWorkTemplateVO saveTemplate(
+            Long tenantId,
+            Long draftingWorkCategoryId,
+            String uploadedBy,
+            DraftingWorkTemplateSaveRequestVO payload) throws Exception;
 }

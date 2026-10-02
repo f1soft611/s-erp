@@ -327,6 +327,38 @@ interface F1GridColumn<T> {
 - 세 함수 모두 지정하지 않으면 기본 값 표시 및 기존 편집 동작을 그대로 유지한다.
 - 복잡한 스타일은 `getCellProps.className`과 외부 CSS 클래스로 확장하는 것이 가장 안전하다.
 
+### 행별 업무 액션
+
+데이터 표시가 아닌 행별 업무 액션도 별도 Grid core 수정 없이 `renderCell`로 제공할 수 있다. 기안양식관리의 `hasDocument` 컬럼은 행의 문서 유무에 따라 `문서 작성`/`문서 수정` 버튼을 표시하고, callback에 해당 행을 전달한다. 권한이 없으면 버튼 대신 읽기 전용 상태를 표시한다.
+
+```tsx
+{
+  field: 'hasDocument',
+  headerName: '문서 양식',
+  width: 140,
+  pinned: 'right',
+  editable: false,
+  renderCell: ({ row }) => (
+    <Button
+      aria-label={`${row.hasDocument ? '문서 수정' : '문서 작성'}: ${row.codeName}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenTemplate(row);
+      }}
+    >
+      {row.hasDocument ? '문서 수정' : '문서 작성'}
+    </Button>
+  ),
+  form: { hidden: true },
+  search: { hidden: true },
+}
+```
+
+- 행 액션은 페이지/업무 callback이 소유한다. `renderCell`은 메뉴 권한이나 API 저장 책임을 갖지 않는다.
+- 액션 클릭은 `stopPropagation()`으로 Grid 행 선택/편집 이벤트와 분리한다.
+- 기존 사용자 layout 저장값에 새 pinned 컬럼이 없을 때 페이지가 저장된 순서/폭/숨김 설정을 유지하면서 신규 action pin을 1회 migration할 수 있다. Grid core의 persisted layout 초기화는 변경하지 않는다.
+- 좁은 뷰포트에서는 넓은 Grid가 내부 가로 스크롤을 사용한다. 문서 액션은 마지막 열에 두어 필요하면 내부 스크롤로 접근하며, 페이지 전체 가로 overflow를 만들지 않는다.
+
 예:
 
 ```typescript

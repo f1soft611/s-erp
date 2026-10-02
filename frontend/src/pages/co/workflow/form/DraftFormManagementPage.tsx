@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -33,6 +33,7 @@ import {
   createDraftFormColumns,
   DraftFormGrid,
 } from './components/DraftFormGrid';
+import { DraftFormTemplateDialog } from './components/DraftFormTemplateDialog';
 import { useDraftFormManagement } from './hooks/useDraftFormManagement';
 
 type DraftFormManagementPageProps = {
@@ -65,6 +66,11 @@ export function DraftFormManagementPage({
     Record<string, PageSearchFieldValue>
   >({});
   const [helperOpen, setHelperOpen] = useState(false);
+  const [templateTarget, setTemplateTarget] = useState<DraftFormRow | null>(null);
+  const [pendingTemplateTarget, setPendingTemplateTarget] =
+    useState<DraftFormRow | null>(null);
+  const [templateDiscardConfirmOpen, setTemplateDiscardConfirmOpen] =
+    useState(false);
   const [categoryNoticeDismissed, setCategoryNoticeDismissed] = useState(false);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<DraftFormFilters | null>(
@@ -82,6 +88,18 @@ export function DraftFormManagementPage({
     (selectedMenuPermissions?.create || selectedMenuPermissions?.update),
   );
   const canWriteForms = pagePermissions.create || pagePermissions.update;
+  const canEditTemplate = pagePermissions.update;
+  const handleOpenTemplate = useCallback(
+    (row: DraftFormRow) => {
+      if (management.hasChanges) {
+        setPendingTemplateTarget(row);
+        setTemplateDiscardConfirmOpen(true);
+        return;
+      }
+      setTemplateTarget(row);
+    },
+    [management.hasChanges],
+  );
   const columns = useMemo(
     () =>
       createDraftFormColumns(
@@ -89,12 +107,15 @@ export function DraftFormManagementPage({
         management.cycleItems,
         management.users,
         canWriteForms,
+        canEditTemplate ? handleOpenTemplate : undefined,
       ),
     [
       management.categoryItems,
       management.cycleItems,
       management.users,
       canWriteForms,
+      canEditTemplate,
+      handleOpenTemplate,
     ],
   );
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
@@ -304,6 +325,17 @@ export function DraftFormManagementPage({
           onChangesChange={management.handleChangesChange}
         />
       </Box>
+      {templateTarget && (
+        <DraftFormTemplateDialog
+          key={String(templateTarget.draftingWorkCategoryId)}
+          open
+          row={templateTarget}
+          onClose={() => setTemplateTarget(null)}
+          onSaved={async () => {
+            await management.loadRows(management.appliedFilters, { quiet: true });
+          }}
+        />
+      )}
       <CommonCodeItemHelpDialog
         open={helperOpen}
         groupId={management.categoryGroupId}
@@ -334,6 +366,24 @@ export function DraftFormManagementPage({
         continueLabel="계속"
         onCancel={cancelPendingSearch}
         onContinue={confirmPendingSearch}
+      />
+      <UnsavedChangesConfirmDialog
+        open={templateDiscardConfirmOpen}
+        title="저장하지 않은 변경사항"
+        description="기안양식 기본정보 변경을 버리고 문서 양식을 여시겠습니까?"
+        cancelLabel="계속 편집"
+        continueLabel="변경 버리고 열기"
+        onCancel={() => {
+          setTemplateDiscardConfirmOpen(false);
+          setPendingTemplateTarget(null);
+        }}
+        onContinue={() => {
+          const target = pendingTemplateTarget;
+          setTemplateDiscardConfirmOpen(false);
+          setPendingTemplateTarget(null);
+          management.discardChanges();
+          if (target) setTemplateTarget(target);
+        }}
       />
     </Box>
   );

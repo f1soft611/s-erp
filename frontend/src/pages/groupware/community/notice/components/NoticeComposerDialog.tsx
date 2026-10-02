@@ -21,6 +21,12 @@ import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
+import {
+  Color,
+  FontFamily,
+  FontSize,
+  TextStyle,
+} from '@tiptap/extension-text-style';
 import StarterKit from '@tiptap/starter-kit';
 import {
   Table,
@@ -436,10 +442,14 @@ export function NoticeComposerDialog({
       extensions: [
         StarterKit,
         NoticeImage,
+        TextStyle,
+        FontFamily,
+        FontSize,
+        Color,
         Table.configure({
           resizable: true,
           handleWidth: 6,
-          cellMinWidth: 40,
+          cellMinWidth: 16,
           lastColumnResizable: true,
           renderWrapper: true,
         }),
