@@ -32,14 +32,14 @@ npm --prefix frontend run test -- tests/rich-text-editor.test.tsx tests/rich-tex
 
 기존 4173 개발 서버와 인증된 UI를 사용했다. 메뉴를 통한 공지사항과 기안양식관리 이동을 확인했으며, 실제 저장 요청은 수행하지 않았다.
 
-| 화면/뷰포트 | dialog 폭 | editor 폭 | document 가로폭 | 관찰 |
-| --- | ---: | ---: | ---: | --- |
-| 공지 1280px | 820px | 770px | 1280px | toolbar가 viewport 안에 위치 |
-| 공지 768px | 704px | 654px | 768px | toolbar가 viewport 안에 위치 |
-| 공지 375px | 311px | 277px | 375px | 페이지 전체 가로 overflow 없음 |
-| 기안양식 1280px | 820px | 738px | 1280px | 글꼴/크기/색상 controls 표시 |
-| 기안양식 768px | 704px | 622px | 768px | 글꼴/크기/색상 controls 표시 |
-| 기안양식 375px | 311px | 245px | 375px | 페이지 전체 가로 overflow 없음. toolbar 우측 rect가 viewport 끝보다 1 CSS px 큰 측정값을 보였음 |
+| 화면/뷰포트     | dialog 폭 | editor 폭 | document 가로폭 | 관찰                                                                                            |
+| --------------- | --------: | --------: | --------------: | ----------------------------------------------------------------------------------------------- |
+| 공지 1280px     |     820px |     770px |          1280px | toolbar가 viewport 안에 위치                                                                    |
+| 공지 768px      |     704px |     654px |           768px | toolbar가 viewport 안에 위치                                                                    |
+| 공지 375px      |     311px |     277px |           375px | 페이지 전체 가로 overflow 없음                                                                  |
+| 기안양식 1280px |     820px |     738px |          1280px | 글꼴/크기/색상 controls 표시                                                                    |
+| 기안양식 768px  |     704px |     622px |           768px | 글꼴/크기/색상 controls 표시                                                                    |
+| 기안양식 375px  |     311px |     245px |           375px | 페이지 전체 가로 overflow 없음. toolbar 우측 rect가 viewport 끝보다 1 CSS px 큰 측정값을 보였음 |
 
 기안양식 본문에서 HTML 표 1행·2셀을 실제 paste하고 두 셀의 값이 보존되는 것을 확인했다. 변경 본문은 저장하지 않고 취소/폐기했다. 이미지 파일 업로드 및 pointer drag resize는 실제 browser upload/drag로 확인하지 않았으며, upload adapter/failure/cleanup과 resize handle·계산은 focused Vitest로 검증했다.
 
@@ -55,6 +55,6 @@ npm --prefix frontend run test -- tests/rich-text-editor.test.tsx tests/rich-tex
 
 ## 잔여 확인
 
-- `git diff --check` 결과는 최종 문서 저장 후 실행해 확인한다.
+- `git diff --check`: passed after the final documentation update.
 - Notice page legacy suites에는 현재 baseline 대비 추가 실패 2개가 관찰되어 별도 검토가 필요하다.
 - Browser screenshot artifacts는 사용자 요청으로 생략했다.
