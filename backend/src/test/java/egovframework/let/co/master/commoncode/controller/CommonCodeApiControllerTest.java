@@ -28,6 +28,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupSearchCondition;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
@@ -107,6 +108,22 @@ class CommonCodeApiControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.result.message").value("상위 상세코드는 현재 그룹의 부모 그룹 상세코드만 선택할 수 있습니다."));
     }
+
+            @Test
+                void saveBatchReturnsDuplicateCodeMessageAsResultMessage() throws Exception {
+            String duplicateMessage = "이미 사용 중인 상세 코드입니다.";
+                when(commonCodeBatchService.saveBatch(eq(1L), any()))
+                .thenThrow(new IllegalArgumentException(duplicateMessage));
+
+                mockMvc.perform(post("/api/v1/co/master/common-code/save-batch")
+                .principal(authenticationFor())
+                .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+                .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.resultCode").value(ResponseCode.INPUT_CHECK_ERROR.getCode()))
+                .andExpect(jsonPath("$.resultMessage").value(duplicateMessage))
+                .andExpect(jsonPath("$.result.message").value(duplicateMessage));
+            }
 
     private UsernamePasswordAuthenticationToken authenticationFor() {
         LoginVO user = new LoginVO();

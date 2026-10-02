@@ -87,7 +87,7 @@ export function CommonCodeItemHelpDialog({
         width: 100,
         editable: false,
         align: 'center',
-        required: true,
+        required: false,
       },
       {
         field: 'itemNm',

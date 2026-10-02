@@ -494,12 +494,31 @@
 - `(tenant_id, drafting_work_category_id, employee_no)` unique
 - 양식 담당자 매핑을 보존하는 HACCP 원본 테이블
 
+### 2-23. tb_id_sequence
+
+| 컬럼              | 타입      | 설명                 |
+| ----------------- | --------- | -------------------- |
+| generator_key     | varchar   | 발번 목적 키         |
+| scope_key_1       | varchar   | 첫 번째 발번 범위 키 |
+| scope_key_2       | varchar   | 두 번째 발번 범위 키 |
+| last_issued_value | bigint    | 마지막 발급 숫자     |
+| created_at        | timestamp | 생성 일시            |
+| updated_at        | timestamp | 갱신 일시            |
+
+제약/역할:
+
+- `(generator_key, scope_key_1, scope_key_2)` 복합 PK로 조건별 발번 카운터를 분리
+- `tenant_id` 없이 범위 키로 카운터를 구분
+- 공통코드 상세코드는 그룹 ID를 `scope_key_1`로 사용하며, 기존 숫자 코드의 그룹별 최댓값을 초기값으로 사용
+- `last_issued_value`는 0 이상
+
 ---
 
 ## 변경 이력
 
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
 - 2026-10-02: `tb_drafting_work_category`의 삭제되지 않은 양식 코드에 테넌트별 부분 unique index를 추가하는 SQL 초안을 정의했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고. (미반영 SQL 초안)
+- 2026-10-02: 조건별 숫자 발번을 위한 `tb_id_sequence`와 공통코드 그룹별 카운터 초기화를 추가했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고.
 - 2026-09-16: 공통 첨부/댓글 스키마 추가로 `tb_common_file`, `tb_common_comment` 신규 테이블 생성. 공통 서비스는 `owner_type + owner_id` 기준으로 notice, board, approval, feed를 모두 재사용할 수 있도록 정리. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.
 - 2026-09-18: 공지사항 본문 이미지와 일반 첨부파일을 구분하기 위해 `tb_common_file.file_usage_type` 컬럼 및 허용값 제약을 추가. 적용 스크립트는 [backend/DATABASE/20260918](../../backend/DATABASE/20260918) 및 [docs/database/20260918](20260918) 참고.
 - 2026-09-16: 공지사항 본문은 `contents_html`/`contents_json`/`contents_text` 3중 저장 구조로 정교화하고, MinIO 첨부 메타 연동을 위해 `tb_board_file` 및 `tb_board_post` 보강, NOTICE 타입 보장. 적용 스크립트는 [backend/DATABASE/20260916](../../backend/DATABASE/20260916) 및 [docs/database/2026-09-16](2026-09-16) 참고.

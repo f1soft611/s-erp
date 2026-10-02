@@ -240,6 +240,25 @@ describe('CommonCodeItemHelpDialog', () => {
     expect(onReload).toHaveBeenCalledOnce();
   });
 
+  it('allows a new classification item without a code so the backend can generate it', async () => {
+    const { onCreateItem, onReload } = renderDialog();
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 추가' }));
+    await editCell(getLastGridRow().querySelectorAll('[role="gridcell"]')[2] as HTMLElement, '자동발번 분류');
+    fireEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
+      ).getByRole('button', { name: '저장' }),
+    );
+
+    await waitFor(() =>
+      expect(onCreateItem).toHaveBeenCalledWith(
+        expect.objectContaining({ itemCode: '', itemNm: '자동발번 분류' }),
+      ),
+    );
+    expect(onReload).toHaveBeenCalledOnce();
+  });
+
   it('updates an existing classification item and reloads the list', async () => {
     const { onUpdateItem, onReload } = renderDialog();
 

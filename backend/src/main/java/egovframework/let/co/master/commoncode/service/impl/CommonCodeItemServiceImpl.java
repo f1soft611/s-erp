@@ -18,16 +18,25 @@ import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
 import egovframework.let.co.master.commoncode.domain.repository.CommonCodeGroupDAO;
 import egovframework.let.co.master.commoncode.domain.repository.CommonCodeItemDAO;
 import egovframework.let.co.master.commoncode.service.CommonCodeItemService;
+import egovframework.let.common.idsequence.service.IdSequenceService;
 
 @Service("commonCodeItemService")
 public class CommonCodeItemServiceImpl extends EgovAbstractServiceImpl implements CommonCodeItemService {
 
+    private static final String ITEM_CODE_GENERATOR_KEY = "COMMON_CODE_ITEM_CODE";
+    private static final int ITEM_CODE_MINIMUM_WIDTH = 3;
+
     private final CommonCodeGroupDAO commonCodeGroupDAO;
     private final CommonCodeItemDAO commonCodeItemDAO;
+    private final IdSequenceService idSequenceService;
 
-    public CommonCodeItemServiceImpl(CommonCodeGroupDAO commonCodeGroupDAO, CommonCodeItemDAO commonCodeItemDAO) {
+    public CommonCodeItemServiceImpl(
+            CommonCodeGroupDAO commonCodeGroupDAO,
+            CommonCodeItemDAO commonCodeItemDAO,
+            IdSequenceService idSequenceService) {
         this.commonCodeGroupDAO = commonCodeGroupDAO;
         this.commonCodeItemDAO = commonCodeItemDAO;
+        this.idSequenceService = idSequenceService;
     }
 
     @Override
@@ -56,21 +65,19 @@ public class CommonCodeItemServiceImpl extends EgovAbstractServiceImpl implement
     @Override
     @Transactional
     public CommonCodeItemVO createItem(Long tenantId, Long groupId, CommonCodeItemSaveRequestVO payload) throws Exception {
-        if (!StringUtils.hasText(payload.getItemCode())) {
-            throw new IllegalArgumentException("상세 코드는 필수입니다.");
-        }
         if (!StringUtils.hasText(payload.getItemNm())) {
             throw new IllegalArgumentException("상세 코드명은 필수입니다.");
         }
 
         CommonCodeGroupVO group = ensureGroupBelongsToTenant(tenantId, groupId);
         validateParentItem(tenantId, group, payload.getParentItemId());
-        validateItemCodeDuplication(tenantId, groupId, payload.getItemCode());
+        String itemCode = normalizeOrGenerateItemCode(groupId, payload.getItemCode());
+        validateItemCodeDuplication(tenantId, groupId, itemCode);
 
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("groupId", groupId);
-        params.put("itemCode", payload.getItemCode().trim());
+        params.put("itemCode", itemCode);
         params.put("itemNm", payload.getItemNm().trim());
         params.put("itemDc", payload.getItemDc());
         params.put("parentItemId", payload.getParentItemId());
@@ -79,6 +86,42 @@ public class CommonCodeItemServiceImpl extends EgovAbstractServiceImpl implement
 
         Long newId = commonCodeItemDAO.insertItem(params);
         return findItemById(tenantId, groupId, newId);
+    }
+
+    private String normalizeOrGenerateItemCode(Long groupId, String rawItemCode) throws Exception {
+        if (!StringUtils.hasText(rawItemCode)) {
+            Long nextValue = idSequenceService.nextValue(
+                    ITEM_CODE_GENERATOR_KEY,
+                    String.valueOf(groupId),
+                    "");
+            return formatGeneratedItemCode(nextValue);
+        }
+
+        String itemCode = rawItemCode.trim();
+        if (itemCode.matches("[0-9]+")) {
+            try {
+                idSequenceService.advanceToAtLeast(
+                        ITEM_CODE_GENERATOR_KEY,
+                        String.valueOf(groupId),
+                        "",
+                        Long.valueOf(itemCode));
+            } catch (NumberFormatException ignored) {
+                // Numeric item codes outside BIGINT range do not affect the sequence.
+            }
+        }
+        return itemCode;
+    }
+
+    private String formatGeneratedItemCode(Long value) {
+        String itemCode = String.valueOf(value);
+        if (itemCode.length() >= ITEM_CODE_MINIMUM_WIDTH) {
+            return itemCode;
+        }
+        StringBuilder paddedCode = new StringBuilder(ITEM_CODE_MINIMUM_WIDTH);
+        for (int index = itemCode.length(); index < ITEM_CODE_MINIMUM_WIDTH; index++) {
+            paddedCode.append('0');
+        }
+        return paddedCode.append(itemCode).toString();
     }
 
     @Override
