@@ -132,6 +132,93 @@ class DraftingWorkTemplateServiceImplTest {
     }
 
     @Test
+    void getTemplateRemovesUnsupportedJsonNodesAndMarks() throws Exception {
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+            "{\"type\":\"doc\",\"content\":["
+                + "{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"keep\","
+                + "\"marks\":[{\"type\":\"bold\"},{\"type\":\"fontFamily\",\"attrs\":{\"font\":\"bad\"}}]}]},"
+                + "{\"type\":\"iframe\",\"attrs\":{\"src\":\"https://evil.example\"},"
+                + "\"content\":[{\"type\":\"text\",\"text\":\"remove\"}]}]}",
+            "<p>본문</p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
+
+        JsonNode content = result.getTemplateJson().path("content");
+        assertEquals(1, content.size());
+        assertEquals("paragraph", content.get(0).path("type").asText());
+        JsonNode marks = content.get(0).path("content").get(0).path("marks");
+        assertEquals(1, marks.size());
+        assertEquals("bold", marks.get(0).path("type").asText());
+    }
+
+    @Test
+    void getTemplateRetainsSupportedTiptapNodesMarksAndSchemaAttributes() throws Exception {
+        String templateJson = "{\"type\":\"doc\",\"content\":["
+            + "{\"type\":\"paragraph\",\"content\":["
+            + "{\"type\":\"text\",\"text\":\"bold\",\"marks\":[{\"type\":\"bold\"}]},"
+            + "{\"type\":\"text\",\"text\":\"italic\",\"marks\":[{\"type\":\"italic\"}]},"
+            + "{\"type\":\"text\",\"text\":\"strike\",\"marks\":[{\"type\":\"strike\"}]},"
+            + "{\"type\":\"text\",\"text\":\"link\",\"marks\":[{\"type\":\"link\","
+            + "\"attrs\":{\"href\":\"https://safe.example/path\"}}]},"
+            + "{\"type\":\"text\",\"text\":\"underline\",\"marks\":[{\"type\":\"underline\"}]},"
+            + "{\"type\":\"text\",\"text\":\"code\",\"marks\":[{\"type\":\"code\"}]}]},"
+            + "{\"type\":\"heading\",\"attrs\":{\"level\":3,\"unknown\":\"remove\"},"
+            + "\"content\":[{\"type\":\"text\",\"text\":\"title\"}]},"
+            + "{\"type\":\"bulletList\",\"content\":[{\"type\":\"listItem\","
+            + "\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"bullet\"}]}]}]},"
+            + "{\"type\":\"orderedList\",\"attrs\":{\"start\":4},\"content\":[{\"type\":\"listItem\","
+            + "\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"ordered\"}]}]}]},"
+            + "{\"type\":\"blockquote\",\"content\":[{\"type\":\"paragraph\",\"content\":["
+            + "{\"type\":\"text\",\"text\":\"quote\"}]}]},"
+            + "{\"type\":\"table\",\"content\":[{\"type\":\"tableRow\",\"content\":["
+            + "{\"type\":\"tableHeader\",\"attrs\":{\"colspan\":2,\"rowspan\":3},"
+            + "\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"head\"}]}]},"
+            + "{\"type\":\"tableCell\",\"attrs\":{\"colspan\":3,\"rowspan\":2},"
+            + "\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"cell\"}]}]}]}]},"
+            + "{\"type\":\"image\",\"attrs\":{\"src\":\"/api/v1/co/workflow/forms/77/template-images/12\","
+            + "\"alt\":\"inspection chart\",\"width\":640,\"height\":360}}]}";
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(templateJson, "<p>본문</p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
+
+        JsonNode document = result.getTemplateJson();
+        JsonNode content = document.path("content");
+        assertEquals("doc", document.path("type").asText());
+        assertEquals("paragraph", content.get(0).path("type").asText());
+        assertEquals("text", content.get(0).path("content").get(0).path("type").asText());
+        assertEquals(6, content.get(0).path("content").size());
+        assertEquals("bold", content.get(0).path("content").get(0).path("marks").get(0).path("type").asText());
+        assertEquals("italic", content.get(0).path("content").get(1).path("marks").get(0).path("type").asText());
+        assertEquals("strike", content.get(0).path("content").get(2).path("marks").get(0).path("type").asText());
+        assertEquals("https://safe.example/path", content.get(0).path("content").get(3)
+            .path("marks").get(0).path("attrs").path("href").asText());
+        assertEquals("underline", content.get(0).path("content").get(4).path("marks").get(0).path("type").asText());
+        assertEquals("code", content.get(0).path("content").get(5).path("marks").get(0).path("type").asText());
+        assertEquals(3, content.get(1).path("attrs").path("level").asInt());
+        assertTrue(content.get(1).path("attrs").path("unknown").isMissingNode());
+        assertEquals("bulletList", content.get(2).path("type").asText());
+        assertEquals("orderedList", content.get(3).path("type").asText());
+        assertEquals(4, content.get(3).path("attrs").path("start").asInt());
+        assertEquals("blockquote", content.get(4).path("type").asText());
+        assertEquals("table", content.get(5).path("type").asText());
+        assertEquals("tableRow", content.get(5).path("content").get(0).path("type").asText());
+        assertEquals(2, content.get(5).path("content").get(0).path("content").get(0)
+            .path("attrs").path("colspan").asInt());
+        assertEquals(3, content.get(5).path("content").get(0).path("content").get(0)
+            .path("attrs").path("rowspan").asInt());
+        assertEquals("tableCell", content.get(5).path("content").get(0).path("content").get(1).path("type").asText());
+        assertEquals(3, content.get(5).path("content").get(0).path("content").get(1)
+            .path("attrs").path("colspan").asInt());
+        assertEquals(2, content.get(5).path("content").get(0).path("content").get(1)
+            .path("attrs").path("rowspan").asInt());
+        JsonNode imageAttributes = content.get(6).path("attrs");
+        assertEquals("/api/v1/co/workflow/forms/77/template-images/12", imageAttributes.path("src").asText());
+        assertEquals("inspection chart", imageAttributes.path("alt").asText());
+        assertEquals(640, imageAttributes.path("width").asInt());
+        assertEquals(360, imageAttributes.path("height").asInt());
+    }
+
+    @Test
     void getTemplateRetainsOnlySameFormImagesInHtml() throws Exception {
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
                 "{\"type\":\"doc\",\"content\":[]}",
