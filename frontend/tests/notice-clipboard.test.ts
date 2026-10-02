@@ -6,6 +6,35 @@ import {
 } from '../src/pages/groupware/community/notice/utils/noticeClipboard';
 
 describe('notice clipboard normalization', () => {
+  it('normalizes embedded cell styles without mutating the global document head', () => {
+    const initialHeadStyles = Array.from(
+      document.head.querySelectorAll('style'),
+    );
+    const headObserver = new MutationObserver(() => undefined);
+    headObserver.observe(document.head, { childList: true });
+
+    try {
+      const normalized = normalizeClipboardHtmlForEditor(
+        '<style>td { color: red; }</style><table><tbody><tr><td>업무</td></tr></tbody></table>',
+      );
+      const headMutations = headObserver
+        .takeRecords()
+        .flatMap((record) => [
+          ...Array.from(record.addedNodes),
+          ...Array.from(record.removedNodes),
+        ])
+        .filter((node) => node instanceof HTMLStyleElement);
+
+      expect(normalized).toContain('<td style="color:red">업무</td>');
+      expect(Array.from(document.head.querySelectorAll('style'))).toEqual(
+        initialHeadStyles,
+      );
+      expect(headMutations).toHaveLength(0);
+    } finally {
+      headObserver.disconnect();
+    }
+  });
+
   it('preserves spreadsheet table rows while removing unsafe markup', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<script>alert(1)</script><table><tbody><tr><td>업무</td><td>담당</td></tr></tbody></table>',

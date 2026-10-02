@@ -158,9 +158,9 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
   };
 
   root.ownerDocument.querySelectorAll('style').forEach((styleElement) => {
-    const runtimeStyle = document.createElement('style');
+    const runtimeStyle = root.ownerDocument.createElement('style');
     runtimeStyle.textContent = styleElement.textContent;
-    document.head.appendChild(runtimeStyle);
+    root.ownerDocument.head.appendChild(runtimeStyle);
 
     if (runtimeStyle.sheet?.cssRules) {
       applyRules(runtimeStyle.sheet.cssRules);
