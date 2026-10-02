@@ -92,6 +92,26 @@ class DraftingWorkTemplateServiceImplTest {
     }
 
     @Test
+    void getTemplateRemovesNonTextAndUnsafeHrefValuesAndRetainsSafeLinks() throws Exception {
+        when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
+                "{\"type\":\"doc\",\"content\":["
+                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":[\"https://safe.example\"]}}]},"
+                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":{\"url\":\"https://safe.example\"}}}]},"
+                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"javascript:alert(1)\"}}]},"
+                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"https://safe.example/path\"}}]}]}",
+                "<p>본문</p>"));
+
+        DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
+
+        JsonNode content = result.getTemplateJson().path("content");
+        assertTrue(content.get(0).path("marks").get(0).path("attrs").path("href").isMissingNode());
+        assertTrue(content.get(1).path("marks").get(0).path("attrs").path("href").isMissingNode());
+        assertTrue(content.get(2).path("marks").get(0).path("attrs").path("href").isMissingNode());
+        assertEquals("https://safe.example/path",
+                content.get(3).path("marks").get(0).path("attrs").path("href").asText());
+    }
+
+    @Test
     void getTemplateOnlyRetainsImageSourcesForTheCurrentForm() throws Exception {
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
                 "{\"type\":\"doc\",\"content\":["

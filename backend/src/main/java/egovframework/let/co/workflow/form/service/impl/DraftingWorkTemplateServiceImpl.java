@@ -125,7 +125,7 @@ public class DraftingWorkTemplateServiceImpl {
                                 || !isSafeTemplateImageUrl(value.asText(), draftingWorkCategoryId))) {
                     fields.remove();
                 } else if (normalizedName.equals("href")
-                        && value.isTextual() && !isSafeUrl(value.asText(), true)) {
+                        && (!value.isTextual() || !isSafeUrl(value.asText(), true))) {
                     fields.remove();
                 } else {
                     sanitizeJsonNode(value, draftingWorkCategoryId, imageNode && normalizedName.equals("attrs"));
