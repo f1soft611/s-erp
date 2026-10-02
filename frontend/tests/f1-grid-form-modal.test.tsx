@@ -922,9 +922,9 @@ describe('row form modal', () => {
       maxWidth: '960px',
       maxHeight: '85vh',
     });
-    expect(screen.getByTestId('f1-grid-form-content')).toHaveStyle({
-      overflowY: 'auto',
-    });
+    expect(
+      screen.getByTestId('f1-grid-form-content').parentElement,
+    ).toHaveStyle({ overflowY: 'auto' });
     expect(screen.getByTestId('f1-grid-form-grid')).toHaveStyle({
       display: 'grid',
     });
@@ -933,9 +933,21 @@ describe('row form modal', () => {
       '--f1-form-span-sm': '2',
       '--f1-form-span-lg': '2',
     });
-    expect(
-      screen.getByText('적용 후 화면의 저장 버튼으로 최종 저장됩니다.'),
-    ).toBeInTheDocument();
+    const footerGuidance = screen.getByText(
+      '적용 후 화면의 저장 버튼으로 최종 저장됩니다.',
+    );
+    expect(footerGuidance).toBeInTheDocument();
+    expect(footerGuidance.parentElement).toHaveStyle({ flex: '1 1 auto' });
+    expect(footerGuidance.parentElement?.parentElement).toHaveStyle({
+      justifyContent: 'space-between',
+    });
+    const footer = screen
+      .getByTestId('common-dialog-actions')
+      .closest('.MuiDialogActions-root');
+    const divider = footer?.previousElementSibling;
+    expect(divider).toHaveClass('MuiDivider-root');
+    expect(getComputedStyle(divider as Element).borderBottomWidth).toBe('thin');
+    expect(getComputedStyle(footer as Element).borderTopStyle).toBe('none');
   });
 
   it('uses a full-screen dialog on mobile matchMedia', () => {

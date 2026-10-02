@@ -122,7 +122,7 @@ describe('CommonCodeItemHelpDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(
-      within(categoryDialog).getByRole('button', { name: '분류 설정 닫기' }),
+      within(categoryDialog).getByRole('button', { name: '닫기' }),
     );
     const discardConfirmation = await screen.findByRole('dialog', {
       name: '저장하지 않은 변경사항',
@@ -146,7 +146,16 @@ describe('CommonCodeItemHelpDialog', () => {
       name: '기안양식 분류 설정',
     });
     const footer = dialog.querySelector('.MuiDialogActions-root');
+    const divider = dialog.querySelector('.MuiDivider-root');
     expect(footer).not.toBeNull();
+    expect(screen.getByTestId('common-dialog-actions')).toBeInTheDocument();
+    expect(dialog.querySelector('.MuiDialogContent-root')).not.toHaveClass(
+      'MuiDialogContent-dividers',
+    );
+    expect(divider).toBeInTheDocument();
+    expect(footer?.previousElementSibling).toBe(divider);
+    expect(getComputedStyle(divider as Element).borderBottomWidth).toBe('thin');
+    expect(getComputedStyle(footer as Element).borderTopStyle).toBe('none');
     expect(
       within(footer as HTMLElement)
         .getAllByRole('button')
@@ -154,9 +163,7 @@ describe('CommonCodeItemHelpDialog', () => {
     ).toEqual(['저장', '취소']);
     expect(within(dialog).getByRole('button', { name: '저장' })).toBeVisible();
     expect(within(dialog).getByRole('button', { name: '취소' })).toBeVisible();
-    expect(
-      within(dialog).getByRole('button', { name: '분류 설정 닫기' }),
-    ).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: '닫기' })).toBeVisible();
     expect(
       screen.queryByRole('textbox', { name: '상세코드' }),
     ).not.toBeInTheDocument();

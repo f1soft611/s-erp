@@ -593,6 +593,12 @@ interface F1GridProps<T extends object> {
 
 1280px 이상에서는 최대 `960px`의 3열 폼, 768px 이상 1280px 미만에서는 2열 폼, 768px 미만에서는 full-screen 1열 폼을 사용한다. `form.span`은 각 뷰포트의 가용 열 수를 넘지 않게 제한된다. 모달은 `background`, `text`, `divider`, `primary`, `action` MUI 테마 토큰을 사용해 라이트·다크 테마에 대응한다.
 
+행 폼 모달의 외곽은 공통 `CommonDialog` 셸을 사용한다. 제목·선택 설명·닫기 동작은 공통 헤더에 배치되고 본문만 세로 스크롤되며 헤더와 푸터는 유지된다. “적용 후 화면의 저장 버튼으로 최종 저장됩니다.” 안내는 선택형 푸터 좌측 슬롯에, 적용/취소는 우측 액션 영역에 표시한다. 기안양식관리처럼 `rowFormPlugin`을 사용하는 화면도 동일한 셸을 공유하며, 폼 필드/그룹 배치는 기존 화면 설정을 따른다.
+
+footer 경계는 공통 셸이 색상 prop 없이 렌더링하는 기본 MUI `Divider` 한 개로 표시한다. 본문이나 호출 화면에서 추가 하단 경계선을 넣지 않는다.
+
+다크 테마에서 모달 외곽·헤더·푸터는 슬레이트 `#1e293b`, 본문은 페이지 바탕인 `background.default`를 사용한다. 폼 내부 그룹은 `background.paper`로 구분하고, 라이트 테마는 기존 paper/본문 배경 조합을 유지한다.
+
 ```tsx
 <F1Grid
   ref={gridRef}

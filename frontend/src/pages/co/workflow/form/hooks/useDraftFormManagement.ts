@@ -44,6 +44,7 @@ export function useDraftFormManagement() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
@@ -75,12 +76,14 @@ export function useDraftFormManagement() {
 
   const loadOptions = useCallback(async () => {
     setOptionsLoading(true);
+    setOptionsLoaded(false);
     try {
       const options = await fetchDraftFormOptions();
       setCategoryGroupId(options.categoryGroup?.id ?? '');
       setCategoryItems(options.categoryItems);
       setCycleItems(options.cycleItems);
       setUsers(options.users);
+      setOptionsLoaded(true);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -174,6 +177,7 @@ export function useDraftFormManagement() {
     setError,
     loading,
     optionsLoading,
+    optionsLoaded,
     saving,
     hasChanges,
     setHasChanges,

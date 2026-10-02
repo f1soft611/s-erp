@@ -402,6 +402,65 @@ describe('Draft form management page', () => {
     ).toBeInTheDocument();
   });
 
+  it('waits for classification options before showing the empty notice', async () => {
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    let resolveCategoryItems: ((value: unknown) => void) | undefined;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/co/master/common-code/groups/11/items') {
+        return new Promise((resolve) => {
+          resolveCategoryItems = resolve;
+        });
+      }
+      return originalApiGet?.(path);
+    });
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole('textbox', { name: '기안양식 검색' });
+    expect(
+      screen.queryByText(
+        '분류 항목이 없습니다. 분류를 추가한 뒤 기안양식을 등록할 수 있습니다.',
+      ),
+    ).not.toBeInTheDocument();
+
+    resolveCategoryItems?.({ resultList: [] });
+    expect(
+      await screen.findByText(
+        '분류 항목이 없습니다. 분류를 추가한 뒤 기안양식을 등록할 수 있습니다.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('validates required classification values before calling the create API', async () => {
     render(
       <ThemeProvider theme={createTheme()}>

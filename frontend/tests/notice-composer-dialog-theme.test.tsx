@@ -32,6 +32,52 @@ describe('NoticeComposerDialog theme handling', () => {
     );
   });
 
+  it('uses the slate surface for category and title fields in dark mode', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <NoticeComposerDialog
+          open
+          isDark
+          onClose={() => undefined}
+          noticeGubunOptions={[{ code: 'GENERAL', name: '일반' }]}
+        />
+      </ThemeProvider>,
+    );
+
+    const categoryInput = screen.getByRole('combobox', { name: /구분/ });
+    const titleInput = screen.getByRole('textbox', { name: '제목' });
+
+    expect(categoryInput.closest('.MuiInputBase-root')).toHaveStyle({
+      backgroundColor: 'rgb(30, 41, 59)',
+    });
+    expect(titleInput.closest('.MuiInputBase-root')).toHaveStyle({
+      backgroundColor: 'rgb(30, 41, 59)',
+    });
+  });
+
+  it('keeps category and title fields white in light mode', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <NoticeComposerDialog
+          open
+          isDark={false}
+          onClose={() => undefined}
+          noticeGubunOptions={[{ code: 'GENERAL', name: '일반' }]}
+        />
+      </ThemeProvider>,
+    );
+
+    const categoryInput = screen.getByRole('combobox', { name: /구분/ });
+    const titleInput = screen.getByRole('textbox', { name: '제목' });
+
+    expect(categoryInput.closest('.MuiInputBase-root')).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
+    expect(titleInput.closest('.MuiInputBase-root')).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
+  });
+
   it('keeps the editor filling the composer width', () => {
     render(
       <ThemeProvider theme={createAppTheme('light')}>
@@ -191,12 +237,21 @@ describe('NoticeComposerDialog theme handling', () => {
     const editorBox = screen.getByRole('textbox', { name: /본문/i });
     expect(editorBox).toBeInTheDocument();
     expect(editorBox).toHaveStyle('overflow-y: auto');
-    expect(
-      screen.getByRole('button', { name: /툴바 열기/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /첨부 링크/i }),
-    ).toBeInTheDocument();
+    const toolbarButton = screen.getByRole('button', { name: /툴바 열기/i });
+    const attachmentButton = screen.getByRole('button', {
+      name: /첨부 링크/i,
+    });
+    const footerStart = screen.getByTestId('common-dialog-footer-start');
+    const actions = screen.getByTestId('common-dialog-actions');
+
+    expect(footerStart).toContainElement(toolbarButton);
+    expect(footerStart).toContainElement(attachmentButton);
+    expect(actions).toContainElement(
+      screen.getByRole('button', { name: '저장' }),
+    );
+    expect(actions).toContainElement(
+      screen.getByRole('button', { name: '취소' }),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /툴바 열기/i }));
 

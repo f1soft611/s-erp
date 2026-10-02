@@ -1,19 +1,7 @@
-import CloseIcon from '@mui/icons-material/Close';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Tooltip,
-  Typography,
-  useMediaQuery,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Box, Button, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, SyntheticEvent } from 'react';
+import { CommonDialog } from '../../CommonDialog';
 import type {
   F1GridColumn,
   F1GridFormMode,
@@ -53,10 +41,6 @@ export function F1GridFormModal<T extends object>({
   onApply,
   onDraftChange,
 }: F1GridFormModalProps<T>) {
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-  const titleId = useId();
-  const descriptionId = useId();
   const fieldRefs = useRef(new Map<string, HTMLDivElement>());
   const [draftRow, setDraftRow] = useState<T>(() => ({ ...row }));
   const [validationErrors, setValidationErrors] = useState<
@@ -148,133 +132,56 @@ export function F1GridFormModal<T extends object>({
   };
 
   return (
-    <Dialog
+    <CommonDialog
       open={open}
       onClose={onCancel}
-      onContextMenu={stopGridEventPropagation}
-      onCopy={stopGridEventPropagation}
-      onKeyDown={stopGridEventPropagation}
-      onPaste={stopGridEventPropagation}
-      fullScreen={fullScreen}
-      fullWidth
-      maxWidth={false}
-      aria-labelledby={titleId}
-      aria-describedby={description ? descriptionId : undefined}
-      slotProps={{
-        paper: {
-          style: {
-            maxWidth: fullScreen ? undefined : '960px',
-            maxHeight: fullScreen ? undefined : '85vh',
-          },
-          sx: {
-            bgcolor: 'background.paper',
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 2,
-            boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            width: '100%',
-          },
-        },
+      title={title}
+      description={description}
+      size="lg"
+      fullScreenOnMobile
+      dialogProps={{
+        onContextMenu: stopGridEventPropagation,
+        onCopy: stopGridEventPropagation,
+        onKeyDown: stopGridEventPropagation,
+        onPaste: stopGridEventPropagation,
       }}
-    >
-      <DialogTitle
-        component="div"
-        id={`${titleId}-container`}
-        sx={{
-          alignItems: 'flex-start',
-          borderBottom: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          flexShrink: 0,
-          gap: 2,
-          justifyContent: 'space-between',
-          px: 2,
-          py: 1.75,
-        }}
-      >
-        <Box sx={{ minWidth: 0, width: '100%' }}>
-          <Typography
-            component="h2"
-            id={titleId}
+      footerStart={
+        <Typography
+          color="text.secondary"
+          sx={{ fontSize: '0.78rem', fontWeight: 500 }}
+          variant="caption"
+        >
+          적용 후 화면의 저장 버튼으로 최종 저장됩니다.
+        </Typography>
+      }
+      actions={
+        <>
+          <Button
+            onClick={applyDraft}
             sx={{
-              color: 'text.primary',
-              fontSize: { xs: '1.1rem', sm: '1.4rem' },
+              borderRadius: 1.5,
               fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.3,
+              minWidth: 96,
+              px: 2.5,
             }}
-            variant="h6"
+            variant="contained"
           >
-            {title}
-          </Typography>
-          {description && (
-            <Box
-              sx={{
-                alignItems: 'center',
-                bgcolor: alpha(theme.palette.primary.main, 0.04),
-                border: 1,
-                borderColor: alpha(theme.palette.primary.main, 0.12),
-                borderLeft: 2,
-                borderLeftColor: 'primary.main',
-                borderRadius: 1,
-                display: 'flex',
-                mt: 1.25,
-                px: 1.25,
-                py: 0.75,
-                width: '100%',
-              }}
-            >
-              <Typography
-                id={descriptionId}
-                color="text.primary"
-                sx={{
-                  fontSize: '0.9rem',
-                  fontWeight: 500,
-                  lineHeight: 1.4,
-                }}
-                variant="body2"
-              >
-                {description}
-              </Typography>
-            </Box>
-          )}
-        </Box>
-        <Tooltip title="닫기">
-          <IconButton
-            aria-label="닫기"
-            edge="end"
+            적용
+          </Button>
+          <Button
             onClick={onCancel}
             sx={{
-              bgcolor: 'action.hover',
-              borderRadius: '10px',
-              color: 'text.secondary',
-              height: 40,
-              width: 40,
-              '&:hover': {
-                bgcolor: 'action.selected',
-              },
+              borderRadius: 1.5,
+              fontWeight: 600,
+              px: 2,
             }}
           >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </DialogTitle>
-
-      <DialogContent
-        data-testid="f1-grid-form-content"
-        style={{ overflowY: 'auto' }}
-        sx={{
-          bgcolor: 'background.default',
-          backgroundImage:
-            'linear-gradient(180deg, rgba(148, 163, 184, 0.05) 0%, rgba(148, 163, 184, 0) 120px)',
-          px: 3,
-          pt: 1.5,
-          pb: 1.5,
-        }}
-      >
+            취소
+          </Button>
+        </>
+      }
+    >
+      <Box data-testid="f1-grid-form-content">
         <Box
           data-testid="f1-grid-form-grid"
           style={{ display: 'grid' }}
@@ -381,53 +288,7 @@ export function F1GridFormModal<T extends object>({
             </Box>
           ))}
         </Box>
-      </DialogContent>
-
-      <DialogActions
-        sx={{
-          alignItems: 'center',
-          bgcolor: 'background.paper',
-          borderColor: 'divider',
-          borderTop: 1,
-          flexShrink: 0,
-          gap: 1,
-          justifyContent: 'space-between',
-          px: 3,
-          py: 1.5,
-        }}
-      >
-        <Typography
-          color="text.secondary"
-          sx={{ fontSize: '0.78rem', fontWeight: 500 }}
-          variant="caption"
-        >
-          적용 후 화면의 저장 버튼으로 최종 저장됩니다.
-        </Typography>
-        <Box sx={{ display: 'flex', flexShrink: 0, gap: 1 }}>
-          <Button
-            onClick={applyDraft}
-            sx={{
-              borderRadius: 1.5,
-              fontWeight: 700,
-              minWidth: 96,
-              px: 2.5,
-            }}
-            variant="contained"
-          >
-            적용
-          </Button>
-          <Button
-            onClick={onCancel}
-            sx={{
-              borderRadius: 1.5,
-              fontWeight: 600,
-              px: 2,
-            }}
-          >
-            취소
-          </Button>
-        </Box>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </CommonDialog>
   );
 }

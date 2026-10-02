@@ -543,38 +543,49 @@ await page.screenshot({
   fullPage: false,
 });
 await page.keyboard.press('Escape');
-await page.setViewportSize({ width: 375, height: 900 });
-await page.getByRole('button', { name: '분류 설정', exact: true }).click();
-const mobileCategoryDialog = page.getByRole('dialog', {
-  name: '기안양식 분류 설정',
-});
-await mobileCategoryDialog.waitFor();
-const isMobileDialogFullScreen = await mobileCategoryDialog.evaluate((dialog) =>
-  dialog.classList.contains('MuiDialog-paperFullScreen'),
-);
-if (!isMobileDialogFullScreen) {
-  throw new Error(
-    'Classification help dialog did not become full-screen at 375px.',
+const categoryDialogScreenshots = [];
+let mobileCategoryGridScroll;
+let isMobileDialogFullScreen = false;
+for (const width of [768, 375]) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.getByRole('button', { name: '분류 설정', exact: true }).click();
+  const categoryDialog = page.getByRole('dialog', {
+    name: '기안양식 분류 설정',
+  });
+  await categoryDialog.waitFor();
+  await page.waitForTimeout(300);
+  const isFullScreen = await categoryDialog.evaluate((dialog) =>
+    dialog.classList.contains('MuiDialog-paperFullScreen'),
   );
+  if (width === 375 && !isFullScreen) {
+    throw new Error(
+      'Classification help dialog did not become full-screen at 375px.',
+    );
+  }
+  const gridScroll = await categoryDialog
+    .getByTestId('f1-grid-body-scroll')
+    .evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: getComputedStyle(element).overflowY,
+    }));
+  if (gridScroll.scrollHeight <= gridScroll.clientHeight) {
+    throw new Error(
+      `Expected category Grid body to scroll at ${width}px: ${JSON.stringify(gridScroll)}`,
+    );
+  }
+  categoryDialogScreenshots.push({ width, isFullScreen, gridScroll });
+  if (width === 375) {
+    mobileCategoryGridScroll = gridScroll;
+    isMobileDialogFullScreen = isFullScreen;
+  }
+  await page.screenshot({
+    path: path.join(screenshotDir, `${width}px-category-dialog.png`),
+    fullPage: false,
+  });
+  await page.keyboard.press('Escape');
+  await categoryDialog.waitFor({ state: 'hidden' });
 }
-const mobileCategoryGridScroll = await mobileCategoryDialog
-  .getByTestId('f1-grid-body-scroll')
-  .evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    overflowY: getComputedStyle(element).overflowY,
-  }));
-if (
-  mobileCategoryGridScroll.scrollHeight <= mobileCategoryGridScroll.clientHeight
-) {
-  throw new Error(
-    `Expected mobile category Grid body to scroll: ${JSON.stringify(mobileCategoryGridScroll)}`,
-  );
-}
-await page.screenshot({
-  path: path.join(screenshotDir, '375px-category-dialog.png'),
-  fullPage: false,
-});
 
 if (duplicateKeyWarnings.length > 0) {
   throw new Error(
@@ -588,6 +599,7 @@ console.log(
       measurements,
       categoryGridScroll,
       mobileCategoryGridScroll,
+      categoryDialogScreenshots,
       userPickerScreenshots,
       cellPickerScreenshots,
       categorySuccessToast: true,

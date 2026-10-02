@@ -1,21 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
-import {
-  Alert,
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  CircularProgress,
-  Stack,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack } from '@mui/material';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
+import { CommonDialog } from '../CommonDialog';
 import { useNotification } from '../../context/NotificationContext';
 import {
   F1Grid,
@@ -98,7 +85,7 @@ export function CommonCodeItemHelpDialog({
         field: 'itemCode',
         headerName: '상세코드',
         width: 100,
-        editable: canEdit,
+        editable: false,
         align: 'center',
         required: true,
       },
@@ -206,58 +193,42 @@ export function CommonCodeItemHelpDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={requestClose}
-      fullWidth
-      maxWidth="md"
-      aria-labelledby="draft-form-category-dialog-title"
-      fullScreen={typeof window !== 'undefined' && window.innerWidth < 600}
-      slotProps={{
-        paper: {
-          sx: {
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-            height: { xs: '100%', sm: '60vh' },
-            maxHeight: { xs: '100%', sm: '85vh' },
-          },
-        },
-      }}
-    >
-      <DialogTitle
-        component="div"
-        sx={{
-          alignItems: 'center',
-          borderBottom: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          justifyContent: 'space-between',
-          py: 1.25,
-        }}
-      >
-        <Typography
-          id="draft-form-category-dialog-title"
-          component="h2"
-          variant="h6"
-        >
-          기안양식 분류 설정
-        </Typography>
-        <Tooltip title="닫기">
-          <IconButton
-            aria-label="분류 설정 닫기"
-            edge="end"
-            onClick={requestClose}
-            size="small"
-            disabled={saving}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </DialogTitle>
-      <DialogContent
-        dividers
-        sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+    <>
+      <CommonDialog
+        open={open}
+        onClose={requestClose}
+        title="기안양식 분류 설정"
+        size="lg"
+        bodyMode="fill"
+        paperHeight="60vh"
+        fullScreenOnMobile
+        actions={
+          <>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={
+                  saving ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+                }
+                sx={{
+                  borderRadius: 1.5,
+                  fontWeight: 700,
+                  minWidth: 96,
+                  px: 2.5,
+                }}
+                disabled={!hasChanges || saving}
+                onClick={() => void handleSave()}
+              >
+                저장
+              </Button>
+            )}
+            <Button onClick={requestClose} disabled={saving}>
+              취소
+            </Button>
+          </>
+        }
       >
         <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -304,36 +275,7 @@ export function CommonCodeItemHelpDialog({
             />
           </Box>
         </Stack>
-      </DialogContent>
-      <DialogActions
-        sx={{
-          borderTop: 1,
-          borderColor: 'divider',
-          flexShrink: 0,
-          gap: 1,
-          justifyContent: 'flex-end',
-          px: 2,
-          py: 1.5,
-        }}
-      >
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={
-              saving ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : undefined
-            }
-            disabled={!hasChanges || saving}
-            onClick={() => void handleSave()}
-          >
-            저장
-          </Button>
-        )}
-        <Button onClick={requestClose} disabled={saving}>
-          취소
-        </Button>
-      </DialogActions>
+      </CommonDialog>
       <UnsavedChangesConfirmDialog
         open={closeConfirmOpen}
         title="저장하지 않은 변경사항"
@@ -343,6 +285,6 @@ export function CommonCodeItemHelpDialog({
         onCancel={cancelClose}
         onContinue={discardAndClose}
       />
-    </Dialog>
+    </>
   );
 }
