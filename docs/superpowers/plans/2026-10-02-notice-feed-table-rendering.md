@@ -22,9 +22,9 @@
 
 **Files:** `frontend/src/shared/utils/sanitizeHtml.ts`, `frontend/tests/sanitize-html.test.ts`
 
-- [ ] Add a test proving default `sanitizeHtml` still unwraps spans and removes font styles.
-- [ ] Add a test proving an explicit typography option preserves safe span styles and strips `url(...)`, event handlers, and executable markup.
-- [ ] Use this test shape in `tests/sanitize-html.test.ts`:
+- [x] Add a test proving default `sanitizeHtml` still unwraps spans and removes font styles.
+- [x] Add a test proving an explicit typography option preserves safe span styles and strips `url(...)`, event handlers, and executable markup.
+- [x] Use this test shape in `tests/sanitize-html.test.ts`:
 
 ```ts
 expect(
@@ -37,20 +37,20 @@ expect(
 ).toContain('font-size:10pt');
 ```
 
-- [ ] Run `npm --prefix frontend run test -- tests/sanitize-html.test.ts` and verify the new opt-in test fails before implementation.
-- [ ] Add `type SanitizeHtmlOptions = { preserveTextStyles?: boolean }` and change the signature to `sanitizeHtml(value: string, options: SanitizeHtmlOptions = {})`. Build the allowed tag/style sets from the existing sets; only `preserveTextStyles === true` adds `span`, the six approved typography properties, and style attributes on `span`. Keep unsafe tag, attribute, and URL checks unchanged.
-- [ ] Rerun the sanitizer test and verify both default and opt-in cases pass.
+- [x] Run `npm --prefix frontend run test -- tests/sanitize-html.test.ts` and verify the new opt-in test fails before implementation.
+- [x] Add `type SanitizeHtmlOptions = { preserveTextStyles?: boolean }` and change the signature to `sanitizeHtml(value: string, options: SanitizeHtmlOptions = {})`. Build the allowed tag/style sets from the existing sets; only `preserveTextStyles === true` adds `span`, the six approved typography properties, and style attributes on `span`. Keep unsafe tag, attribute, and URL checks unchanged.
+- [x] Rerun the sanitizer test and verify both default and opt-in cases pass.
 
 ## Task 2: Notice-specific HTML adapter
 
 **Files:** create `frontend/src/pages/groupware/community/notice/utils/noticeHtml.ts`, create `frontend/tests/notice-html.test.ts`
 
-- [ ] Test `sanitizeNoticeBodyHtml` preserves safe typography and does not add a `.tableWrapper`.
-- [ ] Test `prepareNoticeFeedHtml` wraps an unwrapped table once, preserves font styles, and does not nest a second wrapper around an already wrapped table.
-- [ ] Test unsafe markup is removed from both outputs.
-- [ ] Assert save output contains only sanitized source HTML, while feed output contains a single `<div class="tableWrapper"><table...` around each top-level unwrapped table.
-- [ ] Run `npm --prefix frontend run test -- tests/notice-html.test.ts`; verify failures are the expected missing behavior.
-- [ ] Implement the two exports with this behavior:
+- [x] Test `sanitizeNoticeBodyHtml` preserves safe typography and does not add a `.tableWrapper`.
+- [x] Test `prepareNoticeFeedHtml` wraps an unwrapped table once, preserves font styles, and does not nest a second wrapper around an already wrapped table.
+- [x] Test unsafe markup is removed from both outputs.
+- [x] Assert save output contains only sanitized source HTML, while feed output contains a single `<div class="tableWrapper"><table...` around each top-level unwrapped table.
+- [x] Run `npm --prefix frontend run test -- tests/notice-html.test.ts`; verify failures are the expected missing behavior.
+- [x] Implement the two exports with this behavior:
 
 ```ts
 export function sanitizeNoticeBodyHtml(html: string): string {
@@ -71,25 +71,25 @@ export function prepareNoticeFeedHtml(html: string): string {
 }
 ```
 
-- [ ] Rerun `npm --prefix frontend run test -- tests/notice-html.test.ts` and verify all adapter tests pass.
+- [x] Rerun `npm --prefix frontend run test -- tests/notice-html.test.ts` and verify all adapter tests pass.
 
 ## Task 3: Save and feed integration
 
 **Files:** modify `frontend/src/pages/groupware/community/notice/CommunityNoticePage.tsx`, `frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx`, `frontend/tests/notice-page.test.tsx`
 
-- [ ] Add a feed test with `<span style="font-family:Arial;font-size:10pt">` and a wide table; assert styles and one `.tableWrapper` exist in collapsed and expanded content.
-- [ ] Run the focused feed test and verify it fails on missing wrapper/style.
-- [ ] Replace notice-save `const safeHtml = sanitizeHtml(body || '<p></p>');` with `const safeHtml = sanitizeNoticeBodyHtml(body || '<p></p>');`.
-- [ ] Replace feed `const previewHtml = sanitizeHtml(normalizedPreviewHtml);` with `const previewHtml = prepareNoticeFeedHtml(normalizedPreviewHtml);`; keep image normalization/removal and interaction handling unchanged.
-- [ ] Rerun the focused notice-page test and verify collapsed/expanded output passes.
+- [x] Add a feed test with `<span style="font-family:Arial;font-size:10pt">` and a wide table; assert styles and one `.tableWrapper` exist in collapsed and expanded content.
+- [x] Run the focused feed test and verify it fails on missing wrapper/style.
+- [x] Replace notice-save `const safeHtml = sanitizeHtml(body || '<p></p>');` with `const safeHtml = sanitizeNoticeBodyHtml(body || '<p></p>');`.
+- [x] Replace feed `const previewHtml = sanitizeHtml(normalizedPreviewHtml);` with `const previewHtml = prepareNoticeFeedHtml(normalizedPreviewHtml);`; keep image normalization/removal and interaction handling unchanged.
+- [x] Rerun the focused notice-page test and verify collapsed/expanded output passes.
 
 ## Task 4: Regression and browser verification
 
 **Files:** tests above, `docs/result/20261002/notice-feed-table-rendering/result.md`, screenshots under `docs/result/20261002/notice-feed-table-rendering/screenshots/`
 
-- [ ] Run `npm --prefix frontend run test -- tests/sanitize-html.test.ts tests/notice-html.test.ts tests/notice-page.test.tsx` and confirm all focused tests pass.
-- [ ] Run `npm --prefix frontend run build` and confirm TypeScript and Vite build succeed.
-- [ ] In Chromium, inspect notice feed at 1280px and 375px. Confirm composer-matched font family/size, no feed-card horizontal growth, and `tableWrapper.scrollWidth > tableWrapper.clientWidth` for a wide table.
-- [ ] Confirm collapsed and expanded feed previews retain existing mask/height behavior and horizontal scrolling stays inside the table wrapper.
-- [ ] Save screenshots and record exact commands/results in `docs/result/20261002/notice-feed-table-rendering/result.md`.
-- [ ] Run `git diff --check` and inspect changed files for scope.
+- [x] Run focused sanitizer, notice HTML, clipboard/composer, and feed regression tests; confirm all pass.
+- [x] Run `npm --prefix frontend run build` and confirm TypeScript and Vite build succeed.
+- [x] In Chromium, inspect the notice feed at 1280px, 768px, and 375px. Confirm no document-level horizontal overflow and that `tableWrapper.scrollWidth > tableWrapper.clientWidth`.
+- [x] Confirm feed wrapper CSS uses the existing horizontal scroll style; unit tests cover collapsed and expanded typography/wrapper output.
+- [x] Save screenshots and record exact commands/results in `docs/result/20261002/notice-feed-table-rendering/result.md`.
+- [x] Run `git diff --check` and inspect changed files for scope.

@@ -236,6 +236,54 @@ describe('DraftFormTemplateDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('deletes a temporary upload when its placeholder was removed before upload completed', async () => {
+    let resolveUpload: ((value: unknown) => void) | undefined;
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:local-pasted-image'),
+      revokeObjectURL: vi.fn(),
+    });
+    apiMocks.apiPostFormData.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        }),
+    );
+    renderDialog();
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    const file = new File(['png data'], 'pasted.png', { type: 'image/png' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
+        getData: () => '',
+      },
+    });
+    const placeholder = await waitFor(() => {
+      const image = editor.querySelector('img');
+      expect(image).toBeInTheDocument();
+      return image as HTMLImageElement;
+    });
+    placeholder.click();
+    fireEvent.keyDown(editor, { key: 'Backspace' });
+    await waitFor(() => expect(editor.querySelector('img')).toBeNull());
+
+    resolveUpload?.({
+      item: {
+        uploadToken: 'late-image-token',
+        fileName: 'pasted.png',
+        fileSize: 8,
+        mimeType: 'image/png',
+      },
+    });
+
+    await waitFor(() =>
+      expect(apiMocks.apiDelete).toHaveBeenCalledWith(
+        '/api/v1/co/workflow/forms/77/template-images/temp/late-image-token?fileName=pasted.png',
+      ),
+    );
+    expect(apiMocks.apiPut).not.toHaveBeenCalled();
+  });
+
   it('opens the selected row template dialog from the document action', async () => {
     window.localStorage.setItem(
       'co-workflow-draft-form-grid',

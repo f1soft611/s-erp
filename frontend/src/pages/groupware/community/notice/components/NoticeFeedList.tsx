@@ -24,7 +24,7 @@ import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
 import { noticeContentStyles } from './noticeContentStyles';
-import { sanitizeHtml } from '../../../../../shared/utils/sanitizeHtml';
+import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 
 type NoticeFeedListProps = {
@@ -497,7 +497,7 @@ export function NoticeFeedList({
             item.bodyHtml ?? item.body,
             item.id,
           );
-          const previewHtml = sanitizeHtml(normalizedPreviewHtml);
+          const previewHtml = prepareNoticeFeedHtml(normalizedPreviewHtml);
           const hasRichHtml = /<[^>]+>/.test(previewHtml);
           const embeddedImagePreviews =
             extractNoticeEmbeddedImagePreviews(previewHtml);

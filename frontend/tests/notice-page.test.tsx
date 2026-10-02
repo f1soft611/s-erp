@@ -258,7 +258,9 @@ describe('Community notice page', () => {
 
     const collapsedPreview = screen.getByTestId(`notice-preview-${item.id}`);
     expect(collapsedPreview).toHaveAttribute('data-expanded', 'false');
-    expect(collapsedPreview.querySelector('.tableWrapper > table')).not.toBeNull();
+    expect(
+      collapsedPreview.querySelector('.tableWrapper > table'),
+    ).not.toBeNull();
     expect(collapsedPreview.querySelector('span')?.getAttribute('style')).toBe(
       'font-family:Arial;font-size:10pt',
     );
@@ -267,7 +269,9 @@ describe('Community notice page', () => {
 
     const expandedPreview = screen.getByTestId(`notice-preview-${item.id}`);
     expect(expandedPreview).toHaveAttribute('data-expanded', 'true');
-    expect(expandedPreview.querySelector('.tableWrapper > table')).not.toBeNull();
+    expect(
+      expandedPreview.querySelector('.tableWrapper > table'),
+    ).not.toBeNull();
     expect(expandedPreview.querySelector('span')?.getAttribute('style')).toBe(
       'font-family:Arial;font-size:10pt',
     );

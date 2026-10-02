@@ -180,26 +180,40 @@ export function DraftFormTemplateDialog({
         Number(row.draftingWorkCategoryId),
         file,
       );
+      const editor = editorRef.current;
+      const position = editor ? findImagePosition(editor, clientUploadId) : -1;
+      if (!editor || position < 0) {
+        await deleteDraftFormTemplateImage(
+          Number(row.draftingWorkCategoryId),
+          uploaded.uploadToken,
+          uploaded.fileName,
+        );
+        URL.revokeObjectURL(objectUrl);
+        objectUrls.current.delete(clientUploadId);
+        return;
+      }
+      const node = editor.state.doc.nodeAt(position);
+      if (!node) {
+        await deleteDraftFormTemplateImage(
+          Number(row.draftingWorkCategoryId),
+          uploaded.uploadToken,
+          uploaded.fileName,
+        );
+        URL.revokeObjectURL(objectUrl);
+        objectUrls.current.delete(clientUploadId);
+        return;
+      }
       pendingImages.current.set(uploaded.uploadToken, {
         ...uploaded,
         objectUrl,
       });
-      const editor = editorRef.current;
-      if (editor) {
-        const position = findImagePosition(editor, clientUploadId);
-        if (position >= 0) {
-          const node = editor.state.doc.nodeAt(position);
-          if (node) {
-            editor.view.dispatch(
-              editor.state.tr.setNodeMarkup(position, undefined, {
-                ...node.attrs,
-                'data-upload-token': uploaded.uploadToken,
-                'data-upload-state': 'uploaded',
-              }),
-            );
-          }
-        }
-      }
+      editor.view.dispatch(
+        editor.state.tr.setNodeMarkup(position, undefined, {
+          ...node.attrs,
+          'data-upload-token': uploaded.uploadToken,
+          'data-upload-state': 'uploaded',
+        }),
+      );
       setError('');
     } catch {
       const editor = editorRef.current;

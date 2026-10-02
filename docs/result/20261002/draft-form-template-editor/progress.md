@@ -41,7 +41,7 @@
 - [x] Task 5: 프론트 API와 문서 액션
 - [x] Task 6: 본문 다이얼로그와 Tiptap 편집
 - [x] Task 7: F1-Grid 및 MinIO 운영 문서
-- [ ] Task 8: 통합 검증, 브라우저 캡처, 사양/품질 리뷰
+- [x] Task 8: 통합 검증, 브라우저 기능 확인, 사양/품질 리뷰 (사용자 요청으로 캡처 생략)
 
 ## 검증 및 리뷰 기록
 
@@ -71,10 +71,16 @@
 - Task 4 코드 품질 리뷰: 최종 승인, Critical/Important 결함 없음. 초기 리뷰에서 제기된 transaction atomicity와 local src + `data-file-id` 소유권 우회는 rollback policy/row lock 및 membership 검증과 테스트로 해소했다. afterCommit callback의 MinIO 실패는 warning log로 남으며, 정기 lifecycle 운영 설정은 Task7에서 확인한다.
 - Task 5/6 구현: 새 F1-Grid `문서 양식` 액션은 `hasDocument`로 작성/수정을 구분하고 UPDATE 권한 없이는 읽기 전용 상태를 표시한다. 선택 form ID의 템플릿 API를 전용 frontend service로 호출한다. 기존 row metadata가 dirty이면 문서 에디터 진입 전 확인창을 띄운다. `DraftFormTemplateDialog`에서 JSON/HTML restore/save, table/text clipboard normalization, image paste temp upload/token correlation, upload error cleanup, discard confirmation, authenticated blob rehydration을 처리한다.
 - 사용자 layout 호환: 기존 `co-workflow-draft-form-grid` 저장값을 보존하며 `hasDocument` 오른쪽 고정만 한 번 migration한다. 별도 F1-Grid core 변경은 없다.
-- Task 5/6 focused 검증: `draft-form-template-service.test.ts`, `draft-form-grid-template-action.test.tsx`, `draft-form-template-dialog.test.tsx` - 3 files, 13 tests passed. `npm --prefix frontend run build` - TypeScript/Vite build 성공.
+- Task 5/6 focused 검증: `draft-form-template-service.test.ts`, `draft-form-grid-template-action.test.tsx`, `draft-form-template-dialog.test.tsx` - 3 files, 최종 14 tests passed. `npm --prefix frontend run build` - TypeScript/Vite build 성공.
 - 기존 page test baseline: `draft-form-management.test.tsx`는 기준선에서 5 failures를 보고했고 변경 후에도 5 failures/16 passed다. 실패는 기존 행 저장/soft-delete/context-menu 동작 범위이며, 새 action integration은 독립 `draft-form-template-dialog.test.tsx`에서 통과했다.
-- Task 5/6 브라우저 검증: 실제 로컬 페이지와 데이터에서 첫 양식 행의 `문서 작성` 액션을 눌러 dialog GET/open을 확인했다. 저장은 누르지 않았다. 1280/768/375px 목록의 body width는 각 viewport와 동일하고, Grid client width는 1172/660/267px; dialog 폭은 820/704/311px이며 375px footer 저장/취소 버튼은 viewport 안에 있었다. screenshot 6장을 이 결과 폴더에 저장했다.
+- Task 5/6 browser check: 실제 `/co/workflow/form`에서 첫 양식의 `문서 작성` 액션과 template GET/dialog open을 확인했다. 저장은 실행하지 않았다. 1280/768/375px body width는 viewport와 동일했고 Grid/dialog geometry를 측정했다. 사용자가 browser screenshot 생략을 요청해 생성했던 실제 데이터 포함 가능 캡처 6개를 제거했고 screenshot artifacts는 남기지 않는다.
 - Task 5/6 사양 준수 리뷰: PASS. UPDATE gating, row callback, template API, editor restore/save, paste/upload/delete, authenticated blob rehydration과 dirty 보호를 확인했다. editor를 별도 파일로 분리하지 않고 dialog 안에 두어 변경 파일을 최소화했다.
 - Task 5/6 코드 품질 리뷰: 승인, Critical/Important 결함 없음. 동시 image paste ID tracking, object URL lifecycle, dirty-state baseline, grid preference migration을 확인했다. 동시 paste stress coverage는 Minor 권고로 남긴다.
 - Task 7 문서: F1-GRID.md에 renderCell 업무 action/저장 layout migration/내부 가로 스크롤 사용을 기록했다. MinIO 가이드에는 `tenant/` prefix + `s-erp-temp-owner=drafting-work-form` tag에만 7일 만료를 적용하는 규칙과 promotion 시 tag 제거를 문서화했다. `git diff --check` 통과.
 - Task 7 MinIO 정책 근거: `mc ilm rule add` 공식 문서에서 `--prefix`, `--tags`, `--expire-days` 지원을 확인했다. 현재 로컬/운영 MinIO에 lifecycle rule은 실행하지 않았으며 operator 적용은 배포 환경 단계로 남긴다.
+- Task 8 frontend full suite (최신 실행): `npm --prefix frontend run test -- --reporter=dot` - 62 files 중 42 passed/20 failed; 680 tests 중 518 passed/162 failed, unhandled errors 10건. 시작 기준선은 57 files 중 37 passed/18 failed; 649 tests 중 479 passed/138 failed였으므로 전체 suite는 비-green이며 failures 24건 증가했다. 실패 영역에는 `app-router-not-found`, common-code/content API, dashboard/sidebar, draft-form-management, F1-Grid/menu, notice, role/theme, `tmp-debug-menu-page` 등이 포함된다. 신규 기능 focused tests와 frontend build는 통과했지만 전체 증가분이 이번 변경과 무관하다고 전부 입증하지 못했다. 이를 숨기지 않고 residual risk로 남긴다.
+- Task 8 backend full suite (최신 실행): `mvn -f backend/pom.xml test` - 213 tests, 0 failures/errors, 2 skipped, `BUILD SUCCESS`. Surefire aggregate에서도 213/0/0/2 확인.
+- Task 8 frontend build (최신 실행): `npm --prefix frontend run build` - TypeScript 및 Vite production build 성공.
+- Task 8 IDE diagnostics: `DraftFormGrid.tsx`, `DraftFormTemplateDialog.tsx`, `draftFormTemplate.service.ts` 오류 없음.
+- 최종 리뷰: 사양 준수 PASS; 코드 품질 승인, Critical/Important 이슈 없음. 늦게 완료된 이미지 업로드 중 placeholder 삭제 시 returned temp token 즉시 정리 경로도 regression test로 검증했다 (frontend modal suite 7/7).
+- 캡처 상태: 사용자 명시 요청에 따라 브라우저 캡처 artifacts를 저장하지 않는다. 임시로 생성했던 캡처 파일은 제거했으며 screenshots 폴더는 비어 있다.

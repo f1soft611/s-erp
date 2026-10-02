@@ -65,7 +65,7 @@ import {
   updateCommonComment,
 } from '../../../../shared/services/commonContentApi';
 import type { CommonFileItem } from '../../../../shared/services/commonContentApi';
-import { sanitizeHtml } from '../../../../shared/utils/sanitizeHtml';
+import { sanitizeNoticeBodyHtml } from './utils/noticeHtml';
 import { getStoredAuth } from '../../../../shared/services/authService';
 import {
   fetchCommonCodeGroups,
@@ -698,7 +698,7 @@ export function CommunityNoticePage({
       return;
     }
 
-    const safeHtml = sanitizeHtml(body || '<p></p>');
+    const safeHtml = sanitizeNoticeBodyHtml(body || '<p></p>');
     const safeJson = bodyJson || JSON.stringify({ type: 'doc', content: [] });
     const safeText = (bodyText ?? toPlainText(safeHtml)).trim();
 

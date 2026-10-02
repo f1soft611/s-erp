@@ -30,6 +30,23 @@ describe('notice HTML rendering', () => {
     );
   });
 
+  it('keeps the Excel font family and point size through save and feed rendering', () => {
+    const savedHtml = sanitizeNoticeBodyHtml(
+      '<table><tbody><tr><td style="font-family:&quot;맑은 고딕&quot;, monospace;font-size:22pt;font-weight:700">헤더</td></tr></tbody></table>',
+    );
+    const feedDocument = new DOMParser().parseFromString(
+      prepareNoticeFeedHtml(savedHtml),
+      'text/html',
+    );
+    const cell = feedDocument.querySelector('td');
+
+    expect(cell?.style.getPropertyValue('font-family')).toBe(
+      '"맑은 고딕", monospace',
+    );
+    expect(cell?.style.getPropertyValue('font-size')).toBe('22pt');
+    expect(cell?.style.getPropertyValue('font-weight')).toBe('700');
+  });
+
   it('removes unsafe markup and does not duplicate wrappers for nested tables', () => {
     const result = prepareNoticeFeedHtml(
       '<script>alert(1)</script><table><tbody><tr><td>바깥<table><tbody><tr><td>안쪽</td></tr></tbody></table></td></tr></tbody></table>',

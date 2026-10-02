@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -44,6 +50,80 @@ describe('NoticeComposerDialog payload', () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText('구분을 선택해 주세요.')).toBeInTheDocument();
+  });
+
+  it('shows save progress and prevents duplicate submissions while saving', async () => {
+    let resolveSubmit: (() => void) | undefined;
+    const onClose = vi.fn();
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '본문 저장 지연 테스트' },
+    });
+    const saveButton = screen.getByRole('button', { name: '저장' });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(saveButton).toBeDisabled();
+    expect(within(saveButton).getByRole('progressbar')).toBeVisible();
+    fireEvent.click(saveButton);
+    expect(onSubmit).toHaveBeenCalledOnce();
+
+    resolveSubmit?.();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  });
+
+  it('clears save progress and keeps the composer open when submission fails', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('저장 실패'));
+
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '저장 실패 상태 복구' },
+    });
+    const saveButton = screen.getByRole('button', { name: '저장' });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    await waitFor(() => expect(saveButton).toBeEnabled());
+
+    expect(
+      within(saveButton).queryByRole('progressbar'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('renders a file-type icon for an existing spreadsheet attachment', () => {

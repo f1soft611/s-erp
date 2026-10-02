@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   IconButton,
   MenuItem,
   TextField,
@@ -428,6 +429,7 @@ export function NoticeComposerDialog({
     defaultNoticeGubunCode,
   );
   const [noticeGubunError, setNoticeGubunError] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -923,6 +925,7 @@ export function NoticeComposerDialog({
       setNoticeGubunError(true);
       return;
     }
+    if (saving) return;
 
     const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
     const bodyText = body
@@ -941,6 +944,7 @@ export function NoticeComposerDialog({
       .map((attachment) => attachment.boardFileId as number | string);
 
     if (onSubmit) {
+      setSaving(true);
       try {
         await onSubmit({
           title,
@@ -954,10 +958,18 @@ export function NoticeComposerDialog({
         });
       } catch {
         return;
+      } finally {
+        setSaving(false);
       }
     }
 
     onClose();
+  };
+
+  const handleCloseRequest = () => {
+    if (!saving) {
+      onClose();
+    }
   };
 
   const footerStart = (
@@ -1069,7 +1081,10 @@ export function NoticeComposerDialog({
         variant="contained"
         color="primary"
         onClick={handleSubmit}
-        disabled={title.trim().length === 0 && editorIsEmpty}
+        disabled={saving || (title.trim().length === 0 && editorIsEmpty)}
+        startIcon={
+          saving ? <CircularProgress size={16} color="inherit" /> : undefined
+        }
         sx={{
           borderRadius: 1.5,
           fontWeight: 700,
@@ -1086,7 +1101,8 @@ export function NoticeComposerDialog({
       <Button
         variant="text"
         color="primary"
-        onClick={onClose}
+        onClick={handleCloseRequest}
+        disabled={saving}
         sx={{
           borderRadius: 1.5,
           fontWeight: 600,
@@ -1105,7 +1121,7 @@ export function NoticeComposerDialog({
   return (
     <CommonDialog
       open={open}
-      onClose={onClose}
+      onClose={handleCloseRequest}
       title="새 공지 작성"
       size="md"
       bodyMode="fill"
