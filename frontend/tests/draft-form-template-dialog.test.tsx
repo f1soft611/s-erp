@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
@@ -208,14 +214,32 @@ describe('DraftFormTemplateDialog', () => {
     );
   });
 
-  it('provides shared font controls and preserves pasted spreadsheet tables', async () => {
+  it('hides typography controls and preserves pasted spreadsheet tables', async () => {
     renderDialog();
     const editor = await screen.findByRole('textbox', { name: '본문' });
     fireEvent.click(screen.getByRole('button', { name: '툴바 열기' }));
 
-    expect(screen.getByRole('combobox', { name: '글꼴' })).toBeInTheDocument();
+    const toolbar = screen.getByTestId('draft-form-template-toolbar');
     expect(
-      screen.getByRole('combobox', { name: '글자 크기' }),
+      within(toolbar).getByRole('combobox', { name: '문단' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).queryByRole('combobox', { name: '글꼴' }),
+    ).toBeNull();
+    expect(
+      within(toolbar).queryByRole('combobox', { name: '글자 크기' }),
+    ).toBeNull();
+    expect(
+      within(toolbar).getByRole('button', { name: '글자 색상' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '밑줄' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '표 삽입' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '링크' }),
     ).toBeInTheDocument();
 
     fireEvent.paste(editor, {

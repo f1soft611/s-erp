@@ -15,6 +15,7 @@ import type { Editor } from '@tiptap/react';
 import {
   RichTextEditor,
   RichTextEditorToolbar,
+  richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import { uploadNoticeEmbeddedImage } from '../services/noticeBoardService';
@@ -94,7 +95,6 @@ export function NoticeComposerDialog({
   const panelBorder = resolvedDark
     ? 'rgba(148, 163, 184, 0.2)'
     : 'rgba(148, 163, 184, 0.22)';
-  const panelBackground = resolvedDark ? '#0f172a' : '#f8fafc';
   const editorSurfaceBackground = resolvedDark ? '#0f172a' : '#ffffff';
   const fieldSurfaceBackground = resolvedDark
     ? '#1e293b'
@@ -312,42 +312,13 @@ export function NoticeComposerDialog({
       <RichTextEditorToolbar
         editor={editor}
         panelTestId="notice-toolbar-popup"
-        triggerSx={{
-          border: `1px solid ${panelBorder}`,
-          borderRadius: 1,
-          width: 32,
-          height: 32,
-          bgcolor: panelBackground,
-          color: theme.palette.text.primary,
-        }}
-        panelSx={{
-          gap: 0.75,
-          p: 1,
-          borderRadius: 2,
-          borderColor: panelBorder,
-          bgcolor: resolvedDark
-            ? 'rgba(15, 23, 42, 0.96)'
-            : 'rgba(255, 255, 255, 0.98)',
-          boxShadow: resolvedDark
-            ? '0 10px 25px rgba(15, 23, 42, 0.24)'
-            : '0 10px 25px rgba(15, 23, 42, 0.12)',
-          maxWidth: 'min(520px, calc(100vw - 180px))',
-          whiteSpace: 'nowrap',
-        }}
       />
 
       <IconButton
         size="small"
         aria-label="첨부 링크"
         onClick={() => attachmentInputRef.current?.click()}
-        sx={{
-          border: `1px solid ${panelBorder}`,
-          borderRadius: 1,
-          width: 32,
-          height: 32,
-          bgcolor: panelBackground,
-          color: theme.palette.text.primary,
-        }}
+        sx={richTextEditorIconButtonSx}
       >
         <AttachFileOutlinedIcon fontSize="small" />
       </IconButton>
@@ -561,8 +532,11 @@ export function NoticeComposerDialog({
                 overflow: 'hidden',
                 backgroundColor: editorSurfaceBackground,
                 '& .notice-composer-editor': {
+                  flex: 1,
                   width: '100%',
                   minWidth: 0,
+                  minHeight: 0,
+                  height: '100%',
                   position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',

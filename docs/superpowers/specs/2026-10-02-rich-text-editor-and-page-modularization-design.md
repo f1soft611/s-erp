@@ -15,7 +15,9 @@
 ## 목표
 
 - 공지 페이지에서 화면 조립, 상태/동작, API 호출, 데이터 변환, 타입 책임을 분명히 분리한다.
-- 공지와 기안양식이 같은 공통 리치 텍스트 편집기와 전체 편집 기능을 사용한다.
+- 공지와 기안양식이 같은 공통 리치 텍스트 편집기와 동일한 하단 icon toolbar를 사용한다.
+- toolbar에서는 사용자가 제공한 목록(문단, B/I/U/S, 색상, 표, 링크, 번호/글머리)을 제공한다. 별도 글꼴/글자 크기 선택기는 두지 않고, Tiptap inline typography schema와 clipboard parsing은 기존/붙여넣은 서식 호환을 위해 유지한다.
+- 공지/기안양식 footer toolbar는 screenshot reference와 같은 얇은 공통 icon style을 사용하며 consumer별 trigger/panel style override를 두지 않는다.
 - 도메인별 이미지 업로드, 이미지 조회, 저장, 권한 및 임시 파일 정리 계약은 각 기능에 유지한다.
 - 화면의 기존 동작과 저장 payload를 보존하며, 기안양식은 공지와 같은 글꼴·색상, 표 편집/붙여넣기, 이미지 크기 조절을 제공한다.
 - 공유 파일명에는 `notice` 접두사를 쓰지 않고 `RichTextEditor`, `clipboard` 등 재사용 목적이 드러나는 공통 이름을 사용한다.

@@ -1,13 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import { Box, IconButton, MenuItem, TextField, Tooltip } from '@mui/material';
+import {
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
+import {
+  Box,
+  Button,
+  Divider,
+  IconButton,
+  MenuItem,
+  Popover,
+  Select,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
+import FormatColorTextOutlinedIcon from '@mui/icons-material/FormatColorTextOutlined';
 import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
 import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
 import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumberedOutlined';
-import FormatQuoteOutlinedIcon from '@mui/icons-material/FormatQuoteOutlined';
-import RedoOutlinedIcon from '@mui/icons-material/RedoOutlined';
+import InsertLinkOutlinedIcon from '@mui/icons-material/InsertLinkOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import StrikethroughSOutlinedIcon from '@mui/icons-material/StrikethroughSOutlined';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
+import FormatUnderlinedOutlinedIcon from '@mui/icons-material/FormatUnderlinedOutlined';
 import {
   Color,
   FontFamily,
@@ -125,6 +143,56 @@ const RichTextTableHeader = TableHeader.extend({
           attributes.style ? { style: attributes.style } : {},
       },
     };
+  },
+});
+
+export const richTextEditorIconButtonSx = {
+  width: 32,
+  height: 32,
+  flexShrink: 0,
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 1,
+  p: 0,
+  bgcolor: 'background.paper',
+  color: 'text.secondary',
+  '&:hover': {
+    borderColor: 'text.secondary',
+    bgcolor: 'action.hover',
+  },
+} as const;
+
+const textColorSwatches = [
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#84cc16',
+  '#22c55e',
+  '#14b8a6',
+  '#3b82f6',
+  '#6366f1',
+  '#8b5cf6',
+  '#ec4899',
+  '#6b7280',
+  '#111827',
+];
+
+const toolbarIconButtonSx = (active: boolean) => ({
+  width: 32,
+  height: 32,
+  flexShrink: 0,
+  border: 0,
+  borderRadius: 0.75,
+  p: 0,
+  color: active ? 'text.primary' : 'text.secondary',
+  bgcolor: active ? 'action.selected' : 'transparent',
+  '&:hover': {
+    bgcolor: active ? 'action.selected' : 'action.hover',
+  },
+  '&.Mui-focusVisible': {
+    outline: '2px solid',
+    outlineColor: 'primary.main',
+    outlineOffset: 1,
   },
 });
 
@@ -258,7 +326,9 @@ export function RichTextEditor({
   const editor = useEditor(
     {
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          link: { openOnClick: false, autolink: true },
+        }),
         RichTextImage.configure({ inline: false, allowBase64: false }),
         TextStyle,
         FontFamily,
@@ -538,77 +608,192 @@ export function RichTextEditor({
     <Box
       className={className}
       sx={[
-        { width: '100%', minWidth: 0 },
+        {
+          display: 'flex',
+          flex: '1 1 0%',
+          flexDirection: 'column',
+          width: '100%',
+          minWidth: 0,
+          minHeight: 0,
+          height: '100%',
+          overflow: 'hidden',
+        },
         richTextEditorContentStyles,
         contentSx ? { '& .ProseMirror': contentSx } : {},
       ]}
     >
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="rich-text-editor-content" />
     </Box>
   );
 }
 
-const toolbarItems = [
-  {
-    label: '굵게',
-    icon: <FormatBoldOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) => editor.chain().focus().toggleBold().run(),
-    mark: 'bold',
-  },
-  {
-    label: '기울임',
-    icon: <FormatItalicOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) => editor.chain().focus().toggleItalic().run(),
-    mark: 'italic',
-  },
-  {
-    label: '취소선',
-    icon: <StrikethroughSOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) => editor.chain().focus().toggleStrike().run(),
-    mark: 'strike',
-  },
-  {
-    label: '글머리 기호',
-    icon: <FormatListBulletedOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) =>
-      editor.chain().focus().toggleBulletList().run(),
-    mark: 'bulletList',
-  },
-  {
-    label: '번호 목록',
-    icon: <FormatListNumberedOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) =>
-      editor.chain().focus().toggleOrderedList().run(),
-    mark: 'orderedList',
-  },
-  {
-    label: '인용',
-    icon: <FormatQuoteOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) =>
-      editor.chain().focus().toggleBlockquote().run(),
-    mark: 'blockquote',
-  },
-  {
-    label: '되돌리기',
-    icon: <UndoOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) => editor.chain().focus().undo().run(),
-    mark: '',
-  },
-  {
-    label: '다시 실행',
-    icon: <RedoOutlinedIcon fontSize="small" />,
-    command: (editor: Editor) => editor.chain().focus().redo().run(),
-    mark: '',
-  },
-];
-
 export function RichTextEditorToolbar({
   editor,
   panelTestId = 'rich-text-editor-toolbar',
-  triggerSx,
-  panelSx,
 }: RichTextEditorToolbarProps) {
   const [open, setOpen] = useState(false);
+  const [linkAnchor, setLinkAnchor] = useState<HTMLElement | null>(null);
+  const [colorAnchor, setColorAnchor] = useState<HTMLElement | null>(null);
+  const [linkText, setLinkText] = useState('');
+  const [linkValue, setLinkValue] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [textColor, setTextColor] = useState('#000000');
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [, refreshToolbar] = useReducer((revision: number) => revision + 1, 0);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!editor) return;
+    const handleEditorTransaction = () => refreshToolbar();
+    editor.on('transaction', handleEditorTransaction);
+    return () => {
+      editor.off('transaction', handleEditorTransaction);
+    };
+  }, [editor]);
+
+  const paragraphValue =
+    !editor || editor.isActive('paragraph')
+      ? 'paragraph'
+      : editor.isActive('heading', { level: 1 })
+        ? 'heading-1'
+        : editor.isActive('heading', { level: 2 })
+          ? 'heading-2'
+          : editor.isActive('heading', { level: 3 })
+            ? 'heading-3'
+            : 'paragraph';
+
+  const handleParagraphChange = (value: string) => {
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    if (value === 'paragraph') {
+      chain.setParagraph().run();
+      return;
+    }
+    const level = Number(value.slice(-1)) as 1 | 2 | 3;
+    chain.setHeading({ level }).run();
+  };
+
+  const openColorPalette = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!editor) return;
+    setTextColor(String(editor.getAttributes('textStyle').color ?? '#000000'));
+    setColorAnchor(event.currentTarget);
+  };
+
+  const applyTextColor = (color: string | null) => {
+    if (!editor) return;
+    if (color) {
+      setTextColor(color);
+      setRecentColors((current) =>
+        [
+          color,
+          ...current.filter((recentColor) => recentColor !== color),
+        ].slice(0, 6),
+      );
+      editor.chain().focus().setColor(color).run();
+    } else {
+      setTextColor('#000000');
+      editor.chain().focus().unsetColor().run();
+    }
+    setColorAnchor(null);
+  };
+
+  const renderColorSwatch = (color: string, isRecent = false) => (
+    <IconButton
+      key={`${isRecent ? 'recent' : 'preset'}-${color}`}
+      size="small"
+      aria-label={`${isRecent ? '최근 색상' : '색상'} ${color}`}
+      aria-pressed={textColor === color}
+      onClick={() => applyTextColor(color)}
+      sx={{
+        width: 20,
+        height: 20,
+        p: 0,
+        borderRadius: 0.5,
+        border: 1,
+        borderColor: textColor === color ? 'text.primary' : 'divider',
+      }}
+    >
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          bgcolor: color,
+          borderRadius: 0.25,
+        }}
+      />
+    </IconButton>
+  );
+
+  const openLinkEditor = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!editor) return;
+    if (editor.isActive('link')) {
+      editor.chain().extendMarkRange('link').run();
+    }
+    const { from, to } = editor.state.selection;
+    setLinkText(editor.state.doc.textBetween(from, to));
+    setLinkValue(String(editor.getAttributes('link').href ?? ''));
+    setLinkError('');
+    setLinkAnchor(event.currentTarget);
+  };
+
+  const applyLink = () => {
+    if (!editor) return;
+    const rawValue = linkValue.trim();
+    const href = /^(https?:\/\/|mailto:|tel:|\/(?!\/))/i.test(rawValue)
+      ? rawValue
+      : /^[a-z\d.-]+\.[a-z]{2,}(?::\d+)?(?:\/.*)?$/i.test(rawValue)
+        ? `https://${rawValue}`
+        : '';
+    if (!href) {
+      setLinkError('유효한 링크 주소를 입력해 주세요.');
+      return;
+    }
+    const text = linkText.trim();
+    if (!text) {
+      setLinkError('표시 텍스트를 입력해 주세요.');
+      return;
+    }
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        text,
+        marks: [{ type: 'link', attrs: { href } }],
+      })
+      .run();
+    setLinkAnchor(null);
+  };
+
+  const removeLink = () => {
+    editor?.chain().focus().extendMarkRange('link').unsetLink().run();
+    setLinkAnchor(null);
+  };
+
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!open || !toolbar) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (
+        toolbar.scrollWidth <= toolbar.clientWidth ||
+        Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      toolbar.scrollLeft = Math.max(
+        0,
+        Math.min(
+          toolbar.scrollWidth - toolbar.clientWidth,
+          toolbar.scrollLeft + event.deltaY,
+        ),
+      );
+    };
+
+    toolbar.addEventListener('wheel', handleWheel, { passive: false });
+    return () => toolbar.removeEventListener('wheel', handleWheel);
+  }, [editor, open]);
 
   return (
     <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -620,7 +805,7 @@ export function RichTextEditorToolbar({
             aria-expanded={open}
             disabled={!editor}
             onClick={() => setOpen((current) => !current)}
-            sx={triggerSx}
+            sx={toolbarIconButtonSx(open)}
           >
             <FormatBoldOutlinedIcon fontSize="small" />
           </IconButton>
@@ -628,6 +813,7 @@ export function RichTextEditorToolbar({
       </Tooltip>
       {open && editor && (
         <Box
+          ref={toolbarRef}
           data-testid={panelTestId}
           sx={{
             position: 'absolute',
@@ -635,89 +821,311 @@ export function RichTextEditorToolbar({
             bottom: 'calc(100% + 8px)',
             zIndex: 2,
             display: 'flex',
-            gap: 0.5,
-            p: 0.75,
+            alignItems: 'center',
+            gap: 0.25,
+            p: 0.5,
             border: 1,
             borderColor: 'divider',
-            borderRadius: 1,
+            borderRadius: 1.5,
             bgcolor: 'background.paper',
-            maxWidth: 'min(520px, calc(100vw - 48px))',
+            maxWidth: 'min(520px, calc(100vw - 64px))',
             overflowX: 'auto',
-            ...panelSx,
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(100, 116, 139, 0.65) transparent',
+            '&::-webkit-scrollbar': {
+              height: 6,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(100, 116, 139, 0.65)',
+              borderRadius: 3,
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: 'transparent',
+            },
           }}
         >
-          <TextField
-            select
+          <Select
             size="small"
-            margin="none"
-            label="글꼴"
-            value=""
+            variant="standard"
+            value={paragraphValue}
+            inputProps={{ 'aria-label': '문단' }}
             onChange={(event) =>
-              editor.chain().focus().setFontFamily(event.target.value).run()
+              handleParagraphChange(String(event.target.value))
             }
-            sx={{ width: 118, flexShrink: 0 }}
+            sx={{
+              width: 88,
+              flexShrink: 0,
+              px: 1,
+              fontSize: '0.875rem',
+              '&:before, &:after': { display: 'none' },
+              '& .MuiSelect-select': { py: 0.75, pr: '24px !important' },
+            }}
           >
-            <MenuItem value="Arial">Arial</MenuItem>
-            <MenuItem value="Georgia">Georgia</MenuItem>
-            <MenuItem value="Malgun Gothic">맑은 고딕</MenuItem>
-            <MenuItem value="sans-serif">Sans Serif</MenuItem>
-          </TextField>
-          <TextField
-            select
-            size="small"
-            margin="none"
-            label="글자 크기"
-            value=""
-            onChange={(event) =>
-              editor.chain().focus().setFontSize(event.target.value).run()
-            }
-            sx={{ width: 104, flexShrink: 0 }}
-          >
-            {['10px', '12px', '14px', '16px', '18px', '24px', '32px'].map(
-              (fontSize) => (
-                <MenuItem key={fontSize} value={fontSize}>
-                  {fontSize}
-                </MenuItem>
-              ),
-            )}
-          </TextField>
+            <MenuItem value="paragraph">본문</MenuItem>
+            <MenuItem value="heading-1">제목 1</MenuItem>
+            <MenuItem value="heading-2">제목 2</MenuItem>
+            <MenuItem value="heading-3">부제목</MenuItem>
+          </Select>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.25 }} />
+          <Tooltip title="굵게">
+            <IconButton
+              size="small"
+              aria-label="굵게"
+              aria-pressed={editor.isActive('bold')}
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              sx={toolbarIconButtonSx(editor.isActive('bold'))}
+            >
+              <FormatBoldOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="기울임">
+            <IconButton
+              size="small"
+              aria-label="기울임"
+              aria-pressed={editor.isActive('italic')}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              sx={toolbarIconButtonSx(editor.isActive('italic'))}
+            >
+              <FormatItalicOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="밑줄">
+            <IconButton
+              size="small"
+              aria-label="밑줄"
+              aria-pressed={editor.isActive('underline')}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              sx={toolbarIconButtonSx(editor.isActive('underline'))}
+            >
+              <FormatUnderlinedOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="취소선">
+            <IconButton
+              size="small"
+              aria-label="취소선"
+              aria-pressed={editor.isActive('strike')}
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              sx={toolbarIconButtonSx(editor.isActive('strike'))}
+            >
+              <StrikethroughSOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="글자 색상">
-            <input
+            <IconButton
+              size="small"
               aria-label="글자 색상"
-              type="color"
-              defaultValue="#000000"
-              onChange={(event) =>
-                editor.chain().focus().setColor(event.target.value).run()
+              aria-pressed={Boolean(editor.getAttributes('textStyle').color)}
+              onClick={openColorPalette}
+              sx={{
+                ...toolbarIconButtonSx(
+                  Boolean(editor.getAttributes('textStyle').color),
+                ),
+                position: 'relative',
+              }}
+            >
+              <FormatColorTextOutlinedIcon fontSize="small" />
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 9,
+                  right: 9,
+                  bottom: 5,
+                  height: 2,
+                  bgcolor: textColor,
+                }}
+              />
+            </IconButton>
+          </Tooltip>
+          <Popover
+            open={Boolean(colorAnchor)}
+            anchorEl={colorAnchor}
+            onClose={() => setColorAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            slotProps={{
+              paper: {
+                sx: { width: 176, p: 1, border: 1, borderColor: 'divider' },
+              },
+            }}
+          >
+            <Button
+              size="small"
+              fullWidth
+              onClick={() => applyTextColor(null)}
+              sx={{ justifyContent: 'flex-start', mb: 0.75 }}
+              startIcon={
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    bgcolor: 'text.primary',
+                    border: 1,
+                    borderColor: 'divider',
+                  }}
+                />
               }
-              style={{
-                width: 32,
-                height: 32,
-                flexShrink: 0,
-                padding: 2,
-                border: '1px solid #94a3b8',
-                borderRadius: 4,
-                background: 'transparent',
-                cursor: 'pointer',
+            >
+              기본 색상
+            </Button>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(6, 1fr)',
+                gap: 0.5,
+              }}
+              data-testid="rich-text-editor-color-swatches"
+            >
+              {textColorSwatches.map((color) => renderColorSwatch(color))}
+            </Box>
+            {recentColors.length > 0 && (
+              <>
+                <Divider sx={{ my: 0.75 }} />
+                <Typography
+                  variant="caption"
+                  sx={{ display: 'block', mb: 0.5, color: 'text.secondary' }}
+                >
+                  최근 색상
+                </Typography>
+                <Box
+                  data-testid="rich-text-editor-recent-colors"
+                  role="group"
+                  aria-label="최근 색상"
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(6, 1fr)',
+                    gap: 0.5,
+                  }}
+                >
+                  {recentColors.map((color) => renderColorSwatch(color, true))}
+                </Box>
+              </>
+            )}
+          </Popover>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.25 }} />
+          <Tooltip title="표 삽입">
+            <IconButton
+              size="small"
+              aria-label="표 삽입"
+              onClick={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows: 3, cols: 3, withHeaderRow: false })
+                  .run()
+              }
+              sx={toolbarIconButtonSx(false)}
+            >
+              <TableChartOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="링크">
+            <IconButton
+              size="small"
+              aria-label="링크"
+              aria-pressed={editor.isActive('link')}
+              onClick={openLinkEditor}
+              sx={toolbarIconButtonSx(editor.isActive('link'))}
+            >
+              <InsertLinkOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.25 }} />
+          <Tooltip title="번호 목록">
+            <IconButton
+              size="small"
+              aria-label="번호 목록"
+              aria-pressed={editor.isActive('orderedList')}
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              sx={toolbarIconButtonSx(editor.isActive('orderedList'))}
+            >
+              <FormatListNumberedOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="글머리 기호">
+            <IconButton
+              size="small"
+              aria-label="글머리 기호"
+              aria-pressed={editor.isActive('bulletList')}
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              sx={toolbarIconButtonSx(editor.isActive('bulletList'))}
+            >
+              <FormatListBulletedOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Popover
+            open={Boolean(linkAnchor)}
+            anchorEl={linkAnchor}
+            onClose={() => setLinkAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  p: 1.5,
+                  width: 300,
+                  maxWidth: 'calc(100vw - 32px)',
+                },
+              },
+            }}
+          >
+            <TextField
+              autoFocus
+              size="small"
+              fullWidth
+              label="표시 텍스트"
+              value={linkText}
+              error={Boolean(linkError) && !linkText.trim()}
+              helperText={
+                Boolean(linkError) && !linkText.trim() ? linkError : undefined
+              }
+              onChange={(event) => {
+                setLinkText(event.target.value);
+                setLinkError('');
               }}
             />
-          </Tooltip>
-          {toolbarItems.map((item) => (
-            <Tooltip key={item.label} title={item.label}>
-              <IconButton
-                size="small"
-                aria-label={item.label}
-                aria-pressed={
-                  item.mark ? editor.isActive(item.mark) : undefined
-                }
-                onClick={() => {
-                  item.command(editor);
-                  setOpen(false);
-                }}
-              >
-                {item.icon}
-              </IconButton>
-            </Tooltip>
-          ))}
+            <TextField
+              size="small"
+              fullWidth
+              label="URL"
+              value={linkValue}
+              error={Boolean(linkError) && Boolean(linkText.trim())}
+              helperText={
+                Boolean(linkError) && Boolean(linkText.trim())
+                  ? linkError
+                  : undefined
+              }
+              onChange={(event) => {
+                setLinkValue(event.target.value);
+                if (linkError) setLinkError('');
+              }}
+            />
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 0.5,
+                width: '100%',
+              }}
+            >
+              {editor.isActive('link') && (
+                <Button size="small" onClick={removeLink}>
+                  링크 제거
+                </Button>
+              )}
+              <Box sx={{ flex: 1 }} />
+              <Button size="small" onClick={() => setLinkAnchor(null)}>
+                취소
+              </Button>
+              <Button size="small" variant="contained" onClick={applyLink}>
+                확인
+              </Button>
+            </Box>
+          </Popover>
         </Box>
       )}
     </Box>

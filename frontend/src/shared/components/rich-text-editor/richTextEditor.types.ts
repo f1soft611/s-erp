@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
-import type { SxProps, Theme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import type { SystemStyleObject } from '@mui/system';
 
 export type RichTextEditorImage = {
@@ -32,6 +32,4 @@ export type RichTextEditorProps = {
 export type RichTextEditorToolbarProps = {
   editor: Editor | null;
   panelTestId?: string;
-  triggerSx?: SxProps<Theme>;
-  panelSx?: SxProps<Theme>;
 };

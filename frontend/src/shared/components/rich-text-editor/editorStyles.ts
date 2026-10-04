@@ -2,6 +2,23 @@ import type { Theme } from '@mui/material/styles';
 import type { SystemStyleObject } from '@mui/system';
 
 export const richTextEditorContentStyles: SystemStyleObject<Theme> = {
+  '& .rich-text-editor-content': {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1 1 0%',
+    width: '100%',
+    minWidth: 0,
+    minHeight: 0,
+    height: '100%',
+    overflow: 'hidden',
+  },
+  '& .rich-text-editor-content > .ProseMirror': {
+    flex: '1 1 0%',
+    minHeight: 0,
+    maxHeight: '100%',
+    overflowX: 'auto',
+    overflowY: 'auto',
+  },
   '& .ProseMirror': {
     fontSize: '0.95rem',
     lineHeight: 1.7,
@@ -13,7 +30,27 @@ export const richTextEditorContentStyles: SystemStyleObject<Theme> = {
     boxSizing: 'border-box',
     '& p': {
       margin: 0,
+      fontSize: '16px',
+      fontWeight: 400,
       whiteSpace: 'pre-wrap',
+    },
+    '& h1': {
+      margin: '0.25em 0',
+      fontSize: '24px',
+      fontWeight: 700,
+      lineHeight: 1.35,
+    },
+    '& h2': {
+      margin: '0.25em 0',
+      fontSize: '20px',
+      fontWeight: 700,
+      lineHeight: 1.4,
+    },
+    '& h3': {
+      margin: '0.25em 0',
+      fontSize: '18px',
+      fontWeight: 600,
+      lineHeight: 1.45,
     },
     '& p:empty': {
       minHeight: '1.7em',

@@ -292,10 +292,28 @@ describe('NoticeComposerDialog payload', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: '툴바 열기' }));
-    expect(screen.getByRole('button', { name: '굵게' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    const toolbar = screen.getByTestId('notice-toolbar-popup');
+    expect(
+      within(toolbar).getByRole('combobox', { name: '문단' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).queryByRole('combobox', { name: '글꼴' }),
+    ).toBeNull();
+    expect(
+      within(toolbar).queryByRole('combobox', { name: '글자 크기' }),
+    ).toBeNull();
+    expect(
+      within(toolbar).getByRole('button', { name: '밑줄' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '표 삽입' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '링크' }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: '굵게' }),
+    ).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('keeps clipboard table structure readable for the notice editor', () => {
