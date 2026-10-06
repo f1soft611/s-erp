@@ -34,6 +34,10 @@ export const richTextEditorContentStyles: SystemStyleObject<Theme> = {
       fontWeight: 400,
       whiteSpace: 'pre-wrap',
     },
+    '& table p': {
+      fontSize: 'inherit',
+      lineHeight: 'normal',
+    },
     '& h1': {
       margin: '0.25em 0',
       fontSize: '24px',

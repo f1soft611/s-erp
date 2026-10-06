@@ -18,13 +18,15 @@ class RichTextDocumentSanitizerTest {
                 + "<span style=\"font-family:Arial;font-size:14px;color:#123456;"
                 + "background-image:url(https://bad.example/x)\">강조</span></p>"
                 + "<table><tbody><tr><td colspan=\"2\" style=\"width:160px;"
+                + "font-family:Arial;font-size:22pt;"
                 + "background-color:#ffffff;behavior:expression(alert(1))\">셀</td></tr></tbody></table>"
                 + "<a href=\"javascript:alert(1)\" onclick=\"run()\">위험 링크</a>";
 
         String sanitized = sanitizer.sanitizeHtml(html);
 
         assertThat(sanitized).contains("본문", "강조", "font-family:Arial", "font-size:14px", "color:#123456")
-                .contains("<table", "colspan=\"2\"", "width:160px", "background-color:#ffffff")
+                .contains("<table", "colspan=\"2\"", "width:160px", "font-family:Arial",
+                        "font-size:22pt", "background-color:#ffffff")
                 .doesNotContain("<script", "onclick", "url(", "expression(", "javascript:");
     }
 
@@ -112,6 +114,7 @@ class RichTextDocumentSanitizerTest {
                 JsonNode document = objectMapper.readTree("{\"type\":\"doc\",\"content\":[{\"type\":\"table\","
                         + "\"content\":[{\"type\":\"tableRow\",\"content\":[{\"type\":\"tableCell\","
                         + "\"attrs\":{\"colspan\":2,\"style\":\"width:160px;background-color:#fff;"
+                        + "font-family:Arial;font-size:22pt;"
                         + "white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;"
                         + "background-image:url(https://bad.example/x)\"},\"content\":[{\"type\":\"paragraph\"}]}]}]}]}");
 
@@ -120,7 +123,8 @@ class RichTextDocumentSanitizerTest {
 
                 assertThat(attributes.path("colspan").asInt()).isEqualTo(2);
                 assertThat(attributes.path("style").asText())
-                        .isEqualTo("width:160px;background-color:#fff;white-space:pre-wrap;"
+                        .isEqualTo("width:160px;background-color:#fff;font-family:Arial;font-size:22pt;"
+                                + "white-space:pre-wrap;"
                                 + "word-break:break-all;overflow-wrap:anywhere");
             }
 }

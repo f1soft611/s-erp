@@ -30,7 +30,7 @@ The hook does not own title/category/attachment fields, domain API requests, ale
 
 For non-table `text/html` clipboard input, the shared normalizer preserves safe inline and block-level text styles instead of flattening the fragment to `textContent`. It converts legacy `<font face/size>` and block `font-family`/`font-size` styles to supported inline spans before shared HTML sanitization. Unsafe CSS and active content remain removed. Notice and Draft use the same normalizer through `RichTextEditor`.
 
-Excel table cells also preserve `font-family`, `font-size`, `line-height`, `white-space`, `word-break`, and `overflow-wrap`. Wrapping values are restricted to safe CSS enums (`pre-wrap`, `pre-line`, `break-all`, `keep-all`, `break-word`, `anywhere`, and normal equivalents) in clipboard and both sanitizer layers.
+Excel table cells preserve the clipboard's `<br>` count/order, text-node line breaks, indentation, and spaces without interpreting bullets or guessing which breaks are visual wraps. Plain-text clipboard tabs and spaces are also retained; only CRLF is canonicalized to LF. Loading stored Tiptap JSON does not rewrite its breaks. The clipboard normalizer still expands safe CSS `font` shorthand into individual text properties and reads class-based `<col>` widths before building Tiptap `colwidth` attributes. Table paragraphs inherit their cell font size and use normal line height. Wrapping values are restricted to safe CSS enums (`pre-wrap`, `pre-line`, `break-all`, `keep-all`, `break-word`, `anywhere`, and normal equivalents) in clipboard and both sanitizer layers. The backend table-style allowlist includes safe font family/size/style and line height so both HTML and JSON saves retain spreadsheet typography.
 
 ### Common editor document sanitizer
 

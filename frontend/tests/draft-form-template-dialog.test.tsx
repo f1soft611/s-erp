@@ -95,6 +95,76 @@ describe('DraftFormTemplateDialog', () => {
     );
   });
 
+  it('restores stored Excel line breaks without rewriting them on reopen', async () => {
+    apiMocks.apiGet.mockResolvedValue({
+      item: {
+        ...template,
+        templateJson: {
+          type: 'doc',
+          content: [
+            {
+              type: 'table',
+              content: [
+                {
+                  type: 'tableRow',
+                  content: [
+                    {
+                      type: 'tableCell',
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [
+                            {
+                              type: 'text',
+                              text: '중요관리점(CCP-2P)모니터링',
+                              marks: [{ type: 'bold' }],
+                            },
+                            { type: 'hardBreak' },
+                            {
+                              type: 'text',
+                              text: '일지',
+                              marks: [{ type: 'bold' }],
+                            },
+                            { type: 'hardBreak' },
+                            { type: 'hardBreak' },
+                            {
+                              type: 'text',
+                              text: '[X-ray 금속검출공정]',
+                              marks: [{ type: 'bold' }],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        templateHtml:
+          '<table><tbody><tr><td><strong>중요관리점(CCP-2P)모니터링<br>일지<br><br>[X-ray 금속검출공정]</strong></td></tr></tbody></table>',
+      },
+    });
+    const { onClose } = renderDialog();
+
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    await waitFor(() =>
+      expect(
+        editor
+          .querySelector('table td p')
+          ?.innerHTML.replace(/<\/?strong>/g, ''),
+      ).toBe('중요관리점(CCP-2P)모니터링<br>일지<br><br>[X-ray 금속검출공정]'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(
+      screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalled();
+    expect(apiMocks.apiPut).not.toHaveBeenCalled();
+  });
+
   it('scrolls the editor content from the top of its frame and keeps inner padding', async () => {
     renderDialog();
 
@@ -281,6 +351,31 @@ describe('DraftFormTemplateDialog', () => {
       expect(cell.style.whiteSpace).toBe('pre-wrap');
       expect(cell.style.wordBreak).toBe('break-all');
       expect(cell.style.overflowWrap).toBe('anywhere');
+    });
+  });
+
+  it('preserves Excel title line breaks and cell font size when pasting', async () => {
+    renderDialog();
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === 'text/html'
+            ? '<table><tbody><tr><td style="font-family:Arial;font-size:22pt"><strong>중요관리점(CCP-2P)모니터링<br>일지<br><br>[X-ray 금속검출공정]</strong></td></tr></tbody></table>'
+            : '',
+      },
+    });
+
+    await waitFor(() => {
+      const cell = editor.querySelector('table td');
+      const title = cell?.querySelector('strong');
+      expect((cell as HTMLTableCellElement | null)?.style.fontSize).toBe(
+        '22pt',
+      );
+      expect(title?.innerHTML).toBe(
+        '중요관리점(CCP-2P)모니터링<br>일지<br><br>[X-ray 금속검출공정]',
+      );
     });
   });
 

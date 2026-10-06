@@ -34,8 +34,9 @@ public class RichTextDocumentSanitizer {
     private static final Set<String> TEXT_STYLE_ATTRIBUTES = setOf("color", "fontFamily", "fontSize");
     private static final Set<String> TABLE_STYLE_ATTRIBUTES = setOf(
             "background", "background-color", "border", "border-bottom", "border-left",
-            "border-right", "border-top", "color", "font-weight", "height", "min-width",
-            "overflow-wrap", "text-align", "vertical-align", "width", "white-space", "word-break");
+            "border-right", "border-top", "color", "font-family", "font-size", "font-style",
+            "font-weight", "height", "line-height", "min-width", "overflow-wrap", "text-align",
+            "vertical-align", "width", "white-space", "word-break");
     private static final Set<String> INLINE_TEXT_STYLE_ATTRIBUTES = setOf(
             "color", "font-family", "font-size", "font-style", "font-weight", "line-height",
             "overflow-wrap", "text-decoration", "white-space", "word-break");

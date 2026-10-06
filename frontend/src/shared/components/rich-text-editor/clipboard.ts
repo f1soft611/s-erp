@@ -75,6 +75,25 @@ function isSafeStyleDeclaration(property: string, value: string): boolean {
   return true;
 }
 
+function expandFontShorthand(
+  ownerDocument: Document,
+  value: string,
+): Array<readonly [string, string]> {
+  if (!value || !isSafeCellStyleValue(value)) return [];
+
+  const probe = ownerDocument.createElement('span');
+  probe.style.setProperty('font', value);
+  return (
+    [
+      ['font-style', probe.style.fontStyle],
+      ['font-weight', probe.style.fontWeight],
+      ['font-size', probe.style.fontSize],
+      ['font-family', probe.style.fontFamily],
+      ['line-height', probe.style.lineHeight],
+    ] as const
+  ).filter(([, declarationValue]) => Boolean(declarationValue));
+}
+
 function normalizeCellDimension(value: string | null): string | null {
   const normalized = value?.trim() ?? '';
   if (!normalized) {
@@ -164,6 +183,21 @@ function sanitizeCellStyle(cell: Element, omitWidth = false): string | null {
     }
   }
 
+  for (const [property, value] of expandFontShorthand(
+    cell.ownerDocument,
+    style.getPropertyValue('font'),
+  )) {
+    if (
+      allowedCellStyleProperties.has(property) &&
+      !declarations.some((declaration) =>
+        declaration.startsWith(`${property}:`),
+      ) &&
+      isSafeStyleDeclaration(property, value)
+    ) {
+      declarations.push(`${property}:${value}`);
+    }
+  }
+
   for (const [property, attribute] of [
     ['width', 'width'],
     ['height', 'height'],
@@ -203,6 +237,21 @@ function sanitizeTextStyle(element: Element): string | null {
       property === 'font-size' ? normalizeCellDimension(value) : value;
     if (normalizedValue) {
       declarations.push(`${property}:${normalizedValue}`);
+    }
+  }
+
+  for (const [property, value] of expandFontShorthand(
+    element.ownerDocument,
+    style.getPropertyValue('font'),
+  )) {
+    if (
+      allowedTextStyleProperties.has(property) &&
+      !declarations.some((declaration) =>
+        declaration.startsWith(`${property}:`),
+      ) &&
+      isSafeStyleDeclaration(property, value)
+    ) {
+      declarations.push(`${property}:${value}`);
     }
   }
 
@@ -280,6 +329,17 @@ function normalizeClipboardBlockTextStyles(root: HTMLElement): void {
     });
 }
 
+function serializeClipboardChildren(parent: ParentNode): string {
+  const nodes = Array.from(parent.childNodes);
+  const serialized: string[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    serialized.push(serializeClipboardCellNode(nodes[index]));
+  }
+
+  return serialized.join('');
+}
+
 function normalizeClipboardTable(table: Element): string {
   const rows = Array.from(table.querySelectorAll('tr')).filter(
     (row) => row.closest('table') === table,
@@ -332,10 +392,7 @@ function normalizeClipboardTable(table: Element): string {
         columnIndex += colspan;
         const style = sanitizeCellStyle(cell, Boolean(colwidthAttribute));
         const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
-        const content = Array.from(cell.childNodes)
-          .map(serializeClipboardCellNode)
-          .join('')
-          .trim();
+        const content = serializeClipboardChildren(cell);
 
         return `<${tagName}${spanAttributes}${colwidthAttribute}${styleAttribute}>${content}</${tagName}>`;
       });
@@ -351,14 +408,12 @@ function normalizeClipboardTable(table: Element): string {
 
 function serializeClipboardCellNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    const text = (node.textContent ?? '')
-      .replace(/\u00a0/g, ' ')
-      .replace(/\r\n?/g, '\n');
+    const text = (node.textContent ?? '').replace(/\r\n?/g, '\n');
     if (!text.trim() && text.includes('\n')) {
       return '';
     }
 
-    return escapeHtml(text.replace(/[\t\f\v ]+/g, ' ')).replace(/\n/g, '<br>');
+    return escapeHtml(text).replace(/\n/g, '<br>');
   }
 
   if (!(node instanceof Element)) {
@@ -373,9 +428,7 @@ function serializeClipboardCellNode(node: Node): string {
     return normalizeClipboardTable(node);
   }
 
-  const content = Array.from(node.childNodes)
-    .map(serializeClipboardCellNode)
-    .join('');
+  const content = serializeClipboardChildren(node);
   const style = sanitizeTextStyle(node);
   const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
   const styledContent = style
@@ -404,7 +457,7 @@ function serializeClipboardCellNode(node: Node): string {
 function applyEmbeddedCellStyles(root: HTMLElement): void {
   const styleTargets = Array.from(
     root.querySelectorAll(
-      'th, td, span, p, div, font, strong, b, em, i, s, del',
+      'col, th, td, span, p, div, font, strong, b, em, i, s, del',
     ),
   );
   const styleProperties = Array.from(allowedCellStyleProperties);
@@ -420,6 +473,11 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
       .map(
         ([property, value]) =>
           [property.trim().toLowerCase(), value.trim()] as const,
+      )
+      .flatMap(([property, value]) =>
+        property === 'font'
+          ? expandFontShorthand(root.ownerDocument, value)
+          : [[property, value] as const],
       )
       .filter(
         ([property, value]) =>
@@ -437,9 +495,11 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
           continue;
         }
 
-        const allowedProperties = element.matches('td, th')
-          ? allowedCellStyleProperties
-          : allowedTextStyleProperties;
+        const allowedProperties = element.matches('col')
+          ? new Set(['width'])
+          : element.matches('td, th')
+            ? allowedCellStyleProperties
+            : allowedTextStyleProperties;
         for (const [property, value] of declarations) {
           if (allowedProperties.has(property)) {
             (element as HTMLElement).style.setProperty(property, value);
@@ -462,9 +522,23 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
             continue;
           }
 
-          const allowedProperties = element.matches('td, th')
-            ? styleProperties
-            : Array.from(allowedTextStyleProperties);
+          const allowedProperties = element.matches('col')
+            ? ['width']
+            : element.matches('td, th')
+              ? styleProperties
+              : Array.from(allowedTextStyleProperties);
+          const fontShorthand = styleRule.style.getPropertyValue('font').trim();
+          for (const [property, value] of expandFontShorthand(
+            root.ownerDocument,
+            fontShorthand,
+          )) {
+            if (
+              allowedProperties.includes(property) &&
+              isSafeStyleDeclaration(property, value)
+            ) {
+              (element as HTMLElement).style.setProperty(property, value);
+            }
+          }
           for (const property of allowedProperties) {
             const value = styleRule.style.getPropertyValue(property).trim();
             if (value && isSafeStyleDeclaration(property, value)) {
@@ -596,10 +670,7 @@ export function normalizeClipboardHtmlForEditor(
 }
 
 export function normalizeClipboardTextForEditor(rawText: string): string {
-  return rawText
-    .replace(/\u00a0/g, ' ')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, ' | ');
+  return rawText.replace(/\r\n?/g, '\n');
 }
 
 export function hasSpreadsheetClipboardContent(

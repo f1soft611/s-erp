@@ -46,9 +46,28 @@ describe('notice clipboard normalization', () => {
     expect(normalized).not.toContain('alert(1)');
   });
 
-  it('preserves line breaks within spreadsheet cells', () => {
+  it('preserves single line breaks within spreadsheet cells', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<table><tbody><tr><td>첫 줄<br>둘째 줄</td></tr></tbody></table>',
+    );
+
+    expect(normalized).toContain('<td>첫 줄<br>둘째 줄</td>');
+  });
+
+  it('preserves Excel line breaks and indentation without interpreting markers', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><tbody><tr><td><p>중요관리점(CCP-2P)모니터링<br>일지<br>[X-ray 금속검출공정]</p><p>* 기기 감도<br>   - 표준시편을 통과시킨다.<br>검출 여부를 기록한다.<br>* 제품 감도</p></td></tr></tbody></table>',
+    );
+
+    expect(normalized).toBe(
+      '<table><tbody><tr><td><p>중요관리점(CCP-2P)모니터링<br>일지<br>[X-ray 금속검출공정]</p>' +
+        '<p>* 기기 감도<br>   - 표준시편을 통과시킨다.<br>검출 여부를 기록한다.<br>* 제품 감도</p></td></tr></tbody></table>',
+    );
+  });
+
+  it('preserves line breaks carried by whitespace-only text nodes inside a cell', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><tbody><tr><td>첫 줄<span></span>\n둘째 줄</td></tr></tbody></table>',
     );
 
     expect(normalized).toContain('<td>첫 줄<br>둘째 줄</td>');
@@ -169,9 +188,9 @@ describe('notice clipboard normalization', () => {
     ]);
   });
 
-  it('normalizes plain clipboard text line endings and tab-separated cells', () => {
+  it('preserves plain clipboard tabs and normalizes only line endings', () => {
     expect(normalizeClipboardTextForEditor('첫째\t둘째\r\n셋째\t넷째')).toBe(
-      '첫째 | 둘째\n셋째 | 넷째',
+      '첫째\t둘째\n셋째\t넷째',
     );
   });
 

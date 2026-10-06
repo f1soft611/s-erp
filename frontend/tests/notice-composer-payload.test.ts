@@ -576,7 +576,7 @@ describe('NoticeComposerDialog payload', () => {
     const html = `
       <table><tbody>
         <tr>
-          <td style="width:120px;height:28px;background-color:#fff2cc;border:2px solid #1f2937;">셀</td>
+          <td style="width:120px;height:28px;background-color:#fff2cc;border:2px solid #1f2937;font:italic 10pt Arial;">셀</td>
         </tr>
       </tbody></table>
     `;
@@ -587,14 +587,46 @@ describe('NoticeComposerDialog payload', () => {
     expect(normalized).toContain('height:28px');
     expect(normalized).toContain('background-color:rgb(255, 242, 204)');
     expect(normalized).toContain('border:2px solid rgb(31, 41, 55)');
+    expect(normalized).toContain('font-size:10pt');
+    expect(normalized).toContain('font-family:Arial');
+    expect(normalized).toContain('font-style:italic');
+  });
+
+  it('converts Excel soft line breaks to wrapping while retaining paragraph breaks', () => {
+    const html =
+      '<table><tbody><tr><td>첫 줄<br>이어지는 줄<br><br>새 문단</td></tr></tbody></table>';
+
+    const normalized = normalizeClipboardHtmlForEditor(html);
+
+    expect(normalized).toContain('첫 줄 이어지는 줄<br>새 문단');
+    expect(normalized).not.toContain('첫 줄<br>');
+  });
+
+  it('converts wrapped text-node newlines to spaces without dropping characters', () => {
+    const html =
+      '<table><tbody><tr><td><strong>중요관리점(CCP-2P)모니터링\n일지\n[X-ray 금속검출공정]</strong></td></tr></tbody></table>';
+
+    const normalized = normalizeClipboardHtmlForEditor(html);
+
+    expect(normalized).toContain(
+      '중요관리점(CCP-2P)모니터링 일지 [X-ray 금속검출공정]',
+    );
+    expect(normalized).not.toContain('모니터링<br>일지');
   });
 
   it('applies embedded Excel CSS rules to matching cells', () => {
     const html = `
       <html><head>
-        <style>.xl65 { background-color: #fff2cc; border: 2px solid #1f2937; }</style>
+        <style>
+          .xl65 { background-color: #fff2cc; border: 2px solid #1f2937; }
+          .xlfont { font: italic bold 10pt Arial; }
+          .xlcol { width: 22pt; }
+          .xlcolwide { width: 44pt; }
+        </style>
       </head><body>
-        <table><tbody><tr><td class="xl65">셀</td></tr></tbody></table>
+        <table><colgroup><col class="xlcol"><col class="xlcolwide"></colgroup>
+          <tbody><tr><td class="xl65 xlfont">셀</td><td>다음</td></tr></tbody>
+        </table>
       </body></html>
     `;
 
@@ -602,6 +634,10 @@ describe('NoticeComposerDialog payload', () => {
 
     expect(normalized).toContain('background-color:rgb(255, 242, 204)');
     expect(normalized).toContain('border:2px solid rgb(31, 41, 55)');
+    expect(normalized).toContain('font-size:10pt');
+    expect(normalized).toContain('font-family:Arial');
+    expect(normalized).toContain('colwidth="29"');
+    expect(normalized).toContain('colwidth="59"');
     expect(normalized).not.toContain('class="xl65"');
   });
 
@@ -724,7 +760,7 @@ describe('NoticeComposerDialog payload', () => {
 
     const editor = screen.getByRole('textbox', { name: /본문/i });
     const excelHtml = `
-      <html><body>
+      <html><head><style>.excel-text { font: 10pt Arial; }</style></head><body>
         <table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
           <colgroup>
             <col style="width:120px;" />
@@ -733,7 +769,7 @@ describe('NoticeComposerDialog payload', () => {
           </colgroup>
           <tbody>
             <tr>
-              <td style="padding:2px 4px;width:120px;height:28px;font-size:10pt;font-family:Arial;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;">업무</td>
+              <td class="excel-text" style="padding:2px 4px;width:120px;height:28px;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;">업무</td>
               <td style="padding:2px 4px;">담당</td>
               <td style="padding:2px 4px;">일자</td>
             </tr>
@@ -777,7 +813,9 @@ describe('NoticeComposerDialog payload', () => {
       expect(
         (rows[2].querySelectorAll('td')[1] as HTMLTableCellElement).colSpan,
       ).toBe(2);
-      expect(rows[2].querySelector('br')).toBeInTheDocument();
+      expect(rows[2].querySelectorAll('td')[1]?.textContent).toContain(
+        'Excel 붙여넣기 검증 테스트',
+      );
       expect(rows[0].querySelectorAll('td')[0].getAttribute('colwidth')).toBe(
         '120',
       );
@@ -786,6 +824,7 @@ describe('NoticeComposerDialog payload', () => {
       )[0] as HTMLTableCellElement;
       expect(firstCell.style.fontFamily).toBe('Arial');
       expect(firstCell.style.fontSize).toBe('10pt');
+      expect(firstCell.querySelector('p')).toHaveStyle({ fontSize: '10pt' });
       expect(firstCell.style.whiteSpace).toBe('pre-wrap');
       expect(firstCell.style.wordBreak).toBe('break-all');
       expect(firstCell.style.overflowWrap).toBe('anywhere');

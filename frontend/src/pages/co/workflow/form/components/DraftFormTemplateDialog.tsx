@@ -96,8 +96,8 @@ export function DraftFormTemplateDialog({
   };
 
   const deleteTemporaryImage = (image: {
-    uploadToken: string;
     fileName: string;
+    uploadToken: string;
   }) =>
     deleteDraftFormTemplateImage(
       Number(row.draftingWorkCategoryId),
@@ -151,7 +151,9 @@ export function DraftFormTemplateDialog({
     initialHtml.current = template.templateHtml || '<p></p>';
     editor.commands.setContent(
       (template.templateJson as JSONContent | null) ?? initialHtml.current,
-      { emitUpdate: false },
+      {
+        emitUpdate: false,
+      },
     );
     setHasChanges(false);
 
