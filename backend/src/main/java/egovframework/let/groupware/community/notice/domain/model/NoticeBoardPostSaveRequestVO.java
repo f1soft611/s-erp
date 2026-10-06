@@ -34,6 +34,8 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     private List<Long> attachmentIds;
     @Schema(description = "본문 임베드 이미지 메타데이터")
     private List<NoticeEmbeddedImageVO> embeddedImages;
+    @Schema(description = "이번 작성 세션에서 업로드한 임시 이미지")
+    private List<NoticeEmbeddedImageVO> temporaryImages;
 
     public String getEffectiveContentsHtml() {
         return StringUtils.hasText(this.contentsHtml) ? this.contentsHtml : this.contents;
@@ -165,5 +167,13 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
 
     public void setEmbeddedImages(List<NoticeEmbeddedImageVO> embeddedImages) {
         this.embeddedImages = embeddedImages;
+    }
+
+    public List<NoticeEmbeddedImageVO> getTemporaryImages() {
+        return temporaryImages;
+    }
+
+    public void setTemporaryImages(List<NoticeEmbeddedImageVO> temporaryImages) {
+        this.temporaryImages = temporaryImages;
     }
 }

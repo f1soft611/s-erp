@@ -179,6 +179,19 @@ public class NoticeBoardApiController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
     }
 
+    @Operation(summary = "공지 본문 임시 이미지 삭제", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
+    @DeleteMapping("/embedded-images/temp/{uploadToken}")
+    public ResultVO deleteTemporaryEmbeddedImage(
+            @PathVariable String uploadToken,
+            @RequestParam String fileName,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        noticeEmbeddedImageService.deleteTemporaryImage(user.getTenantId(), uploadToken, fileName);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "공지 임시 이미지가 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
     @Operation(summary = "첨부파일 삭제", security = @SecurityRequirement(name = "Authorization"), tags = {"NoticeBoardApiController"})
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "삭제 성공"),
@@ -209,8 +222,10 @@ public class NoticeBoardApiController {
     @GetMapping("/posts/{postId}/embedded-images")
     public void streamEmbeddedImage(@PathVariable Long postId,
             @RequestParam String objectKey,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user,
             HttpServletResponse response) throws Exception {
-        noticeBoardService.streamEmbeddedImage(postId, objectKey, response);
+        requireAuthenticated(user);
+        noticeBoardService.streamEmbeddedImage(user.getTenantId(), postId, objectKey, response);
     }
 
     private void requireAuthenticated(LoginVO user) {

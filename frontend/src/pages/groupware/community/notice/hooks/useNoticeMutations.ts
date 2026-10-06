@@ -11,6 +11,7 @@ import {
 import type {
   NoticeBoardAttachmentApi,
   NoticeBoardPostApi,
+  NoticeBoardPostSavePayload,
   NoticeComposerSubmitPayload,
   NoticeEditorDraft,
   NoticeFeedItem,
@@ -78,6 +79,7 @@ export function useNoticeMutations({
       attachments,
       removedAttachmentIds,
       embeddedImages,
+      temporaryImages,
     }: NoticeComposerSubmitPayload) => {
       const trimmedTitle = title.trim();
       if (!trimmedTitle) return;
@@ -88,18 +90,22 @@ export function useNoticeMutations({
       const updatedDraft = { title: trimmedTitle, body: safeHtml, attachments };
       const existingId = editorDraft.id;
       let attachmentDeletionFailed = false;
+      const noticePayload: NoticeBoardPostSavePayload = {
+        title: trimmedTitle,
+        contents: safeHtml,
+        contentsHtml: safeHtml,
+        contentsJson: safeJson,
+        contentsText: safeText,
+        noticeGubunCode,
+        embeddedImages,
+        temporaryImages,
+      };
 
       try {
         if (existingId) {
           const updated = await updateNoticePost(existingId, {
-            title: trimmedTitle,
-            contents: safeHtml,
-            contentsHtml: safeHtml,
-            contentsJson: safeJson,
-            contentsText: safeText,
+            ...noticePayload,
             isPinned: editorDraft.isPinned,
-            noticeGubunCode,
-            embeddedImages,
           });
           const uploadableFiles = attachments
             .map((attachment) => attachment.file)
@@ -158,15 +164,7 @@ export function useNoticeMutations({
           setServerItemRevision((revision) => revision + 1);
           showSuccess('공지사항이 수정되었습니다.');
         } else {
-          const created = await createNoticePost({
-            title: trimmedTitle,
-            contents: safeHtml,
-            contentsHtml: safeHtml,
-            contentsJson: safeJson,
-            contentsText: safeText,
-            noticeGubunCode,
-            embeddedImages,
-          });
+          const created = await createNoticePost(noticePayload);
           const createdId = Number(created.postId ?? 0);
           const uploadedAttachments: NoticeBoardAttachmentApi[] = [];
           if (createdId > 0) {

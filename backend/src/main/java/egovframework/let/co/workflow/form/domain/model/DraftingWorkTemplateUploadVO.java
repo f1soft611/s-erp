@@ -11,4 +11,5 @@ public class DraftingWorkTemplateUploadVO {
     private String fileName;
     private Long fileSize;
     private String mimeType;
+    private String previewUrl;
 }

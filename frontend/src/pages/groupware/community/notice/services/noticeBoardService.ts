@@ -9,6 +9,7 @@ import {
 import type {
   NoticeBoardAttachmentApi,
   NoticeBoardPostApi,
+  NoticeBoardPostSavePayload,
   NoticeEmbeddedImageApi,
 } from '../types/community.types';
 export type {
@@ -118,7 +119,7 @@ export async function fetchNoticePostDetail(
 }
 
 export async function createNoticePost(
-  payload: Partial<NoticeBoardPostApi>,
+  payload: NoticeBoardPostSavePayload,
 ): Promise<NoticeBoardPostApi> {
   const result = await apiPost<{ item?: NoticeBoardPostApi }>(
     '/api/v1/groupware/boards/notice/posts',
@@ -130,7 +131,7 @@ export async function createNoticePost(
 
 export async function updateNoticePost(
   postId: number,
-  payload: Partial<NoticeBoardPostApi>,
+  payload: NoticeBoardPostSavePayload,
 ): Promise<NoticeBoardPostApi> {
   const result = await apiPut<{ item?: NoticeBoardPostApi }>(
     `/api/v1/groupware/boards/notice/posts/${postId}`,
@@ -182,6 +183,16 @@ export async function uploadNoticeEmbeddedImage(
     formData,
   );
   return normalizeNoticeEmbeddedImage(result);
+}
+
+export async function deleteNoticeEmbeddedImage(
+  uploadToken: string,
+  fileName: string,
+): Promise<void> {
+  const query = new URLSearchParams({ fileName });
+  await apiDelete(
+    `/api/v1/groupware/boards/notice/embedded-images/temp/${encodeURIComponent(uploadToken)}?${query}`,
+  );
 }
 
 export async function deleteNoticeAttachment(

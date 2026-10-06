@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NoticeComposerDialog } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
 import { createAppTheme } from '../src/theme/theme';
 import {
@@ -16,16 +16,25 @@ import {
   calculateNoticeImageResizeWidth,
   serializeNoticeEditorJson,
 } from '../src/pages/groupware/community/notice/components/NoticeComposerDialog';
-import { uploadNoticeEmbeddedImage } from '../src/pages/groupware/community/notice/services/noticeBoardService';
+import {
+  deleteNoticeEmbeddedImage,
+  uploadNoticeEmbeddedImage,
+} from '../src/pages/groupware/community/notice/services/noticeBoardService';
 
 vi.mock(
   '../src/pages/groupware/community/notice/services/noticeBoardService',
   () => ({
+    deleteNoticeEmbeddedImage: vi.fn(),
     uploadNoticeEmbeddedImage: vi.fn(),
   }),
 );
 
 describe('NoticeComposerDialog payload', () => {
+  beforeEach(() => {
+    vi.mocked(uploadNoticeEmbeddedImage).mockReset();
+    vi.mocked(deleteNoticeEmbeddedImage).mockReset();
+  });
+
   it('blocks saving when the notice category is not selected', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -239,6 +248,204 @@ describe('NoticeComposerDialog payload', () => {
         screen.getByRole('textbox', { name: /본문/i }),
       ).toBeInTheDocument();
     });
+  });
+
+  it('passes live embedded images and the full temporary upload session separately on save', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(uploadNoticeEmbeddedImage).mockResolvedValue({
+      uploadToken: 'notice-image-token',
+      fileId: 'notice-image-token',
+      fileName: 'pasted.png',
+      fileSize: 8,
+      mimeType: 'image/png',
+      objectKey: 'tenant/1/embedded-image-temp/notice-image-token/pasted.png',
+      bucketName: 'document-attachments',
+      imageUrl: 'https://minio.example/notice-preview',
+    });
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () =>
+              new File(['png'], 'pasted.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/notice-preview',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        embeddedImages: [
+          expect.objectContaining({ uploadToken: 'notice-image-token' }),
+        ],
+        temporaryImages: [
+          expect.objectContaining({
+            uploadToken: 'notice-image-token',
+            fileName: 'pasted.png',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('deletes a temporary embedded image when closing without saving', async () => {
+    vi.mocked(uploadNoticeEmbeddedImage).mockResolvedValue({
+      uploadToken: 'notice-image-token',
+      fileId: 'notice-image-token',
+      fileName: 'pasted.png',
+      fileSize: 8,
+      mimeType: 'image/png',
+      objectKey: 'tenant/1/embedded-image-temp/notice-image-token/pasted.png',
+      bucketName: 'document-attachments',
+      imageUrl: 'https://minio.example/notice-preview',
+    });
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () =>
+              new File(['png'], 'pasted.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/notice-preview',
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    await waitFor(() =>
+      expect(deleteNoticeEmbeddedImage).toHaveBeenCalledWith(
+        'notice-image-token',
+        'pasted.png',
+      ),
+    );
+  });
+
+  it('blocks saving and closing while an embedded image upload is pending', async () => {
+    let resolveUpload:
+      | ((image: {
+          uploadToken: string;
+          fileId: string;
+          fileName: string;
+          fileSize: number;
+          mimeType: string;
+          objectKey: string;
+          bucketName: string;
+          imageUrl: string;
+        }) => void)
+      | undefined;
+    const onClose = vi.fn();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(uploadNoticeEmbeddedImage).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        }),
+    );
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose,
+          onSubmit,
+          noticeGubunOptions: [{ code: 'GENERAL', name: '일반' }],
+          defaultNoticeGubunCode: 'GENERAL',
+        }),
+      ),
+    );
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () =>
+              new File(['png'], 'pasted.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(uploadNoticeEmbeddedImage).toHaveBeenCalledOnce(),
+    );
+
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    resolveUpload?.({
+      uploadToken: 'notice-image-token',
+      fileId: 'notice-image-token',
+      fileName: 'pasted.png',
+      fileSize: 8,
+      mimeType: 'image/png',
+      objectKey: 'tenant/1/embedded-image-temp/notice-image-token/pasted.png',
+      bucketName: 'document-attachments',
+      imageUrl: 'https://minio.example/notice-preview',
+    });
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/notice-preview',
+      ),
+    );
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
   });
 
   it('allows saving a non-empty initial body even when the title is blank', async () => {

@@ -95,6 +95,7 @@ describe('useNoticeMutations', () => {
         attachments: [],
         removedAttachmentIds: [],
         embeddedImages: [],
+        temporaryImages: [{ uploadToken: 'temp-1', fileName: 'image.png' }],
       });
     });
 
@@ -107,6 +108,7 @@ describe('useNoticeMutations', () => {
         contentsText: '본문',
         noticeGubunCode: 'OPS',
         embeddedImages: [],
+        temporaryImages: [{ uploadToken: 'temp-1', fileName: 'image.png' }],
       }),
     );
     expect(loadNoticePosts).toHaveBeenCalledWith({ silent: true });
@@ -118,5 +120,50 @@ describe('useNoticeMutations', () => {
     });
     expect(closeComposer).toHaveBeenCalledOnce();
     expect(showSuccess).toHaveBeenCalledWith('공지사항이 등록되었습니다.');
+  });
+
+  it('forwards temporary image session metadata when updating a notice', async () => {
+    serviceMocks.updateNoticePost.mockResolvedValue({ postId: 12 });
+    const { result } = renderHook(() =>
+      useNoticeMutations({
+        setNoticeItems: vi.fn(),
+        setPinnedNoticeItems: vi.fn(),
+        setServerItemRevision: vi.fn(),
+        loadNoticePosts: vi.fn().mockResolvedValue(undefined),
+        noticeGubunNamesRef: { current: new Map() },
+        editorDraft: {
+          id: 12,
+          title: '기존 공지',
+          body: '<p>본문</p>',
+          attachments: [],
+        },
+        setEditorDraft: vi.fn(),
+        closeComposer: vi.fn(),
+        showError: vi.fn(),
+        showSuccess: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSaveNotice({
+        title: '수정 공지',
+        noticeGubunCode: 'OPS',
+        body: '<p>본문</p>',
+        bodyJson: '{"type":"doc"}',
+        bodyText: '본문',
+        attachments: [],
+        removedAttachmentIds: [],
+        embeddedImages: [],
+        temporaryImages: [{ uploadToken: 'temp-2', fileName: 'unused.png' }],
+      });
+    });
+
+    expect(serviceMocks.updateNoticePost).toHaveBeenCalledWith(
+      12,
+      expect.objectContaining({
+        embeddedImages: [],
+        temporaryImages: [{ uploadToken: 'temp-2', fileName: 'unused.png' }],
+      }),
+    );
   });
 });

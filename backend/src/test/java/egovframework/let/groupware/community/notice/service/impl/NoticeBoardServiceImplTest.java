@@ -2,6 +2,7 @@ package egovframework.let.groupware.community.notice.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -22,9 +23,12 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
+import egovframework.com.common.service.EmbeddedImageStorageService;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
+import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
@@ -32,6 +36,128 @@ import egovframework.let.groupware.community.notice.domain.repository.NoticeBoar
 import egovframework.let.common.dto.ListResult;
 
 class NoticeBoardServiceImplTest {
+
+    @Test
+    void createPostPromotesEmbeddedImageAndPersistsStableHtmlAndJsonSources() throws Exception {
+    NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+    CommonFileService commonFileService = mock(CommonFileService.class);
+    CommonCommentService commonCommentService = mock(CommonCommentService.class);
+    EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
+    String uploadToken = "bde1fdec-5d22-487a-a254-2b9547cd32b3";
+    String temporaryKey = "tenant/1/embedded-image-temp/" + uploadToken + "/pasted.png";
+    String permanentKey = "tenant/1/embedded-images/notice/42/" + uploadToken + "/pasted.png";
+    String stableUrl = "/api/v1/groupware/boards/notice/posts/42/embedded-images?objectKey=tenant%2F1%2Fembedded-images%2Fnotice%2F42%2F"
+        + uploadToken + "%2Fpasted.png";
+    CommonFileVO promoted = new CommonFileVO();
+    promoted.setFileId(113L);
+    promoted.setTenantId(1L);
+    promoted.setOwnerType("NOTICE");
+    promoted.setOwnerId(42L);
+    promoted.setFileUsageType("EMBEDDED");
+    promoted.setDeletedYn("N");
+    promoted.setObjectKey(permanentKey);
+    promoted.setBucketName("document-attachments");
+    promoted.setFileName("pasted.png");
+    promoted.setMimeType("image/png");
+    NoticeEmbeddedImageVO temporary = new NoticeEmbeddedImageVO();
+    temporary.setUploadToken(uploadToken);
+    temporary.setFileName("pasted.png");
+    when(noticeBoardDAO.insertNoticePost(org.mockito.ArgumentMatchers.anyMap())).thenReturn(42L);
+    NoticeBoardPostVO savedPost = new NoticeBoardPostVO();
+    savedPost.setPostId(42L);
+    savedPost.setContentsHtml("<p><img src=\"" + stableUrl
+        + "\" data-file-id=\"113\" data-object-key=\"" + permanentKey + "\"></p>");
+    when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap())).thenReturn(savedPost);
+    when(imageStorageService.promoteTemporaryImage(
+        1L, "NOTICE", 42L, uploadToken, "pasted.png", "login-user")).thenReturn(promoted);
+    when(imageStorageService.listOwnedImages(1L, "NOTICE", 42L))
+        .thenReturn(Collections.singletonList(promoted));
+    when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.singletonList(promoted));
+    CommonCommentPageVO commentPage = new CommonCommentPageVO();
+    commentPage.setComments(Collections.emptyList());
+    when(commonCommentService.listComments(1L, "NOTICE", 42L, 3, null)).thenReturn(commentPage);
+    when(commonCommentService.countComments(1L, "NOTICE", 42L)).thenReturn(0L);
+
+    NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+    payload.setTitle("이미지 공지");
+    payload.setNoticeGubunCode("GENERAL");
+    payload.setWriterId("untrusted-payload-user");
+    payload.setContentsHtml("<p><img src=\"https://minio.example/presigned\" data-upload-token=\""
+        + uploadToken + "\" data-object-key=\"" + temporaryKey + "\" alt=\"pasted.png\"></p>");
+    payload.setContentsJson("{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
+        + "\"src\":\"https://minio.example/presigned\",\"data-upload-token\":\""
+        + uploadToken + "\",\"data-object-key\":\"" + temporaryKey + "\",\"alt\":\"pasted.png\"}}]}");
+    payload.setEmbeddedImages(Collections.singletonList(temporary));
+
+    new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService)
+        .createPost(1L, payload, "login-user", "로그인 사용자");
+
+    org.mockito.ArgumentCaptor<Map<String, Object>> params = org.mockito.ArgumentCaptor.forClass(Map.class);
+    verify(noticeBoardDAO).updateNoticePost(params.capture());
+    assertThat(params.getValue().get("contentsHtml").toString()).contains(stableUrl)
+        .contains("data-file-id=\"113\"").doesNotContain("presigned", "data-upload-token");
+    assertThat(params.getValue().get("contentsJson").toString()).contains(stableUrl)
+        .contains("data-file-id").doesNotContain("presigned", "data-upload-token");
+    verify(imageStorageService).promoteTemporaryImage(
+        1L, "NOTICE", 42L, uploadToken, "pasted.png", "login-user");
+    verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(42L),
+        org.mockito.ArgumentMatchers.argThat((List<EmbeddedImageUploadVO> uploads) ->
+            uploads.size() == 1 && uploadToken.equals(uploads.get(0).getUploadToken())
+                && "pasted.png".equals(uploads.get(0).getFileName())),
+        eq(Collections.singleton(113L)));
+    }
+
+    @Test
+    void updatePostRetainsOwnedLegacyImageAndRewritesBothBodyFormats() throws Exception {
+    NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+    CommonFileService commonFileService = mock(CommonFileService.class);
+    CommonCommentService commonCommentService = mock(CommonCommentService.class);
+    EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
+    String legacyKey = "tenant/1/notice-temp/old-token/pasted.png";
+    String stableUrl = "/api/v1/groupware/boards/notice/posts/42/embedded-images?objectKey="
+        + "tenant%2F1%2Fnotice-temp%2Fold-token%2Fpasted.png";
+    CommonFileVO owned = new CommonFileVO();
+    owned.setFileId(113L);
+    owned.setTenantId(1L);
+    owned.setOwnerType("NOTICE");
+    owned.setOwnerId(42L);
+    owned.setFileUsageType("EMBEDDED");
+    owned.setDeletedYn("N");
+    owned.setObjectKey(legacyKey);
+    owned.setBucketName("document-attachments");
+    when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+        .thenReturn(new NoticeBoardPostVO());
+    when(imageStorageService.listOwnedImages(1L, "NOTICE", 42L))
+        .thenReturn(Collections.singletonList(owned));
+    when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.singletonList(owned));
+    CommonCommentPageVO commentPage = new CommonCommentPageVO();
+    commentPage.setComments(Collections.emptyList());
+    when(commonCommentService.listComments(1L, "NOTICE", 42L, 3, null)).thenReturn(commentPage);
+    when(commonCommentService.countComments(1L, "NOTICE", 42L)).thenReturn(0L);
+    NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+    payload.setTitle("수정 공지");
+    payload.setNoticeGubunCode("GENERAL");
+    payload.setContentsHtml("<p><img src=\"blob:http://localhost/preview\" data-file-id=\"113\" "
+        + "data-object-key=\"" + legacyKey + "\" alt=\"pasted.png\"></p>");
+    payload.setContentsJson("{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
+        + "\"src\":\"blob:http://localhost/preview\",\"data-file-id\":\"113\","
+        + "\"data-object-key\":\"" + legacyKey + "\",\"alt\":\"pasted.png\"}}]}");
+
+    new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService)
+        .updatePost(1L, 42L, payload, "login-user", "로그인 사용자");
+
+    ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+    verify(noticeBoardDAO).updateNoticePost(params.capture());
+    assertThat(params.getValue().get("contentsHtml").toString()).contains(stableUrl);
+    assertThat(params.getValue().get("contentsJson").toString()).contains(stableUrl);
+    verify(imageStorageService, org.mockito.Mockito.never())
+        .promoteTemporaryImage(org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyString());
+    verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(42L),
+        eq(Collections.emptyList()), eq(Collections.singleton(113L)));
+    }
 
     @Test
     void updatesPinnedStateWithoutReplacingRequiredPostFields() throws Exception {
@@ -246,10 +372,33 @@ class NoticeBoardServiceImplTest {
     }
 
     @Test
+    void rejectsEmbeddedImageSaveWhenCommonStorageServiceIsUnavailable() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지 이미지");
+        payload.setNoticeGubunCode("GENERAL");
+        payload.setContentsHtml("<p>본문</p>");
+        NoticeEmbeddedImageVO image = new NoticeEmbeddedImageVO();
+        image.setUploadToken("bde1fdec-5d22-487a-a254-2b9547cd32b3");
+        image.setFileName("pasted.png");
+        payload.setEmbeddedImages(Collections.singletonList(image));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> new NoticeBoardServiceImpl(noticeBoardDAO, mock(CommonFileService.class),
+                        mock(CommonCommentService.class)).createPost(1L, payload));
+
+        assertThat(exception.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+                .insertNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void listPostsHydratesAttachmentsCommentsAndPaginationMetadata() throws Exception {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
         CommonFileService commonFileService = mock(CommonFileService.class);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(new NoticeBoardPostVO());
         NoticeBoardPostVO firstPost = new NoticeBoardPostVO();
         firstPost.setPostId(7L);
         NoticeBoardPostVO secondPost = new NoticeBoardPostVO();
@@ -379,10 +528,14 @@ class NoticeBoardServiceImplTest {
         post.setContentsHtml("<p><img src=\"https://minio.example/expired\" data-object-key=\"tenant/1/notice-temp/token/image.png\"></p>");
         NoticeBoardFileVO embeddedImage = new NoticeBoardFileVO();
         embeddedImage.setBoardFileId(73L);
+        embeddedImage.setPostId(7L);
         embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
         embeddedImage.setFileUsageType("EMBEDDED");
         CommonFileVO embeddedCommonFile = new CommonFileVO();
         embeddedCommonFile.setFileId(73L);
+        embeddedCommonFile.setTenantId(1L);
+        embeddedCommonFile.setOwnerType("NOTICE");
+        embeddedCommonFile.setOwnerId(7L);
         embeddedCommonFile.setObjectKey("tenant/1/notice-temp/token/image.png");
         embeddedCommonFile.setFileUsageType("EMBEDDED");
         CommonCommentPageVO commentPage = new CommonCommentPageVO();
@@ -406,15 +559,20 @@ class NoticeBoardServiceImplTest {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
         CommonFileService commonFileService = mock(CommonFileService.class);
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(new NoticeBoardPostVO());
         CommonFileVO embeddedImage = new CommonFileVO();
         embeddedImage.setFileId(73L);
+        embeddedImage.setTenantId(1L);
+        embeddedImage.setOwnerType("NOTICE");
+        embeddedImage.setOwnerId(7L);
         embeddedImage.setObjectKey("tenant/1/notice-temp/token/image.png");
         embeddedImage.setFileUsageType("EMBEDDED");
         when(commonFileService.listFiles(1L, "NOTICE", 7L))
             .thenReturn(Arrays.asList(embeddedImage));
 
         new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
-            .streamEmbeddedImage(7L, "tenant/1/notice-temp/token/image.png",
+            .streamEmbeddedImage(1L, 7L, "tenant/1/notice-temp/token/image.png",
                 new MockHttpServletResponse());
 
         verify(commonFileService).downloadFile(
@@ -511,20 +669,25 @@ class NoticeBoardServiceImplTest {
         NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
         CommonFileService commonFileService = mock(CommonFileService.class);
         CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
         when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(new NoticeBoardPostVO());
-        CommonFileVO first = new CommonFileVO();
-        first.setFileId(21L);
-        CommonFileVO second = new CommonFileVO();
-        second.setFileId(22L);
-        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(first, second));
+        CommonFileVO attachment = new CommonFileVO();
+        attachment.setFileId(21L);
+        attachment.setFileUsageType("ATTACHMENT");
+        CommonFileVO embeddedImage = new CommonFileVO();
+        embeddedImage.setFileId(22L);
+        embeddedImage.setFileUsageType("EMBEDDED");
+        when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Arrays.asList(attachment, embeddedImage));
 
-        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService)
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService)
             .deletePost(1L, 7L);
 
         verify(commonFileService).listFiles(1L, "NOTICE", 7L);
         verify(commonFileService).deleteFile(1L, "NOTICE", 7L, 21L);
-        verify(commonFileService).deleteFile(1L, "NOTICE", 7L, 22L);
+        verify(commonFileService, org.mockito.Mockito.never()).deleteFile(1L, "NOTICE", 7L, 22L);
+        verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(7L),
+                eq(Collections.emptyList()), eq(Collections.emptySet()));
         verify(noticeBoardDAO).softDeleteNoticePost(org.mockito.ArgumentMatchers.anyMap());
     }
 }

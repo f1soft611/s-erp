@@ -33,6 +33,7 @@ export type DraftFormTemplateUpload = {
   fileName: string;
   fileSize: number;
   mimeType: string;
+  previewUrl: string;
 };
 
 type ApiResponse<T> = {

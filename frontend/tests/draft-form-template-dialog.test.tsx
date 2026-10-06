@@ -155,6 +155,7 @@ describe('DraftFormTemplateDialog', () => {
 
   it('uploads a pasted image to the form temp path and saves its upload token', async () => {
     const createObjectUrl = vi.fn(() => 'blob:local-pasted-image');
+    const previewUrl = 'https://minio.example/embedded-image-preview';
     vi.stubGlobal('URL', {
       ...URL,
       createObjectURL: createObjectUrl,
@@ -166,6 +167,7 @@ describe('DraftFormTemplateDialog', () => {
         fileName: 'pasted.png',
         fileSize: 8,
         mimeType: 'image/png',
+        previewUrl,
       },
     });
     renderDialog();
@@ -186,6 +188,9 @@ describe('DraftFormTemplateDialog', () => {
     });
 
     await waitFor(() => expect(apiMocks.apiPostFormData).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute('src', previewUrl),
+    );
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalled());
 

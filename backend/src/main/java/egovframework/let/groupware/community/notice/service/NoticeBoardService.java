@@ -50,6 +50,6 @@ public interface NoticeBoardService {
 
     void downloadAttachment(Long tenantId, Long postId, Long boardFileId, HttpServletResponse response) throws Exception;
 
-        void streamEmbeddedImage(Long postId, String objectKey, HttpServletResponse response)
+    void streamEmbeddedImage(Long tenantId, Long postId, String objectKey, HttpServletResponse response)
             throws Exception;
 }

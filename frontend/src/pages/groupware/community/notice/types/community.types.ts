@@ -90,6 +90,15 @@ export type NoticeComposerSubmitPayload = {
   attachments: NoticeComposerDraftAttachment[];
   removedAttachmentIds: Array<number | string>;
   embeddedImages: NoticeComposerEmbeddedImage[];
+  temporaryImages: Array<
+    Pick<NoticeComposerEmbeddedImage, 'uploadToken' | 'fileName'>
+  >;
+};
+
+export type NoticeBoardPostSavePayload = Partial<NoticeBoardPostApi> & {
+  temporaryImages?: Array<
+    Pick<NoticeComposerEmbeddedImage, 'uploadToken' | 'fileName'>
+  >;
 };
 
 export type NoticeComposerDialogProps = {

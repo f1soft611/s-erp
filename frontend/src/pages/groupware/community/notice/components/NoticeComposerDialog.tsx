@@ -18,7 +18,10 @@ import {
   richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
-import { uploadNoticeEmbeddedImage } from '../services/noticeBoardService';
+import {
+  deleteNoticeEmbeddedImage,
+  uploadNoticeEmbeddedImage,
+} from '../services/noticeBoardService';
 import {
   getAttachmentExtension,
   getAttachmentIconMeta,
@@ -109,6 +112,8 @@ export function NoticeComposerDialog({
   );
   const [noticeGubunError, setNoticeGubunError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -117,6 +122,12 @@ export function NoticeComposerDialog({
   );
   const [attachments, setAttachments] =
     useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
+  const pendingEmbeddedImages = useRef(
+    new Map<
+      string,
+      Pick<NoticeComposerEmbeddedImage, 'uploadToken' | 'fileName'>
+    >(),
+  );
 
   useEffect(() => {
     if (!open) {
@@ -127,6 +138,7 @@ export function NoticeComposerDialog({
     setNoticeGubunCode(defaultNoticeGubunCode);
     setNoticeGubunError(false);
     setAttachments(defaultAttachments);
+    pendingEmbeddedImages.current.clear();
     setImageUploadError(null);
     setPasteDebugLog(
       pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
@@ -253,7 +265,11 @@ export function NoticeComposerDialog({
       setNoticeGubunError(true);
       return;
     }
-    if (saving) return;
+    if (saving || closing) return;
+    if (uploadingCount > 0) {
+      setImageUploadError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
+      return;
+    }
 
     const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
     const bodyText = body
@@ -283,7 +299,9 @@ export function NoticeComposerDialog({
           attachments,
           removedAttachmentIds,
           embeddedImages: collectNoticeEmbeddedImages(editor),
+          temporaryImages: Array.from(pendingEmbeddedImages.current.values()),
         });
+        pendingEmbeddedImages.current.clear();
       } catch {
         return;
       } finally {
@@ -291,13 +309,62 @@ export function NoticeComposerDialog({
       }
     }
 
-    onClose();
+    if (onSubmit) {
+      onClose();
+    } else {
+      handleCloseRequest();
+    }
   };
 
   const handleCloseRequest = () => {
-    if (!saving) {
-      onClose();
+    if (saving || closing) return;
+    if (uploadingCount > 0) {
+      setImageUploadError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
+      return;
     }
+    const temporaryImages = Array.from(pendingEmbeddedImages.current.values());
+    if (temporaryImages.length === 0) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    void Promise.allSettled(
+      temporaryImages.map((image) =>
+        deleteNoticeEmbeddedImage(image.uploadToken, image.fileName),
+      ),
+    ).finally(() => {
+      pendingEmbeddedImages.current.clear();
+      setClosing(false);
+      onClose();
+    });
+  };
+
+  const uploadEmbeddedImage = async (file: File) => {
+    const uploaded = await uploadNoticeEmbeddedImage(file);
+    const pendingImage = {
+      uploadToken: uploaded.uploadToken,
+      fileName: uploaded.fileName,
+    };
+    pendingEmbeddedImages.current.set(uploaded.uploadToken, pendingImage);
+    setImageUploadError(null);
+    return {
+      src: uploaded.imageUrl,
+      alt: uploaded.fileName,
+      uploadToken: uploaded.uploadToken,
+      fileId: uploaded.fileId == null ? null : String(uploaded.fileId),
+      objectKey: uploaded.objectKey,
+      fileSize: uploaded.fileSize,
+      mimeType: uploaded.mimeType,
+    };
+  };
+
+  const deleteOrphanedEmbeddedImage = async (image: {
+    uploadToken?: string | null;
+    alt?: string | null;
+  }) => {
+    if (!image.uploadToken || !image.alt) return;
+    await deleteNoticeEmbeddedImage(image.uploadToken, image.alt);
+    pendingEmbeddedImages.current.delete(image.uploadToken);
   };
 
   const footerStart = (
@@ -331,7 +398,12 @@ export function NoticeComposerDialog({
         variant="contained"
         color="primary"
         onClick={handleSubmit}
-        disabled={saving || (title.trim().length === 0 && editorIsEmpty)}
+        disabled={
+          saving ||
+          closing ||
+          uploadingCount > 0 ||
+          (title.trim().length === 0 && editorIsEmpty)
+        }
         startIcon={
           saving ? (
             <CircularProgress
@@ -358,7 +430,7 @@ export function NoticeComposerDialog({
         variant="text"
         color="primary"
         onClick={handleCloseRequest}
-        disabled={saving}
+        disabled={saving || closing || uploadingCount > 0}
         sx={{
           borderRadius: 1.5,
           fontWeight: 600,
@@ -580,19 +652,9 @@ export function NoticeComposerDialog({
                 onClipboardPaste={
                   pasteDebugEnabled ? handleClipboardDebug : undefined
                 }
-                uploadImage={async (file) => {
-                  const uploaded = await uploadNoticeEmbeddedImage(file);
-                  return {
-                    src: uploaded.imageUrl,
-                    alt: uploaded.fileName,
-                    uploadToken: uploaded.uploadToken,
-                    fileId:
-                      uploaded.fileId == null ? null : String(uploaded.fileId),
-                    objectKey: uploaded.objectKey,
-                    fileSize: uploaded.fileSize,
-                    mimeType: uploaded.mimeType,
-                  };
-                }}
+                uploadImage={uploadEmbeddedImage}
+                onOrphanedImageUpload={deleteOrphanedEmbeddedImage}
+                onUploadingChange={setUploadingCount}
                 onImageUploadError={(message) =>
                   setImageUploadError(message || null)
                 }

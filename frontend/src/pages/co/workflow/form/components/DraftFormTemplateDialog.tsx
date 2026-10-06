@@ -100,6 +100,7 @@ export function DraftFormTemplateDialog({
     pendingImages.current.set(uploaded.uploadToken, uploaded);
     setError('');
     return {
+      src: uploaded.previewUrl,
       alt: uploaded.fileName,
       uploadToken: uploaded.uploadToken,
       fileSize: uploaded.fileSize,
