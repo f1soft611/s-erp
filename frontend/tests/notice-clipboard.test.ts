@@ -167,6 +167,45 @@ describe('notice clipboard normalization', () => {
     expect(normalized).toContain('<td colwidth="30">C</td>');
   });
 
+  it('places a colspan after the full range is checked against rowspans', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><colgroup><col width="10"><col width="20"><col width="30"><col width="40"></colgroup><tbody><tr><td>A</td><td rowspan="2">B</td><td>C</td></tr><tr><td colspan="2">D</td></tr></tbody></table>',
+    );
+
+    expect(normalized).toContain('<td rowspan="2" colwidth="20">B</td>');
+    expect(normalized).toContain('<td colspan="2" colwidth="30,40">D</td>');
+  });
+
+  it('synchronizes quoted plain-text cell lines with the matching merged HTML cells', () => {
+    const html =
+      '<table><colgroup><col width="10"><col width="20"><col width="30"><col width="40"></colgroup><tbody>' +
+      '<tr><td colspan="2"><p>제목 첫 줄<br>전체<br><br>X-ray 줄</p></td><td>1호기</td><td>2호기</td></tr>' +
+      '<tr><td>방법</td><td colspan="3"><p>* 기기 감도<br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도</p></td></tr></tbody></table>';
+    const plainText =
+      '"제목 첫 줄 전체\nX-ray 줄"\t\t1호기\t2호기\r\n방법\t"* 기기 감도\n - 표준시편을 통과시킨다. 이어지는 문장\n* 제품 감도"\t\t';
+
+    const normalized = normalizeClipboardHtmlForEditor(html, plainText);
+    const document = new DOMParser().parseFromString(normalized, 'text/html');
+    const rows = Array.from(document.querySelectorAll('table tr'));
+
+    expect(rows[0].querySelector('td')?.getAttribute('colspan')).toBe('2');
+    expect(rows[0].querySelector('td')?.getAttribute('colwidth')).toBe('10,20');
+    expect(rows[0].querySelector('td p')?.innerHTML).toBe(
+      '제목 첫 줄 전체<br>X-ray 줄',
+    );
+    expect(rows[1].querySelectorAll('td')[1]?.getAttribute('colspan')).toBe(
+      '3',
+    );
+    expect(rows[1].querySelectorAll('td')[1]?.getAttribute('colwidth')).toBe(
+      '20,30,40',
+    );
+    expect(
+      rows[1].querySelectorAll('td')[1]?.querySelector('p')?.innerHTML,
+    ).toBe(
+      '* 기기 감도<br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도',
+    );
+  });
+
   it('does not count nested table cells as cells in the outer row', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<table><tbody><tr><td>외부 A<table><tbody><tr><td>내부 A</td><td>내부 B</td></tr></tbody></table></td><td>외부 B</td></tr><tr><td>다음</td><td>행</td></tr></tbody></table>',

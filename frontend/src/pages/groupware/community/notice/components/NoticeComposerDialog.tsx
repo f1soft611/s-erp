@@ -55,6 +55,116 @@ export function serializeNoticeEditorJson(
   return editor ? JSON.stringify(editor.getJSON()) : undefined;
 }
 
+function parseClipboardTextGrid(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+    if (!quoted && character === '\t') {
+      row.push(field);
+      field = '';
+      continue;
+    }
+    if (!quoted && (character === '\r' || character === '\n')) {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+      if (character === '\r' && text[index + 1] === '\n') index += 1;
+      continue;
+    }
+    field += character;
+  }
+
+  if (field || row.length > 0 || rows.length === 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function summarizeClipboardTables(html: string) {
+  if (!html || typeof DOMParser === 'undefined') return [];
+
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  return Array.from(document.querySelectorAll('table')).map((table) => {
+    const occupiedUntil: number[] = [];
+    const rows = Array.from(table.querySelectorAll('tr')).filter(
+      (row) => row.closest('table') === table,
+    );
+    return {
+      columns: Array.from(
+        table.querySelectorAll(':scope > colgroup > col'),
+      ).map((column) => ({
+        width: (column as HTMLElement).style.width,
+        span: column.getAttribute('span'),
+        style: column.getAttribute('style'),
+      })),
+      rows: rows.map((row, rowIndex) => {
+        let columnIndex = 0;
+        return Array.from(row.children)
+          .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
+          .map((cell) => {
+            const colspan = Math.max(
+              1,
+              Number(cell.getAttribute('colspan')) || 1,
+            );
+            const rowspan = Math.max(
+              1,
+              Number(cell.getAttribute('rowspan')) || 1,
+            );
+            const rangeIsAvailable = (startColumn: number) => {
+              for (
+                let spanColumn = startColumn;
+                spanColumn < startColumn + colspan;
+                spanColumn += 1
+              ) {
+                if ((occupiedUntil[spanColumn] ?? 0) > rowIndex) return false;
+              }
+              return true;
+            };
+            while (!rangeIsAvailable(columnIndex)) {
+              columnIndex += 1;
+            }
+            const startColumn = columnIndex;
+            for (
+              let spanColumn = startColumn;
+              spanColumn < startColumn + colspan;
+              spanColumn += 1
+            ) {
+              occupiedUntil[spanColumn] = Math.max(
+                occupiedUntil[spanColumn] ?? 0,
+                rowIndex + rowspan,
+              );
+            }
+            columnIndex += colspan;
+            return {
+              column: startColumn,
+              colspan,
+              rowspan,
+              width: cell.getAttribute('width'),
+              style: cell.getAttribute('style'),
+              text: cell.textContent ?? '',
+              html: cell.innerHTML.slice(0, 240),
+            };
+          });
+      }),
+    };
+  });
+}
+
 export function NoticeComposerDialog({
   open,
   isDark,
@@ -204,14 +314,17 @@ export function NoticeComposerDialog({
   const handleClipboardDebug = (data: DataTransfer, normalizedHtml: string) => {
     const html = data.getData('text/html') ?? '';
     const text = data.getData('text/plain') ?? '';
+    const sourceCells = summarizeClipboardTables(html);
+    const normalizedCells = summarizeClipboardTables(normalizedHtml);
     setPasteDebugLog((current) => [
       ...current,
       `[paste] types=${Array.from(data.types).join(', ')}`,
       `[paste] htmlLength=${html.length}, textLength=${text.length}`,
-      `[paste] html=${html.slice(0, 500)}`,
-      `[paste] text=${text.slice(0, 500)}`,
+      `[paste] text=${JSON.stringify(text)}`,
+      `[paste] plainGrid=${JSON.stringify(parseClipboardTextGrid(text))}`,
+      `[paste] sourceCells=${JSON.stringify(sourceCells)}`,
       `[normalized] length=${normalizedHtml.length}`,
-      `[normalized] html=${normalizedHtml.slice(0, 800)}`,
+      `[normalized] cells=${JSON.stringify(normalizedCells)}`,
     ]);
     window.setTimeout(() => {
       const editorElement = document.querySelector(

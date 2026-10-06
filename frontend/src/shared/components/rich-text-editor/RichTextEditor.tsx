@@ -45,6 +45,7 @@ import StarterKit from '@tiptap/starter-kit';
 import {
   hasSpreadsheetClipboardContent,
   normalizeClipboardHtmlForEditor,
+  normalizeClipboardTextGridForEditor,
   normalizeClipboardTextForEditor,
 } from './clipboard';
 import { richTextEditorContentStyles } from './editorStyles';
@@ -362,18 +363,25 @@ export function RichTextEditor({
         transformPastedHTML: normalizeClipboardHtmlForEditor,
         transformPastedText: normalizeClipboardTextForEditor,
         handlePaste: (view, event) => {
-          const reportPaste = () => {
-            if (!event.clipboardData) return;
-            clipboardPasteRef.current?.(
-              event.clipboardData,
-              normalizeClipboardHtmlForEditor(
-                event.clipboardData.getData('text/html'),
-              ),
-            );
+          const data = event.clipboardData;
+          const getNormalizedClipboard = () => {
+            if (!data) return '';
+            const html = data.getData('text/html') ?? '';
+            const plainText = data.getData('text/plain') ?? '';
+            return html.trim()
+              ? normalizeClipboardHtmlForEditor(html, plainText)
+              : normalizeClipboardTextGridForEditor(plainText);
           };
-          if (hasSpreadsheetClipboardContent(event.clipboardData)) {
-            reportPaste();
-            return false;
+          if (hasSpreadsheetClipboardContent(data)) {
+            const normalizedClipboard = getNormalizedClipboard();
+            if (data) {
+              clipboardPasteRef.current?.(data, normalizedClipboard);
+            }
+            event.preventDefault();
+            if (!readOnly && normalizedClipboard) {
+              editorRef.current?.commands.insertContent(normalizedClipboard);
+            }
+            return true;
           }
           const files = Array.from(event.clipboardData?.items ?? [])
             .filter(

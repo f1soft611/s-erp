@@ -6,6 +6,7 @@
 - Notice와 Draft dialog는 domain upload/delete adapter, 사용자 메시지, 폼·dirty-close UI, 기존 API payload mapping을 유지한다.
 - backend `RichTextDocumentSanitizer`가 Notice/Draft HTML과 Tiptap JSON에 동일한 server-side allowlist를 적용한다. Notice의 supported text/table styles와 Tiptap textStyle/link/underline/table/image schema를 보존하며 active content, event attrs, unsafe CSS/URL은 제거한다.
 - shared clipboard normalizer preserves safe font-family/font-size from non-table HTML, block-level styles and legacy `<font face/size>`. Excel table paste retains source `<br>` count/order, text-node newlines, indentation, and spaces without marker inference; text-only clipboard retains tabs and spaces. Stored JSON is restored without break rewriting. CSS `font` shorthand and class-based `<col>` widths are still recovered, and table paragraphs inherit cell font size.
+- Merged cells now scan for a contiguous free column range across the entire `colspan`, preventing placement/`colwidth` drift when a range intersects an existing `rowspan`.
 - backend HTML and JSON table-cell style allowlists now preserve safe `font-family`, `font-size`, `font-style`, and `line-height`; before the fix both test paths dropped cell font family/size.
 - backend `EmbeddedImageDocumentProcessor`가 null-safe token 수집, temporary session 검증, 기존 owner image resolution, 새 이미지 promotion, owner metadata 확인, stable URL rewrite, transient attr 제거, retained file ID 산출을 공통 수행한다.
 - processor는 editor에서 참조한 상세 image metadata와 전체 임시 session을 별도 입력으로 받는다. 상세 metadata는 promotion filename 선택에 우선하지만 새 token promotion 권한은 이번 session membership으로만 허용한다.
@@ -15,13 +16,13 @@
 
 ## 검증
 
-- Frontend focused: shared lifecycle hook, Notice HTML/composer/image/clipboard, Draft template dialog — 6 files, 67 tests passed; `npm --prefix frontend run build` passed.
+- Frontend focused: shared lifecycle hook, Notice HTML/composer/image/clipboard, Draft template dialog — 6 files, 68 tests passed; `npm --prefix frontend run build` passed.
 - Frontend: `npm --prefix frontend run build` — TypeScript 및 Vite build 통과.
 - Backend focused: sanitizer 6, processor 4, Notice service/image adapter 24, Draft service/image adapter 22 tests passed.
 - Backend full: `mvn -f backend/pom.xml test` — 228 tests, 0 failures/errors, 2 skipped, `BUILD SUCCESS`.
 - Backend package: `mvn -f backend/pom.xml package` — `BUILD SUCCESS`, 228 tests/0 failures/errors/2 skipped; latest class is copied to the IntelliJ Tomcat exploded docBase.
 - Browser save/reopen: 미검증. Tomcat package artifact는 갱신했지만 실행 중인 IntelliJ Tomcat ROOT context는 자동 재시작되지 않아 최신 class 반영에 context reload가 필요하다. 공유 서버를 임의 종료하지 않았다.
-- Shared browser diagnosis: earlier clipboard transforms inferred soft wraps from line content and rewrote saved JSON on reopen. That can destroy distinctions unavailable after persistence. The revised path preserves raw clipboard break/spacing structure and no longer rewrites stored documents. Existing templates already saved by the former transform cannot recover removed breaks or spaces; repaste those cells from Excel and save once.
+- Shared browser diagnosis: earlier clipboard transforms inferred soft wraps from line content and rewrote saved JSON on reopen. That can destroy distinctions unavailable after persistence. The revised path preserves raw clipboard break/spacing structure, corrects merged-column placement, and no longer rewrites stored documents. Existing templates already saved by the former transform cannot recover removed breaks, spaces, or source column widths; repaste those cells from Excel and save once.
 - Screenshot은 시각 UI 변경이 아니므로 추가하지 않았다.
 
 ## 후속 메모

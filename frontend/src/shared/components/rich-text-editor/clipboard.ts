@@ -160,6 +160,65 @@ function getClipboardTableColumnWidths(table: Element): number[] {
   });
 }
 
+export function parseClipboardTextGrid(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+    if (!quoted && character === '\t') {
+      row.push(field);
+      field = '';
+      continue;
+    }
+    if (!quoted && (character === '\r' || character === '\n')) {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+      if (character === '\r' && text[index + 1] === '\n') index += 1;
+      continue;
+    }
+    field += character;
+  }
+
+  if (field || row.length > 0 || rows.length === 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function serializePlainTextCell(text: string, sourceCell: Element): string {
+  const serializedText = escapeHtml(text.replace(/\r\n?/g, '\n')).replace(
+    /\n/g,
+    '<br>',
+  );
+  const sourceParagraph = Array.from(sourceCell.children).find((child) =>
+    ['p', 'div'].includes(child.tagName.toLowerCase()),
+  );
+  if (!sourceParagraph) return serializedText;
+
+  const style = sanitizeTextStyle(sourceParagraph);
+  const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
+  return `<p${styleAttribute}>${serializedText}</p>`;
+}
+
+function comparableCellText(text: string): string {
+  return text.replace(/[\s\u00a0]/g, '');
+}
+
 function sanitizeCellStyle(cell: Element, omitWidth = false): string | null {
   const declarations: string[] = [];
   const style = (cell as HTMLElement).style;
@@ -340,11 +399,35 @@ function serializeClipboardChildren(parent: ParentNode): string {
   return serialized.join('');
 }
 
-function normalizeClipboardTable(table: Element): string {
+function normalizeClipboardTable(
+  table: Element,
+  plainTextRows?: string[][],
+): string {
   const rows = Array.from(table.querySelectorAll('tr')).filter(
     (row) => row.closest('table') === table,
   );
   const columnWidths = getClipboardTableColumnWidths(table);
+  const logicalColumnCount = Math.max(
+    columnWidths.length,
+    ...rows.map((row) =>
+      Array.from(row.children)
+        .filter(
+          (cell) =>
+            cell.tagName.toLowerCase() === 'td' ||
+            cell.tagName.toLowerCase() === 'th',
+        )
+        .reduce(
+          (total, cell) =>
+            total + Math.max(1, Number(cell.getAttribute('colspan')) || 1),
+          0,
+        ),
+    ),
+  );
+  const plainTextMatchesTable = Boolean(
+    plainTextRows &&
+    plainTextRows.length === rows.length &&
+    plainTextRows.every((row) => row.length >= logicalColumnCount),
+  );
   const occupiedUntil: number[] = [];
   const normalizedRows = rows
     .map((row, rowIndex) => {
@@ -362,7 +445,17 @@ function normalizeClipboardTable(table: Element): string {
         const tagName = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td';
         const colspan = Math.max(1, Number(cell.getAttribute('colspan')) || 1);
         const rowspan = Math.max(1, Number(cell.getAttribute('rowspan')) || 1);
-        while ((occupiedUntil[columnIndex] ?? 0) > rowIndex) {
+        const hasAvailableColumnRange = (startColumn: number) => {
+          for (
+            let spanColumn = startColumn;
+            spanColumn < startColumn + colspan;
+            spanColumn += 1
+          ) {
+            if ((occupiedUntil[spanColumn] ?? 0) > rowIndex) return false;
+          }
+          return true;
+        };
+        while (!hasAvailableColumnRange(columnIndex)) {
           columnIndex += 1;
         }
         const cellColumn = columnIndex;
@@ -392,7 +485,15 @@ function normalizeClipboardTable(table: Element): string {
         columnIndex += colspan;
         const style = sanitizeCellStyle(cell, Boolean(colwidthAttribute));
         const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
-        const content = serializeClipboardChildren(cell);
+        const plainTextCell = plainTextMatchesTable
+          ? plainTextRows?.[rowIndex]?.[cellColumn]
+          : undefined;
+        const content =
+          typeof plainTextCell === 'string' &&
+          comparableCellText(plainTextCell) ===
+            comparableCellText(cell.textContent ?? '')
+            ? serializePlainTextCell(plainTextCell, cell)
+            : serializeClipboardChildren(cell);
 
         return `<${tagName}${spanAttributes}${colwidthAttribute}${styleAttribute}>${content}</${tagName}>`;
       });
@@ -578,6 +679,7 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
 
 export function normalizeClipboardHtmlForEditor(
   rawHtml: string | null | undefined,
+  rawPlainText = '',
 ): string {
   if (!rawHtml || !rawHtml.trim()) {
     return '';
@@ -616,7 +718,12 @@ export function normalizeClipboardHtmlForEditor(
   const tables = Array.from(root.querySelectorAll('table')).filter(
     (table) => !table.parentElement?.closest('table'),
   );
-  const normalizedTables = tables.map(normalizeClipboardTable).filter(Boolean);
+  const plainTextRows = rawPlainText
+    ? parseClipboardTextGrid(rawPlainText)
+    : undefined;
+  const normalizedTables = tables
+    .map((table) => normalizeClipboardTable(table, plainTextRows))
+    .filter(Boolean);
   if (normalizedTables.length > 0) {
     return normalizedTables.join('');
   }
@@ -671,6 +778,25 @@ export function normalizeClipboardHtmlForEditor(
 
 export function normalizeClipboardTextForEditor(rawText: string): string {
   return rawText.replace(/\r\n?/g, '\n');
+}
+
+export function normalizeClipboardTextGridForEditor(rawText: string): string {
+  const rows = parseClipboardTextGrid(rawText);
+  const serializedRows = rows.map(
+    (row) =>
+      `<tr>${row
+        .map((cell) => {
+          const text = escapeHtml(cell.replace(/\r\n?/g, '\n')).replace(
+            /\n/g,
+            '<br>',
+          );
+          return `<td><p>${text}</p></td>`;
+        })
+        .join('')}</tr>`,
+  );
+  return serializedRows.length
+    ? `<table><tbody>${serializedRows.join('')}</tbody></table>`
+    : '';
 }
 
 export function hasSpreadsheetClipboardContent(

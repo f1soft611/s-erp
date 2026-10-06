@@ -592,26 +592,67 @@ describe('NoticeComposerDialog payload', () => {
     expect(normalized).toContain('font-style:italic');
   });
 
-  it('converts Excel soft line breaks to wrapping while retaining paragraph breaks', () => {
+  it('preserves Excel soft and paragraph line breaks in clipboard order', () => {
     const html =
       '<table><tbody><tr><td>첫 줄<br>이어지는 줄<br><br>새 문단</td></tr></tbody></table>';
 
     const normalized = normalizeClipboardHtmlForEditor(html);
 
-    expect(normalized).toContain('첫 줄 이어지는 줄<br>새 문단');
-    expect(normalized).not.toContain('첫 줄<br>');
+    expect(normalized).toContain(
+      '<td>첫 줄<br>이어지는 줄<br><br>새 문단</td>',
+    );
   });
 
-  it('converts wrapped text-node newlines to spaces without dropping characters', () => {
+  it('preserves wrapped text-node newlines without dropping characters', () => {
     const html =
       '<table><tbody><tr><td><strong>중요관리점(CCP-2P)모니터링\n일지\n[X-ray 금속검출공정]</strong></td></tr></tbody></table>';
 
     const normalized = normalizeClipboardHtmlForEditor(html);
 
     expect(normalized).toContain(
-      '중요관리점(CCP-2P)모니터링 일지 [X-ray 금속검출공정]',
+      '<strong>중요관리점(CCP-2P)모니터링<br>일지<br>[X-ray 금속검출공정]</strong>',
     );
-    expect(normalized).not.toContain('모니터링<br>일지');
+  });
+
+  it('synchronizes real Excel plain-text line breaks into merged HTML cells', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+        }),
+      ),
+    );
+
+    const editor = screen.getByRole('textbox', { name: /본문/i });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (type: string) =>
+          type === 'text/html'
+            ? '<table><colgroup><col width="10"><col width="20"><col width="30"><col width="40"></colgroup><tbody><tr><td colspan="2"><p>제목 첫 줄<br>잘못 나뉜 줄<br><br>X-ray 줄</p></td><td>1호기</td><td>2호기</td></tr><tr><td>방법</td><td colspan="3"><p>* 기기 감도<br>잘못 나뉜 설명<br>* 제품 감도</p></td></tr></tbody></table>'
+            : '"제목 첫 줄 전체\nX-ray 줄"\t\t1호기\t2호기\r\n방법\t"* 기기 감도\n - 표준시편을 통과시킨다. 이어지는 문장\n* 제품 감도"\t\t',
+      },
+      preventDefault: vi.fn(),
+    });
+
+    await waitFor(() => {
+      const rows = editor.querySelectorAll('table tr');
+      expect(rows[0].querySelector('td p')?.innerHTML).toBe(
+        '제목 첫 줄 전체<br>X-ray 줄',
+      );
+      expect(rows[0].querySelector('td')?.getAttribute('colspan')).toBe('2');
+      expect(
+        rows[1].querySelectorAll('td')[1]?.querySelector('p')?.innerHTML,
+      ).toBe(
+        '* 기기 감도<br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도',
+      );
+      expect(rows[1].querySelectorAll('td')[1]?.getAttribute('colspan')).toBe(
+        '3',
+      );
+    });
   });
 
   it('applies embedded Excel CSS rules to matching cells', () => {
@@ -813,8 +854,8 @@ describe('NoticeComposerDialog payload', () => {
       expect(
         (rows[2].querySelectorAll('td')[1] as HTMLTableCellElement).colSpan,
       ).toBe(2);
-      expect(rows[2].querySelectorAll('td')[1]?.textContent).toContain(
-        'Excel 붙여넣기 검증 테스트',
+      expect(rows[2].querySelectorAll('td')[1]?.textContent).toBe(
+        'Excel 붙여넣기 검증\u00a0테스트',
       );
       expect(rows[0].querySelectorAll('td')[0].getAttribute('colwidth')).toBe(
         '120',
