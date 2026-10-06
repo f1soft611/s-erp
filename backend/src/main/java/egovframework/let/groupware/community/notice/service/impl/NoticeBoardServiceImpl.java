@@ -379,6 +379,14 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 }
             }
         }
+        if (sessionImages != null) {
+            for (NoticeEmbeddedImageVO image : sessionImages) {
+                if (image != null && StringUtils.hasText(image.getUploadToken())
+                        && !uploadByToken.containsKey(image.getUploadToken())) {
+                    uploadByToken.put(image.getUploadToken(), image);
+                }
+            }
+        }
 
         Set<String> referencedTokens = new HashSet<String>();
         Document htmlDocument = Jsoup.parseBodyFragment(html);
@@ -415,7 +423,11 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
 
         for (String token : referencedTokens) {
-            if (!sessionTokens.contains(token)) {
+            CommonFileVO alreadyOwned = findOwnedImageByUploadToken(token, ownedImages);
+            if (alreadyOwned != null) {
+                promotedByToken.put(token, alreadyOwned);
+            }
+            if (!sessionTokens.contains(token) && alreadyOwned == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "본문 이미지가 현재 임시 업로드 세션에 속하지 않습니다.");
             }
@@ -444,7 +456,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         if (node.isObject()) {
             if ("image".equals(node.path("type").asText())) {
-                String token = node.path("attrs").path("data-upload-token").asText();
+                String token = readJsonText(node.path("attrs"), "data-upload-token");
                 if (StringUtils.hasText(token)) {
                     tokens.add(token);
                 }
@@ -489,11 +501,12 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 JsonNode sourceAttributes = object.get("attrs");
                 ObjectNode attributes = sourceAttributes instanceof ObjectNode
                         ? (ObjectNode) sourceAttributes : object.putObject("attrs");
-                CommonFileVO owned = resolveImageOwner(attributes.path("data-upload-token").asText(),
-                        attributes.path("data-object-key").asText(), attributes.path("data-file-id").asText(),
+                String uploadToken = readJsonText(attributes, "data-upload-token");
+                String objectKey = readJsonText(attributes, "data-object-key");
+                String fileId = readJsonText(attributes, "data-file-id");
+                CommonFileVO owned = resolveImageOwner(uploadToken, objectKey, fileId,
                         promotedByToken, ownedImages);
-                if (owned == null && (StringUtils.hasText(attributes.path("data-file-id").asText())
-                        || StringUtils.hasText(attributes.path("data-upload-token").asText()))) {
+                if (owned == null && (StringUtils.hasText(fileId) || StringUtils.hasText(uploadToken))) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "공지 소유가 확인되지 않은 본문 이미지입니다.");
                 }
@@ -508,6 +521,11 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             node.elements().forEachRemaining(child ->
                     rewriteJsonImageNodes(child, promotedByToken, ownedImages, retainedFileIds));
         }
+    }
+
+    private String readJsonText(JsonNode node, String fieldName) {
+        JsonNode value = node.path(fieldName);
+        return value.isNull() || value.isMissingNode() ? "" : value.asText();
     }
 
     private CommonFileVO resolveImageOwner(
@@ -535,6 +553,22 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 return image;
             }
             if (StringUtils.hasText(fileId) && String.valueOf(image.getFileId()).equals(fileId)) {
+                return image;
+            }
+        }
+        return null;
+    }
+
+    private CommonFileVO findOwnedImageByUploadToken(String uploadToken, List<CommonFileVO> ownedImages) {
+        if (!StringUtils.hasText(uploadToken) || ownedImages == null) {
+            return null;
+        }
+        for (CommonFileVO image : ownedImages) {
+            if (image == null || !StringUtils.hasText(image.getObjectKey())) {
+                continue;
+            }
+            String[] pathSegments = image.getObjectKey().split("/");
+            if (pathSegments.length >= 2 && uploadToken.equals(pathSegments[pathSegments.length - 2])) {
                 return image;
             }
         }

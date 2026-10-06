@@ -140,7 +140,8 @@ class NoticeBoardServiceImplTest {
     payload.setContentsHtml("<p><img src=\"blob:http://localhost/preview\" data-file-id=\"113\" "
         + "data-object-key=\"" + legacyKey + "\" alt=\"pasted.png\"></p>");
     payload.setContentsJson("{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
-        + "\"src\":\"blob:http://localhost/preview\",\"data-file-id\":\"113\","
+        + "\"src\":\"blob:http://localhost/preview\",\"data-upload-token\":null,"
+        + "\"data-file-id\":\"113\","
         + "\"data-object-key\":\"" + legacyKey + "\",\"alt\":\"pasted.png\"}}]}");
 
     new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService)
@@ -148,8 +149,10 @@ class NoticeBoardServiceImplTest {
 
     ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
     verify(noticeBoardDAO).updateNoticePost(params.capture());
-    assertThat(params.getValue().get("contentsHtml").toString()).contains(stableUrl);
-    assertThat(params.getValue().get("contentsJson").toString()).contains(stableUrl);
+    assertThat(params.getValue().get("contentsHtml").toString()).contains(stableUrl)
+        .doesNotContain("data-upload-token");
+    assertThat(params.getValue().get("contentsJson").toString()).contains(stableUrl)
+        .doesNotContain("data-upload-token");
     verify(imageStorageService, org.mockito.Mockito.never())
         .promoteTemporaryImage(org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
@@ -157,6 +160,62 @@ class NoticeBoardServiceImplTest {
             org.mockito.ArgumentMatchers.anyString());
     verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(42L),
         eq(Collections.emptyList()), eq(Collections.singleton(113L)));
+    }
+
+    @Test
+    void updatePostPromotesReferencedImageFromTemporarySessionMetadata() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommonFileService commonFileService = mock(CommonFileService.class);
+        CommonCommentService commonCommentService = mock(CommonCommentService.class);
+        EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
+        String uploadToken = "6ba4f1f6-9638-4d8e-a8fd-32575d806a61";
+        String stableUrl = "/api/v1/groupware/boards/notice/posts/42/embedded-images?objectKey="
+            + "tenant%2F1%2Fembedded-images%2Fnotice%2F42%2F" + uploadToken + "%2Fimage.png";
+        NoticeEmbeddedImageVO sessionImage = new NoticeEmbeddedImageVO();
+        sessionImage.setUploadToken(uploadToken);
+        sessionImage.setFileName("image.png");
+        CommonFileVO promoted = new CommonFileVO();
+        promoted.setFileId(117L);
+        promoted.setTenantId(1L);
+        promoted.setOwnerType("NOTICE");
+        promoted.setOwnerId(42L);
+        promoted.setFileUsageType("EMBEDDED");
+        promoted.setDeletedYn("N");
+        promoted.setObjectKey("tenant/1/embedded-images/notice/42/" + uploadToken + "/image.png");
+        when(noticeBoardDAO.selectNoticePostById(org.mockito.ArgumentMatchers.anyMap()))
+            .thenReturn(new NoticeBoardPostVO());
+        when(imageStorageService.listOwnedImages(1L, "NOTICE", 42L))
+            .thenReturn(Collections.emptyList());
+        when(imageStorageService.promoteTemporaryImage(
+            1L, "NOTICE", 42L, uploadToken, "image.png", "login-user")).thenReturn(promoted);
+        when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.emptyList());
+        CommonCommentPageVO commentPage = new CommonCommentPageVO();
+        commentPage.setComments(Collections.emptyList());
+        when(commonCommentService.listComments(1L, "NOTICE", 42L, 3, null)).thenReturn(commentPage);
+        when(commonCommentService.countComments(1L, "NOTICE", 42L)).thenReturn(0L);
+
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("수정 공지");
+        payload.setNoticeGubunCode("GENERAL");
+        payload.setContentsHtml("<p><img src=\"blob:preview\" data-upload-token=\""
+            + uploadToken + "\" alt=\"image.png\"></p>");
+        payload.setContentsJson("{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
+            + "\"src\":\"blob:preview\",\"data-upload-token\":\"" + uploadToken
+            + "\",\"alt\":\"image.png\"}}]}");
+        payload.setEmbeddedImages(Collections.emptyList());
+        payload.setTemporaryImages(Collections.singletonList(sessionImage));
+
+        new NoticeBoardServiceImpl(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService)
+            .updatePost(1L, 42L, payload, "login-user", "로그인 사용자");
+
+        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).updateNoticePost(params.capture());
+        assertThat(params.getValue().get("contentsHtml").toString())
+            .contains(stableUrl).doesNotContain("data-upload-token", "blob:");
+        assertThat(params.getValue().get("contentsJson").toString())
+            .contains(stableUrl).doesNotContain("data-upload-token", "blob:");
+        verify(imageStorageService).promoteTemporaryImage(
+            1L, "NOTICE", 42L, uploadToken, "image.png", "login-user");
     }
 
     @Test

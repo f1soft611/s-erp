@@ -9,6 +9,12 @@
 - Notice/Draft dialog 모두 upload 중 save/close를 차단하고 취소·orphan temporary DELETE를 연결한다. Save request는 본문에서 참조하는 이미지와 upload session 전체를 구분해 전달하므로 미사용 token은 저장 완료 후 삭제된다.
 - 일반 첨부 경로와 owner type은 변경하지 않았다. DB schema 변경은 없다.
 
+## Notice 회귀 보완
+
+- 피드에서 stable Notice image URL을 `<img>`가 직접 요청하면 Authorization header가 없어 `ERR_BLOCKED_BY_ORB`로 차단됐다. 피드 썸네일과 펼친 본문 이미지는 `apiGetBlob`으로 인증 조회한 blob URL을 사용하며, 저장된 HTML/JSON은 stable API URL을 유지한다.
+- 수정 저장 중 본문 token이 `temporaryImages`에는 있지만 `embeddedImages`에 누락되면 승격 map을 만들지 못해 400이 발생했다. 현재 세션 허용목록을 통과한 token/fileName을 fallback metadata로 사용하며, editor metadata가 있으면 기존 값을 우선한다.
+- 공유 브라우저에서 post 82의 실제 update payload를 캡처했다. HTML에는 upload token이 없고 JSON image attrs의 `data-upload-token`은 `null`; `temporaryImages`와 `embeddedImages`는 모두 empty였다. Jackson `NullNode.asText()`가 `"null"`을 반환해 이를 session token으로 수집한 것이 400 원인이다. JSON MissingNode/NullNode는 빈 문자열로 정규화하며, 기존 owner-key token fallback과 hydrate transient-attr 제거도 유지한다.
+
 ## 기존 데이터 호환
 
 - 기존 Draft permanent object key 및 stable file ID는 `tb_common_file` owner lookup을 통해 계속 읽는다.
@@ -29,13 +35,15 @@ Preview presigned URL 만료와 object lifecycle 만료는 별도다. Preview UR
 
 ## 검증
 
-- Backend full: `mvn -f backend/pom.xml test` — 217 tests, 0 failures/errors, 2 skipped, `BUILD SUCCESS`.
+- Backend full: `mvn -f backend/pom.xml test` — 218 tests, 0 failures/errors, 2 skipped, `BUILD SUCCESS`.
 - Backend focused image suites — common storage, Notice/Draft adapters/services/controllers 통과.
-- Frontend focused: `notice-board-service`, `notice-composer-payload`, `use-notice-mutations`, `draft-form-template-dialog`; 4 files, 41 tests passed.
+- Regression focused: `NoticeBoardServiceImplTest` 22 tests passed.
+- Frontend focused: `notice-embedded-image-service`, `notice-board-service`, `notice-composer-payload`; 3 files, 33 tests passed.
 - Frontend build: `npm --prefix frontend run build` — TypeScript 및 Vite build 통과.
+- Notice page/local-update integration runs reported failures in comment/pagination and local-state assertions; those unrelated assertions were not changed.
 - `git diff --check` 통과.
 - 변경된 backend/frontend 핵심 파일 diagnostics에 오류가 없다.
-- Browser save/reopen 확인은 미수행: 공유 로컬 앱이 로그인 화면으로 이동했고 인증 정보를 사용하지 않았다. 스크린샷도 저장하지 않았다.
+- 공유 브라우저는 피드 이미지를 blob URL로 표시하며 naturalWidth 161을 확인했다. Backend fix 후에도 실제 save는 400으로 남아 있어 확인한 결과 Tomcat ROOT context가 수정 전부터 실행 중이다. `mvn package`로 `backend/target/s-erp-backend`의 class는 갱신했으나 JVM context는 재시작/재배포 전까지 기존 class를 사용한다. 공유 서버를 임의 종료하지 않아 live save 검증은 pending이다.
 
 ## 문서
 
