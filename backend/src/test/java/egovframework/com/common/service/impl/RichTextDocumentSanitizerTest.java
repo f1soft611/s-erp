@@ -31,6 +31,18 @@ class RichTextDocumentSanitizerTest {
     }
 
     @Test
+    void doesNotInsertPrettyPrintWhitespaceAfterHardBreaksInTableCells() {
+        String html = "<table><tbody><tr><td><p><strong>중요관리점모니터링 일지<br>[X-ray 금속검출공정]"
+                + "</strong></p><p>* 기기 감도<br>   - 표준시편을 통과시킨다.<br>이어지는 문장</p></td></tr></tbody></table>";
+
+        String sanitized = sanitizer.sanitizeHtml(html);
+
+        assertThat(sanitized).contains("<br>[X-ray 금속검출공정]")
+                .contains("<br>   - 표준시편을 통과시킨다.<br>이어지는 문장")
+                .doesNotContain("<br>\n", "<br>\r");
+    }
+
+    @Test
     void sanitizesTiptapJsonWhilePreservingSupportedMarksAndImageSessionMetadata() throws Exception {
         JsonNode document = objectMapper.readTree("{\"type\":\"doc\",\"content\":["
                 + "{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"강조\","

@@ -166,4 +166,69 @@ describe('useNoticeMutations', () => {
       }),
     );
   });
+
+  it('updates a pinned notice body in both local lists after save', async () => {
+    const updatedBody =
+      '<table><tbody><tr><td>수정된 본문</td></tr></tbody></table>';
+    serviceMocks.updateNoticePost.mockResolvedValue({
+      postId: 12,
+      title: '수정 공지',
+      noticeGubunCode: 'OPS',
+      contents: updatedBody,
+      contentsHtml: updatedBody,
+      contentsText: '수정된 본문',
+      isPinned: 'Y',
+    });
+    const pinnedNotice = {
+      ...notice,
+      isPinned: 'Y',
+      body: '이전 본문',
+      bodyHtml: '<p>이전 본문</p>',
+    };
+    const { result } = renderHook(() => {
+      const [noticeItems, setNoticeItems] = useState<NoticeFeedItem[]>([]);
+      const [pinnedNoticeItems, setPinnedNoticeItems] = useState<
+        NoticeFeedItem[]
+      >([pinnedNotice]);
+      const mutations = useNoticeMutations({
+        noticeItems,
+        setNoticeItems,
+        pinnedNoticeItems,
+        setPinnedNoticeItems,
+        setServerItemRevision: () => undefined,
+        loadNoticePosts: vi.fn().mockResolvedValue(undefined),
+        noticeGubunNamesRef: { current: new Map() },
+        editorDraft: {
+          id: 12,
+          title: '기존 공지',
+          body: '<p>이전 본문</p>',
+          isPinned: 'Y',
+          attachments: [],
+        },
+        setEditorDraft: vi.fn(),
+        closeComposer: vi.fn(),
+        showError: vi.fn(),
+        showSuccess: vi.fn(),
+      });
+      return { noticeItems, pinnedNoticeItems, mutations };
+    });
+
+    await act(async () => {
+      await result.current.mutations.handleSaveNotice({
+        title: '수정 공지',
+        noticeGubunCode: 'OPS',
+        body: updatedBody,
+        bodyJson: '{"type":"doc"}',
+        bodyText: '수정된 본문',
+        attachments: [],
+        removedAttachmentIds: [],
+        embeddedImages: [],
+        temporaryImages: [],
+      });
+    });
+
+    expect(result.current.pinnedNoticeItems[0].bodyHtml).toBe(updatedBody);
+    expect(result.current.pinnedNoticeItems[0].summary).toBe('수정된 본문');
+    expect(result.current.noticeItems).toEqual([]);
+  });
 });

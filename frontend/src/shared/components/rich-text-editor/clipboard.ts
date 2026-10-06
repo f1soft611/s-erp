@@ -201,10 +201,7 @@ export function parseClipboardTextGrid(text: string): string[][] {
 }
 
 function serializePlainTextCell(text: string, sourceCell: Element): string {
-  const serializedText = escapeHtml(text.replace(/\r\n?/g, '\n')).replace(
-    /\n/g,
-    '<br>',
-  );
+  const serializedText = serializePlainTextWithSourceMarks(text, sourceCell);
   const sourceParagraph = Array.from(sourceCell.children).find((child) =>
     ['p', 'div'].includes(child.tagName.toLowerCase()),
   );
@@ -217,6 +214,102 @@ function serializePlainTextCell(text: string, sourceCell: Element): string {
 
 function comparableCellText(text: string): string {
   return text.replace(/[\s\u00a0]/g, '');
+}
+
+type ClipboardTextMark = { tag: string; style?: string };
+
+function getTextNodeMarks(node: Text, cell: Element): ClipboardTextMark[] {
+  const ancestors: Element[] = [];
+  let current = node.parentElement;
+  while (current && current !== cell) {
+    ancestors.unshift(current);
+    current = current.parentElement;
+  }
+
+  const marks: ClipboardTextMark[] = [];
+  for (const ancestor of ancestors) {
+    const tag = ancestor.tagName.toLowerCase();
+    if (['strong', 'b'].includes(tag)) marks.push({ tag: 'strong' });
+    else if (['em', 'i'].includes(tag)) marks.push({ tag: 'em' });
+    else if (['s', 'strike', 'del'].includes(tag)) marks.push({ tag: 's' });
+
+    const style = sanitizeTextStyle(ancestor);
+    if (style) marks.push({ tag: 'span', style });
+  }
+  return marks;
+}
+
+function collectClipboardTextMarks(cell: Element): ClipboardTextMark[][] {
+  const marks: ClipboardTextMark[][] = [];
+  const walker = cell.ownerDocument.createTreeWalker(
+    cell,
+    NodeFilter.SHOW_TEXT,
+  );
+  let current = walker.nextNode();
+  while (current) {
+    const textNode = current as Text;
+    const nodeMarks = getTextNodeMarks(textNode, cell);
+    for (const character of Array.from(textNode.textContent ?? '')) {
+      if (!/[\s\u00a0]/.test(character)) marks.push(nodeMarks);
+    }
+    current = walker.nextNode();
+  }
+  return marks;
+}
+
+function sameClipboardMarks(
+  left: ClipboardTextMark[],
+  right: ClipboardTextMark[],
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function wrapClipboardText(text: string, marks: ClipboardTextMark[]): string {
+  return [...marks].reverse().reduce((content, mark) => {
+    if (mark.tag === 'span') {
+      const styleAttribute = mark.style
+        ? ` style="${escapeHtml(mark.style)}"`
+        : '';
+      return `<span${styleAttribute}>${content}</span>`;
+    }
+    return `<${mark.tag}>${content}</${mark.tag}>`;
+  }, escapeHtml(text));
+}
+
+function serializePlainTextWithSourceMarks(
+  text: string,
+  sourceCell: Element,
+): string {
+  const sourceMarks = collectClipboardTextMarks(sourceCell);
+  const characters = Array.from(text.replace(/\r\n?/g, '\n'));
+  const output: string[] = [];
+  let activeMarks: ClipboardTextMark[] | null = null;
+  let segment = '';
+  let sourceIndex = 0;
+
+  const flush = () => {
+    if (segment && activeMarks)
+      output.push(wrapClipboardText(segment, activeMarks));
+    segment = '';
+  };
+
+  for (const character of characters) {
+    if (character === '\n') {
+      flush();
+      output.push('<br>');
+      activeMarks = null;
+      continue;
+    }
+
+    const marks: ClipboardTextMark[] = /[\s\u00a0]/.test(character)
+      ? (activeMarks ?? sourceMarks[sourceIndex] ?? [])
+      : (sourceMarks[sourceIndex++] ?? []);
+    if (activeMarks && !sameClipboardMarks(activeMarks, marks)) flush();
+    activeMarks = marks;
+    segment += character;
+  }
+  flush();
+  return output.join('');
 }
 
 function sanitizeCellStyle(cell: Element, omitWidth = false): string | null {
