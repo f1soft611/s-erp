@@ -5,7 +5,7 @@
 - frontend `useRichTextEditorSaveLifecycle`가 editor HTML/JSON snapshot, 본문 참조 이미지와 전체 임시 session 구분, upload 진행 상태, orphan/cancel/success session 정리를 공통 소유한다.
 - Notice와 Draft dialog는 domain upload/delete adapter, 사용자 메시지, 폼·dirty-close UI, 기존 API payload mapping을 유지한다.
 - backend `RichTextDocumentSanitizer`가 Notice/Draft HTML과 Tiptap JSON에 동일한 server-side allowlist를 적용한다. Notice의 supported text/table styles와 Tiptap textStyle/link/underline/table/image schema를 보존하며 active content, event attrs, unsafe CSS/URL은 제거한다.
-- shared clipboard normalizer preserves safe font-family/font-size from non-table HTML, block-level styles and legacy `<font face/size>`. Excel paste uses quoted TSV cell text/line breaks when its 24-column row grid and non-whitespace text align with HTML; it preserves HTML merges, widths and cell styles while correcting HTML-only soft wraps. Non-matching cells safely retain HTML. Stored JSON is restored without rewriting. CSS `font` shorthand/class-based `<col>` widths and plain-text-only TSV are supported.
+- shared clipboard normalizer preserves safe font-family/font-size from non-table HTML, block-level styles and legacy `<font face/size>`. Excel paste uses quoted TSV cell text/line breaks when its row grid and non-whitespace text align with HTML; it preserves HTML merges, widths, cell styles, and inline font-color runs while correcting HTML-only soft wraps. Non-matching cells safely retain HTML. Stored JSON is restored without rewriting. CSS `font` shorthand/class-based `<col>` widths and plain-text-only TSV are supported.
 - Merged cells now scan for a contiguous free column range across the entire `colspan`, preventing placement/`colwidth` drift when a range intersects an existing `rowspan`.
 - backend HTML and JSON table-cell style allowlists now preserve safe `font-family`, `font-size`, `font-style`, and `line-height`; before the fix both test paths dropped cell font family/size.
 - backend `EmbeddedImageDocumentProcessor`가 null-safe token 수집, temporary session 검증, 기존 owner image resolution, 새 이미지 promotion, owner metadata 확인, stable URL rewrite, transient attr 제거, retained file ID 산출을 공통 수행한다.
@@ -16,7 +16,7 @@
 
 ## 검증
 
-- Frontend focused: shared lifecycle hook, Notice HTML/composer/image/clipboard, Draft template dialog — 6 files, 71 tests passed; `npm --prefix frontend run build` passed.
+- Frontend focused: shared lifecycle hook, Notice HTML/composer/image/clipboard and mutations, Draft template dialog — 7 files, 78 tests passed; `npm --prefix frontend run build` passed. Two existing `notice-page` comment pagination tests remain failing because their expected older-comment button is absent.
 - Frontend: `npm --prefix frontend run build` — TypeScript 및 Vite build 통과.
 - Backend focused: sanitizer 6, processor 4, Notice service/image adapter 24, Draft service/image adapter 22 tests passed.
 - Backend full: `mvn -f backend/pom.xml test` — 228 tests, 0 failures/errors, 2 skipped, `BUILD SUCCESS`.
