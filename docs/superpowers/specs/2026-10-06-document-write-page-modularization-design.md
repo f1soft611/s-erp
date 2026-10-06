@@ -41,12 +41,12 @@
 대상은 `frontend/src/pages/groupware/documents/write/` 내부로 제한한다.
 
 - `DocumentWritePage.tsx`: 헤더, 레이아웃, 목록·요약 컴포넌트를 연결하고 페이지 훅의 값을 전달한다.
-- `components/DocumentComposerDialog.tsx`: 문서 구분 탭, 제목, 본문 편집기, 첨부 목록과 푸터 액션을 렌더링한다. 기존 `CommonDialog`를 그대로 사용하며 공용 모달 구현은 수정하지 않는다.
+- `components/DocumentComposerDialog.tsx`: 문서 구분 탭, 제목, 공통 `RichTextEditor`/`RichTextEditorToolbar`, 첨부 목록과 푸터 액션을 렌더링한다. 기존 `CommonDialog`를 그대로 사용하며 공용 모달 및 공통 에디터 구현은 수정하지 않는다.
 - `components/DocumentFeedItem.tsx`: 피드 카드와 문서 상태 칩을 렌더링한다.
 - `components/ApprovalSummaryPanel.tsx`: 결재 요약과 알림을 렌더링한다.
 - `components/EmptyDocumentList.tsx`: 빈 목록 안내와 작성 진입 버튼을 렌더링한다.
 - `hooks/useDocumentWritePage.ts`: 목록 보기 방식, 업무 구분 필터, 작성 다이얼로그 열기/닫기 상태를 관리한다.
-- `hooks/useDocumentComposer.ts`: 작성 탭, 제목, Tiptap 편집기, 툴바 표시, 첨부 파일, 취소 시 초기화 동작을 관리한다.
+- `hooks/useDocumentComposer.ts`: 작성 탭, 제목, 공통 `RichTextEditor`가 전달하는 Tiptap editor 인스턴스, 첨부 파일, 취소 시 초기화 동작을 관리한다. 편집기와 서식 툴바 구현은 공통 컴포넌트에 위임한다.
 - `types/documentWrite.types.ts`: 문서 종류, 결재 상태, 샘플 문서 및 페이지 속성 타입을 정의한다.
 - `data/documentWriteData.ts`: 현재 샘플 문서와 문서 종류 데이터를 둔다.
 
@@ -54,12 +54,13 @@
 
 ### 데이터와 사용자 흐름
 
-샘플 목록은 현재와 동일한 정적 데이터에서 가져온다. 페이지 훅은 업무 구분 필터를 적용하고, 고정/비고정 목록과 공용 피드·리스트 뷰 입력값을 만든다. 페이지 액션이나 빈 상태의 작성 버튼은 작성 모달을 연다. 작성 모달은 작성 훅이 가진 편집 상태를 사용하고, 취소/닫기 동작은 제목·첨부·본문·툴바를 기존처럼 초기화한다.
+샘플 목록은 현재와 동일한 정적 데이터에서 가져온다. 페이지 훅은 업무 구분 필터를 적용하고, 고정/비고정 목록과 공용 피드·리스트 뷰 입력값을 만든다. 페이지 액션이나 빈 상태의 작성 버튼은 작성 모달을 연다. 작성 모달은 공통 `RichTextEditor`와 `RichTextEditorToolbar`를 사용하고, editor 인스턴스는 `onEditorReady`로 훅에 전달한다. 취소/닫기 동작은 제목·첨부·본문을 초기화하며 공통 툴바의 표시 상태는 툴바 컴포넌트 생명주기에 따른다.
 
 ### 유지할 동작과 범위 제외
 
 - 기본 리스트 보기, 피드 전환, 필터, 상단 고정 문서, 결재 요약과 샘플 데이터는 동일하게 유지한다.
 - 현재 활성/비활성 문서 구분, 제목·본문 입력, 서식 툴바, 첨부 선택과 삭제를 유지한다.
+- 본문 및 서식 툴바는 기존 공통 RichTextEditor 구현을 사용한다. 공통 툴바가 제공하는 글꼴·표·색상·링크 도구를 활용하며 이 기능은 페이지 전용 편집기에서 복제하지 않는다.
 - 저장 버튼은 계속 비활성화한다. 문서 생성·수정 API, 임시저장, 유효성 검증, 권한, 백엔드 연동은 추가하지 않는다.
 - `CommonDialog` 및 공지사항 작성 흐름은 수정하지 않는다.
 - 라우팅, 메뉴 권한, 다른 그룹웨어 페이지는 변경하지 않는다.

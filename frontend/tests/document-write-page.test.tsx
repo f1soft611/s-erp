@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitForElementToBeRemoved,
+} from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
@@ -72,16 +77,44 @@ describe('Document write page', () => {
     expect(
       screen.getByRole('dialog', { name: '문서 작성' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('document-composer-dialog-root'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '기안서' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '업무연락' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '지출결의서' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '근태신청' })).toBeDisabled();
     expect(screen.getByRole('textbox', { name: '제목' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '본문' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: '본문' }).closest('.rich-text-editor-content'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '툴바 열기' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '첨부 링크' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: '툴바 열기' }));
     expect(screen.getByRole('button', { name: '굵게' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '표 삽입' })).toBeInTheDocument();
+  });
+
+  it('clears the compose title when the dialog closes and reopens', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '작성 중 제목' },
+    });
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '작성 중 제목',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: '문서 작성' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('');
   });
 });
