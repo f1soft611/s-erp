@@ -7,6 +7,8 @@ export type CommonViewItem = {
   dateLabel: string;
   isPinned?: boolean;
   categoryLabel?: string;
+  statusLabel?: string;
+  statusColor?: 'default' | 'error' | 'info' | 'success' | 'warning';
   metaLabel?: string;
   summary?: string;
 };

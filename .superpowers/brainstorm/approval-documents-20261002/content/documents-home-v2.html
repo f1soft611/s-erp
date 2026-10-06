@@ -1,0 +1,679 @@
+<style>
+  .documents-preview {
+    color: #21312e;
+  }
+  .documents-preview h2 {
+    margin-bottom: 6px;
+  }
+  .documents-preview > .subtitle {
+    margin-bottom: 18px;
+  }
+  .app-canvas {
+    position: relative;
+    max-width: 1180px;
+    margin: 0 auto;
+    min-height: 660px;
+    overflow: hidden;
+    border: 1px solid #d8e1dd;
+    border-radius: 7px;
+    background: #f5f8f6;
+    box-shadow: 0 14px 38px #15322c16;
+    font:
+      12px/1.45 'Segoe UI',
+      sans-serif;
+  }
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 38px;
+    padding: 0 18px;
+    border-bottom: 1px solid #e2e9e5;
+    background: #fff;
+    color: #697772;
+  }
+  .brand {
+    color: #12776c;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px 12px;
+    background: #fff;
+  }
+  .breadcrumb {
+    color: #82908b;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+  .page-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #172d2a;
+  }
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 11px;
+    border: 1px solid #cdd8d3;
+    border-radius: 4px;
+    background: #fff;
+    color: #314440;
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .button.primary {
+    border-color: #117a6f;
+    background: #117a6f;
+    color: #fff;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    align-items: start;
+    gap: 14px;
+    padding: 14px 18px 18px;
+  }
+  .left-pane,
+  .right-pane {
+    min-width: 0;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .toolbar-left,
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .segmented {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid #d8e1dd;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .segmented span {
+    padding: 5px 9px;
+    border-radius: 3px;
+    color: #6c7b75;
+  }
+  .segmented .active {
+    background: #e4f1ed;
+    color: #116b61;
+    font-weight: 700;
+  }
+  .subtle {
+    color: #6d7a75;
+    font-size: 10px;
+  }
+  .pinned {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    margin-bottom: 10px;
+    border: 1px solid #dce6e1;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .pin-label {
+    flex: 0 0 auto;
+    color: #52645e;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .pinned-doc {
+    min-width: 0;
+    padding: 5px 8px;
+    border-left: 1px solid #e3e9e6;
+    color: #344640;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pinned-doc b {
+    color: #18766b;
+    font-size: 9px;
+    margin-right: 5px;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px;
+    margin-bottom: 8px;
+    border: 1px solid #e0e7e3;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .search-input {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 80px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid #dce4e0;
+    border-radius: 3px;
+    color: #929d98;
+  }
+  .grid-wrap {
+    overflow: hidden;
+    border: 1px solid #dce4e0;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+  .grid th {
+    height: 31px;
+    background: #eff4f1;
+    color: #53655f;
+    font-weight: 700;
+  }
+  .grid td,
+  .grid th {
+    padding: 7px 6px;
+    border-bottom: 1px solid #e5ebe8;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .grid td:first-child,
+  .grid th:first-child {
+    text-align: center;
+  }
+  .grid tr:last-child td {
+    border-bottom: 0;
+  }
+  .doc-title {
+    color: #263b35;
+    font-weight: 650;
+  }
+  .kind {
+    display: inline-block;
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: #edf4f1;
+    color: #477267;
+    font-size: 9px;
+  }
+  .state {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: #e4f1ed;
+    color: #237467;
+    font-size: 9px;
+  }
+  .state.wait {
+    background: #fff2d9;
+    color: #94621c;
+  }
+  .state.draft {
+    background: #eef0f0;
+    color: #64716d;
+  }
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    color: #62716b;
+    font-size: 10px;
+  }
+  .right-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .panel {
+    padding: 12px;
+    border: 1px solid #dfe7e3;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .panel-head strong {
+    color: #253b35;
+    font-size: 12px;
+  }
+  .panel-link {
+    color: #15766b;
+    font-size: 10px;
+  }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+  .metric {
+    padding: 9px;
+    border-radius: 4px;
+    background: #f3f7f5;
+  }
+  .metric span {
+    display: block;
+    color: #788680;
+    font-size: 9px;
+  }
+  .metric b {
+    display: block;
+    margin-top: 3px;
+    color: #17463e;
+    font-size: 20px;
+    line-height: 1.1;
+  }
+  .metric.alert {
+    background: #fff6e8;
+  }
+  .metric.alert b {
+    color: #a7681d;
+  }
+  .notice-row {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-top: 1px solid #edf1ef;
+  }
+  .notice-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #d58b35;
+  }
+  .notice-copy {
+    min-width: 0;
+  }
+  .notice-copy b {
+    display: block;
+    color: #374a44;
+    font-size: 10px;
+    font-weight: 650;
+  }
+  .notice-copy span {
+    display: block;
+    margin-top: 2px;
+    color: #83908b;
+    font-size: 9px;
+  }
+  .summary-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .summary-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid #edf1ef;
+    color: #5c6d66;
+    font-size: 10px;
+  }
+  .summary-list b {
+    color: #314840;
+  }
+  .scrim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 26px;
+    background: #15201f78;
+  }
+  .composer {
+    width: min(850px, 96%);
+    height: min(565px, 94%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #d8e0dc;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 18px 55px #17252140;
+  }
+  .composer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid #e1e8e4;
+    color: #1d302c;
+    font-size: 14px;
+    font-weight: 750;
+  }
+  .close {
+    color: #76847e;
+    font-size: 18px;
+    font-weight: 400;
+  }
+  .doc-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 16px 0;
+    border-bottom: 1px solid #dce5e1;
+    background: #f7f9f8;
+  }
+  .doc-tab {
+    padding: 9px 13px;
+    border-bottom: 2px solid transparent;
+    color: #65746e;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .doc-tab.active {
+    border-color: #117a6f;
+    background: #fff;
+    color: #117268;
+    font-weight: 750;
+  }
+  .doc-tab.disabled {
+    opacity: 0.42;
+  }
+  .composer-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 16px;
+  }
+  .type-fields {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px dashed #c7d4ce;
+    border-radius: 4px;
+    background: #f7faf8;
+    color: #64756e;
+    font-size: 10px;
+  }
+  .field-label {
+    margin-bottom: 4px;
+    color: #6d7b75;
+    font-size: 10px;
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    min-height: 33px;
+    padding: 0 10px;
+    border: 1px solid #dce4e0;
+    border-radius: 4px;
+    background: #fff;
+    color: #9aa49f;
+  }
+  .body-editor {
+    flex: 1;
+    min-height: 85px;
+    padding: 10px;
+    border: 1px solid #dce4e0;
+    color: #9aa49f;
+  }
+  .composer-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-top: 1px solid #e1e8e4;
+    background: #fbfcfb;
+  }
+  .foot-actions {
+    display: flex;
+    gap: 7px;
+  }
+  .caption {
+    margin: 9px 0 0;
+    color: #71817a;
+    font-size: 10px;
+  }
+  @media (max-width: 900px) {
+    .columns {
+      grid-template-columns: minmax(0, 1fr) 210px;
+      gap: 9px;
+      padding: 10px;
+    }
+    .app-canvas {
+      min-height: 620px;
+    }
+    .grid {
+      font-size: 9px;
+    }
+    .grid td,
+    .grid th {
+      padding: 6px 4px;
+    }
+  }
+  @media (max-width: 680px) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+    .right-pane {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .scrim {
+      padding: 8px;
+    }
+    .composer {
+      width: 100%;
+      height: 96%;
+    }
+    .doc-tab {
+      padding: 8px 7px;
+      font-size: 9px;
+    }
+    .toolbar {
+      flex-wrap: wrap;
+    }
+  }
+</style>
+
+<div class="documents-preview">
+  <h2>문서현황과 작성 팝업</h2>
+  <p class="subtitle">
+    공지사항과 같은 좌측 피드/목록 + 우측 요약 패턴을 적용하고, 페이지 우측
+    상단의 작성 버튼이 문서유형 탭이 있는 팝업을 엽니다.
+  </p>
+  <div class="app-canvas">
+    <div class="app-bar">
+      <span class="brand">S-ERP</span><span>그룹웨어　　김민수　⌄</span>
+    </div>
+    <div class="page-header">
+      <div>
+        <div class="breadcrumb">그룹웨어　›　전자결재</div>
+        <h3>문서현황</h3>
+      </div>
+      <button class="button primary">＋ 문서 작성</button>
+    </div>
+    <div class="columns">
+      <main class="left-pane">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <span class="subtle">내 문서</span>
+            <div class="segmented">
+              <span>피드</span><span class="active">목록</span>
+            </div>
+            <span class="subtle">전체 24건</span>
+          </div>
+          <div class="toolbar-right">
+            <button class="button">구분 전체⌄</button
+            ><button class="button">정렬⌄</button>
+          </div>
+        </div>
+        <div class="pinned">
+          <span class="pin-label">상단고정</span
+          ><span class="pinned-doc"><b>기안서</b> 출장비 정산 기준 확인</span
+          ><span class="pinned-doc"><b>업무연락</b> 10월 점검 일정 공유</span>
+        </div>
+        <div class="search">
+          <span class="search-input">제목 또는 작성자 검색</span
+          ><button class="button">상세검색⌄</button
+          ><button class="button">조회</button>
+        </div>
+        <div class="grid-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>구분</th>
+                <th>제목</th>
+                <th>작성일</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td><span class="kind">기안서</span></td>
+                <td class="doc-title">월간 업무 계획 승인 요청</td>
+                <td>2026-10-02</td>
+                <td><span class="state wait">결재대기</span></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><span class="kind">업무연락</span></td>
+                <td class="doc-title">생산 일정 변경 안내</td>
+                <td>2026-10-01</td>
+                <td><span class="state">진행중</span></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><span class="kind">기안서</span></td>
+                <td class="doc-title">작업 장비 교체 검토</td>
+                <td>2026-09-30</td>
+                <td><span class="state draft">임시저장</span></td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td><span class="kind">업무연락</span></td>
+                <td class="doc-title">현장 점검 결과 공유</td>
+                <td>2026-09-29</td>
+                <td><span class="state wait">보완요청</span></td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td><span class="kind">기안서</span></td>
+                <td class="doc-title">교육 참석 신청</td>
+                <td>2026-09-28</td>
+                <td><span class="state">완료</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pagination">‹　1　2　3　4　5　›</div>
+        </div>
+        <p class="caption">
+          목록 모드에서는 F1-Grid를 사용하고, 상세검색은 구분·상태·기간 등
+          확정된 조건으로 구성합니다.
+        </p>
+      </main>
+      <aside class="right-pane">
+        <section class="panel">
+          <div class="panel-head">
+            <strong>결재 요약</strong><span class="panel-link">전체보기 →</span>
+          </div>
+          <div class="metric-grid">
+            <div class="metric alert">
+              <span>내가 처리할 결재</span><b>3</b>
+            </div>
+            <div class="metric"><span>작성 중 문서</span><b>2</b></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <strong>놓치지 마세요</strong
+            ><span class="panel-link">더보기 →</span>
+          </div>
+          <div class="notice-row">
+            <span class="notice-dot"></span>
+            <div class="notice-copy">
+              <b>결재 요청 2건이 도착했습니다</b
+              ><span>가장 오래된 요청 · 10월 1일</span>
+            </div>
+          </div>
+          <div class="notice-row">
+            <span class="notice-dot"></span>
+            <div class="notice-copy">
+              <b>보완이 필요한 문서 1건</b><span>내용 확인 후 다시 제출</span>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <strong>내 문서 상태</strong
+            ><span class="panel-link">문서현황 →</span>
+          </div>
+          <ul class="summary-list">
+            <li><span>결재 진행 중</span><b>5건</b></li>
+            <li><span>완료</span><b>12건</b></li>
+            <li><span>임시저장</span><b>2건</b></li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+    <div class="scrim">
+      <section class="composer">
+        <div class="composer-head">
+          <span>문서 작성</span><span class="close">×</span>
+        </div>
+        <div class="doc-tabs">
+          <span class="doc-tab active">기안서</span
+          ><span class="doc-tab">업무연락</span
+          ><span class="doc-tab disabled">지출결의서</span
+          ><span class="doc-tab disabled">근태신청</span>
+        </div>
+        <div class="composer-body">
+          <div class="type-fields">
+            <span>선택한 문서유형의 입력항목 영역</span
+            ><span>기안서 전용항목은 검토 후 반영</span>
+          </div>
+          <div>
+            <div class="field-label">제목 *</div>
+            <div class="field">제목을 입력하세요.</div>
+          </div>
+          <div class="body-editor">본문을 입력하세요.</div>
+        </div>
+        <div class="composer-foot">
+          <button class="button">＋ 첨부</button>
+          <div class="foot-actions">
+            <button class="button">취소</button
+            ><button class="button primary">저장</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p class="caption">
+    검토용 시안입니다. 요약 항목·상태·고정 기능·피드/목록 전환 및 저장 동작은
+    실제 결재 규칙에 맞춰 확정합니다.
+  </p>
+</div>

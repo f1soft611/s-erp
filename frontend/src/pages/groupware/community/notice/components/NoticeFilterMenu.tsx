@@ -6,12 +6,14 @@ type NoticeFilterMenuProps = {
   filters: Array<{ code: string; name: string; isImportant?: boolean }>;
   selectedCode: string;
   onChange: (code: string) => void;
+  ariaLabel?: string;
 };
 
 export function NoticeFilterMenu({
   filters,
   selectedCode,
   onChange,
+  ariaLabel = '공지사항 필터',
 }: NoticeFilterMenuProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -21,7 +23,7 @@ export function NoticeFilterMenu({
     <>
       <IconButton
         size="small"
-        aria-label="공지사항 필터"
+        aria-label={ariaLabel}
         title="필터"
         onClick={(event) => setAnchorEl(event.currentTarget)}
         color={selectedCode ? 'primary' : 'default'}

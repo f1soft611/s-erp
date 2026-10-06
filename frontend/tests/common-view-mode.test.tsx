@@ -70,6 +70,27 @@ describe('common notice view mode components', () => {
     expect(screen.getByText('시스템')).toBeInTheDocument();
   });
 
+  it('renders an optional status beside the category label in list mode', () => {
+    render(
+      <ListView
+        items={[
+          {
+            id: 3,
+            title: '결재 문서',
+            authorLabel: '작성자',
+            dateLabel: '2026-10-02',
+            categoryLabel: '기안서',
+            statusLabel: '결재대기',
+          },
+        ]}
+      />,
+    );
+
+    const titleRow = screen.getByText('결재 문서').parentElement;
+    expect(titleRow).toHaveTextContent('기안서');
+    expect(titleRow).toHaveTextContent('결재대기');
+  });
+
   it('provides mode-specific skeletons', () => {
     render(
       <>

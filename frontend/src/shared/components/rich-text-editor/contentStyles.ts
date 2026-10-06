@@ -1,4 +1,4 @@
-export const noticeContentStyles = {
+export const richTextContentStyles = {
   fontSize: '0.95rem',
   lineHeight: 1.7,
   '& p': {

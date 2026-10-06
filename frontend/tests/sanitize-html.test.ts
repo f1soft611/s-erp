@@ -24,6 +24,25 @@ describe('sanitizeHtml', () => {
     expect(result).not.toContain('style=');
   });
 
+  it('preserves approved text styles only when explicitly enabled', () => {
+    const html =
+      '<span style="font-family:Arial;font-size:10pt;color:#123456">셀</span>';
+
+    expect(sanitizeHtml(html)).toBe('셀');
+
+    const result = sanitizeHtml(
+      '<span onclick="run()" style="font-family:Arial;font-size:10pt;color:#123456;background-image:url(https://evil.example/x)">셀</span><script>run()</script>',
+      { preserveTextStyles: true },
+    );
+
+    expect(result).toContain(
+      '<span style="font-family:Arial;font-size:10pt;color:#123456">셀</span>',
+    );
+    expect(result).not.toMatch(
+      /onclick|background-image|url\(|<script|run\(\)/i,
+    );
+  });
+
   it('rejects protocol-relative and unsupported URL schemes', () => {
     const result = sanitizeHtml(
       '<p><a href="//evil.example/path">host</a><a href="ftp://evil.example/file">ftp</a><a href="vbscript:msgbox(1)">script</a><a href="/local/path">local</a></p>',

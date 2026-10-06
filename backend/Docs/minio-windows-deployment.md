@@ -186,6 +186,28 @@ MinIO Client로 버킷을 만든다.
 
 ---
 
+## 6-1. 공통 임베디드 이미지 임시 객체 7일 만료
+
+공지사항과 기안양식 본문 이미지가 공통 embedded-image storage service를 사용한다. 기존 `document-attachments` 버킷의 key 규칙은 다음과 같다.
+
+- 임시: `tenant/{tenantId}/embedded-image-temp/{uploadToken}/{fileName}`
+- 영구: `tenant/{tenantId}/embedded-images/{ownerTypeLower}/{ownerId}/{uploadToken}/{fileName}`
+
+임시 객체에는 `s-erp-temp-owner=embedded-image` object tag를 기록한다. MinIO lifecycle은 `tenant/` prefix와 tag가 모두 일치하는 임시 객체만 7일 후 expiration한다. 저장·취소·orphan 시 앱이 임시 객체를 즉시 정리하고, lifecycle은 브라우저 종료/장애 후 남은 temp object를 위한 안전망이다. Promotion copy에서는 tag를 제거해 영구 객체가 rule 대상이 되지 않게 한다.
+
+`mc` alias가 `local`인 경우 운영자 권한으로 아래 rule을 적용한다. 버킷 전체나 `tenant/` prefix 전체에 tag 없이 만료 규칙을 적용하지 않는다.
+
+```powershell
+& 'C:\Tools\MinIO\mc.exe' ilm rule add --prefix 'tenant/' --tags 's-erp-temp-owner=embedded-image' --expire-days '7' local/document-attachments
+& 'C:\Tools\MinIO\mc.exe' ilm rule ls local/document-attachments
+```
+
+검증 시 rule 목록에서 prefix, tag, 7일 expiration이 함께 표시되는지 확인한다. 이 rule은 `embedded-images/` 영구 객체와 legacy `notice-temp/` 객체에는 적용되지 않는다. 기존 Notice legacy 객체는 별도 목록/전환/정리 작업 없이 삭제하면 안 된다.
+
+버킷 versioning을 켠 환경은 current version expiration만으로 과거 버전이 제거되지 않을 수 있으므로, 별도 noncurrent retention 정책을 검토한다. 사용자 승인 없이 버킷 전체 version purge를 추가하지 않는다.
+
+---
+
 ## 7. Tomcat용 setenv.bat
 
 Tomcat 설치 폴더의 bin\setenv.bat 에 아래를 넣는다.

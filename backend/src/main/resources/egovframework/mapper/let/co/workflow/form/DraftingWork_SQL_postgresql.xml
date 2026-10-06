@@ -152,6 +152,32 @@
         ORDER BY w.view_seq ASC, w.drafting_work_category_id ASC
       </select>
 
+      <select id="selectTemplate" parameterType="map" resultType="map">
+        SELECT
+          drafting_work_category_id AS "draftingWorkCategoryId",
+          cata_type_code AS "cataTypeCode",
+          code_name AS "codeName",
+          drafting_work_template_json::text AS "templateJson",
+          drafting_work_template_html AS "templateHtml",
+          (
+            drafting_work_template_json IS NOT NULL
+            OR NULLIF(TRIM(COALESCE(drafting_work_template_html, '')), '') IS NOT NULL
+          ) AS "hasDocument"
+        FROM public.tb_drafting_work_category
+        WHERE tenant_id = #{tenantId}
+          AND drafting_work_category_id = #{workId}
+          AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
+      </select>
+
+      <select id="lockTemplate" parameterType="map" resultType="long">
+        SELECT drafting_work_category_id
+        FROM public.tb_drafting_work_category
+        WHERE tenant_id = #{tenantId}
+          AND drafting_work_category_id = #{workId}
+          AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
+        FOR UPDATE
+      </select>
+
       <select id="selectAssigneeIds" parameterType="map" resultType="string">
           SELECT employee_no
           FROM public.tb_drafting_work_category_authority
@@ -216,6 +242,16 @@
           approver_id = #{approverId, jdbcType=BIGINT},
           use_at = #{useAt},
           updated_by = #{updatedBy, jdbcType=BIGINT},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND drafting_work_category_id = #{workId}
+          AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
+      </update>
+
+      <update id="updateTemplate" parameterType="map">
+        UPDATE public.tb_drafting_work_category
+        SET drafting_work_template_json = CAST(#{templateJson} AS jsonb),
+          drafting_work_template_html = #{templateHtml},
           updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND drafting_work_category_id = #{workId}

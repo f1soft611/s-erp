@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../src/shared/services/apiClient', () => apiMocks);
 
 import {
+  deleteNoticeEmbeddedImage,
   downloadNoticeAttachment,
   fetchNoticePosts,
   updateNoticePinned,
@@ -30,6 +31,18 @@ describe('notice board downloads', () => {
     expect(apiMocks.apiDownload).toHaveBeenCalledWith(
       '/api/v1/groupware/boards/notice/attachments/5/download?postId=54',
       '업무일정표.xlsx',
+    );
+  });
+});
+
+describe('notice embedded image temporary cleanup', () => {
+  it('deletes a temporary upload by token and URL-encoded file name', async () => {
+    apiMocks.apiDelete.mockResolvedValue(undefined);
+
+    await deleteNoticeEmbeddedImage('token-1', 'pasted image.png');
+
+    expect(apiMocks.apiDelete).toHaveBeenCalledWith(
+      '/api/v1/groupware/boards/notice/embedded-images/temp/token-1?fileName=pasted+image.png',
     );
   });
 });

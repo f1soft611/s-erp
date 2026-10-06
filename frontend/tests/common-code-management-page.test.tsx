@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import {
   CommonCodeManagementPanel,
+  getItemCodeValidationMessage,
   getGroupDeleteBlockedMessage,
   resolveCreatedGroupId,
   resolveCreatedGroupIdMap,
@@ -150,6 +151,13 @@ beforeEach(() => {
 });
 
 describe('CommonCode management page', () => {
+  it('allows an empty item code only for a new row that can be auto-generated', () => {
+    expect(getItemCodeValidationMessage('', true)).toBeNull();
+    expect(getItemCodeValidationMessage('', false)).toBe(
+      '상세코드는 필수입니다.',
+    );
+  });
+
   it('sends group and detail changes in a single batch save request', async () => {
     apiMocks.apiPost.mockResolvedValue({ result: { success: true } });
 

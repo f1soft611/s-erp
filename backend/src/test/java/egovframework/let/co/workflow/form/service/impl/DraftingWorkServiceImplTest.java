@@ -28,6 +28,7 @@ import egovframework.let.co.workflow.form.domain.model.DraftingWorkSearchConditi
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkSaveRequestVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkVO;
 import egovframework.let.co.workflow.form.domain.repository.DraftingWorkDAO;
+import egovframework.let.co.workflow.form.service.DraftingWorkTemplateImageService;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
@@ -54,7 +55,9 @@ class DraftingWorkServiceImplTest {
     @BeforeEach
     void setUp() {
         draftingWorkService = new DraftingWorkServiceImpl(
-            draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService);
+            draftingWorkDAO, codeIdGnrService, commonCodeGroupService, commonCodeItemService,
+            new DraftingWorkTemplateServiceImpl(
+                    draftingWorkDAO, org.mockito.Mockito.mock(DraftingWorkTemplateImageService.class)));
     }
 
     @Test

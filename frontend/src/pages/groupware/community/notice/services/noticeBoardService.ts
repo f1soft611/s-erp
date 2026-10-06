@@ -6,30 +6,17 @@ import {
   apiPostFormData,
   apiPut,
 } from '../../../../../shared/services/apiClient';
-import type { CommonCommentItem } from '../../../../../shared/services/commonContentApi';
-
-export type NoticeBoardAttachmentApi = {
-  boardFileId?: number | string | null;
-  postId?: number | string | null;
-  fileName?: string | null;
-  fileSize?: number | string | null;
-  objectKey?: string | null;
-  bucketName?: string | null;
-  mimeType?: string | null;
-  contentType?: string | null;
-  fileUsageType?: string | null;
-};
-
-export type NoticeEmbeddedImageApi = {
-  uploadToken: string;
-  fileId?: number | string | null;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  objectKey: string;
-  bucketName: string;
-  imageUrl: string;
-};
+import type {
+  NoticeBoardAttachmentApi,
+  NoticeBoardPostApi,
+  NoticeBoardPostSavePayload,
+  NoticeEmbeddedImageApi,
+} from '../types/community.types';
+export type {
+  NoticeBoardAttachmentApi,
+  NoticeBoardPostApi,
+  NoticeEmbeddedImageApi,
+} from '../types/community.types';
 
 type NoticeEmbeddedImageApiFields = Partial<NoticeEmbeddedImageApi> & {
   contentType?: string | null;
@@ -54,42 +41,6 @@ export function normalizeNoticeEmbeddedImage(
     imageUrl: String(source.imageUrl ?? ''),
   };
 }
-
-export type NoticeBoardPostApi = {
-  postId?: number | string | null;
-  title?: string | null;
-  noticeGubunCode?: string | null;
-  contents?: string | null;
-  contentsHtml?: string | null;
-  contentsJson?: string | null;
-  contentsText?: string | null;
-  writerId?: string | null;
-  writerName?: string | null;
-  lastModifiedBy?: string | null;
-  lastModifiedByName?: string | null;
-  viewCount?: number | string | null;
-  isPinned?: string | null;
-  createdAt?: string | Date | null;
-  attachments?: NoticeBoardAttachmentApi[];
-  comments?: Array<
-    CommonCommentItem & {
-      createdAt?: string | Date | null;
-    }
-  >;
-  commentCount?: number | string | null;
-  hasPreviousComments?: boolean;
-  nextBeforeCommentId?: number | string | null;
-  embeddedImages?: Array<{
-    uploadToken: string;
-    fileId?: number | string | null;
-    objectKey: string;
-    imageUrl: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    width?: number | string | null;
-  }>;
-};
 
 type NoticeBoardListResponse = {
   resultList?: NoticeBoardPostApi[];
@@ -168,7 +119,7 @@ export async function fetchNoticePostDetail(
 }
 
 export async function createNoticePost(
-  payload: Partial<NoticeBoardPostApi>,
+  payload: NoticeBoardPostSavePayload,
 ): Promise<NoticeBoardPostApi> {
   const result = await apiPost<{ item?: NoticeBoardPostApi }>(
     '/api/v1/groupware/boards/notice/posts',
@@ -180,7 +131,7 @@ export async function createNoticePost(
 
 export async function updateNoticePost(
   postId: number,
-  payload: Partial<NoticeBoardPostApi>,
+  payload: NoticeBoardPostSavePayload,
 ): Promise<NoticeBoardPostApi> {
   const result = await apiPut<{ item?: NoticeBoardPostApi }>(
     `/api/v1/groupware/boards/notice/posts/${postId}`,
@@ -232,6 +183,16 @@ export async function uploadNoticeEmbeddedImage(
     formData,
   );
   return normalizeNoticeEmbeddedImage(result);
+}
+
+export async function deleteNoticeEmbeddedImage(
+  uploadToken: string,
+  fileName: string,
+): Promise<void> {
+  const query = new URLSearchParams({ fileName });
+  await apiDelete(
+    `/api/v1/groupware/boards/notice/embedded-images/temp/${encodeURIComponent(uploadToken)}?${query}`,
+  );
 }
 
 export async function deleteNoticeAttachment(

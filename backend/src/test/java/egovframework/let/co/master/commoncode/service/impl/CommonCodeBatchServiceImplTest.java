@@ -3,7 +3,11 @@ package egovframework.let.co.master.commoncode.service.impl;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +24,8 @@ import egovframework.let.co.master.commoncode.domain.model.CommonCodeBatchSaveRe
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupChangeVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeGroupVO;
 import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemChangeVO;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemSaveRequestVO;
+import egovframework.let.co.master.commoncode.domain.model.CommonCodeItemVO;
 import egovframework.let.co.master.commoncode.domain.repository.CommonCodeGroupDAO;
 import egovframework.let.co.master.commoncode.domain.repository.CommonCodeItemDAO;
 import egovframework.let.co.master.commoncode.service.CommonCodeGroupService;
@@ -85,5 +91,56 @@ class CommonCodeBatchServiceImplTest {
         InOrder order = inOrder(commonCodeItemService, commonCodeGroupService);
         order.verify(commonCodeItemService).deleteItem(1L, 10L, 99L);
         order.verify(commonCodeGroupService).deleteGroup(1L, 10L);
+    }
+
+    @Test
+    void saveBatchAllowsEmptyItemCodeForNewRowsSoServiceCanGenerateIt() throws Exception {
+        CommonCodeGroupVO group = new CommonCodeGroupVO();
+        group.setCommonCodeGroupId(10L);
+        when(commonCodeGroupDAO.selectGroupById(anyMap())).thenReturn(group);
+        when(commonCodeItemService.createItem(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any(CommonCodeItemSaveRequestVO.class)))
+                .thenReturn(new CommonCodeItemVO());
+
+        CommonCodeBatchSaveRequestVO payload = new CommonCodeBatchSaveRequestVO();
+        CommonCodeBatchItemChangeSetVO items = new CommonCodeBatchItemChangeSetVO();
+        CommonCodeItemChangeVO row = new CommonCodeItemChangeVO();
+        row.setId("new-item");
+        row.setGroupId("10");
+        row.setItemCode("");
+        row.setItemNm("자동발번 항목");
+        items.setInsertedRows(Collections.singletonList(row));
+        payload.setItems(items);
+
+        service.saveBatch(1L, payload);
+
+        verify(commonCodeItemService).createItem(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.argThat(item -> item.getItemCode().isEmpty()));
+    }
+
+    @Test
+    void saveBatchStillRequiresItemCodeWhenUpdatingExistingRows() throws Exception {
+        CommonCodeBatchSaveRequestVO payload = new CommonCodeBatchSaveRequestVO();
+        CommonCodeBatchItemChangeSetVO items = new CommonCodeBatchItemChangeSetVO();
+        CommonCodeItemChangeVO row = new CommonCodeItemChangeVO();
+        row.setId("77");
+        row.setGroupId("10");
+        row.setItemCode("");
+        row.setItemNm("수정 항목");
+        items.setUpdatedRows(Collections.singletonList(row));
+        payload.setItems(items);
+
+        assertThatThrownBy(() -> service.saveBatch(1L, payload))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("상세코드는 필수입니다.");
+        verify(commonCodeItemService, never()).updateItem(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(CommonCodeItemSaveRequestVO.class));
     }
 }

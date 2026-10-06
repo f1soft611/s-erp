@@ -28,6 +28,16 @@ class CommonCodeMapperJdbcTypeTest {
         assertThat(xml).contains("tb_common_code_item");
     }
 
+    @Test
+    void postgresIdSequenceMapperUsesAtomicUpsertWithoutTenantId() throws Exception {
+        String xml = readResource("egovframework/mapper/let/common/idsequence/IdSequence_SQL_postgresql.xml");
+
+        assertThat(xml).contains("INSERT INTO tb_id_sequence");
+        assertThat(xml).contains("ON CONFLICT (generator_key, scope_key_1, scope_key_2)");
+        assertThat(xml).contains("RETURNING last_issued_value");
+        assertThat(xml).doesNotContain("tenant_id");
+    }
+
     private String readResource(String path) throws IOException {
         try (InputStream stream = getClass().getClassLoader().getResourceAsStream(path)) {
             assertThat(stream).isNotNull();

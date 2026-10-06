@@ -29,6 +29,24 @@ public class DraftingWorkDAO extends EgovAbstractMapper {
         return rows == null || rows.isEmpty() ? null : rows.get(0);
     }
 
+    public Map<String, Object> selectTemplate(Long tenantId, Long workId) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("workId", workId);
+        return selectOne("DraftingWorkDAO.selectTemplate", params);
+    }
+
+    public void lockTemplate(Long tenantId, Long workId) throws Exception {
+        Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("tenantId", tenantId);
+        params.put("workId", workId);
+        selectOne("DraftingWorkDAO.lockTemplate", params);
+    }
+
+    public int updateTemplate(Map<String, Object> params) throws Exception {
+        return update("DraftingWorkDAO.updateTemplate", params);
+    }
+
     public Long insertWork(Map<String, Object> params) throws Exception {
         return selectOne("DraftingWorkDAO.insertWork", params);
     }

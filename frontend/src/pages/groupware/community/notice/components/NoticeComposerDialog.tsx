@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   IconButton,
   MenuItem,
   TextField,
@@ -10,75 +11,44 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import FormatBoldOutlinedIcon from '@mui/icons-material/FormatBoldOutlined';
-import FormatItalicOutlinedIcon from '@mui/icons-material/FormatItalicOutlined';
-import StrikethroughSOutlinedIcon from '@mui/icons-material/StrikethroughSOutlined';
-import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
-import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumberedOutlined';
-import FormatQuoteOutlinedIcon from '@mui/icons-material/FormatQuoteOutlined';
-import RedoOutlinedIcon from '@mui/icons-material/RedoOutlined';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import { EditorContent, useEditor, type Editor } from '@tiptap/react';
-import Image from '@tiptap/extension-image';
-import Placeholder from '@tiptap/extension-placeholder';
-import StarterKit from '@tiptap/starter-kit';
+import type { Editor } from '@tiptap/react';
 import {
-  Table,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from '@tiptap/extension-table';
-import { noticeContentStyles } from './noticeContentStyles';
+  RichTextEditor,
+  RichTextEditorToolbar,
+  richTextEditorIconButtonSx,
+} from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
-import { uploadNoticeEmbeddedImage } from '../services/noticeBoardService';
+import {
+  deleteNoticeEmbeddedImage,
+  uploadNoticeEmbeddedImage,
+} from '../services/noticeBoardService';
 import {
   getAttachmentExtension,
   getAttachmentIconMeta,
 } from '../../../../../shared/components/feed/attachmentIconMeta';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import type {
+  NoticeComposerDialogProps,
+  NoticeComposerDraftAttachment,
+} from '../types/community.types';
+import { parseClipboardTextGrid } from '../../../../../shared/components/rich-text-editor/clipboard';
+export {
+  hasSpreadsheetClipboardContent,
+  normalizeClipboardHtmlForEditor,
+  normalizeClipboardTextForEditor,
+} from '../../../../../shared/components/rich-text-editor/clipboard';
+export {
+  calculateImageResize as calculateNoticeImageResize,
+  calculateImageResizeWidth as calculateNoticeImageResizeWidth,
+} from '../../../../../shared/components/rich-text-editor/imageResize';
 
-export type NoticeComposerDraftAttachment = {
-  id: string;
-  name: string;
-  size?: number;
-  extension?: string;
-  file?: File;
-  boardFileId?: number | string | null;
-  objectKey?: string | null;
-  bucketName?: string | null;
-};
+export type {
+  NoticeComposerDraftAttachment,
+  NoticeComposerEmbeddedImage,
+} from '../types/community.types';
 
-export type NoticeComposerEmbeddedImage = {
-  uploadToken: string;
-  fileId?: number | string | null;
-  objectKey: string;
-  imageUrl: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  width?: number | string | null;
-};
-
-type NoticeComposerDialogProps = {
-  open: boolean;
-  isDark: boolean;
-  onClose: () => void;
-  onSubmit?: (payload: {
-    title: string;
-    noticeGubunCode: string;
-    body: string;
-    bodyJson?: string;
-    bodyText?: string;
-    attachments: NoticeComposerDraftAttachment[];
-    removedAttachmentIds: Array<number | string>;
-    embeddedImages: NoticeComposerEmbeddedImage[];
-  }) => Promise<unknown> | unknown;
-  defaultTitle?: string;
-  noticeGubunOptions?: Array<{ code: string; name: string }>;
-  defaultNoticeGubunCode?: string;
-  defaultBody?: string;
-  defaultAttachments?: NoticeComposerDraftAttachment[];
-};
+const emptyNoticeContent = '<p></p>';
 
 export function serializeNoticeEditorJson(
   editor: { getJSON: () => unknown } | null | undefined,
@@ -86,626 +56,75 @@ export function serializeNoticeEditorJson(
   return editor ? JSON.stringify(editor.getJSON()) : undefined;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+function summarizeClipboardTables(html: string) {
+  if (!html || typeof DOMParser === 'undefined') return [];
 
-const allowedCellStyleProperties = new Set([
-  'background',
-  'background-color',
-  'border',
-  'border-bottom',
-  'border-left',
-  'border-right',
-  'border-top',
-  'color',
-  'font-weight',
-  'height',
-  'text-align',
-  'vertical-align',
-  'width',
-]);
-
-function isSafeCellStyleValue(value: string): boolean {
-  return !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(value);
-}
-
-function normalizeCellDimension(value: string | null): string | null {
-  const normalized = value?.trim() ?? '';
-  if (!normalized) {
-    return null;
-  }
-
-  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
-    return `${normalized}px`;
-  }
-
-  return /^(?:\d+(?:\.\d+)?)(?:px|pt|pc|cm|mm|in|em|rem|%|vh|vw)$/.test(
-    normalized,
-  )
-    ? normalized
-    : null;
-}
-
-function normalizeImageDimension(value: string | null): string | null {
-  const normalized = value?.trim() ?? '';
-  return /^(?:\d+(?:\.\d+)?)(?:px|%)$/.test(normalized) ? normalized : null;
-}
-
-export function calculateNoticeImageResizeWidth(
-  startWidth: number,
-  delta: number,
-): number {
-  const safeStartWidth = Number.isFinite(startWidth) ? startWidth : 320;
-  const safeDelta = Number.isFinite(delta) ? delta : 0;
-  return Math.max(120, Math.min(1200, Math.round(safeStartWidth + safeDelta)));
-}
-
-type NoticeImageResizeDirection =
-  | 'n'
-  | 'ne'
-  | 'e'
-  | 'se'
-  | 's'
-  | 'sw'
-  | 'w'
-  | 'nw';
-
-export function calculateNoticeImageResize(
-  startWidth: number,
-  startHeight: number,
-  deltaX: number,
-  deltaY: number,
-  direction: NoticeImageResizeDirection,
-): { width: number; height: number } {
-  const safeStartWidth = Number.isFinite(startWidth) ? startWidth : 320;
-  const safeStartHeight = Number.isFinite(startHeight) ? startHeight : 200;
-  const safeDeltaX = Number.isFinite(deltaX) ? deltaX : 0;
-  const safeDeltaY = Number.isFinite(deltaY) ? deltaY : 0;
-  const isCorner = direction.length === 2;
-  const hasHorizontalAxis = direction.includes('e') || direction.includes('w');
-  const hasVerticalAxis = direction.includes('n') || direction.includes('s');
-  const horizontalDelta = direction.includes('w') ? -safeDeltaX : safeDeltaX;
-  const verticalDelta = direction.includes('n') ? -safeDeltaY : safeDeltaY;
-
-  if (isCorner) {
-    const aspectRatio = Math.max(0.01, safeStartWidth / safeStartHeight);
-    const proposedWidth =
-      Math.abs(horizontalDelta) >= Math.abs(verticalDelta) * aspectRatio
-        ? safeStartWidth + horizontalDelta
-        : safeStartWidth + verticalDelta * aspectRatio;
-    const width = calculateNoticeImageResizeWidth(
-      safeStartWidth,
-      proposedWidth - safeStartWidth,
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  return Array.from(document.querySelectorAll('table')).map((table) => {
+    const occupiedUntil: number[] = [];
+    const rows = Array.from(table.querySelectorAll('tr')).filter(
+      (row) => row.closest('table') === table,
     );
     return {
-      width,
-      height: Math.max(80, Math.round(width / aspectRatio)),
-    };
-  }
-
-  const width = hasHorizontalAxis
-    ? calculateNoticeImageResizeWidth(safeStartWidth, horizontalDelta)
-    : Math.round(safeStartWidth);
-  const height = hasVerticalAxis
-    ? Math.max(80, Math.round(safeStartHeight + verticalDelta))
-    : Math.max(80, Math.round(safeStartHeight));
-
-  return { width, height };
-}
-
-function sanitizeCellStyle(cell: Element): string | null {
-  const declarations: string[] = [];
-  const style = (cell as HTMLElement).style;
-
-  for (const property of allowedCellStyleProperties) {
-    const value = style.getPropertyValue(property).trim();
-    if (!value || !isSafeCellStyleValue(value)) {
-      continue;
-    }
-
-    const normalizedValue =
-      property === 'width' || property === 'height'
-        ? normalizeCellDimension(value)
-        : value;
-    if (normalizedValue) {
-      declarations.push(`${property}:${normalizedValue}`);
-    }
-  }
-
-  for (const [property, attribute] of [
-    ['width', 'width'],
-    ['height', 'height'],
-  ] as const) {
-    if (
-      declarations.some((declaration) => declaration.startsWith(`${property}:`))
-    ) {
-      continue;
-    }
-
-    const normalizedValue = normalizeCellDimension(
-      cell.getAttribute(attribute),
-    );
-    if (normalizedValue) {
-      declarations.push(`${property}:${normalizedValue}`);
-    }
-  }
-
-  return declarations.length > 0 ? declarations.join(';') : null;
-}
-
-function applyEmbeddedCellStyles(root: HTMLElement): void {
-  const cells = Array.from(root.querySelectorAll('th, td'));
-  const styleProperties = Array.from(allowedCellStyleProperties);
-
-  const applyDeclarationText = (
-    selectorText: string,
-    declarationText: string,
-  ): void => {
-    const declarations = declarationText
-      .split(';')
-      .map((declaration) => declaration.split(':'))
-      .filter(([property, value]) => property && value)
-      .map(
-        ([property, value]) =>
-          [property.trim().toLowerCase(), value.trim()] as const,
-      )
-      .filter(
-        ([property, value]) =>
-          allowedCellStyleProperties.has(property) &&
-          isSafeCellStyleValue(value),
-      );
-
-    for (const selector of selectorText.split(',')) {
-      for (const cell of cells) {
-        try {
-          if (!cell.matches(selector.trim())) {
-            continue;
-          }
-        } catch {
-          continue;
-        }
-
-        for (const [property, value] of declarations) {
-          (cell as HTMLElement).style.setProperty(property, value);
-        }
-      }
-    }
-  };
-
-  const applyRules = (rules: CSSRuleList): void => {
-    Array.from(rules).forEach((rule) => {
-      if (rule.type === CSSRule.STYLE_RULE) {
-        const styleRule = rule as CSSStyleRule;
-        for (const cell of cells) {
-          try {
-            if (!cell.matches(styleRule.selectorText)) {
-              continue;
+      columns: Array.from(
+        table.querySelectorAll(':scope > colgroup > col'),
+      ).map((column) => ({
+        width: (column as HTMLElement).style.width,
+        span: column.getAttribute('span'),
+        style: column.getAttribute('style'),
+      })),
+      rows: rows.map((row, rowIndex) => {
+        let columnIndex = 0;
+        return Array.from(row.children)
+          .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
+          .map((cell) => {
+            const colspan = Math.max(
+              1,
+              Number(cell.getAttribute('colspan')) || 1,
+            );
+            const rowspan = Math.max(
+              1,
+              Number(cell.getAttribute('rowspan')) || 1,
+            );
+            const rangeIsAvailable = (startColumn: number) => {
+              for (
+                let spanColumn = startColumn;
+                spanColumn < startColumn + colspan;
+                spanColumn += 1
+              ) {
+                if ((occupiedUntil[spanColumn] ?? 0) > rowIndex) return false;
+              }
+              return true;
+            };
+            while (!rangeIsAvailable(columnIndex)) {
+              columnIndex += 1;
             }
-          } catch {
-            continue;
-          }
-
-          for (const property of styleProperties) {
-            const value = styleRule.style.getPropertyValue(property).trim();
-            if (value && isSafeCellStyleValue(value)) {
-              (cell as HTMLElement).style.setProperty(property, value);
+            const startColumn = columnIndex;
+            for (
+              let spanColumn = startColumn;
+              spanColumn < startColumn + colspan;
+              spanColumn += 1
+            ) {
+              occupiedUntil[spanColumn] = Math.max(
+                occupiedUntil[spanColumn] ?? 0,
+                rowIndex + rowspan,
+              );
             }
-          }
-        }
-      } else if (rule.type !== CSSRule.IMPORT_RULE) {
-        const nestedRules = (rule as CSSGroupingRule).cssRules;
-        if (nestedRules) {
-          applyRules(nestedRules);
-        }
-      }
-    });
-  };
-
-  root.ownerDocument.querySelectorAll('style').forEach((styleElement) => {
-    const runtimeStyle = document.createElement('style');
-    runtimeStyle.textContent = styleElement.textContent;
-    document.head.appendChild(runtimeStyle);
-
-    if (runtimeStyle.sheet?.cssRules) {
-      applyRules(runtimeStyle.sheet.cssRules);
-    }
-
-    const cssText = styleElement.textContent ?? '';
-    const fallbackRulePattern = /([^{}]+)\{([^{}]*)\}/g;
-    let fallbackMatch = fallbackRulePattern.exec(cssText);
-    while (fallbackMatch) {
-      applyDeclarationText(fallbackMatch[1], fallbackMatch[2]);
-      fallbackMatch = fallbackRulePattern.exec(cssText);
-    }
-
-    runtimeStyle.remove();
-  });
-}
-
-const StyledTableCell = TableCell.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-        renderHTML: (attributes: { style?: string | null }) =>
-          attributes.style ? { style: attributes.style } : {},
-      },
+            columnIndex += colspan;
+            return {
+              column: startColumn,
+              colspan,
+              rowspan,
+              width: cell.getAttribute('width'),
+              style: cell.getAttribute('style'),
+              text: cell.textContent ?? '',
+              html: cell.innerHTML.slice(0, 240),
+            };
+          });
+      }),
     };
-  },
-});
-
-const StyledTableHeader = TableHeader.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-        renderHTML: (attributes: { style?: string | null }) =>
-          attributes.style ? { style: attributes.style } : {},
-      },
-    };
-  },
-});
-
-const NoticeImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      'data-upload-token': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-upload-token'),
-        renderHTML: (attributes: { 'data-upload-token'?: string | null }) =>
-          attributes['data-upload-token']
-            ? { 'data-upload-token': attributes['data-upload-token'] }
-            : {},
-      },
-      'data-upload-state': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-upload-state'),
-        renderHTML: (attributes: { 'data-upload-state'?: string | null }) =>
-          attributes['data-upload-state']
-            ? { 'data-upload-state': attributes['data-upload-state'] }
-            : {},
-      },
-      'data-file-id': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-file-id'),
-        renderHTML: (attributes: { 'data-file-id'?: string | null }) =>
-          attributes['data-file-id']
-            ? { 'data-file-id': attributes['data-file-id'] }
-            : {},
-      },
-      'data-object-key': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-object-key'),
-        renderHTML: (attributes: { 'data-object-key'?: string | null }) =>
-          attributes['data-object-key']
-            ? { 'data-object-key': attributes['data-object-key'] }
-            : {},
-      },
-      'data-file-size': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-file-size'),
-        renderHTML: (attributes: {
-          'data-file-size'?: number | string | null;
-        }) =>
-          attributes['data-file-size'] != null
-            ? { 'data-file-size': String(attributes['data-file-size']) }
-            : {},
-      },
-      'data-mime-type': {
-        default: null,
-        parseHTML: (element: HTMLElement) =>
-          element.getAttribute('data-mime-type'),
-        renderHTML: (attributes: { 'data-mime-type'?: string | null }) =>
-          attributes['data-mime-type']
-            ? { 'data-mime-type': attributes['data-mime-type'] }
-            : {},
-      },
-    };
-  },
-});
-
-function findEmbeddedImagePosition(
-  editor: Editor,
-  uploadToken: string,
-  fallbackToken?: string,
-): number {
-  let position = -1;
-  editor.state.doc.descendants((node, nodePosition) => {
-    const imageUploadToken = String(node.attrs['data-upload-token'] ?? '');
-    if (
-      node.type.name === 'image' &&
-      (imageUploadToken === uploadToken ||
-        (fallbackToken && imageUploadToken === fallbackToken))
-    ) {
-      position = nodePosition;
-      return false;
-    }
-    return true;
   });
-  return position;
 }
-
-function updateEmbeddedImageNode(
-  editor: Editor,
-  uploadToken: string,
-  uploaded: {
-    uploadToken?: string;
-    imageUrl: string;
-    fileName: string;
-    fileId?: number | string | null;
-    objectKey: string;
-    fileSize: number;
-    mimeType: string;
-  },
-): void {
-  const persistedToken = uploaded.uploadToken ?? uploadToken;
-  const position = findEmbeddedImagePosition(
-    editor,
-    uploadToken,
-    uploaded.uploadToken,
-  );
-  if (position < 0) {
-    return;
-  }
-
-  editor
-    .chain()
-    .setNodeSelection(position)
-    .updateAttributes('image', {
-      src: uploaded.imageUrl,
-      alt: uploaded.fileName,
-      'data-file-id': uploaded.fileId == null ? null : String(uploaded.fileId),
-      'data-object-key': uploaded.objectKey,
-      'data-file-size': String(uploaded.fileSize),
-      'data-mime-type': uploaded.mimeType,
-      'data-upload-token': persistedToken,
-      'data-upload-state': null,
-    })
-    .run();
-}
-
-export function collectNoticeEmbeddedImages(
-  editor: { state: Editor['state'] } | null | undefined,
-): NoticeComposerEmbeddedImage[] {
-  if (!editor) {
-    return [];
-  }
-
-  const images: NoticeComposerEmbeddedImage[] = [];
-  editor.state.doc.descendants((node) => {
-    if (node.type.name !== 'image' || !node.attrs['data-upload-token']) {
-      return true;
-    }
-    images.push({
-      uploadToken: String(node.attrs['data-upload-token']),
-      fileId: node.attrs['data-file-id'] ?? null,
-      objectKey: String(node.attrs['data-object-key'] ?? ''),
-      imageUrl: String(node.attrs.src ?? ''),
-      fileName: String(node.attrs.alt ?? 'pasted-image'),
-      fileSize: Number(node.attrs['data-file-size'] ?? 0) || 0,
-      mimeType: String(node.attrs['data-mime-type'] ?? ''),
-      width: node.attrs.width ?? null,
-    });
-    return true;
-  });
-  return images;
-}
-
-function removeEmbeddedImageNode(editor: Editor, uploadToken: string): void {
-  const position = findEmbeddedImagePosition(editor, uploadToken);
-  if (position < 0) {
-    return;
-  }
-
-  editor.chain().setNodeSelection(position).deleteSelection().run();
-}
-
-export function normalizeClipboardHtmlForEditor(
-  rawHtml: string | null | undefined,
-): string {
-  if (!rawHtml || !rawHtml.trim()) {
-    return '';
-  }
-
-  const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
-  const root = doc.body;
-
-  applyEmbeddedCellStyles(root);
-
-  root
-    .querySelectorAll('script,style,iframe,svg,object,embed,form,meta,link')
-    .forEach((node) => node.remove());
-
-  root.querySelectorAll('img').forEach((image) => {
-    const src = image.getAttribute('src')?.trim() ?? '';
-    if (!/^(?:https?:|\/)(?!\/)/i.test(src) && !/^https?:\/\//i.test(src)) {
-      image.remove();
-      return;
-    }
-    Array.from(image.attributes).forEach((attribute) => {
-      if (
-        !['src', 'alt', 'title', 'width', 'height'].includes(attribute.name)
-      ) {
-        image.removeAttribute(attribute.name);
-      }
-    });
-    const width = normalizeImageDimension(image.getAttribute('width'));
-    const height = normalizeImageDimension(image.getAttribute('height'));
-    if (width) image.setAttribute('width', width);
-    else image.removeAttribute('width');
-    if (height) image.setAttribute('height', height);
-    else image.removeAttribute('height');
-  });
-
-  const tableRows = Array.from(root.querySelectorAll('tr'));
-  if (tableRows.length > 0) {
-    const rows = tableRows
-      .map((row) => {
-        const cells = Array.from(row.querySelectorAll('th, td'));
-        if (cells.length === 0) {
-          return '';
-        }
-
-        const normalizedCells = cells.map((cell) => {
-          const value = (cell.textContent ?? '')
-            .replace(/\u00a0/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          const tagName = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td';
-          const colspan = Math.max(
-            1,
-            Number(cell.getAttribute('colspan')) || 1,
-          );
-          const rowspan = Math.max(
-            1,
-            Number(cell.getAttribute('rowspan')) || 1,
-          );
-          const spanAttributes = [
-            colspan > 1 ? ` colspan="${colspan}"` : '',
-            rowspan > 1 ? ` rowspan="${rowspan}"` : '',
-          ].join('');
-          const style = sanitizeCellStyle(cell);
-          const styleAttribute = style ? ` style="${escapeHtml(style)}"` : '';
-
-          return `<${tagName}${spanAttributes}${styleAttribute}>${escapeHtml(value)}</${tagName}>`;
-        });
-
-        return `<tr>${normalizedCells.join('')}</tr>`;
-      })
-      .filter((row) => row !== '');
-
-    if (rows.length > 0) {
-      return `<table><tbody>${rows.join('')}</tbody></table>`;
-    }
-  }
-
-  const textCells = Array.from(root.querySelectorAll('td, th'));
-  if (textCells.length > 0) {
-    const rows = textCells
-      .map((cell) => {
-        const value = (cell.textContent ?? '')
-          .replace(/\u00a0/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        return value ? value : '';
-      })
-      .filter(Boolean);
-
-    if (rows.length > 0) {
-      return rows.map((value) => `<p>${escapeHtml(value)}</p>`).join('');
-    }
-  }
-
-  const plainTextCandidate = root.textContent ?? '';
-  const normalizedText = plainTextCandidate
-    .replace(/\u00a0/g, ' ')
-    .replace(/\r\n/g, '\n')
-    .replace(/\t/g, ' | ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  if (!normalizedText) {
-    return '';
-  }
-
-  const blocks = normalizedText
-    .split(/\n{2,}|\n/)
-    .map((line) => line.replace(/\s+\|\s+/g, ' | ').trim())
-    .filter(Boolean)
-    .map((line) => `<p>${escapeHtml(line)}</p>`)
-    .join('');
-
-  return blocks || `<p>${escapeHtml(normalizedText)}</p>`;
-}
-
-function normalizeClipboardTextForEditor(rawText: string): string {
-  return rawText
-    .replace(/\u00a0/g, ' ')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, ' | ');
-}
-
-function hasSpreadsheetClipboardContent(
-  clipboardData: DataTransfer | null | undefined,
-): boolean {
-  if (!clipboardData) {
-    return false;
-  }
-
-  const html = clipboardData.getData('text/html') ?? '';
-  const text = clipboardData.getData('text/plain') ?? '';
-
-  if (/<table\b/i.test(html)) {
-    return true;
-  }
-
-  const normalizedText = text.replace(/\r\n?/g, '\n').trim();
-  if (!normalizedText) {
-    return false;
-  }
-
-  return normalizedText.includes('\t') && normalizedText.includes('\n');
-}
-
-function autoSizeActiveTableCell(editor: Editor): void {
-  const { $from } = editor.state.selection;
-  let cellElement: HTMLElement | null = null;
-
-  for (let depth = $from.depth; depth > 0; depth -= 1) {
-    const node = $from.node(depth);
-    if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') {
-      continue;
-    }
-
-    cellElement = editor.view.nodeDOM(
-      $from.before(depth),
-    ) as HTMLElement | null;
-    break;
-  }
-
-  if (!cellElement) {
-    return;
-  }
-
-  const computedStyle = window.getComputedStyle(cellElement);
-  const measurement = document.createElement('span');
-  measurement.textContent = cellElement.textContent ?? '';
-  measurement.style.position = 'absolute';
-  measurement.style.visibility = 'hidden';
-  measurement.style.whiteSpace = 'nowrap';
-  measurement.style.font = computedStyle.font;
-  measurement.style.letterSpacing = computedStyle.letterSpacing;
-  measurement.style.paddingLeft = computedStyle.paddingLeft;
-  measurement.style.paddingRight = computedStyle.paddingRight;
-  document.body.appendChild(measurement);
-  const measuredWidth = Math.ceil(measurement.getBoundingClientRect().width);
-  measurement.remove();
-
-  const currentWidth = cellElement.getBoundingClientRect().width;
-  if (measuredWidth <= currentWidth + 1) {
-    return;
-  }
-
-  editor.commands.setCellAttribute('colwidth', [measuredWidth]);
-}
-
-const emptyNoticeContent = '<p></p>';
 
 export function NoticeComposerDialog({
   open,
@@ -723,13 +142,11 @@ export function NoticeComposerDialog({
   const panelBorder = resolvedDark
     ? 'rgba(148, 163, 184, 0.2)'
     : 'rgba(148, 163, 184, 0.22)';
-  const panelBackground = resolvedDark ? '#0f172a' : '#f8fafc';
   const editorSurfaceBackground = resolvedDark ? '#0f172a' : '#ffffff';
   const fieldSurfaceBackground = resolvedDark
     ? '#1e293b'
     : editorSurfaceBackground;
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const editorRef = useRef<Editor | null>(null);
   const pasteDebugEnabled =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('noticePasteDebug') === '1';
@@ -738,7 +155,9 @@ export function NoticeComposerDialog({
     defaultNoticeGubunCode,
   );
   const [noticeGubunError, setNoticeGubunError] = useState(false);
-  const [toolbarOpen, setToolbarOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [editor, setEditor] = useState<Editor | null>(null);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [pasteDebugLog, setPasteDebugLog] = useState<string[]>(() =>
@@ -746,135 +165,6 @@ export function NoticeComposerDialog({
   );
   const [attachments, setAttachments] =
     useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
-
-  const editorConfig = useMemo(
-    () => ({
-      extensions: [
-        StarterKit,
-        NoticeImage,
-        Table.configure({
-          resizable: true,
-          handleWidth: 6,
-          cellMinWidth: 40,
-          lastColumnResizable: true,
-          renderWrapper: true,
-        }),
-        TableRow,
-        StyledTableHeader,
-        StyledTableCell,
-        Placeholder.configure({
-          placeholder: '본문을 입력하세요.',
-          emptyEditorClass: 'is-editor-empty',
-        }),
-      ],
-      content:
-        defaultBody && defaultBody.trim() ? defaultBody : emptyNoticeContent,
-      immediatelyRender: false,
-      editable: true,
-      editorProps: {
-        attributes: {
-          role: 'textbox',
-          'aria-label': '본문',
-          'aria-multiline': 'true',
-          spellcheck: 'true',
-          style: `background-color: ${editorSurfaceBackground}; outline: none; line-height: 1.7;`,
-        },
-        handlePaste: (_view: unknown, event: ClipboardEvent) => {
-          if (hasSpreadsheetClipboardContent(event.clipboardData)) {
-            return false;
-          }
-
-          const imageFiles = Array.from(event.clipboardData?.items ?? [])
-            .filter(
-              (item) => item.kind === 'file' && item.type.startsWith('image/'),
-            )
-            .map((item) => item.getAsFile())
-            .filter((file): file is File => Boolean(file));
-
-          if (imageFiles.length > 0) {
-            event.preventDefault();
-            const activeEditor = editorRef.current;
-            if (!activeEditor) {
-              return true;
-            }
-
-            void (async () => {
-              for (const file of imageFiles) {
-                const placeholderSrc = URL.createObjectURL(file);
-                const uploadToken = `local-${Date.now()}-${Math.random()
-                  .toString(36)
-                  .slice(2)}`;
-                activeEditor
-                  .chain()
-                  .focus()
-                  .setImage({ src: placeholderSrc, alt: '이미지 업로드 중' })
-                  .updateAttributes('image', {
-                    'data-upload-token': uploadToken,
-                    'data-upload-state': 'uploading',
-                  })
-                  .run();
-
-                try {
-                  const uploaded = await uploadNoticeEmbeddedImage(file);
-                  updateEmbeddedImageNode(activeEditor, uploadToken, uploaded);
-                  setImageUploadError(null);
-                } catch {
-                  removeEmbeddedImageNode(activeEditor, uploadToken);
-                  setImageUploadError('본문 이미지 업로드에 실패했습니다.');
-                } finally {
-                  URL.revokeObjectURL(placeholderSrc);
-                }
-              }
-            })();
-            return true;
-          }
-
-          if (pasteDebugEnabled) {
-            const data = event.clipboardData;
-            const html = data?.getData('text/html') ?? '';
-            const text = data?.getData('text/plain') ?? '';
-            const normalizedHtml = normalizeClipboardHtmlForEditor(html);
-            setPasteDebugLog((current) => [
-              ...current,
-              `[paste] types=${data ? Array.from(data.types).join(', ') : '(none)'}`,
-              `[paste] htmlLength=${html.length}, textLength=${text.length}`,
-              `[paste] html=${html.slice(0, 500)}`,
-              `[paste] text=${text.slice(0, 500)}`,
-              `[normalized] length=${normalizedHtml.length}`,
-              `[normalized] html=${normalizedHtml.slice(0, 800)}`,
-            ]);
-
-            window.setTimeout(() => {
-              const editorElement = document.querySelector(
-                '.notice-composer-editor .ProseMirror',
-              );
-              setPasteDebugLog((current) => [
-                ...current,
-                `[after 300ms] text=${editorElement?.textContent ?? '(editor not found)'}`,
-                `[after 300ms] html=${editorElement?.innerHTML ?? '(editor not found)'}`,
-              ]);
-            }, 300);
-          }
-
-          return false;
-        },
-        transformPastedHTML: (html: string) =>
-          normalizeClipboardHtmlForEditor(html),
-        transformPastedText: (text: string) =>
-          normalizeClipboardTextForEditor(text),
-      },
-      onUpdate: ({ editor }: { editor: Editor }) => {
-        autoSizeActiveTableCell(editor);
-      },
-    }),
-    [defaultBody, editorSurfaceBackground, pasteDebugEnabled],
-  );
-
-  const editor = useEditor(editorConfig);
-
-  useEffect(() => {
-    editorRef.current = editor;
-  }, [editor]);
 
   useEffect(() => {
     if (!open) {
@@ -945,197 +235,6 @@ export function NoticeComposerDialog({
   }, [editor, open, defaultBody]);
 
   useEffect(() => {
-    if (!editor || !open) {
-      return;
-    }
-
-    const syncEditorState = () => {
-      setEditorIsEmpty(editor.isEmpty);
-    };
-
-    const resizeOverlay = document.createElement('div');
-    resizeOverlay.className = 'notice-image-resize-overlay';
-    resizeOverlay.setAttribute('aria-label', '이미지 크기 조절 영역');
-    resizeOverlay.style.display = 'none';
-    resizeOverlay.style.position = 'fixed';
-    resizeOverlay.style.zIndex = '1400';
-    resizeOverlay.style.pointerEvents = 'none';
-    resizeOverlay.style.boxSizing = 'border-box';
-    resizeOverlay.style.border = '1px solid #2563eb';
-    resizeOverlay.style.touchAction = 'none';
-
-    const resizeDirections: Array<NoticeImageResizeDirection> = [
-      'nw',
-      'n',
-      'ne',
-      'e',
-      'se',
-      's',
-      'sw',
-      'w',
-    ];
-    const resizeHandles = resizeDirections.map((direction) => {
-      const handle = document.createElement('span');
-      handle.className = `notice-image-resize-handle notice-image-resize-handle-${direction}`;
-      handle.dataset.direction = direction;
-      handle.setAttribute('aria-label', `${direction} 방향 이미지 크기 조절`);
-      handle.style.position = 'absolute';
-      handle.style.width = '10px';
-      handle.style.height = '10px';
-      handle.style.border = '1px solid #1d4ed8';
-      handle.style.borderRadius = '2px';
-      handle.style.backgroundColor = '#ffffff';
-      handle.style.pointerEvents = 'auto';
-      handle.style.touchAction = 'none';
-      handle.style.transform = 'translate(-50%, -50%)';
-      return handle;
-    });
-    resizeHandles.forEach((handle) => resizeOverlay.appendChild(handle));
-    document.body.appendChild(resizeOverlay);
-
-    let selectedImage: HTMLImageElement | null = null;
-    let selectedImagePosition = -1;
-
-    const syncResizeOverlay = () => {
-      const nodeElement = editor.view.dom.querySelector(
-        'img.ProseMirror-selectednode',
-      );
-      selectedImage =
-        nodeElement instanceof HTMLImageElement ? nodeElement : null;
-      selectedImagePosition = selectedImage
-        ? editor.view.posAtDOM(selectedImage, 0)
-        : -1;
-
-      if (!selectedImage) {
-        resizeOverlay.style.display = 'none';
-        return;
-      }
-
-      const imageRect = selectedImage.getBoundingClientRect();
-      const editorRect = editor.view.dom.getBoundingClientRect();
-      const clipTop = Math.max(0, editorRect.top - imageRect.top);
-      const clipRight = Math.max(0, imageRect.right - editorRect.right);
-      const clipBottom = Math.max(0, imageRect.bottom - editorRect.bottom);
-      const clipLeft = Math.max(0, editorRect.left - imageRect.left);
-      resizeOverlay.style.display = 'block';
-      resizeOverlay.style.left = `${imageRect.left}px`;
-      resizeOverlay.style.top = `${imageRect.top}px`;
-      resizeOverlay.style.width = `${imageRect.width}px`;
-      resizeOverlay.style.height = `${imageRect.height}px`;
-      resizeOverlay.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)`;
-
-      const positions: Record<NoticeImageResizeDirection, [string, string]> = {
-        nw: ['0%', '0%'],
-        n: ['50%', '0%'],
-        ne: ['100%', '0%'],
-        e: ['100%', '50%'],
-        se: ['100%', '100%'],
-        s: ['50%', '100%'],
-        sw: ['0%', '100%'],
-        w: ['0%', '50%'],
-      };
-      resizeHandles.forEach((handle) => {
-        const direction = handle.dataset
-          .direction as NoticeImageResizeDirection;
-        const [left, top] = positions[direction];
-        handle.style.left = left;
-        handle.style.top = top;
-        handle.style.cursor = `${direction}-resize`;
-      });
-    };
-
-    const handleImagePointerDown = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const imageElement = target?.closest('img');
-      if (!imageElement || !editor.view.dom.contains(imageElement)) {
-        return;
-      }
-
-      const imagePos = editor.view.posAtDOM(imageElement, 0);
-      if (!Number.isFinite(imagePos)) {
-        return;
-      }
-
-      editor.commands.setNodeSelection(imagePos);
-      syncResizeOverlay();
-    };
-
-    const handleResizePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      const direction = target?.dataset.direction as
-        | NoticeImageResizeDirection
-        | undefined;
-      if (!direction || !selectedImage || selectedImagePosition < 0) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      const resizeStartX = event.clientX;
-      const resizeStartY = event.clientY;
-      const resizeStartWidth =
-        selectedImage.getBoundingClientRect().width || 320;
-      const resizeStartHeight =
-        selectedImage.getBoundingClientRect().height || 200;
-
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        const nextSize = calculateNoticeImageResize(
-          resizeStartWidth,
-          resizeStartHeight,
-          moveEvent.clientX - resizeStartX,
-          moveEvent.clientY - resizeStartY,
-          direction,
-        );
-        editor
-          .chain()
-          .focus()
-          .setNodeSelection(selectedImagePosition)
-          .updateAttributes('image', {
-            width: `${nextSize.width}px`,
-            height: `${nextSize.height}px`,
-          })
-          .run();
-        syncResizeOverlay();
-      };
-
-      const handlePointerUp = () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-      };
-
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-    };
-
-    syncEditorState();
-    editor.on('create', syncEditorState);
-    editor.on('update', syncEditorState);
-    editor.on('selectionUpdate', syncEditorState);
-    editor.view.dom.addEventListener('mousedown', handleImagePointerDown);
-    resizeOverlay.addEventListener('pointerdown', handleResizePointerDown);
-    editor.on('selectionUpdate', syncResizeOverlay);
-    editor.on('update', syncResizeOverlay);
-    window.addEventListener('resize', syncResizeOverlay);
-    window.addEventListener('scroll', syncResizeOverlay, true);
-    editor.view.dom.addEventListener('scroll', syncResizeOverlay, true);
-    syncResizeOverlay();
-
-    return () => {
-      editor.off('create', syncEditorState);
-      editor.off('update', syncEditorState);
-      editor.off('selectionUpdate', syncEditorState);
-      editor.view.dom.removeEventListener('mousedown', handleImagePointerDown);
-      editor.off('selectionUpdate', syncResizeOverlay);
-      editor.off('update', syncResizeOverlay);
-      resizeOverlay.removeEventListener('pointerdown', handleResizePointerDown);
-      window.removeEventListener('resize', syncResizeOverlay);
-      window.removeEventListener('scroll', syncResizeOverlay, true);
-      editor.view.dom.removeEventListener('scroll', syncResizeOverlay, true);
-      resizeOverlay.remove();
-    };
-  }, [editor, open]);
-
-  useEffect(() => {
     if (!editor || open) {
       return;
     }
@@ -1143,57 +242,6 @@ export function NoticeComposerDialog({
     editor.commands.setTextSelection(1);
     editor.commands.blur();
   }, [editor, open]);
-
-  const toolbarItems = [
-    {
-      label: '굵게',
-      icon: <FormatBoldOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('bold') ?? false,
-      onClick: () => editor?.chain().focus().toggleBold().run(),
-    },
-    {
-      label: '기울임',
-      icon: <FormatItalicOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('italic') ?? false,
-      onClick: () => editor?.chain().focus().toggleItalic().run(),
-    },
-    {
-      label: '취소선',
-      icon: <StrikethroughSOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('strike') ?? false,
-      onClick: () => editor?.chain().focus().toggleStrike().run(),
-    },
-    {
-      label: '글머리 기호',
-      icon: <FormatListBulletedOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('bulletList') ?? false,
-      onClick: () => editor?.chain().focus().toggleBulletList().run(),
-    },
-    {
-      label: '번호 목록',
-      icon: <FormatListNumberedOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('orderedList') ?? false,
-      onClick: () => editor?.chain().focus().toggleOrderedList().run(),
-    },
-    {
-      label: '인용',
-      icon: <FormatQuoteOutlinedIcon fontSize="small" />,
-      active: editor?.isActive('blockquote') ?? false,
-      onClick: () => editor?.chain().focus().toggleBlockquote().run(),
-    },
-    {
-      label: '되돌리기',
-      icon: <UndoOutlinedIcon fontSize="small" />,
-      active: false,
-      onClick: () => editor?.chain().focus().undo().run(),
-    },
-    {
-      label: '다시 실행',
-      icon: <RedoOutlinedIcon fontSize="small" />,
-      active: false,
-      onClick: () => editor?.chain().focus().redo().run(),
-    },
-  ];
 
   const handleAttachmentSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFiles = Array.from(event.target.files ?? []);
@@ -1224,13 +272,73 @@ export function NoticeComposerDialog({
     setAttachments((current) => current.filter((file) => file.id !== id));
   };
 
+  const handleClipboardDebug = (data: DataTransfer, normalizedHtml: string) => {
+    const html = data.getData('text/html') ?? '';
+    const text = data.getData('text/plain') ?? '';
+    const sourceCells = summarizeClipboardTables(html);
+    const normalizedCells = summarizeClipboardTables(normalizedHtml);
+    setPasteDebugLog((current) => [
+      ...current,
+      `[paste] types=${Array.from(data.types).join(', ')}`,
+      `[paste] htmlLength=${html.length}, textLength=${text.length}`,
+      `[paste] text=${JSON.stringify(text)}`,
+      `[paste] plainGrid=${JSON.stringify(parseClipboardTextGrid(text))}`,
+      `[paste] sourceCells=${JSON.stringify(sourceCells)}`,
+      `[normalized] length=${normalizedHtml.length}`,
+      `[normalized] cells=${JSON.stringify(normalizedCells)}`,
+    ]);
+    window.setTimeout(() => {
+      const editorElement = document.querySelector(
+        '.notice-composer-editor .ProseMirror',
+      );
+      setPasteDebugLog((current) => [
+        ...current,
+        `[after 300ms] text=${editorElement?.textContent ?? '(editor not found)'}`,
+        `[after 300ms] html=${editorElement?.innerHTML ?? '(editor not found)'}`,
+      ]);
+    }, 300);
+  };
+
+  const uploadEmbeddedImage = async (file: File) => {
+    const uploaded = await uploadNoticeEmbeddedImage(file);
+    setImageUploadError(null);
+    return {
+      src: uploaded.imageUrl,
+      alt: uploaded.fileName,
+      fileName: uploaded.fileName,
+      uploadToken: uploaded.uploadToken,
+      fileId: uploaded.fileId == null ? null : String(uploaded.fileId),
+      objectKey: uploaded.objectKey,
+      fileSize: uploaded.fileSize,
+      mimeType: uploaded.mimeType,
+    };
+  };
+
+  const deleteTemporaryImage = (image: {
+    uploadToken: string;
+    fileName: string;
+  }) => deleteNoticeEmbeddedImage(image.uploadToken, image.fileName);
+
+  const editorSaveLifecycle = useRichTextEditorSaveLifecycle({
+    editor,
+    uploadImage: uploadEmbeddedImage,
+    deleteTemporaryImage,
+    onImageUploadError: (message) => setImageUploadError(message || null),
+  });
+
   const handleSubmit = async () => {
     if (!noticeGubunCode.trim()) {
       setNoticeGubunError(true);
       return;
     }
+    if (saving || closing) return;
+    if (editorSaveLifecycle.uploadingCount > 0) {
+      setImageUploadError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
+      return;
+    }
 
-    const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
+    const snapshot = editorSaveLifecycle.getSnapshot();
+    const body = snapshot.html || defaultBody || emptyNoticeContent;
     const bodyText = body
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -1247,23 +355,54 @@ export function NoticeComposerDialog({
       .map((attachment) => attachment.boardFileId as number | string);
 
     if (onSubmit) {
+      setSaving(true);
       try {
         await onSubmit({
           title,
           noticeGubunCode,
           body,
-          bodyJson: serializeNoticeEditorJson(editor),
+          bodyJson: JSON.stringify(snapshot.json),
           bodyText,
           attachments,
           removedAttachmentIds,
-          embeddedImages: collectNoticeEmbeddedImages(editor),
+          embeddedImages: snapshot.referencedImages.map((image) => ({
+            uploadToken: String(image.uploadToken),
+            fileId: image.fileId ?? null,
+            objectKey: String(image.objectKey ?? ''),
+            imageUrl: String(image.src ?? ''),
+            fileName: image.fileName,
+            fileSize: Number(image.fileSize ?? 0) || 0,
+            mimeType: String(image.mimeType ?? ''),
+            width: image.width ?? null,
+          })),
+          temporaryImages: snapshot.temporaryImages,
         });
+        editorSaveLifecycle.completeSave();
       } catch {
         return;
+      } finally {
+        setSaving(false);
       }
     }
 
-    onClose();
+    if (onSubmit) {
+      onClose();
+    } else {
+      handleCloseRequest();
+    }
+  };
+
+  const handleCloseRequest = () => {
+    if (saving || closing) return;
+    if (editorSaveLifecycle.uploadingCount > 0) {
+      setImageUploadError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
+      return;
+    }
+    setClosing(true);
+    void editorSaveLifecycle.cleanupTemporaryImages().finally(() => {
+      setClosing(false);
+      onClose();
+    });
   };
 
   const footerStart = (
@@ -1275,97 +414,19 @@ export function NoticeComposerDialog({
         gap: 1,
       }}
     >
-      <IconButton
-        size="small"
-        aria-label="툴바 열기"
-        onClick={() => setToolbarOpen((open) => !open)}
-        sx={{
-          border: `1px solid ${panelBorder}`,
-          borderRadius: 1,
-          width: 32,
-          height: 32,
-          bgcolor: panelBackground,
-          color: theme.palette.text.primary,
-        }}
-      >
-        <FormatBoldOutlinedIcon fontSize="small" />
-      </IconButton>
+      <RichTextEditorToolbar
+        editor={editor}
+        panelTestId="notice-toolbar-popup"
+      />
 
       <IconButton
         size="small"
         aria-label="첨부 링크"
         onClick={() => attachmentInputRef.current?.click()}
-        sx={{
-          border: `1px solid ${panelBorder}`,
-          borderRadius: 1,
-          width: 32,
-          height: 32,
-          bgcolor: panelBackground,
-          color: theme.palette.text.primary,
-        }}
+        sx={richTextEditorIconButtonSx}
       >
         <AttachFileOutlinedIcon fontSize="small" />
       </IconButton>
-
-      {toolbarOpen && (
-        <Box
-          data-testid="notice-toolbar-popup"
-          sx={{
-            position: 'absolute',
-            left: 0,
-            bottom: 'calc(100% + 8px)',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'row',
-            flexWrap: 'nowrap',
-            alignItems: 'center',
-            gap: 0.75,
-            p: 1,
-            borderRadius: 2,
-            border: `1px solid ${panelBorder}`,
-            bgcolor: resolvedDark
-              ? 'rgba(15, 23, 42, 0.96)'
-              : 'rgba(255, 255, 255, 0.98)',
-            boxShadow: resolvedDark
-              ? '0 10px 25px rgba(15, 23, 42, 0.24)'
-              : '0 10px 25px rgba(15, 23, 42, 0.12)',
-            maxWidth: 'min(520px, calc(100vw - 180px))',
-            overflowX: 'auto',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {toolbarItems.map(({ label, icon, onClick }) => (
-            <Button
-              key={label}
-              size="small"
-              variant="contained"
-              aria-label={label}
-              onClick={() => {
-                onClick();
-                setToolbarOpen(false);
-              }}
-              sx={{
-                minWidth: 0,
-                width: 32,
-                height: 32,
-                borderRadius: 1,
-                p: 0,
-                bgcolor: resolvedDark
-                  ? 'rgba(59, 130, 246, 0.18)'
-                  : 'rgba(59, 130, 246, 0.08)',
-                color: resolvedDark ? '#e2e8f0' : '#0f172a',
-                '&:hover': {
-                  bgcolor: resolvedDark
-                    ? 'rgba(59, 130, 246, 0.3)'
-                    : 'rgba(59, 130, 246, 0.14)',
-                },
-              }}
-            >
-              {icon}
-            </Button>
-          ))}
-        </Box>
-      )}
     </Box>
   );
 
@@ -1375,7 +436,21 @@ export function NoticeComposerDialog({
         variant="contained"
         color="primary"
         onClick={handleSubmit}
-        disabled={title.trim().length === 0 && editorIsEmpty}
+        disabled={
+          saving ||
+          closing ||
+          editorSaveLifecycle.uploadingCount > 0 ||
+          (title.trim().length === 0 && editorIsEmpty)
+        }
+        startIcon={
+          saving ? (
+            <CircularProgress
+              size={16}
+              color="inherit"
+              aria-label="공지 저장 중"
+            />
+          ) : undefined
+        }
         sx={{
           borderRadius: 1.5,
           fontWeight: 700,
@@ -1387,12 +462,13 @@ export function NoticeComposerDialog({
           },
         }}
       >
-        저장
+        {saving ? '저장 중…' : '저장'}
       </Button>
       <Button
         variant="text"
         color="primary"
-        onClick={onClose}
+        onClick={handleCloseRequest}
+        disabled={saving || closing || editorSaveLifecycle.uploadingCount > 0}
         sx={{
           borderRadius: 1.5,
           fontWeight: 600,
@@ -1411,7 +487,7 @@ export function NoticeComposerDialog({
   return (
     <CommonDialog
       open={open}
-      onClose={onClose}
+      onClose={handleCloseRequest}
       title="새 공지 작성"
       size="md"
       bodyMode="fill"
@@ -1566,15 +642,17 @@ export function NoticeComposerDialog({
                 overflow: 'hidden',
                 backgroundColor: editorSurfaceBackground,
                 '& .notice-composer-editor': {
+                  flex: 1,
                   width: '100%',
                   minWidth: 0,
+                  minHeight: 0,
+                  height: '100%',
                   position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
                 },
                 '& .notice-composer-editor .ProseMirror': {
-                  ...noticeContentStyles,
                   display: 'block',
                   width: '100%',
                   minWidth: 0,
@@ -1599,9 +677,49 @@ export function NoticeComposerDialog({
                 },
               }}
             >
-              <EditorContent
-                editor={editor}
+              <RichTextEditor
+                content={
+                  defaultBody && defaultBody.trim()
+                    ? defaultBody
+                    : emptyNoticeContent
+                }
+                onEditorReady={setEditor}
+                onContentChange={(currentEditor) =>
+                  setEditorIsEmpty(currentEditor.isEmpty)
+                }
+                onClipboardPaste={
+                  pasteDebugEnabled ? handleClipboardDebug : undefined
+                }
+                uploadImage={editorSaveLifecycle.uploadImage}
+                onOrphanedImageUpload={
+                  editorSaveLifecycle.onOrphanedImageUpload
+                }
+                onUploadingChange={editorSaveLifecycle.onUploadingChange}
+                onImageUploadError={editorSaveLifecycle.onImageUploadError}
                 className="notice-composer-editor"
+                contentSx={{
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  flex: 1,
+                  minHeight: 180,
+                  maxHeight: '100%',
+                  overflowY: 'auto',
+                  overflowX: 'auto',
+                  outline: 'none',
+                  px: 2,
+                  py: 1.5,
+                  color: theme.palette.text.primary,
+                  backgroundColor: editorSurfaceBackground,
+                  boxSizing: 'border-box',
+                  '& p.is-editor-empty:first-of-type::before': {
+                    content: 'attr(data-placeholder)',
+                    color: theme.palette.text.disabled,
+                    float: 'left',
+                    height: 0,
+                    pointerEvents: 'none',
+                  },
+                }}
               />
               {imageUploadError && (
                 <Typography

@@ -210,7 +210,7 @@ public class CommonCodeGroupApiController {
         Map<String, Object> errorMap = new HashMap<>();
         errorMap.put("message", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR));
+            .body(resultVoHelper.buildFromMap(errorMap, ResponseCode.INPUT_CHECK_ERROR, message));
     }
 
     private void requireAdmin(LoginVO user) {

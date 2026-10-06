@@ -19,7 +19,7 @@ export function ContentSplitLayout({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: 'minmax(0, 1.25fr) minmax(0, 0.75fr)',
+          md: 'minmax(0, 1.35fr) minmax(0, 0.75fr)',
         },
         gap: 2,
         alignItems: 'start',

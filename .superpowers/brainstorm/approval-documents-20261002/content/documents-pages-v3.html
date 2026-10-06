@@ -1,0 +1,850 @@
+<style>
+  .approval-pages {
+    color: #21312e;
+  }
+  .approval-pages h2 {
+    margin-bottom: 6px;
+  }
+  .approval-pages > .subtitle {
+    margin-bottom: 18px;
+  }
+  .page-pair {
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .screen-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #d8e1dd;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 12px 32px #15322c12;
+  }
+  .screen-label {
+    padding: 12px 15px 9px;
+    background: #fff;
+  }
+  .screen-label b {
+    display: block;
+    color: #17312c;
+    font-size: 13px;
+  }
+  .screen-label span {
+    display: block;
+    margin-top: 3px;
+    color: #76847e;
+    font-size: 10px;
+  }
+  .app-canvas {
+    position: relative;
+    min-height: 535px;
+    overflow: hidden;
+    border-top: 1px solid #e3eae6;
+    background: #f5f8f6;
+    font:
+      11px/1.45 'Segoe UI',
+      sans-serif;
+    color: #273a35;
+  }
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 31px;
+    padding: 0 12px;
+    border-bottom: 1px solid #e2e9e5;
+    background: #fff;
+    color: #697772;
+    font-size: 9px;
+  }
+  .brand {
+    color: #12776c;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px 9px;
+    background: #fff;
+  }
+  .breadcrumb {
+    color: #82908b;
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+  .page-header h3 {
+    margin: 0;
+    font-size: 15px;
+    color: #172d2a;
+  }
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 27px;
+    padding: 0 9px;
+    border: 1px solid #cdd8d3;
+    border-radius: 4px;
+    background: #fff;
+    color: #314440;
+    font-size: 9px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .button.primary {
+    border-color: #117a6f;
+    background: #117a6f;
+    color: #fff;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 185px;
+    align-items: start;
+    gap: 9px;
+    padding: 10px 12px 14px;
+  }
+  .left-pane,
+  .right-pane {
+    min-width: 0;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+  .toolbar-left,
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+  .segmented {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid #d8e1dd;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .segmented span {
+    padding: 4px 7px;
+    border-radius: 3px;
+    color: #6c7b75;
+    font-size: 9px;
+  }
+  .segmented .active {
+    background: #e4f1ed;
+    color: #116b61;
+    font-weight: 700;
+  }
+  .subtle {
+    color: #6d7a75;
+    font-size: 9px;
+  }
+  .pin-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px;
+    margin-bottom: 7px;
+    border: 1px solid #dce6e1;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .pin-tag {
+    flex: 0 0 auto;
+    color: #52645e;
+    font-size: 8px;
+    font-weight: 700;
+  }
+  .pin-item {
+    min-width: 0;
+    padding-left: 7px;
+    border-left: 1px solid #e3e9e6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #344640;
+    font-size: 9px;
+  }
+  .pin-item b {
+    color: #18766b;
+    margin-right: 3px;
+  }
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+  .input {
+    display: flex;
+    align-items: center;
+    min-width: 60px;
+    height: 26px;
+    flex: 1;
+    padding: 0 7px;
+    border: 1px solid #dce4e0;
+    border-radius: 3px;
+    background: #fff;
+    color: #929d98;
+    font-size: 9px;
+  }
+  .feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .feed-item {
+    display: flex;
+    gap: 8px;
+    padding: 9px;
+    border: 1px solid #e0e7e3;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .feed-mark {
+    width: 3px;
+    flex: 0 0 3px;
+    border-radius: 3px;
+    background: #2b8b7e;
+  }
+  .feed-main {
+    min-width: 0;
+    flex: 1;
+  }
+  .feed-title {
+    overflow: hidden;
+    color: #253a34;
+    font-size: 10px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .feed-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+    color: #84918b;
+    font-size: 8px;
+  }
+  .doc-kind {
+    color: #267669;
+    font-weight: 700;
+  }
+  .state {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 5px;
+    border-radius: 9px;
+    background: #e4f1ed;
+    color: #237467;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+  .state.wait {
+    background: #fff2d9;
+    color: #94621c;
+  }
+  .state.draft {
+    background: #eef0f0;
+    color: #64716d;
+  }
+  .right-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .panel {
+    padding: 9px;
+    border: 1px solid #dfe7e3;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 7px;
+  }
+  .panel-head strong {
+    color: #253b35;
+    font-size: 10px;
+  }
+  .panel-link {
+    color: #15766b;
+    font-size: 8px;
+  }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .metric {
+    padding: 6px;
+    border-radius: 3px;
+    background: #f3f7f5;
+  }
+  .metric.alert {
+    background: #fff6e8;
+  }
+  .metric span {
+    display: block;
+    color: #788680;
+    font-size: 8px;
+  }
+  .metric b {
+    display: block;
+    margin-top: 2px;
+    color: #17463e;
+    font-size: 17px;
+    line-height: 1.1;
+  }
+  .metric.alert b {
+    color: #a7681d;
+  }
+  .action-row {
+    display: flex;
+    gap: 5px;
+    padding: 6px 0;
+    border-top: 1px solid #edf1ef;
+  }
+  .action-dot {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 5px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #d58b35;
+  }
+  .action-row b {
+    display: block;
+    color: #374a44;
+    font-size: 8px;
+    font-weight: 650;
+  }
+  .action-row span {
+    display: block;
+    margin-top: 2px;
+    color: #83908b;
+    font-size: 8px;
+  }
+  .table-wrap {
+    overflow: auto;
+    border: 1px solid #dce4e0;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8px;
+  }
+  .grid th {
+    height: 27px;
+    background: #eff4f1;
+    color: #53655f;
+    font-weight: 700;
+  }
+  .grid td,
+  .grid th {
+    padding: 5px 4px;
+    border-bottom: 1px solid #e5ebe8;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .grid td:first-child,
+  .grid th:first-child {
+    text-align: center;
+  }
+  .grid td.title {
+    color: #263b35;
+    font-weight: 650;
+  }
+  .grid tr:last-child td {
+    border-bottom: 0;
+  }
+  .search-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    padding: 7px;
+    margin: 0 12px 8px;
+    border: 1px solid #e0e7e3;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .search-panel .input {
+    flex: 1 1 100%;
+  }
+  .select {
+    min-height: 23px;
+    padding: 4px 6px;
+    border: 1px solid #dce4e0;
+    border-radius: 3px;
+    background: #fff;
+    color: #687770;
+    font-size: 8px;
+  }
+  .modal-scrim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 13px;
+    background: #15201f76;
+  }
+  .composer {
+    width: 96%;
+    height: 94%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #d8e0dc;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 14px 40px #17252140;
+  }
+  .composer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-bottom: 1px solid #e1e8e4;
+    color: #1d302c;
+    font-size: 11px;
+    font-weight: 750;
+  }
+  .close {
+    color: #76847e;
+    font-size: 16px;
+    font-weight: 400;
+  }
+  .doc-tabs {
+    display: flex;
+    gap: 1px;
+    padding: 6px 10px 0;
+    border-bottom: 1px solid #dce5e1;
+    background: #f7f9f8;
+  }
+  .doc-tab {
+    padding: 7px 9px;
+    border-bottom: 2px solid transparent;
+    color: #65746e;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+  .doc-tab.active {
+    border-color: #117a6f;
+    background: #fff;
+    color: #117268;
+    font-weight: 750;
+  }
+  .doc-tab.disabled {
+    opacity: 0.42;
+  }
+  .composer-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px;
+  }
+  .type-fields {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 28px;
+    gap: 5px;
+    padding: 0 8px;
+    border: 1px dashed #c7d4ce;
+    border-radius: 3px;
+    background: #f7faf8;
+    color: #64756e;
+    font-size: 8px;
+  }
+  .field-label {
+    margin-bottom: 3px;
+    color: #6d7b75;
+    font-size: 8px;
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 8px;
+    border: 1px solid #dce4e0;
+    border-radius: 3px;
+    color: #9aa49f;
+    font-size: 9px;
+  }
+  .body-editor {
+    flex: 1;
+    min-height: 55px;
+    padding: 8px;
+    border: 1px solid #dce4e0;
+    color: #9aa49f;
+    font-size: 9px;
+  }
+  .composer-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    border-top: 1px solid #e1e8e4;
+    background: #fbfcfb;
+  }
+  .actions {
+    display: flex;
+    gap: 5px;
+  }
+  .caption {
+    margin: 8px 12px 12px;
+    color: #71817a;
+    font-size: 8px;
+  }
+  @media (max-width: 900px) {
+    .page-pair {
+      grid-template-columns: 1fr;
+    }
+    .app-canvas {
+      min-height: 500px;
+    }
+  }
+  @media (max-width: 540px) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+    .right-pane {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .right-pane .panel:last-child {
+      grid-column: 1 / -1;
+    }
+    .page-header {
+      padding-right: 10px;
+      padding-left: 10px;
+    }
+    .columns {
+      padding: 8px;
+    }
+    .modal-scrim {
+      padding: 6px;
+    }
+    .composer {
+      width: 100%;
+    }
+    .doc-tab {
+      padding: 6px 5px;
+      font-size: 8px;
+    }
+  }
+</style>
+
+<div class="approval-pages">
+  <h2>문서작성과 문서현황 분리</h2>
+  <p class="subtitle">
+    작성은 공지사항형 피드와 요약을 중심으로, 문서현황은 F1-Grid와 상세검색을
+    제공하는 별도 화면으로 구성합니다.
+  </p>
+  <div class="page-pair">
+    <section class="screen-card">
+      <div class="screen-label">
+        <b>1. 문서작성</b
+        ><span>좌측 문서 피드/리스트 + 우측 결재 요약, 작성 버튼에서 팝업</span>
+      </div>
+      <div class="app-canvas">
+        <div class="app-bar">
+          <span class="brand">S-ERP</span><span>그룹웨어　김민수 ⌄</span>
+        </div>
+        <div class="page-header">
+          <div>
+            <div class="breadcrumb">그룹웨어　›　전자결재</div>
+            <h3>문서작성</h3>
+          </div>
+          <button class="button primary">＋ 문서 작성</button>
+        </div>
+        <div class="columns">
+          <main class="left-pane">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <span class="subtle">내 문서</span>
+                <div class="segmented">
+                  <span class="active">피드</span><span>리스트</span>
+                </div>
+                <span class="subtle">전체 24건</span>
+              </div>
+              <div class="toolbar-right">
+                <button class="button">구분 전체⌄</button>
+              </div>
+            </div>
+            <div class="pin-row">
+              <span class="pin-tag">상단고정</span
+              ><span class="pin-item"><b>기안서</b>출장비 정산 기준 확인</span
+              ><span class="pin-item"><b>업무연락</b>10월 점검 일정 공유</span>
+            </div>
+            <div class="filter-bar">
+              <span class="input">제목 또는 작성자 검색</span
+              ><button class="button">필터⌄</button>
+            </div>
+            <div class="feed-list">
+              <article class="feed-item">
+                <span class="feed-mark"></span>
+                <div class="feed-main">
+                  <div class="feed-title">월간 업무 계획 승인 요청</div>
+                  <div class="feed-meta">
+                    <span class="doc-kind">기안서</span><span>김민수</span
+                    ><span>10월 2일</span
+                    ><span class="state wait">결재대기</span>
+                  </div>
+                </div>
+              </article>
+              <article class="feed-item">
+                <span class="feed-mark"></span>
+                <div class="feed-main">
+                  <div class="feed-title">생산 일정 변경 안내</div>
+                  <div class="feed-meta">
+                    <span class="doc-kind">업무연락</span><span>김민수</span
+                    ><span>10월 1일</span><span class="state">진행중</span>
+                  </div>
+                </div>
+              </article>
+              <article class="feed-item">
+                <span class="feed-mark"></span>
+                <div class="feed-main">
+                  <div class="feed-title">작업 장비 교체 검토</div>
+                  <div class="feed-meta">
+                    <span class="doc-kind">기안서</span><span>김민수</span
+                    ><span>9월 30일</span
+                    ><span class="state draft">임시저장</span>
+                  </div>
+                </div>
+              </article>
+              <article class="feed-item">
+                <span class="feed-mark"></span>
+                <div class="feed-main">
+                  <div class="feed-title">현장 점검 결과 공유</div>
+                  <div class="feed-meta">
+                    <span class="doc-kind">업무연락</span><span>김민수</span
+                    ><span>9월 29일</span
+                    ><span class="state wait">보완요청</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </main>
+          <aside class="right-pane">
+            <section class="panel">
+              <div class="panel-head">
+                <strong>결재 요약</strong
+                ><span class="panel-link">전체보기 →</span>
+              </div>
+              <div class="metric-grid">
+                <div class="metric alert">
+                  <span>내가 처리할 결재</span><b>3</b>
+                </div>
+                <div class="metric"><span>작성 중 문서</span><b>2</b></div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <strong>놓치지 마세요</strong
+                ><span class="panel-link">더보기 →</span>
+              </div>
+              <div class="action-row">
+                <span class="action-dot"></span>
+                <div>
+                  <b>결재 요청 2건 도착</b
+                  ><span>가장 오래된 요청 · 10월 1일</span>
+                </div>
+              </div>
+              <div class="action-row">
+                <span class="action-dot"></span>
+                <div>
+                  <b>보완 요청 문서 1건</b><span>내용 확인이 필요합니다</span>
+                </div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <strong>내 문서 상태</strong
+                ><span class="panel-link">현황 보기 →</span>
+              </div>
+              <div class="metric-grid">
+                <div class="metric"><span>진행 중</span><b>5</b></div>
+                <div class="metric"><span>완료</span><b>12</b></div>
+              </div>
+            </section>
+          </aside>
+        </div>
+        <div class="modal-scrim">
+          <section class="composer">
+            <div class="composer-head">
+              <span>문서 작성</span><span class="close">×</span>
+            </div>
+            <div class="doc-tabs">
+              <span class="doc-tab active">기안서</span
+              ><span class="doc-tab">업무연락</span
+              ><span class="doc-tab disabled">지출결의서</span
+              ><span class="doc-tab disabled">근태신청</span>
+            </div>
+            <div class="composer-body">
+              <div class="type-fields">
+                <span>문서유형별 추가 항목</span
+                ><span>선택 유형에 따라 변경</span>
+              </div>
+              <div>
+                <div class="field-label">제목 *</div>
+                <div class="field">제목을 입력하세요.</div>
+              </div>
+              <div class="body-editor">본문을 입력하세요.</div>
+            </div>
+            <div class="composer-foot">
+              <button class="button">＋ 첨부</button>
+              <div class="actions">
+                <button class="button">취소</button
+                ><button class="button primary">저장</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p class="caption">
+        작성 화면은 F1-Grid 없이 공지사항처럼 문서 피드/리스트를 제공합니다.
+        현재는 작성 팝업을 연 모습입니다.
+      </p>
+    </section>
+
+    <section class="screen-card">
+      <div class="screen-label">
+        <b>2. 문서현황</b
+        ><span>독립 화면 · 상세검색과 F1-Grid로 전체 문서를 확인</span>
+      </div>
+      <div class="app-canvas">
+        <div class="app-bar">
+          <span class="brand">S-ERP</span><span>그룹웨어　김민수 ⌄</span>
+        </div>
+        <div class="page-header">
+          <div>
+            <div class="breadcrumb">그룹웨어　›　전자결재</div>
+            <h3>문서현황</h3>
+          </div>
+          <button class="button">문서작성으로 →</button>
+        </div>
+        <div class="search-panel">
+          <span class="input">제목 또는 문서번호 검색</span
+          ><button class="select">구분 전체⌄</button
+          ><button class="select">상태 전체⌄</button
+          ><button class="select">작성기간　⌄</button
+          ><button class="button primary">조회</button>
+        </div>
+        <div style="padding: 0 12px">
+          <div class="table-wrap">
+            <table class="grid">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>문서번호</th>
+                  <th>구분</th>
+                  <th>제목</th>
+                  <th>작성자</th>
+                  <th>작성일</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>WF-2026-1042</td>
+                  <td>기안서</td>
+                  <td class="title">월간 업무 계획 승인 요청</td>
+                  <td>김민수</td>
+                  <td>2026-10-02</td>
+                  <td><span class="state wait">결재대기</span></td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>WF-2026-1041</td>
+                  <td>업무연락</td>
+                  <td class="title">생산 일정 변경 안내</td>
+                  <td>김민수</td>
+                  <td>2026-10-01</td>
+                  <td><span class="state">진행중</span></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>WF-2026-1038</td>
+                  <td>기안서</td>
+                  <td class="title">작업 장비 교체 검토</td>
+                  <td>김민수</td>
+                  <td>2026-09-30</td>
+                  <td><span class="state draft">임시저장</span></td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>WF-2026-1036</td>
+                  <td>업무연락</td>
+                  <td class="title">현장 점검 결과 공유</td>
+                  <td>김민수</td>
+                  <td>2026-09-29</td>
+                  <td><span class="state wait">보완요청</span></td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>WF-2026-1032</td>
+                  <td>기안서</td>
+                  <td class="title">교육 참석 신청</td>
+                  <td>박서연</td>
+                  <td>2026-09-28</td>
+                  <td><span class="state">완료</span></td>
+                </tr>
+                <tr>
+                  <td>6</td>
+                  <td>WF-2026-1029</td>
+                  <td>업무연락</td>
+                  <td class="title">주간 점검 일정 공유</td>
+                  <td>이도윤</td>
+                  <td>2026-09-26</td>
+                  <td><span class="state">진행중</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                padding: 8px;
+                color: #76847e;
+                font-size: 8px;
+              "
+            >
+              <span>총 24건</span><span>‹　1　2　3　4　5　›</span>
+            </div>
+          </div>
+        </div>
+        <p class="caption">
+          현황 페이지에서만 F1-Grid를 사용하고, 상세검색 조건은 실제 문서/결재
+          조회 계약에 맞춰 확정합니다.
+        </p>
+      </div>
+    </section>
+  </div>
+  <p class="caption">
+    ※ 문서 상태, 고정 기능, 피드 전환, 요약 수치는 구조 검토용 예시입니다. 실제
+    상태와 데이터 권한은 사양 단계에서 확인합니다.
+  </p>
+</div>

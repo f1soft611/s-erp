@@ -97,7 +97,7 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         }
 
         for (CommonCodeItemChangeVO row : itemChanges.getInsertedRows()) {
-            validateItemRow(row);
+            validateItemRow(row, true);
             String rawGroupId = row.getGroupId();
             Long groupId = resolveGroupId(tenantId, rawGroupId, tempGroupIdToPersistedGroupId);
             CommonCodeItemVO created = commonCodeItemService.createItem(tenantId, groupId, toItemPayload(row));
@@ -105,7 +105,7 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         }
 
         for (CommonCodeItemChangeVO row : itemChanges.getUpdatedRows()) {
-            validateItemRow(row);
+            validateItemRow(row, false);
             Long groupId = resolveGroupId(tenantId, row.getGroupId(), tempGroupIdToPersistedGroupId);
             Long itemId = toLong(row.getId());
             if (itemId == null) {
@@ -133,11 +133,11 @@ public class CommonCodeBatchServiceImpl extends EgovAbstractServiceImpl implemen
         }
     }
 
-    private void validateItemRow(CommonCodeItemChangeVO row) {
+    private void validateItemRow(CommonCodeItemChangeVO row, boolean allowEmptyCode) {
         if (row == null) {
             throw new IllegalArgumentException("상세 변경 행이 비어 있습니다.");
         }
-        if (!StringUtils.hasText(row.getItemCode())) {
+        if (!allowEmptyCode && !StringUtils.hasText(row.getItemCode())) {
             throw new IllegalArgumentException("상세코드는 필수입니다.");
         }
         if (!StringUtils.hasText(row.getItemNm())) {

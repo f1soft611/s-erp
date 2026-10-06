@@ -60,12 +60,45 @@ const allowedStyleProperties = new Set([
   'font-weight',
   'height',
   'min-width',
+  'overflow-wrap',
   'text-align',
   'vertical-align',
   'width',
+  'white-space',
+  'word-break',
 ]);
 
-function sanitizeStyle(value: string): string {
+const allowedTextStyleProperties = new Set([
+  'color',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'line-height',
+  'text-decoration',
+  'overflow-wrap',
+  'white-space',
+  'word-break',
+]);
+
+const safeWrappingValues: Record<string, Set<string>> = {
+  'white-space': new Set([
+    'normal',
+    'pre',
+    'nowrap',
+    'pre-wrap',
+    'pre-line',
+    'break-spaces',
+  ]),
+  'word-break': new Set(['normal', 'break-all', 'keep-all', 'break-word']),
+  'overflow-wrap': new Set(['normal', 'break-word', 'anywhere']),
+};
+
+export type SanitizeHtmlOptions = {
+  preserveTextStyles?: boolean;
+};
+
+function sanitizeStyle(value: string, styleProperties: Set<string>): string {
   return value
     .split(';')
     .map((declaration) => declaration.split(':'))
@@ -76,7 +109,9 @@ function sanitizeStyle(value: string): string {
     ])
     .filter(
       ([property, declarationValue]) =>
-        allowedStyleProperties.has(property) &&
+        styleProperties.has(property) &&
+        (!safeWrappingValues[property] ||
+          safeWrappingValues[property].has(declarationValue.toLowerCase())) &&
         !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(
           declarationValue,
         ),
@@ -131,7 +166,10 @@ function isSafeUrl(value: string): boolean {
   return /^(https?:|mailto:)/i.test(normalized);
 }
 
-export function sanitizeHtml(value: string): string {
+export function sanitizeHtml(
+  value: string,
+  options: SanitizeHtmlOptions = {},
+): string {
   if (typeof DOMParser === 'undefined') {
     return value
       .replace(/<(script|style|svg)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
@@ -144,13 +182,20 @@ export function sanitizeHtml(value: string): string {
   }
 
   const parsed = new DOMParser().parseFromString(value, 'text/html');
+  const preserveTextStyles = options.preserveTextStyles === true;
+  const tags = preserveTextStyles
+    ? new Set([...allowedTags, 'span'])
+    : allowedTags;
+  const styleProperties = preserveTextStyles
+    ? new Set([...allowedStyleProperties, ...allowedTextStyleProperties])
+    : allowedStyleProperties;
   parsed
     .querySelectorAll('script, style, svg, iframe, object, embed, link, meta')
     .forEach((node) => node.remove());
 
   parsed.body.querySelectorAll('*').forEach((node) => {
     const element = node as HTMLElement;
-    if (!allowedTags.has(element.tagName.toLowerCase())) {
+    if (!tags.has(element.tagName.toLowerCase())) {
       element.replaceWith(...Array.from(element.childNodes));
       return;
     }
@@ -169,15 +214,19 @@ export function sanitizeHtml(value: string): string {
 
       if (name === 'style') {
         if (
-          !['td', 'th', 'col', 'colgroup'].includes(
-            element.tagName.toLowerCase(),
-          )
+          ![
+            'td',
+            'th',
+            'col',
+            'colgroup',
+            ...(preserveTextStyles ? ['span'] : []),
+          ].includes(element.tagName.toLowerCase())
         ) {
           element.removeAttribute(attribute.name);
           return;
         }
 
-        const safeStyle = sanitizeStyle(attribute.value);
+        const safeStyle = sanitizeStyle(attribute.value, styleProperties);
         if (safeStyle) {
           element.setAttribute('style', safeStyle);
         } else {

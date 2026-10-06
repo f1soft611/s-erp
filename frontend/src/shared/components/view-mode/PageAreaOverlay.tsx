@@ -51,7 +51,7 @@ export function PageAreaOverlay({ children, onClose }: PageAreaOverlayProps) {
       >
         <Box
           sx={{
-            width: 'min(960px, 72vw)',
+            width: 'min(975px, 72vw)',
             maxWidth: '100%',
             height: '100%',
             minHeight: 0,

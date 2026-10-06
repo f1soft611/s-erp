@@ -1,0 +1,495 @@
+<style>
+  .approval-design {
+    color: #142326;
+  }
+  .approval-design h2 {
+    margin-bottom: 8px;
+  }
+  .approval-design .subtitle {
+    margin-bottom: 22px;
+  }
+  .approval-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .approval-option {
+    min-width: 0;
+    border: 2px solid #d8dfdc;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    cursor: pointer;
+    transition:
+      border-color 0.18s ease,
+      transform 0.18s ease;
+  }
+  .approval-option:hover {
+    border-color: #19877c;
+    transform: translateY(-2px);
+  }
+  .approval-option.selected {
+    border-color: #087d70;
+    box-shadow: 0 0 0 3px #087d7022;
+  }
+  .approval-option-head {
+    display: flex;
+    gap: 12px;
+    padding: 16px 18px 12px;
+    align-items: flex-start;
+  }
+  .approval-option-head .letter {
+    flex: 0 0 28px;
+  }
+  .approval-option-head h3 {
+    margin: 0 0 4px;
+    color: #132627;
+  }
+  .approval-option-head p {
+    margin: 0;
+    color: #62716f;
+    font-size: 13px;
+  }
+  .erp-frame {
+    position: relative;
+    margin: 0 12px 12px;
+    height: 435px;
+    overflow: hidden;
+    border: 1px solid #dce4e1;
+    border-radius: 5px;
+    background: #f4f7f6;
+    font:
+      11px/1.45 'Segoe UI',
+      sans-serif;
+    color: #273735;
+  }
+  .erp-top {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    background: #fff;
+    border-bottom: 1px solid #e2e8e5;
+    color: #667572;
+  }
+  .erp-brand {
+    color: #13786e;
+    font-weight: 800;
+    font-size: 12px;
+  }
+  .erp-content {
+    padding: 16px 18px;
+  }
+  .erp-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .erp-title strong {
+    font-size: 16px;
+    color: #162c2b;
+  }
+  .erp-btn {
+    border: 1px solid #cbd6d2;
+    border-radius: 4px;
+    background: #fff;
+    color: #334441;
+    padding: 6px 10px;
+    font-weight: 600;
+  }
+  .erp-btn.primary {
+    background: #117b70;
+    border-color: #117b70;
+    color: white;
+  }
+  .erp-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #e0e7e4;
+    border-radius: 5px;
+    background: white;
+  }
+  .erp-input {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 0 8px;
+    border: 1px solid #dce4e1;
+    border-radius: 3px;
+    background: white;
+    color: #7b8884;
+  }
+  .erp-grid {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+  }
+  .erp-grid th {
+    background: #f1f5f3;
+    color: #596864;
+    font-weight: 700;
+  }
+  .erp-grid th,
+  .erp-grid td {
+    padding: 8px 7px;
+    border: 1px solid #e0e6e3;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .erp-grid td:first-child,
+  .erp-grid th:first-child {
+    text-align: center;
+  }
+  .status {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: #e6f3ef;
+    color: #287463;
+    font-size: 10px;
+  }
+  .status.muted {
+    background: #eef0f0;
+    color: #67716e;
+  }
+  .scrim {
+    position: absolute;
+    inset: 32px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    background: #17201f88;
+  }
+  .composer {
+    width: 94%;
+    height: 95%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #d6ddda;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px #16252235;
+  }
+  .composer-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e6ebe9;
+    color: #1a2d2a;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .composer-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 12px 0;
+    border-bottom: 1px solid #dfe6e3;
+    background: #f7f9f8;
+  }
+  .composer-tab {
+    padding: 7px 10px;
+    color: #63716d;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  .composer-tab.active {
+    color: #087b70;
+    border-color: #087b70;
+    font-weight: 700;
+    background: white;
+  }
+  .composer-tab.disabled {
+    opacity: 0.42;
+  }
+  .composer-body {
+    padding: 12px;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+  .field-label {
+    color: #71807b;
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+  .field {
+    border: 1px solid #e0e6e3;
+    border-radius: 4px;
+    padding: 8px;
+    background: #fff;
+    color: #88938f;
+  }
+  .field.title-field {
+    color: #344440;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .type-fields {
+    padding: 7px 8px;
+    border: 1px dashed #bdcbc5;
+    border-radius: 4px;
+    background: #f8faf9;
+    color: #667570;
+  }
+  .editor {
+    flex: 1;
+    min-height: 50px;
+    border: 1px solid #dfe6e3;
+    padding: 9px;
+    color: #9aa5a1;
+  }
+  .composer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-top: 1px solid #e1e7e4;
+    background: #fbfcfb;
+  }
+  .composer-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .fullwriter {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .fullwriter .erp-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .writer-subtitle {
+    color: #77847f;
+    margin-top: 3px;
+  }
+  .writer-tabs {
+    display: flex;
+    gap: 5px;
+    margin: 4px 0 12px;
+    border-bottom: 1px solid #dce5e1;
+  }
+  .writer-tabs span {
+    padding: 8px 10px;
+    color: #64726e;
+  }
+  .writer-tabs .active {
+    color: #087b70;
+    font-weight: 700;
+    border-bottom: 2px solid #087b70;
+  }
+  .common-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+  .document-editor {
+    flex: 1;
+    min-height: 80px;
+    background: white;
+    border: 1px solid #dce4e1;
+    padding: 10px;
+    color: #98a39f;
+  }
+  .writer-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding-top: 9px;
+  }
+  .approx {
+    font-size: 9px;
+    color: #80908a;
+    margin-top: 6px;
+  }
+  @media (max-width: 900px) {
+    .approval-options {
+      grid-template-columns: 1fr;
+    }
+    .erp-frame {
+      height: 390px;
+    }
+  }
+</style>
+
+<div class="approval-design">
+  <h2>문서 작성 화면 진입 방식</h2>
+  <p class="subtitle">
+    각 시안의 카드를 눌러 선호하는 구조를 선택해 주세요. 문서별 추가 필드와
+    저장·상신 동작은 검토 후 확정합니다.
+  </p>
+  <div class="approval-options">
+    <div
+      class="approval-option"
+      data-choice="modal"
+      onclick="toggleSelect(this)"
+    >
+      <div class="approval-option-head">
+        <div class="letter">A</div>
+        <div>
+          <h3>현황 화면 + 대형 작성 모달</h3>
+          <p>
+            문서현황에서 바로 작성. 공지 작성 모달의 익숙한 흐름과 가장
+            가깝습니다.
+          </p>
+        </div>
+      </div>
+      <div class="erp-frame">
+        <div class="erp-top">
+          <span class="erp-brand">S-ERP</span><span>그룹웨어　　사용자</span>
+        </div>
+        <div class="erp-content">
+          <div class="erp-title">
+            <strong>문서현황</strong
+            ><button class="erp-btn primary">＋ 문서작성</button>
+          </div>
+          <div class="erp-search">
+            <span class="erp-input" style="flex: 1">제목 또는 작성자 검색</span
+            ><button class="erp-btn">상세검색⌄</button
+            ><button class="erp-btn">조회</button>
+          </div>
+          <table class="erp-grid">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>구분</th>
+                <th>제목</th>
+                <th>작성자</th>
+                <th>작성일</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>기안서</td>
+                <td>월간 업무 계획</td>
+                <td>김민수</td>
+                <td>2026-10-02</td>
+                <td><span class="status muted">임시저장</span></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>업무연락</td>
+                <td>점검 일정 안내</td>
+                <td>박서연</td>
+                <td>2026-10-01</td>
+                <td><span class="status">진행중</span></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>기안서</td>
+                <td>장비 교체 검토</td>
+                <td>이도윤</td>
+                <td>2026-09-30</td>
+                <td><span class="status">완료</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="approx">F1-Grid 상세검색 예시: 구분 · 상태 · 작성일</div>
+        </div>
+        <div class="scrim">
+          <div class="composer">
+            <div class="composer-title">
+              <span>문서 작성</span><span style="color: #81908a">×</span>
+            </div>
+            <div class="composer-tabs">
+              <span class="composer-tab active">기안서</span
+              ><span class="composer-tab">업무연락</span
+              ><span class="composer-tab disabled">지출결의서</span
+              ><span class="composer-tab disabled">근태신청</span>
+            </div>
+            <div class="composer-body">
+              <div class="type-fields">
+                기안서 전용 입력항목 영역
+                <span style="opacity: 0.7">(확정 전)</span>
+              </div>
+              <div>
+                <div class="field-label">제목 *</div>
+                <div class="field title-field">제목을 입력하세요.</div>
+              </div>
+              <div class="editor">본문을 입력하세요.</div>
+            </div>
+            <div class="composer-footer">
+              <span class="erp-btn">📎 첨부</span>
+              <div class="composer-actions">
+                <button class="erp-btn">취소</button
+                ><button class="erp-btn primary">저장</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="approval-option"
+      data-choice="page"
+      onclick="toggleSelect(this)"
+    >
+      <div class="approval-option-head">
+        <div class="letter">B</div>
+        <div>
+          <h3>현황 화면 + 별도 작성 페이지</h3>
+          <p>
+            작성 영역을 넓게 확보하고, 유형별 필드가 늘어나도 확장하기 쉽습니다.
+          </p>
+        </div>
+      </div>
+      <div class="erp-frame">
+        <div class="erp-top">
+          <span class="erp-brand">S-ERP</span><span>그룹웨어　　사용자</span>
+        </div>
+        <div class="fullwriter">
+          <div class="erp-content">
+            <div class="erp-title" style="margin-bottom: 2px">
+              <div>
+                <strong>문서 작성</strong>
+                <div class="writer-subtitle">전자결재　›　문서 작성</div>
+              </div>
+              <button class="erp-btn">← 문서현황</button>
+            </div>
+            <div class="writer-tabs">
+              <span class="active">기안서</span><span>업무연락</span
+              ><span style="opacity: 0.4">지출결의서</span
+              ><span style="opacity: 0.4">근태신청</span>
+            </div>
+            <div class="type-fields" style="margin-bottom: 8px">
+              기안서 전용 입력항목 영역
+              <span style="opacity: 0.7">(확정 전)</span>
+            </div>
+            <div class="common-fields">
+              <div>
+                <div class="field-label">제목 *</div>
+                <div class="field title-field">제목을 입력하세요.</div>
+              </div>
+            </div>
+            <div class="document-editor">본문을 입력하세요.</div>
+            <div class="writer-actions">
+              <button class="erp-btn">취소</button
+              ><button class="erp-btn">임시저장</button
+              ><button class="erp-btn primary">결재요청</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="approx">
+    ※ 상태·검색 항목·하단 버튼은 구조 검토용 예시이며, 실제 업무 규칙은 별도
+    확정이 필요합니다.
+  </p>
+</div>

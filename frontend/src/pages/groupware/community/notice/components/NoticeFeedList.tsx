@@ -13,6 +13,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -22,10 +23,14 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
-import type { NoticeCommentItem, NoticeFeedItem } from '../data/noticeData';
-import { noticeContentStyles } from './noticeContentStyles';
-import { sanitizeHtml } from '../../../../../shared/utils/sanitizeHtml';
+import type {
+  NoticeCommentItem,
+  NoticeFeedItem,
+} from '../types/community.types';
+import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
+import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
+import { apiGetBlob } from '../../../../../shared/services/apiClient';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -249,6 +254,8 @@ export function normalizeNoticeEmbeddedImageSources(
 
   const document = new DOMParser().parseFromString(html, 'text/html');
   document.querySelectorAll('img').forEach((image) => {
+    image.removeAttribute('data-upload-token');
+    image.removeAttribute('data-upload-state');
     const objectKey = image.getAttribute('data-object-key');
     if (!objectKey) {
       return;
@@ -259,6 +266,81 @@ export function normalizeNoticeEmbeddedImageSources(
     );
   });
   return document.body.innerHTML;
+}
+
+function deferNoticeEmbeddedImageSources(html: string): string {
+  if (!html || typeof DOMParser === 'undefined') {
+    return html;
+  }
+
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  document.querySelectorAll('img').forEach((image) => {
+    const source = image.getAttribute('src') ?? '';
+    if (!source.includes('/api/v1/groupware/boards/notice/posts/')) {
+      return;
+    }
+    image.setAttribute('data-notice-embedded-image-source', source);
+    image.removeAttribute('src');
+  });
+  return document.body.innerHTML;
+}
+
+type AuthenticatedNoticeImageProps = {
+  src: string;
+  alt: string;
+  onLoad?: React.ReactEventHandler<HTMLImageElement>;
+  onClick?: React.MouseEventHandler<HTMLImageElement>;
+  sx?: SxProps<Theme>;
+};
+
+export function AuthenticatedNoticeImage({
+  src,
+  alt,
+  onLoad,
+  onClick,
+  sx,
+}: AuthenticatedNoticeImageProps) {
+  const [objectUrl, setObjectUrl] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    let nextObjectUrl: string | undefined;
+    setObjectUrl(undefined);
+
+    if (!src.includes('/api/v1/groupware/boards/notice/posts/')) {
+      setObjectUrl(src);
+      return;
+    }
+
+    void apiGetBlob(src)
+      .then((blob) => {
+        nextObjectUrl = URL.createObjectURL(blob);
+        if (active) {
+          setObjectUrl(nextObjectUrl);
+        } else {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+      })
+      .catch(() => setObjectUrl(undefined));
+
+    return () => {
+      active = false;
+      if (nextObjectUrl) {
+        URL.revokeObjectURL(nextObjectUrl);
+      }
+    };
+  }, [src]);
+
+  return (
+    <Box
+      component="img"
+      src={objectUrl}
+      alt={alt}
+      onLoad={onLoad}
+      onClick={onClick}
+      sx={sx}
+    />
+  );
 }
 
 export function removeNoticeEmbeddedImages(html: string): string {
@@ -343,6 +425,55 @@ export function NoticeFeedList({
     observer.observe(element);
     return () => observer.disconnect();
   }, [onReachEnd]);
+
+  useEffect(() => {
+    const images = Array.from(
+      document.querySelectorAll<HTMLImageElement>(
+        'img[data-notice-embedded-image-source]',
+      ),
+    );
+    const sources = Array.from(
+      new Set(
+        images
+          .map((image) =>
+            image.getAttribute('data-notice-embedded-image-source'),
+          )
+          .filter((source): source is string => Boolean(source)),
+      ),
+    );
+    const objectUrls: string[] = [];
+    let active = true;
+
+    void Promise.all(
+      sources.map(async (source) => {
+        try {
+          const objectUrl = URL.createObjectURL(await apiGetBlob(source));
+          objectUrls.push(objectUrl);
+          return [source, objectUrl] as const;
+        } catch {
+          return [source, null] as const;
+        }
+      }),
+    ).then((resolvedSources) => {
+      if (!active) {
+        return;
+      }
+      const sourceMap = new Map(resolvedSources);
+      images.forEach((image) => {
+        const source = image.getAttribute('data-notice-embedded-image-source');
+        const objectUrl = source ? sourceMap.get(source) : null;
+        if (objectUrl) {
+          image.src = objectUrl;
+          image.removeAttribute('data-notice-embedded-image-source');
+        }
+      });
+    });
+
+    return () => {
+      active = false;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [items, expandedNoticeId, serverItemRevision]);
 
   useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
@@ -497,10 +628,14 @@ export function NoticeFeedList({
             item.bodyHtml ?? item.body,
             item.id,
           );
-          const previewHtml = sanitizeHtml(normalizedPreviewHtml);
+          const sanitizedPreviewHtml = prepareNoticeFeedHtml(
+            normalizedPreviewHtml,
+          );
+          const previewHtml =
+            deferNoticeEmbeddedImageSources(sanitizedPreviewHtml);
           const hasRichHtml = /<[^>]+>/.test(previewHtml);
           const embeddedImagePreviews =
-            extractNoticeEmbeddedImagePreviews(previewHtml);
+            extractNoticeEmbeddedImagePreviews(sanitizedPreviewHtml);
           const collapsedPreviewHtml = removeNoticeEmbeddedImages(previewHtml);
           const itemComments =
             localCommentsByNoticeId[item.id] ?? item.comments ?? [];
@@ -717,7 +852,7 @@ export function NoticeFeedList({
                       }
                     }}
                     sx={{
-                      ...noticeContentStyles,
+                      ...richTextContentStyles,
                       color: 'text.primary',
                       mb: 1.5,
                       overflow: isExpanded ? 'visible' : 'hidden',
@@ -842,8 +977,7 @@ export function NoticeFeedList({
                                 }}
                               />
                             )}
-                            <Box
-                              component="img"
+                            <AuthenticatedNoticeImage
                               src={image.src}
                               alt={image.alt}
                               onLoad={() =>
@@ -853,10 +987,10 @@ export function NoticeFeedList({
                                   return next;
                                 })
                               }
-                              onClick={() => {
+                              onClick={(event) => {
                                 if (isLoaded) {
                                   setViewerImage({
-                                    src: image.src,
+                                    src: event.currentTarget.src,
                                     alt: image.alt,
                                   });
                                 }

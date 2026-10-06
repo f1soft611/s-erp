@@ -215,9 +215,6 @@ describe('CommonCodeItemHelpDialog', () => {
     const { onCreateItem, onReload } = renderDialog();
 
     fireEvent.click(await screen.findByRole('button', { name: '분류 추가' }));
-    const insertedRow = getLastGridRow();
-    const insertedCells = within(insertedRow).getAllByRole('gridcell');
-    await editCell(insertedCells[1], 'SAFETY');
     await editCell(
       within(getLastGridRow()).getAllByRole('gridcell')[2],
       '안전점검',
@@ -231,10 +228,32 @@ describe('CommonCodeItemHelpDialog', () => {
     await waitFor(() =>
       expect(onCreateItem).toHaveBeenCalledWith(
         expect.objectContaining({
-          itemCode: 'SAFETY',
+          itemCode: '',
           itemNm: '안전점검',
           useAt: 'Y',
         }),
+      ),
+    );
+    expect(onReload).toHaveBeenCalledOnce();
+  });
+
+  it('allows a new classification item without a code so the backend can generate it', async () => {
+    const { onCreateItem, onReload } = renderDialog();
+
+    fireEvent.click(await screen.findByRole('button', { name: '분류 추가' }));
+    await editCell(
+      within(getLastGridRow()).getAllByRole('gridcell')[2],
+      '자동발번 분류',
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '기안양식 분류 설정' }),
+      ).getByRole('button', { name: '저장' }),
+    );
+
+    await waitFor(() =>
+      expect(onCreateItem).toHaveBeenCalledWith(
+        expect.objectContaining({ itemCode: '', itemNm: '자동발번 분류' }),
       ),
     );
     expect(onReload).toHaveBeenCalledOnce();
@@ -339,10 +358,6 @@ describe('CommonCodeItemHelpDialog', () => {
     });
     const copiedRow = copiedCell.closest('[role="row"]');
     expect(copiedRow).not.toBeNull();
-    const copiedCells = within(copiedRow as HTMLElement).getAllByRole(
-      'gridcell',
-    );
-    await editCell(copiedCells[1], 'SAFETY');
     await editCell(
       await screen.findByRole('gridcell', { name: '점검 복사' }),
       '안전점검',
@@ -355,7 +370,7 @@ describe('CommonCodeItemHelpDialog', () => {
 
     await waitFor(() =>
       expect(onCreateItem).toHaveBeenCalledWith(
-        expect.objectContaining({ itemCode: 'SAFETY', itemNm: '안전점검' }),
+        expect.objectContaining({ itemCode: '', itemNm: '안전점검' }),
       ),
     );
     expect(onReload).toHaveBeenCalledOnce();

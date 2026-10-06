@@ -114,7 +114,7 @@ describe('NoticeComposerDialog theme handling', () => {
 
     await waitFor(() => {
       expect(
-        document.querySelector('.notice-image-resize-overlay'),
+        document.querySelector('.rich-text-image-resize-overlay'),
       ).toBeInTheDocument();
     });
 
@@ -261,9 +261,20 @@ describe('NoticeComposerDialog theme handling', () => {
       ).toBeInTheDocument();
     });
 
-    expect(
-      screen.queryByRole('button', { name: /^링크$/i }),
-    ).not.toBeInTheDocument();
+    const boldButton = screen.getByRole('button', { name: /^굵게$/i });
+    expect(getComputedStyle(toolbarButton).borderTopWidth).toBe('0px');
+    const boldStyle = getComputedStyle(boldButton);
+    expect(boldStyle.width).toBe('32px');
+    expect(boldStyle.height).toBe('32px');
+    expect(boldStyle.borderTopWidth).toBe('0px');
+
+    const attachmentStyle = getComputedStyle(attachmentButton);
+    expect(attachmentStyle.width).toBe('32px');
+    expect(attachmentStyle.height).toBe('32px');
+    expect(attachmentStyle.borderTopWidth).toBe('1px');
+    expect(attachmentStyle.borderTopStyle).toBe('solid');
+
+    expect(screen.getByRole('button', { name: /^링크$/i })).toBeInTheDocument();
 
     const fileInput = screen.getByLabelText(/첨부 파일 선택/i);
     fireEvent.change(fileInput, {
