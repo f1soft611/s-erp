@@ -1,10 +1,12 @@
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import { useTheme } from '@mui/material/styles';
 import {
+  Alert,
   Box,
   Button,
   Chip,
   IconButton,
+  MenuItem,
   Tab,
   Tabs,
   TextField,
@@ -16,8 +18,13 @@ import {
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
+import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { DocumentKind } from '../types/documentWrite.types';
-import { useDocumentComposer } from '../hooks/useDocumentComposer';
+import {
+  ALL_CATEGORY_VALUE,
+  useDocumentComposer,
+} from '../hooks/useDocumentComposer';
+import { DocumentApprovalFields } from './DocumentApprovalFields';
 
 type DocumentComposerDialogProps = {
   open: boolean;
@@ -34,17 +41,60 @@ export function DocumentComposerDialog({
     setActiveDocumentKind,
     composerTitle,
     setComposerTitle,
+    draftDate,
+    drafterName,
+    categoryItems,
+    availableForms,
+    userOptions,
+    selectedCategoryId,
+    selectedFormId,
+    handleFormChange,
+    handleCategoryChange,
+    templateError,
+    templateLoading,
+    templateReplaceConfirmOpen,
+    cancelTemplateReplacement,
+    confirmTemplateReplacement,
+    approvalStages,
+    selectedApprovalUserIds,
+    referenceUserIds,
+    addApproval,
+    addAgreement,
+    removeApprovalStage,
+    handleApprovalUserChange,
+    handleReferenceUserChange,
+    loadError,
+    isLoading,
     attachments,
     setAttachments,
     attachmentInputRef,
     editor,
-    setEditor,
+    handleEditorReady,
     handleAttachmentSelect,
     closeComposer,
     editorSurfaceBackground,
     fieldSurfaceBackground,
-  } = useDocumentComposer(onClose);
+  } = useDocumentComposer(open, onClose);
   const panelBorder = theme.palette.divider;
+  const formFieldSx = {
+    '& .MuiInputBase-root': {
+      minHeight: 38,
+    },
+    '& .MuiInputBase-input, & .MuiSelect-select': {
+      fontSize: '0.93rem',
+      paddingBottom: '8.5px',
+      paddingTop: '8.5px',
+    },
+    '& .MuiInputLabel-root': {
+      color: 'text.secondary',
+      fontSize: '0.82rem',
+      fontWeight: 600,
+      opacity: 1,
+    },
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: 'primary.main',
+    },
+  };
 
   const composerFooterStart = (
     <Box
@@ -120,6 +170,8 @@ export function DocumentComposerDialog({
           gap: 1.5,
           height: '100%',
           minHeight: 0,
+          minWidth: 0,
+          overflowY: 'auto',
         }}
       >
         <Tabs
@@ -140,6 +192,112 @@ export function DocumentComposerDialog({
           <Tab value="지출결의서" label="지출결의서" disabled />
           <Tab value="근태신청" label="근태신청" disabled />
         </Tabs>
+        {activeDocumentKind === '기안서' && (
+          <>
+            {isLoading && (
+              <Alert severity="info">기안서 정보를 불러오는 중입니다.</Alert>
+            )}
+            {templateLoading && (
+              <Alert severity="info">
+                기안양식 본문을 불러오는 중입니다.
+              </Alert>
+            )}
+            {loadError && <Alert severity="error">{loadError}</Alert>}
+            {templateError && <Alert severity="error">{templateError}</Alert>}
+            <Box
+              data-testid="document-draft-metadata"
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'minmax(0, 1fr)',
+                  sm: 'repeat(2, minmax(0, 1fr))',
+                },
+                gap: 1.25,
+                flexShrink: 0,
+              }}
+            >
+              <TextField
+                label="기안일"
+                value={draftDate}
+                fullWidth
+                size="small"
+                margin="none"
+                slotProps={{ htmlInput: { readOnly: true } }}
+                sx={formFieldSx}
+              />
+              <TextField
+                label="기안자"
+                value={drafterName}
+                fullWidth
+                size="small"
+                margin="none"
+                slotProps={{ htmlInput: { readOnly: true } }}
+                sx={formFieldSx}
+              />
+              <TextField
+                select
+                label="구분"
+                value={selectedCategoryId}
+                onChange={(event) => handleCategoryChange(event.target.value)}
+                fullWidth
+                size="small"
+                margin="none"
+                disabled={isLoading || templateLoading}
+                helperText={
+                  !isLoading && categoryItems.length === 0
+                    ? '등록된 분류가 없습니다.'
+                    : undefined
+                }
+                sx={formFieldSx}
+              >
+                <MenuItem value={ALL_CATEGORY_VALUE}>전체</MenuItem>
+                {categoryItems.map((category) => (
+                  <MenuItem key={category.id} value={category.id}>
+                    {category.itemNm}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="기안양식"
+                value={selectedFormId}
+                onChange={(event) => handleFormChange(event.target.value)}
+                fullWidth
+                size="small"
+                margin="none"
+                disabled={
+                  isLoading || templateLoading || availableForms.length === 0
+                }
+                helperText={
+                  !isLoading && availableForms.length === 0
+                    ? '선택 가능한 기안양식이 없습니다.'
+                    : undefined
+                }
+                sx={formFieldSx}
+              >
+                {availableForms.map((form) => (
+                  <MenuItem
+                    key={form.draftingWorkCategoryId}
+                    value={String(form.draftingWorkCategoryId)}
+                  >
+                    {form.codeName}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+            <DocumentApprovalFields
+              userOptions={userOptions}
+              selectedApprovalUserIds={selectedApprovalUserIds}
+              referenceUserIds={referenceUserIds}
+              approvalStages={approvalStages}
+              onApprovalUserChange={handleApprovalUserChange}
+              onReferenceUserChange={handleReferenceUserChange}
+              onAddApproval={addApproval}
+              onAddAgreement={addAgreement}
+              onRemoveApprovalStage={removeApprovalStage}
+            />
+          </>
+        )}
         <TextField
           value={composerTitle}
           onChange={(event) => setComposerTitle(event.target.value)}
@@ -236,8 +394,9 @@ export function DocumentComposerDialog({
               }}
             >
               <RichTextEditor
-                onEditorReady={setEditor}
+                onEditorReady={handleEditorReady}
                 className="document-composer-editor"
+                readOnly={templateLoading}
                 contentSx={{
                   ...richTextContentStyles,
                   display: 'block',
@@ -285,6 +444,15 @@ export function DocumentComposerDialog({
           </Box>
         </Box>
       </Box>
+      <UnsavedChangesConfirmDialog
+        open={templateReplaceConfirmOpen}
+        title="작성 중인 본문 교체"
+        description="선택한 기안양식의 본문으로 현재 내용을 바꾸시겠습니까?"
+        cancelLabel="취소"
+        continueLabel="교체"
+        onCancel={cancelTemplateReplacement}
+        onContinue={confirmTemplateReplacement}
+      />
     </CommonDialog>
   );
 }
