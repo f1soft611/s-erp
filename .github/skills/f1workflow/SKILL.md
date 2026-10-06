@@ -1,3 +1,8 @@
+---
+name: f1workflow
+description: f1workflow
+disable-model-invocation: true
+---
 ﻿---
 description: 'Superpowers 기반 F1Workflow 지능형 개발 절차 (각 단계별 스킬 문서를 순차적으로 읽고 지침을 적용)'
 name: 'f1workflow'
