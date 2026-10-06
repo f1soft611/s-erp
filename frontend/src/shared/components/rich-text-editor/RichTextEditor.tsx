@@ -360,7 +360,7 @@ export function RichTextEditor({
           'aria-multiline': 'true',
           spellcheck: 'true',
         },
-        transformPastedHTML: normalizeClipboardHtmlForEditor,
+        transformPastedHTML: (html) => normalizeClipboardHtmlForEditor(html),
         transformPastedText: normalizeClipboardTextForEditor,
         handlePaste: (view, event) => {
           const data = event.clipboardData;
@@ -371,6 +371,10 @@ export function RichTextEditor({
             return html.trim()
               ? normalizeClipboardHtmlForEditor(html, plainText)
               : normalizeClipboardTextGridForEditor(plainText);
+          };
+          const reportPaste = () => {
+            if (!data) return;
+            clipboardPasteRef.current?.(data, getNormalizedClipboard());
           };
           if (hasSpreadsheetClipboardContent(data)) {
             const normalizedClipboard = getNormalizedClipboard();

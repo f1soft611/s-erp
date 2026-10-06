@@ -32,6 +32,7 @@ import type {
   NoticeComposerDialogProps,
   NoticeComposerDraftAttachment,
 } from '../types/community.types';
+import { parseClipboardTextGrid } from '../../../../../shared/components/rich-text-editor/clipboard';
 export {
   hasSpreadsheetClipboardContent,
   normalizeClipboardHtmlForEditor,
@@ -53,46 +54,6 @@ export function serializeNoticeEditorJson(
   editor: { getJSON: () => unknown } | null | undefined,
 ): string | undefined {
   return editor ? JSON.stringify(editor.getJSON()) : undefined;
-}
-
-function parseClipboardTextGrid(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let quoted = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted && text[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-      continue;
-    }
-    if (!quoted && character === '\t') {
-      row.push(field);
-      field = '';
-      continue;
-    }
-    if (!quoted && (character === '\r' || character === '\n')) {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-      if (character === '\r' && text[index + 1] === '\n') index += 1;
-      continue;
-    }
-    field += character;
-  }
-
-  if (field || row.length > 0 || rows.length === 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
 }
 
 function summarizeClipboardTables(html: string) {

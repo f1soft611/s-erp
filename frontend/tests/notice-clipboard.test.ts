@@ -206,6 +206,15 @@ describe('notice clipboard normalization', () => {
     );
   });
 
+  it('keeps HTML cell text when the plain-text grid has different characters', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><tbody><tr><td>HTML 원문</td></tr></tbody></table>',
+      'plain text\t',
+    );
+
+    expect(normalized).toContain('<td>HTML 원문</td>');
+  });
+
   it('does not count nested table cells as cells in the outer row', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<table><tbody><tr><td>외부 A<table><tbody><tr><td>내부 A</td><td>내부 B</td></tr></tbody></table></td><td>외부 B</td></tr><tr><td>다음</td><td>행</td></tr></tbody></table>',
