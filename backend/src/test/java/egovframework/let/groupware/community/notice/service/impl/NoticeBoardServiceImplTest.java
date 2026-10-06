@@ -71,7 +71,7 @@ class NoticeBoardServiceImplTest {
     when(imageStorageService.promoteTemporaryImage(
         1L, "NOTICE", 42L, uploadToken, "pasted.png", "login-user")).thenReturn(promoted);
     when(imageStorageService.listOwnedImages(1L, "NOTICE", 42L))
-        .thenReturn(Collections.singletonList(promoted));
+        .thenReturn(Collections.<CommonFileVO>emptyList(), Collections.singletonList(promoted));
     when(commonFileService.listFiles(1L, "NOTICE", 42L)).thenReturn(Collections.singletonList(promoted));
     CommonCommentPageVO commentPage = new CommonCommentPageVO();
     commentPage.setComments(Collections.emptyList());

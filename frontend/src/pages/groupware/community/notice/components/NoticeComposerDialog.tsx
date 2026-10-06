@@ -17,6 +17,7 @@ import {
   RichTextEditorToolbar,
   richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import {
   deleteNoticeEmbeddedImage,
@@ -30,7 +31,6 @@ import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import type {
   NoticeComposerDialogProps,
   NoticeComposerDraftAttachment,
-  NoticeComposerEmbeddedImage,
 } from '../types/community.types';
 export {
   hasSpreadsheetClipboardContent,
@@ -53,33 +53,6 @@ export function serializeNoticeEditorJson(
   editor: { getJSON: () => unknown } | null | undefined,
 ): string | undefined {
   return editor ? JSON.stringify(editor.getJSON()) : undefined;
-}
-
-export function collectNoticeEmbeddedImages(
-  editor: { state: Editor['state'] } | null | undefined,
-): NoticeComposerEmbeddedImage[] {
-  if (!editor) {
-    return [];
-  }
-
-  const images: NoticeComposerEmbeddedImage[] = [];
-  editor.state.doc.descendants((node) => {
-    if (node.type.name !== 'image' || !node.attrs['data-upload-token']) {
-      return true;
-    }
-    images.push({
-      uploadToken: String(node.attrs['data-upload-token']),
-      fileId: node.attrs['data-file-id'] ?? null,
-      objectKey: String(node.attrs['data-object-key'] ?? ''),
-      imageUrl: String(node.attrs.src ?? ''),
-      fileName: String(node.attrs.alt ?? 'pasted-image'),
-      fileSize: Number(node.attrs['data-file-size'] ?? 0) || 0,
-      mimeType: String(node.attrs['data-mime-type'] ?? ''),
-      width: node.attrs.width ?? null,
-    });
-    return true;
-  });
-  return images;
 }
 
 export function NoticeComposerDialog({
@@ -113,7 +86,6 @@ export function NoticeComposerDialog({
   const [noticeGubunError, setNoticeGubunError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [uploadingCount, setUploadingCount] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorIsEmpty, setEditorIsEmpty] = useState(true);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -122,12 +94,6 @@ export function NoticeComposerDialog({
   );
   const [attachments, setAttachments] =
     useState<NoticeComposerDraftAttachment[]>(defaultAttachments);
-  const pendingEmbeddedImages = useRef(
-    new Map<
-      string,
-      Pick<NoticeComposerEmbeddedImage, 'uploadToken' | 'fileName'>
-    >(),
-  );
 
   useEffect(() => {
     if (!open) {
@@ -138,7 +104,6 @@ export function NoticeComposerDialog({
     setNoticeGubunCode(defaultNoticeGubunCode);
     setNoticeGubunError(false);
     setAttachments(defaultAttachments);
-    pendingEmbeddedImages.current.clear();
     setImageUploadError(null);
     setPasteDebugLog(
       pasteDebugEnabled ? ['[notice-paste] 진단 모드가 활성화되었습니다.'] : [],
@@ -260,18 +225,46 @@ export function NoticeComposerDialog({
     }, 300);
   };
 
+  const uploadEmbeddedImage = async (file: File) => {
+    const uploaded = await uploadNoticeEmbeddedImage(file);
+    setImageUploadError(null);
+    return {
+      src: uploaded.imageUrl,
+      alt: uploaded.fileName,
+      fileName: uploaded.fileName,
+      uploadToken: uploaded.uploadToken,
+      fileId: uploaded.fileId == null ? null : String(uploaded.fileId),
+      objectKey: uploaded.objectKey,
+      fileSize: uploaded.fileSize,
+      mimeType: uploaded.mimeType,
+    };
+  };
+
+  const deleteTemporaryImage = (image: {
+    uploadToken: string;
+    fileName: string;
+  }) => deleteNoticeEmbeddedImage(image.uploadToken, image.fileName);
+
+  const editorSaveLifecycle = useRichTextEditorSaveLifecycle({
+    editor,
+    uploadImage: uploadEmbeddedImage,
+    deleteTemporaryImage,
+    onImageUploadError: (message) => setImageUploadError(message || null),
+  });
+
   const handleSubmit = async () => {
     if (!noticeGubunCode.trim()) {
       setNoticeGubunError(true);
       return;
     }
     if (saving || closing) return;
-    if (uploadingCount > 0) {
+    if (editorSaveLifecycle.uploadingCount > 0) {
       setImageUploadError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
       return;
     }
 
-    const body = editor?.getHTML() ?? defaultBody ?? emptyNoticeContent;
+    const snapshot = editorSaveLifecycle.getSnapshot();
+    const body = snapshot.html || defaultBody || emptyNoticeContent;
     const bodyText = body
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -294,14 +287,23 @@ export function NoticeComposerDialog({
           title,
           noticeGubunCode,
           body,
-          bodyJson: serializeNoticeEditorJson(editor),
+          bodyJson: JSON.stringify(snapshot.json),
           bodyText,
           attachments,
           removedAttachmentIds,
-          embeddedImages: collectNoticeEmbeddedImages(editor),
-          temporaryImages: Array.from(pendingEmbeddedImages.current.values()),
+          embeddedImages: snapshot.referencedImages.map((image) => ({
+            uploadToken: String(image.uploadToken),
+            fileId: image.fileId ?? null,
+            objectKey: String(image.objectKey ?? ''),
+            imageUrl: String(image.src ?? ''),
+            fileName: image.fileName,
+            fileSize: Number(image.fileSize ?? 0) || 0,
+            mimeType: String(image.mimeType ?? ''),
+            width: image.width ?? null,
+          })),
+          temporaryImages: snapshot.temporaryImages,
         });
-        pendingEmbeddedImages.current.clear();
+        editorSaveLifecycle.completeSave();
       } catch {
         return;
       } finally {
@@ -318,53 +320,15 @@ export function NoticeComposerDialog({
 
   const handleCloseRequest = () => {
     if (saving || closing) return;
-    if (uploadingCount > 0) {
+    if (editorSaveLifecycle.uploadingCount > 0) {
       setImageUploadError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
       return;
     }
-    const temporaryImages = Array.from(pendingEmbeddedImages.current.values());
-    if (temporaryImages.length === 0) {
-      onClose();
-      return;
-    }
     setClosing(true);
-    void Promise.allSettled(
-      temporaryImages.map((image) =>
-        deleteNoticeEmbeddedImage(image.uploadToken, image.fileName),
-      ),
-    ).finally(() => {
-      pendingEmbeddedImages.current.clear();
+    void editorSaveLifecycle.cleanupTemporaryImages().finally(() => {
       setClosing(false);
       onClose();
     });
-  };
-
-  const uploadEmbeddedImage = async (file: File) => {
-    const uploaded = await uploadNoticeEmbeddedImage(file);
-    const pendingImage = {
-      uploadToken: uploaded.uploadToken,
-      fileName: uploaded.fileName,
-    };
-    pendingEmbeddedImages.current.set(uploaded.uploadToken, pendingImage);
-    setImageUploadError(null);
-    return {
-      src: uploaded.imageUrl,
-      alt: uploaded.fileName,
-      uploadToken: uploaded.uploadToken,
-      fileId: uploaded.fileId == null ? null : String(uploaded.fileId),
-      objectKey: uploaded.objectKey,
-      fileSize: uploaded.fileSize,
-      mimeType: uploaded.mimeType,
-    };
-  };
-
-  const deleteOrphanedEmbeddedImage = async (image: {
-    uploadToken?: string | null;
-    alt?: string | null;
-  }) => {
-    if (!image.uploadToken || !image.alt) return;
-    await deleteNoticeEmbeddedImage(image.uploadToken, image.alt);
-    pendingEmbeddedImages.current.delete(image.uploadToken);
   };
 
   const footerStart = (
@@ -401,7 +365,7 @@ export function NoticeComposerDialog({
         disabled={
           saving ||
           closing ||
-          uploadingCount > 0 ||
+          editorSaveLifecycle.uploadingCount > 0 ||
           (title.trim().length === 0 && editorIsEmpty)
         }
         startIcon={
@@ -430,7 +394,7 @@ export function NoticeComposerDialog({
         variant="text"
         color="primary"
         onClick={handleCloseRequest}
-        disabled={saving || closing || uploadingCount > 0}
+        disabled={saving || closing || editorSaveLifecycle.uploadingCount > 0}
         sx={{
           borderRadius: 1.5,
           fontWeight: 600,
@@ -652,12 +616,12 @@ export function NoticeComposerDialog({
                 onClipboardPaste={
                   pasteDebugEnabled ? handleClipboardDebug : undefined
                 }
-                uploadImage={uploadEmbeddedImage}
-                onOrphanedImageUpload={deleteOrphanedEmbeddedImage}
-                onUploadingChange={setUploadingCount}
-                onImageUploadError={(message) =>
-                  setImageUploadError(message || null)
+                uploadImage={editorSaveLifecycle.uploadImage}
+                onOrphanedImageUpload={
+                  editorSaveLifecycle.onOrphanedImageUpload
                 }
+                onUploadingChange={editorSaveLifecycle.onUploadingChange}
+                onImageUploadError={editorSaveLifecycle.onImageUploadError}
                 className="notice-composer-editor"
                 contentSx={{
                   display: 'block',

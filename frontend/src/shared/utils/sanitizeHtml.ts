@@ -60,9 +60,12 @@ const allowedStyleProperties = new Set([
   'font-weight',
   'height',
   'min-width',
+  'overflow-wrap',
   'text-align',
   'vertical-align',
   'width',
+  'white-space',
+  'word-break',
 ]);
 
 const allowedTextStyleProperties = new Set([
@@ -73,7 +76,23 @@ const allowedTextStyleProperties = new Set([
   'font-weight',
   'line-height',
   'text-decoration',
+  'overflow-wrap',
+  'white-space',
+  'word-break',
 ]);
+
+const safeWrappingValues: Record<string, Set<string>> = {
+  'white-space': new Set([
+    'normal',
+    'pre',
+    'nowrap',
+    'pre-wrap',
+    'pre-line',
+    'break-spaces',
+  ]),
+  'word-break': new Set(['normal', 'break-all', 'keep-all', 'break-word']),
+  'overflow-wrap': new Set(['normal', 'break-word', 'anywhere']),
+};
 
 export type SanitizeHtmlOptions = {
   preserveTextStyles?: boolean;
@@ -91,6 +110,8 @@ function sanitizeStyle(value: string, styleProperties: Set<string>): string {
     .filter(
       ([property, declarationValue]) =>
         styleProperties.has(property) &&
+        (!safeWrappingValues[property] ||
+          safeWrappingValues[property].has(declarationValue.toLowerCase())) &&
         !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(
           declarationValue,
         ),

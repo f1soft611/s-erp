@@ -1,3 +1,5 @@
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
+
 const allowedCellStyleProperties = new Set([
   'background',
   'background-color',
@@ -13,10 +15,13 @@ const allowedCellStyleProperties = new Set([
   'font-weight',
   'height',
   'line-height',
+  'overflow-wrap',
   'text-align',
   'text-decoration',
   'vertical-align',
   'width',
+  'white-space',
+  'word-break',
 ]);
 
 const allowedTextStyleProperties = new Set([
@@ -27,7 +32,10 @@ const allowedTextStyleProperties = new Set([
   'font-style',
   'font-weight',
   'line-height',
+  'overflow-wrap',
   'text-decoration',
+  'white-space',
+  'word-break',
 ]);
 
 function escapeHtml(value: string): string {
@@ -41,6 +49,30 @@ function escapeHtml(value: string): string {
 
 function isSafeCellStyleValue(value: string): boolean {
   return !/[{}<>]|url\s*\(|expression\s*\(|javascript\s*:/i.test(value);
+}
+
+function isSafeStyleDeclaration(property: string, value: string): boolean {
+  if (!isSafeCellStyleValue(value)) return false;
+  const normalized = value.trim().toLowerCase();
+  if (property === 'white-space') {
+    return [
+      'normal',
+      'pre',
+      'nowrap',
+      'pre-wrap',
+      'pre-line',
+      'break-spaces',
+    ].includes(normalized);
+  }
+  if (property === 'word-break') {
+    return ['normal', 'break-all', 'keep-all', 'break-word'].includes(
+      normalized,
+    );
+  }
+  if (property === 'overflow-wrap') {
+    return ['normal', 'break-word', 'anywhere'].includes(normalized);
+  }
+  return true;
 }
 
 function normalizeCellDimension(value: string | null): string | null {
@@ -119,7 +151,7 @@ function sanitizeCellStyle(cell: Element, omitWidth = false): string | null {
     }
 
     const value = style.getPropertyValue(property).trim();
-    if (!value || !isSafeCellStyleValue(value)) {
+    if (!value || !isSafeStyleDeclaration(property, value)) {
       continue;
     }
 
@@ -163,7 +195,7 @@ function sanitizeTextStyle(element: Element): string | null {
 
   for (const property of allowedTextStyleProperties) {
     const value = style.getPropertyValue(property).trim();
-    if (!value || !isSafeCellStyleValue(value)) {
+    if (!value || !isSafeStyleDeclaration(property, value)) {
       continue;
     }
 
@@ -214,6 +246,38 @@ function sanitizeTextStyle(element: Element): string | null {
   }
 
   return declarations.length > 0 ? declarations.join(';') : null;
+}
+
+function normalizeLegacyClipboardFonts(root: HTMLElement): void {
+  root.querySelectorAll('font').forEach((font) => {
+    const style = sanitizeTextStyle(font);
+    if (!style) {
+      font.replaceWith(...Array.from(font.childNodes));
+      return;
+    }
+    const span = font.ownerDocument.createElement('span');
+    span.setAttribute('style', style);
+    while (font.firstChild) {
+      span.appendChild(font.firstChild);
+    }
+    font.replaceWith(span);
+  });
+}
+
+function normalizeClipboardBlockTextStyles(root: HTMLElement): void {
+  root
+    .querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre')
+    .forEach((block) => {
+      const style = sanitizeTextStyle(block);
+      if (!style) return;
+      const span = block.ownerDocument.createElement('span');
+      span.setAttribute('style', style);
+      while (block.firstChild) {
+        span.appendChild(block.firstChild);
+      }
+      block.appendChild(span);
+      block.removeAttribute('style');
+    });
 }
 
 function normalizeClipboardTable(table: Element): string {
@@ -360,7 +424,7 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
       .filter(
         ([property, value]) =>
           allowedCellStyleProperties.has(property) &&
-          isSafeCellStyleValue(value),
+          isSafeStyleDeclaration(property, value),
       );
 
     for (const selector of selectorText.split(',')) {
@@ -403,7 +467,7 @@ function applyEmbeddedCellStyles(root: HTMLElement): void {
             : Array.from(allowedTextStyleProperties);
           for (const property of allowedProperties) {
             const value = styleRule.style.getPropertyValue(property).trim();
-            if (value && isSafeCellStyleValue(value)) {
+            if (value && isSafeStyleDeclaration(property, value)) {
               (element as HTMLElement).style.setProperty(property, value);
             }
           }
@@ -510,6 +574,15 @@ export function normalizeClipboardHtmlForEditor(
 
   if (!normalizedText) {
     return '';
+  }
+
+  normalizeLegacyClipboardFonts(root);
+  normalizeClipboardBlockTextStyles(root);
+  const normalizedHtml = sanitizeHtml(root.innerHTML, {
+    preserveTextStyles: true,
+  });
+  if (normalizedHtml) {
+    return normalizedHtml;
   }
 
   const blocks = normalizedText

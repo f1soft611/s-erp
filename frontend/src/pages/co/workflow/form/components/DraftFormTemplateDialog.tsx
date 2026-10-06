@@ -9,6 +9,7 @@ import {
   RichTextEditor,
   RichTextEditorToolbar,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
+import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
 import type { DraftFormRow } from '../types/draftFormManagement.types';
 import {
@@ -18,10 +19,7 @@ import {
   saveDraftFormTemplate,
   uploadDraftFormTemplateImage,
   type DraftFormTemplate,
-  type DraftFormTemplateUpload,
 } from '../services/draftFormTemplate.service';
-
-type PendingImage = DraftFormTemplateUpload;
 
 export type DraftFormTemplateDialogProps = {
   open: boolean;
@@ -40,12 +38,10 @@ export function DraftFormTemplateDialog({
   const [template, setTemplate] = useState<DraftFormTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const initialHtml = useRef('<p></p>');
-  const pendingImages = useRef(new Map<string, PendingImage>());
   const objectUrls = useRef(new Map<string, string>());
   const [editor, setEditor] = useState<Editor | null>(null);
 
@@ -54,7 +50,7 @@ export function DraftFormTemplateDialog({
       URL.revokeObjectURL(objectUrl);
     }
     objectUrls.current.clear();
-    pendingImages.current.clear();
+    editorSaveLifecycle.completeSave();
     setConfirmDiscardOpen(false);
     setHasChanges(false);
     setError('');
@@ -62,7 +58,7 @@ export function DraftFormTemplateDialog({
   };
 
   const handleCloseRequest = () => {
-    if (saving || uploadingCount > 0) {
+    if (saving || editorSaveLifecycle.uploadingCount > 0) {
       setError('저장 또는 이미지 업로드가 끝난 뒤 닫아 주세요.');
       return;
     }
@@ -74,16 +70,7 @@ export function DraftFormTemplateDialog({
   };
 
   const cleanupTemporaryImages = async () => {
-    const files = Array.from(pendingImages.current.values());
-    await Promise.allSettled(
-      files.map((image) =>
-        deleteDraftFormTemplateImage(
-          Number(row.draftingWorkCategoryId),
-          image.uploadToken,
-          image.fileName,
-        ),
-      ),
-    );
+    await editorSaveLifecycle.cleanupTemporaryImages();
   };
 
   const handleDiscard = () => {
@@ -92,31 +79,38 @@ export function DraftFormTemplateDialog({
 
   const uploadTemplateImage = async (
     file: File,
-  ): Promise<RichTextEditorImage> => {
+  ): Promise<RichTextEditorImage & { fileName: string }> => {
     const uploaded = await uploadDraftFormTemplateImage(
       Number(row.draftingWorkCategoryId),
       file,
     );
-    pendingImages.current.set(uploaded.uploadToken, uploaded);
     setError('');
     return {
       src: uploaded.previewUrl,
       alt: uploaded.fileName,
+      fileName: uploaded.fileName,
       uploadToken: uploaded.uploadToken,
       fileSize: uploaded.fileSize,
       mimeType: uploaded.mimeType,
     };
   };
 
-  const deleteOrphanedTemplateImage = async (image: RichTextEditorImage) => {
-    if (!image.uploadToken || !image.alt) return;
-    await deleteDraftFormTemplateImage(
+  const deleteTemporaryImage = (image: {
+    uploadToken: string;
+    fileName: string;
+  }) =>
+    deleteDraftFormTemplateImage(
       Number(row.draftingWorkCategoryId),
       image.uploadToken,
-      image.alt,
+      image.fileName,
     );
-    pendingImages.current.delete(image.uploadToken);
-  };
+
+  const editorSaveLifecycle = useRichTextEditorSaveLifecycle({
+    editor,
+    uploadImage: uploadTemplateImage,
+    deleteTemporaryImage,
+    onImageUploadError: setError,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -213,18 +207,24 @@ export function DraftFormTemplateDialog({
   }, [editor, row.draftingWorkCategoryId, template]);
 
   const handleSave = async () => {
-    if (!editor || !template || saving || uploadingCount > 0) return;
+    if (
+      !editor ||
+      !template ||
+      saving ||
+      editorSaveLifecycle.uploadingCount > 0
+    )
+      return;
     setSaving(true);
     setError('');
     try {
+      const snapshot = editorSaveLifecycle.getSnapshot();
       await saveDraftFormTemplate(Number(row.draftingWorkCategoryId), {
-        templateJson: editor.getJSON() as DraftFormTemplate['templateJson'] &
+        templateJson: snapshot.json as DraftFormTemplate['templateJson'] &
           Record<string, unknown>,
-        templateHtml: editor.getHTML(),
-        embeddedImages: Array.from(pendingImages.current.values()).map(
-          ({ uploadToken, fileName }) => ({ uploadToken, fileName }),
-        ),
+        templateHtml: snapshot.html,
+        embeddedImages: snapshot.temporaryImages,
       });
+      editorSaveLifecycle.completeSave();
       await onSaved();
       showSuccess('기안양식 본문을 저장했습니다.');
       finishClose();
@@ -246,9 +246,8 @@ export function DraftFormTemplateDialog({
         onClose={handleCloseRequest}
         title={row.hasDocument ? '문서 양식 수정' : '문서 양식 작성'}
         description={`${row.cataTypeCode} · ${row.codeName}`}
-        size="md"
+        size="lg"
         bodyMode="fill"
-        paperHeight="90vh"
         fullScreenOnMobile
         footerStart={
           <RichTextEditorToolbar
@@ -261,7 +260,12 @@ export function DraftFormTemplateDialog({
             <Button
               variant="contained"
               onClick={() => void handleSave()}
-              disabled={loading || !template || saving || uploadingCount > 0}
+              disabled={
+                loading ||
+                !template ||
+                saving ||
+                editorSaveLifecycle.uploadingCount > 0
+              }
               startIcon={
                 saving ? (
                   <CircularProgress size={16} color="inherit" />
@@ -309,12 +313,11 @@ export function DraftFormTemplateDialog({
                 flex: 1,
                 minHeight: 0,
                 minWidth: 0,
-                overflow: 'auto',
+                overflow: 'hidden',
                 borderTop: 1,
                 borderBottom: 1,
                 borderColor: 'divider',
                 bgcolor: 'background.paper',
-                p: 2,
               }}
             >
               <RichTextEditor
@@ -324,15 +327,22 @@ export function DraftFormTemplateDialog({
                 onContentChange={(currentEditor) =>
                   setHasChanges(currentEditor.getHTML() !== initialHtml.current)
                 }
-                uploadImage={uploadTemplateImage}
-                onOrphanedImageUpload={deleteOrphanedTemplateImage}
-                onUploadingChange={setUploadingCount}
-                onImageUploadError={setError}
+                uploadImage={editorSaveLifecycle.uploadImage}
+                onOrphanedImageUpload={
+                  editorSaveLifecycle.onOrphanedImageUpload
+                }
+                onUploadingChange={editorSaveLifecycle.onUploadingChange}
+                onImageUploadError={editorSaveLifecycle.onImageUploadError}
                 className="draft-form-template-rich-text-editor"
                 contentSx={{
                   minHeight: '100%',
                   outline: 'none',
                   lineHeight: 1.7,
+                  overflowX: 'auto',
+                  overflowY: 'auto',
+                  boxSizing: 'border-box',
+                  px: 2,
+                  py: 2,
                   overflowWrap: 'anywhere',
                   '& p.is-editor-empty:first-of-type::before': {
                     color: 'text.disabled',

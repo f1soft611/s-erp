@@ -105,15 +105,20 @@ class DraftingWorkTemplateServiceImplTest {
     void getTemplateRemovesNonTextAndUnsafeHrefValuesAndRetainsSafeLinks() throws Exception {
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
                 "{\"type\":\"doc\",\"content\":["
-                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":[\"https://safe.example\"]}}]},"
-                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":{\"url\":\"https://safe.example\"}}}]},"
-                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"javascript:alert(1)\"}}]},"
-                        + "{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"https://safe.example/path\"}}]}]}",
+                    + "{\"type\":\"text\",\"text\":\"array\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":[\"https://safe.example\"]}}]},"
+                    + "{\"type\":\"text\",\"text\":\"object\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":{\"url\":\"https://safe.example\"}}}]},"
+                    + "{\"type\":\"text\",\"text\":\"unsafe\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"javascript:alert(1)\"}}]},"
+                    + "{\"type\":\"text\",\"text\":\"safe\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"https://safe.example/path\"}}]}]}",
                 "<p>본문</p>"));
 
         DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
 
         JsonNode content = result.getTemplateJson().path("content");
+        assertEquals(4, content.size(), result.getTemplateJson().toString());
+        for (JsonNode text : content) {
+            assertEquals(1, text.path("marks").size());
+            assertTrue(text.path("marks").get(0).has("attrs"));
+        }
         assertTrue(content.get(0).path("marks").get(0).path("attrs").path("href").isMissingNode());
         assertTrue(content.get(1).path("marks").get(0).path("attrs").path("href").isMissingNode());
         assertTrue(content.get(2).path("marks").get(0).path("attrs").path("href").isMissingNode());
@@ -122,7 +127,7 @@ class DraftingWorkTemplateServiceImplTest {
     }
 
     @Test
-    void getTemplateOnlyRetainsImageSourcesForTheCurrentForm() throws Exception {
+    void getTemplateRetainsSafeExternalAndCurrentFormImageSources() throws Exception {
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
                 "{\"type\":\"doc\",\"content\":["
                         + "{\"type\":\"image\",\"attrs\":{\"src\":\"https://remote.example/image.png\"}},"
@@ -134,7 +139,7 @@ class DraftingWorkTemplateServiceImplTest {
         DraftingWorkTemplateVO result = draftingWorkTemplateService.getTemplate(9L, 77L);
 
         JsonNode images = result.getTemplateJson().path("content");
-        assertTrue(images.get(0).path("attrs").path("src").isMissingNode());
+        assertEquals("https://remote.example/image.png", images.get(0).path("attrs").path("src").asText());
         assertTrue(images.get(1).path("attrs").path("src").isMissingNode());
         assertTrue(images.get(2).path("attrs").path("src").isMissingNode());
         assertEquals("/api/v1/co/workflow/forms/77/template-images/12",
@@ -229,7 +234,7 @@ class DraftingWorkTemplateServiceImplTest {
     }
 
     @Test
-    void getTemplateRetainsOnlySameFormImagesInHtml() throws Exception {
+    void getTemplateRetainsSafeExternalAndSameFormImagesInHtml() throws Exception {
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
                 "{\"type\":\"doc\",\"content\":[]}",
                 "<img src=\"/api/v1/co/workflow/forms/77/template-images/12\" alt=\"safe\" "
@@ -245,7 +250,7 @@ class DraftingWorkTemplateServiceImplTest {
         assertTrue(result.getTemplateHtml().contains("width=\"320\""));
         assertTrue(result.getTemplateHtml().contains("height=\"180\""));
         assertFalse(result.getTemplateHtml().contains("onclick"));
-        assertFalse(result.getTemplateHtml().contains("remote.example"));
+        assertTrue(result.getTemplateHtml().contains("https://remote.example/image.png"));
         assertFalse(result.getTemplateHtml().contains("forms/78/"));
     }
 
@@ -308,12 +313,16 @@ class DraftingWorkTemplateServiceImplTest {
         request.setEmbeddedImages(Collections.singletonList(embeddedImage));
         egovframework.com.common.domain.model.CommonFileVO promoted = new egovframework.com.common.domain.model.CommonFileVO();
         promoted.setFileId(901L);
+        promoted.setTenantId(9L);
         promoted.setFileUsageType("EMBEDDED");
         promoted.setOwnerType("DRAFTING_WORK_TEMPLATE");
         promoted.setOwnerId(77L);
+        promoted.setDeletedYn("N");
         promoted.setObjectKey("tenant/9/drafting-work-form/77/" + uploadToken + "/chart.png");
-        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
-        when(templateImageService.promoteTemporaryImage(9L, 77L, uploadToken, "chart.png", "login-9"))
+        when(templateImageService.listOwnedImages(9L, "DRAFTING_WORK_TEMPLATE", 77L))
+            .thenReturn(Collections.emptyList());
+        when(templateImageService.promoteTemporaryImage(
+            9L, "DRAFTING_WORK_TEMPLATE", 77L, uploadToken, "chart.png", "login-9"))
             .thenReturn(promoted);
         when(draftingWorkDAO.updateTemplate(any())).thenReturn(1);
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
@@ -326,13 +335,14 @@ class DraftingWorkTemplateServiceImplTest {
         assertEquals(imageUrl, result.getTemplateJson().path("content").get(0).path("attrs").path("src").asText());
         org.mockito.InOrder saveOrder = inOrder(draftingWorkDAO, templateImageService);
         saveOrder.verify(draftingWorkDAO).lockTemplate(9L, 77L);
-        saveOrder.verify(templateImageService).listTemplateImages(9L, 77L);
+        saveOrder.verify(templateImageService).listOwnedImages(9L, "DRAFTING_WORK_TEMPLATE", 77L);
         saveOrder.verify(templateImageService).promoteTemporaryImage(
-            9L, 77L, uploadToken, "chart.png", "login-9");
+            9L, "DRAFTING_WORK_TEMPLATE", 77L, uploadToken, "chart.png", "login-9");
         assertEquals(imageUrl, result.getTemplateHtml().substring(
             result.getTemplateHtml().indexOf("src=\"") + 5,
             result.getTemplateHtml().indexOf("\"", result.getTemplateHtml().indexOf("src=\"") + 5)));
-        verify(templateImageService).promoteTemporaryImage(9L, 77L, uploadToken, "chart.png", "login-9");
+        verify(templateImageService).promoteTemporaryImage(
+            9L, "DRAFTING_WORK_TEMPLATE", 77L, uploadToken, "chart.png", "login-9");
         verify(templateImageService).completeTemplateSave(
             eq(9L), eq(77L), eq(request.getEmbeddedImages()), any());
         verify(draftingWorkDAO).updateTemplate(argThat(params ->
@@ -348,7 +358,8 @@ class DraftingWorkTemplateServiceImplTest {
         request.setTemplateJson(OBJECT_MAPPER.readTree("{\"type\":\"doc\",\"content\":["
             + "{\"type\":\"image\",\"attrs\":{\"src\":"
             + "\"/api/v1/co/workflow/forms/77/template-images/901\"}}]}"));
-        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
+        when(templateImageService.listOwnedImages(9L, "DRAFTING_WORK_TEMPLATE", 77L))
+            .thenReturn(Collections.emptyList());
 
         assertThrows(IllegalArgumentException.class,
             () -> draftingWorkTemplateService.saveTemplate(9L, 77L, "login-9", request));
@@ -374,7 +385,8 @@ class DraftingWorkTemplateServiceImplTest {
         ownedImage.setDeletedYn("N");
         ownedImage.setObjectKey("tenant/9/drafting-work-form/77/"
             + "bde1fdec-5d22-487a-a254-2b9547cd32b3/existing.png");
-        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.singletonList(ownedImage));
+        when(templateImageService.listOwnedImages(9L, "DRAFTING_WORK_TEMPLATE", 77L))
+            .thenReturn(Collections.singletonList(ownedImage));
         when(draftingWorkDAO.updateTemplate(any())).thenReturn(1);
         when(draftingWorkDAO.selectTemplate(9L, 77L)).thenReturn(templateRow(
             "{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{"
@@ -384,7 +396,8 @@ class DraftingWorkTemplateServiceImplTest {
         DraftingWorkTemplateVO result = draftingWorkTemplateService.saveTemplate(9L, 77L, "actor-9", request);
 
         assertEquals(imageUrl, result.getTemplateJson().path("content").get(0).path("attrs").path("src").asText());
-        verify(templateImageService, never()).promoteTemporaryImage(any(), any(), any(), any(), any());
+        verify(templateImageService, never()).promoteTemporaryImage(
+            any(), any(), any(), any(), any(), any());
         verify(draftingWorkDAO).updateTemplate(argThat(params ->
             params.get("templateJson").toString().contains(imageUrl)
                 && params.get("templateHtml").toString().contains(imageUrl)));
@@ -397,7 +410,8 @@ class DraftingWorkTemplateServiceImplTest {
             + "{\"type\":\"image\",\"attrs\":{\"src\":\"blob:http://localhost/preview\","
             + "\"data-file-id\":\"901\"}}]}"));
         request.setTemplateHtml("<p><img src=\"blob:http://localhost/preview\" data-file-id=\"901\"></p>");
-        when(templateImageService.listTemplateImages(9L, 77L)).thenReturn(Collections.emptyList());
+        when(templateImageService.listOwnedImages(9L, "DRAFTING_WORK_TEMPLATE", 77L))
+            .thenReturn(Collections.emptyList());
 
         assertThrows(IllegalArgumentException.class,
             () -> draftingWorkTemplateService.saveTemplate(9L, 77L, "actor-9", request));

@@ -95,6 +95,21 @@ describe('DraftFormTemplateDialog', () => {
     );
   });
 
+  it('scrolls the editor content from the top of its frame and keeps inner padding', async () => {
+    renderDialog();
+
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    const frame = screen.getByTestId('draft-form-template-editor');
+
+    expect(editor).toHaveClass('ProseMirror');
+    expect(frame).toHaveStyle({ overflow: 'hidden' });
+    expect(editor).toHaveStyle({
+      overflowX: 'auto',
+      overflowY: 'auto',
+      padding: '16px',
+    });
+  });
+
   it('rehydrates a stored image using the authenticated blob endpoint', async () => {
     const objectUrl = 'blob:authenticated-template-image';
     vi.stubGlobal('URL', {
@@ -252,7 +267,7 @@ describe('DraftFormTemplateDialog', () => {
         items: [],
         getData: (type: string) =>
           type === 'text/html'
-            ? '<table><tbody><tr><td>표 셀 A</td><td>표 셀 B</td></tr></tbody></table>'
+            ? '<table><tbody><tr><td style="font-family:Arial;font-size:10pt;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere">표 셀 A</td><td>표 셀 B</td></tr></tbody></table>'
             : '',
       },
     });
@@ -260,6 +275,36 @@ describe('DraftFormTemplateDialog', () => {
     await waitFor(() => {
       expect(editor.querySelectorAll('table tr')).toHaveLength(1);
       expect(editor.querySelector('table')?.textContent).toBe('표 셀 A표 셀 B');
+      const cell = editor.querySelector('table td') as HTMLTableCellElement;
+      expect(cell.style.fontFamily).toBe('Arial');
+      expect(cell.style.fontSize).toBe('10pt');
+      expect(cell.style.whiteSpace).toBe('pre-wrap');
+      expect(cell.style.wordBreak).toBe('break-all');
+      expect(cell.style.overflowWrap).toBe('anywhere');
+    });
+  });
+
+  it('preserves font family and size when pasting non-table rich HTML', async () => {
+    renderDialog();
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === 'text/html'
+            ? '<p style="font-family:Arial;font-size:14pt;color:#123456">기안 본문</p>'
+            : '',
+      },
+    });
+
+    await waitFor(() => {
+      const styledText = editor.querySelector('span');
+      expect(styledText).toHaveTextContent('기안 본문');
+      expect(styledText).toHaveStyle({
+        fontFamily: 'Arial',
+        fontSize: '14pt',
+        color: 'rgb(18, 52, 86)',
+      });
     });
   });
 

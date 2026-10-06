@@ -8,10 +8,11 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.service.EmbeddedImageDocumentStorage;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateEmbeddedImageVO;
 import egovframework.let.co.workflow.form.domain.model.DraftingWorkTemplateUploadVO;
 
-public interface DraftingWorkTemplateImageService {
+public interface DraftingWorkTemplateImageService extends EmbeddedImageDocumentStorage {
 
     DraftingWorkTemplateUploadVO uploadTemporaryImage(
             Long tenantId, Long draftingWorkCategoryId, MultipartFile file) throws Exception;

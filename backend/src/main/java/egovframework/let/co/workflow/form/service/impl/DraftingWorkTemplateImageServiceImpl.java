@@ -88,6 +88,24 @@ public class DraftingWorkTemplateImageServiceImpl implements DraftingWorkTemplat
     }
 
     @Override
+    public List<CommonFileVO> listOwnedImages(Long tenantId, String ownerType, Long ownerId) throws Exception {
+        requireOwnerType(ownerType);
+        return listTemplateImages(tenantId, ownerId);
+    }
+
+    @Override
+    public CommonFileVO promoteTemporaryImage(
+            Long tenantId,
+            String ownerType,
+            Long ownerId,
+            String uploadToken,
+            String fileName,
+            String uploadedBy) throws Exception {
+        requireOwnerType(ownerType);
+        return promoteTemporaryImage(tenantId, ownerId, uploadToken, fileName, uploadedBy);
+    }
+
+    @Override
     public void completeTemplateSave(
             Long tenantId,
             Long draftingWorkCategoryId,
@@ -119,4 +137,11 @@ public class DraftingWorkTemplateImageServiceImpl implements DraftingWorkTemplat
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "기안양식을 찾을 수 없습니다.");
         }
     }
+
+    private void requireOwnerType(String ownerType) {
+        if (!OWNER_TYPE.equalsIgnoreCase(ownerType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기안양식 본문 이미지 소유 유형이 올바르지 않습니다.");
+        }
+    }
+
 }

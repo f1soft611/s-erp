@@ -733,7 +733,7 @@ describe('NoticeComposerDialog payload', () => {
           </colgroup>
           <tbody>
             <tr>
-              <td style="padding:2px 4px;width:120px;height:28px;font-size:10pt;font-family:Arial;">업무</td>
+              <td style="padding:2px 4px;width:120px;height:28px;font-size:10pt;font-family:Arial;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;">업무</td>
               <td style="padding:2px 4px;">담당</td>
               <td style="padding:2px 4px;">일자</td>
             </tr>
@@ -781,6 +781,14 @@ describe('NoticeComposerDialog payload', () => {
       expect(rows[0].querySelectorAll('td')[0].getAttribute('colwidth')).toBe(
         '120',
       );
+      const firstCell = rows[0].querySelectorAll(
+        'td',
+      )[0] as HTMLTableCellElement;
+      expect(firstCell.style.fontFamily).toBe('Arial');
+      expect(firstCell.style.fontSize).toBe('10pt');
+      expect(firstCell.style.whiteSpace).toBe('pre-wrap');
+      expect(firstCell.style.wordBreak).toBe('break-all');
+      expect(firstCell.style.overflowWrap).toBe('anywhere');
       expect(rows[2].querySelectorAll('td')[1].getAttribute('colwidth')).toBe(
         '160,140',
       );
@@ -800,6 +808,42 @@ describe('NoticeComposerDialog payload', () => {
       expect(editor.querySelector('strong')).toHaveTextContent(
         'Excel 붙여넣기 검증',
       );
+    });
+  });
+
+  it('preserves font family and size when pasting non-table rich HTML', async () => {
+    render(
+      React.createElement(
+        ThemeProvider,
+        { theme: createAppTheme('light') },
+        React.createElement(NoticeComposerDialog, {
+          open: true,
+          isDark: false,
+          onClose: () => undefined,
+        }),
+      ),
+    );
+
+    const editor = await screen.findByRole('textbox', { name: /본문/i });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === 'text/html'
+            ? '<p style="font-family:Arial;font-size:14pt;color:#123456">일반 본문</p>'
+            : '',
+      },
+      preventDefault: vi.fn(),
+    });
+
+    await waitFor(() => {
+      const styledText = editor.querySelector('span');
+      expect(styledText).toHaveTextContent('일반 본문');
+      expect(styledText).toHaveStyle({
+        fontFamily: 'Arial',
+        fontSize: '14pt',
+        color: 'rgb(18, 52, 86)',
+      });
     });
   });
 

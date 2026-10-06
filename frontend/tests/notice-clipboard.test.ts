@@ -76,6 +76,68 @@ describe('notice clipboard normalization', () => {
     expect(normalized).toContain('<em>기울임</em>');
   });
 
+  it('preserves Excel cell font and line-wrapping styles', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><tbody><tr><td style="font-family:Arial;font-size:10pt;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere">긴 문장</td></tr></tbody></table>',
+    );
+    const cell = new DOMParser()
+      .parseFromString(normalized, 'text/html')
+      .querySelector('td');
+
+    expect(cell?.style.fontFamily).toBe('Arial');
+    expect(cell?.style.fontSize).toBe('10pt');
+    expect(cell?.style.whiteSpace).toBe('pre-wrap');
+    expect(cell?.style.wordBreak).toBe('break-all');
+    expect(cell?.style.overflowWrap).toBe('anywhere');
+  });
+
+  it('preserves safe font family and size in non-table rich HTML', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<p>본문 <span style="font-family:Arial;font-size:14pt;color:#123456">강조</span></p>',
+    );
+    const editorDocument = new DOMParser().parseFromString(
+      normalized,
+      'text/html',
+    );
+    const styledText = editorDocument.querySelector('span');
+
+    expect(styledText).not.toBeNull();
+    expect(styledText?.style.fontFamily).toBe('Arial');
+    expect(styledText?.style.fontSize).toBe('14pt');
+    expect(styledText?.style.color).toBe('rgb(18, 52, 86)');
+  });
+
+  it('converts legacy font face and size attributes when pasting non-table HTML', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<p><font face="Arial" size="5">큰 글자</font></p>',
+    );
+    const editorDocument = new DOMParser().parseFromString(
+      normalized,
+      'text/html',
+    );
+    const styledText = editorDocument.querySelector('span');
+
+    expect(styledText?.textContent).toBe('큰 글자');
+    expect(styledText?.style.fontFamily).toBe('Arial');
+    expect(styledText?.style.fontSize).toBe('18pt');
+  });
+
+  it('moves block-level font family and size onto inline text during paste', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<p style="font-family:Arial;font-size:14pt;color:#123456">블록 서식</p>',
+    );
+    const editorDocument = new DOMParser().parseFromString(
+      normalized,
+      'text/html',
+    );
+    const styledText = editorDocument.querySelector('p > span');
+
+    expect(styledText?.textContent).toBe('블록 서식');
+    expect(styledText?.style.fontFamily).toBe('Arial');
+    expect(styledText?.style.fontSize).toBe('14pt');
+    expect(styledText?.style.color).toBe('rgb(18, 52, 86)');
+  });
+
   it('maps Excel column widths onto Tiptap table cell column widths', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<table><colgroup><col style="width:15pt"><col style="width:30px"><col width="40"></colgroup><tbody><tr><td rowspan="2">A</td><td colspan="2">B</td></tr><tr><td>C</td></tr></tbody></table>',

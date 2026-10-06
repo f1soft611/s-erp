@@ -32,7 +32,7 @@ describe('notice HTML rendering', () => {
 
   it('keeps the Excel font family and point size through save and feed rendering', () => {
     const savedHtml = sanitizeNoticeBodyHtml(
-      '<table><tbody><tr><td style="font-family:&quot;맑은 고딕&quot;, monospace;font-size:22pt;font-weight:700">헤더</td></tr></tbody></table>',
+      '<table><tbody><tr><td style="font-family:&quot;맑은 고딕&quot;, monospace;font-size:22pt;font-weight:700;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere">헤더</td></tr></tbody></table>',
     );
     const feedDocument = new DOMParser().parseFromString(
       prepareNoticeFeedHtml(savedHtml),
@@ -45,6 +45,9 @@ describe('notice HTML rendering', () => {
     );
     expect(cell?.style.getPropertyValue('font-size')).toBe('22pt');
     expect(cell?.style.getPropertyValue('font-weight')).toBe('700');
+    expect(cell?.style.getPropertyValue('white-space')).toBe('pre-wrap');
+    expect(cell?.style.getPropertyValue('word-break')).toBe('break-all');
+    expect(cell?.style.getPropertyValue('overflow-wrap')).toBe('anywhere');
   });
 
   it('removes unsafe markup and does not duplicate wrappers for nested tables', () => {

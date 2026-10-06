@@ -10,21 +10,11 @@ import javax.servlet.http.HttpServletResponse;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 
-public interface EmbeddedImageStorageService {
+public interface EmbeddedImageStorageService extends EmbeddedImageDocumentStorage {
 
     EmbeddedImageUploadVO uploadTemporaryImage(Long tenantId, MultipartFile file) throws Exception;
 
-    CommonFileVO promoteTemporaryImage(
-            Long tenantId,
-            String ownerType,
-            Long ownerId,
-            String uploadToken,
-            String fileName,
-            String uploadedBy) throws Exception;
-
             void deleteTemporaryImage(Long tenantId, String uploadToken, String fileName) throws Exception;
-
-            List<CommonFileVO> listOwnedImages(Long tenantId, String ownerType, Long ownerId) throws Exception;
 
             void completeOwnerSave(
                 Long tenantId,

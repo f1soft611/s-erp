@@ -1,7 +1,9 @@
 package egovframework.let.groupware.community.notice.service.impl;
 
 import java.security.MessageDigest;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,7 +43,9 @@ import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.common.service.CommonCommentService;
 import egovframework.com.common.service.CommonFileService;
+import egovframework.com.common.service.EmbeddedImageDocumentProcessor;
 import egovframework.com.common.service.EmbeddedImageStorageService;
+import egovframework.com.common.service.RichTextDocumentSanitizer;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardFileVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeEmbeddedImageVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSaveRequestVO;
@@ -62,6 +66,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private final CommonFileService commonFileService;
     private final CommonCommentService commonCommentService;
     private final EmbeddedImageStorageService imageStorageService;
+    private final EmbeddedImageDocumentProcessor imageDocumentProcessor;
 
     @Resource(name = "propertiesService")
     private EgovPropertyService propertyService;
@@ -73,6 +78,8 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         this.commonFileService = commonFileService;
         this.commonCommentService = commonCommentService;
         this.imageStorageService = imageStorageService;
+        this.imageDocumentProcessor = imageStorageService == null ? null
+                : new EmbeddedImageDocumentProcessor(imageStorageService, new RichTextDocumentSanitizer());
     }
 
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
@@ -270,17 +277,15 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             }
         }
         if (imageStorageService != null) {
-            NoticeImageSaveResult imageSave = rewriteAndPromoteEmbeddedImages(
+            EmbeddedImageDocumentProcessor.Result imageSave = rewriteAndPromoteEmbeddedImages(
                     tenantId, postId, contentsHtml, contentsJson, payload.getEmbeddedImages(),
                     payload.getTemporaryImages(), actorId);
-            if (imageSave.hasImages()) {
-                params.put("postId", postId);
-                params.put("contents", imageSave.getContentsHtml());
-                params.put("contentsHtml", imageSave.getContentsHtml());
-                params.put("contentsJson", imageSave.getContentsJson());
-                params.put("contentsText", plainText(imageSave.getContentsHtml()));
-                noticeBoardDAO.updateNoticePost(params);
-            }
+            params.put("postId", postId);
+            params.put("contents", imageSave.getHtml());
+            params.put("contentsHtml", imageSave.getHtml());
+            params.put("contentsJson", imageSave.getJson());
+            params.put("contentsText", plainText(imageSave.getHtml()));
+            noticeBoardDAO.updateNoticePost(params);
             imageStorageService.completeOwnerSave(tenantId, BOARD_TYPE_NOTICE, postId,
                     toStorageUploads(payload), imageSave.getRetainedFileIds());
         }
@@ -327,13 +332,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("lastModifiedByName", actorName);
         params.put("isPinned", StringUtils.hasText(payload.getIsPinned()) ? payload.getIsPinned().toUpperCase() : "N");
         if (imageStorageService != null) {
-            NoticeImageSaveResult imageSave = rewriteAndPromoteEmbeddedImages(
+            EmbeddedImageDocumentProcessor.Result imageSave = rewriteAndPromoteEmbeddedImages(
                     tenantId, postId, contentsHtml, contentsJson, payload.getEmbeddedImages(),
                     payload.getTemporaryImages(), actorId);
-            params.put("contents", imageSave.getContentsHtml());
-            params.put("contentsHtml", imageSave.getContentsHtml());
-            params.put("contentsJson", imageSave.getContentsJson());
-            params.put("contentsText", plainText(imageSave.getContentsHtml()));
+            params.put("contents", imageSave.getHtml());
+            params.put("contentsHtml", imageSave.getHtml());
+            params.put("contentsJson", imageSave.getJson());
+            params.put("contentsText", plainText(imageSave.getHtml()));
             noticeBoardDAO.updateNoticePost(params);
             imageStorageService.completeOwnerSave(tenantId, BOARD_TYPE_NOTICE, postId,
                     toStorageUploads(payload), imageSave.getRetainedFileIds());
@@ -343,7 +348,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         return getPost(tenantId, postId);
     }
 
-    private NoticeImageSaveResult rewriteAndPromoteEmbeddedImages(
+    private EmbeddedImageDocumentProcessor.Result rewriteAndPromoteEmbeddedImages(
             Long tenantId,
             Long postId,
             String contentsHtml,
@@ -351,103 +356,72 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             List<NoticeEmbeddedImageVO> embeddedImages,
             List<NoticeEmbeddedImageVO> temporaryImages,
             String uploadedBy) throws Exception {
-        String html = contentsHtml == null ? "" : contentsHtml;
         JsonNode json = IMAGE_OBJECT_MAPPER.readTree(StringUtils.hasText(contentsJson)
                 ? contentsJson : "{\"type\":\"doc\",\"content\":[]}");
-        List<CommonFileVO> listedImages = imageStorageService.listOwnedImages(tenantId, BOARD_TYPE_NOTICE, postId);
-        List<CommonFileVO> ownedImages = listedImages == null
-            ? new ArrayList<CommonFileVO>() : new ArrayList<CommonFileVO>(listedImages);
-        Map<String, NoticeEmbeddedImageVO> uploadByToken = new HashMap<String, NoticeEmbeddedImageVO>();
-        List<NoticeEmbeddedImageVO> sessionImages = temporaryImages == null ? embeddedImages : temporaryImages;
-        Set<String> sessionTokens = new HashSet<String>();
-        if (sessionImages != null) {
-            for (NoticeEmbeddedImageVO image : sessionImages) {
-                if (image == null || !StringUtils.hasText(image.getUploadToken())
-                        || !StringUtils.hasText(image.getFileName())
-                        || !sessionTokens.add(image.getUploadToken())) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "본문 이미지 임시 업로드 정보가 올바르지 않습니다.");
+        return imageDocumentProcessor.process(
+                tenantId,
+                BOARD_TYPE_NOTICE,
+                postId,
+                contentsHtml,
+                json,
+                toStorageUploads(embeddedImages),
+                toStorageUploads(temporaryImages == null ? embeddedImages : temporaryImages),
+                uploadedBy,
+                noticeImageUrlResolver(postId));
+    }
+
+    private EmbeddedImageDocumentProcessor.StableImageUrlResolver noticeImageUrlResolver(final Long postId) {
+        return new EmbeddedImageDocumentProcessor.StableImageUrlResolver() {
+            @Override
+            public String toStableUrl(CommonFileVO image) {
+                return stableNoticeImageUrl(image);
+            }
+
+            @Override
+            public CommonFileVO resolveOwnedImage(String source, List<CommonFileVO> ownedImages) {
+                URI uri;
+                try {
+                    uri = URI.create(source);
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("공지 본문 이미지 경로가 올바르지 않습니다.", exception);
+                }
+                String prefix = "/api/v1/groupware/boards/notice/posts/";
+                String path = uri.getPath();
+                if (path == null || !path.startsWith(prefix)) {
+                    return null;
+                }
+                String route = path.substring(prefix.length());
+                int separator = route.indexOf('/');
+                if (separator < 0 || !String.valueOf(postId).equals(route.substring(0, separator))
+                        || !"/embedded-images".equals(route.substring(separator))) {
+                    throw new IllegalArgumentException("다른 공지사항의 본문 이미지는 사용할 수 없습니다.");
+                }
+                String objectKey = queryParameter(uri.getRawQuery(), "objectKey");
+                CommonFileVO owned = StringUtils.hasText(objectKey)
+                        ? findOwnedImage(objectKey, null, ownedImages) : null;
+                if (owned == null) {
+                    throw new IllegalArgumentException("현재 공지사항에 속한 본문 이미지가 아닙니다.");
+                }
+                return owned;
+            }
+        };
+    }
+
+    private String queryParameter(String rawQuery, String parameterName) {
+        if (!StringUtils.hasText(rawQuery)) {
+            return null;
+        }
+        for (String parameter : rawQuery.split("&")) {
+            int separator = parameter.indexOf('=');
+            if (separator > 0 && parameterName.equals(parameter.substring(0, separator))) {
+                try {
+                    return URLDecoder.decode(parameter.substring(separator + 1), "UTF-8");
+                } catch (Exception exception) {
+                    throw new IllegalArgumentException("공지 본문 이미지 경로가 올바르지 않습니다.", exception);
                 }
             }
         }
-        if (embeddedImages != null) {
-            for (NoticeEmbeddedImageVO image : embeddedImages) {
-                if (image == null || !StringUtils.hasText(image.getUploadToken())
-                        || !StringUtils.hasText(image.getFileName())
-                        || uploadByToken.put(image.getUploadToken(), image) != null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 업로드 정보가 올바르지 않습니다.");
-                }
-            }
-        }
-        if (sessionImages != null) {
-            for (NoticeEmbeddedImageVO image : sessionImages) {
-                if (image != null && StringUtils.hasText(image.getUploadToken())
-                        && !uploadByToken.containsKey(image.getUploadToken())) {
-                    uploadByToken.put(image.getUploadToken(), image);
-                }
-            }
-        }
-
-        Set<String> referencedTokens = new HashSet<String>();
-        Document htmlDocument = Jsoup.parseBodyFragment(html);
-        for (Element image : htmlDocument.body().select("img[data-upload-token]")) {
-            if (StringUtils.hasText(image.attr("data-upload-token"))) {
-                referencedTokens.add(image.attr("data-upload-token"));
-            }
-        }
-        collectJsonUploadTokens(json, referencedTokens);
-
-        Map<String, CommonFileVO> promotedByToken = new HashMap<String, CommonFileVO>();
-        Set<Long> retainedFileIds = new HashSet<Long>();
-        for (NoticeEmbeddedImageVO upload : uploadByToken.values()) {
-            String token = upload.getUploadToken();
-            if (!referencedTokens.contains(token)) {
-                continue;
-            }
-            CommonFileVO alreadyOwned = findOwnedImage(upload.getObjectKey(), upload.getFileId(), ownedImages);
-            if (alreadyOwned != null) {
-                promotedByToken.put(token, alreadyOwned);
-                continue;
-            }
-            CommonFileVO promoted = imageStorageService.promoteTemporaryImage(
-                    tenantId, BOARD_TYPE_NOTICE, postId, token, upload.getFileName(), uploadedBy);
-            if (promoted == null || promoted.getFileId() == null
-                    || !BOARD_TYPE_NOTICE.equals(promoted.getOwnerType())
-                    || !postId.equals(promoted.getOwnerId())
-                    || !"EMBEDDED".equalsIgnoreCase(promoted.getFileUsageType())) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "공지 본문 이미지 소유 정보를 확정하지 못했습니다.");
-            }
-            promotedByToken.put(token, promoted);
-            ownedImages.add(promoted);
-        }
-
-        for (String token : referencedTokens) {
-            CommonFileVO alreadyOwned = findOwnedImageByUploadToken(token, ownedImages);
-            if (alreadyOwned != null) {
-                promotedByToken.put(token, alreadyOwned);
-            }
-            if (!sessionTokens.contains(token) && alreadyOwned == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "본문 이미지가 현재 임시 업로드 세션에 속하지 않습니다.");
-            }
-            if (!promotedByToken.containsKey(token)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "본문 이미지 임시 업로드 정보가 없습니다.");
-            }
-        }
-
-        rewriteHtmlImageNodes(htmlDocument.body(), promotedByToken, ownedImages, retainedFileIds);
-        ObjectNode rewrittenJson = json instanceof ObjectNode
-                ? (ObjectNode) json.deepCopy()
-                : IMAGE_OBJECT_MAPPER.createObjectNode();
-        if (!(json instanceof ObjectNode)) {
-            rewrittenJson.put("type", "doc");
-            rewrittenJson.putArray("content");
-        }
-        rewriteJsonImageNodes(rewrittenJson, promotedByToken, ownedImages, retainedFileIds);
-        return new NoticeImageSaveResult(htmlDocument.body().html(),
-                IMAGE_OBJECT_MAPPER.writeValueAsString(rewrittenJson), retainedFileIds,
-                containsImageNode(rewrittenJson) || !htmlDocument.body().select("img").isEmpty());
+        return null;
     }
 
     private void collectJsonUploadTokens(JsonNode node, Set<String> tokens) {
@@ -559,22 +533,6 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         return null;
     }
 
-    private CommonFileVO findOwnedImageByUploadToken(String uploadToken, List<CommonFileVO> ownedImages) {
-        if (!StringUtils.hasText(uploadToken) || ownedImages == null) {
-            return null;
-        }
-        for (CommonFileVO image : ownedImages) {
-            if (image == null || !StringUtils.hasText(image.getObjectKey())) {
-                continue;
-            }
-            String[] pathSegments = image.getObjectKey().split("/");
-            if (pathSegments.length >= 2 && uploadToken.equals(pathSegments[pathSegments.length - 2])) {
-                return image;
-            }
-        }
-        return null;
-    }
-
     private void setStableImageAttributes(Element image, CommonFileVO owned) throws Exception {
         image.attr("src", stableNoticeImageUrl(owned));
         image.attr("data-file-id", String.valueOf(owned.getFileId()));
@@ -608,41 +566,21 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
     }
 
-    private boolean containsImageNode(JsonNode node) {
-        if (node == null) {
-            return false;
-        }
-        if (node.isObject()) {
-            if ("image".equals(node.path("type").asText())) {
-                return true;
-            }
-            java.util.Iterator<JsonNode> children = node.elements();
-            while (children.hasNext()) {
-                if (containsImageNode(children.next())) {
-                    return true;
-                }
-            }
-        } else if (node.isArray()) {
-            java.util.Iterator<JsonNode> children = node.elements();
-            while (children.hasNext()) {
-                if (containsImageNode(children.next())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private String plainText(String html) {
         return Jsoup.parseBodyFragment(html == null ? "" : html).text();
     }
 
     private List<EmbeddedImageUploadVO> toStorageUploads(NoticeBoardPostSaveRequestVO payload) {
-        List<NoticeEmbeddedImageVO> source = payload.getTemporaryImages() != null
-                ? payload.getTemporaryImages() : payload.getEmbeddedImages();
+        List<NoticeEmbeddedImageVO> session = payload.getTemporaryImages() != null
+            ? payload.getTemporaryImages() : payload.getEmbeddedImages();
+        return toStorageUploads(session);
+    }
+
+    private List<EmbeddedImageUploadVO> toStorageUploads(
+            List<NoticeEmbeddedImageVO> images) {
         List<EmbeddedImageUploadVO> uploads = new ArrayList<EmbeddedImageUploadVO>();
-        if (source != null) {
-            for (NoticeEmbeddedImageVO image : source) {
+        if (images != null) {
+            for (NoticeEmbeddedImageVO image : images) {
                 if (image == null) {
                     continue;
                 }
@@ -653,26 +591,6 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             }
         }
         return uploads;
-    }
-
-    private static class NoticeImageSaveResult {
-        private final String contentsHtml;
-        private final String contentsJson;
-        private final Set<Long> retainedFileIds;
-        private final boolean hasImages;
-
-        private NoticeImageSaveResult(
-                String contentsHtml, String contentsJson, Set<Long> retainedFileIds, boolean hasImages) {
-            this.contentsHtml = contentsHtml;
-            this.contentsJson = contentsJson;
-            this.retainedFileIds = retainedFileIds;
-            this.hasImages = hasImages;
-        }
-
-        private String getContentsHtml() { return contentsHtml; }
-        private String getContentsJson() { return contentsJson; }
-        private Set<Long> getRetainedFileIds() { return retainedFileIds; }
-        private boolean hasImages() { return hasImages; }
     }
 
     @Override

@@ -56,7 +56,7 @@ export function CommonDialog({
   const fullScreen = fullScreenOnMobile && isMobile;
   const titleId = useId();
   const descriptionId = useId();
-  const maxWidth = size === 'lg' ? 960 : 820;
+  const maxWidth = size === 'lg' ? 990 : 820;
   const hasFooter = Boolean(footerStart || actions);
   const surfaceBackground =
     theme.palette.mode === 'dark' ? '#1e293b' : 'background.paper';
