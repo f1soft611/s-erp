@@ -1,5 +1,7 @@
 # 문서작성 결재선 입력 필드 공간 개선 구현 계획
 
+> Superseded: this plan describes the rejected committed-selector-box layout. Use [the approved card-row design](../specs/2026-10-07-document-write-approval-card-row-design.md) and [card-row implementation plan](./2026-10-07-document-write-approval-card-row.md). Its historical test results and steps do not describe the current UI.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 결재선을 번호 순서의 가로 다중 선택 필드로 바꾸고, 결재/합의 확정 후 다음 빈 입력을 이어 붙인다.

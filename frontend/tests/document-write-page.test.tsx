@@ -241,10 +241,59 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const editor = screen.getByRole('textbox', { name: '본문' });
+    const composerLayout = screen.getByTestId('document-composer-layout');
+    const editorPanel = screen.getByTestId('document-composer-editor-panel');
     const dialogContent = editor.closest('.MuiDialogContent-root');
 
-    expect(editor).toHaveStyle({ minHeight: '180px', maxHeight: 'none' });
+    expect(composerLayout).toHaveStyle({
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      minHeight: '0',
+    });
+    expect(editorPanel).toHaveStyle({
+      flexGrow: '1',
+      flexShrink: '0',
+      minHeight: '180px',
+    });
+    expect(editor).toHaveStyle({
+      minHeight: '180px',
+      maxHeight: 'none',
+      flexShrink: '0',
+    });
     expect(dialogContent).toHaveStyle({ overflowY: 'auto' });
+  });
+
+  it('keeps the editor whitespace even when a template starts with a margined block', async () => {
+    composerApi.fetchDraftFormTemplate.mockResolvedValue({
+      ...draftFormTemplate,
+      templateJson: null,
+      templateHtml:
+        '<blockquote><p>첫 블록</p></blockquote><p>마지막 블록</p>',
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const formSelector = screen.getByRole('combobox', { name: '기안양식' });
+    fireEvent.mouseDown(formSelector);
+    fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
+
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    await waitFor(() => expect(editor).toHaveTextContent('마지막 블록'));
+
+    const firstBlock = editor.firstElementChild;
+    const lastBlock = editor.lastElementChild;
+    if (!firstBlock || !lastBlock) {
+      throw new Error('Template blocks were not rendered in the editor.');
+    }
+
+    expect(getComputedStyle(editor).paddingTop).toBe(
+      getComputedStyle(editor).paddingBottom,
+    );
+    expect(getComputedStyle(firstBlock).marginTop).toBe('0px');
+    expect(getComputedStyle(lastBlock).marginBottom).toBe('0px');
   });
 
   it('shows read-only draft metadata and the default category and form fields', async () => {
@@ -337,8 +386,8 @@ describe('Document write page', () => {
       screen.getByText('선택 가능한 기안양식이 없습니다.'),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText('선택 가능한 사용자가 없습니다.'),
-    ).toHaveLength(2);
+      screen.queryByText('선택 가능한 사용자가 없습니다.'),
+    ).not.toBeInTheDocument();
   });
 
   it('filters the selectable forms by active category and available body', async () => {
@@ -392,13 +441,56 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('adds one selected user as an approval stage with metadata and an empty seal', async () => {
+  it('renders labeled approval and reference rows with approval actions beside the selector', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
-    expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '합의 추가' })).toBeDisabled();
+
+    const approvalRow = screen.getByTestId('document-approval-row');
+    const referenceRow = screen.getByTestId('document-reference-row');
+    expect(within(approvalRow).getByText('결재선')).toBeInTheDocument();
+    expect(within(referenceRow).getByText('참조')).toBeInTheDocument();
+    expect(
+      approvalRow.compareDocumentPosition(referenceRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      within(approvalRow).getByRole('combobox', {
+        name: '결재선 1 사용자 선택',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(approvalRow).getByRole('button', { name: '결재 추가' }),
+    ).toBeDisabled();
+    expect(
+      within(approvalRow).getByRole('button', { name: '합의 추가' }),
+    ).toBeDisabled();
+    expect(
+      within(referenceRow).getByRole('combobox', { name: '참조자 선택' }),
+    ).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    const titleSurface = dialog.querySelector('.MuiDialogTitle-root')
+      ?.parentElement?.parentElement;
+    const contentSurface = dialog.querySelector('.MuiDialogContent-root');
+    const footerSurface = dialog.querySelector('.MuiDialogActions-root');
+    expect(getComputedStyle(dialog).backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(getComputedStyle(titleSurface!).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(contentSurface!).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(footerSurface!).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+  });
+
+  it('renders a committed approver as a numbered participant card with an empty seal', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
       name: '결재선 1 사용자 선택',
@@ -409,18 +501,35 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
     const stage = screen.getByTestId('document-approval-stage');
+    expect(stage).toHaveTextContent('1. 결재');
     expect(stage).toHaveTextContent('홍길동');
+    expect(stage).toHaveTextContent('기획팀');
     expect(
       stage.querySelector('img[src="/users/emp-1.png"]'),
     ).not.toBeNull();
-    expect(screen.getByLabelText('결재 도장 자리')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '결재선 1' })).toHaveProperty(
-      'readOnly',
-      true,
-    );
+    expect(
+      within(stage).getByLabelText('결재 도장 자리'),
+    ).toBeInTheDocument();
+    expect(
+      within(stage).getByRole('button', { name: '결재 단계 1 삭제' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: '결재선 1' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
     ).toBeInTheDocument();
+    const selectorControl = screen
+      .getByRole('combobox', { name: '결재선 2 사용자 선택' })
+      .closest('.MuiInputBase-root');
+    expect(stage).toHaveStyle({ height: '40px' });
+    expect(selectorControl).toHaveStyle({ height: '40px' });
+    expect(screen.getByRole('button', { name: '결재 추가' })).toHaveStyle({
+      height: '40px',
+    });
+    expect(screen.getByRole('button', { name: '합의 추가' })).toHaveStyle({
+      height: '40px',
+    });
   });
 
   it('adds selected approval users as ordered individual stages and removes them from candidates', async () => {
@@ -449,17 +558,17 @@ describe('Document write page', () => {
     const stages = screen.getAllByTestId('document-approval-stage');
     expect(stages).toHaveLength(2);
     expect(stages[0]).toHaveTextContent('김민수');
-    expect(stages[0]).toHaveTextContent('결재 1');
+    expect(stages[0]).toHaveTextContent('1. 결재');
     expect(stages[1]).toHaveTextContent('홍길동');
-    expect(stages[1]).toHaveTextContent('결재 2');
-    expect(screen.getByRole('combobox', { name: '결재선 1' })).toHaveProperty(
-      'readOnly',
-      true,
-    );
-    expect(screen.getByRole('combobox', { name: '결재선 2' })).toHaveProperty(
-      'readOnly',
-      true,
-    );
+    expect(stages[1]).toHaveTextContent('2. 결재');
+    expect(stages[0]).toHaveTextContent('개발팀');
+    expect(stages[1]).toHaveTextContent('기획팀');
+    expect(
+      screen.queryByRole('combobox', { name: '결재선 1' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: '결재선 2' }),
+    ).not.toBeInTheDocument();
     const nextApprovalPicker = screen.getByRole('combobox', {
       name: '결재선 3 사용자 선택',
     });
@@ -496,7 +605,12 @@ describe('Document write page', () => {
     expect(stages).toHaveLength(1);
     expect(stages[0]).toHaveTextContent('홍길동');
     expect(stages[0]).toHaveTextContent('김민수');
+    expect(stages[0]).toHaveTextContent('기획팀');
+    expect(stages[0]).toHaveTextContent('개발팀');
     expect(screen.getByLabelText('합의 도장 자리')).toBeInTheDocument();
+    expect(
+      within(stages[0]).getByRole('button', { name: '합의 단계 1 삭제' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
     ).toBeInTheDocument();
@@ -525,6 +639,33 @@ describe('Document write page', () => {
     expect(
       await screen.findByRole('option', { name: /홍길동/ }),
     ).toBeInTheDocument();
+  });
+
+  it('keeps the empty approval selector without an unavailable-user message', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    for (const userName of ['홍길동', '김민수', '박서준']) {
+      const approvalPicker = screen.getByRole('combobox', {
+        name: '결재선 1 사용자 선택',
+      });
+      fireEvent.change(approvalPicker, { target: { value: userName } });
+      fireEvent.click(
+        await screen.findByRole('option', { name: new RegExp(userName) }),
+      );
+    }
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    expect(
+      screen.getByRole('combobox', { name: '결재선 4 사용자 선택' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('선택 가능한 사용자가 없습니다.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '합의 추가' })).toBeDisabled();
   });
 
   it('keeps reference users separate from approval stages', async () => {
@@ -801,5 +942,5 @@ describe('Document write page', () => {
         .getByRole('combobox', { name: '참조자 선택' })
         .closest('.MuiAutocomplete-root'),
     ).not.toHaveTextContent(/홍길동|김민수/);
-  });
+  }, 10000);
 });

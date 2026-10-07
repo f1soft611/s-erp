@@ -135,6 +135,7 @@ export function DocumentComposerDialog({
       title="문서 작성"
       size="lg"
       bodyMode="fill"
+      surfaceBackgroundColor="#ffffff"
       footerStart={composerFooterStart}
       actions={
         <>
@@ -164,10 +165,13 @@ export function DocumentComposerDialog({
       dialogProps={{ 'data-testid': 'document-composer-dialog-root' }}
     >
       <Box
+        data-testid="document-composer-layout"
         sx={{
           display: 'flex',
           flexDirection: 'column',
           gap: 1.5,
+          height: '100%',
+          minHeight: 0,
           minWidth: 0,
         }}
       >
@@ -195,9 +199,7 @@ export function DocumentComposerDialog({
               <Alert severity="info">기안서 정보를 불러오는 중입니다.</Alert>
             )}
             {templateLoading && (
-              <Alert severity="info">
-                기안양식 본문을 불러오는 중입니다.
-              </Alert>
+              <Alert severity="info">기안양식 본문을 불러오는 중입니다.</Alert>
             )}
             {loadError && <Alert severity="error">{loadError}</Alert>}
             {templateError && <Alert severity="error">{templateError}</Alert>}
@@ -299,6 +301,7 @@ export function DocumentComposerDialog({
           value={composerTitle}
           onChange={(event) => setComposerTitle(event.target.value)}
           fullWidth
+          size="small"
           margin="none"
           placeholder="제목을 입력하세요."
           slotProps={{ input: { 'aria-label': '제목' } }}
@@ -327,7 +330,12 @@ export function DocumentComposerDialog({
           }}
         />
         <Box
+          data-testid="document-composer-editor-panel"
           sx={{
+            display: 'flex',
+            flex: '1 0 auto',
+            flexDirection: 'column',
+            minHeight: 180,
             width: '100%',
             minWidth: 0,
             bgcolor: editorSurfaceBackground,
@@ -336,8 +344,10 @@ export function DocumentComposerDialog({
           <Box
             sx={{
               display: 'flex',
+              flex: '1 0 auto',
               flexDirection: 'column',
               width: '100%',
+              minHeight: 0,
               minWidth: 0,
               borderTop: `1px solid ${panelBorder}`,
               borderBottom: `1px solid ${panelBorder}`,
@@ -347,11 +357,12 @@ export function DocumentComposerDialog({
               sx={{
                 minHeight: 180,
                 display: 'flex',
+                flex: '1 0 auto',
                 width: '100%',
                 minWidth: 0,
                 bgcolor: editorSurfaceBackground,
                 '& .document-composer-editor': {
-                  flex: '0 0 auto',
+                  flex: '1 0 auto',
                   width: '100%',
                   minWidth: 0,
                   minHeight: 180,
@@ -362,7 +373,7 @@ export function DocumentComposerDialog({
                   overflow: 'visible',
                 },
                 '& .document-composer-editor .rich-text-editor-content': {
-                  flex: '0 0 auto',
+                  flex: '1 0 auto',
                   minHeight: 180,
                   height: 'auto',
                   overflow: 'visible',
@@ -372,7 +383,7 @@ export function DocumentComposerDialog({
                   display: 'block',
                   width: '100%',
                   minWidth: 0,
-                  flex: '0 0 auto',
+                  flex: '1 0 auto',
                   minHeight: 180,
                   maxHeight: 'none',
                   overflowY: 'visible',
@@ -390,10 +401,12 @@ export function DocumentComposerDialog({
                     height: 0,
                     pointerEvents: 'none',
                   },
+                  '& > :first-child': { marginTop: 0 },
+                  '& > :last-child': { marginBottom: 0 },
                 },
                 '& .document-composer-editor .rich-text-editor-content > .ProseMirror':
                   {
-                    flex: '0 0 auto',
+                    flex: '1 0 auto',
                     minHeight: 180,
                     maxHeight: 'none',
                     overflowY: 'visible',

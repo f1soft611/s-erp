@@ -2,7 +2,7 @@
 
 ## Status
 
-Reviewed and approved by the user.
+Superseded by the user-approved card-row design in [2026-10-07-document-write-approval-card-row-design.md](./2026-10-07-document-write-approval-card-row-design.md). The committed selector-box layout described here is historical and must not be treated as the current UI.
 
 ## Goal
 

@@ -19,6 +19,7 @@ Present approval stages as compact participant cards, matching the supplied refe
 - Do not show `선택 가능한 사용자가 없습니다.` beneath either user selector. Leave the selector empty and the approval actions disabled when no candidates remain.
 - Set the document-composer `CommonDialog` surface, header, content, and footer backgrounds to white. Add an optional surface-background override to `CommonDialog`; keep the theme-based defaults for all other dialogs.
 - Preserve the shared `UserSelectEditor` and rich-text editor behavior.
+- On composer open, make the body editor fill the available height below the preceding fields. Keep a 180px minimum; long content expands naturally and uses modal-body scrolling. Normalize only the first block's outer top margin and last block's outer bottom margin so the editor's visible top/bottom whitespace stays equal. See [Document Composer Editor Fill-Height Design](./2026-10-07-document-composer-editor-fill-height-design.md).
 
 ## Stage behavior
 

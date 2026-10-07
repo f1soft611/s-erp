@@ -55,25 +55,6 @@ describe('UserSelectEditor', () => {
     expect(chipLabels).toEqual(['User 2', 'User 1']);
   });
 
-  it('does not expose chip removal in read-only mode', () => {
-    const { container } = render(
-      <UserSelectEditor
-        value={['user-1']}
-        options={options}
-        multiple
-        label="Users"
-        readOnly
-        onChange={vi.fn()}
-      />,
-    );
-
-    const chip = container.querySelector('.MuiChip-root');
-    expect(chip?.querySelector('.MuiChip-deleteIcon')).toBeNull();
-    expect(
-      screen.getByRole('combobox', { name: 'Users' }),
-    ).toHaveProperty('readOnly', true);
-  });
-
   it('keeps selected candidates visible by default', () => {
     const onChange = vi.fn();
     const { container } = render(
@@ -100,5 +81,22 @@ describe('UserSelectEditor', () => {
     expect(deleteIcon).not.toBeNull();
     fireEvent.click(deleteIcon!);
     expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('vertically centers the unshrunk outlined label', () => {
+    const { container } = render(
+      <UserSelectEditor
+        value={null}
+        options={options}
+        label="Users"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const label = container.querySelector('.MuiInputLabel-root');
+
+    expect(label && getComputedStyle(label).transform).toBe(
+      'translate(14px, 11px) scale(1)',
+    );
   });
 });

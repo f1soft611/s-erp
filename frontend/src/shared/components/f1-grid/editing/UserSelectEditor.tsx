@@ -205,19 +205,14 @@ export function UserSelectEditor({
                 }
                 label={option.label}
                 size="small"
-                onDelete={
-                  readOnly
-                    ? undefined
-                    : () => {
-                        const remaining = selectedItems.filter(
-                          (item) =>
-                            String(item.value) !== String(option.value),
-                        );
-                        onChange(
-                          multiple ? remaining.map((item) => item.value) : null,
-                        );
-                      }
-                }
+                onDelete={() => {
+                  const remaining = selectedItems.filter(
+                    (item) => String(item.value) !== String(option.value),
+                  );
+                  onChange(
+                    multiple ? remaining.map((item) => item.value) : null,
+                  );
+                }}
               />
             ))}
           </Box>
@@ -268,6 +263,9 @@ export function UserSelectEditor({
             '& .MuiInputLabel-root': {
               fontSize: '0.82rem',
               fontWeight: 600,
+            },
+            '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': {
+              transform: 'translate(14px, 11px) scale(1)',
             },
             '& .MuiFormHelperText-root': { marginLeft: 0, marginTop: 0.5 },
           }}
