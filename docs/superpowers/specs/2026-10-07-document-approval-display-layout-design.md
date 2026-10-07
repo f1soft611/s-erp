@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved in conversation on 2026-10-07. This design supersedes [Document Approval Participant Chip Design](./2026-10-07-document-approval-chip-style-design.md), which described a single gray chip for each approval stage. The earlier direction to use that one-chip layout is no longer current.
+Approved in conversation on 2026-10-07. The approval-slot sizing, empty-slot behavior, and agreement-row visibility in this design are superseded by [Document Approval Compact Capacity Design](./2026-10-07-document-approval-compact-capacity-design.md). The compact-capacity design is authoritative for those details. This document's global participant ordering, individual participant removal, and independent reference-selection decisions remain valid. This design also supersedes [Document Approval Participant Chip Design](./2026-10-07-document-approval-chip-style-design.md), which described a single gray chip for each approval stage.
 
 ## Goal
 
@@ -10,14 +10,14 @@ Separate document-composer approval input from the committed approval display, s
 
 ## Layout
 
-Render the controls in this order, each as a labeled row:
+Render applicable controls as labeled rows in this order. The compact-capacity design controls whether the agreement row is present:
 
 1. **결재선** — the current multi-user selector followed by `결재 추가` and `합의 추가` buttons. This row is for choosing users and committing them; committed participants are not rendered inline here.
-2. **결재** — display confirmed approval users as table-like columns. Each participant column contains a position/title cell, a stamp/signature area, and a lower sequence-number/name row, following the supplied third image. Include a remove (`X`) action in each column so a committed participant can be removed individually. Keep participants in their existing approval order. When the row runs out of available width, continue on the next line in the same order; do not create page-level horizontal overflow.
-3. **합의** — display each confirmed agreement participant as an individual compact chip following the supplied second image. A chip contains only the global approval sequence number, participant name, seal placeholder, and an individual remove (`X`) action. Do not show avatar or stage-kind text in these chips. Wrap chips to additional lines when necessary.
+2. **결재** — display confirmed approval users as table-like columns, retaining each participant's position/title, seal area, global sequence, name, and individual remove (`X`) action. The compact-capacity design governs slot sizing, default empty slots, and wrapping.
+3. **합의** — only when agreement participants exist, display each as an individual compact chip containing the global approval sequence number, participant name, seal placeholder, and individual remove (`X`) action. Do not show avatar or stage-kind text. The compact-capacity design governs row visibility and compact participant presentation.
 4. **참조** — retain the existing reference selector row and behavior unchanged.
 
-Keep the labels in a consistent left column and the content in a min-width-safe right column. Empty committed approval/agreement sections should not create misleading participant rows.
+Keep the labels in a consistent left column and the content in a min-width-safe right column. Apply the compact-capacity design for the presence of default empty approval slots and for hiding the agreement row when there are no agreement participants.
 
 ## Ordering and stage behavior
 
@@ -33,7 +33,7 @@ Keep the labels in a consistent left column and the content in a min-width-safe 
 - Keep meaningful row labels (`결재선`, `결재`, `합의`, `참조`) and accessible controls.
 - Each approval table column identifies its participant and sequence for assistive technologies and has a remove button naming that participant and sequence.
 - Each agreement chip has accessible sequence/name content and a remove button naming the participant and sequence.
-- Keep the approval table columns compact with visible neutral borders and the signature area clearly distinguishable. Keep agreement chips muted and compact, visually similar to the supplied reference.
+- Keep approval columns and agreement chips compact, with the presentation details in the compact-capacity design taking precedence.
 
 ## Scope
 
