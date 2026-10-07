@@ -37,6 +37,7 @@ vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
 }));
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
 
 const category = {
   id: '101',
@@ -170,6 +171,52 @@ async function waitForComposerReady() {
       '기안자',
     ),
   );
+}
+
+function installApprovalResizeObserverMock() {
+  const observers: (ResizeObserver & { resize: (width: number) => void })[] =
+    [];
+
+  class MockApprovalResizeObserver implements ResizeObserver {
+    private target: Element | null = null;
+
+    constructor(private callback: ResizeObserverCallback) {
+      observers.push(this as ResizeObserver & { resize: (width: number) => void });
+    }
+
+    observe(target: Element): void {
+      this.target = target;
+      this.resize(262);
+    }
+
+    unobserve(_target: Element): void {}
+
+    disconnect(): void {
+      this.target = null;
+    }
+
+    resize(width: number): void {
+      if (!this.target) return;
+      const entry = {
+        target: this.target,
+        contentRect: {
+          x: 0,
+          y: 0,
+          top: 0,
+          right: width,
+          bottom: 0,
+          left: 0,
+          width,
+          height: 0,
+          toJSON: () => ({}),
+        },
+      } as ResizeObserverEntry;
+      this.callback([entry], this);
+    }
+  }
+
+  vi.stubGlobal('ResizeObserver', MockApprovalResizeObserver);
+  return observers;
 }
 
 describe('Document write page', () => {
@@ -450,7 +497,103 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders separate approval input, approval, agreement, and reference rows', async () => {
+  it('calculates approval slot capacity from the measured content width', () => {
+    expect(calculateApprovalSlotCapacity(262)).toBe(3);
+    expect(calculateApprovalSlotCapacity(654)).toBe(7);
+    expect(calculateApprovalSlotCapacity(940)).toBe(11);
+    expect(calculateApprovalSlotCapacity(0)).toBe(1);
+  });
+
+  it('fills subdued empty approval slots and updates them when the observed width changes', async () => {
+    const approvalObservers = installApprovalResizeObserverMock();
+    let unmount = () => {};
+
+    try {
+      const rendered = render(<DashboardContent {...pageProps} />);
+      unmount = rendered.unmount;
+
+      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+      await waitForComposerReady();
+
+      const grid = screen.getByTestId('document-approval-grid');
+      const slots = () => Array.from(grid.children) as HTMLElement[];
+      expect(grid).toHaveAttribute('data-slot-capacity', '3');
+      expect(slots()).toHaveLength(3);
+      slots().forEach((slot) => {
+        const seal = within(slot).getByLabelText('결재 도장 자리');
+        expect(seal).toHaveStyle({ borderStyle: 'dashed' });
+        expect(slot.textContent).toBe('도장');
+        expect(slot.querySelector('[aria-label*="순번"]')).toBeNull();
+        expect(slot.querySelector('button')).toBeNull();
+      });
+
+      expect(approvalObservers.length).toBeGreaterThan(0);
+      act(() => approvalObservers[0].resize(654));
+      await waitFor(() => {
+        expect(grid).toHaveAttribute('data-slot-capacity', '7');
+        expect(slots()).toHaveLength(7);
+      });
+    } finally {
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retains and wraps the fourth approval in a three-column grid', async () => {
+    composerApi.fetchDraftFormOptions.mockResolvedValue({
+      categoryGroup: null,
+      categoryItems: [category],
+      cycleItems: [],
+      users: [
+        composerUser,
+        anotherComposerUser,
+        thirdComposerUser,
+        fourthComposerUser,
+      ],
+    });
+    installApprovalResizeObserverMock();
+    let unmount = () => {};
+
+    try {
+      const rendered = render(<DashboardContent {...pageProps} />);
+      unmount = rendered.unmount;
+
+      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+      await waitForComposerReady();
+
+      const picker = screen.getByRole('combobox', {
+        name: '결재선 1 사용자 선택',
+      });
+      const names = ['홍길동', '김민수', '박서준', '이수진'];
+      for (const name of names) {
+        fireEvent.change(picker, { target: { value: name } });
+        fireEvent.click(
+          await screen.findByRole('option', { name: new RegExp(name) }),
+        );
+      }
+      fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+      const grid = screen.getByTestId('document-approval-grid');
+      const approvalPeople = within(grid).getAllByTestId(
+        'document-approval-person',
+      );
+      expect(grid).toHaveAttribute('data-slot-capacity', '3');
+      expect(grid).toHaveStyle({
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))',
+      });
+      expect(grid.children).toHaveLength(4);
+      expect(
+        approvalPeople.map((person) => person.getAttribute('aria-label')),
+      ).toEqual(names.map((name, index) => `결재 ${index + 1} ${name}`));
+      expect(grid.lastElementChild).toBe(approvalPeople[3]);
+    } finally {
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('hides the empty agreement row while preserving the remaining row order', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
@@ -460,24 +603,19 @@ describe('Document write page', () => {
     const approvalDisplayRow = screen.getByTestId(
       'document-approval-display-row',
     );
-    const agreementDisplayRow = screen.getByTestId(
-      'document-agreement-display-row',
-    );
+    expect(
+      screen.queryByTestId('document-agreement-display-row'),
+    ).not.toBeInTheDocument();
     const referenceRow = screen.getByTestId('document-reference-row');
     expect(within(approvalInputRow).getByText('결재선')).toBeInTheDocument();
     expect(within(approvalDisplayRow).getByText('결재')).toBeInTheDocument();
-    expect(within(agreementDisplayRow).getByText('합의')).toBeInTheDocument();
     expect(within(referenceRow).getByText('참조')).toBeInTheDocument();
     expect(
       approvalInputRow.compareDocumentPosition(approvalDisplayRow) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     expect(
-      approvalDisplayRow.compareDocumentPosition(agreementDisplayRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(
-      agreementDisplayRow.compareDocumentPosition(referenceRow) &
+      approvalDisplayRow.compareDocumentPosition(referenceRow) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     expect(
@@ -492,7 +630,6 @@ describe('Document write page', () => {
       within(approvalInputRow).getByRole('button', { name: '합의 추가' }),
     ).toBeDisabled();
     expect(approvalDisplayRow).not.toHaveTextContent('홍길동');
-    expect(agreementDisplayRow).not.toHaveTextContent('홍길동');
     expect(
       within(referenceRow).getByRole('combobox', { name: '참조자 선택' }),
     ).toBeInTheDocument();
@@ -552,7 +689,6 @@ describe('Document write page', () => {
       .closest('.MuiInputBase-root');
     expect(screen.getByTestId('document-approval-grid')).toHaveStyle({
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
     });
     expect(selectorControl).toHaveStyle({ height: '40px' });
     expect(screen.getByRole('button', { name: '결재 추가' })).toHaveStyle({
@@ -561,6 +697,82 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '합의 추가' })).toHaveStyle({
       height: '40px',
     });
+  });
+
+  it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
+    const approvalName = '홍길동김철수';
+    const agreementName = '김민수박서준';
+    composerApi.fetchDraftFormOptions.mockResolvedValue({
+      categoryGroup: null,
+      categoryItems: [category],
+      cycleItems: [],
+      users: [
+        { ...composerUser, userId: 'emp-long-1', userNm: approvalName },
+        { ...anotherComposerUser, userId: 'emp-long-2', userNm: agreementName },
+      ],
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 1 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: approvalName } });
+    fireEvent.click(
+      await screen.findByRole('option', { name: new RegExp(approvalName) }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    const agreementPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(agreementPicker, { target: { value: agreementName } });
+    fireEvent.click(
+      await screen.findByRole('option', { name: new RegExp(agreementName) }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
+
+    const approval = screen.getByTestId('document-approval-person');
+    const agreement = screen.getByTestId('document-agreement-chip');
+    const assertParticipantPresentation = (
+      participant: HTMLElement,
+      sequence: number,
+      fullName: string,
+      kind: '결재' | '합의',
+    ) => {
+      const badge = within(participant).getByLabelText(
+        `결재 순번 ${sequence}`,
+      );
+      expect(badge).toHaveStyle({ borderRadius: '50%' });
+      const badgeRgb = getComputedStyle(badge)
+        .backgroundColor.match(/\d+/g)
+        ?.slice(0, 3)
+        .map(Number);
+      expect(badgeRgb).toBeDefined();
+      expect(badgeRgb![2]).toBeGreaterThan(badgeRgb![0]);
+
+      expect(
+        within(participant).getByLabelText(`${kind} 도장 자리`),
+      ).toBeInTheDocument();
+      expect(
+        within(participant).getByRole('button', {
+          name: `${kind} 참여자 ${sequence} ${fullName} 삭제`,
+        }),
+      ).toBeInTheDocument();
+      const name = within(participant).getByTitle(fullName);
+      expect(name).toHaveStyle({
+        maxWidth: '3em',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      });
+      expect(participant.getAttribute('aria-label')).toContain(fullName);
+    };
+
+    assertParticipantPresentation(approval, 1, approvalName, '결재');
+    assertParticipantPresentation(agreement, 2, agreementName, '합의');
   });
 
   it('adds selected approval users as ordered individual stages and removes them from candidates', async () => {
@@ -624,6 +836,9 @@ describe('Document write page', () => {
     });
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '합의 추가' })).toBeDisabled();
+    expect(
+      screen.queryByTestId('document-agreement-display-row'),
+    ).not.toBeInTheDocument();
     fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
     fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
@@ -650,6 +865,17 @@ describe('Document write page', () => {
         name: '합의 참여자 1 홍길동 삭제',
       }),
     ).toBeInTheDocument();
+    const approvalRow = screen.getByTestId('document-approval-display-row');
+    const agreementRow = screen.getByTestId('document-agreement-display-row');
+    const referenceRow = screen.getByTestId('document-reference-row');
+    expect(
+      approvalRow.compareDocumentPosition(agreementRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      agreementRow.compareDocumentPosition(referenceRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(screen.getByTestId('document-agreement-list')).toHaveStyle({
       display: 'flex',
       flexWrap: 'wrap',
@@ -699,6 +925,9 @@ describe('Document write page', () => {
       screen.getByRole('button', { name: '합의 참여자 1 김민수 삭제' }),
     );
     expect(screen.queryAllByTestId('document-agreement-chip')).toHaveLength(0);
+    expect(
+      screen.queryByTestId('document-agreement-display-row'),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('combobox', { name: '결재선 1 사용자 선택' }),
     ).toBeInTheDocument();
