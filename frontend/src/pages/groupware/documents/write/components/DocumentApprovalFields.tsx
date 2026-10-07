@@ -268,7 +268,6 @@ export function DocumentApprovalFields({
                     color="text.disabled"
                     sx={{ alignContent: 'center', textAlign: 'center' }}
                   >
-                    직위/직함
                   </Typography>
                   <Box
                     sx={{

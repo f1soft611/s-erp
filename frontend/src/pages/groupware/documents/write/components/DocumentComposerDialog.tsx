@@ -409,7 +409,7 @@ export function DocumentComposerDialog({
                     height: 0,
                     pointerEvents: 'none',
                   },
-                  '& > :first-child': { marginTop: 0 },
+                  '& > :first-of-type': { marginTop: 0 },
                   '& > :last-child': { marginBottom: 0 },
                 },
                 '& .document-composer-editor .rich-text-editor-content > .ProseMirror':

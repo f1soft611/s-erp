@@ -14,8 +14,10 @@ theme rather than forcing a white canvas in dark mode.
 - Use a white editor canvas in light mode and match the common dialog body
   surface (`#1e293b`) in dark mode. Apply the selected surface consistently to
   the editor panel, editable area, and attachment area.
-- Keep default editor text and placeholder colors readable against each
-  theme's editor surface.
+- Use theme `text.primary` for default editor body text and the same muted
+  `text.disabled` color as the title placeholder for the body placeholder.
+- Keep the title input bold (`700`) and editor body text regular (`400`) by
+  default. Preserve user-applied rich-text formatting.
 - Keep the dialog shell and title field surfaces themed as before.
 - Add focused regression tests for agreement chip colors and the dark-mode
   composer editor surface. Preserve unrelated approval-line work already in
@@ -47,5 +49,7 @@ theme rather than forcing a white canvas in dark mode.
 - Dark agreement chips use a dark slate surface and remain legible.
 - The editor canvas is `#ffffff` in light mode and `#1e293b` in dark mode;
   default text and placeholder remain legible against each surface.
+- The body placeholder matches the title placeholder's muted theme color; title
+  text is bold and the default editor body is regular.
 - Run focused tests, lint, build, and shared-browser checks at 375px, 768px,
   and 1280px. Avoid exposing personal/document content in screenshots.

@@ -122,14 +122,18 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         setDrafterName(profile.name.trim());
         const signedInUserId = profile.userId?.trim();
         const signedInUser = signedInUserId
-          ? availableUsers.find(
+          ? (availableUsers.find(
               (user) => String(user.value) === signedInUserId,
-            )
+            ) ?? {
+              value: signedInUserId,
+              label: profile.name.trim(),
+              avatarUrl: profile.profileImage,
+              positionName: profile.levelName,
+              departmentName: profile.departmentName,
+            })
           : undefined;
         if (!signedInUser) {
-          setLoadError(
-            '로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.',
-          );
+          setLoadError('로그인 사용자의 계정 ID를 확인할 수 없습니다.');
           return;
         }
         setApprovalStages([

@@ -259,6 +259,36 @@ function installApprovalResizeObserverMock() {
 }
 
 describe('Document write page', () => {
+  it('does not emit an SSR-unsafe first-child selector warning', async () => {
+    const errorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      render(<DashboardContent {...pageProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+      await waitForComposerReady();
+
+      const consoleCalls = [...errorSpy.mock.calls, ...warnSpy.mock.calls];
+      expect(
+        consoleCalls.some((call) =>
+          call.some((argument) =>
+            String(argument).includes(
+              'pseudo class ":first-child" is potentially unsafe',
+            ),
+          ),
+        ),
+      ).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  }, 15000);
+
   it('adds the signed-in user as a non-removable first approver', async () => {
     render(<DashboardContent {...pageProps} />);
 
@@ -275,22 +305,36 @@ describe('Document write page', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows an error when the signed-in user is missing from the user options', async () => {
+  it('uses profile details as the fixed first approver when absent from selectable users', async () => {
+    composerApi.fetchDraftFormOptions.mockResolvedValue({
+      categoryGroup: null,
+      categoryItems: [category],
+      cycleItems: [],
+      users: [anotherComposerUser, thirdComposerUser],
+    });
     composerApi.fetchMyProfile.mockResolvedValue({
-      userId: 'missing-user',
+      userId: 'emp-profile-only',
       name: '기안자',
+      departmentName: '기획팀',
+      levelName: '팀장',
+      profileImage: '/users/profile-only.png',
     });
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
 
+    const firstApprover = await screen.findByRole('group', {
+      name: '결재 1 기안자',
+    });
+    expect(firstApprover).toHaveTextContent('팀장');
+    expect(firstApprover).toHaveTextContent('기안자');
     expect(
-      await screen.findByText(
-        '로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId('document-approval-person')).toBeNull();
-  });
+      within(firstApprover).queryByRole('button', { name: /삭제/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.'),
+    ).not.toBeInTheDocument();
+  }, 15000);
 
   it('prevents the same user from being assigned to approval and reference', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -364,6 +408,7 @@ describe('Document write page', () => {
 
       const emptySlot = screen.getAllByTestId('document-empty-approval-slot')[0];
       expect(within(emptySlot).getByLabelText('직위/직함 자리')).toBeInTheDocument();
+      expect(within(emptySlot).queryByText('직위/직함')).not.toBeInTheDocument();
       expect(within(emptySlot).getByLabelText('결재 도장 자리')).toBeInTheDocument();
       expect(within(emptySlot).getByLabelText('결재자 이름 자리')).toBeInTheDocument();
       expect(emptySlot).toHaveStyle({
