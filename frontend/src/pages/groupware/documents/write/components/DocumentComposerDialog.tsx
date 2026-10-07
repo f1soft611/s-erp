@@ -60,7 +60,7 @@ export function DocumentComposerDialog({
     referenceUserIds,
     addApproval,
     addAgreement,
-    removeApprovalStage,
+    removeApprovalUser,
     handleApprovalUserChange,
     handleReferenceUserChange,
     loadError,
@@ -293,7 +293,7 @@ export function DocumentComposerDialog({
               onReferenceUserChange={handleReferenceUserChange}
               onAddApproval={addApproval}
               onAddAgreement={addAgreement}
-              onRemoveApprovalStage={removeApprovalStage}
+              onRemoveApprovalUser={removeApprovalUser}
             />
           </>
         )}
@@ -350,7 +350,7 @@ export function DocumentComposerDialog({
               minHeight: 0,
               minWidth: 0,
               borderTop: `1px solid ${panelBorder}`,
-              borderBottom: `1px solid ${panelBorder}`,
+              // borderBottom: `1px solid ${panelBorder}`,
             }}
           >
             <Box

@@ -268,9 +268,15 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     setSelectedApprovalUserIds([]);
   }, [selectedApprovalUsers]);
 
-  const removeApprovalStage = useCallback((stageId: number) => {
+  const removeApprovalUser = useCallback((stageId: number, userId: string) => {
     setApprovalStages((current) =>
-      current.filter((stage) => stage.id !== stageId),
+      current.flatMap((stage) => {
+        if (stage.id !== stageId) return [stage];
+        const users = stage.users.filter(
+          (user) => String(user.value) !== userId,
+        );
+        return users.length > 0 ? [{ ...stage, users }] : [];
+      }),
     );
   }, []);
 
@@ -343,7 +349,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     referenceUserIds,
     addApproval,
     addAgreement,
-    removeApprovalStage,
+    removeApprovalUser,
     handleApprovalUserChange,
     handleReferenceUserChange,
     loadError,

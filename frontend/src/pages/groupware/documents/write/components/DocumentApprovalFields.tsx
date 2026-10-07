@@ -1,5 +1,5 @@
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
-import { Avatar, Box, Button, IconButton, Stack, Typography } from '@mui/material';
+import { Box, Button, IconButton, Typography } from '@mui/material';
 import { UserSelectEditor } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
@@ -14,7 +14,7 @@ type DocumentApprovalFieldsProps = {
   onReferenceUserChange: (value: F1GridUserValue) => void;
   onAddApproval: () => void;
   onAddAgreement: () => void;
-  onRemoveApprovalStage: (stageId: number) => void;
+  onRemoveApprovalUser: (stageId: number, userId: string) => void;
 };
 
 function SealSlot({ kind }: { kind: 'approval' | 'agreement' }) {
@@ -49,7 +49,7 @@ export function DocumentApprovalFields({
   onReferenceUserChange,
   onAddApproval,
   onAddAgreement,
-  onRemoveApprovalStage,
+  onRemoveApprovalUser,
 }: DocumentApprovalFieldsProps) {
   const assignedApprovalUserIds = new Set(
     approvalStages.flatMap((stage) =>
@@ -59,6 +59,29 @@ export function DocumentApprovalFields({
   const approvalOptions = userOptions.filter(
     (user) => !assignedApprovalUserIds.has(String(user.value)),
   );
+  let sequence = 0;
+  const participants = approvalStages.flatMap((stage) =>
+    stage.users.map((user) => ({
+      stageId: stage.id,
+      kind: stage.kind,
+      user,
+      sequence: ++sequence,
+    })),
+  );
+  const approvalParticipants = participants.filter(
+    (participant) => participant.kind === 'approval',
+  );
+  const agreementParticipants = participants.filter(
+    (participant) => participant.kind === 'agreement',
+  );
+  const nextApprovalNumber = participants.length + 1;
+  const labeledRowSx = {
+    display: 'grid',
+    gridTemplateColumns: { xs: '64px minmax(0, 1fr)', sm: '80px minmax(0, 1fr)' },
+    alignItems: 'start',
+    gap: { xs: 1, sm: 1.5 },
+    minWidth: 0,
+  } as const;
 
   return (
     <Box
@@ -66,179 +89,214 @@ export function DocumentApprovalFields({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 1.5,
+        gap: 1.25,
         minWidth: 0,
         flexShrink: 0,
       }}
     >
       <Box
-        data-testid="document-approval-row"
+        data-testid="document-approval-input-row"
         sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '64px minmax(0, 1fr)', sm: '80px minmax(0, 1fr)' },
+          ...labeledRowSx,
           alignItems: 'center',
-          gap: { xs: 1, sm: 1.5 },
-          minWidth: 0,
         }}
       >
         <Typography variant="body2" sx={{ fontWeight: 700 }}>
           결재선
         </Typography>
-        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+        <Box
+          data-testid="document-approval-active-field"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 0.75,
+            minWidth: 0,
+          }}
+        >
           <Box
-            data-testid="document-approval-stage-strip"
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
+              flex: '1 1 180px',
               minWidth: 0,
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              py: 0.25,
+              '& .MuiInputBase-root': {
+                height: 40,
+                boxSizing: 'border-box',
+              },
             }}
           >
-            {approvalStages.map((stage, index) => (
+            <UserSelectEditor
+              value={selectedApprovalUserIds}
+              options={approvalOptions}
+              multiple
+              hideSelectedOptions
+              preserveSelectionOrder
+              label={`결재선 ${nextApprovalNumber} 사용자 선택`}
+              onChange={onApprovalUserChange}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 0.5, flex: '0 0 auto' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={selectedApprovalUserIds.length === 0}
+              onClick={onAddApproval}
+              sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
+            >
+              결재 추가
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={selectedApprovalUserIds.length === 0}
+              onClick={onAddAgreement}
+              sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
+            >
+              합의 추가
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box data-testid="document-approval-display-row" sx={labeledRowSx}>
+        <Typography variant="body2" sx={{ fontWeight: 700, pt: 0.5 }}>
+          결재
+        </Typography>
+        <Box
+          data-testid="document-approval-grid"
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+            gap: 0.5,
+            minWidth: 0,
+          }}
+        >
+          {approvalParticipants.map(({ stageId, user, sequence: order }) => (
+            <Box
+              key={`${stageId}-${String(user.value)}`}
+              role="group"
+              aria-label={`결재 ${order} ${user.label}`}
+              data-testid="document-approval-person"
+              sx={{
+                display: 'grid',
+                gridTemplateRows: '32px 64px 32px',
+                minWidth: 0,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ alignContent: 'center', px: 0.5, textAlign: 'center' }}
+              >
+                {user.positionName ?? ''}
+              </Typography>
               <Box
-                key={stage.id}
-                role="group"
-                aria-label={`${stage.kind === 'approval' ? '결재' : '합의'} 단계 ${index + 1}`}
-                data-testid="document-approval-stage"
+                aria-label="결재 도장 자리"
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  flex: '0 0 auto',
-                  height: 40,
-                  boxSizing: 'border-box',
-                  px: 0.75,
-                  border: '1px solid',
+                  display: 'grid',
+                  placeItems: 'center',
+                  borderBlock: '1px solid',
                   borderColor: 'divider',
-                  borderRadius: 1,
+                  color: 'text.disabled',
+                  fontSize: '0.75rem',
                 }}
               >
-                <Stack spacing={0.25} sx={{ flex: '0 0 auto' }}>
-                  <Typography
-                    variant="caption"
-                    sx={{ fontWeight: 700, lineHeight: 1.2 }}
-                  >
-                    {index + 1}. {stage.kind === 'approval' ? '결재' : '합의'}
-                  </Typography>
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ alignItems: 'center' }}
-                >
-                  {stage.users.map((user) => (
-                    <Stack
-                      key={String(user.value)}
-                      direction="row"
-                      spacing={0.75}
-                      sx={{ alignItems: 'center', minWidth: 0 }}
-                    >
-                      <Avatar
-                        src={user.avatarUrl ?? undefined}
-                        alt={`${user.label} 프로필`}
-                        sx={{ width: 30, height: 30, flex: '0 0 auto' }}
-                      >
-                        {user.label.charAt(0)}
-                      </Avatar>
-                      <Stack spacing={0.1} sx={{ minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          noWrap
-                          sx={{ fontWeight: 600, maxWidth: 120 }}
-                        >
-                          {user.label}
-                        </Typography>
-                        {user.departmentName && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            noWrap
-                            sx={{ maxWidth: 120 }}
-                          >
-                            {user.departmentName}
-                          </Typography>
-                        )}
-                      </Stack>
-                    </Stack>
-                  ))}
-                </Stack>
-                <SealSlot kind={stage.kind} />
+                도장
+              </Box>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '20px minmax(0, 1fr) 28px',
+                  alignItems: 'center',
+                  minWidth: 0,
+                  px: 0.5,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {order}
+                </Typography>
+                <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+                  {user.label}
+                </Typography>
                 <IconButton
                   size="small"
-                  aria-label={`${stage.kind === 'approval' ? '결재' : '합의'} 단계 ${index + 1} 삭제`}
-                  onClick={() => onRemoveApprovalStage(stage.id)}
+                  aria-label={`결재 참여자 ${order} ${user.label} 삭제`}
+                  onClick={() =>
+                    onRemoveApprovalUser(stageId, String(user.value))
+                  }
+                  sx={{ p: 0.25 }}
                 >
                   <DeleteOutlineOutlinedIcon fontSize="small" />
                 </IconButton>
               </Box>
-            ))}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Box data-testid="document-agreement-display-row" sx={labeledRowSx}>
+        <Typography variant="body2" sx={{ fontWeight: 700, pt: 0.5 }}>
+          합의
+        </Typography>
+        <Box
+          data-testid="document-agreement-list"
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 0.75,
+            minWidth: 0,
+          }}
+        >
+          {agreementParticipants.map(({ stageId, user, sequence: order }) => (
             <Box
-              data-testid="document-approval-active-field"
+              key={`${stageId}-${String(user.value)}`}
+              role="group"
+              aria-label={`합의 ${order} ${user.label}`}
+              data-testid="document-agreement-chip"
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 0.75,
-                flex: '0 0 390px',
-                minWidth: 0,
+                flex: '0 0 auto',
+                height: 40,
+                px: 0.75,
+                border: '1px solid',
+                borderColor: 'grey.300',
+                borderRadius: 1,
+                bgcolor: 'grey.100',
               }}
             >
-              <Box
-                sx={{
-                  flex: '1 1 auto',
-                  minWidth: 180,
-                  '& .MuiInputBase-root': {
-                    height: 40,
-                    boxSizing: 'border-box',
-                  },
-                }}
+              <Typography
+                variant="caption"
+                aria-label={`결재 순번 ${order}`}
+                sx={{ fontWeight: 700 }}
               >
-                <UserSelectEditor
-                  value={selectedApprovalUserIds}
-                  options={approvalOptions}
-                  multiple
-                  hideSelectedOptions
-                  preserveSelectionOrder
-                  label={`결재선 ${approvalStages.length + 1} 사용자 선택`}
-                  onChange={onApprovalUserChange}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', gap: 0.5, flex: '0 0 auto' }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={selectedApprovalUserIds.length === 0}
-                  onClick={onAddApproval}
-                  sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
-                >
-                  결재 추가
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={selectedApprovalUserIds.length === 0}
-                  onClick={onAddAgreement}
-                  sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
-                >
-                  합의 추가
-                </Button>
-              </Box>
+                {order}
+              </Typography>
+              <Typography variant="body2" noWrap sx={{ maxWidth: 120 }}>
+                {user.label}
+              </Typography>
+              <SealSlot kind="agreement" />
+              <IconButton
+                size="small"
+                aria-label={`합의 참여자 ${order} ${user.label} 삭제`}
+                onClick={() =>
+                  onRemoveApprovalUser(stageId, String(user.value))
+                }
+                sx={{ p: 0.25 }}
+              >
+                <DeleteOutlineOutlinedIcon fontSize="small" />
+              </IconButton>
             </Box>
-          </Box>
-        </Stack>
+          ))}
+        </Box>
       </Box>
 
       <Box
         data-testid="document-reference-row"
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '64px minmax(0, 1fr)', sm: '80px minmax(0, 1fr)' },
-          alignItems: 'center',
-          gap: { xs: 1, sm: 1.5 },
-          minWidth: 0,
-        }}
+        sx={{ ...labeledRowSx, alignItems: 'center' }}
       >
         <Typography variant="body2" sx={{ fontWeight: 700 }}>
           참조

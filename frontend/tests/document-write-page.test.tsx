@@ -85,6 +85,15 @@ const thirdComposerUser = {
   levelNm: '사원',
 };
 
+const fourthComposerUser = {
+  userId: 'emp-4',
+  loginId: 4,
+  userNm: '이수진',
+  departmentNm: '인사팀',
+  profileImage: '/users/emp-4.png',
+  levelNm: '부장',
+};
+
 const draftForm = {
   draftingWorkCategoryId: 77,
   cataTypeCode: '007',
@@ -441,31 +450,49 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders labeled approval and reference rows with approval actions beside the selector', async () => {
+  it('renders separate approval input, approval, agreement, and reference rows', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    const approvalRow = screen.getByTestId('document-approval-row');
+    const approvalInputRow = screen.getByTestId('document-approval-input-row');
+    const approvalDisplayRow = screen.getByTestId(
+      'document-approval-display-row',
+    );
+    const agreementDisplayRow = screen.getByTestId(
+      'document-agreement-display-row',
+    );
     const referenceRow = screen.getByTestId('document-reference-row');
-    expect(within(approvalRow).getByText('결재선')).toBeInTheDocument();
+    expect(within(approvalInputRow).getByText('결재선')).toBeInTheDocument();
+    expect(within(approvalDisplayRow).getByText('결재')).toBeInTheDocument();
+    expect(within(agreementDisplayRow).getByText('합의')).toBeInTheDocument();
     expect(within(referenceRow).getByText('참조')).toBeInTheDocument();
     expect(
-      approvalRow.compareDocumentPosition(referenceRow) &
+      approvalInputRow.compareDocumentPosition(approvalDisplayRow) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     expect(
-      within(approvalRow).getByRole('combobox', {
+      approvalDisplayRow.compareDocumentPosition(agreementDisplayRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      agreementDisplayRow.compareDocumentPosition(referenceRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      within(approvalInputRow).getByRole('combobox', {
         name: '결재선 1 사용자 선택',
       }),
     ).toBeInTheDocument();
     expect(
-      within(approvalRow).getByRole('button', { name: '결재 추가' }),
+      within(approvalInputRow).getByRole('button', { name: '결재 추가' }),
     ).toBeDisabled();
     expect(
-      within(approvalRow).getByRole('button', { name: '합의 추가' }),
+      within(approvalInputRow).getByRole('button', { name: '합의 추가' }),
     ).toBeDisabled();
+    expect(approvalDisplayRow).not.toHaveTextContent('홍길동');
+    expect(agreementDisplayRow).not.toHaveTextContent('홍길동');
     expect(
       within(referenceRow).getByRole('combobox', { name: '참조자 선택' }),
     ).toBeInTheDocument();
@@ -486,7 +513,7 @@ describe('Document write page', () => {
     );
   });
 
-  it('renders a committed approver as a numbered participant card with an empty seal', async () => {
+  it('renders an approval participant in a table column with position, seal, sequence, and name', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
@@ -500,18 +527,19 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
-    const stage = screen.getByTestId('document-approval-stage');
-    expect(stage).toHaveTextContent('1. 결재');
-    expect(stage).toHaveTextContent('홍길동');
-    expect(stage).toHaveTextContent('기획팀');
+    const participant = screen.getByTestId('document-approval-person');
+    expect(participant).toHaveTextContent('대리');
+    expect(participant).toHaveTextContent('1');
+    expect(participant).toHaveTextContent('홍길동');
+    expect(participant).not.toHaveTextContent('기획팀');
+    expect(participant.querySelector('img')).toBeNull();
     expect(
-      stage.querySelector('img[src="/users/emp-1.png"]'),
-    ).not.toBeNull();
-    expect(
-      within(stage).getByLabelText('결재 도장 자리'),
+      within(participant).getByLabelText('결재 도장 자리'),
     ).toBeInTheDocument();
     expect(
-      within(stage).getByRole('button', { name: '결재 단계 1 삭제' }),
+      within(participant).getByRole('button', {
+        name: '결재 참여자 1 홍길동 삭제',
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('combobox', { name: '결재선 1' }),
@@ -522,7 +550,10 @@ describe('Document write page', () => {
     const selectorControl = screen
       .getByRole('combobox', { name: '결재선 2 사용자 선택' })
       .closest('.MuiInputBase-root');
-    expect(stage).toHaveStyle({ height: '40px' });
+    expect(screen.getByTestId('document-approval-grid')).toHaveStyle({
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    });
     expect(selectorControl).toHaveStyle({ height: '40px' });
     expect(screen.getByRole('button', { name: '결재 추가' })).toHaveStyle({
       height: '40px',
@@ -555,14 +586,16 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
-    const stages = screen.getAllByTestId('document-approval-stage');
-    expect(stages).toHaveLength(2);
-    expect(stages[0]).toHaveTextContent('김민수');
-    expect(stages[0]).toHaveTextContent('1. 결재');
-    expect(stages[1]).toHaveTextContent('홍길동');
-    expect(stages[1]).toHaveTextContent('2. 결재');
-    expect(stages[0]).toHaveTextContent('개발팀');
-    expect(stages[1]).toHaveTextContent('기획팀');
+    const participants = screen.getAllByTestId('document-approval-person');
+    expect(participants).toHaveLength(2);
+    expect(participants[0]).toHaveTextContent('과장');
+    expect(participants[0]).toHaveTextContent('1');
+    expect(participants[0]).toHaveTextContent('김민수');
+    expect(participants[1]).toHaveTextContent('대리');
+    expect(participants[1]).toHaveTextContent('2');
+    expect(participants[1]).toHaveTextContent('홍길동');
+    expect(participants[0]).not.toHaveTextContent('개발팀');
+    expect(participants[1]).not.toHaveTextContent('기획팀');
     expect(
       screen.queryByRole('combobox', { name: '결재선 1' }),
     ).not.toBeInTheDocument();
@@ -575,12 +608,12 @@ describe('Document write page', () => {
     fireEvent.click(nextApprovalPicker);
     expect(screen.queryByRole('option', { name: /김민수/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /홍길동/ })).not.toBeInTheDocument();
-    const stageStrip = screen.getByTestId('document-approval-stage-strip');
-    expect(stageStrip).toBeInTheDocument();
-    expect(stageStrip).toHaveStyle({ overflowX: 'auto' });
+    expect(screen.getByTestId('document-approval-grid')).toHaveStyle({
+      display: 'grid',
+    });
   });
 
-  it('groups multiple selected users into one agreement stage and appends the next field', async () => {
+  it('renders each selected agreement user as a wrapped chip and appends the next selector', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
@@ -601,22 +634,32 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '합의 추가' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
 
-    const stages = screen.getAllByTestId('document-approval-stage');
-    expect(stages).toHaveLength(1);
-    expect(stages[0]).toHaveTextContent('홍길동');
-    expect(stages[0]).toHaveTextContent('김민수');
-    expect(stages[0]).toHaveTextContent('기획팀');
-    expect(stages[0]).toHaveTextContent('개발팀');
-    expect(screen.getByLabelText('합의 도장 자리')).toBeInTheDocument();
+    const agreementChips = screen.getAllByTestId('document-agreement-chip');
+    expect(agreementChips).toHaveLength(2);
+    expect(agreementChips[0]).toHaveTextContent('1');
+    expect(agreementChips[0]).toHaveTextContent('홍길동');
+    expect(agreementChips[1]).toHaveTextContent('2');
+    expect(agreementChips[1]).toHaveTextContent('김민수');
+    agreementChips.forEach((chip) => {
+      expect(chip.querySelector('img')).toBeNull();
+      expect(chip).not.toHaveTextContent('합의');
+      expect(within(chip).getByLabelText('합의 도장 자리')).toBeInTheDocument();
+    });
     expect(
-      within(stages[0]).getByRole('button', { name: '합의 단계 1 삭제' }),
+      within(agreementChips[0]).getByRole('button', {
+        name: '합의 참여자 1 홍길동 삭제',
+      }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('document-agreement-list')).toHaveStyle({
+      display: 'flex',
+      flexWrap: 'wrap',
+    });
     expect(
-      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
+      screen.getByRole('combobox', { name: '결재선 3 사용자 선택' }),
     ).toBeInTheDocument();
   });
 
-  it('returns agreement users to candidates after removing their stage', async () => {
+  it('removes only the selected agreement user and returns that user to candidates', async () => {
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
@@ -630,14 +673,105 @@ describe('Document write page', () => {
     fireEvent.change(approvalPicker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
     fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
-    fireEvent.click(screen.getByRole('button', { name: '합의 단계 1 삭제' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '합의 참여자 1 홍길동 삭제' }),
+    );
 
+    expect(screen.getAllByTestId('document-agreement-chip')).toHaveLength(1);
+    expect(screen.getByTestId('document-agreement-chip')).toHaveTextContent(
+      '김민수',
+    );
+    expect(
+      screen.getByRole('button', { name: '합의 참여자 1 김민수 삭제' }),
+    ).toBeInTheDocument();
     const activeApprovalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
+      name: '결재선 2 사용자 선택',
     });
-    fireEvent.change(activeApprovalPicker, { target: { value: '홍길동' } });
+    fireEvent.click(activeApprovalPicker);
     expect(
       await screen.findByRole('option', { name: /홍길동/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: /김민수/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '합의 참여자 1 김민수 삭제' }),
+    );
+    expect(screen.queryAllByTestId('document-agreement-chip')).toHaveLength(0);
+    expect(
+      screen.getByRole('combobox', { name: '결재선 1 사용자 선택' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: '결재선 1 사용자 선택' }));
+    expect(
+      await screen.findByRole('option', { name: /김민수/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps global participant sequence across approval and agreement and renumbers after removal', async () => {
+    composerApi.fetchDraftFormOptions.mockResolvedValue({
+      categoryGroup: null,
+      categoryItems: [category],
+      cycleItems: [],
+      users: [
+        composerUser,
+        anotherComposerUser,
+        thirdComposerUser,
+        fourthComposerUser,
+      ],
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const addUsers = async (
+      selectorNumber: number,
+      names: string[],
+      actionLabel: '결재 추가' | '합의 추가',
+    ) => {
+      const picker = screen.getByRole('combobox', {
+        name: `결재선 ${selectorNumber} 사용자 선택`,
+      });
+      for (const name of names) {
+        fireEvent.change(picker, { target: { value: name } });
+        fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }));
+      }
+      fireEvent.click(screen.getByRole('button', { name: actionLabel }));
+    };
+
+    await addUsers(1, ['홍길동'], '결재 추가');
+    await addUsers(2, ['김민수', '박서준'], '합의 추가');
+    await addUsers(4, ['이수진'], '결재 추가');
+
+    const approvalPeople = screen.getAllByTestId('document-approval-person');
+    const agreementChips = screen.getAllByTestId('document-agreement-chip');
+    expect(approvalPeople).toHaveLength(2);
+    expect(approvalPeople[0]).toHaveTextContent('1');
+    expect(approvalPeople[0]).toHaveTextContent('홍길동');
+    expect(approvalPeople[1]).toHaveTextContent('4');
+    expect(approvalPeople[1]).toHaveTextContent('이수진');
+    expect(agreementChips).toHaveLength(2);
+    expect(agreementChips[0]).toHaveTextContent('2');
+    expect(agreementChips[0]).toHaveTextContent('김민수');
+    expect(agreementChips[1]).toHaveTextContent('3');
+    expect(agreementChips[1]).toHaveTextContent('박서준');
+
+    fireEvent.click(
+      within(approvalPeople[0]).getByRole('button', {
+        name: '결재 참여자 1 홍길동 삭제',
+      }),
+    );
+
+    expect(screen.getAllByTestId('document-approval-person')).toHaveLength(1);
+    expect(screen.getByTestId('document-approval-person')).toHaveTextContent(
+      '3',
+    );
+    const renumberedChips = screen.getAllByTestId('document-agreement-chip');
+    expect(renumberedChips[0]).toHaveTextContent('1');
+    expect(renumberedChips[1]).toHaveTextContent('2');
+    expect(
+      screen.getByRole('combobox', { name: '결재선 4 사용자 선택' }),
     ).toBeInTheDocument();
   });
 
@@ -692,7 +826,9 @@ describe('Document write page', () => {
     expect(
       screen.queryByRole('option', { name: /홍길동/ }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('document-approval-stage')).toBeNull();
+    expect(
+      screen.queryByTestId('document-approval-person'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('참조 도장 자리')).toBeNull();
   });
 
@@ -935,7 +1071,9 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('');
-    expect(screen.queryByTestId('document-approval-stage')).toBeNull();
+    expect(
+      screen.queryByTestId('document-approval-person'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('document-reference-list')).not.toBeInTheDocument();
     expect(
       screen
