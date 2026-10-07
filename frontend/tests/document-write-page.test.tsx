@@ -8,6 +8,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const composerApi = vi.hoisted(() => ({
@@ -38,6 +39,8 @@ vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
+
+const muiTheme = createTheme();
 
 const category = {
   id: '101',
@@ -521,7 +524,11 @@ describe('Document write page', () => {
       expect(slots()).toHaveLength(3);
       slots().forEach((slot) => {
         const seal = within(slot).getByLabelText('결재 도장 자리');
-        expect(seal).toHaveStyle({ borderStyle: 'dashed' });
+        expect(seal).toHaveStyle({
+          borderStyle: 'dashed',
+          borderColor: muiTheme.palette.divider,
+          color: muiTheme.palette.text.disabled,
+        });
         expect(slot.textContent).toBe('도장');
         expect(slot.querySelector('[aria-label*="순번"]')).toBeNull();
         expect(slot.querySelector('button')).toBeNull();
@@ -742,16 +749,14 @@ describe('Document write page', () => {
       fullName: string,
       kind: '결재' | '합의',
     ) => {
-      const badge = within(participant).getByLabelText(
-        `결재 순번 ${sequence}`,
-      );
-      expect(badge).toHaveStyle({ borderRadius: '50%' });
-      const badgeRgb = getComputedStyle(badge)
-        .backgroundColor.match(/\d+/g)
-        ?.slice(0, 3)
-        .map(Number);
-      expect(badgeRgb).toBeDefined();
-      expect(badgeRgb![2]).toBeGreaterThan(badgeRgb![0]);
+      const badge = within(participant).getByText(String(sequence), {
+        exact: true,
+      });
+      expect(badge).toHaveStyle({
+        backgroundColor: muiTheme.palette.primary.light,
+        borderRadius: '50%',
+      });
+      expect(badge).toHaveAttribute('aria-label', `참여 순번 ${sequence}`);
 
       expect(
         within(participant).getByLabelText(`${kind} 도장 자리`),
@@ -999,9 +1004,20 @@ describe('Document write page', () => {
     const renumberedChips = screen.getAllByTestId('document-agreement-chip');
     expect(renumberedChips[0]).toHaveTextContent('1');
     expect(renumberedChips[1]).toHaveTextContent('2');
+    const nextApprovalPicker = screen.getByRole('combobox', {
+      name: '결재선 4 사용자 선택',
+    });
+    fireEvent.click(nextApprovalPicker);
     expect(
-      screen.getByRole('combobox', { name: '결재선 4 사용자 선택' }),
+      await screen.findByRole('option', { name: /홍길동/ }),
     ).toBeInTheDocument();
+    for (const remainingApprover of ['김민수', '박서준', '이수진']) {
+      expect(
+        screen.queryByRole('option', {
+          name: new RegExp(remainingApprover),
+        }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it('keeps the empty approval selector without an unavailable-user message', async () => {
