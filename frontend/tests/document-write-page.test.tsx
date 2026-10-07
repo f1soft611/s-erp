@@ -297,6 +297,11 @@ describe('Document write page', () => {
 
     const firstApprover = screen.getByTestId('document-approval-person');
     expect(firstApprover).toHaveAttribute('aria-label', '결재 1 홍길동');
+    const approverName = within(firstApprover).getByText('홍길동');
+    expect(approverName).not.toHaveStyle({ maxWidth: '3em' });
+    expect(approverName.parentElement).toHaveStyle({
+      gridTemplateColumns: '20px minmax(0, 1fr)',
+    });
     expect(
       within(firstApprover).queryByRole('button', { name: /삭제/ }),
     ).not.toBeInTheDocument();
@@ -334,6 +339,50 @@ describe('Document write page', () => {
     expect(
       screen.queryByText('로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.'),
     ).not.toBeInTheDocument();
+  }, 15000);
+
+  it('normalizes drafter identity and excludes it from approval and reference choices', async () => {
+    composerApi.fetchDraftFormOptions.mockResolvedValue({
+      categoryGroup: null,
+      categoryItems: [category],
+      cycleItems: [],
+      users: [
+        {
+          ...composerUser,
+          userId: ` ${composerUser.userId} `,
+          userNm: '기안자',
+        },
+        anotherComposerUser,
+        thirdComposerUser,
+      ],
+    });
+    composerApi.fetchMyProfile.mockResolvedValue({
+      userId: composerUser.userId,
+      name: '기안자',
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.click(approvalPicker);
+    const approvalListbox = getPickerListbox(approvalPicker);
+    expect(
+      within(approvalListbox).queryByRole('option', { name: /기안자/ }),
+    ).toBeNull();
+    fireEvent.keyDown(approvalPicker, { key: 'Escape' });
+
+    const referencePicker = screen.getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    fireEvent.click(referencePicker);
+    const referenceListbox = getPickerListbox(referencePicker);
+    expect(
+      within(referenceListbox).queryByRole('option', { name: /기안자/ }),
+    ).toBeNull();
   }, 15000);
 
   it('prevents the same user from being assigned to approval and reference', async () => {
@@ -410,7 +459,9 @@ describe('Document write page', () => {
       expect(within(emptySlot).getByLabelText('직위/직함 자리')).toBeInTheDocument();
       expect(within(emptySlot).queryByText('직위/직함')).not.toBeInTheDocument();
       expect(within(emptySlot).getByLabelText('결재 도장 자리')).toBeInTheDocument();
+      expect(within(emptySlot).queryByText('도장')).not.toBeInTheDocument();
       expect(within(emptySlot).getByLabelText('결재자 이름 자리')).toBeInTheDocument();
+      expect(within(emptySlot).queryByText('이름')).not.toBeInTheDocument();
       expect(emptySlot).toHaveStyle({
         borderStyle: 'dashed',
         borderColor: muiTheme.palette.divider,
@@ -1132,11 +1183,15 @@ describe('Document write page', () => {
       }
       const name = within(participant).getByTitle(fullName);
       expect(name).toHaveStyle({
-        maxWidth: '3em',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
       });
+      if (kind === '결재') {
+        expect(name).not.toHaveStyle({ maxWidth: '3em' });
+      } else {
+        expect(name).toHaveStyle({ maxWidth: '3em' });
+      }
       expect(participant.getAttribute('aria-label')).toContain(fullName);
     };
 

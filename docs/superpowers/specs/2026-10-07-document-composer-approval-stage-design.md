@@ -51,7 +51,7 @@ Update only the document composer hook and approval-field/dialog presentation, f
 ## Verification
 
 - Test that the signed-in user appears as the fixed sequence-1 approval participant after successful profile/options loading, cannot be removed or selected for another role, and is not duplicated when selected in the approval selector.
-- Test an explicit error when the signed-in `userId` is missing from available user options.
+- Test profile-backed fixed first-approver construction when the signed-in user is absent from available options. Trim candidate IDs consistently so the fixed user is not eligible in approval, agreement, or reference selectors.
 - Test that approval, agreement, and reference selectors cannot assign an already committed or actively selected user across roles, and that removing a removable participant restores eligibility.
 - Test the example stage numbering: signed-in approval 1, two agreement users both 2, and subsequent approval stages 3 and 4.
 - Test that the approval/agreement divider is absent, empty approval columns have the complete dashed placeholder layout without a sequence or remove action, and unapproved agreement participants have no seal placeholder.

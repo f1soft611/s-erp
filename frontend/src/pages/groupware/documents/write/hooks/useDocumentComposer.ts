@@ -31,7 +31,7 @@ export const ALL_CATEGORY_VALUE = '__all__';
 
 function toUserOption(user: DraftFormUserOption): F1GridUserOption {
   return {
-    value: user.userId,
+    value: user.userId.trim(),
     label: user.userNm,
     avatarUrl: user.profileImage,
     positionName: user.levelNm,

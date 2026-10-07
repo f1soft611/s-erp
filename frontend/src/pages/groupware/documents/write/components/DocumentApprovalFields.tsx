@@ -65,9 +65,7 @@ function PlaceholderSealSlot() {
         color: 'text.disabled',
         fontSize: '0.75rem',
       }}
-    >
-      도장
-    </Box>
+    />
   );
 }
 
@@ -267,8 +265,7 @@ export function DocumentApprovalFields({
                     variant="caption"
                     color="text.disabled"
                     sx={{ alignContent: 'center', textAlign: 'center' }}
-                  >
-                  </Typography>
+                  ></Typography>
                   <Box
                     sx={{
                       display: 'grid',
@@ -284,9 +281,7 @@ export function DocumentApprovalFields({
                     variant="body2"
                     color="text.disabled"
                     sx={{ alignContent: 'center', textAlign: 'center' }}
-                  >
-                    이름
-                  </Typography>
+                  />
                 </Box>
               );
             }
@@ -330,7 +325,9 @@ export function DocumentApprovalFields({
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: '20px minmax(0, 1fr) 24px',
+                    gridTemplateColumns: isFixed
+                      ? '20px minmax(0, 1fr)'
+                      : '20px minmax(0, 1fr) 24px',
                     alignItems: 'center',
                     columnGap: '2px',
                     minWidth: 0,
@@ -344,7 +341,7 @@ export function DocumentApprovalFields({
                     noWrap
                     sx={{
                       minWidth: 0,
-                      maxWidth: '3em',
+                      ...(isFixed ? {} : { maxWidth: '3em' }),
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -402,14 +399,10 @@ export function DocumentApprovalFields({
                       px: 0.75,
                       border: '1px solid',
                       borderColor: (theme) =>
-                        theme.palette.mode === 'dark'
-                          ? 'divider'
-                          : 'grey.300',
+                        theme.palette.mode === 'dark' ? 'divider' : 'grey.300',
                       borderRadius: 1,
                       bgcolor: (theme) =>
-                        theme.palette.mode === 'dark'
-                          ? '#334155'
-                          : 'grey.100',
+                        theme.palette.mode === 'dark' ? '#334155' : 'grey.100',
                       color: 'text.primary',
                     }}
                   >
