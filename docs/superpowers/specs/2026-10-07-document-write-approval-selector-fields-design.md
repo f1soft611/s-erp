@@ -2,7 +2,7 @@
 
 ## Status
 
-Design approved in conversation; written specification is awaiting user review.
+Reviewed and approved by the user.
 
 ## Goal
 
@@ -11,7 +11,7 @@ Reduce vertical space in the document composer by placing approval-stage selecto
 ## Approved interaction
 
 - The approval area is an ordered horizontal strip.
-- Each approval-stage field supports multiple selected users. The final field is the only active field; committed fields retain their selected users as read-only chips.
+- Each approval-stage field supports multiple selected users. The final field is the only active field; committed fields retain their selected users as read-only chips that cannot be removed from the input.
 - `결재 추가` and `합의 추가` determine the kind of the selected users when the active field is committed. Both actions are disabled while that field is empty.
 - Committing a stage appends it after existing stages and adds a new empty multi-select field at the end.
 - `결재 추가` preserves the existing behavior: each selected user becomes an individual approval stage in selection order.
@@ -31,6 +31,7 @@ Reduce vertical space in the document composer by placing approval-stage selecto
 ## Component and state design
 
 - Keep the rendering and layout in `DocumentApprovalFields`.
+- Ensure `UserSelectEditor`'s `readOnly` mode prevents deleting selected chips. Add a focused regression assertion so committed selector values cannot be modified by the chip's delete action.
 - Keep `approvalStages` as the ordered, committed stage state in `useDocumentComposer`.
 - Keep one `selectedApprovalUserIds` array for the active input; it is cleared only after `결재 추가` or `합의 추가` commits successfully.
 - Render committed stage values from `approvalStages` in read-only `UserSelectEditor` fields. Render one active multi-select field after them.
