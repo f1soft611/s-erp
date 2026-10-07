@@ -11,11 +11,14 @@ Present approval stages as compact participant cards, matching the supplied refe
 ## Layout
 
 - The approval row has a left-side `결재선` label and a right-side content area.
-- Committed stages appear in order in the right-side area. Each approval participant is shown as one compact unit containing its sequence number, profile image, name, department, seal area, and a remove (`×`) action.
-- The active multi-user selector follows the committed units, with `결재` and `합의` actions immediately beside it.
+- Committed stages appear in order in the right-side area. Each approval participant is shown as one compact unit containing its sequence number, stage kind, profile image, name, department, seal area, and a remove (`×`) action.
+- Each participant unit and each `결재 추가`/`합의 추가` button has the same rendered height as the active user selector. Keep the order/kind, avatar, name/department, seal, and remove action in a single compact row.
+- The active multi-user selector follows the committed units, with `결재 추가` and `합의 추가` actions immediately beside it.
 - The reference row is directly below the approval row, with a left-side `참조` label and one independent multi-select field on the right.
 - On narrow viewports, only the approval content region may scroll horizontally. Labels stay visible and the page/dialog width must not grow.
-- Preserve the shared `UserSelectEditor`, `CommonDialog`, and rich-text editor behavior.
+- Do not show `선택 가능한 사용자가 없습니다.` beneath either user selector. Leave the selector empty and the approval actions disabled when no candidates remain.
+- Set the document-composer `CommonDialog` surface, header, content, and footer backgrounds to white. Add an optional surface-background override to `CommonDialog`; keep the theme-based defaults for all other dialogs.
+- Preserve the shared `UserSelectEditor` and rich-text editor behavior.
 
 ## Stage behavior
 
@@ -35,8 +38,8 @@ Present approval stages as compact participant cards, matching the supplied refe
 
 ## Validation
 
-- Component tests verify participant card content, role-specific grouping, sequence numbering, selection and commit controls, whole-stage removal, user candidate restoration, and independent references.
-- Browser verification at 375px, 768px, and 1280px confirms row alignment, visible labels, local approval-content scrolling, no page-level horizontal overflow, and modal/editor scroll behavior.
+- Component tests verify participant card content and height, role-specific grouping, sequence numbering, selection and commit controls, whole-stage removal, user candidate restoration, absence of the unavailable-user message, white composer dialog surfaces, and independent references.
+- Browser verification at 375px, 768px, and 1280px confirms row alignment, visible labels, equal rendered heights for selector/card/actions, local approval-content scrolling, no page-level horizontal overflow, and modal/editor scroll behavior.
 - Run focused document composer and shared user selector tests, frontend lint, and production build.
 
 ## Out of scope
