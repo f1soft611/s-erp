@@ -980,9 +980,9 @@ describe('Document write page', () => {
   });
 
   it('calculates approval slot capacity from the measured content width', () => {
-    expect(calculateApprovalSlotCapacity(262)).toBe(3);
+    expect(calculateApprovalSlotCapacity(262)).toBe(2);
     expect(calculateApprovalSlotCapacity(654)).toBe(7);
-    expect(calculateApprovalSlotCapacity(940)).toBe(11);
+    expect(calculateApprovalSlotCapacity(940)).toBe(10);
     expect(calculateApprovalSlotCapacity(0)).toBe(1);
   });
 
@@ -1001,12 +1001,12 @@ describe('Document write page', () => {
       const slots = () => Array.from(grid.children) as HTMLElement[];
       const emptySlots = () =>
         within(grid).getAllByTestId('document-empty-approval-slot');
-      expect(grid).toHaveAttribute('data-slot-capacity', '3');
-      expect(slots()).toHaveLength(3);
+      expect(grid).toHaveAttribute('data-slot-capacity', '2');
+      expect(slots()).toHaveLength(2);
       expect(within(grid).getAllByTestId('document-approval-person')).toHaveLength(
         1,
       );
-      expect(emptySlots()).toHaveLength(2);
+      expect(emptySlots()).toHaveLength(1);
       emptySlots().forEach((slot) => {
         const seal = within(slot).getByLabelText('결재 도장 자리');
         expect(slot).toHaveStyle({
@@ -1051,7 +1051,7 @@ describe('Document write page', () => {
       await waitForComposerReady();
 
       const grid = screen.getByTestId('document-approval-grid');
-      expect(grid).toHaveAttribute('data-slot-capacity', '3');
+      expect(grid).toHaveAttribute('data-slot-capacity', '2');
       Object.defineProperty(grid, 'clientWidth', {
         configurable: true,
         value: 654,
@@ -1084,7 +1084,7 @@ describe('Document write page', () => {
         fifthComposerUser,
       ],
     });
-    installApprovalResizeObserverMock();
+    const approvalObservers = installApprovalResizeObserverMock();
     let unmount = () => {};
 
     try {
@@ -1107,13 +1107,22 @@ describe('Document write page', () => {
       fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
       const grid = screen.getByTestId('document-approval-grid');
+      const gridObserver = approvalObservers.find((observer) =>
+        observer.isObserving(grid),
+      );
+      expect(gridObserver).toBeDefined();
+      act(() => gridObserver!.resize(272));
+      await waitFor(() => {
+        expect(grid).toHaveAttribute('data-slot-capacity', '3');
+      });
+
       const approvalPeople = within(grid).getAllByTestId(
         'document-approval-person',
       );
       expect(grid).toHaveAttribute('data-slot-capacity', '3');
       expect(grid).toHaveStyle({
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))',
+        gridTemplateColumns: 'repeat(3, minmax(88px, 1fr))',
       });
       expect(grid.children).toHaveLength(5);
       expect(
@@ -1222,8 +1231,8 @@ describe('Document write page', () => {
   });
 
   it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
-    const approvalName = '홍길동김철수';
-    const agreementName = '김민수박서준';
+    const approvalName = '홍길동김';
+    const agreementName = '김민수박';
     composerApi.fetchDraftFormOptions.mockResolvedValue({
       categoryGroup: null,
       categoryItems: [category],
@@ -1293,9 +1302,10 @@ describe('Document write page', () => {
         whiteSpace: 'nowrap',
       });
       if (kind === '결재') {
+        expect(participant).toHaveStyle({ minWidth: '88px' });
         expect(name).not.toHaveStyle({ maxWidth: '3em' });
       } else {
-        expect(name).toHaveStyle({ maxWidth: '3em' });
+        expect(name).toHaveStyle({ maxWidth: '4em' });
       }
       expect(participant.getAttribute('aria-label')).toContain(fullName);
     };

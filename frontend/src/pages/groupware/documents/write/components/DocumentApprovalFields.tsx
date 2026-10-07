@@ -6,7 +6,7 @@ import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { DocumentApprovalStage } from '../types/documentWrite.types';
 
-const MIN_APPROVAL_SLOT_WIDTH = 80;
+const MIN_APPROVAL_SLOT_WIDTH = 88;
 const APPROVAL_SLOT_GAP = 4;
 const participantRemoveActionSx = {
   opacity: 0,
@@ -314,7 +314,7 @@ export function DocumentApprovalFields({
                 sx={{
                   display: 'grid',
                   gridTemplateRows: '32px 64px 32px',
-                  minWidth: 0,
+                  minWidth: MIN_APPROVAL_SLOT_WIDTH,
                   border: '1px solid',
                   borderColor: 'divider',
                   ...participantHoverSx,
@@ -371,9 +371,7 @@ export function DocumentApprovalFields({
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: isFixed
-                      ? '20px minmax(0, 1fr)'
-                      : '20px minmax(0, 1fr) 24px',
+                    gridTemplateColumns: '20px minmax(0, 1fr)',
                     alignItems: 'center',
                     columnGap: '2px',
                     minWidth: 0,
@@ -387,7 +385,6 @@ export function DocumentApprovalFields({
                     noWrap
                     sx={{
                       minWidth: 0,
-                      ...(isFixed ? {} : { maxWidth: '3em' }),
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -448,7 +445,7 @@ export function DocumentApprovalFields({
                       noWrap
                       sx={{
                         minWidth: 0,
-                        maxWidth: '3em',
+                        maxWidth: '4em',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
