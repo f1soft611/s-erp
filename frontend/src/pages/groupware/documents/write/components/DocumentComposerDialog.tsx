@@ -77,6 +77,8 @@ export function DocumentComposerDialog({
     fieldSurfaceBackground,
   } = useDocumentComposer(open, onClose);
   const panelBorder = theme.palette.divider;
+  const editorTextColor = theme.palette.text.primary;
+  const editorPlaceholderColor = theme.palette.text.disabled;
   const formFieldSx = {
     '& .MuiInputBase-root': {
       minHeight: 38,
@@ -136,7 +138,6 @@ export function DocumentComposerDialog({
       title="문서 작성"
       size="lg"
       bodyMode="fill"
-      surfaceBackgroundColor="#ffffff"
       footerStart={composerFooterStart}
       actions={
         <>
@@ -397,12 +398,13 @@ export function DocumentComposerDialog({
                   outline: 'none',
                   px: 2,
                   py: 1.5,
-                  color: theme.palette.text.primary,
+                  color: editorTextColor,
+                  fontWeight: 400,
                   bgcolor: editorSurfaceBackground,
                   boxSizing: 'border-box',
                   '& p.is-editor-empty:first-of-type::before': {
                     content: 'attr(data-placeholder)',
-                    color: theme.palette.text.disabled,
+                    color: editorPlaceholderColor,
                     float: 'left',
                     height: 0,
                     pointerEvents: 'none',
@@ -435,7 +437,8 @@ export function DocumentComposerDialog({
                   outline: 'none',
                   px: 2,
                   py: 1.5,
-                  color: theme.palette.text.primary,
+                  color: editorTextColor,
+                  fontWeight: 400,
                   bgcolor: editorSurfaceBackground,
                   boxSizing: 'border-box',
                 }}
@@ -462,6 +465,11 @@ export function DocumentComposerDialog({
                         current.filter((_, fileIndex) => fileIndex !== index),
                       )
                     }
+                    sx={{
+                      bgcolor: 'grey.100',
+                      color: '#0f172a',
+                      '& .MuiChip-deleteIcon': { color: '#475569' },
+                    }}
                   />
                 ))}
               </Box>

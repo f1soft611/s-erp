@@ -54,14 +54,14 @@ describe('CommonDialog', () => {
       'rgb(30, 41, 59)',
     );
     expect(getComputedStyle(content as Element).backgroundColor).toBe(
-      'rgb(15, 23, 42)',
+      'rgb(30, 41, 59)',
     );
     expect(getComputedStyle(footer as Element).backgroundColor).toBe(
       'rgb(30, 41, 59)',
     );
   });
 
-  it('preserves the existing paper and content backgrounds in light mode', () => {
+  it('uses white surfaces throughout the dialog in light mode', () => {
     render(
       <ThemeProvider theme={createAppTheme('light')}>
         <CommonDialog
@@ -86,11 +86,39 @@ describe('CommonDialog', () => {
       'rgb(255, 255, 255)',
     );
     expect(getComputedStyle(content as Element).backgroundColor).toBe(
-      'rgb(244, 247, 251)',
+      'rgb(255, 255, 255)',
     );
     expect(getComputedStyle(footer as Element).backgroundColor).toBe(
       'rgb(255, 255, 255)',
     );
+  });
+
+  it('uses an explicit surface override for every dialog region', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <CommonDialog
+          open
+          title="사용자 지정 표면"
+          onClose={vi.fn()}
+          surfaceBackgroundColor="#334155"
+          actions={<button type="button">확인</button>}
+        >
+          <p>본문</p>
+        </CommonDialog>
+      </ThemeProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const header = dialog.querySelector('.MuiDialogTitle-root')?.parentElement
+      ?.parentElement;
+    const content = dialog.querySelector('.MuiDialogContent-root');
+    const footer = dialog.querySelector('.MuiDialogActions-root');
+
+    [dialog, header, content, footer].forEach((region) => {
+      expect(getComputedStyle(region as Element).backgroundColor).toBe(
+        'rgb(51, 65, 85)',
+      );
+    });
   });
 
   it('renders an accessible title, optional description, and close action', () => {

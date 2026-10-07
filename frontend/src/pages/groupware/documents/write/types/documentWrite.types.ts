@@ -11,6 +11,7 @@ export type DocumentApprovalStage = {
   id: number;
   kind: 'approval' | 'agreement';
   users: F1GridUserOption[];
+  isFixed?: boolean;
 };
 
 export type DocumentWriteItem = {

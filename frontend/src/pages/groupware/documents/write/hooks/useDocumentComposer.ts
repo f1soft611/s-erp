@@ -52,14 +52,14 @@ function getTemplateErrorMessage(error: unknown): string {
 }
 
 function toUserIds(value: F1GridUserValue): string[] {
-  if (Array.isArray(value)) return value.map(String);
+  if (Array.isArray(value)) return [...new Set(value.map(String))];
   return value == null ? [] : [String(value)];
 }
 
 export function useDocumentComposer(open: boolean, onClose: () => void) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const editorSurfaceBackground = isDark ? '#0f172a' : '#ffffff';
+  const editorSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const fieldSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const [activeDocumentKind, setActiveDocumentKind] =
     useState<DocumentKind>('기안서');
@@ -112,13 +112,34 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         if (!active) return;
 
         setCategoryItems(options.categoryItems);
-        setUserOptions(options.users.map(toUserOption));
+        const availableUsers = options.users.map(toUserOption);
+        setUserOptions(availableUsers);
         setDraftForms(forms);
         if (!profile.name?.trim()) {
           setLoadError('로그인 사용자의 이름을 확인할 수 없습니다.');
           return;
         }
         setDrafterName(profile.name.trim());
+        const signedInUserId = profile.userId?.trim();
+        const signedInUser = signedInUserId
+          ? availableUsers.find(
+              (user) => String(user.value) === signedInUserId,
+            )
+          : undefined;
+        if (!signedInUser) {
+          setLoadError(
+            '로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.',
+          );
+          return;
+        }
+        setApprovalStages([
+          {
+            id: nextStageId.current++,
+            kind: 'approval',
+            users: [signedInUser],
+            isFixed: true,
+          },
+        ]);
       })
       .catch((error: unknown) => {
         if (active) setLoadError(getErrorMessage(error));
@@ -243,35 +264,56 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   );
 
   const addApproval = useCallback(() => {
-    if (selectedApprovalUsers.length === 0) return;
-    const nextStages: DocumentApprovalStage[] = selectedApprovalUsers.map(
-      (user) => ({
+    const assignedUserIds = new Set(
+      approvalStages.flatMap((stage) =>
+        stage.users.map((user) => String(user.value)),
+      ),
+    );
+    const referenceIds = new Set(referenceUserIds);
+    const eligibleUsers = selectedApprovalUsers.filter(
+      (user) =>
+        !assignedUserIds.has(String(user.value)) &&
+        !referenceIds.has(String(user.value)),
+    );
+    if (eligibleUsers.length === 0) return;
+    const nextStages: DocumentApprovalStage[] = eligibleUsers.map((user) => ({
         id: nextStageId.current++,
         kind: 'approval',
         users: [user],
-      }),
-    );
+      }));
     setApprovalStages((current) => [...current, ...nextStages]);
     setSelectedApprovalUserIds([]);
-  }, [selectedApprovalUsers]);
+  }, [approvalStages, referenceUserIds, selectedApprovalUsers]);
 
   const addAgreement = useCallback(() => {
-    if (selectedApprovalUsers.length === 0) return;
+    const assignedUserIds = new Set(
+      approvalStages.flatMap((stage) =>
+        stage.users.map((user) => String(user.value)),
+      ),
+    );
+    const referenceIds = new Set(referenceUserIds);
+    const eligibleUsers = selectedApprovalUsers.filter(
+      (user) =>
+        !assignedUserIds.has(String(user.value)) &&
+        !referenceIds.has(String(user.value)),
+    );
+    if (eligibleUsers.length === 0) return;
     setApprovalStages((current) => [
       ...current,
       {
         id: nextStageId.current++,
         kind: 'agreement',
-        users: selectedApprovalUsers,
+        users: eligibleUsers,
       },
     ]);
     setSelectedApprovalUserIds([]);
-  }, [selectedApprovalUsers]);
+  }, [approvalStages, referenceUserIds, selectedApprovalUsers]);
 
   const removeApprovalUser = useCallback((stageId: number, userId: string) => {
     setApprovalStages((current) =>
       current.flatMap((stage) => {
         if (stage.id !== stageId) return [stage];
+        if (stage.isFixed) return [stage];
         const users = stage.users.filter(
           (user) => String(user.value) !== userId,
         );
@@ -281,11 +323,31 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   }, []);
 
   const handleApprovalUserChange = (value: F1GridUserValue) => {
-    setSelectedApprovalUserIds(toUserIds(value));
+    const assignedUserIds = new Set(
+      approvalStages.flatMap((stage) =>
+        stage.users.map((user) => String(user.value)),
+      ),
+    );
+    const referenceIds = new Set(referenceUserIds);
+    setSelectedApprovalUserIds(
+      toUserIds(value).filter(
+        (id) => !assignedUserIds.has(id) && !referenceIds.has(id),
+      ),
+    );
   };
 
   const handleReferenceUserChange = (value: F1GridUserValue) => {
-    setReferenceUserIds(toUserIds(value));
+    const assignedUserIds = new Set(
+      approvalStages.flatMap((stage) =>
+        stage.users.map((user) => String(user.value)),
+      ),
+    );
+    const selectedApprovalIds = new Set(selectedApprovalUserIds);
+    setReferenceUserIds(
+      toUserIds(value).filter(
+        (id) => !assignedUserIds.has(id) && !selectedApprovalIds.has(id),
+      ),
+    );
   };
 
   const handleAttachmentSelect = (event: ChangeEvent<HTMLInputElement>) => {

@@ -8,8 +8,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { createTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppTheme } from '../src/theme/theme';
 
 const composerApi = vi.hoisted(() => ({
   fetchDraftFormOptions: vi.fn(),
@@ -98,6 +99,15 @@ const fourthComposerUser = {
   levelNm: '부장',
 };
 
+const fifthComposerUser = {
+  userId: 'emp-5',
+  loginId: 5,
+  userNm: '최민호',
+  departmentNm: '영업팀',
+  profileImage: '/users/emp-5.png',
+  levelNm: '차장',
+};
+
 const draftForm = {
   draftingWorkCategoryId: 77,
   cataTypeCode: '007',
@@ -138,12 +148,18 @@ beforeEach(() => {
     categoryGroup: null,
     categoryItems: [category],
     cycleItems: [],
-    users: [composerUser, anotherComposerUser, thirdComposerUser],
+    users: [
+      composerUser,
+      anotherComposerUser,
+      thirdComposerUser,
+      fourthComposerUser,
+      fifthComposerUser,
+    ],
   });
   composerApi.fetchDraftForms.mockResolvedValue([draftForm]);
   composerApi.fetchDraftFormTemplate.mockResolvedValue(draftFormTemplate);
   composerApi.fetchMyProfile.mockResolvedValue({
-    userId: 'writer',
+    userId: composerUser.userId,
     name: '기안자',
   });
 });
@@ -174,6 +190,13 @@ async function waitForComposerReady() {
       '기안자',
     ),
   );
+}
+
+function getPickerListbox(picker: HTMLElement): HTMLElement {
+  const listboxId = picker.getAttribute('aria-controls');
+  const listbox = listboxId ? document.getElementById(listboxId) : null;
+  if (!listbox) throw new Error('User picker listbox is not open.');
+  return listbox;
 }
 
 function installApprovalResizeObserverMock() {
@@ -236,6 +259,188 @@ function installApprovalResizeObserverMock() {
 }
 
 describe('Document write page', () => {
+  it('adds the signed-in user as a non-removable first approver', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const firstApprover = screen.getByTestId('document-approval-person');
+    expect(firstApprover).toHaveAttribute('aria-label', '결재 1 홍길동');
+    expect(
+      within(firstApprover).queryByRole('button', { name: /삭제/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows an error when the signed-in user is missing from the user options', async () => {
+    composerApi.fetchMyProfile.mockResolvedValue({
+      userId: 'missing-user',
+      name: '기안자',
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+
+    expect(
+      await screen.findByText(
+        '로그인 사용자를 결재선 사용자 목록에서 찾을 수 없습니다.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('document-approval-person')).toBeNull();
+  });
+
+  it('prevents the same user from being assigned to approval and reference', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    const referencePicker = screen.getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    fireEvent.click(referencePicker);
+    const referenceListbox = getPickerListbox(referencePicker);
+    expect(
+      within(referenceListbox).queryByRole('option', { name: /홍길동/ }),
+    ).toBeNull();
+    expect(
+      within(referenceListbox).queryByRole('option', { name: /김민수/ }),
+    ).toBeNull();
+    fireEvent.keyDown(referencePicker, { key: 'Escape' });
+
+    const nextApprovalPicker = screen.getByRole('combobox', {
+      name: '결재선 3 사용자 선택',
+    });
+    fireEvent.click(nextApprovalPicker);
+    const approvalListbox = getPickerListbox(nextApprovalPicker);
+    expect(
+      within(approvalListbox).queryByRole('option', { name: /홍길동/ }),
+    ).toBeNull();
+    expect(
+      within(approvalListbox).queryByRole('option', { name: /김민수/ }),
+    ).toBeNull();
+  }, 15000);
+
+  it('keeps an actively selected approval user out of reference candidates', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+
+    fireEvent.click(screen.getByRole('combobox', { name: '참조자 선택' }));
+    const referencePicker = screen.getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    expect(
+      within(getPickerListbox(referencePicker)).queryByRole('option', {
+        name: /김민수/,
+      }),
+    ).toBeNull();
+  });
+
+  it('shows a complete dashed empty approval and hides the pending agreement seal', async () => {
+    installApprovalResizeObserverMock();
+    const rendered = render(<DashboardContent {...pageProps} />);
+
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+      await waitForComposerReady();
+
+      const emptySlot = screen.getAllByTestId('document-empty-approval-slot')[0];
+      expect(within(emptySlot).getByLabelText('직위/직함 자리')).toBeInTheDocument();
+      expect(within(emptySlot).getByLabelText('결재 도장 자리')).toBeInTheDocument();
+      expect(within(emptySlot).getByLabelText('결재자 이름 자리')).toBeInTheDocument();
+      expect(emptySlot).toHaveStyle({
+        borderStyle: 'dashed',
+        borderColor: muiTheme.palette.divider,
+      });
+      expect(emptySlot.querySelector('[aria-label*="순번"]')).toBeNull();
+      expect(emptySlot.querySelector('button')).toBeNull();
+
+      const approvalPicker = screen.getByRole('combobox', {
+        name: '결재선 2 사용자 선택',
+      });
+      fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+      fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+      fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
+
+      const agreement = screen.getByTestId('document-agreement-chip');
+      expect(within(agreement).queryByLabelText('합의 도장 자리')).toBeNull();
+      const fields = screen.getByTestId('document-approval-fields');
+      const children = Array.from(fields.children);
+      const approvalRowIndex = children.indexOf(
+        screen.getByTestId('document-approval-display-row'),
+      );
+      const agreementRowIndex = children.indexOf(
+        screen.getByTestId('document-agreement-display-row'),
+      );
+      expect(
+        children
+          .slice(approvalRowIndex + 1, agreementRowIndex)
+          .some((child) => child.classList.contains('MuiDivider-root')),
+      ).toBe(false);
+    } finally {
+      rendered.unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('shares one sequence across an agreement stage without numbering participants individually', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const addUsers = async (
+      selectorNumber: number,
+      names: string[],
+      actionLabel: '결재 추가' | '합의 추가',
+    ) => {
+      const picker = screen.getByRole('combobox', {
+        name: `결재선 ${selectorNumber} 사용자 선택`,
+      });
+      for (const name of names) {
+        fireEvent.change(picker, { target: { value: name } });
+        fireEvent.click(
+          await screen.findByRole('option', { name: new RegExp(name) }),
+        );
+      }
+      fireEvent.click(screen.getByRole('button', { name: actionLabel }));
+    };
+
+    await addUsers(2, ['김민수', '박서준'], '합의 추가');
+    await addUsers(3, ['이수진'], '결재 추가');
+    await addUsers(4, ['최민호'], '결재 추가');
+
+    const approvalPeople = screen.getAllByTestId('document-approval-person');
+    const agreementChips = screen.getAllByTestId('document-agreement-chip');
+    expect(approvalPeople.map((person) => person.getAttribute('aria-label'))).toEqual([
+      '결재 1 홍길동',
+      '결재 3 이수진',
+      '결재 4 최민호',
+    ]);
+    expect(agreementChips.map((chip) => chip.getAttribute('aria-label'))).toEqual([
+      '합의 2 김민수',
+      '합의 2 박서준',
+    ]);
+  }, 15000);
+
   it('renders at the groupware write route instead of the coming-soon page', () => {
     render(<DashboardContent {...pageProps} />);
 
@@ -306,6 +511,67 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '표 삽입' })).toBeInTheDocument();
   });
 
+  it('uses the shared dark surface and theme-aware editor surface', async () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <DashboardContent {...pageProps} />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    const header = dialog.querySelector('.MuiDialogTitle-root')?.parentElement
+      ?.parentElement;
+    const content = dialog.querySelector('.MuiDialogContent-root');
+    const footer = dialog.querySelector('.MuiDialogActions-root');
+    const editorPanel = screen.getByTestId('document-composer-editor-panel');
+
+    [dialog, header, content, footer].forEach((region) => {
+      expect(getComputedStyle(region as Element).backgroundColor).toBe(
+        'rgb(30, 41, 59)',
+      );
+    });
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    const title = screen.getByRole('textbox', { name: '제목' });
+    const placeholder = editor.querySelector('p.is-editor-empty');
+
+    expect(getComputedStyle(editorPanel).backgroundColor).toBe(
+      'rgb(30, 41, 59)',
+    );
+    expect(getComputedStyle(editor).backgroundColor).toBe('rgb(30, 41, 59)');
+    expect(getComputedStyle(editor).color).toBe('rgb(226, 232, 240)');
+    expect(getComputedStyle(title).fontWeight).toBe('700');
+    expect(getComputedStyle(editor).fontWeight).toBe('400');
+    expect(placeholder).toBeInTheDocument();
+  });
+
+  it('keeps the editor surface white in the light theme', async () => {
+    render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <DashboardContent {...pageProps} />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const editorPanel = screen.getByTestId('document-composer-editor-panel');
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    const title = screen.getByRole('textbox', { name: '제목' });
+
+    expect(getComputedStyle(editorPanel).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(editor).backgroundColor).toBe(
+      'rgb(255, 255, 255)',
+    );
+    expect(getComputedStyle(editor).color).toBe('rgb(15, 23, 42)');
+    expect(getComputedStyle(title).fontWeight).toBe('700');
+    expect(getComputedStyle(editor).fontWeight).toBe('400');
+  });
+
   it('lets the dialog content scroll while the editor surface grows naturally', async () => {
     render(<DashboardContent {...pageProps} />);
 
@@ -326,7 +592,7 @@ describe('Document write page', () => {
     expect(editorPanel).toHaveStyle({
       flexGrow: '1',
       flexShrink: '0',
-      minHeight: '180px',
+      minHeight: '200px',
     });
     expect(editor).toHaveStyle({
       minHeight: '180px',
@@ -533,16 +799,25 @@ describe('Document write page', () => {
 
       const grid = screen.getByTestId('document-approval-grid');
       const slots = () => Array.from(grid.children) as HTMLElement[];
+      const emptySlots = () =>
+        within(grid).getAllByTestId('document-empty-approval-slot');
       expect(grid).toHaveAttribute('data-slot-capacity', '3');
       expect(slots()).toHaveLength(3);
-      slots().forEach((slot) => {
+      expect(within(grid).getAllByTestId('document-approval-person')).toHaveLength(
+        1,
+      );
+      expect(emptySlots()).toHaveLength(2);
+      emptySlots().forEach((slot) => {
         const seal = within(slot).getByLabelText('결재 도장 자리');
-        expect(seal).toHaveStyle({
+        expect(slot).toHaveStyle({
           borderStyle: 'dashed',
           borderColor: muiTheme.palette.divider,
+        });
+        expect(seal).toHaveStyle({
           color: muiTheme.palette.text.disabled,
         });
-        expect(slot.textContent).toBe('도장');
+        expect(within(slot).getByLabelText('직위/직함 자리')).toBeInTheDocument();
+        expect(within(slot).getByLabelText('결재자 이름 자리')).toBeInTheDocument();
         expect(slot.querySelector('[aria-label*="순번"]')).toBeNull();
         expect(slot.querySelector('button')).toBeNull();
       });
@@ -556,6 +831,7 @@ describe('Document write page', () => {
       await waitFor(() => {
         expect(grid).toHaveAttribute('data-slot-capacity', '7');
         expect(slots()).toHaveLength(7);
+        expect(emptySlots()).toHaveLength(6);
       });
     } finally {
       unmount();
@@ -585,6 +861,9 @@ describe('Document write page', () => {
       await waitFor(() => {
         expect(grid).toHaveAttribute('data-slot-capacity', '7');
         expect(grid.children).toHaveLength(7);
+        expect(within(grid).getAllByTestId('document-empty-approval-slot')).toHaveLength(
+          6,
+        );
       });
     } finally {
       unmount();
@@ -602,6 +881,7 @@ describe('Document write page', () => {
         anotherComposerUser,
         thirdComposerUser,
         fourthComposerUser,
+        fifthComposerUser,
       ],
     });
     installApprovalResizeObserverMock();
@@ -615,9 +895,9 @@ describe('Document write page', () => {
       await waitForComposerReady();
 
       const picker = screen.getByRole('combobox', {
-        name: '결재선 1 사용자 선택',
+        name: '결재선 2 사용자 선택',
       });
-      const names = ['홍길동', '김민수', '박서준', '이수진'];
+      const names = ['김민수', '박서준', '이수진', '최민호'];
       for (const name of names) {
         fireEvent.change(picker, { target: { value: name } });
         fireEvent.click(
@@ -635,11 +915,14 @@ describe('Document write page', () => {
         display: 'grid',
         gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))',
       });
-      expect(grid.children).toHaveLength(4);
+      expect(grid.children).toHaveLength(5);
       expect(
         approvalPeople.map((person) => person.getAttribute('aria-label')),
-      ).toEqual(names.map((name, index) => `결재 ${index + 1} ${name}`));
-      expect(grid.lastElementChild).toBe(approvalPeople[3]);
+      ).toEqual([
+        '결재 1 홍길동',
+        ...names.map((name, index) => `결재 ${index + 2} ${name}`),
+      ]);
+      expect(grid.lastElementChild).toBe(approvalPeople[4]);
     } finally {
       unmount();
       vi.unstubAllGlobals();
@@ -673,7 +956,7 @@ describe('Document write page', () => {
     ).not.toBe(0);
     expect(
       within(approvalInputRow).getByRole('combobox', {
-        name: '결재선 1 사용자 선택',
+        name: '결재선 2 사용자 선택',
       }),
     ).toBeInTheDocument();
     expect(
@@ -681,8 +964,8 @@ describe('Document write page', () => {
     ).toBeDisabled();
     expect(
       within(approvalInputRow).getByRole('button', { name: '합의 추가' }),
-    ).toBeDisabled();
-    expect(approvalDisplayRow).not.toHaveTextContent('홍길동');
+    ).toBeDisabled(    );
+    expect(approvalDisplayRow).toHaveTextContent('홍길동');
     expect(
       within(referenceRow).getByRole('combobox', { name: '참조자 선택' }),
     ).toBeInTheDocument();
@@ -709,14 +992,6 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
-    });
-    fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
-    expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
-
     const participant = screen.getByTestId('document-approval-person');
     expect(participant).toHaveTextContent('대리');
     expect(participant).toHaveTextContent('1');
@@ -727,16 +1002,10 @@ describe('Document write page', () => {
       within(participant).getByLabelText('결재 도장 자리'),
     ).toBeInTheDocument();
     expect(
-      within(participant).getByRole('button', {
-        name: '결재 참여자 1 홍길동 삭제',
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('combobox', { name: '결재선 1' }),
+      within(participant).queryByRole('button', { name: /삭제/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }))
+      .toBeInTheDocument();
     const selectorControl = screen
       .getByRole('combobox', { name: '결재선 2 사용자 선택' })
       .closest('.MuiInputBase-root');
@@ -763,20 +1032,15 @@ describe('Document write page', () => {
         { ...composerUser, userId: 'emp-long-1', userNm: approvalName },
         { ...anotherComposerUser, userId: 'emp-long-2', userNm: agreementName },
       ],
+    }, 15000);
+    composerApi.fetchMyProfile.mockResolvedValue({
+      userId: 'emp-long-1',
+      name: '기안자',
     });
     render(<DashboardContent {...pageProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
-
-    const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
-    });
-    fireEvent.change(approvalPicker, { target: { value: approvalName } });
-    fireEvent.click(
-      await screen.findByRole('option', { name: new RegExp(approvalName) }),
-    );
-    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
     const agreementPicker = screen.getByRole('combobox', {
       name: '결재선 2 사용자 선택',
@@ -804,14 +1068,23 @@ describe('Document write page', () => {
       });
       expect(badge).toHaveAttribute('aria-label', `참여 순번 ${sequence}`);
 
-      expect(
-        within(participant).getByLabelText(`${kind} 도장 자리`),
-      ).toBeInTheDocument();
-      expect(
-        within(participant).getByRole('button', {
-          name: `${kind} 참여자 ${sequence} ${fullName} 삭제`,
-        }),
-      ).toBeInTheDocument();
+      if (kind === '결재') {
+        expect(
+          within(participant).getByLabelText('결재 도장 자리'),
+        ).toBeInTheDocument();
+      } else {
+        expect(
+          within(participant).queryByLabelText('합의 도장 자리'),
+        ).toBeNull();
+      }
+      const removeButton = within(participant).queryByRole('button', {
+        name: `${kind} 참여자 ${sequence} ${fullName} 삭제`,
+      });
+      if (kind === '결재') {
+        expect(removeButton).toBeNull();
+      } else {
+        expect(removeButton).toBeInTheDocument();
+      }
       const name = within(participant).getByTitle(fullName);
       expect(name).toHaveStyle({
         maxWidth: '3em',
@@ -833,7 +1106,7 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
+      name: '결재선 2 사용자 선택',
     });
     fireEvent.change(approvalPicker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
@@ -844,26 +1117,24 @@ describe('Document write page', () => {
       approvalPicker.closest('.MuiAutocomplete-root'),
     ).toHaveTextContent('김민수');
 
-    fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
     const participants = screen.getAllByTestId('document-approval-person');
     expect(participants).toHaveLength(2);
-    expect(participants[0]).toHaveTextContent('과장');
+    expect(participants[0]).toHaveTextContent('대리');
     expect(participants[0]).toHaveTextContent('1');
-    expect(participants[0]).toHaveTextContent('김민수');
-    expect(participants[1]).toHaveTextContent('대리');
+    expect(participants[0]).toHaveTextContent('홍길동');
+    expect(participants[1]).toHaveTextContent('과장');
     expect(participants[1]).toHaveTextContent('2');
-    expect(participants[1]).toHaveTextContent('홍길동');
-    expect(participants[0]).not.toHaveTextContent('개발팀');
-    expect(participants[1]).not.toHaveTextContent('기획팀');
-    expect(
-      screen.queryByRole('combobox', { name: '결재선 1' }),
-    ).not.toBeInTheDocument();
+    expect(participants[1]).toHaveTextContent('김민수');
+    expect(participants[0]).not.toHaveTextContent('기획팀');
+    expect(participants[1]).not.toHaveTextContent('개발팀');
     expect(
       screen.queryByRole('combobox', { name: '결재선 2' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: '결재선 3' }),
     ).not.toBeInTheDocument();
     const nextApprovalPicker = screen.getByRole('combobox', {
       name: '결재선 3 사용자 선택',
@@ -883,37 +1154,35 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
+      name: '결재선 2 사용자 선택',
     });
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '합의 추가' })).toBeDisabled();
     expect(
       screen.queryByTestId('document-agreement-display-row'),
     ).not.toBeInTheDocument();
-    fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
-    expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: '합의 추가' })).toBeEnabled();
     fireEvent.change(approvalPicker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.change(approvalPicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '합의 추가' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
 
     const agreementChips = screen.getAllByTestId('document-agreement-chip');
     expect(agreementChips).toHaveLength(2);
-    expect(agreementChips[0]).toHaveTextContent('1');
-    expect(agreementChips[0]).toHaveTextContent('홍길동');
+    expect(agreementChips[0]).toHaveTextContent('2');
+    expect(agreementChips[0]).toHaveTextContent('김민수');
     expect(agreementChips[1]).toHaveTextContent('2');
-    expect(agreementChips[1]).toHaveTextContent('김민수');
+    expect(agreementChips[1]).toHaveTextContent('박서준');
     agreementChips.forEach((chip) => {
       expect(chip.querySelector('img')).toBeNull();
       expect(chip).not.toHaveTextContent('합의');
-      expect(within(chip).getByLabelText('합의 도장 자리')).toBeInTheDocument();
+      expect(within(chip).queryByLabelText('합의 도장 자리')).toBeNull();
     });
     expect(
       within(agreementChips[0]).getByRole('button', {
-        name: '합의 참여자 1 홍길동 삭제',
+        name: '합의 참여자 2 김민수 삭제',
       }),
     ).toBeInTheDocument();
     const approvalRow = screen.getByTestId('document-approval-display-row');
@@ -943,52 +1212,53 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
-    });
-    fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
+      name: '결재선 2 사용자 선택',
+    }, 15000);
     fireEvent.change(approvalPicker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.change(approvalPicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
     fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
     fireEvent.click(
-      screen.getByRole('button', { name: '합의 참여자 1 홍길동 삭제' }),
+      screen.getByRole('button', { name: '합의 참여자 2 김민수 삭제' }),
     );
 
     expect(screen.getAllByTestId('document-agreement-chip')).toHaveLength(1);
     expect(screen.getByTestId('document-agreement-chip')).toHaveTextContent(
-      '김민수',
+      '박서준',
     );
     expect(
-      screen.getByRole('button', { name: '합의 참여자 1 김민수 삭제' }),
+      screen.getByRole('button', { name: '합의 참여자 2 박서준 삭제' }),
     ).toBeInTheDocument();
     const activeApprovalPicker = screen.getByRole('combobox', {
-      name: '결재선 2 사용자 선택',
+      name: '결재선 3 사용자 선택',
     });
     fireEvent.click(activeApprovalPicker);
+    expect(screen.queryByRole('option', { name: /홍길동/ })).toBeNull();
     expect(
-      await screen.findByRole('option', { name: /홍길동/ }),
+      await screen.findByRole('option', { name: /김민수/ }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('option', { name: /김민수/ }),
+      screen.queryByRole('option', { name: /박서준/ }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: '합의 참여자 1 김민수 삭제' }),
+      screen.getByRole('button', { name: '합의 참여자 2 박서준 삭제' }),
     );
     expect(screen.queryAllByTestId('document-agreement-chip')).toHaveLength(0);
     expect(
       screen.queryByTestId('document-agreement-display-row'),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('combobox', { name: '결재선 1 사용자 선택' }),
+      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('combobox', { name: '결재선 1 사용자 선택' }));
+    fireEvent.click(screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }));
     expect(
       await screen.findByRole('option', { name: /김민수/ }),
     ).toBeInTheDocument();
-  });
+  }, 15000);
 
-  it('keeps global participant sequence across approval and agreement and renumbers after removal', async () => {
+  it('numbers participants by stage and renumbers after a removable stage is deleted', async () => {
     composerApi.fetchDraftFormOptions.mockResolvedValue({
       categoryGroup: null,
       categoryItems: [category],
@@ -998,6 +1268,7 @@ describe('Document write page', () => {
         anotherComposerUser,
         thirdComposerUser,
         fourthComposerUser,
+        fifthComposerUser,
       ],
     });
     render(<DashboardContent {...pageProps} />);
@@ -1020,51 +1291,48 @@ describe('Document write page', () => {
       fireEvent.click(screen.getByRole('button', { name: actionLabel }));
     };
 
-    await addUsers(1, ['홍길동'], '결재 추가');
     await addUsers(2, ['김민수', '박서준'], '합의 추가');
-    await addUsers(4, ['이수진'], '결재 추가');
+    await addUsers(3, ['이수진'], '결재 추가');
+    await addUsers(4, ['최민호'], '결재 추가');
 
     const approvalPeople = screen.getAllByTestId('document-approval-person');
     const agreementChips = screen.getAllByTestId('document-agreement-chip');
-    expect(approvalPeople).toHaveLength(2);
-    expect(approvalPeople[0]).toHaveTextContent('1');
-    expect(approvalPeople[0]).toHaveTextContent('홍길동');
-    expect(approvalPeople[1]).toHaveTextContent('4');
-    expect(approvalPeople[1]).toHaveTextContent('이수진');
+    expect(approvalPeople).toHaveLength(3);
+    expect(approvalPeople[0]).toHaveAttribute('aria-label', '결재 1 홍길동');
+    expect(approvalPeople[1]).toHaveAttribute('aria-label', '결재 3 이수진');
+    expect(approvalPeople[2]).toHaveAttribute('aria-label', '결재 4 최민호');
     expect(agreementChips).toHaveLength(2);
-    expect(agreementChips[0]).toHaveTextContent('2');
-    expect(agreementChips[0]).toHaveTextContent('김민수');
-    expect(agreementChips[1]).toHaveTextContent('3');
-    expect(agreementChips[1]).toHaveTextContent('박서준');
+    expect(agreementChips[0]).toHaveAttribute('aria-label', '합의 2 김민수');
+    expect(agreementChips[1]).toHaveAttribute('aria-label', '합의 2 박서준');
 
     fireEvent.click(
-      within(approvalPeople[0]).getByRole('button', {
-        name: '결재 참여자 1 홍길동 삭제',
+      within(approvalPeople[1]).getByRole('button', {
+        name: '결재 참여자 3 이수진 삭제',
       }),
     );
 
-    expect(screen.getAllByTestId('document-approval-person')).toHaveLength(1);
-    expect(screen.getByTestId('document-approval-person')).toHaveTextContent(
-      '3',
-    );
+    const renumberedApprovals = screen.getAllByTestId('document-approval-person');
+    expect(renumberedApprovals).toHaveLength(2);
+    expect(renumberedApprovals[0]).toHaveAttribute('aria-label', '결재 1 홍길동');
+    expect(renumberedApprovals[1]).toHaveAttribute('aria-label', '결재 3 최민호');
     const renumberedChips = screen.getAllByTestId('document-agreement-chip');
-    expect(renumberedChips[0]).toHaveTextContent('1');
-    expect(renumberedChips[1]).toHaveTextContent('2');
+    expect(renumberedChips[0]).toHaveAttribute('aria-label', '합의 2 김민수');
+    expect(renumberedChips[1]).toHaveAttribute('aria-label', '합의 2 박서준');
     const nextApprovalPicker = screen.getByRole('combobox', {
       name: '결재선 4 사용자 선택',
     });
     fireEvent.click(nextApprovalPicker);
     expect(
-      await screen.findByRole('option', { name: /홍길동/ }),
+      await screen.findByRole('option', { name: /이수진/ }),
     ).toBeInTheDocument();
-    for (const remainingApprover of ['김민수', '박서준', '이수진']) {
+    for (const remainingApprover of ['홍길동', '김민수', '박서준', '최민호']) {
       expect(
         screen.queryByRole('option', {
           name: new RegExp(remainingApprover),
         }),
       ).not.toBeInTheDocument();
     }
-  });
+  }, 15000);
 
   it('keeps the empty approval selector without an unavailable-user message', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -1072,9 +1340,9 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    for (const userName of ['홍길동', '김민수', '박서준']) {
+    for (const userName of ['김민수', '박서준', '이수진', '최민호']) {
       const approvalPicker = screen.getByRole('combobox', {
-        name: '결재선 1 사용자 선택',
+        name: '결재선 2 사용자 선택',
       });
       fireEvent.change(approvalPicker, { target: { value: userName } });
       fireEvent.click(
@@ -1084,7 +1352,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
 
     expect(
-      screen.getByRole('combobox', { name: '결재선 4 사용자 선택' }),
+      screen.getByRole('combobox', { name: '결재선 6 사용자 선택' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText('선택 가능한 사용자가 없습니다.'),
@@ -1102,24 +1370,30 @@ describe('Document write page', () => {
     const referencePicker = screen.getByRole('combobox', {
       name: '참조자 선택',
     });
-    fireEvent.change(referencePicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
     fireEvent.change(referencePicker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.change(referencePicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
 
     expect(screen.queryByTestId('document-reference-list')).not.toBeInTheDocument();
     expect(referencePicker.closest('.MuiAutocomplete-root')).toHaveTextContent(
-      '홍길동',
+      '김민수',
     );
     expect(referencePicker.closest('.MuiAutocomplete-root')).toHaveTextContent(
-      '김민수',
+      '박서준',
     );
     expect(
       screen.queryByRole('option', { name: /홍길동/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('document-approval-person'),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('document-approval-person')).toHaveAttribute(
+      'aria-label',
+      '결재 1 홍길동',
+    );
+    fireEvent.click(
+      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
+    );
+    expect(screen.queryByRole('option', { name: /김민수/ })).toBeNull();
+    expect(screen.queryByRole('option', { name: /박서준/ })).toBeNull();
     expect(screen.queryByLabelText('참조 도장 자리')).toBeNull();
   });
 
@@ -1333,20 +1607,20 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
     const approvalPicker = screen.getByRole('combobox', {
-      name: '결재선 1 사용자 선택',
+      name: '결재선 2 사용자 선택',
     });
-    fireEvent.change(approvalPicker, { target: { value: '홍길동' } });
-    fireEvent.click(await screen.findByRole('option', { name: /홍길동/ }));
+    fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
     fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
     fireEvent.keyDown(
-      screen.getByRole('combobox', { name: '결재선 2 사용자 선택' }),
+      screen.getByRole('combobox', { name: '결재선 3 사용자 선택' }),
       { key: 'Escape' },
     );
     const referencePicker = screen.getByRole('combobox', {
       name: '참조자 선택',
     });
-    fireEvent.change(referencePicker, { target: { value: '김민수' } });
-    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.change(referencePicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
       target: { value: '작성 중 제목' },
     });
@@ -1362,14 +1636,15 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('');
-    expect(
-      screen.queryByTestId('document-approval-person'),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('document-approval-person')).toHaveAttribute(
+      'aria-label',
+      '결재 1 홍길동',
+    );
     expect(screen.queryByTestId('document-reference-list')).not.toBeInTheDocument();
     expect(
       screen
         .getByRole('combobox', { name: '참조자 선택' })
         .closest('.MuiAutocomplete-root'),
-    ).not.toHaveTextContent(/홍길동|김민수/);
+    ).not.toHaveTextContent(/박서준/);
   }, 10000);
 });

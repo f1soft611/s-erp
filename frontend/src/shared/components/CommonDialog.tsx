@@ -62,7 +62,7 @@ export function CommonDialog({
   const hasFooter = Boolean(footerStart || actions);
   const surfaceBackground =
     surfaceBackgroundColor ??
-    (theme.palette.mode === 'dark' ? '#1e293b' : 'background.paper');
+    (theme.palette.mode === 'dark' ? '#1e293b' : '#ffffff');
   return (
     <Dialog
       {...dialogProps}
@@ -170,7 +170,7 @@ export function CommonDialog({
             : {}),
         }}
         sx={{
-          bgcolor: surfaceBackgroundColor ?? 'background.default',
+          bgcolor: surfaceBackground,
           px: { xs: 2, sm: 3 },
           py: 2,
         }}
