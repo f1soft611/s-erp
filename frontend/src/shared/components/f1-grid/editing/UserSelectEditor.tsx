@@ -15,6 +15,8 @@ export type UserSelectEditorProps = {
   value: F1GridUserValue;
   options: F1GridUserOption[];
   multiple?: boolean;
+  hideSelectedOptions?: boolean;
+  preserveSelectionOrder?: boolean;
   autoFocus?: boolean;
   compact?: boolean;
   anchorEl?: HTMLElement | null;
@@ -42,6 +44,8 @@ export function UserSelectEditor({
   value,
   options,
   multiple = false,
+  hideSelectedOptions = false,
+  preserveSelectionOrder = false,
   autoFocus = false,
   compact = false,
   anchorEl,
@@ -56,12 +60,21 @@ export function UserSelectEditor({
 }: UserSelectEditorProps) {
   const selectedOptions = useMemo(() => {
     const selectedValues = Array.isArray(value) ? value : [value];
+    if (multiple && preserveSelectionOrder) {
+      return selectedValues.flatMap((selected) => {
+        if (selected == null) return [];
+        const option = options.find(
+          (candidate) => String(candidate.value) === String(selected),
+        );
+        return option ? [option] : [];
+      });
+    }
     return options.filter((option) =>
       selectedValues.some((selected) =>
         selected == null ? false : String(selected) === String(option.value),
       ),
     );
-  }, [options, value]);
+  }, [multiple, options, preserveSelectionOrder, value]);
   const selectedValue = multiple
     ? selectedOptions
     : (selectedOptions[0] ?? null);
@@ -90,6 +103,7 @@ export function UserSelectEditor({
       readOnly={readOnly}
       openOnFocus
       disableCloseOnSelect={multiple}
+      filterSelectedOptions={hideSelectedOptions}
       options={options}
       value={selectedValue as F1GridUserOption | F1GridUserOption[] | null}
       getOptionLabel={(option) => option.label}
@@ -249,6 +263,9 @@ export function UserSelectEditor({
             '& .MuiInputLabel-root': {
               fontSize: '0.82rem',
               fontWeight: 600,
+            },
+            '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': {
+              transform: 'translate(14px, 11px) scale(1)',
             },
             '& .MuiFormHelperText-root': { marginLeft: 0, marginTop: 0.5 },
           }}

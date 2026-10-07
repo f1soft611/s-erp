@@ -215,6 +215,17 @@ describe('notice clipboard normalization', () => {
     expect(normalized).toContain('<td>HTML 원문</td>');
   });
 
+  it('preserves inline Excel font colors when synchronizing plain-text breaks', () => {
+    const normalized = normalizeClipboardHtmlForEditor(
+      '<table><tbody><tr><td><p><span style="color:#ff0000">색상 표기</span><br>다음 줄</p></td></tr></tbody></table>',
+      '"색상 표기\n다음 줄"',
+    );
+
+    expect(normalized).toContain(
+      '<span style="color:rgb(255, 0, 0)">색상 표기</span><br>다음 줄',
+    );
+  });
+
   it('does not count nested table cells as cells in the outer row', () => {
     const normalized = normalizeClipboardHtmlForEditor(
       '<table><tbody><tr><td>외부 A<table><tbody><tr><td>내부 A</td><td>내부 B</td></tr></tbody></table></td><td>외부 B</td></tr><tr><td>다음</td><td>행</td></tr></tbody></table>',

@@ -30,6 +30,7 @@ export type CommonDialogProps = {
   size?: CommonDialogSize;
   bodyMode?: CommonDialogBodyMode;
   paperHeight?: CSSProperties['height'];
+  surfaceBackgroundColor?: CSSProperties['backgroundColor'];
   fullScreenOnMobile?: boolean;
   dialogProps?: Omit<
     DialogProps,
@@ -48,6 +49,7 @@ export function CommonDialog({
   size = 'md',
   bodyMode = 'content',
   paperHeight,
+  surfaceBackgroundColor,
   fullScreenOnMobile = false,
   dialogProps,
 }: CommonDialogProps) {
@@ -59,7 +61,8 @@ export function CommonDialog({
   const maxWidth = size === 'lg' ? 990 : 820;
   const hasFooter = Boolean(footerStart || actions);
   const surfaceBackground =
-    theme.palette.mode === 'dark' ? '#1e293b' : 'background.paper';
+    surfaceBackgroundColor ??
+    (theme.palette.mode === 'dark' ? '#1e293b' : '#ffffff');
   return (
     <Dialog
       {...dialogProps}
@@ -81,6 +84,9 @@ export function CommonDialog({
                 ...(paperHeight !== undefined || bodyMode === 'fill'
                   ? { height: paperHeight ?? '90vh' }
                   : {}),
+                ...(surfaceBackgroundColor !== undefined
+                  ? { backgroundColor: surfaceBackgroundColor }
+                  : {}),
               },
           sx: {
             bgcolor: surfaceBackground,
@@ -99,6 +105,11 @@ export function CommonDialog({
       }}
     >
       <Box
+        style={
+          surfaceBackgroundColor !== undefined
+            ? { backgroundColor: surfaceBackgroundColor }
+            : undefined
+        }
         sx={{
           alignItems: 'flex-start',
           borderBottom: 1,
@@ -154,9 +165,12 @@ export function CommonDialog({
           flex: bodyMode === 'fill' ? '1 1 auto' : '0 1 auto',
           minHeight: 0,
           overflowY: 'auto',
+          ...(surfaceBackgroundColor !== undefined
+            ? { backgroundColor: surfaceBackgroundColor }
+            : {}),
         }}
         sx={{
-          bgcolor: 'background.default',
+          bgcolor: surfaceBackground,
           px: { xs: 2, sm: 3 },
           py: 2,
         }}
@@ -167,6 +181,11 @@ export function CommonDialog({
       {hasFooter && <Divider />}
       {hasFooter && (
         <DialogActions
+          style={
+            surfaceBackgroundColor !== undefined
+              ? { backgroundColor: surfaceBackgroundColor }
+              : undefined
+          }
           sx={{
             alignItems: 'center',
             bgcolor: surfaceBackground,

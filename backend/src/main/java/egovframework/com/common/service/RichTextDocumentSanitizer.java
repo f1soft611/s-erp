@@ -53,10 +53,13 @@ public class RichTextDocumentSanitizer {
         if (!StringUtils.hasText(html)) {
             return "";
         }
+        Document.OutputSettings outputSettings = new Document.OutputSettings().prettyPrint(false);
         Document parsed = Jsoup.parseBodyFragment(html);
+        parsed.outputSettings(outputSettings);
         parsed.select("script, style, svg, iframe, object, embed, link, meta").remove();
-        String safeHtml = Jsoup.clean(parsed.body().html(), HTML_ALLOWLIST);
+        String safeHtml = Jsoup.clean(parsed.body().html(), "", HTML_ALLOWLIST, outputSettings);
         Document safeDocument = Jsoup.parseBodyFragment(safeHtml);
+        safeDocument.outputSettings(outputSettings);
         for (Element element : safeDocument.body().getAllElements()) {
             sanitizeElementAttributes(element);
         }

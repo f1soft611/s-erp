@@ -132,35 +132,35 @@ export function useNoticeMutations({
             attachmentDeletionFailed = true;
             throw error;
           }
-          setNoticeItems((current) =>
-            current.map((item) => {
-              if (item.id !== existingId) return item;
-              const nextPost: NoticeBoardPostApi = {
-                ...updated,
-                postId: existingId,
-                attachments: [
-                  ...attachments
-                    .filter((attachment) => !attachment.file)
-                    .map(toNoticeAttachmentApi),
-                  ...uploadedAttachments,
-                ],
-                comments: updated.comments,
-                commentCount: updated.commentCount ?? item.commentCount,
-                isPinned: updated.isPinned ?? item.isPinned,
-              };
-              const nextItem = mapNoticePost(
-                nextPost,
-                noticeGubunNamesRef.current,
-              );
-              return {
-                ...nextItem,
-                comments: updated.comments ? nextItem.comments : item.comments,
-                commentCount: updated.comments
-                  ? nextItem.commentCount
-                  : item.commentCount,
-              };
-            }),
-          );
+          const mergeUpdatedNotice = (item: NoticeFeedItem) => {
+            if (item.id !== existingId) return item;
+            const nextPost: NoticeBoardPostApi = {
+              ...updated,
+              postId: existingId,
+              attachments: [
+                ...attachments
+                  .filter((attachment) => !attachment.file)
+                  .map(toNoticeAttachmentApi),
+                ...uploadedAttachments,
+              ],
+              comments: updated.comments,
+              commentCount: updated.commentCount ?? item.commentCount,
+              isPinned: updated.isPinned ?? item.isPinned,
+            };
+            const nextItem = mapNoticePost(
+              nextPost,
+              noticeGubunNamesRef.current,
+            );
+            return {
+              ...nextItem,
+              comments: updated.comments ? nextItem.comments : item.comments,
+              commentCount: updated.comments
+                ? nextItem.commentCount
+                : item.commentCount,
+            };
+          };
+          setNoticeItems((current) => current.map(mergeUpdatedNotice));
+          setPinnedNoticeItems?.((current) => current.map(mergeUpdatedNotice));
           setServerItemRevision((revision) => revision + 1);
           showSuccess('공지사항이 수정되었습니다.');
         } else {
@@ -212,6 +212,7 @@ export function useNoticeMutations({
       editorDraft.isPinned,
       loadNoticePosts,
       noticeGubunNamesRef,
+      setPinnedNoticeItems,
       setEditorDraft,
       setNoticeItems,
       setServerItemRevision,

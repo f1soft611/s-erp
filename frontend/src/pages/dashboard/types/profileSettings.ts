@@ -1,5 +1,6 @@
 export type MyProfile = {
   userId: string;
+  employeeId: number | string;
   name?: string | null;
   email?: string | null;
   departmentName?: string | null;

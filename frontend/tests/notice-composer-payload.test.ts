@@ -632,7 +632,7 @@ describe('NoticeComposerDialog payload', () => {
       clipboardData: {
         getData: (type: string) =>
           type === 'text/html'
-            ? '<table><colgroup><col width="10"><col width="20"><col width="30"><col width="40"></colgroup><tbody><tr><td colspan="2" style="font-family:Arial;font-size:22pt"><p>제목 첫 줄<br>전체<br><br>X-ray 줄</p></td><td>1호기</td><td>2호기</td></tr><tr><td>방법</td><td colspan="3" style="font-family:Arial;font-size:9pt"><p>* 기기 감도<br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도</p></td></tr></tbody></table>'
+            ? '<table><colgroup><col width="10"><col width="20"><col width="30"><col width="40"></colgroup><tbody><tr><td colspan="2" style="font-family:Arial;font-size:22pt"><p>제목 첫 줄<br>전체<br><br>X-ray 줄</p></td><td>1호기</td><td>2호기</td></tr><tr><td>방법</td><td colspan="3" style="font-family:Arial;font-size:9pt"><p><span style="color:#ff0000">* 기기 감도</span><br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도</p></td></tr></tbody></table>'
             : '"제목 첫 줄 전체\nX-ray 줄"\t\t1호기\t2호기\r\n방법\t"* 기기 감도\n - 표준시편을 통과시킨다. 이어지는 문장\n* 제품 감도"\t\t',
       },
       preventDefault: vi.fn(),
@@ -647,14 +647,19 @@ describe('NoticeComposerDialog payload', () => {
       expect(
         (rows[0].querySelector('td') as HTMLTableCellElement).style.fontSize,
       ).toBe('22pt');
-      expect(
-        rows[1].querySelectorAll('td')[1]?.querySelector('p')?.innerHTML,
-      ).toBe(
-        '* 기기 감도<br> - 표준시편을 통과시킨다. 이어지는 문장<br>* 제품 감도',
+      const method = rows[1].querySelectorAll('td')[1]?.querySelector('p');
+      const coloredText = method?.querySelector('span');
+      expect(coloredText?.textContent).toBe('* 기기 감도');
+      expect(coloredText?.style.color).toBe('rgb(255, 0, 0)');
+      expect(method?.textContent?.replace(/[\s\u00a0]/g, '')).toBe(
+        '*기기감도-표준시편을통과시킨다.이어지는문장*제품감도',
       );
       expect(rows[1].querySelectorAll('td')[1]?.getAttribute('colspan')).toBe(
         '3',
       );
+      expect(
+        rows[1].querySelectorAll('td')[1]?.querySelector('span')?.style.color,
+      ).toBe('rgb(255, 0, 0)');
     });
   });
 

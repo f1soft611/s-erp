@@ -38,6 +38,14 @@ describe('F1-Grid docs portal', () => {
     ).toBeInTheDocument();
   });
 
+  it('documents that every rowKey must be stable and unique', () => {
+    render(<F1GridDocsPage initialDocumentId="core-grid" />);
+
+    expect(
+      screen.getByText('행마다 안정적이고 고유한 행 식별자'),
+    ).toBeInTheDocument();
+  });
+
   it('keeps the label spacing consistent and the hero title styled as a headline', () => {
     render(<F1GridDocsPage />);
 

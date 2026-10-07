@@ -1,6 +1,7 @@
 package egovframework.let.uat.uia.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,15 +26,18 @@ class ProfileSettingsApiControllerTest {
                 new ResultVoHelper(), service);
         LoginVO user = authenticatedUser();
         MyProfileVO profile = new MyProfileVO();
-        profile.setUserId("admin");
+        profile.setUserId("login-code");
+        profile.setEmployeeId(42L);
         profile.setEmail("user@example.com");
         when(service.getMyProfile(user)).thenReturn(profile);
 
         ResultVO response = controller.getMyProfile(user);
         Map<String, Object> result = response.getResult();
 
-        assertEquals("admin", result.get("userId"));
+        assertEquals("login-code", result.get("userId"));
+        assertEquals(42L, result.get("employeeId"));
         assertEquals("user@example.com", result.get("email"));
+        assertTrue(result.containsKey("employeeId"));
         verify(service).getMyProfile(user);
     }
 

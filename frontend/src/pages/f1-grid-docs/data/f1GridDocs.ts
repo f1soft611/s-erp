@@ -25,7 +25,7 @@ export const f1GridDocs: F1GridDoc[] = [
         rows: [
           ['rows', 'T[]', '표시할 데이터 집합'],
           ['columns', 'F1GridColumn<T>[]', '필드별 표시/편집 정책'],
-          ['rowKey', 'keyof T', '행 식별자'],
+          ['rowKey', 'keyof T', '행마다 안정적이고 고유한 행 식별자'],
           ['editorPlugins', 'F1GridEditorPlugin<T>[]', '커스텀 편집기 확장'],
         ],
       },
@@ -67,7 +67,7 @@ export const f1GridDocs: F1GridDoc[] = [
         rows: [
           ['rows', 'T[]', '표시할 행'],
           ['columns', 'F1GridColumn<T>[]', '컬럼 정의'],
-          ['rowKey', 'keyof T', '행 식별자'],
+          ['rowKey', 'keyof T', '행마다 안정적이고 고유한 행 식별자'],
           ['ariaLabel', 'string', '그리드 영역 접근성 레이블 (기본값 F1-GRID)'],
           [
             'height / minHeight / maxHeight',
@@ -742,7 +742,7 @@ export const f1GridDocs: F1GridDoc[] = [
             '서버 데이터 조회 오류 콜백',
           ],
           ['columns', 'F1GridColumn<T>[]', '컬럼 정의'],
-          ['rowKey', 'keyof T', '행 식별자'],
+          ['rowKey', 'keyof T', '행마다 안정적이고 고유한 행 식별자'],
           ['ariaLabel', 'string', '접근성 레이블'],
           ['columnLine', 'boolean', '컬럼 세로 구분선'],
           [
