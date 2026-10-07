@@ -1,5 +1,5 @@
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
-import { Box, Button, IconButton, Typography } from '@mui/material';
+import { Box, Button, Divider, IconButton, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { UserSelectEditor } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
@@ -330,68 +330,75 @@ export function DocumentApprovalFields({
         </Box>
       </Box>
 
-      <Box data-testid="document-agreement-display-row" sx={labeledRowSx}>
-        <Typography variant="body2" sx={{ fontWeight: 700, pt: 0.5 }}>
-          합의
-        </Typography>
-        <Box
-          data-testid="document-agreement-list"
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 0.75,
-            minWidth: 0,
-          }}
-        >
-          {agreementParticipants.map(({ stageId, user, sequence: order }) => (
+      {agreementParticipants.length > 0 && (
+        <>
+          <Divider sx={{ borderColor: 'grey.300' }} />
+          <Box data-testid="document-agreement-display-row" sx={labeledRowSx}>
+            <Typography variant="body2" sx={{ fontWeight: 700, pt: 0.5 }}>
+              합의
+            </Typography>
             <Box
-              key={`${stageId}-${String(user.value)}`}
-              role="group"
-              aria-label={`합의 ${order} ${user.label}`}
-              data-testid="document-agreement-chip"
+              data-testid="document-agreement-list"
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                flexWrap: 'wrap',
                 gap: 0.75,
-                flex: '0 0 auto',
-                height: 40,
-                px: 0.75,
-                border: '1px solid',
-                borderColor: 'grey.300',
-                borderRadius: 1,
-                bgcolor: 'grey.100',
+                minWidth: 0,
               }}
             >
-              <ParticipantSequenceBadge order={order} />
-              <Typography
-                variant="body2"
-                title={user.label}
-                noWrap
-                sx={{
-                  minWidth: 0,
-                  maxWidth: '3em',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {user.label}
-              </Typography>
-              <SealSlot kind="agreement" />
-              <IconButton
-                size="small"
-                aria-label={`합의 참여자 ${order} ${user.label} 삭제`}
-                onClick={() =>
-                  onRemoveApprovalUser(stageId, String(user.value))
-                }
-                sx={{ p: 0.25 }}
-              >
-                <DeleteOutlineOutlinedIcon fontSize="small" />
-              </IconButton>
+              {agreementParticipants.map(
+                ({ stageId, user, sequence: order }) => (
+                  <Box
+                    key={`${stageId}-${String(user.value)}`}
+                    role="group"
+                    aria-label={`합의 ${order} ${user.label}`}
+                    data-testid="document-agreement-chip"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                      flex: '0 0 auto',
+                      height: 40,
+                      px: 0.75,
+                      border: '1px solid',
+                      borderColor: 'grey.300',
+                      borderRadius: 1,
+                      bgcolor: 'grey.100',
+                    }}
+                  >
+                    <ParticipantSequenceBadge order={order} />
+                    <Typography
+                      variant="body2"
+                      title={user.label}
+                      noWrap
+                      sx={{
+                        minWidth: 0,
+                        maxWidth: '3em',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {user.label}
+                    </Typography>
+                    <SealSlot kind="agreement" />
+                    <IconButton
+                      size="small"
+                      aria-label={`합의 참여자 ${order} ${user.label} 삭제`}
+                      onClick={() =>
+                        onRemoveApprovalUser(stageId, String(user.value))
+                      }
+                      sx={{ p: 0.25 }}
+                    >
+                      <DeleteOutlineOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ),
+              )}
             </Box>
-          ))}
-        </Box>
-      </Box>
+          </Box>
+        </>
+      )}
 
       <Box
         data-testid="document-reference-row"
