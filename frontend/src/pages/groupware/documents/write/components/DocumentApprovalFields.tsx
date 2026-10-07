@@ -130,8 +130,14 @@ export function DocumentApprovalFields({
     const grid = approvalGridRef.current;
     if (!grid) return;
 
-    setSlotCapacity(calculateApprovalSlotCapacity(grid.clientWidth));
-    if (typeof ResizeObserver === 'undefined') return;
+    const updateSlotCapacity = () => {
+      setSlotCapacity(calculateApprovalSlotCapacity(grid.clientWidth));
+    };
+    updateSlotCapacity();
+    window.addEventListener('resize', updateSlotCapacity);
+    if (typeof ResizeObserver === 'undefined') {
+      return () => window.removeEventListener('resize', updateSlotCapacity);
+    }
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries.find((item) => item.target === grid);
@@ -141,7 +147,10 @@ export function DocumentApprovalFields({
     });
     observer.observe(grid);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSlotCapacity);
+    };
   }, []);
 
   return (

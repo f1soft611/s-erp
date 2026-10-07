@@ -563,6 +563,35 @@ describe('Document write page', () => {
     }
   });
 
+  it('recalculates approval slot capacity after a viewport resize', async () => {
+    installApprovalResizeObserverMock();
+    let unmount = () => {};
+
+    try {
+      const rendered = render(<DashboardContent {...pageProps} />);
+      unmount = rendered.unmount;
+
+      fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+      await waitForComposerReady();
+
+      const grid = screen.getByTestId('document-approval-grid');
+      expect(grid).toHaveAttribute('data-slot-capacity', '3');
+      Object.defineProperty(grid, 'clientWidth', {
+        configurable: true,
+        value: 654,
+      });
+      fireEvent(window, new Event('resize'));
+
+      await waitFor(() => {
+        expect(grid).toHaveAttribute('data-slot-capacity', '7');
+        expect(grid.children).toHaveLength(7);
+      });
+    } finally {
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('retains and wraps the fourth approval in a three-column grid', async () => {
     composerApi.fetchDraftFormOptions.mockResolvedValue({
       categoryGroup: null,

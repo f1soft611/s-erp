@@ -10,6 +10,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Divider,
 } from '@mui/material';
 import {
   RichTextEditor,
@@ -284,6 +285,9 @@ export function DocumentComposerDialog({
                 ))}
               </TextField>
             </Box>
+
+            <Divider />
+
             <DocumentApprovalFields
               userOptions={userOptions}
               selectedApprovalUserIds={selectedApprovalUserIds}
@@ -297,6 +301,8 @@ export function DocumentComposerDialog({
             />
           </>
         )}
+
+        <Divider />
         <TextField
           value={composerTitle}
           onChange={(event) => setComposerTitle(event.target.value)}
@@ -335,7 +341,7 @@ export function DocumentComposerDialog({
             display: 'flex',
             flex: '1 0 auto',
             flexDirection: 'column',
-            minHeight: 180,
+            minHeight: 200,
             width: '100%',
             minWidth: 0,
             bgcolor: editorSurfaceBackground,
