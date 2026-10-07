@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved by the user on 2026-10-07. This design refines the committed approval-stage appearance in the document composer without changing stage data or behavior.
+Superseded by [Document Approval Display Layout Design](./2026-10-07-document-approval-display-layout-design.md) on 2026-10-07 after the user clarified that approval participants belong in a wrapping table layout and agreement participants belong in individual wrapping chips.
 
 ## Goal
 
