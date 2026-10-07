@@ -6,7 +6,7 @@ import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { DocumentApprovalStage } from '../types/documentWrite.types';
 
-const MIN_APPROVAL_SLOT_WIDTH = 100;
+const MIN_APPROVAL_SLOT_WIDTH = 80;
 const APPROVAL_SLOT_GAP = 4;
 
 // oxlint-disable-next-line react/only-export-components
@@ -63,8 +63,8 @@ function ParticipantSequenceBadge({ order }: { order: number }) {
         display: 'grid',
         placeItems: 'center',
         flex: '0 0 auto',
-        width: 20,
-        height: 20,
+        width: 15,
+        height: 15,
         borderRadius: '50%',
         bgcolor: 'primary.light',
         color: 'primary.dark',
