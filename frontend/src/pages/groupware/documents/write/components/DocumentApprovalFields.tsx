@@ -1,9 +1,24 @@
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import { Box, Button, IconButton, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
 import { UserSelectEditor } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { DocumentApprovalStage } from '../types/documentWrite.types';
+
+const MIN_APPROVAL_SLOT_WIDTH = 100;
+const APPROVAL_SLOT_GAP = 4;
+
+// oxlint-disable-next-line react/only-export-components
+export function calculateApprovalSlotCapacity(contentWidth: number): number {
+  return Math.max(
+    1,
+    Math.floor(
+      (contentWidth + APPROVAL_SLOT_GAP) /
+        (MIN_APPROVAL_SLOT_WIDTH + APPROVAL_SLOT_GAP),
+    ),
+  );
+}
 
 type DocumentApprovalFieldsProps = {
   userOptions: F1GridUserOption[];
@@ -36,6 +51,29 @@ function SealSlot({ kind }: { kind: 'approval' | 'agreement' }) {
       }}
     >
       도장
+    </Box>
+  );
+}
+
+function ParticipantSequenceBadge({ order }: { order: number }) {
+  return (
+    <Box
+      aria-label={`참여 순번 ${order}`}
+      sx={{
+        display: 'grid',
+        placeItems: 'center',
+        flex: '0 0 auto',
+        width: 20,
+        height: 20,
+        borderRadius: '50%',
+        bgcolor: 'primary.light',
+        color: 'primary.dark',
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        lineHeight: 1,
+      }}
+    >
+      {order}
     </Box>
   );
 }
@@ -74,14 +112,37 @@ export function DocumentApprovalFields({
   const agreementParticipants = participants.filter(
     (participant) => participant.kind === 'agreement',
   );
+  const approvalGridRef = useRef<HTMLDivElement | null>(null);
+  const [slotCapacity, setSlotCapacity] = useState(1);
   const nextApprovalNumber = participants.length + 1;
   const labeledRowSx = {
     display: 'grid',
-    gridTemplateColumns: { xs: '64px minmax(0, 1fr)', sm: '80px minmax(0, 1fr)' },
+    gridTemplateColumns: {
+      xs: '64px minmax(0, 1fr)',
+      sm: '80px minmax(0, 1fr)',
+    },
     alignItems: 'start',
     gap: { xs: 1, sm: 1.5 },
     minWidth: 0,
   } as const;
+
+  useEffect(() => {
+    const grid = approvalGridRef.current;
+    if (!grid) return;
+
+    setSlotCapacity(calculateApprovalSlotCapacity(grid.clientWidth));
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find((item) => item.target === grid);
+      if (entry) {
+        setSlotCapacity(calculateApprovalSlotCapacity(entry.contentRect.width));
+      }
+    });
+    observer.observe(grid);
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <Box
@@ -162,77 +223,110 @@ export function DocumentApprovalFields({
           결재
         </Typography>
         <Box
+          ref={approvalGridRef}
           data-testid="document-approval-grid"
+          data-slot-capacity={slotCapacity}
           sx={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-            gap: 0.5,
+            gridTemplateColumns: `repeat(${slotCapacity}, minmax(${MIN_APPROVAL_SLOT_WIDTH}px, 1fr))`,
+            gap: `${APPROVAL_SLOT_GAP}px`,
             minWidth: 0,
           }}
         >
-          {approvalParticipants.map(({ stageId, user, sequence: order }) => (
-            <Box
-              key={`${stageId}-${String(user.value)}`}
-              role="group"
-              aria-label={`결재 ${order} ${user.label}`}
-              data-testid="document-approval-person"
-              sx={{
-                display: 'grid',
-                gridTemplateRows: '32px 64px 32px',
-                minWidth: 0,
-                border: '1px solid',
-                borderColor: 'divider',
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                noWrap
-                sx={{ alignContent: 'center', px: 0.5, textAlign: 'center' }}
-              >
-                {user.positionName ?? ''}
-              </Typography>
-              <Box
-                aria-label="결재 도장 자리"
-                sx={{
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderBlock: '1px solid',
-                  borderColor: 'divider',
-                  color: 'text.disabled',
-                  fontSize: '0.75rem',
-                }}
-              >
-                도장
-              </Box>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: '20px minmax(0, 1fr) 28px',
-                  alignItems: 'center',
-                  minWidth: 0,
-                  px: 0.5,
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  {order}
-                </Typography>
-                <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
-                  {user.label}
-                </Typography>
-                <IconButton
-                  size="small"
-                  aria-label={`결재 참여자 ${order} ${user.label} 삭제`}
-                  onClick={() =>
-                    onRemoveApprovalUser(stageId, String(user.value))
-                  }
-                  sx={{ p: 0.25 }}
+          {Array.from({
+            length: Math.max(slotCapacity, approvalParticipants.length),
+          }).map((_, index) => {
+            const participant = approvalParticipants[index];
+            if (!participant) {
+              return (
+                <Box
+                  key={`empty-approval-slot-${index}`}
+                  sx={{
+                    display: 'grid',
+                    placeItems: 'center',
+                    minWidth: 0,
+                  }}
                 >
-                  <DeleteOutlineOutlinedIcon fontSize="small" />
-                </IconButton>
+                  <SealSlot kind="approval" />
+                </Box>
+              );
+            }
+
+            const { stageId, user, sequence: order } = participant;
+            return (
+              <Box
+                key={`${stageId}-${String(user.value)}`}
+                role="group"
+                aria-label={`결재 ${order} ${user.label}`}
+                data-testid="document-approval-person"
+                sx={{
+                  display: 'grid',
+                  gridTemplateRows: '32px 64px 32px',
+                  minWidth: 0,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  sx={{ alignContent: 'center', px: 0.5, textAlign: 'center' }}
+                >
+                  {user.positionName ?? ''}
+                </Typography>
+                <Box
+                  aria-label="결재 도장 자리"
+                  sx={{
+                    display: 'grid',
+                    placeItems: 'center',
+                    borderBlock: '1px solid',
+                    borderColor: 'divider',
+                    color: 'text.disabled',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  도장
+                </Box>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '20px minmax(0, 1fr) 24px',
+                    alignItems: 'center',
+                    columnGap: '2px',
+                    minWidth: 0,
+                    px: 0.25,
+                  }}
+                >
+                  <ParticipantSequenceBadge order={order} />
+                  <Typography
+                    variant="body2"
+                    title={user.label}
+                    noWrap
+                    sx={{
+                      minWidth: 0,
+                      maxWidth: '3em',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {user.label}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    aria-label={`결재 참여자 ${order} ${user.label} 삭제`}
+                    onClick={() =>
+                      onRemoveApprovalUser(stageId, String(user.value))
+                    }
+                    sx={{ p: 0.25 }}
+                  >
+                    <DeleteOutlineOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       </Box>
 
@@ -268,14 +362,19 @@ export function DocumentApprovalFields({
                 bgcolor: 'grey.100',
               }}
             >
+              <ParticipantSequenceBadge order={order} />
               <Typography
-                variant="caption"
-                aria-label={`결재 순번 ${order}`}
-                sx={{ fontWeight: 700 }}
+                variant="body2"
+                title={user.label}
+                noWrap
+                sx={{
+                  minWidth: 0,
+                  maxWidth: '3em',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
               >
-                {order}
-              </Typography>
-              <Typography variant="body2" noWrap sx={{ maxWidth: 120 }}>
                 {user.label}
               </Typography>
               <SealSlot kind="agreement" />
