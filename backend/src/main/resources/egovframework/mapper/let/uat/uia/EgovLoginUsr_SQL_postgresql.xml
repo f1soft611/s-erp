@@ -193,6 +193,7 @@
     <select id="selectMyProfile" parameterType="map" resultType="egovframework.let.uat.uia.domain.model.MyProfileVO">
         SELECT
             li.login_code AS userId,
+            u.user_id AS employeeId,
             u.user_nm AS name,
             u.email_addr AS email,
             d.department_nm AS departmentName,

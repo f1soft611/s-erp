@@ -1,4 +1,4 @@
-import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { UserSelectEditor } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
@@ -8,6 +8,24 @@ import type { DocumentApprovalStage } from '../types/documentWrite.types';
 
 const MIN_APPROVAL_SLOT_WIDTH = 80;
 const APPROVAL_SLOT_GAP = 4;
+const participantRemoveActionSx = {
+  opacity: 0,
+  pointerEvents: 'none',
+  transition: 'opacity 120ms ease-in-out',
+} as const;
+const participantHoverSx = {
+  '&:hover .participant-remove-action, &:focus-within .participant-remove-action':
+    {
+      opacity: 1,
+      pointerEvents: 'auto',
+    },
+  '@media (hover: none)': {
+    '& .participant-remove-action': {
+      opacity: 1,
+      pointerEvents: 'auto',
+    },
+  },
+} as const;
 
 // oxlint-disable-next-line react/only-export-components
 export function calculateApprovalSlotCapacity(contentWidth: number): number {
@@ -299,16 +317,46 @@ export function DocumentApprovalFields({
                   minWidth: 0,
                   border: '1px solid',
                   borderColor: 'divider',
+                  ...participantHoverSx,
                 }}
               >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  noWrap
-                  sx={{ alignContent: 'center', px: 0.5, textAlign: 'center' }}
+                <Box
+                  data-testid="document-approval-position-row"
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: isFixed
+                      ? 'minmax(0, 1fr)'
+                      : 'minmax(0, 1fr) 24px',
+                    alignItems: 'center',
+                    minWidth: 0,
+                    px: 0.25,
+                  }}
                 >
-                  {user.positionName ?? ''}
-                </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    sx={{ minWidth: 0, px: 0.25, textAlign: 'center' }}
+                  >
+                    {user.positionName ?? ''}
+                  </Typography>
+                  {!isFixed && (
+                    <IconButton
+                      className="participant-remove-action"
+                      size="small"
+                      aria-label={`결재 참여자 ${order} ${user.label} 삭제`}
+                      onClick={() =>
+                        onRemoveApprovalUser(stageId, String(user.value))
+                      }
+                      sx={{ ...participantRemoveActionSx, p: 0.25 }}
+                    >
+                      <CloseIcon
+                        data-testid="approval-remove-icon"
+                        fontSize="small"
+                      />
+                    </IconButton>
+                  )}
+                </Box>
                 <Box
                   aria-label="결재 도장 자리"
                   sx={{
@@ -319,9 +367,7 @@ export function DocumentApprovalFields({
                     color: 'text.disabled',
                     fontSize: '0.75rem',
                   }}
-                >
-                  도장
-                </Box>
+                ></Box>
                 <Box
                   sx={{
                     display: 'grid',
@@ -349,18 +395,6 @@ export function DocumentApprovalFields({
                   >
                     {user.label}
                   </Typography>
-                  {!isFixed && (
-                    <IconButton
-                      size="small"
-                      aria-label={`결재 참여자 ${order} ${user.label} 삭제`}
-                      onClick={() =>
-                        onRemoveApprovalUser(stageId, String(user.value))
-                      }
-                      sx={{ p: 0.25 }}
-                    >
-                      <DeleteOutlineOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  )}
                 </Box>
               </Box>
             );
@@ -404,6 +438,7 @@ export function DocumentApprovalFields({
                       bgcolor: (theme) =>
                         theme.palette.mode === 'dark' ? '#334155' : 'grey.100',
                       color: 'text.primary',
+                      ...participantHoverSx,
                     }}
                   >
                     <ParticipantSequenceBadge order={order} />
@@ -422,14 +457,18 @@ export function DocumentApprovalFields({
                       {user.label}
                     </Typography>
                     <IconButton
+                      className="participant-remove-action"
                       size="small"
                       aria-label={`합의 참여자 ${order} ${user.label} 삭제`}
                       onClick={() =>
                         onRemoveApprovalUser(stageId, String(user.value))
                       }
-                      sx={{ p: 0.25 }}
+                      sx={{ ...participantRemoveActionSx, p: 0.25 }}
                     >
-                      <DeleteOutlineOutlinedIcon fontSize="small" />
+                      <CloseIcon
+                        data-testid="agreement-remove-icon"
+                        fontSize="small"
+                      />
                     </IconButton>
                   </Box>
                 ),

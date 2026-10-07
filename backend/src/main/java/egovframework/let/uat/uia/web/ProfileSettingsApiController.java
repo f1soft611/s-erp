@@ -74,6 +74,7 @@ public class ProfileSettingsApiController {
     private Map<String, Object> profileResult(MyProfileVO profile) {
         Map<String, Object> result = new HashMap<String, Object>();
         result.put("userId", profile.getUserId());
+        result.put("employeeId", profile.getEmployeeId());
         result.put("name", profile.getName());
         result.put("email", profile.getEmail());
         result.put("departmentName", profile.getDepartmentName());

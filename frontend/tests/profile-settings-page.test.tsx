@@ -14,6 +14,7 @@ describe('ProfileSettingsPage', () => {
     vi.clearAllMocks();
     vi.mocked(profileService.fetchMyProfile).mockResolvedValue({
       userId: 'admin',
+      employeeId: 42,
       name: '사용자명',
       email: 'user@example.com',
       departmentName: '개발팀',
@@ -23,6 +24,7 @@ describe('ProfileSettingsPage', () => {
     });
     vi.mocked(profileService.updateMyProfile).mockResolvedValue({
       userId: 'admin',
+      employeeId: 42,
       name: '사용자명',
       email: 'new@example.com',
       departmentName: '개발팀',

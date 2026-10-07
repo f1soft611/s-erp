@@ -160,6 +160,7 @@ beforeEach(() => {
   composerApi.fetchDraftFormTemplate.mockResolvedValue(draftFormTemplate);
   composerApi.fetchMyProfile.mockResolvedValue({
     userId: composerUser.userId,
+    employeeId: composerUser.userId,
     name: '기안자',
   });
 });
@@ -319,6 +320,7 @@ describe('Document write page', () => {
     });
     composerApi.fetchMyProfile.mockResolvedValue({
       userId: 'emp-profile-only',
+      employeeId: 'emp-profile-only',
       name: '기안자',
       departmentName: '기획팀',
       levelName: '팀장',
@@ -341,7 +343,13 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
   }, 15000);
 
-  it('normalizes drafter identity and excludes it from approval and reference choices', async () => {
+  it('uses employee identity to exclude the drafter while retaining same-name users', async () => {
+    const sameNameUser = {
+      ...composerUser,
+      userId: 'emp-same-name',
+      departmentNm: '회계팀',
+      userNm: '기안자',
+    };
     composerApi.fetchDraftFormOptions.mockResolvedValue({
       categoryGroup: null,
       categoryItems: [category],
@@ -352,12 +360,14 @@ describe('Document write page', () => {
           userId: ` ${composerUser.userId} `,
           userNm: '기안자',
         },
+        sameNameUser,
         anotherComposerUser,
         thirdComposerUser,
       ],
     });
     composerApi.fetchMyProfile.mockResolvedValue({
-      userId: composerUser.userId,
+      userId: 'login-code-1',
+      employeeId: composerUser.userId,
       name: '기안자',
     });
     render(<DashboardContent {...pageProps} />);
@@ -365,14 +375,20 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
+    const firstApprover = screen.getByTestId('document-approval-person');
+    expect(firstApprover).toHaveAttribute('aria-label', '결재 1 기안자');
+
     const approvalPicker = screen.getByRole('combobox', {
       name: '결재선 2 사용자 선택',
     });
     fireEvent.click(approvalPicker);
     const approvalListbox = getPickerListbox(approvalPicker);
     expect(
-      within(approvalListbox).queryByRole('option', { name: /기안자/ }),
+      within(approvalListbox).queryByRole('option', { name: /기안자.*기획팀/ }),
     ).toBeNull();
+    expect(
+      within(approvalListbox).getByRole('option', { name: /기안자.*회계팀/ }),
+    ).toBeInTheDocument();
     fireEvent.keyDown(approvalPicker, { key: 'Escape' });
 
     const referencePicker = screen.getByRole('combobox', {
@@ -381,8 +397,26 @@ describe('Document write page', () => {
     fireEvent.click(referencePicker);
     const referenceListbox = getPickerListbox(referencePicker);
     expect(
-      within(referenceListbox).queryByRole('option', { name: /기안자/ }),
+      within(referenceListbox).queryByRole('option', { name: /기안자.*기획팀/ }),
     ).toBeNull();
+    expect(
+      within(referenceListbox).getByRole('option', { name: /기안자.*회계팀/ }),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(referencePicker, { key: 'Escape' });
+
+    const agreementPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.click(agreementPicker);
+    const agreementListbox = getPickerListbox(agreementPicker);
+    expect(
+      within(agreementListbox).queryByRole('option', {
+        name: /기안자.*기획팀/,
+      }),
+    ).toBeNull();
+    expect(
+      within(agreementListbox).getByRole('option', { name: /기안자.*회계팀/ }),
+    ).toBeInTheDocument();
   }, 15000);
 
   it('prevents the same user from being assigned to approval and reference', async () => {
@@ -535,6 +569,58 @@ describe('Document write page', () => {
       '합의 2 김민수',
       '합의 2 박서준',
     ]);
+  }, 15000);
+
+  it('uses X removal actions for non-fixed approvals and agreement participants', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    const agreementPicker = screen.getByRole('combobox', {
+      name: '결재선 3 사용자 선택',
+    });
+    fireEvent.change(agreementPicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
+    fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
+
+    const removableApproval = screen.getByRole('group', {
+      name: '결재 2 김민수',
+    });
+    const approvalRemoveButton = within(removableApproval).getByRole('button', {
+      name: '결재 참여자 2 김민수 삭제',
+    });
+    const positionRow = within(removableApproval).getByTestId(
+      'document-approval-position-row',
+    );
+    expect(positionRow).toContainElement(approvalRemoveButton);
+    expect(
+      within(approvalRemoveButton).getByTestId('approval-remove-icon'),
+    ).toBeInTheDocument();
+
+    const agreement = screen.getByRole('group', {
+      name: '합의 3 박서준',
+    });
+    const agreementRemoveButton = within(agreement).getByRole('button', {
+      name: '합의 참여자 3 박서준 삭제',
+    });
+    expect(
+      within(agreementRemoveButton).getByTestId('agreement-remove-icon'),
+    ).toBeInTheDocument();
+
+    const fixedDrafter = screen.getByRole('group', {
+      name: '결재 1 홍길동',
+    });
+    expect(
+      within(fixedDrafter).queryByRole('button', { name: /삭제/ }),
+    ).toBeNull();
   }, 15000);
 
   it('renders at the groupware write route instead of the coming-soon page', () => {
@@ -794,6 +880,7 @@ describe('Document write page', () => {
   it('shows an error when the profile has no drafter name and explicit empty states', async () => {
     composerApi.fetchMyProfile.mockResolvedValue({
       userId: 'writer',
+      employeeId: 'writer',
       name: ' ',
     });
     composerApi.fetchDraftFormOptions.mockResolvedValue({
@@ -822,6 +909,23 @@ describe('Document write page', () => {
     expect(
       screen.queryByText('선택 가능한 사용자가 없습니다.'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows an error when the profile has no employee identity', async () => {
+    composerApi.fetchMyProfile.mockResolvedValue({
+      userId: 'login-code-1',
+      employeeId: ' ',
+      name: '기안자',
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '로그인 사용자의 사원 ID를 확인할 수 없습니다.',
+    );
+    expect(screen.queryByTestId('document-approval-person')).toBeNull();
   });
 
   it('filters the selectable forms by active category and available body', async () => {
@@ -1131,6 +1235,7 @@ describe('Document write page', () => {
     }, 15000);
     composerApi.fetchMyProfile.mockResolvedValue({
       userId: 'emp-long-1',
+      employeeId: 'emp-long-1',
       name: '기안자',
     });
     render(<DashboardContent {...pageProps} />);

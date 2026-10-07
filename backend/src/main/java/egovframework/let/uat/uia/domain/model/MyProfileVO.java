@@ -7,6 +7,7 @@ import lombok.Setter;
 @Setter
 public class MyProfileVO {
     private String userId;
+    private Long employeeId;
     private String name;
     private String email;
     private String departmentName;

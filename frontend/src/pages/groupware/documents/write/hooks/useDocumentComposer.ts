@@ -120,22 +120,21 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
           return;
         }
         setDrafterName(profile.name.trim());
-        const signedInUserId = profile.userId?.trim();
-        const signedInUser = signedInUserId
-          ? (availableUsers.find(
-              (user) => String(user.value) === signedInUserId,
-            ) ?? {
-              value: signedInUserId,
-              label: profile.name.trim(),
-              avatarUrl: profile.profileImage,
-              positionName: profile.levelName,
-              departmentName: profile.departmentName,
-            })
-          : undefined;
-        if (!signedInUser) {
-          setLoadError('로그인 사용자의 계정 ID를 확인할 수 없습니다.');
+        const signedInEmployeeId = String(profile.employeeId ?? '').trim();
+        if (!signedInEmployeeId) {
+          setLoadError('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
           return;
         }
+        const signedInUser =
+          availableUsers.find(
+            (user) => String(user.value).trim() === signedInEmployeeId,
+          ) ?? {
+            value: signedInEmployeeId,
+            label: profile.name.trim(),
+            avatarUrl: profile.profileImage,
+            positionName: profile.levelName,
+            departmentName: profile.departmentName,
+          };
         setApprovalStages([
           {
             id: nextStageId.current++,

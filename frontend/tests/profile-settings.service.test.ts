@@ -19,6 +19,7 @@ describe('profileSettings.service', () => {
   it('loads the authenticated user profile', async () => {
     const profile = {
       userId: 'admin',
+      employeeId: 42,
       name: '사용자명',
       email: 'user@example.com',
       departmentName: '개발팀',
