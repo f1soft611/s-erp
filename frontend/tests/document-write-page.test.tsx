@@ -177,14 +177,23 @@ async function waitForComposerReady() {
 }
 
 function installApprovalResizeObserverMock() {
-  const observers: (ResizeObserver & { resize: (width: number) => void })[] =
-    [];
+  const observers: (
+    ResizeObserver & {
+      resize: (width: number) => void;
+      isObserving: (element: Element) => boolean;
+    }
+  )[] = [];
 
   class MockApprovalResizeObserver implements ResizeObserver {
     private target: Element | null = null;
 
     constructor(private callback: ResizeObserverCallback) {
-      observers.push(this as ResizeObserver & { resize: (width: number) => void });
+      observers.push(
+        this as ResizeObserver & {
+          resize: (width: number) => void;
+          isObserving: (element: Element) => boolean;
+        },
+      );
     }
 
     observe(target: Element): void {
@@ -196,6 +205,10 @@ function installApprovalResizeObserverMock() {
 
     disconnect(): void {
       this.target = null;
+    }
+
+    isObserving(element: Element): boolean {
+      return this.target === element;
     }
 
     resize(width: number): void {
@@ -535,7 +548,11 @@ describe('Document write page', () => {
       });
 
       expect(approvalObservers.length).toBeGreaterThan(0);
-      act(() => approvalObservers[0].resize(654));
+      const gridObserver = approvalObservers.find((observer) =>
+        observer.isObserving(grid),
+      );
+      expect(gridObserver).toBeDefined();
+      act(() => gridObserver!.resize(654));
       await waitFor(() => {
         expect(grid).toHaveAttribute('data-slot-capacity', '7');
         expect(slots()).toHaveLength(7);
