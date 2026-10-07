@@ -243,15 +243,15 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   );
 
   const addApproval = useCallback(() => {
-    if (selectedApprovalUsers.length !== 1) return;
-    setApprovalStages((current) => [
-      ...current,
-      {
+    if (selectedApprovalUsers.length === 0) return;
+    const nextStages: DocumentApprovalStage[] = selectedApprovalUsers.map(
+      (user) => ({
         id: nextStageId.current++,
         kind: 'approval',
-        users: selectedApprovalUsers,
-      },
-    ]);
+        users: [user],
+      }),
+    );
+    setApprovalStages((current) => [...current, ...nextStages]);
     setSelectedApprovalUserIds([]);
   }, [selectedApprovalUsers]);
 

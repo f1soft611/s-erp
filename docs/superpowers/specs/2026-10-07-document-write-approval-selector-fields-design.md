@@ -16,7 +16,7 @@ Reduce vertical space in the document composer by placing approval-stage selecto
 - Committing a stage appends it after existing stages and adds a new empty multi-select field at the end.
 - `결재 추가` preserves the existing behavior: each selected user becomes an individual approval stage in selection order.
 - `합의 추가` preserves the existing behavior: all selected users become one agreement stage.
-- Each committed field displays its stage kind, current order, selected users, and a remove action. Removing a stage renumbers later stages and makes its users available again.
+- Each committed field displays its stage kind, current order, selected users, the existing seal placeholder, and a remove action. Removing a stage renumbers later stages and makes its users available again.
 - Users already committed to approval or agreement stages are excluded from the active approval field's candidates. Selected values remain visible in their field.
 - The reference field remains one independent multi-select control. Selected references appear as input chips only; no duplicate preview list is shown.
 - The approval strip uses its own horizontal scrolling on narrow screens. It must not expand the dialog or page width.

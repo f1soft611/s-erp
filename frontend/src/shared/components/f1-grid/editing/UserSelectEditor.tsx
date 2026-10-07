@@ -15,6 +15,8 @@ export type UserSelectEditorProps = {
   value: F1GridUserValue;
   options: F1GridUserOption[];
   multiple?: boolean;
+  hideSelectedOptions?: boolean;
+  preserveSelectionOrder?: boolean;
   autoFocus?: boolean;
   compact?: boolean;
   anchorEl?: HTMLElement | null;
@@ -42,6 +44,8 @@ export function UserSelectEditor({
   value,
   options,
   multiple = false,
+  hideSelectedOptions = false,
+  preserveSelectionOrder = false,
   autoFocus = false,
   compact = false,
   anchorEl,
@@ -56,12 +60,21 @@ export function UserSelectEditor({
 }: UserSelectEditorProps) {
   const selectedOptions = useMemo(() => {
     const selectedValues = Array.isArray(value) ? value : [value];
+    if (multiple && preserveSelectionOrder) {
+      return selectedValues.flatMap((selected) => {
+        if (selected == null) return [];
+        const option = options.find(
+          (candidate) => String(candidate.value) === String(selected),
+        );
+        return option ? [option] : [];
+      });
+    }
     return options.filter((option) =>
       selectedValues.some((selected) =>
         selected == null ? false : String(selected) === String(option.value),
       ),
     );
-  }, [options, value]);
+  }, [multiple, options, preserveSelectionOrder, value]);
   const selectedValue = multiple
     ? selectedOptions
     : (selectedOptions[0] ?? null);
@@ -90,6 +103,7 @@ export function UserSelectEditor({
       readOnly={readOnly}
       openOnFocus
       disableCloseOnSelect={multiple}
+      filterSelectedOptions={hideSelectedOptions}
       options={options}
       value={selectedValue as F1GridUserOption | F1GridUserOption[] | null}
       getOptionLabel={(option) => option.label}
@@ -191,14 +205,19 @@ export function UserSelectEditor({
                 }
                 label={option.label}
                 size="small"
-                onDelete={() => {
-                  const remaining = selectedItems.filter(
-                    (item) => String(item.value) !== String(option.value),
-                  );
-                  onChange(
-                    multiple ? remaining.map((item) => item.value) : null,
-                  );
-                }}
+                onDelete={
+                  readOnly
+                    ? undefined
+                    : () => {
+                        const remaining = selectedItems.filter(
+                          (item) =>
+                            String(item.value) !== String(option.value),
+                        );
+                        onChange(
+                          multiple ? remaining.map((item) => item.value) : null,
+                        );
+                      }
+                }
               />
             ))}
           </Box>

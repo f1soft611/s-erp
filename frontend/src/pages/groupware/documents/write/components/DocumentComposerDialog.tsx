@@ -168,10 +168,7 @@ export function DocumentComposerDialog({
           display: 'flex',
           flexDirection: 'column',
           gap: 1.5,
-          height: '100%',
-          minHeight: 0,
           minWidth: 0,
-          overflowY: 'auto',
         }}
       >
         <Tabs
@@ -331,19 +328,15 @@ export function DocumentComposerDialog({
         />
         <Box
           sx={{
-            flex: 1,
-            minHeight: 0,
             width: '100%',
             minWidth: 0,
             bgcolor: editorSurfaceBackground,
-            overflow: 'hidden',
           }}
         >
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              height: '100%',
               width: '100%',
               minWidth: 0,
               borderTop: `1px solid ${panelBorder}`,
@@ -352,30 +345,37 @@ export function DocumentComposerDialog({
           >
             <Box
               sx={{
-                flex: 1,
                 minHeight: 180,
                 display: 'flex',
                 width: '100%',
                 minWidth: 0,
-                overflow: 'hidden',
                 bgcolor: editorSurfaceBackground,
                 '& .document-composer-editor': {
+                  flex: '0 0 auto',
                   width: '100%',
                   minWidth: 0,
+                  minHeight: 180,
+                  height: 'auto',
                   position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',
-                  overflow: 'hidden',
+                  overflow: 'visible',
+                },
+                '& .document-composer-editor .rich-text-editor-content': {
+                  flex: '0 0 auto',
+                  minHeight: 180,
+                  height: 'auto',
+                  overflow: 'visible',
                 },
                 '& .document-composer-editor .ProseMirror': {
                   ...richTextContentStyles,
                   display: 'block',
                   width: '100%',
                   minWidth: 0,
-                  flex: 1,
+                  flex: '0 0 auto',
                   minHeight: 180,
-                  maxHeight: '100%',
-                  overflowY: 'auto',
+                  maxHeight: 'none',
+                  overflowY: 'visible',
                   overflowX: 'auto',
                   outline: 'none',
                   px: 2,
@@ -391,6 +391,13 @@ export function DocumentComposerDialog({
                     pointerEvents: 'none',
                   },
                 },
+                '& .document-composer-editor .rich-text-editor-content > .ProseMirror':
+                  {
+                    flex: '0 0 auto',
+                    minHeight: 180,
+                    maxHeight: 'none',
+                    overflowY: 'visible',
+                  },
               }}
             >
               <RichTextEditor
@@ -402,10 +409,9 @@ export function DocumentComposerDialog({
                   display: 'block',
                   width: '100%',
                   minWidth: 0,
-                  flex: 1,
                   minHeight: 180,
-                  maxHeight: '100%',
-                  overflowY: 'auto',
+                  maxHeight: 'none',
+                  overflowY: 'visible',
                   overflowX: 'auto',
                   outline: 'none',
                   px: 2,
