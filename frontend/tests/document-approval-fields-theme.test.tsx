@@ -34,24 +34,34 @@ function renderAgreementChip(mode: 'light' | 'dark') {
 }
 
 describe('DocumentApprovalFields theme', () => {
-  it('keeps the existing gray agreement chip surface in light mode', () => {
+  it('keeps the agreement chip background transparent in light mode', () => {
     renderAgreementChip('light');
 
     const chip = screen.getByTestId('document-agreement-chip');
 
-    expect(getComputedStyle(chip).backgroundColor).toBe('rgb(245, 245, 245)');
+    expect(getComputedStyle(chip).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(getComputedStyle(chip).borderColor).toBe('rgb(224, 224, 224)');
   });
 
-  it('uses a dark slate agreement chip surface in dark mode', () => {
+  it('keeps the agreement chip background transparent in dark mode', () => {
     renderAgreementChip('dark');
 
     const chip = screen.getByTestId('document-agreement-chip');
 
-    expect(getComputedStyle(chip).backgroundColor).toBe('rgb(51, 65, 85)');
+    expect(getComputedStyle(chip).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(getComputedStyle(chip).borderColor).toBe('rgba(255, 255, 255, 0.12)');
     expect(getComputedStyle(screen.getByText('합의 사용자')).color).toBe(
       'rgb(226, 232, 240)',
     );
+  });
+
+  it('centers the agreement row label and removes the label top padding', () => {
+    renderAgreementChip('light');
+
+    expect(
+      getComputedStyle(screen.getByTestId('document-agreement-display-row'))
+        .alignItems,
+    ).toBe('center');
+    expect(getComputedStyle(screen.getByText('합의')).paddingTop).toBe('0');
   });
 });

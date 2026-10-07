@@ -401,8 +401,11 @@ export function DocumentApprovalFields({
 
       {agreementParticipants.length > 0 && (
         <>
-          <Box data-testid="document-agreement-display-row" sx={labeledRowSx}>
-            <Typography variant="body2" sx={{ fontWeight: 700, pt: 0.5 }}>
+          <Box
+            data-testid="document-agreement-display-row"
+            sx={{ ...labeledRowSx, alignItems: 'center' }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
               합의
             </Typography>
             <Box
@@ -432,8 +435,6 @@ export function DocumentApprovalFields({
                       borderColor: (theme) =>
                         theme.palette.mode === 'dark' ? 'divider' : 'grey.300',
                       borderRadius: 1,
-                      bgcolor: (theme) =>
-                        theme.palette.mode === 'dark' ? '#334155' : 'grey.100',
                       color: 'text.primary',
                       ...participantHoverSx,
                     }}

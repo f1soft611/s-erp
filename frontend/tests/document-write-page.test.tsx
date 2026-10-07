@@ -1232,7 +1232,8 @@ describe('Document write page', () => {
 
   it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
     const approvalName = '홍길동김';
-    const agreementName = '김민수박';
+    const agreementName = '김민수';
+    const longName = '홍길동김철수';
     composerApi.fetchDraftFormOptions.mockResolvedValue({
       categoryGroup: null,
       categoryItems: [category],
@@ -1240,6 +1241,7 @@ describe('Document write page', () => {
       users: [
         { ...composerUser, userId: 'emp-long-1', userNm: approvalName },
         { ...anotherComposerUser, userId: 'emp-long-2', userNm: agreementName },
+        { ...thirdComposerUser, userId: 'emp-long-3', userNm: longName },
       ],
     }, 15000);
     composerApi.fetchMyProfile.mockResolvedValue({
@@ -1252,8 +1254,17 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    const agreementPicker = screen.getByRole('combobox', {
+    const approvalPicker = screen.getByRole('combobox', {
       name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: longName } });
+    fireEvent.click(
+      await screen.findByRole('option', { name: new RegExp(longName) }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    const agreementPicker = screen.getByRole('combobox', {
+      name: '결재선 3 사용자 선택',
     });
     fireEvent.change(agreementPicker, { target: { value: agreementName } });
     fireEvent.click(
@@ -1261,7 +1272,9 @@ describe('Document write page', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
 
-    const approval = screen.getByTestId('document-approval-person');
+    const approvals = screen.getAllByTestId('document-approval-person');
+    const approval = approvals[0];
+    const longApproval = approvals[1];
     const agreement = screen.getByTestId('document-agreement-chip');
     const assertParticipantPresentation = (
       participant: HTMLElement,
@@ -1311,7 +1324,16 @@ describe('Document write page', () => {
     };
 
     assertParticipantPresentation(approval, 1, approvalName, '결재');
-    assertParticipantPresentation(agreement, 2, agreementName, '합의');
+    assertParticipantPresentation(agreement, 3, agreementName, '합의');
+    const truncatedApprovalName = within(longApproval).getByTitle(longName);
+    expect(truncatedApprovalName).toHaveStyle({
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    });
+    expect(longApproval.getAttribute('aria-label')).toBe(
+      `결재 2 ${longName}`,
+    );
   });
 
   it('adds selected approval users as ordered individual stages and removes them from candidates', async () => {
