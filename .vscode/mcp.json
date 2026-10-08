@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "s-erp-postgresql-readonly": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/tools/mcp-postgresql-readonly/dist/index.js"]
-    }
-  }
-}

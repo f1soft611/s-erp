@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "s-erp-postgresql-readonly": {
+      "type": "local",
+      "command": "node",
+      "args": ["D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"],
+      "tools": ["*"]
+    },
+    "s-erp-postgresql-readonly-tenant-1212123312": {
+      "type": "local",
+      "command": "node",
+      "args": ["D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"],
+      "env": {
+        "S_ERP_DB_NAME": "tenant_1212123312"
+      },
+      "tools": ["*"]
+    }
+  }
+}
