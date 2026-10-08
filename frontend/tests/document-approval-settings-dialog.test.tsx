@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { DocumentApprovalSettingsDialog } from '../src/pages/groupware/documents/write/components/DocumentApprovalSettingsDialog';
@@ -60,6 +60,23 @@ function renderSettings(
   return { onClose, onApply };
 }
 
+function createDataTransfer() {
+  const payload = new Map<string, string>();
+  return {
+    effectAllowed: 'none' as DataTransfer['effectAllowed'],
+    setData: (type: string, value: string) => payload.set(type, value),
+    getData: (type: string) => payload.get(type) ?? '',
+  } as DataTransfer;
+}
+
+function dragOverAt(target: HTMLElement, clientY: number) {
+  const event = createEvent.dragOver(target, {
+    dataTransfer: createDataTransfer(),
+  });
+  Object.defineProperty(event, 'clientY', { value: clientY });
+  fireEvent(target, event);
+}
+
 describe('DocumentApprovalSettingsDialog', () => {
   it('loads the current approval line and references while keeping the drafter fixed', () => {
     renderSettings();
@@ -106,27 +123,129 @@ describe('DocumentApprovalSettingsDialog', () => {
 
   it('reorders a stage when it is dropped onto another stage', () => {
     const { onApply } = renderSettings();
-    const payload = new Map<string, string>();
-    const dataTransfer = {
-      effectAllowed: 'none' as DataTransfer['effectAllowed'],
-      setData: (type: string, value: string) => payload.set(type, value),
-      getData: (type: string) => payload.get(type) ?? '',
-    } as DataTransfer;
-
+    const dataTransfer = createDataTransfer();
+    const target = screen.getByRole('group', {
+      name: '합의 3 합의자 1, 합의자 2',
+    });
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 160,
+      height: 60,
+    } as DOMRect);
     fireEvent.dragStart(
-      screen.getByRole('group', { name: '결재 2 결재자' }),
+      screen.getByRole('button', { name: '드래그하여 결재 2 이동' }),
       { dataTransfer },
     );
-    fireEvent.drop(
-      screen.getByRole('group', {
-        name: '합의 3 합의자 1, 합의자 2',
-      }),
-      { dataTransfer },
-    );
+    dragOverAt(target, 150);
+    fireEvent.drop(target, { clientY: 150, dataTransfer });
     fireEvent.click(screen.getByRole('button', { name: '적용' }));
 
     const [stages] = vi.mocked(onApply).mock.calls[0];
     expect(stages.map((stage) => stage.id)).toEqual([1, 3, 2]);
+  });
+
+  it('starts dragging only from the stage handle and marks the dragged stage', () => {
+    renderSettings();
+    const stage = screen.getByRole('group', { name: '결재 2 결재자' });
+    const handle = screen.getByRole('button', {
+      name: '드래그하여 결재 2 이동',
+    });
+
+    expect(stage).not.toHaveAttribute('draggable');
+    expect(handle).toHaveAttribute('draggable', 'true');
+    fireEvent.dragStart(stage, { dataTransfer: createDataTransfer() });
+    expect(stage).not.toHaveAttribute('data-dragging');
+
+    fireEvent.dragStart(handle, { dataTransfer: createDataTransfer() });
+
+    expect(stage).toHaveAttribute('data-dragging', 'true');
+  });
+
+  it.each([
+    ['before', 110, [1, 3, 2, 4]],
+    ['after', 150, [1, 3, 4, 2]],
+  ] as const)(
+    'shows the %s insertion marker and inserts the stage at that position',
+    (position, clientY, expectedIds) => {
+      const { onApply } = renderSettings({
+        approvalStages: [
+          ...approvalStages,
+          {
+            id: 4,
+            kind: 'approval',
+            users: [users[5]],
+          },
+        ],
+      });
+      const dataTransfer = createDataTransfer();
+      const target = screen.getByRole('group', {
+        name: '결재 4 새 결재자',
+      });
+      const bounds = {
+        top: 100,
+        bottom: 160,
+        height: 60,
+      } as DOMRect;
+      vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(bounds);
+      expect(target.getBoundingClientRect()).toBe(bounds);
+      fireEvent.dragStart(
+        screen.getByRole('button', { name: '드래그하여 결재 2 이동' }),
+        { dataTransfer },
+      );
+      dragOverAt(target, clientY);
+
+      expect(target).toHaveAttribute('data-drop-position', position);
+
+      fireEvent.drop(target, { clientY, dataTransfer });
+      fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+      const [stages] = vi.mocked(onApply).mock.calls[0];
+      expect(stages.map((stage) => stage.id)).toEqual(expectedIds);
+    },
+  );
+
+  it('clears dragged and insertion feedback after drag end and drop', () => {
+    renderSettings({
+      approvalStages: [
+        ...approvalStages,
+        {
+          id: 4,
+          kind: 'approval',
+          users: [users[5]],
+        },
+      ],
+    });
+    const source = screen.getByRole('group', { name: '결재 2 결재자' });
+    const target = screen.getByRole('group', {
+      name: '결재 4 새 결재자',
+    });
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 160,
+      height: 60,
+    } as DOMRect);
+    const handle = screen.getByRole('button', {
+      name: '드래그하여 결재 2 이동',
+    });
+    const dataTransfer = createDataTransfer();
+
+    fireEvent.dragStart(handle, { dataTransfer });
+    dragOverAt(target, 110);
+    fireEvent.dragEnd(handle);
+
+    expect(source).not.toHaveAttribute('data-dragging');
+    expect(target).not.toHaveAttribute('data-drop-position');
+
+    fireEvent.dragStart(handle, { dataTransfer });
+    dragOverAt(target, 150);
+    fireEvent.drop(target, { clientY: 150, dataTransfer });
+
+    expect(
+      screen.getByTestId('document-approval-settings-stage-2'),
+    ).not.toHaveAttribute('data-dragging');
+    expect(
+      screen.getByTestId('document-approval-settings-stage-4'),
+    ).not.toHaveAttribute('data-drop-position');
   });
 
   it('adds individual approval stages and updates references before applying', async () => {

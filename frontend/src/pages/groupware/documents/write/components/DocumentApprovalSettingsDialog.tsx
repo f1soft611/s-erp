@@ -11,7 +11,7 @@ import {
   IconButton,
   Typography,
 } from '@mui/material';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import {
   UserSelectEditor,
@@ -65,9 +65,27 @@ export function DocumentApprovalSettingsDialog({
   const [selectedApprovalUserIds, setSelectedApprovalUserIds] = useState<
     string[]
   >([]);
-  const draggedStageId = useRef<number | null>(null);
+  const [draggedStageId, setDraggedStageId] = useState<number | null>(null);
+  const [insertionTarget, setInsertionTarget] = useState<{
+    stageId: number;
+    position: 'before' | 'after';
+  } | null>(null);
+  const [recentlyMovedStageId, setRecentlyMovedStageId] = useState<
+    number | null
+  >(null);
+  const draggedStageIdRef = useRef<number | null>(null);
+  const reorderFeedbackTimer = useRef<number | null>(null);
   const nextStageId = useRef(
     approvalStages.reduce((nextId, stage) => Math.max(nextId, stage.id + 1), 1),
+  );
+
+  useEffect(
+    () => () => {
+      if (reorderFeedbackTimer.current !== null) {
+        window.clearTimeout(reorderFeedbackTimer.current);
+      }
+    },
+    [],
   );
 
   const assignedUserIds = useMemo(
@@ -102,12 +120,11 @@ export function DocumentApprovalSettingsDialog({
     );
   });
   const selectedApprovalUsers = selectedApprovalUserIds.flatMap((id) => {
-    const user = userOptions.find(
-      (option) => String(option.value) === id,
-    );
+    const user = userOptions.find((option) => String(option.value) === id);
     return user ? [user] : [];
   });
-  const userOptionsUnavailable = Boolean(userOptionsError) || userOptions.length === 0;
+  const userOptionsUnavailable =
+    Boolean(userOptionsError) || userOptions.length === 0;
 
   const updateApprovalSelection = (value: F1GridUserValue) => {
     setSelectedApprovalUserIds(
@@ -167,7 +184,11 @@ export function DocumentApprovalSettingsDialog({
     );
   };
 
-  const moveStage = (sourceId: number, targetId: number) => {
+  const moveStage = (
+    sourceId: number,
+    targetId: number,
+    position: 'before' | 'after',
+  ) => {
     setDraftStages((current) => {
       const sourceIndex = current.findIndex((stage) => stage.id === sourceId);
       const targetIndex = current.findIndex((stage) => stage.id === targetId);
@@ -183,7 +204,14 @@ export function DocumentApprovalSettingsDialog({
 
       const next = [...current];
       const [stage] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, stage);
+      const adjustedTargetIndex = next.findIndex(
+        (item) => item.id === targetId,
+      );
+      next.splice(
+        adjustedTargetIndex + (position === 'after' ? 1 : 0),
+        0,
+        stage,
+      );
       return next;
     });
   };
@@ -207,11 +235,51 @@ export function DocumentApprovalSettingsDialog({
 
   const handleDragStart = (
     stageId: number,
-    event: React.DragEvent<HTMLDivElement>,
+    event: React.DragEvent<HTMLButtonElement>,
   ) => {
-    draggedStageId.current = stageId;
+    draggedStageIdRef.current = stageId;
+    setDraggedStageId(stageId);
+    setInsertionTarget(null);
+    setRecentlyMovedStageId(null);
+    if (reorderFeedbackTimer.current !== null) {
+      window.clearTimeout(reorderFeedbackTimer.current);
+      reorderFeedbackTimer.current = null;
+    }
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', String(stageId));
+  };
+
+  const handleDragEnd = () => {
+    draggedStageIdRef.current = null;
+    setDraggedStageId(null);
+    setInsertionTarget(null);
+  };
+
+  const handleDragOver = (
+    stageId: number,
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position =
+      event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+    setInsertionTarget({ stageId, position });
+  };
+
+  const handleDragLeave = (
+    stageId: number,
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
+    const nextTarget = event.relatedTarget;
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
+      return;
+    }
+    setInsertionTarget((current) =>
+      current?.stageId === stageId ? null : current,
+    );
   };
 
   const handleDrop = (
@@ -222,11 +290,27 @@ export function DocumentApprovalSettingsDialog({
     const transferredId = event.dataTransfer.getData('text/plain');
     const sourceId = transferredId
       ? Number(transferredId)
-      : draggedStageId.current;
+      : draggedStageIdRef.current;
+    const position =
+      insertionTarget?.stageId === targetId
+        ? insertionTarget.position
+        : 'before';
     if (sourceId !== null && Number.isFinite(sourceId)) {
-      moveStage(sourceId, targetId);
+      const source = draftStages.find((stage) => stage.id === sourceId);
+      const target = draftStages.find((stage) => stage.id === targetId);
+      if (source && target && sourceId !== targetId && !source.isFixed && !target.isFixed) {
+        moveStage(sourceId, targetId, position);
+        setRecentlyMovedStageId(sourceId);
+        if (reorderFeedbackTimer.current !== null) {
+          window.clearTimeout(reorderFeedbackTimer.current);
+        }
+        reorderFeedbackTimer.current = window.setTimeout(() => {
+          setRecentlyMovedStageId(null);
+          reorderFeedbackTimer.current = null;
+        }, 220);
+      }
     }
-    draggedStageId.current = null;
+    handleDragEnd();
   };
 
   const handleApply = () => {
@@ -244,10 +328,10 @@ export function DocumentApprovalSettingsDialog({
       fullScreenOnMobile
       actions={
         <>
-          <Button onClick={onClose}>취소</Button>
           <Button variant="contained" onClick={handleApply}>
             적용
           </Button>
+          <Button onClick={onClose}>취소</Button>
         </>
       }
       dialogProps={{ 'data-testid': 'document-approval-settings-dialog' }}
@@ -256,9 +340,7 @@ export function DocumentApprovalSettingsDialog({
         data-testid="document-approval-settings-content"
         sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
       >
-        {userOptionsError && (
-          <Alert severity="error">{userOptionsError}</Alert>
-        )}
+        {userOptionsError && <Alert severity="error">{userOptionsError}</Alert>}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -280,27 +362,103 @@ export function DocumentApprovalSettingsDialog({
                   key={stage.id}
                   role="group"
                   aria-label={`${stageName} ${description}`}
-                  data-testid="document-approval-settings-stage"
-                  draggable={!stage.isFixed}
-                  onDragStart={(event) => handleDragStart(stage.id, event)}
-                  onDragOver={(event) => event.preventDefault()}
+                  data-testid={`document-approval-settings-stage-${stage.id}`}
+                  data-dragging={
+                    draggedStageId === stage.id ? 'true' : undefined
+                  }
+                  data-drop-position={
+                    insertionTarget?.stageId === stage.id
+                      ? insertionTarget.position
+                      : undefined
+                  }
+                  data-reordered={
+                    recentlyMovedStageId === stage.id ? 'true' : undefined
+                  }
+                  onDragOver={(event) => handleDragOver(stage.id, event)}
+                  onDragLeave={(event) => handleDragLeave(stage.id, event)}
                   onDrop={(event) => handleDrop(stage.id, event)}
-                  sx={{
+                  sx={(theme) => ({
                     alignItems: 'center',
                     border: 1,
-                    borderColor: 'divider',
+                    borderColor:
+                      draggedStageId === stage.id
+                        ? 'primary.main'
+                        : 'divider',
                     borderRadius: 1,
                     display: 'flex',
                     gap: 1,
                     minWidth: 0,
                     p: 1,
-                  }}
+                    position: 'relative',
+                    opacity: draggedStageId === stage.id ? 0.72 : 1,
+                    backgroundColor:
+                      draggedStageId === stage.id
+                        ? 'action.hover'
+                        : 'background.paper',
+                    boxShadow:
+                      draggedStageId === stage.id ? theme.shadows[4] : 'none',
+                    transform:
+                      draggedStageId === stage.id
+                        ? 'scale(1.01)'
+                        : recentlyMovedStageId === stage.id
+                          ? 'translateY(-2px)'
+                          : 'none',
+                    transition: theme.transitions.create(
+                      [
+                        'background-color',
+                        'border-color',
+                        'box-shadow',
+                        'opacity',
+                        'transform',
+                      ],
+                      { duration: theme.transitions.duration.short },
+                    ),
+                    '&[data-drop-position="before"]::before, &[data-drop-position="after"]::after':
+                      {
+                        backgroundColor: 'primary.main',
+                        borderRadius: 2,
+                        boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
+                        content: '""',
+                        height: 3,
+                        left: 8,
+                        pointerEvents: 'none',
+                        position: 'absolute',
+                        right: 8,
+                        zIndex: 1,
+                      },
+                    '&[data-drop-position="before"]::before': { top: -5 },
+                    '&[data-drop-position="after"]::after': { bottom: -5 },
+                    '&[data-reordered="true"]': {
+                      animation: 'approval-stage-drop 220ms ease-out',
+                    },
+                    '@keyframes approval-stage-drop': {
+                      '0%': { transform: 'translateY(4px)' },
+                      '100%': { transform: 'translateY(-2px)' },
+                    },
+                    '@media (prefers-reduced-motion: reduce)': {
+                      transition: 'none',
+                      '&[data-reordered="true"]': { animation: 'none' },
+                    },
+                  })}
                 >
-                  <DragIndicatorIcon
-                    aria-hidden="true"
-                    color={stage.isFixed ? 'disabled' : 'action'}
-                    fontSize="small"
-                  />
+                  <IconButton
+                    size="small"
+                    aria-label={`드래그하여 ${stageName} 이동`}
+                    disabled={stage.isFixed}
+                    draggable={!stage.isFixed}
+                    onDragStart={(event) => handleDragStart(stage.id, event)}
+                    onDragEnd={handleDragEnd}
+                    sx={{
+                      cursor: stage.isFixed ? 'default' : 'grab',
+                      '&:active': { cursor: 'grabbing' },
+                      touchAction: 'none',
+                    }}
+                  >
+                    <DragIndicatorIcon
+                      color={stage.isFixed ? 'disabled' : 'action'}
+                      fontSize="small"
+                    />
+                  </IconButton>
                   <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
                     <Typography variant="caption" color="text.secondary">
                       {stageName}
@@ -321,9 +479,7 @@ export function DocumentApprovalSettingsDialog({
                                     String(user.value),
                                   )
                           }
-                          deleteIcon={
-                            stage.isFixed ? undefined : <CloseIcon />
-                          }
+                          deleteIcon={stage.isFixed ? undefined : <CloseIcon />}
                         />
                       ))}
                     </Box>

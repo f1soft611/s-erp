@@ -26,6 +26,7 @@ import {
   duplicateGridRows,
   getGridChanges,
   getGridRowById,
+  insertGridRow,
   markRowsDeleted,
   rebaseGridData,
   restoreGridRows,
@@ -108,10 +109,16 @@ const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
 const GRID_ROW_VIRTUALIZATION_THRESHOLD = 200;
 const GRID_COLUMN_VIRTUALIZATION_THRESHOLD = 12;
 
+type F1GridRowInsertion = {
+  targetRowId: F1GridRowId;
+  position: 'before' | 'after';
+};
+
 type F1GridRowFormSession<T extends object> = {
   mode: 'create' | 'edit';
   row: T;
   originalRow?: T;
+  insertion?: F1GridRowInsertion;
 };
 
 function F1GridInner<T extends object>(
@@ -195,6 +202,8 @@ function F1GridInner<T extends object>(
   );
   const [lastSelectedRowId, setLastSelectedRowId] = useState<F1GridRowId>();
   const [focusedCell, setFocusedCell] = useState<F1GridCellPosition>();
+  const [pendingInsertedRowId, setPendingInsertedRowId] =
+    useState<F1GridRowId>();
   const [editingCell, setEditingCell] = useState<F1GridCellPosition>();
   const [cellSelection, setCellSelection] = useState<F1GridCellRange>();
   const [isCellSelectionDragging, setIsCellSelectionDragging] = useState(false);
@@ -824,6 +833,70 @@ function F1GridInner<T extends object>(
     rowKey,
     rowOverscan,
     virtualizeRows,
+    visibleRows,
+  ]);
+
+  useEffect(() => {
+    if (pendingInsertedRowId === undefined) return;
+
+    const rowIndex = visibleRows.findIndex(
+      (row) => getGridRowId(row, rowKey) === pendingInsertedRowId,
+    );
+    const bodyScroll = bodyScrollRef.current;
+    if (rowIndex < 0 || !bodyScroll) return;
+
+    let rowTop = 0;
+    for (let index = 0; index < rowIndex; index += 1) {
+      const row = visibleRows[index];
+      rowTop +=
+        rowHeightsById.get(String(getGridRowId(row, rowKey))) ??
+        defaultRowHeight;
+    }
+    const insertedRow = visibleRows[rowIndex];
+    const insertedRowHeight =
+      rowHeightsById.get(String(getGridRowId(insertedRow, rowKey))) ??
+      defaultRowHeight;
+
+    if (bodyScroll.clientHeight > 0) {
+      const currentScrollTop = bodyScroll.scrollTop;
+      let nextScrollTop = currentScrollTop;
+      if (rowTop < currentScrollTop) {
+        nextScrollTop = rowTop;
+      } else if (
+        rowTop + insertedRowHeight >
+        currentScrollTop + bodyScroll.clientHeight
+      ) {
+        nextScrollTop =
+          rowTop + insertedRowHeight - bodyScroll.clientHeight;
+      }
+
+      if (nextScrollTop !== currentScrollTop) {
+        bodyScroll.scrollTop = nextScrollTop;
+        scheduleViewportMeasure(bodyScroll);
+        return;
+      }
+    }
+
+    const firstEditableColumn = visibleColumns.findIndex(
+      (column) =>
+        isCellEditable(column, insertedRow) && column.type !== 'checkbox',
+    );
+    if (firstEditableColumn >= 0) {
+      const cellNode = cellNodeRefs.current.get(
+        `${String(pendingInsertedRowId)}:${firstEditableColumn}`,
+      );
+      if (!cellNode) return;
+      cellNode.focus();
+    }
+    setPendingInsertedRowId(undefined);
+  }, [
+    bodyScrollMetrics.scrollTop,
+    bodyScrollMetrics.viewportHeight,
+    defaultRowHeight,
+    pendingInsertedRowId,
+    rowHeightsById,
+    rowKey,
+    visibleColumns,
     visibleRows,
   ]);
 
@@ -1710,33 +1783,64 @@ function F1GridInner<T extends object>(
     }
   }
 
-  function handleAddRow(row?: Partial<T>) {
+  function focusNewRow(row: T) {
+    const rowId = getGridRowId(row, rowKey);
+    const firstEditableCol = visibleColumns.findIndex(
+      (column) => isCellEditable(column, row) && column.type !== 'checkbox',
+    );
+    if (firstEditableCol >= 0) {
+      setFocusedCell(getCell(rowId, firstEditableCol));
+    }
+  }
+
+  function handleAddRow(
+    row?: Partial<T>,
+    insertion?: F1GridRowInsertion,
+  ) {
     if (!createRow && !row) return;
 
     const baseRow = createRow ? createRow() : ({} as T);
     const newRow = { ...baseRow, ...row } as T;
+    if (
+      insertion &&
+      !data.rowIndexById.has(String(insertion.targetRowId))
+    ) {
+      return;
+    }
     if (rowFormActive) {
       const newRowId = newRow[rowKey];
       if (typeof newRowId !== 'string' && typeof newRowId !== 'number') return;
       setRowFormErrors({});
-      setRowFormSession({ mode: 'create', row: { ...newRow } });
+      setRowFormSession({
+        mode: 'create',
+        row: { ...newRow },
+        insertion,
+      });
       return;
     }
     const newRowId = getGridRowId(newRow, rowKey);
 
-    setData((current) => addGridRow(current, newRow, rowKey));
+    setData((current) => {
+      if (!insertion) return addGridRow(current, newRow, rowKey);
+      const targetIndex = current.rowIndexById.get(
+        String(insertion.targetRowId),
+      );
+      if (targetIndex === undefined) return current;
+      return insertGridRow(
+        current,
+        newRow,
+        rowKey,
+        targetIndex + (insertion.position === 'after' ? 1 : 0),
+      );
+    });
     setRowSelection({
       allSelected: false,
       includedIds: new Set([newRowId]),
       excludedIds: new Set(),
     });
 
-    const firstEditableCol = visibleColumns.findIndex(
-      (column) => isCellEditable(column, newRow) && column.type !== 'checkbox',
-    );
-    if (firstEditableCol >= 0) {
-      setFocusedCell(getCell(newRowId, firstEditableCol));
-    }
+    focusNewRow(newRow);
+    if (insertion) setPendingInsertedRowId(newRowId);
   }
 
   function openEditRowForm(row: T) {
@@ -1768,12 +1872,39 @@ function F1GridInner<T extends object>(
         return;
       }
 
-      setData((current) => addGridRow(current, draftRow, rowKey));
+      const insertion = rowFormSession.insertion;
+      const targetIndex = insertion
+        ? data.rowIndexById.get(String(insertion.targetRowId))
+        : undefined;
+      if (insertion && targetIndex === undefined) {
+        setRowFormErrors({
+          [String(rowKey)]: '삽입 기준 행을 찾을 수 없습니다.',
+        });
+        return;
+      }
+
+      setData((current) => {
+        if (!insertion) return addGridRow(current, draftRow, rowKey);
+        const currentTargetIndex = current.rowIndexById.get(
+          String(insertion.targetRowId),
+        );
+        if (currentTargetIndex === undefined) return current;
+        return insertGridRow(
+          current,
+          draftRow,
+          rowKey,
+          currentTargetIndex + (insertion.position === 'after' ? 1 : 0),
+        );
+      });
       setRowSelection({
         allSelected: false,
         includedIds: new Set([draftRowId]),
         excludedIds: new Set(),
       });
+      if (insertion) {
+        focusNewRow(draftRow);
+        setPendingInsertedRowId(draftRowId);
+      }
       closeRowForm();
       return;
     }
@@ -2232,6 +2363,13 @@ function F1GridInner<T extends object>(
     }
   }
 
+  function handleInsertRowContextClick(position: 'before' | 'after') {
+    const targetRowId = contextMenu?.rowId;
+    closeContextMenu();
+    if (targetRowId === undefined) return;
+    handleAddRow(undefined, { targetRowId, position });
+  }
+
   function handleDuplicateContextClick() {
     closeContextMenu();
     handleDuplicateSelectedRows();
@@ -2349,6 +2487,8 @@ function F1GridInner<T extends object>(
     visibleRows.length > 0 && selectedCount === visibleRows.length;
   const showAddRootInContextMenu = allowAddRootInContextMenu ?? true;
   const showAddRowInContextMenu = allowAddRowInContextMenu ?? true;
+  const rowInsertionDisabled =
+    sortState.length > 0 || filterState.length > 0;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
 
@@ -2770,6 +2910,28 @@ function F1GridInner<T extends object>(
         ) : null}
         {showAddRowInContextMenu ? (
           <MenuItem onClick={handleAddRowContextClick}>행 추가</MenuItem>
+        ) : null}
+        {!treeContextMenu &&
+        showAddRowInContextMenu &&
+        contextMenu?.rowId !== undefined ? (
+          <>
+            <MenuItem
+              disabled={rowInsertionDisabled}
+              onClick={() => handleInsertRowContextClick('before')}
+            >
+              {rowInsertionDisabled
+                ? '위에 행 삽입 (정렬/필터 해제 필요)'
+                : '위에 행 삽입'}
+            </MenuItem>
+            <MenuItem
+              disabled={rowInsertionDisabled}
+              onClick={() => handleInsertRowContextClick('after')}
+            >
+              {rowInsertionDisabled
+                ? '아래에 행 삽입 (정렬/필터 해제 필요)'
+                : '아래에 행 삽입'}
+            </MenuItem>
+          </>
         ) : null}
         {showDuplicateRowInContextMenu ? (
           <MenuItem

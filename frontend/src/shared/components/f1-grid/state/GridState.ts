@@ -129,28 +129,28 @@ export function rebaseGridData<T extends object>(
   return rebased;
 }
 
-export function addGridRow<T extends object>(
+export function insertGridRow<T extends object>(
   data: F1GridData<T>,
   row: T,
   rowKey: keyof T,
+  index: number,
 ): F1GridData<T> {
   const stateKey = getStateKey(getGridRowId(row, rowKey));
 
   if (data.rowById.has(stateKey)) return data;
 
-  const rows = [...data.rows, row];
-  const rowById = new Map(data.rowById).set(stateKey, row);
-  const rowIndexById = new Map(data.rowIndexById).set(
-    stateKey,
-    rows.length - 1,
-  );
+  const insertIndex = Math.max(0, Math.min(Math.floor(index), data.rows.length));
+  const rows = [
+    ...data.rows.slice(0, insertIndex),
+    row,
+    ...data.rows.slice(insertIndex),
+  ];
   const changedIds = new Set(data.changedIds).add(stateKey);
 
   return {
     ...data,
     rows,
-    rowById,
-    rowIndexById,
+    ...buildRowIndexes(rows, rowKey),
     stateById: { ...data.stateById, [stateKey]: 'inserted' },
     dirtyFieldsById: {
       ...data.dirtyFieldsById,
@@ -161,6 +161,14 @@ export function addGridRow<T extends object>(
     patchesById: { ...data.patchesById, [stateKey]: { ...row } },
     changedIds,
   };
+}
+
+export function addGridRow<T extends object>(
+  data: F1GridData<T>,
+  row: T,
+  rowKey: keyof T,
+): F1GridData<T> {
+  return insertGridRow(data, row, rowKey, data.rows.length);
 }
 
 export function updateGridRow<T extends object>(
