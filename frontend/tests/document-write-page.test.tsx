@@ -875,6 +875,9 @@ describe('Document write page', () => {
       'aria-disabled',
       'true',
     );
+    expect(
+      screen.getByRole('button', { name: '결재선 설정' }),
+    ).toBeDisabled();
   });
 
   it('shows an error when the profile has no drafter name and explicit empty states', async () => {
@@ -1383,6 +1386,141 @@ describe('Document write page', () => {
       display: 'grid',
     });
   });
+
+  it('applies edited stages and references only after confirming the settings dialog', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approvalPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.keyDown(approvalPicker, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    const agreementPicker = screen.getByRole('combobox', {
+      name: '결재선 3 사용자 선택',
+    });
+    fireEvent.change(agreementPicker, { target: { value: '박서준' } });
+    fireEvent.click(await screen.findByRole('option', { name: /박서준/ }));
+    fireEvent.keyDown(agreementPicker, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
+
+    const referencePicker = screen.getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    fireEvent.change(referencePicker, { target: { value: '최민호' } });
+    fireEvent.click(await screen.findByRole('option', { name: /최민호/ }));
+    fireEvent.keyDown(referencePicker, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: '결재선 설정' }));
+    const settingsDialog = screen.getByRole('dialog', {
+      name: '결재선 설정',
+    });
+    fireEvent.click(
+      within(settingsDialog).getByRole('button', {
+        name: '결재 2 아래로 이동',
+      }),
+    );
+
+    const settingsReferencePicker = within(settingsDialog).getByRole(
+      'combobox',
+      { name: '참조자 선택' },
+    );
+    const currentReferenceChip = within(
+      settingsReferencePicker.closest('.MuiAutocomplete-root')!,
+    ).getByText('최민호');
+    const currentReferenceDelete = currentReferenceChip
+      .closest('.MuiChip-root')
+      ?.querySelector('.MuiChip-deleteIcon');
+    if (!currentReferenceDelete) {
+      throw new Error('Current reference chip delete action is missing.');
+    }
+    fireEvent.click(currentReferenceDelete);
+    fireEvent.change(settingsReferencePicker, {
+      target: { value: '이수진' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /이수진/ }));
+    fireEvent.keyDown(settingsReferencePicker, { key: 'Escape' });
+
+    fireEvent.click(
+      within(settingsDialog).getByRole('button', { name: '취소' }),
+    );
+    await waitForElementToBeRemoved(settingsDialog);
+
+    expect(
+      screen.getByRole('group', { name: '결재 2 김민수' }),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen
+          .getByRole('combobox', { name: '참조자 선택' })
+          .closest('.MuiAutocomplete-root')!,
+      ).getByText('최민호'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: '결재 3 김민수' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '결재선 설정' }));
+    const reopenedDialog = screen.getByRole('dialog', {
+      name: '결재선 설정',
+    });
+    fireEvent.click(
+      within(reopenedDialog).getByRole('button', {
+        name: '결재 2 아래로 이동',
+      }),
+    );
+
+    const reopenedReferencePicker = within(reopenedDialog).getByRole(
+      'combobox',
+      { name: '참조자 선택' },
+    );
+    const reopenedReferenceChip = within(
+      reopenedReferencePicker.closest('.MuiAutocomplete-root')!,
+    ).getByText('최민호');
+    const reopenedReferenceDelete = reopenedReferenceChip
+      .closest('.MuiChip-root')
+      ?.querySelector('.MuiChip-deleteIcon');
+    if (!reopenedReferenceDelete) {
+      throw new Error('Reopened reference chip delete action is missing.');
+    }
+    fireEvent.click(reopenedReferenceDelete);
+    fireEvent.change(reopenedReferencePicker, {
+      target: { value: '이수진' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /이수진/ }));
+    fireEvent.keyDown(reopenedReferencePicker, { key: 'Escape' });
+    fireEvent.click(
+      within(reopenedDialog).getByRole('button', { name: '적용' }),
+    );
+    await waitForElementToBeRemoved(reopenedDialog);
+
+    expect(
+      screen.getByRole('group', { name: '결재 3 김민수' }),
+    ).toBeInTheDocument();
+    const appliedReferenceRoot = screen
+      .getByRole('combobox', { name: '참조자 선택' })
+      .closest('.MuiAutocomplete-root')!;
+    expect(within(appliedReferenceRoot).getByText('이수진')).toBeInTheDocument();
+    expect(
+      within(appliedReferenceRoot).queryByText('최민호'),
+    ).not.toBeInTheDocument();
+
+    const nextApprovalPicker = screen.getByRole('combobox', {
+      name: '결재선 4 사용자 선택',
+    });
+    fireEvent.change(nextApprovalPicker, { target: { value: '최민호' } });
+    fireEvent.click(await screen.findByRole('option', { name: /최민호/ }));
+    fireEvent.keyDown(nextApprovalPicker, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+    expect(
+      screen.getByRole('group', { name: '결재 4 최민호' }),
+    ).toBeInTheDocument();
+  }, 15000);
 
   it('renders each selected agreement user as a wrapped chip and appends the next selector', async () => {
     render(<DashboardContent {...pageProps} />);

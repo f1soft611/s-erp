@@ -315,6 +315,8 @@
 | owner_id              | bigint    | 소유 객체 PK                                |
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
+| comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
+| event_type            | varchar   | SYSTEM 이벤트 코드, USER에서는 NULL         |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -328,6 +330,8 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
+- 결재 처리 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다.
+- `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
 
@@ -512,10 +516,78 @@
 - 공통코드 상세코드는 그룹 ID를 `scope_key_1`로 사용하며, 기존 숫자 코드의 그룹별 최댓값을 초기값으로 사용
 - `last_issued_value`는 0 이상
 
+### 2-24. tb_electronic_approval_main
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| electronic_approval_id | bigserial | 결재 문서 PK |
+| tenant_id | bigint | 소속 테넌트 FK |
+| drafting_work_category_id | bigint | 선택 작성 양식 FK, 선택값 |
+| document_type | varchar(40) | 문서 유형 코드 |
+| document_status | varchar(30) | 문서 상태 코드 |
+| title | varchar(300) | 문서 제목 |
+| contents_json | jsonb | Tiptap JSON 본문 |
+| contents_html | text | 화면 렌더링/양식 호환 HTML |
+| contents_text | text | 검색/요약용 평문 |
+| drafter_id / updated_by | varchar(100) | 작성자/마지막 갱신 사용자 키 |
+| drafter_name | varchar(150) | 작성자 이름 스냅샷 |
+| drafter_department_name | varchar(150) | 작성 당시 부서명 |
+| created_at / updated_at / submitted_at | timestamp | 생성/수정/최초 상신 시각 |
+
+제약/역할:
+
+- tenant와 기존 `tb_drafting_work_category` 양식을 참조한다. 양식의 tenant 일치는 서비스에서 검증한다.
+- `(tenant_id, electronic_approval_id)` 복합 unique 키로 결재선의 tenant 일치를 강제한다.
+- `document_type`: `DRAFTING`, `BUSINESS_CONTACT`, `EXPENSE_RESOLUTION`, `ATTENDANCE_APPLICATION`
+- `document_status`: `DRAFT`, `PENDING`, `IN_PROGRESS`, `REVISION_REQUESTED`, `COMPLETED`
+- 본문 원본은 문서작성 편집기의 JSON이며 HTML/평문은 렌더링/검색을 위한 파생 표현이다.
+
+### 2-25. tb_electronic_approval_line_info
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| electronic_approval_line_id | bigserial | 결재선 행 PK |
+| tenant_id / electronic_approval_id | bigint | tenant 및 결재 문서 복합 FK |
+| stage_order / participant_order | integer | 결재 단계 및 단계 내 순서(1부터) |
+| participant_type | varchar(20) | 참여 유형 (`APPROVAL`, `AGREEMENT`, `REFERENCE`) |
+| participant_user_id | varchar(100) | 작성 화면에서 선택한 사용자 키 |
+| participant_name | varchar(150) | 참여자 이름 스냅샷 |
+| participant_department_name | varchar(150) | 참여자 부서명 스냅샷 |
+| action_status | varchar(20) | 처리 상태; 참조 행은 NULL |
+| action_at | timestamp | 결재 처리 시각 |
+| action_comment | text | 결재 처리 의견 |
+| created_at | timestamp | 생성 시각 |
+
+제약/역할:
+
+- 결재 본문과 `(tenant_id, electronic_approval_id)` FK로 연결되며 본문 삭제 시 결재선은 cascade 삭제된다.
+- 단계/참여자 순서와 문서 내 참여자 중복을 unique로 제한한다.
+- `action_status`: `WAITING`, `PENDING`, `APPROVED`, `REJECTED`, `RETURNED`
+- `REFERENCE`는 처리 상태/시각/의견을 가질 수 없다.
+- 승인/반려/보완요청 처리의 구조화된 값이 원본이며 공통 댓글 SYSTEM 행은 화면 타임라인 표시용이다.
+
+### 2-26. tb_common_comment_like
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| comment_like_id | bigserial | 댓글 좋아요 PK |
+| tenant_id | bigint | 소속 테넌트 FK |
+| comment_id | bigint | 공통 댓글 FK |
+| user_id | varchar(100) | 인증된 사용자 키 |
+| created_at | timestamp | 좋아요 생성 시각 |
+
+제약/역할:
+
+- `(tenant_id, comment_id, user_id)` unique로 사용자별 중복 좋아요를 방지한다.
+- `(tenant_id, comment_id)` 복합 FK로 다른 tenant의 댓글을 참조할 수 없다.
+- unlike는 본인이 소유한 관계 행을 삭제한다. 좋아요 수는 관계 행을 집계한다.
+- SYSTEM 댓글 좋아요는 서비스/API에서 거부한다.
+
 ---
 
 ## 변경 이력
 
+- 2026-10-08: 문서 결재 본문/참여자 테이블, 공통 댓글 SYSTEM 이벤트 구분, 댓글 좋아요 테이블의 미적용 SQL 초안을 정의했다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고. 실제 DB에는 적용하지 않았다.
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
 - 2026-10-02: `tb_drafting_work_category`의 삭제되지 않은 양식 코드에 테넌트별 부분 unique index를 추가하는 SQL 초안을 정의했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고. (미반영 SQL 초안)
 - 2026-10-02: 조건별 숫자 발번을 위한 `tb_id_sequence`와 공통코드 그룹별 카운터 초기화를 추가했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고.

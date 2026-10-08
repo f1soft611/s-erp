@@ -1,5 +1,6 @@
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import { useTheme } from '@mui/material/styles';
+import { useState } from 'react';
 import {
   Alert,
   Box,
@@ -26,6 +27,7 @@ import {
   useDocumentComposer,
 } from '../hooks/useDocumentComposer';
 import { DocumentApprovalFields } from './DocumentApprovalFields';
+import { DocumentApprovalSettingsDialog } from './DocumentApprovalSettingsDialog';
 
 type DocumentComposerDialogProps = {
   open: boolean;
@@ -37,6 +39,8 @@ export function DocumentComposerDialog({
   onClose,
 }: DocumentComposerDialogProps) {
   const theme = useTheme();
+  const [approvalSettingsOpen, setApprovalSettingsOpen] = useState(false);
+  const [approvalSettingsSession, setApprovalSettingsSession] = useState(0);
   const {
     activeDocumentKind,
     setActiveDocumentKind,
@@ -62,6 +66,7 @@ export function DocumentComposerDialog({
     addApproval,
     addAgreement,
     removeApprovalUser,
+    replaceApprovalLine,
     handleApprovalUserChange,
     handleReferenceUserChange,
     loadError,
@@ -72,10 +77,18 @@ export function DocumentComposerDialog({
     editor,
     handleEditorReady,
     handleAttachmentSelect,
-    closeComposer,
+    closeComposer: resetComposer,
     editorSurfaceBackground,
     fieldSurfaceBackground,
   } = useDocumentComposer(open, onClose);
+  const closeComposer = () => {
+    setApprovalSettingsOpen(false);
+    resetComposer();
+  };
+  const openApprovalSettings = () => {
+    setApprovalSettingsSession((current) => current + 1);
+    setApprovalSettingsOpen(true);
+  };
   const panelBorder = theme.palette.divider;
   const editorTextColor = theme.palette.text.primary;
   const editorPlaceholderColor = theme.palette.text.disabled;
@@ -132,6 +145,7 @@ export function DocumentComposerDialog({
   );
 
   return (
+    <>
     <CommonDialog
       open={open}
       onClose={closeComposer}
@@ -294,10 +308,12 @@ export function DocumentComposerDialog({
               selectedApprovalUserIds={selectedApprovalUserIds}
               referenceUserIds={referenceUserIds}
               approvalStages={approvalStages}
+              approvalSettingsDisabled={isLoading}
               onApprovalUserChange={handleApprovalUserChange}
               onReferenceUserChange={handleReferenceUserChange}
               onAddApproval={addApproval}
               onAddAgreement={addAgreement}
+              onOpenApprovalSettings={openApprovalSettings}
               onRemoveApprovalUser={removeApprovalUser}
             />
           </>
@@ -487,5 +503,20 @@ export function DocumentComposerDialog({
         onContinue={confirmTemplateReplacement}
       />
     </CommonDialog>
+    <DocumentApprovalSettingsDialog
+      key={approvalSettingsSession}
+      open={approvalSettingsOpen}
+      userOptions={userOptions}
+      userOptionsError={
+        userOptions.length === 0 && !isLoading
+          ? loadError || undefined
+          : undefined
+      }
+      approvalStages={approvalStages}
+      referenceUserIds={referenceUserIds}
+      onClose={() => setApprovalSettingsOpen(false)}
+      onApply={replaceApprovalLine}
+    />
+    </>
   );
 }
