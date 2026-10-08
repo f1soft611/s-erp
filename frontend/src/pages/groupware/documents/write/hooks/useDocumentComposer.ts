@@ -325,6 +325,30 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     );
   }, []);
 
+  const replaceApprovalLine = useCallback(
+    (stages: DocumentApprovalStage[], references: string[]) => {
+      const assignedUserIds = new Set(
+        stages.flatMap((stage) =>
+          stage.users.map((user) => String(user.value)),
+        ),
+      );
+      const referenceIds = new Set(references);
+      const nextStageIdValue = stages.reduce(
+        (nextId, stage) => Math.max(nextId, stage.id + 1),
+        1,
+      );
+      nextStageId.current = Math.max(nextStageId.current, nextStageIdValue);
+      setApprovalStages(stages);
+      setReferenceUserIds(references);
+      setSelectedApprovalUserIds((current) =>
+        current.filter(
+          (id) => !assignedUserIds.has(id) && !referenceIds.has(id),
+        ),
+      );
+    },
+    [],
+  );
+
   const handleApprovalUserChange = (value: F1GridUserValue) => {
     const assignedUserIds = new Set(
       approvalStages.flatMap((stage) =>
@@ -415,6 +439,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     addApproval,
     addAgreement,
     removeApprovalUser,
+    replaceApprovalLine,
     handleApprovalUserChange,
     handleReferenceUserChange,
     loadError,

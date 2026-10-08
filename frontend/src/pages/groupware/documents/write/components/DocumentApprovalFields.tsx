@@ -43,10 +43,12 @@ type DocumentApprovalFieldsProps = {
   selectedApprovalUserIds: string[];
   referenceUserIds: string[];
   approvalStages: DocumentApprovalStage[];
+  approvalSettingsDisabled?: boolean;
   onApprovalUserChange: (value: F1GridUserValue) => void;
   onReferenceUserChange: (value: F1GridUserValue) => void;
   onAddApproval: () => void;
   onAddAgreement: () => void;
+  onOpenApprovalSettings: () => void;
   onRemoveApprovalUser: (stageId: number, userId: string) => void;
 };
 
@@ -92,10 +94,12 @@ export function DocumentApprovalFields({
   selectedApprovalUserIds,
   referenceUserIds,
   approvalStages,
+  approvalSettingsDisabled = false,
   onApprovalUserChange,
   onReferenceUserChange,
   onAddApproval,
   onAddAgreement,
+  onOpenApprovalSettings,
   onRemoveApprovalUser,
 }: DocumentApprovalFieldsProps) {
   const assignedApprovalUserIds = new Set(
@@ -239,6 +243,15 @@ export function DocumentApprovalFields({
               sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
             >
               합의 추가
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={approvalSettingsDisabled}
+              onClick={onOpenApprovalSettings}
+              sx={{ whiteSpace: 'nowrap', height: 40, minHeight: 40 }}
+            >
+              결재선 설정
             </Button>
           </Box>
         </Box>
