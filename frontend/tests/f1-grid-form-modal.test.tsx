@@ -1377,6 +1377,45 @@ describe('F1-Grid row form integration', () => {
     ]);
   });
 
+  it('applies a relative insert form immediately before its context-menu target', () => {
+    const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
+    const rows: IntegratedFormRow[] = [
+      { id: 'ROW-001', name: '첫 번째 행', status: '사용' },
+      { id: 'ROW-002', name: '두 번째 행', status: '사용' },
+    ];
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={rows}
+        columns={integratedColumns}
+        rowKey="id"
+        rowFormPlugin={{}}
+        createRow={() => ({ id: 'ROW-003', name: '', status: '대기' })}
+      />,
+    );
+
+    fireEvent.contextMenu(
+      screen.getByRole('gridcell', { name: '두 번째 행' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '위에 행 삽입' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+      target: { value: '폼으로 삽입' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(gridRef.current?.getRows().map((row) => row.id)).toEqual([
+      'ROW-001',
+      'ROW-003',
+      'ROW-002',
+    ]);
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([
+      { id: 'ROW-003', name: '폼으로 삽입', status: '대기' },
+    ]);
+    expect(
+      screen.getByRole('gridcell', { name: '폼으로 삽입' }),
+    ).toHaveAttribute('tabindex', '0');
+  });
+
   it('does not open a create draft without a valid row key', () => {
     const gridRef = createRef<F1GridRef<IntegratedFormRow>>();
     render(

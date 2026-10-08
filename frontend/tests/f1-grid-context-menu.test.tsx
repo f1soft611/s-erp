@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createRef } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   F1Grid,
   F1Tree,
   type F1GridColumn,
+  type F1GridRef,
 } from '../src/shared/components/f1-grid';
 
 type FlatRow = {
@@ -77,6 +79,158 @@ describe('F1-Grid context menu', () => {
 
     fireEvent.contextMenu(getGridBody('테스트 그리드'));
     expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+  });
+
+  it.each([
+    ['위에 행 삽입', ['1', 'new', '2']],
+    ['아래에 행 삽입', ['1', '2', 'new']],
+  ])('inserts a new row at the selected row position with %s', (action, ids) => {
+    const gridRef = createRef<F1GridRef<FlatRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        createRow={() => ({ id: 'new', name: 'New' })}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Beta' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: action }));
+
+    expect(gridRef.current?.getRows().map((row) => row.id)).toEqual(ids);
+    expect(gridRef.current?.getChanges().insertedRows).toEqual([
+      { id: 'new', name: 'New' },
+    ]);
+    expect(screen.getByRole('gridcell', { name: 'New' })).toHaveAttribute(
+      'tabindex',
+      '0',
+    );
+  });
+
+  it('does not offer relative insertion when the context menu targets empty space', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        createRow={createFlatRow}
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+
+    expect(
+      screen.queryByRole('menuitem', { name: '위에 행 삽입' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: '아래에 행 삽입' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables relative insertion while sorting is active and enables it after clearing sort', async () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="정렬 삽입 테스트"
+        createRow={createFlatRow}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '오름차순 정렬' }));
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Beta' }));
+
+    const insertAbove = screen.getByRole('menuitem', {
+      name: /위에 행 삽입/,
+    });
+    expect(insertAbove).toHaveAttribute('aria-disabled', 'true');
+    expect(insertAbove).toHaveTextContent(/정렬.*필터|필터.*정렬/);
+    expect(
+      screen.getByRole('menuitem', { name: /아래에 행 삽입/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '정렬 해제' }));
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Beta' }));
+    expect(
+      screen.getByRole('menuitem', { name: '위에 행 삽입' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('disables relative insertion while a filter is active', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="필터 삽입 테스트"
+        createRow={createFlatRow}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
+    fireEvent.change(screen.getByLabelText('이름 필터 값'), {
+      target: { value: 'Alpha' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Alpha' }));
+
+    expect(
+      screen.getByRole('menuitem', { name: /위에 행 삽입/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByRole('menuitem', { name: /아래에 행 삽입/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('scrolls a below-inserted virtual row into the viewport', async () => {
+    const rows = Array.from({ length: 250 }, (_, index) => ({
+      id: `row-${index}`,
+      name: index === 52 ? 'Target' : `Row ${index}`,
+    }));
+    const { container } = render(
+      <F1Grid
+        rows={rows}
+        columns={[{ field: 'name', headerName: '이름', editable: true }]}
+        rowKey="id"
+        ariaLabel="가상 삽입 테스트"
+        height={180}
+        rowHeight={32}
+        createRow={() => ({ id: 'inserted', name: 'Inserted' })}
+      />,
+    );
+
+    const body = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperties(body, {
+      clientHeight: { configurable: true, value: 96 },
+      scrollHeight: { configurable: true, value: 250 * 32 },
+      scrollTop: { configurable: true, value: 50 * 32, writable: true },
+    });
+    fireEvent.scroll(body);
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-f1-grid-row-id="row-52"]'),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Target' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '아래에 행 삽입' }));
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-f1-grid-row-id="inserted"]'),
+      ).toBeInTheDocument(),
+    );
+    expect(body.scrollTop).toBeGreaterThan(50 * 32);
+    expect(
+      screen.getByRole('gridcell', { name: 'Inserted' }),
+    ).toHaveAttribute('tabindex', '0');
   });
 
   it('selects the right-clicked cell before the context menu opens inside the grid body', () => {
@@ -293,9 +447,40 @@ describe('F1-Grid context menu', () => {
     );
 
     fireEvent.contextMenu(getGridBody('테스트 트리'));
+    expect(
+      screen.queryByRole('menuitem', { name: /위에 행 삽입/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: /아래에 행 삽입/ }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: '루트 추가' }));
 
     expect(screen.getAllByRole('gridcell', { name: '새 행' })).toHaveLength(1);
+  });
+
+  it('keeps context-menu and ref addRow actions appending to the end', () => {
+    const gridRef = createRef<F1GridRef<FlatRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="추가 위치 테스트"
+        createRow={createFlatRow}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: 'Alpha' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '행 추가' }));
+    expect(gridRef.current?.getRows().map((row) => row.id)).toEqual([
+      '1',
+      '2',
+      expect.stringMatching(/^new-/),
+    ]);
+
+    act(() => gridRef.current?.addRow());
+    expect(gridRef.current?.getRows().at(-1)?.name).toBe('새 행');
   });
 
   it('adds a new row as the child of the row that was right-clicked', () => {
