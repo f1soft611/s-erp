@@ -44,10 +44,11 @@ export function DocumentFeedItem({ item, isDark, onClick }: DocumentFeedItemProp
         '&:hover': onClick ? { borderColor: 'primary.main' } : undefined,
       }}
     >
-      <CardContent sx={{ p: 2.5, minWidth: 0, overflow: 'hidden' }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2.5 }, minWidth: 0, overflow: 'hidden' }}>
         <Box
           sx={{
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
             gap: 1.5,
             mb: 2,
@@ -85,7 +86,8 @@ export function DocumentFeedItem({ item, isDark, onClick }: DocumentFeedItemProp
             sx={{
               alignItems: 'center',
               flexWrap: 'wrap',
-              justifyContent: 'flex-end',
+              justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+              flex: { xs: '1 0 100%', sm: '0 0 auto' },
             }}
           >
             <Chip label={item.kind} size="small" color="primary" />
