@@ -78,6 +78,11 @@ export function DocumentComposerDialog({
     isSaving,
     saveError,
     saveDraft,
+    uploadImage,
+    onOrphanedImageUpload,
+    onUploadingChange,
+    onImageUploadError,
+    uploadingCount,
     retryFailedAttachment,
     reconcileUnknownAttachment,
     removeAttachment,
@@ -184,7 +189,11 @@ export function DocumentComposerDialog({
               boxShadow: 'none',
             }}
           >
-            {isSaving ? '저장 중...' : '저장'}
+            {isSaving
+              ? '저장 중...'
+              : uploadingCount > 0
+                ? '이미지 업로드 중...'
+                : '저장'}
           </Button>
           <Button
             variant="text"
@@ -473,7 +482,11 @@ export function DocumentComposerDialog({
                 <RichTextEditor
                   onEditorReady={handleEditorReady}
                   className="document-composer-editor"
-                  readOnly={templateLoading}
+                  readOnly={isComposerLoading || isSaving}
+                  uploadImage={uploadImage}
+                  onOrphanedImageUpload={onOrphanedImageUpload}
+                  onUploadingChange={onUploadingChange}
+                  onImageUploadError={onImageUploadError}
                   contentSx={{
                     ...richTextContentStyles,
                     display: 'block',

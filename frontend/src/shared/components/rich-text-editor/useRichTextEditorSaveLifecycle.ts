@@ -9,6 +9,7 @@ export type TemporaryRichTextImage = {
 };
 
 export type ReferencedRichTextImage = RichTextEditorImage & {
+  uploadToken: string;
   fileName: string;
   width?: number | string | null;
 };

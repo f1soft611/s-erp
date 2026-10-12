@@ -9,6 +9,7 @@ import {
 import type {
   DocumentApprovalDraftRequest,
   DocumentApprovalDraftResponse,
+  DocumentDraftEmbeddedImageUpload,
   DocumentDraftAttachmentResponse,
 } from '../types/documentWrite.types';
 
@@ -66,6 +67,56 @@ export async function uploadDocumentDraftAttachment(
     fileName: item.fileName ?? file.name,
     fileSize: item.fileSize ?? file.size,
   };
+}
+
+export async function uploadDocumentDraftEmbeddedImage(
+  file: File,
+): Promise<DocumentDraftEmbeddedImageUpload> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiPostFormData<{
+    item?: {
+      uploadToken?: string;
+      fileName?: string;
+      fileSize?: number;
+      mimeType?: string;
+      previewUrl?: string;
+      objectKey?: string;
+    };
+  }>(`${APPROVAL_API}/embedded-images/temp`, formData);
+  const item = response.item;
+  if (
+    !item ||
+    !item.uploadToken?.trim() ||
+    !item.fileName?.trim() ||
+    !item.previewUrl?.trim() ||
+    !item.objectKey?.trim() ||
+    typeof item.fileSize !== 'number' ||
+    !Number.isSafeInteger(item.fileSize) ||
+    item.fileSize < 0 ||
+    !item.mimeType?.trim()
+  ) {
+    throw new Error('본문 이미지 업로드 결과를 확인할 수 없습니다.');
+  }
+  return {
+    src: item.previewUrl,
+    alt: item.fileName,
+    fileName: item.fileName,
+    uploadToken: item.uploadToken,
+    fileSize: item.fileSize,
+    mimeType: item.mimeType,
+    objectKey: item.objectKey,
+  };
+}
+
+export async function deleteDocumentDraftEmbeddedImage(
+  uploadToken: string,
+  fileName: string,
+): Promise<void> {
+  const query = new URLSearchParams({ fileName });
+  await apiDelete(
+    `${APPROVAL_API}/embedded-images/temp/${encodeURIComponent(uploadToken)}?${query.toString()}`,
+  );
 }
 
 export async function listDocumentDraftAttachments(

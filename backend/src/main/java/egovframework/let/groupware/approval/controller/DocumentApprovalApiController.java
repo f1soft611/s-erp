@@ -24,6 +24,7 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
@@ -109,5 +110,35 @@ public class DocumentApprovalApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 ID가 없습니다.");
         }
         documentApprovalService.downloadAttachment(user, electronicApprovalId, fileId, response);
+    }
+
+    @Operation(summary = "전자결재 본문 이미지 임시 업로드", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/embedded-images/temp")
+    public ResponseEntity<ResultVO> uploadTemporaryEmbeddedImage(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        EmbeddedImageUploadVO uploaded = documentApprovalService.uploadTemporaryEmbeddedImage(user, file);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", uploaded);
+        resultMap.put("message", "본문 이미지가 업로드되었습니다.");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "전자결재 임시 본문 이미지 삭제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/embedded-images/temp/{uploadToken}")
+    public ResultVO deleteTemporaryEmbeddedImage(@PathVariable String uploadToken,
+            @RequestParam String fileName, @AuthenticationPrincipal LoginVO user) throws Exception {
+        documentApprovalService.deleteTemporaryEmbeddedImage(user, uploadToken, fileName);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "임시 본문 이미지가 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 본문 이미지 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/{electronicApprovalId}/embedded-images/{fileId}")
+    public void streamEmbeddedImage(@PathVariable Long electronicApprovalId, @PathVariable Long fileId,
+            @AuthenticationPrincipal LoginVO user, HttpServletResponse response) throws Exception {
+        documentApprovalService.streamEmbeddedImage(user, electronicApprovalId, fileId, response);
     }
 }

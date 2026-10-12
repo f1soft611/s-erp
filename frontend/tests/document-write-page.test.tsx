@@ -19,6 +19,8 @@ const composerApi = vi.hoisted(() => ({
   fetchMyProfile: vi.fn(),
   saveDocumentDraft: vi.fn(),
   uploadDocumentDraftAttachment: vi.fn(),
+  uploadDocumentDraftEmbeddedImage: vi.fn(),
+  deleteDocumentDraftEmbeddedImage: vi.fn(),
   listDocumentDraftAttachments: vi.fn(),
   deleteDocumentDraftAttachment: vi.fn(),
 }));
@@ -57,6 +59,8 @@ vi.mock(
   () => ({
     saveDocumentDraft: composerApi.saveDocumentDraft,
     uploadDocumentDraftAttachment: composerApi.uploadDocumentDraftAttachment,
+    uploadDocumentDraftEmbeddedImage: composerApi.uploadDocumentDraftEmbeddedImage,
+    deleteDocumentDraftEmbeddedImage: composerApi.deleteDocumentDraftEmbeddedImage,
     listDocumentDraftAttachments: composerApi.listDocumentDraftAttachments,
     deleteDocumentDraftAttachment: composerApi.deleteDocumentDraftAttachment,
     isDefiniteAttachmentUploadFailure: (error: unknown) =>
@@ -199,6 +203,17 @@ beforeEach(() => {
     fileName: 'evidence.txt',
     fileSize: 8,
   });
+  composerApi.uploadDocumentDraftEmbeddedImage.mockResolvedValue({
+    src: 'https://minio.example/approval-preview',
+    alt: 'pasted.png',
+    fileName: 'pasted.png',
+    uploadToken: 'approval-image-token',
+    fileId: 'approval-image-token',
+    objectKey: 'tenant/1/embedded-image-temp/approval-image-token/pasted.png',
+    fileSize: 8,
+    mimeType: 'image/png',
+  });
+  composerApi.deleteDocumentDraftEmbeddedImage.mockResolvedValue(undefined);
   composerApi.listDocumentDraftAttachments.mockResolvedValue([]);
   composerApi.deleteDocumentDraftAttachment.mockResolvedValue(undefined);
 });
@@ -2151,6 +2166,170 @@ describe('Document write page', () => {
     expect(titleHeader).toHaveTextContent('임시저장 문서 ID: 77');
     expect(dialog.querySelector('.MuiDialogContent-root')).not.toHaveTextContent(
       '임시저장 문서 ID: 77',
+    );
+  });
+
+  it('uploads pasted images and includes editor image metadata in the draft request', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '이미지 초안' },
+    });
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    const file = new File(['png data'], 'pasted.png', { type: 'image/png' });
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
+        getData: () => '',
+      },
+    });
+
+    await waitFor(() =>
+      expect(composerApi.uploadDocumentDraftEmbeddedImage).toHaveBeenCalledWith(file),
+    );
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/approval-preview',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledOnce(),
+    );
+
+    const request = composerApi.saveDocumentDraft.mock.calls[0][0];
+    expect(request.contentsHtml).toContain('data-upload-token="approval-image-token"');
+    expect(JSON.stringify(request.contentsJson)).toContain('"data-upload-token":"approval-image-token"');
+    expect(request).toMatchObject({
+      embeddedImages: [
+        expect.objectContaining({
+          uploadToken: 'approval-image-token',
+          fileName: 'pasted.png',
+          imageUrl: 'https://minio.example/approval-preview',
+          objectKey: 'tenant/1/embedded-image-temp/approval-image-token/pasted.png',
+          fileSize: 8,
+          mimeType: 'image/png',
+        }),
+      ],
+      temporaryImages: [
+        {
+          uploadToken: 'approval-image-token',
+          fileName: 'pasted.png',
+        },
+      ],
+    });
+    expect(composerApi.deleteDocumentDraftEmbeddedImage).not.toHaveBeenCalled();
+  });
+
+  it('prevents saving while a pasted image upload is pending and reports upload failures', async () => {
+    let resolveUpload!: (value: {
+      src: string;
+      alt: string;
+      fileName: string;
+      uploadToken: string;
+      fileSize: number;
+      mimeType: string;
+      objectKey: string;
+    }) => void;
+    composerApi.uploadDocumentDraftEmbeddedImage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      }),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '업로드 대기 초안' },
+    });
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['png'], 'pending.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '이미지 업로드 중...' })).toBeDisabled(),
+    );
+    expect(composerApi.saveDocumentDraft).not.toHaveBeenCalled();
+    resolveUpload({
+      src: 'https://minio.example/pending-preview',
+      alt: 'pending.png',
+      fileName: 'pending.png',
+      uploadToken: 'pending-token',
+      fileSize: 3,
+      mimeType: 'image/png',
+      objectKey: 'tenant/1/embedded-image-temp/pending-token/pending.png',
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '저장' })).toBeEnabled(),
+    );
+
+    composerApi.uploadDocumentDraftEmbeddedImage.mockRejectedValueOnce(
+      new Error('upload failed'),
+    );
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['bad'], 'failed.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '본문 이미지 업로드에 실패했습니다.',
+    );
+    expect(editor.querySelector('img')).not.toBeInTheDocument();
+  });
+
+  it('deletes temporary pasted images when the composer is closed without saving', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['png'], 'pasted.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/approval-preview',
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: '문서 작성' }),
+    );
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftEmbeddedImage).toHaveBeenCalledWith(
+        'approval-image-token',
+        'pasted.png',
+      ),
     );
   });
 

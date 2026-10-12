@@ -13,6 +13,8 @@ public class DocumentApprovalDraftSaveRequestVO {
     private String contentsHtml;
     private String contentsText;
     private List<ApprovalLineVO> approvalLines;
+    private List<DocumentApprovalEmbeddedImageVO> embeddedImages;
+    private List<DocumentApprovalEmbeddedImageVO> temporaryImages;
 
     public String getDocumentType() { return documentType; }
     public void setDocumentType(String documentType) { this.documentType = documentType; }
@@ -28,6 +30,14 @@ public class DocumentApprovalDraftSaveRequestVO {
     public void setContentsText(String contentsText) { this.contentsText = contentsText; }
     public List<ApprovalLineVO> getApprovalLines() { return approvalLines; }
     public void setApprovalLines(List<ApprovalLineVO> approvalLines) { this.approvalLines = approvalLines; }
+    public List<DocumentApprovalEmbeddedImageVO> getEmbeddedImages() { return embeddedImages; }
+    public void setEmbeddedImages(List<DocumentApprovalEmbeddedImageVO> embeddedImages) {
+        this.embeddedImages = embeddedImages;
+    }
+    public List<DocumentApprovalEmbeddedImageVO> getTemporaryImages() { return temporaryImages; }
+    public void setTemporaryImages(List<DocumentApprovalEmbeddedImageVO> temporaryImages) {
+        this.temporaryImages = temporaryImages;
+    }
 
     public static class ApprovalLineVO {
         private Integer stageOrder;

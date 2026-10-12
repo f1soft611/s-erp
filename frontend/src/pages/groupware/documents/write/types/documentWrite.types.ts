@@ -4,6 +4,7 @@ import type {
 } from '../../../../dashboard/types/dashboard';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { JSONContent } from '@tiptap/core';
+import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
 export type ApprovalStatus = '임시저장' | '결재대기' | '결재중' | '보완요청' | '완료';
@@ -45,6 +46,34 @@ export type DocumentApprovalDraftRequest = {
     participantType: 'APPROVAL' | 'AGREEMENT' | 'REFERENCE';
     participantUserId: string;
   }[];
+  embeddedImages: DocumentDraftEmbeddedImageMetadata[];
+  temporaryImages: DocumentDraftTemporaryImage[];
+};
+
+export type DocumentDraftEmbeddedImageMetadata = {
+  uploadToken: string;
+  fileName: string;
+  imageUrl?: string | null;
+  fileId?: string | null;
+  objectKey?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  width?: number | string | null;
+};
+
+export type DocumentDraftTemporaryImage = {
+  uploadToken: string;
+  fileName: string;
+};
+
+export type DocumentDraftEmbeddedImageUpload = RichTextEditorImage & {
+  fileName: string;
+  uploadToken: string;
+  src: string;
+  alt: string;
+  fileSize: number;
+  mimeType: string;
+  objectKey: string;
 };
 
 export type DocumentApprovalDraftResponse = {

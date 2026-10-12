@@ -46,7 +46,7 @@
             contents_json, contents_html, contents_text, drafter_id, drafter_name,
             drafter_department_name, created_at, updated_at, updated_by
         ) VALUES (
-            #{tenantId}, #{draftingWorkCategoryId}, #{documentType}, 'DRAFT', #{title},
+            #{tenantId}, #{draftingWorkCategoryId, jdbcType=BIGINT}, #{documentType}, 'DRAFT', #{title},
             CAST(#{contentsJson} AS jsonb), #{contentsHtml}, #{contentsText}, #{drafterId},
             #{drafterName}, #{drafterDepartmentName}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, #{drafterId}
         )
@@ -55,7 +55,7 @@
 
     <update id="updateDocumentApprovalMain" parameterType="map">
         UPDATE public.tb_electronic_approval_main
-        SET drafting_work_category_id = #{draftingWorkCategoryId},
+        SET drafting_work_category_id = #{draftingWorkCategoryId, jdbcType=BIGINT},
             document_type = #{documentType},
             title = #{title},
             contents_json = CAST(#{contentsJson} AS jsonb),

@@ -1,5 +1,6 @@
 package egovframework.let.groupware.approval.service.impl;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -8,7 +9,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpStatus;
@@ -21,12 +21,16 @@ import org.jsoup.Jsoup;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
+import egovframework.com.common.service.EmbeddedImageDocumentProcessor;
+import egovframework.com.common.service.EmbeddedImageStorageService;
 import egovframework.com.common.service.RichTextDocumentSanitizer;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO.ApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
@@ -46,13 +50,18 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     private final CommonCommentDAO commonCommentDAO;
     private final CommonFileService commonFileService;
     private final RichTextDocumentSanitizer documentSanitizer;
+    private final EmbeddedImageStorageService imageStorageService;
+    private final EmbeddedImageDocumentProcessor imageDocumentProcessor;
 
     public DocumentApprovalServiceImpl(DocumentApprovalDAO documentApprovalDAO, CommonCommentDAO commonCommentDAO,
-            CommonFileService commonFileService, RichTextDocumentSanitizer documentSanitizer) {
+            CommonFileService commonFileService, RichTextDocumentSanitizer documentSanitizer,
+            EmbeddedImageStorageService imageStorageService) {
         this.documentApprovalDAO = documentApprovalDAO;
         this.commonCommentDAO = commonCommentDAO;
         this.commonFileService = commonFileService;
         this.documentSanitizer = documentSanitizer;
+        this.imageStorageService = imageStorageService;
+        this.imageDocumentProcessor = new EmbeddedImageDocumentProcessor(imageStorageService, documentSanitizer);
     }
 
     @Override
@@ -69,9 +78,17 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         if (approvalId == null) {
             throw new IllegalStateException("전자결재 문서 ID를 확인할 수 없습니다.");
         }
+        EmbeddedImageDocumentProcessor.Result imageSave = processEmbeddedImages(user, approvalId, request);
+        applyProcessedBody(documentParams, imageSave);
+        documentParams.put("electronicApprovalId", approvalId);
+        if (documentApprovalDAO.updateDocumentApprovalMain(documentParams) != 1) {
+            throw new IllegalStateException("본문 이미지 저장에 실패했습니다.");
+        }
 
         replaceApprovalLines(user, approvalId, request.getApprovalLines(), participants);
         insertDraftSavedMessage(user, approvalId);
+        imageStorageService.completeOwnerSave(user.getTenantId(), OWNER_TYPE, approvalId,
+                toStorageUploads(request.getTemporaryImages()), imageSave.getRetainedFileIds());
         return draftResponse(approvalId);
     }
 
@@ -94,13 +111,40 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         validateCategory(request.getDraftingWorkCategoryId(), user.getTenantId());
         Map<String, DocumentApprovalParticipantVO> participants = validateParticipants(request.getApprovalLines(), user);
         Map<String, Object> documentParams = documentParams(user, request, actor);
+        EmbeddedImageDocumentProcessor.Result imageSave = processEmbeddedImages(user, electronicApprovalId, request);
+        applyProcessedBody(documentParams, imageSave);
         if (documentApprovalDAO.updateDocumentApprovalMain(documentParams) != 1) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "임시저장 문서를 찾을 수 없습니다.");
         }
 
         replaceApprovalLines(user, electronicApprovalId, request.getApprovalLines(), participants);
         insertDraftSavedMessage(user, electronicApprovalId);
+        imageStorageService.completeOwnerSave(user.getTenantId(), OWNER_TYPE, electronicApprovalId,
+                toStorageUploads(request.getTemporaryImages()), imageSave.getRetainedFileIds());
         return draftResponse(electronicApprovalId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EmbeddedImageUploadVO uploadTemporaryEmbeddedImage(LoginVO user, MultipartFile file) throws Exception {
+        validateAuthenticatedUser(user);
+        return imageStorageService.uploadTemporaryImage(user.getTenantId(), file);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTemporaryEmbeddedImage(LoginVO user, String uploadToken, String fileName) throws Exception {
+        validateAuthenticatedUser(user);
+        imageStorageService.deleteTemporaryImage(user.getTenantId(), uploadToken, fileName);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void streamEmbeddedImage(LoginVO user, Long electronicApprovalId, Long fileId,
+            HttpServletResponse response) throws Exception {
+        requireDraftOwner(user, electronicApprovalId);
+        imageStorageService.streamOwnedImage(
+                user.getTenantId(), OWNER_TYPE, electronicApprovalId, fileId, response);
     }
 
     @Override
@@ -238,6 +282,95 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("contentsText", Jsoup.parseBodyFragment(safeHtml).text());
         params.put("drafterDepartmentName", user.getDepartmentName());
         return params;
+    }
+
+    private EmbeddedImageDocumentProcessor.Result processEmbeddedImages(
+            LoginVO user, Long approvalId, DocumentApprovalDraftSaveRequestVO request) throws Exception {
+        return imageDocumentProcessor.process(
+                user.getTenantId(),
+                OWNER_TYPE,
+                approvalId,
+                request.getContentsHtml(),
+                request.getContentsJson(),
+                toStorageUploads(request.getEmbeddedImages()),
+                toStorageUploads(request.getTemporaryImages()),
+                user.getId(),
+                approvalImageUrlResolver(approvalId));
+    }
+
+    private void applyProcessedBody(
+            Map<String, Object> documentParams, EmbeddedImageDocumentProcessor.Result imageSave) {
+        documentParams.put("contentsHtml", imageSave.getHtml());
+        documentParams.put("contentsJson", imageSave.getJson());
+        documentParams.put("contentsText", Jsoup.parseBodyFragment(imageSave.getHtml()).text());
+    }
+
+    private List<EmbeddedImageUploadVO> toStorageUploads(List<DocumentApprovalEmbeddedImageVO> images) {
+        List<EmbeddedImageUploadVO> uploads = new ArrayList<EmbeddedImageUploadVO>();
+        if (images != null) {
+            for (DocumentApprovalEmbeddedImageVO image : images) {
+                if (image == null) {
+                    continue;
+                }
+                EmbeddedImageUploadVO upload = new EmbeddedImageUploadVO();
+                upload.setUploadToken(image.getUploadToken());
+                upload.setFileName(image.getFileName());
+                uploads.add(upload);
+            }
+        }
+        return uploads;
+    }
+
+    private EmbeddedImageDocumentProcessor.StableImageUrlResolver approvalImageUrlResolver(final Long approvalId) {
+        return new EmbeddedImageDocumentProcessor.StableImageUrlResolver() {
+            @Override
+            public String toStableUrl(CommonFileVO image) {
+                if (image == null || image.getFileId() == null) {
+                    throw new IllegalStateException("본문 이미지 ID를 확인할 수 없습니다.");
+                }
+                return "/api/v1/groupware/approvals/" + approvalId
+                        + "/embedded-images/" + image.getFileId();
+            }
+
+            @Override
+            public CommonFileVO resolveOwnedImage(String source, List<CommonFileVO> ownedImages) {
+                URI uri;
+                try {
+                    uri = URI.create(source);
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("본문 이미지 경로가 올바르지 않습니다.", exception);
+                }
+                if (uri.isAbsolute()) {
+                    return null;
+                }
+                String path = uri.getPath();
+                if (path == null || !path.startsWith("/api/")) {
+                    return null;
+                }
+                String expectedPrefix = "/api/v1/groupware/approvals/" + approvalId + "/embedded-images/";
+                if (!path.startsWith(expectedPrefix) || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+                    throw new IllegalArgumentException("현재 문서에서 사용할 수 없는 본문 이미지 경로입니다.");
+                }
+                String fileIdValue = path.substring(expectedPrefix.length());
+                if (!fileIdValue.matches("[1-9][0-9]*")) {
+                    throw new IllegalArgumentException("본문 이미지 경로가 올바르지 않습니다.");
+                }
+                Long fileId;
+                try {
+                    fileId = Long.valueOf(fileIdValue);
+                } catch (NumberFormatException exception) {
+                    throw new IllegalArgumentException("본문 이미지 경로가 올바르지 않습니다.", exception);
+                }
+                if (ownedImages != null) {
+                    for (CommonFileVO image : ownedImages) {
+                        if (image != null && fileId.equals(image.getFileId())) {
+                            return image;
+                        }
+                    }
+                }
+                throw new IllegalArgumentException("현재 문서가 소유하지 않은 본문 이미지입니다.");
+            }
+        };
     }
 
     private void replaceApprovalLines(LoginVO user, Long approvalId, List<ApprovalLineVO> approvalLines,

@@ -3,6 +3,8 @@ package egovframework.let.groupware.approval.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,11 +28,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
+import egovframework.com.common.service.EmbeddedImageStorageService;
 import egovframework.com.common.service.RichTextDocumentSanitizer;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
 
@@ -39,6 +44,7 @@ class DocumentApprovalServiceImplTest {
     private final DocumentApprovalDAO approvalDAO = mock(DocumentApprovalDAO.class);
     private final CommonCommentDAO commentDAO = mock(CommonCommentDAO.class);
     private final CommonFileService fileService = mock(CommonFileService.class);
+    private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
     private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
     private final LoginVO author = author();
 
@@ -48,6 +54,7 @@ class DocumentApprovalServiceImplTest {
             participant("101", "작성자", "기획팀"),
             participant("202", "결재자", "재무팀")));
         when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
 
@@ -136,6 +143,7 @@ class DocumentApprovalServiceImplTest {
             participant("101", "작성자", "기획팀"),
             participant("202", "결재자", "재무팀")));
         when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(0);
 
         assertThatThrownBy(() -> service().saveDraft(author, request()))
@@ -150,6 +158,7 @@ class DocumentApprovalServiceImplTest {
             participant("101", "작성자", "기획팀"),
             participant("202", "결재자", "재무팀")));
         when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(null);
 
@@ -187,8 +196,141 @@ class DocumentApprovalServiceImplTest {
         verifyNoInteractions(fileService);
     }
 
+    @Test
+    void temporaryEmbeddedImagesUseAuthenticatedTenant() throws Exception {
+        EmbeddedImageUploadVO uploaded = new EmbeddedImageUploadVO();
+        when(imageStorageService.uploadTemporaryImage(4L, null)).thenReturn(uploaded);
+
+        assertThat(service(imageStorageService).uploadTemporaryEmbeddedImage(author, null)).isSameAs(uploaded);
+
+        verify(imageStorageService).uploadTemporaryImage(4L, null);
+    }
+
+    @Test
+    void temporaryEmbeddedImageDeletionUsesAuthenticatedTenant() throws Exception {
+        service(imageStorageService).deleteTemporaryEmbeddedImage(author, "token", "image.png");
+
+        verify(imageStorageService).deleteTemporaryImage(4L, "token", "image.png");
+    }
+
+    @Test
+    void embeddedImageStreamRequiresDraftOwnerBeforeStorageLookup() throws Exception {
+        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("other-login");
+
+        assertThatThrownBy(() -> service(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verifyNoInteractions(imageStorageService);
+    }
+
+    @Test
+    void embeddedImageStreamUsesApprovalOwnerAfterDraftOwnerCheck() throws Exception {
+        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
+
+        service(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null);
+
+        verify(imageStorageService).streamOwnedImage(4L, "APPROVAL", 77L, 91L, null);
+    }
+
+    @Test
+    void saveDraftPromotesReferencedTemporaryImagesAndPersistsStableBody() throws Exception {
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        when(imageStorageService.listOwnedImages(4L, "APPROVAL", 77L)).thenReturn(Collections.emptyList());
+        when(imageStorageService.promoteTemporaryImage(4L, "APPROVAL", 77L, "token", "image.png", "login-author"))
+            .thenReturn(ownedEmbeddedImage(77L, 91L));
+
+        DocumentApprovalDraftSaveRequestVO request = requestWithTemporaryImage(true);
+        DocumentApprovalDraftVO saved = service(imageStorageService).saveDraft(author, request);
+
+        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
+        ArgumentCaptor<Map<String, Object>> updateParams = mapCaptor();
+        verify(approvalDAO).updateDocumentApprovalMain(updateParams.capture());
+        assertThat(updateParams.getValue().get("contentsHtml").toString())
+            .contains("/api/v1/groupware/approvals/77/embedded-images/91")
+            .doesNotContain("data-upload-token");
+        assertThat(updateParams.getValue().get("contentsJson").toString())
+            .contains("/api/v1/groupware/approvals/77/embedded-images/91")
+            .doesNotContain("data-upload-token");
+        verify(imageStorageService).completeOwnerSave(
+            eq(4L),
+            eq("APPROVAL"),
+            eq(77L),
+            argThat(uploads -> uploads.size() == 1
+                && "token".equals(uploads.get(0).getUploadToken())
+                && "image.png".equals(uploads.get(0).getFileName())),
+            argThat(fileIds -> fileIds.contains(91L)));
+        verify(approvalDAO, org.mockito.Mockito.times(2)).insertDocumentApprovalLine(anyMap());
+        verify(commentDAO).insertSystemComment(anyMap());
+    }
+
+    @Test
+    void updateDraftPromotesImagesUnderExistingApprovalOwner() throws Exception {
+        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+        when(imageStorageService.listOwnedImages(4L, "APPROVAL", 77L)).thenReturn(Collections.emptyList());
+        when(imageStorageService.promoteTemporaryImage(4L, "APPROVAL", 77L, "token", "image.png", "login-author"))
+            .thenReturn(ownedEmbeddedImage(77L, 91L));
+
+        DocumentApprovalDraftVO saved =
+            service(imageStorageService).saveDraft(author, 77L, requestWithTemporaryImage(true));
+
+        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
+        verify(imageStorageService).promoteTemporaryImage(
+            4L, "APPROVAL", 77L, "token", "image.png", "login-author");
+        verify(imageStorageService).completeOwnerSave(
+            eq(4L),
+            eq("APPROVAL"),
+            eq(77L),
+            argThat(uploads -> uploads.size() == 1
+                && "token".equals(uploads.get(0).getUploadToken())),
+            argThat(fileIds -> fileIds.contains(91L)));
+        verify(approvalDAO).updateDocumentApprovalMain(org.mockito.ArgumentMatchers.argThat(
+            params -> params.get("contentsHtml").toString()
+                .contains("/api/v1/groupware/approvals/77/embedded-images/91")));
+    }
+
+    @Test
+    void saveDraftRejectsImageOutsideTemporarySessionBeforeWritingLinesOrSystemEvent() throws Exception {
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        DocumentApprovalDraftSaveRequestVO request = requestWithTemporaryImage(false);
+
+        assertThatThrownBy(() -> service(imageStorageService).saveDraft(author, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("본문 이미지가 현재 임시 업로드 세션에 속하지 않습니다.");
+
+        verify(approvalDAO, never()).insertDocumentApprovalLine(anyMap());
+        verifyNoInteractions(commentDAO);
+        verify(imageStorageService, never()).completeOwnerSave(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyList(),
+            org.mockito.ArgumentMatchers.anySet());
+    }
+
     private DocumentApprovalServiceImpl service() {
-        return new DocumentApprovalServiceImpl(approvalDAO, commentDAO, fileService, documentSanitizer);
+        return service(imageStorageService);
+    }
+
+    private DocumentApprovalServiceImpl service(EmbeddedImageStorageService imageStorageService) {
+        return new DocumentApprovalServiceImpl(
+            approvalDAO, commentDAO, fileService, documentSanitizer, imageStorageService);
     }
 
     private DocumentApprovalDraftSaveRequestVO request() throws Exception {
@@ -231,6 +373,43 @@ class DocumentApprovalServiceImplTest {
         user.setName("작성자");
         user.setDepartmentName("기획팀");
         return user;
+    }
+
+    private DocumentApprovalDraftSaveRequestVO requestWithTemporaryImage(boolean includeSession) throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        String imageHtml = "<p><img src=\"https://temporary.example/image.png\" alt=\"image.png\" "
+            + "data-upload-token=\"token\" data-object-key=\"temporary-key\" "
+            + "data-file-size=\"4\" data-mime-type=\"image/png\"></p>";
+        request.setContentsHtml(imageHtml);
+        request.setContentsJson(new ObjectMapper().readTree(
+            "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"image\","
+                + "\"attrs\":{\"src\":\"https://temporary.example/image.png\",\"alt\":\"image.png\","
+                + "\"data-upload-token\":\"token\",\"data-object-key\":\"temporary-key\","
+                + "\"data-file-size\":4,\"data-mime-type\":\"image/png\"}}]}]}"));
+        DocumentApprovalEmbeddedImageVO image = new DocumentApprovalEmbeddedImageVO();
+        image.setUploadToken("token");
+        image.setFileName("image.png");
+        image.setImageUrl("https://temporary.example/image.png");
+        image.setObjectKey("temporary-key");
+        image.setFileSize(4L);
+        image.setMimeType("image/png");
+        request.setEmbeddedImages(Collections.singletonList(image));
+        request.setTemporaryImages(includeSession
+            ? Collections.singletonList(image) : Collections.<DocumentApprovalEmbeddedImageVO>emptyList());
+        return request;
+    }
+
+    private CommonFileVO ownedEmbeddedImage(Long ownerId, Long fileId) {
+        CommonFileVO image = new CommonFileVO();
+        image.setFileId(fileId);
+        image.setTenantId(4L);
+        image.setOwnerType("APPROVAL");
+        image.setOwnerId(ownerId);
+        image.setFileName("image.png");
+        image.setObjectKey("tenant/4/embedded-images/approval/77/token/image.png");
+        image.setFileUsageType("EMBEDDED");
+        image.setDeletedYn("N");
+        return image;
     }
 
     @SuppressWarnings("unchecked")

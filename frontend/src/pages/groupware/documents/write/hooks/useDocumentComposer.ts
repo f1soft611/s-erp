@@ -22,6 +22,7 @@ import type {
   DraftFormUserOption,
 } from '../../../../co/workflow/form/types/draftFormManagement.types';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import type {
   DocumentApprovalDraftRequest,
   DocumentApprovalStage,
@@ -31,11 +32,13 @@ import type {
 } from '../types/documentWrite.types';
 import {
   deleteDocumentDraftAttachment,
+  deleteDocumentDraftEmbeddedImage,
   isDefiniteAttachmentUploadFailure,
   listDocumentDraftAttachments,
   saveDocumentDraft,
   UnknownAttachmentUploadOutcomeError,
   uploadDocumentDraftAttachment,
+  uploadDocumentDraftEmbeddedImage,
 } from '../services/documentApproval.service';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 
@@ -127,6 +130,18 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const nextAttachmentId = useRef(1);
   const draftIdRef = useRef<number | null>(null);
   const savingRef = useRef(false);
+  const imageSaveLifecycle = useRichTextEditorSaveLifecycle({
+    editor,
+    uploadImage: uploadDocumentDraftEmbeddedImage,
+    deleteTemporaryImage: ({ uploadToken, fileName }) =>
+      deleteDocumentDraftEmbeddedImage(uploadToken, fileName),
+    onImageUploadError: (message) => {
+      setSaveError((current) => {
+        if (message) return message;
+        return current === '본문 이미지 업로드에 실패했습니다.' ? '' : current;
+      });
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -469,6 +484,10 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     ) {
       return;
     }
+    if (imageSaveLifecycle.uploadingCount > 0) {
+      setSaveError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
+      return;
+    }
 
     savingRef.current = true;
     setIsSaving(true);
@@ -495,16 +514,29 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         );
       }
 
+      const snapshot = imageSaveLifecycle.getSnapshot();
       const request: DocumentApprovalDraftRequest = {
         documentType: getDocumentType(activeDocumentKind),
         draftingWorkCategoryId: selectedFormId ? Number(selectedFormId) : null,
         title: composerTitle.trim(),
-        contentsJson: editor.getJSON(),
-        contentsHtml: editor.getHTML(),
+        contentsJson: snapshot.json,
+        contentsHtml: snapshot.html,
         contentsText: editor.getText({ blockSeparator: '\n' }),
         approvalLines,
+        embeddedImages: snapshot.referencedImages.map((image) => ({
+          uploadToken: image.uploadToken,
+          fileName: image.fileName,
+          imageUrl: image.src ?? null,
+          fileId: image.fileId ?? null,
+          objectKey: image.objectKey ?? null,
+          fileSize: image.fileSize ?? null,
+          mimeType: image.mimeType ?? null,
+          width: image.width ?? null,
+        })),
+        temporaryImages: snapshot.temporaryImages,
       };
       const saved = await saveDocumentDraft(request, draftIdRef.current);
+      imageSaveLifecycle.completeSave();
       draftIdRef.current = saved.electronicApprovalId;
       setElectronicApprovalId(saved.electronicApprovalId);
 
@@ -540,6 +572,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     selectedFormId,
     showSuccess,
     uploadAttachment,
+    imageSaveLifecycle,
   ]);
 
   const retryFailedAttachment = useCallback(
@@ -717,6 +750,11 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
 
   const closeComposer = useCallback(() => {
     if (savingRef.current) return;
+    if (imageSaveLifecycle.uploadingCount > 0) {
+      setSaveError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
+      return;
+    }
+    void imageSaveLifecycle.cleanupTemporaryImages();
     draftIdRef.current = null;
     setElectronicApprovalId(null);
     setIsSaving(false);
@@ -748,7 +786,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       editorBaseline.current = null;
     }
     onClose();
-  }, [editor, onClose]);
+  }, [editor, imageSaveLifecycle, onClose]);
 
   return {
     activeDocumentKind,
@@ -785,6 +823,11 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     isSaving,
     saveError,
     saveDraft,
+    uploadImage: imageSaveLifecycle.uploadImage,
+    onOrphanedImageUpload: imageSaveLifecycle.onOrphanedImageUpload,
+    onUploadingChange: imageSaveLifecycle.onUploadingChange,
+    onImageUploadError: imageSaveLifecycle.onImageUploadError,
+    uploadingCount: imageSaveLifecycle.uploadingCount,
     retryFailedAttachment,
     reconcileUnknownAttachment,
     removeAttachment,
@@ -792,6 +835,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       !isLoading &&
       !templateLoading &&
       !isSaving &&
+      imageSaveLifecycle.uploadingCount === 0 &&
       Boolean(composerTitle.trim()) &&
       Boolean(editor) &&
       approvalStages.length > 0,
