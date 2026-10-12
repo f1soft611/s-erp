@@ -48,7 +48,8 @@ public class CommonFileApiController {
             @RequestParam Long ownerId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        HashMap<String, Object> resultMap = new HashMap<>();
+            requireNonApprovalOwnerType(ownerType);
+            HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("resultList", commonFileService.listFiles(user.getTenantId(), ownerType, ownerId));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
@@ -62,6 +63,7 @@ public class CommonFileApiController {
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
+        requireNonApprovalOwnerType(ownerType);
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 파일이 없습니다.");
         }
@@ -85,6 +87,7 @@ public class CommonFileApiController {
         if (hasPartialOwner(ownerType, ownerId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 소유 정보가 올바르지 않습니다.");
         }
+        requireNonApprovalOwnerType(ownerType);
         if (StringUtils.hasText(ownerType) && ownerId != null) {
             commonFileService.deleteFile(user.getTenantId(), ownerType, ownerId, fileId);
         } else {
@@ -107,6 +110,7 @@ public class CommonFileApiController {
         if (hasPartialOwner(ownerType, ownerId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 소유 정보가 올바르지 않습니다.");
         }
+        requireNonApprovalOwnerType(ownerType);
         if (StringUtils.hasText(ownerType) && ownerId != null) {
             commonFileService.downloadFile(user.getTenantId(), ownerType, ownerId, fileId, response);
         } else {
@@ -122,5 +126,11 @@ public class CommonFileApiController {
 
     private boolean hasPartialOwner(String ownerType, Long ownerId) {
         return StringUtils.hasText(ownerType) != (ownerId != null);
+    }
+
+    private void requireNonApprovalOwnerType(String ownerType) {
+        if (StringUtils.hasText(ownerType) && "APPROVAL".equalsIgnoreCase(ownerType.trim())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "전자결재 첨부는 전용 권한 확인 경로를 사용해야 합니다.");
+        }
     }
 }

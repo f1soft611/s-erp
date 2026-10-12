@@ -24,6 +24,10 @@ public class CommonCommentVO implements Serializable {
     private Long parentCommentId;
     @Schema(description = "댓글 내용")
     private String content;
+    @Schema(description = "댓글 유형")
+    private String commentType;
+    @Schema(description = "시스템 이벤트 코드")
+    private String eventType;
     @Schema(description = "작성자 ID")
     private String writerId;
     @Schema(description = "작성자 이름")
@@ -65,6 +69,14 @@ public class CommonCommentVO implements Serializable {
     public String getContent() { return content; }
     @Generated
     public void setContent(String content) { this.content = content; }
+    @Generated
+    public String getCommentType() { return commentType; }
+    @Generated
+    public void setCommentType(String commentType) { this.commentType = commentType; }
+    @Generated
+    public String getEventType() { return eventType; }
+    @Generated
+    public void setEventType(String eventType) { this.eventType = eventType; }
     @Generated
     public String getWriterId() { return writerId; }
     @Generated

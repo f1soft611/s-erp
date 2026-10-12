@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DocumentApprovalDAO">
+
+    <resultMap id="participant" type="egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO">
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="departmentName" column="department_name"/>
+    </resultMap>
+
+    <select id="selectActiveDraftingCategory" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM public.tb_drafting_work_category
+            WHERE tenant_id = #{tenantId}
+              AND drafting_work_category_id = #{draftingWorkCategoryId}
+              AND use_at = 'Y'
+              AND COALESCE(delete_status, 'N') &lt;&gt; 'Y'
+        )
+    </select>
+
+    <select id="selectActiveParticipants" parameterType="map" resultMap="participant">
+        SELECT
+            CAST(u.user_id AS varchar) AS user_id,
+            u.user_nm AS user_name,
+            d.department_nm AS department_name
+        FROM public.tb_user u
+        JOIN public.tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+         AND la.use_at = 'Y'
+        LEFT JOIN public.tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        WHERE u.tenant_id = #{tenantId}
+          AND u.use_at = 'Y'
+          AND CAST(u.user_id AS varchar) IN
+          <foreach collection="participantUserIds" item="participantUserId" open="(" separator="," close=")">
+              #{participantUserId}
+          </foreach>
+    </select>
+
+    <select id="insertDocumentApprovalMain" parameterType="map" resultType="long">
+        INSERT INTO public.tb_electronic_approval_main (
+            tenant_id, drafting_work_category_id, document_type, document_status, title,
+            contents_json, contents_html, contents_text, drafter_id, drafter_name,
+            drafter_department_name, created_at, updated_at, updated_by
+        ) VALUES (
+            #{tenantId}, #{draftingWorkCategoryId}, #{documentType}, 'DRAFT', #{title},
+            CAST(#{contentsJson} AS jsonb), #{contentsHtml}, #{contentsText}, #{drafterId},
+            #{drafterName}, #{drafterDepartmentName}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, #{drafterId}
+        )
+        RETURNING electronic_approval_id
+    </select>
+
+    <update id="updateDocumentApprovalMain" parameterType="map">
+        UPDATE public.tb_electronic_approval_main
+        SET drafting_work_category_id = #{draftingWorkCategoryId},
+            document_type = #{documentType},
+            title = #{title},
+            contents_json = CAST(#{contentsJson} AS jsonb),
+            contents_html = #{contentsHtml},
+            contents_text = #{contentsText},
+            drafter_name = #{drafterName},
+            drafter_department_name = #{drafterDepartmentName},
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = #{drafterId}
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND drafter_id = #{drafterId}
+          AND document_status = 'DRAFT'
+    </update>
+
+    <delete id="deleteDocumentApprovalLines" parameterType="map">
+        DELETE FROM public.tb_electronic_approval_line_info
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+    </delete>
+
+    <insert id="insertDocumentApprovalLine" parameterType="map">
+        INSERT INTO public.tb_electronic_approval_line_info (
+            tenant_id, electronic_approval_id, stage_order, participant_order,
+            participant_type, participant_user_id, participant_name,
+            participant_department_name, action_status, action_at, action_comment, created_at
+        ) VALUES (
+            #{tenantId}, #{electronicApprovalId}, #{stageOrder}, #{participantOrder},
+            #{participantType}, #{participantUserId}, #{participantName},
+            #{participantDepartmentName}, #{actionStatus}, NULL, NULL, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <select id="selectDraftDrafterId" parameterType="map" resultType="string">
+        SELECT drafter_id
+        FROM public.tb_electronic_approval_main
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND document_status = 'DRAFT'
+    </select>
+</mapper>

@@ -19,6 +19,10 @@ public class CommonFileDAO extends EgovAbstractMapper {
         return (CommonFileVO) selectOne("CommonFileDAO.selectCommonFileById", params);
     }
 
+    public CommonFileVO selectCommonFileByIdExcludingApproval(Map<String, Object> params) throws Exception {
+        return (CommonFileVO) selectOne("CommonFileDAO.selectCommonFileByIdExcludingApproval", params);
+    }
+
     public CommonFileVO selectCommonFileByIdAndOwner(Map<String, Object> params) throws Exception {
         return (CommonFileVO) selectOne("CommonFileDAO.selectCommonFileByIdAndOwner", params);
     }
@@ -31,8 +35,8 @@ public class CommonFileDAO extends EgovAbstractMapper {
         update("CommonFileDAO.updateCommonFile", params);
     }
 
-    public void softDeleteCommonFile(Map<String, Object> params) throws Exception {
-        update("CommonFileDAO.softDeleteCommonFile", params);
+    public void softDeleteCommonFileExcludingApproval(Map<String, Object> params) throws Exception {
+        update("CommonFileDAO.softDeleteCommonFileExcludingApproval", params);
     }
 
     public void softDeleteCommonFileByOwner(Map<String, Object> params) throws Exception {

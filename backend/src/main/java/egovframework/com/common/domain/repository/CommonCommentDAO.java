@@ -31,6 +31,10 @@ public class CommonCommentDAO extends EgovAbstractMapper {
         return (Long) selectOne("CommonCommentDAO.insertCommonComment", params);
     }
 
+    public Long insertSystemComment(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("CommonCommentDAO.insertSystemComment", params);
+    }
+
     public int updateCommonComment(Map<String, Object> params) throws Exception {
         return update("CommonCommentDAO.updateCommonComment", params);
     }

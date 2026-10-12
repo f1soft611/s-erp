@@ -225,7 +225,15 @@ export function DocumentApprovalFields({
               onChange={onApprovalUserChange}
             />
           </Box>
-          <Box sx={{ display: 'flex', gap: 0.5, flex: '0 0 auto' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 0.5,
+              flex: '0 1 auto',
+              flexWrap: 'wrap',
+              maxWidth: '100%',
+            }}
+          >
             <Button
               variant="outlined"
               size="small"

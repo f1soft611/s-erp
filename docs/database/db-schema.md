@@ -316,7 +316,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드, USER에서는 NULL         |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -330,7 +330,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 결재 처리 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다.
+- 결재 처리 및 임시저장 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -587,6 +587,7 @@
 
 ## 변경 이력
 
+- 2026-10-08: `tb_common_comment` SYSTEM 이벤트 허용 목록에 `DRAFT_SAVED`를 추가하는 `20261008_004` migration 초안을 정의했다. 실제 DB 제약을 재확인하지 못했으며 적용하지 않았다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고.
 - 2026-10-08: 문서 결재 본문/참여자 테이블, 공통 댓글 SYSTEM 이벤트 구분, 댓글 좋아요 테이블의 미적용 SQL 초안을 정의했다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고. 실제 DB에는 적용하지 않았다.
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
 - 2026-10-02: `tb_drafting_work_category`의 삭제되지 않은 양식 코드에 테넌트별 부분 unique index를 추가하는 SQL 초안을 정의했다. [backend/DATABASE/20261002](../../backend/DATABASE/20261002) 및 [docs/database/20261002](20261002) 참고. (미반영 SQL 초안)

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,7 +58,7 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         }
 
         if (commonFileDAO == null) {
-            return new ArrayList<>();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 조회할 수 없습니다.");
         }
 
         HashMap<String, Object> params = new HashMap<>();
@@ -80,21 +81,24 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 파일이 없습니다.");
         }
+        if (minioStorageService == null || commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장소를 사용할 수 없습니다.");
+        }
 
-        String originalName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-        if (!StringUtils.hasText(originalName)) {
+        String originalFilename = file.getOriginalFilename();
+        if (!StringUtils.hasText(originalFilename)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드 파일명이 없습니다.");
         }
 
+        String normalizedName = StringUtils.cleanPath(Objects.requireNonNull(originalFilename)).replace("\\", "/");
         String normalizedOwnerType = ownerType.trim().toUpperCase();
-        String normalizedName = originalName.replace("\\", "/");
-        String objectKey = "tenant/" + tenantId + "/" + normalizedOwnerType.toLowerCase() + "/" + ownerId + "/" + normalizedName;
+        String objectKey = "tenant/" + tenantId + "/" + normalizedOwnerType.toLowerCase() + "/" + ownerId + "/" + UUID.randomUUID();
         String bucketName = StringUtils.hasText(storageBucket) ? storageBucket.trim() : DEFAULT_BUCKET;
+        boolean objectUploaded = false;
 
         try {
-            if (minioStorageService != null) {
-                minioStorageService.upload(bucketName, objectKey, file.getInputStream(), file.getSize(), file.getContentType());
-            }
+            minioStorageService.upload(bucketName, objectKey, file.getInputStream(), file.getSize(), file.getContentType());
+            objectUploaded = true;
             String sha256 = sha256(file.getBytes());
 
             CommonFileVO uploaded = new CommonFileVO();
@@ -112,38 +116,45 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
             uploaded.setUploadedBy(uploaderId == null ? "unknown" : uploaderId);
             uploaded.setDeletedYn("N");
 
-            if (commonFileDAO != null) {
-                HashMap<String, Object> params = new HashMap<>();
-                params.put("tenantId", tenantId);
-                params.put("ownerType", normalizedOwnerType);
-                params.put("ownerId", ownerId);
-                params.put("fileName", normalizedName);
-                params.put("filePath", uploaded.getFilePath());
-                params.put("objectKey", objectKey);
-                params.put("bucketName", bucketName);
-                params.put("storageProvider", "minio");
-                params.put("fileSize", file.getSize());
-                params.put("mimeType", file.getContentType());
-                params.put("checksumSha256", sha256);
-                params.put("contentType", file.getContentType());
-                params.put("fileUsageType", "ATTACHMENT");
-                params.put("uploadedBy", uploaderId == null ? "unknown" : uploaderId);
-                params.put("deletedYn", "N");
-                Long fileId = commonFileDAO.insertCommonFile(params);
-                if (fileId != null) {
-                    uploaded.setFileId(fileId);
-                    HashMap<String, Object> lookup = new HashMap<>();
-                    lookup.put("tenantId", tenantId);
-                    lookup.put("fileId", fileId);
-                    return commonFileDAO.selectCommonFileById(lookup);
+            HashMap<String, Object> params = new HashMap<>();
+            params.put("tenantId", tenantId);
+            params.put("ownerType", normalizedOwnerType);
+            params.put("ownerId", ownerId);
+            params.put("fileName", normalizedName);
+            params.put("filePath", uploaded.getFilePath());
+            params.put("objectKey", objectKey);
+            params.put("bucketName", bucketName);
+            params.put("storageProvider", "minio");
+            params.put("fileSize", file.getSize());
+            params.put("mimeType", file.getContentType());
+            params.put("checksumSha256", sha256);
+            params.put("contentType", file.getContentType());
+            params.put("fileUsageType", "ATTACHMENT");
+            params.put("uploadedBy", uploaderId == null ? "unknown" : uploaderId);
+            params.put("deletedYn", "N");
+            Long fileId = commonFileDAO.insertCommonFile(params);
+            if (fileId == null) {
+                throw new IllegalStateException("파일 메타데이터 ID를 저장하지 못했습니다.");
+            }
+            HashMap<String, Object> lookup = new HashMap<>();
+            lookup.put("tenantId", tenantId);
+            lookup.put("fileId", fileId);
+            CommonFileVO persisted = commonFileDAO.selectCommonFileById(lookup);
+            if (persisted == null) {
+                throw new IllegalStateException("저장된 파일 메타데이터를 확인할 수 없습니다.");
+            }
+            return persisted;
+        } catch (Exception ex) {
+            if (objectUploaded) {
+                try {
+                    minioStorageService.delete(bucketName, objectKey);
+                } catch (Exception cleanupException) {
+                    ex.addSuppressed(cleanupException);
+                    LOGGER.log(Level.SEVERE, "MinIO compensation failed. bucket=" + bucketName + ", objectKey=" + objectKey, cleanupException);
                 }
             }
-
-            uploaded.setFileId(1L);
-            return uploaded;
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "MinIO upload failed. bucket=" + bucketName + ", objectKey=" + objectKey, ex);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "MinIO 업로드 중 오류가 발생했습니다.", ex);
+            LOGGER.log(Level.SEVERE, "Common file upload or metadata persistence failed. bucket=" + bucketName + ", objectKey=" + objectKey, ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다.", ex);
         }
     }
 
@@ -157,21 +168,23 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 ID가 없습니다.");
         }
 
-        if (commonFileDAO != null) {
-            HashMap<String, Object> params = new HashMap<>();
-            params.put("tenantId", tenantId);
-            params.put("fileId", fileId);
-            commonFileDAO.softDeleteCommonFile(params);
+        if (commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 변경할 수 없습니다.");
         }
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("fileId", fileId);
+        commonFileDAO.softDeleteCommonFileExcludingApproval(params);
     }
 
     @Override
     @Transactional
     public void deleteFile(Long tenantId, String ownerType, Long ownerId, Long fileId) throws Exception {
         Map<String, Object> params = ownerFileParams(tenantId, ownerType, ownerId, fileId);
-        if (commonFileDAO != null) {
-            commonFileDAO.softDeleteCommonFileByOwner(params);
+        if (commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 변경할 수 없습니다.");
         }
+        commonFileDAO.softDeleteCommonFileByOwner(params);
     }
 
     @Override
@@ -183,23 +196,25 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 ID가 없습니다.");
         }
 
-        if (commonFileDAO != null) {
-            HashMap<String, Object> params = new HashMap<>();
-            params.put("tenantId", tenantId);
-            params.put("fileId", fileId);
-            CommonFileVO file = commonFileDAO.selectCommonFileById(params);
-            streamFile(file, response);
+        if (commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 조회할 수 없습니다.");
         }
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("fileId", fileId);
+        CommonFileVO file = commonFileDAO.selectCommonFileByIdExcludingApproval(params);
+        streamFile(file, response);
     }
 
     @Override
     public void downloadFile(Long tenantId, String ownerType, Long ownerId, Long fileId,
             HttpServletResponse response) throws Exception {
         Map<String, Object> params = ownerFileParams(tenantId, ownerType, ownerId, fileId);
-        if (commonFileDAO != null) {
-            CommonFileVO file = commonFileDAO.selectCommonFileByIdAndOwner(params);
-            streamFile(file, response);
+        if (commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 조회할 수 없습니다.");
         }
+        CommonFileVO file = commonFileDAO.selectCommonFileByIdAndOwner(params);
+        streamFile(file, response);
     }
 
     private void streamFile(CommonFileVO file, HttpServletResponse response) throws Exception {

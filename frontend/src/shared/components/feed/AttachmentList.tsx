@@ -20,6 +20,7 @@ export type AttachmentListProps = {
   showActions?: boolean;
   onDownload?: (id: string) => void;
   onRemove?: (id: string) => void;
+  testId?: string;
 };
 
 export function AttachmentList({
@@ -29,13 +30,14 @@ export function AttachmentList({
   showActions = true,
   onDownload,
   onRemove,
+  testId = 'notice-attachment-list',
 }: AttachmentListProps) {
   if (files.length === 0) {
     return null;
   }
 
   return (
-    <Box data-testid="notice-attachment-list" sx={{ display: 'grid', gap: 1 }}>
+    <Box data-testid={testId} sx={{ display: 'grid', gap: 1 }}>
       {files.map((file, index) => {
         const iconMeta = getAttachmentIconMeta(file.name);
 

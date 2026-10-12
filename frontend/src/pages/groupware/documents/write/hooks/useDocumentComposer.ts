@@ -22,12 +22,33 @@ import type {
 } from '../../../../co/workflow/form/types/draftFormManagement.types';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type {
+  DocumentApprovalDraftRequest,
   DocumentApprovalStage,
+  DocumentDraftAttachment,
+  DocumentDraftAttachmentStatus,
   DocumentKind,
 } from '../types/documentWrite.types';
+import {
+  deleteDocumentDraftAttachment,
+  isDefiniteAttachmentUploadFailure,
+  listDocumentDraftAttachments,
+  saveDocumentDraft,
+  UnknownAttachmentUploadOutcomeError,
+  uploadDocumentDraftAttachment,
+} from '../services/documentApproval.service';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 
 export const ALL_CATEGORY_VALUE = '__all__';
+
+function getDocumentType(kind: DocumentKind) {
+  const documentTypes: Record<DocumentKind, DocumentApprovalDraftRequest['documentType']> = {
+    기안서: 'DRAFTING',
+    업무연락: 'BUSINESS_CONTACT',
+    지출결의서: 'EXPENSE_RESOLUTION',
+    근태신청: 'ATTENDANCE_APPLICATION',
+  };
+  return documentTypes[kind];
+}
 
 function toUserOption(user: DraftFormUserOption): F1GridUserOption {
   return {
@@ -64,7 +85,11 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const [activeDocumentKind, setActiveDocumentKind] =
     useState<DocumentKind>('기안서');
   const [composerTitle, setComposerTitle] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<DocumentDraftAttachment[]>([]);
+  const [electronicApprovalId, setElectronicApprovalId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveNotice, setSaveNotice] = useState('');
   const [drafterName, setDrafterName] = useState('');
   const [categoryItems, setCategoryItems] = useState<
     Awaited<ReturnType<typeof fetchDraftFormOptions>>['categoryItems']
@@ -98,6 +123,9 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const nextStageId = useRef(1);
   const editorBaseline = useRef<string | null>(null);
   const templateRequestId = useRef(0);
+  const nextAttachmentId = useRef(1);
+  const draftIdRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -380,14 +408,271 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const handleAttachmentSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFiles = Array.from(event.target.files ?? []);
     if (nextFiles.length > 0) {
-      setAttachments((current) => [...current, ...nextFiles]);
+      setAttachments((current) => [
+        ...current,
+        ...nextFiles.map((file) => ({
+          clientId: `attachment-${nextAttachmentId.current++}`,
+          file,
+          status: 'pending' as const,
+        })),
+      ]);
+      setSaveNotice('');
     }
     event.target.value = '';
   };
 
+  const uploadAttachment = useCallback(
+    async (
+      attachment: DocumentDraftAttachment,
+      approvalId: number,
+    ): Promise<DocumentDraftAttachmentStatus> => {
+      try {
+        const uploaded = await uploadDocumentDraftAttachment(
+          approvalId,
+          attachment.file,
+        );
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === attachment.clientId
+              ? { ...item, status: 'uploaded', fileId: uploaded.fileId, error: undefined }
+              : item,
+          ),
+        );
+        return 'uploaded';
+      } catch (error: unknown) {
+        const status = isDefiniteAttachmentUploadFailure(error) ? 'failed' : 'unknown';
+        const message =
+          error instanceof UnknownAttachmentUploadOutcomeError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : '첨부파일 업로드 결과를 확인할 수 없습니다.';
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === attachment.clientId
+              ? { ...item, status, error: message }
+              : item,
+          ),
+        );
+        return status;
+      }
+    },
+    [],
+  );
+
+  const saveDraft = useCallback(async () => {
+    if (
+      savingRef.current ||
+      !editor ||
+      !composerTitle.trim() ||
+      approvalStages.length === 0
+    ) {
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    setSaveError('');
+    setSaveNotice('');
+    try {
+      const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
+        approvalStages.flatMap((stage, stageIndex) =>
+          stage.users.map((user, participantIndex) => ({
+            stageOrder: stageIndex + 1,
+            participantOrder: participantIndex + 1,
+            participantType:
+              stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
+            participantUserId: String(user.value),
+          })),
+        );
+      if (referenceUserIds.length > 0) {
+        approvalLines.push(
+          ...referenceUserIds.map((participantUserId, participantIndex) => ({
+            stageOrder: approvalStages.length + 1,
+            participantOrder: participantIndex + 1,
+            participantType: 'REFERENCE' as const,
+            participantUserId,
+          })),
+        );
+      }
+
+      const request: DocumentApprovalDraftRequest = {
+        documentType: getDocumentType(activeDocumentKind),
+        draftingWorkCategoryId: selectedFormId ? Number(selectedFormId) : null,
+        title: composerTitle.trim(),
+        contentsJson: editor.getJSON(),
+        contentsHtml: editor.getHTML(),
+        contentsText: editor.getText({ blockSeparator: '\n' }),
+        approvalLines,
+      };
+      const saved = await saveDocumentDraft(request, draftIdRef.current);
+      draftIdRef.current = saved.electronicApprovalId;
+      setElectronicApprovalId(saved.electronicApprovalId);
+
+      let failedCount = attachments.filter(
+        (attachment) => attachment.status === 'failed' || attachment.status === 'unknown',
+      ).length;
+      for (const attachment of attachments.filter((item) => item.status === 'pending')) {
+        const status = await uploadAttachment(attachment, saved.electronicApprovalId);
+        if (status !== 'uploaded') failedCount += 1;
+      }
+      setSaveNotice(
+        failedCount > 0
+          ? `문서는 저장되었지만 첨부파일 ${failedCount}건의 상태 확인이 필요합니다.`
+          : '문서가 임시저장되었습니다.',
+      );
+    } catch (error: unknown) {
+      setSaveError(
+        error instanceof Error ? error.message : '문서 저장에 실패했습니다.',
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [
+    activeDocumentKind,
+    approvalStages,
+    attachments,
+    composerTitle,
+    editor,
+    referenceUserIds,
+    selectedFormId,
+    uploadAttachment,
+  ]);
+
+  const retryFailedAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      const approvalId = draftIdRef.current;
+      if (
+        savingRef.current ||
+        !attachment ||
+        attachment.status !== 'failed' ||
+        approvalId === null
+      ) {
+        return;
+      }
+      savingRef.current = true;
+      setIsSaving(true);
+      setSaveError('');
+      setSaveNotice('');
+      try {
+        await uploadAttachment(attachment, approvalId);
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments, uploadAttachment],
+  );
+
+  const reconcileUnknownAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      const approvalId = draftIdRef.current;
+      if (
+        savingRef.current ||
+        !attachment ||
+        attachment.status !== 'unknown' ||
+        approvalId === null
+      ) {
+        return;
+      }
+      savingRef.current = true;
+      setIsSaving(true);
+      setSaveError('');
+      try {
+        const files = await listDocumentDraftAttachments(approvalId);
+        const uploadedIds = new Set(
+          attachments
+            .filter((item) => item.status === 'uploaded' && item.fileId !== undefined)
+            .map((item) => item.fileId),
+        );
+        const matches = files.filter(
+          (file) =>
+            file.fileName === attachment.file.name &&
+            file.fileSize === attachment.file.size &&
+            !uploadedIds.has(file.fileId),
+        );
+        if (matches.length === 1) {
+          setAttachments((current) =>
+            current.map((item) =>
+              item.clientId === clientId
+                ? { ...item, status: 'uploaded', fileId: matches[0].fileId, error: undefined }
+                : item,
+            ),
+          );
+          setSaveNotice('첨부파일 업로드가 확인되었습니다.');
+        } else {
+          setAttachments((current) =>
+            current.map((item) =>
+              item.clientId === clientId
+                ? { ...item, error: '파일 목록에서 업로드 여부를 확인하지 못했습니다.' }
+                : item,
+            ),
+          );
+        }
+      } catch (error: unknown) {
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === clientId
+              ? {
+                  ...item,
+                  error: error instanceof Error ? error.message : '첨부 상태 조회에 실패했습니다.',
+                }
+              : item,
+          ),
+        );
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments],
+  );
+
+  const removeAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      if (!attachment || savingRef.current || attachment.status === 'unknown') return;
+      if (attachment.status !== 'uploaded') {
+        setAttachments((current) => current.filter((item) => item.clientId !== clientId));
+        return;
+      }
+      const approvalId = draftIdRef.current;
+      if (approvalId === null || attachment.fileId === undefined) return;
+      savingRef.current = true;
+      setIsSaving(true);
+      setSaveError('');
+      try {
+        await deleteDocumentDraftAttachment(approvalId, attachment.fileId);
+        setAttachments((current) => current.filter((item) => item.clientId !== clientId));
+      } catch (error: unknown) {
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === clientId
+              ? { ...item, error: error instanceof Error ? error.message : '첨부파일 삭제에 실패했습니다.' }
+              : item,
+          ),
+        );
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments],
+  );
+
   const closeComposer = useCallback(() => {
+    if (savingRef.current) return;
+    draftIdRef.current = null;
+    setElectronicApprovalId(null);
+    setIsSaving(false);
+    setSaveError('');
+    setSaveNotice('');
     setComposerTitle('');
     setAttachments([]);
+    nextAttachmentId.current = 1;
     setDrafterName('');
     setCategoryItems([]);
     setDraftForms([]);
@@ -445,7 +730,21 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     loadError,
     isLoading,
     attachments,
-    setAttachments,
+    electronicApprovalId,
+    isSaving,
+    saveError,
+    saveNotice,
+    saveDraft,
+    retryFailedAttachment,
+    reconcileUnknownAttachment,
+    removeAttachment,
+    canSaveDraft:
+      !isLoading &&
+      !templateLoading &&
+      !isSaving &&
+      Boolean(composerTitle.trim()) &&
+      Boolean(editor) &&
+      approvalStages.length > 0,
     attachmentInputRef,
     editor,
     handleEditorReady,

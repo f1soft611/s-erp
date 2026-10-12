@@ -17,6 +17,10 @@ const composerApi = vi.hoisted(() => ({
   fetchDraftForms: vi.fn(),
   fetchDraftFormTemplate: vi.fn(),
   fetchMyProfile: vi.fn(),
+  saveDocumentDraft: vi.fn(),
+  uploadDocumentDraftAttachment: vi.fn(),
+  listDocumentDraftAttachments: vi.fn(),
+  deleteDocumentDraftAttachment: vi.fn(),
 }));
 
 vi.mock(
@@ -37,6 +41,19 @@ vi.mock(
 vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
   fetchMyProfile: composerApi.fetchMyProfile,
 }));
+
+vi.mock(
+  '../src/pages/groupware/documents/write/services/documentApproval.service',
+  () => ({
+    saveDocumentDraft: composerApi.saveDocumentDraft,
+    uploadDocumentDraftAttachment: composerApi.uploadDocumentDraftAttachment,
+    listDocumentDraftAttachments: composerApi.listDocumentDraftAttachments,
+    deleteDocumentDraftAttachment: composerApi.deleteDocumentDraftAttachment,
+    isDefiniteAttachmentUploadFailure: (error: unknown) =>
+      error instanceof Error && error.message === 'definite failure',
+    UnknownAttachmentUploadOutcomeError: class extends Error {},
+  }),
+);
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
@@ -163,6 +180,17 @@ beforeEach(() => {
     employeeId: composerUser.userId,
     name: '기안자',
   });
+  composerApi.saveDocumentDraft.mockResolvedValue({
+    electronicApprovalId: 77,
+    documentStatus: 'DRAFT',
+  });
+  composerApi.uploadDocumentDraftAttachment.mockResolvedValue({
+    fileId: 501,
+    fileName: 'evidence.txt',
+    fileSize: 8,
+  });
+  composerApi.listDocumentDraftAttachments.mockResolvedValue([]);
+  composerApi.deleteDocumentDraftAttachment.mockResolvedValue(undefined);
 });
 
 const pageProps = {
@@ -1233,6 +1261,18 @@ describe('Document write page', () => {
     });
   });
 
+  it('wraps approval actions when the composer has a narrow viewport', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalActions = screen
+      .getByRole('button', { name: '결재 추가' })
+      .parentElement;
+    expect(approvalActions).toHaveStyle({ flexWrap: 'wrap' });
+  });
+
   it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
     const approvalName = '홍길동김';
     const agreementName = '김민수';
@@ -2022,4 +2062,107 @@ describe('Document write page', () => {
         .closest('.MuiAutocomplete-root'),
     ).not.toHaveTextContent(/박서준/);
   }, 10000);
+
+  it('saves the document payload and reuses its ID on subsequent saves', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '초안 제목' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(1),
+    );
+    const firstRequest = composerApi.saveDocumentDraft.mock.calls[0][0];
+    expect(composerApi.saveDocumentDraft.mock.calls[0][1]).toBeNull();
+    expect(firstRequest).toMatchObject({
+      documentType: 'DRAFTING',
+      draftingWorkCategoryId: null,
+      title: '초안 제목',
+      approvalLines: [
+        expect.objectContaining({
+          stageOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'emp-1',
+        }),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(2),
+    );
+    expect(composerApi.saveDocumentDraft.mock.calls[1][1]).toBe(77);
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    const titleHeader = dialog.querySelector('.MuiDialogTitle-root')?.parentElement;
+    expect(titleHeader).toHaveTextContent('임시저장 문서 ID: 77');
+    expect(dialog.querySelector('.MuiDialogContent-root')).not.toHaveTextContent(
+      '임시저장 문서 ID: 77',
+    );
+  });
+
+  it('keeps failed attachments and retries them individually', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockRejectedValueOnce(new Error('definite failure'))
+      .mockResolvedValueOnce({
+        fileId: 502,
+        fileName: 'evidence.txt',
+        fileSize: 8,
+      });
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 포함 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('definite failure')).toBeInTheDocument();
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('document-composer-attachment-uploaded'),
+      ).toBeInTheDocument(),
+    );
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('업로드 완료')).toBeInTheDocument();
+  });
+
+  it('marks an ambiguous upload as unknown and does not retry it automatically', async () => {
+    composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('network disconnected'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '네트워크 확인 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(
+      await screen.findByRole('button', { name: '상태 확인' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '재시도' }),
+    ).not.toBeInTheDocument();
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '상태 확인' }));
+    expect(
+      await screen.findByText('파일 목록에서 업로드 여부를 확인하지 못했습니다.'),
+    ).toBeInTheDocument();
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+  });
 });

@@ -5,13 +5,13 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   IconButton,
   MenuItem,
   Tab,
   Tabs,
   TextField,
   Divider,
+  Typography,
 } from '@mui/material';
 import {
   RichTextEditor,
@@ -21,6 +21,7 @@ import {
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import type { DocumentKind } from '../types/documentWrite.types';
 import {
   ALL_CATEGORY_VALUE,
@@ -72,7 +73,15 @@ export function DocumentComposerDialog({
     loadError,
     isLoading,
     attachments,
-    setAttachments,
+    electronicApprovalId,
+    isSaving,
+    saveError,
+    saveNotice,
+    saveDraft,
+    retryFailedAttachment,
+    reconcileUnknownAttachment,
+    removeAttachment,
+    canSaveDraft,
     attachmentInputRef,
     editor,
     handleEditorReady,
@@ -139,6 +148,7 @@ export function DocumentComposerDialog({
         multiple
         hidden
         onChange={handleAttachmentSelect}
+        disabled={isSaving}
         aria-label="첨부 파일 선택"
       />
     </Box>
@@ -150,6 +160,11 @@ export function DocumentComposerDialog({
       open={open}
       onClose={closeComposer}
       title="문서 작성"
+      description={
+        electronicApprovalId === null
+          ? undefined
+          : `임시저장 문서 ID: ${electronicApprovalId}`
+      }
       size="lg"
       bodyMode="fill"
       footerStart={composerFooterStart}
@@ -157,7 +172,8 @@ export function DocumentComposerDialog({
         <>
           <Button
             variant="contained"
-            disabled
+            onClick={() => void saveDraft()}
+            disabled={!canSaveDraft}
             sx={{
               borderRadius: 1.5,
               fontWeight: 700,
@@ -166,7 +182,7 @@ export function DocumentComposerDialog({
               boxShadow: 'none',
             }}
           >
-            저장
+            {isSaving ? '저장 중...' : '저장'}
           </Button>
           <Button
             variant="text"
@@ -191,6 +207,8 @@ export function DocumentComposerDialog({
           minWidth: 0,
         }}
       >
+        {saveError && <Alert severity="error">{saveError}</Alert>}
+        {saveNotice && <Alert severity="success">{saveNotice}</Alert>}
         <Tabs
           value={activeDocumentKind}
           onChange={(_, value: DocumentKind) => setActiveDocumentKind(value)}
@@ -464,29 +482,78 @@ export function DocumentComposerDialog({
               <Box
                 data-testid="document-composer-attachments"
                 sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
+                  display: 'grid',
                   gap: 1,
                   borderTop: `1px solid ${panelBorder}`,
                   p: 1.5,
                   bgcolor: editorSurfaceBackground,
                 }}
               >
-                {attachments.map((file, index) => (
-                  <Chip
-                    key={`${file.name}-${file.lastModified}-${index}`}
-                    label={file.name}
-                    onDelete={() =>
-                      setAttachments((current) =>
-                        current.filter((_, fileIndex) => fileIndex !== index),
-                      )
-                    }
+                {attachments.map((attachment) => (
+                  <Box
+                    key={attachment.clientId}
+                    data-testid={`document-composer-attachment-${attachment.status}`}
                     sx={{
-                      bgcolor: 'grey.100',
-                      color: '#0f172a',
-                      '& .MuiChip-deleteIcon': { color: '#475569' },
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) auto',
+                      alignItems: 'center',
+                      columnGap: 1,
+                      rowGap: 0.5,
+                      minWidth: 0,
                     }}
-                  />
+                  >
+                    <AttachmentList
+                      files={[
+                        {
+                          id: attachment.clientId,
+                          name: attachment.file.name,
+                          size: attachment.file.size,
+                        },
+                      ]}
+                      mode="edit"
+                      isDark={theme.palette.mode === 'dark'}
+                      showActions={attachment.status !== 'unknown' && !isSaving}
+                      onRemove={removeAttachment}
+                      testId={`document-composer-attachment-list-${attachment.clientId}`}
+                    />
+                    <Typography
+                      variant="caption"
+                      color={
+                        attachment.status === 'failed' || attachment.status === 'unknown'
+                          ? 'error.main'
+                          : attachment.status === 'uploaded'
+                            ? 'success.main'
+                            : 'text.secondary'
+                      }
+                      sx={{ gridColumn: '1 / -1', minWidth: 0, overflowWrap: 'anywhere' }}
+                    >
+                      {attachment.status === 'uploaded'
+                        ? '업로드 완료'
+                        : attachment.status === 'failed'
+                          ? attachment.error || '업로드 실패'
+                          : attachment.status === 'unknown'
+                            ? attachment.error || '업로드 결과 확인 필요'
+                            : '저장 후 업로드'}
+                    </Typography>
+                    {attachment.status === 'failed' && (
+                      <Button
+                        size="small"
+                        disabled={isSaving}
+                        onClick={() => void retryFailedAttachment(attachment.clientId)}
+                      >
+                        재시도
+                      </Button>
+                    )}
+                    {attachment.status === 'unknown' && (
+                      <Button
+                        size="small"
+                        disabled={isSaving}
+                        onClick={() => void reconcileUnknownAttachment(attachment.clientId)}
+                      >
+                        상태 확인
+                      </Button>
+                    )}
+                  </Box>
                 ))}
               </Box>
             )}
