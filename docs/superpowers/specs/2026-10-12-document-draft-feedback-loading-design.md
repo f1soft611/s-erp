@@ -26,6 +26,8 @@ indicators for blocking content loads.
 - During the initial composer lookups and while the selected form body is being
   fetched, replace the complete composer body below the tabs with a centered
   `CircularProgress`.
+- Keep the form subtree mounted but hidden from layout and the accessibility
+  tree while loading so the editor instance and draft state are not reset.
 - Keep the common dialog header, close control, and footer visible. Disable form
   interaction and saving until the active loading operation completes.
 - Loading failures appear in the composer’s top error area after the spinner is

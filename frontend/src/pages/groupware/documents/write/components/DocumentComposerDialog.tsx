@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   IconButton,
   MenuItem,
   Tab,
@@ -76,7 +77,6 @@ export function DocumentComposerDialog({
     electronicApprovalId,
     isSaving,
     saveError,
-    saveNotice,
     saveDraft,
     retryFailedAttachment,
     reconcileUnknownAttachment,
@@ -99,6 +99,7 @@ export function DocumentComposerDialog({
     setApprovalSettingsOpen(true);
   };
   const panelBorder = theme.palette.divider;
+  const isComposerLoading = isLoading || templateLoading;
   const editorTextColor = theme.palette.text.primary;
   const editorPlaceholderColor = theme.palette.text.disabled;
   const formFieldSx = {
@@ -131,13 +132,14 @@ export function DocumentComposerDialog({
       }}
     >
       <RichTextEditorToolbar
-        editor={editor}
+        editor={isComposerLoading ? null : editor}
         panelTestId="document-composer-toolbar-popup"
       />
       <IconButton
         size="small"
         aria-label="첨부 링크"
         onClick={() => attachmentInputRef.current?.click()}
+        disabled={isComposerLoading || isSaving}
         sx={richTextEditorIconButtonSx}
       >
         <AttachFileOutlinedIcon fontSize="small" />
@@ -148,7 +150,7 @@ export function DocumentComposerDialog({
         multiple
         hidden
         onChange={handleAttachmentSelect}
-        disabled={isSaving}
+        disabled={isComposerLoading || isSaving}
         aria-label="첨부 파일 선택"
       />
     </Box>
@@ -208,7 +210,8 @@ export function DocumentComposerDialog({
         }}
       >
         {saveError && <Alert severity="error">{saveError}</Alert>}
-        {saveNotice && <Alert severity="success">{saveNotice}</Alert>}
+        {loadError && <Alert severity="error">{loadError}</Alert>}
+        {templateError && <Alert severity="error">{templateError}</Alert>}
         <Tabs
           value={activeDocumentKind}
           onChange={(_, value: DocumentKind) => setActiveDocumentKind(value)}
@@ -222,341 +225,354 @@ export function DocumentComposerDialog({
             borderColor: 'divider',
           }}
         >
-          <Tab value="기안서" label="기안서" />
-          <Tab value="업무연락" label="업무연락" />
+          <Tab value="기안서" label="기안서" disabled={isComposerLoading} />
+          <Tab
+            value="업무연락"
+            label="업무연락"
+            disabled={isComposerLoading}
+          />
           <Tab value="지출결의서" label="지출결의서" disabled />
           <Tab value="근태신청" label="근태신청" disabled />
         </Tabs>
-        {activeDocumentKind === '기안서' && (
-          <>
-            {isLoading && (
-              <Alert severity="info">기안서 정보를 불러오는 중입니다.</Alert>
-            )}
-            {templateLoading && (
-              <Alert severity="info">기안양식 본문을 불러오는 중입니다.</Alert>
-            )}
-            {loadError && <Alert severity="error">{loadError}</Alert>}
-            {templateError && <Alert severity="error">{templateError}</Alert>}
-            <Box
-              data-testid="document-draft-metadata"
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: 'minmax(0, 1fr)',
-                  sm: 'repeat(2, minmax(0, 1fr))',
-                },
-                gap: 1.25,
-                flexShrink: 0,
-              }}
-            >
-              <TextField
-                label="기안일"
-                value={draftDate}
-                fullWidth
-                size="small"
-                margin="none"
-                slotProps={{ htmlInput: { readOnly: true } }}
-                sx={formFieldSx}
-              />
-              <TextField
-                label="기안자"
-                value={drafterName}
-                fullWidth
-                size="small"
-                margin="none"
-                slotProps={{ htmlInput: { readOnly: true } }}
-                sx={formFieldSx}
-              />
-              <TextField
-                select
-                label="구분"
-                value={selectedCategoryId}
-                onChange={(event) => handleCategoryChange(event.target.value)}
-                fullWidth
-                size="small"
-                margin="none"
-                disabled={isLoading || templateLoading}
-                helperText={
-                  !isLoading && categoryItems.length === 0
-                    ? '등록된 분류가 없습니다.'
-                    : undefined
-                }
-                sx={formFieldSx}
-              >
-                <MenuItem value={ALL_CATEGORY_VALUE}>전체</MenuItem>
-                {categoryItems.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.itemNm}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="기안양식"
-                value={selectedFormId}
-                onChange={(event) => handleFormChange(event.target.value)}
-                fullWidth
-                size="small"
-                margin="none"
-                disabled={
-                  isLoading || templateLoading || availableForms.length === 0
-                }
-                helperText={
-                  !isLoading && availableForms.length === 0
-                    ? '선택 가능한 기안양식이 없습니다.'
-                    : undefined
-                }
-                sx={formFieldSx}
-              >
-                {availableForms.map((form) => (
-                  <MenuItem
-                    key={form.draftingWorkCategoryId}
-                    value={String(form.draftingWorkCategoryId)}
-                  >
-                    {form.codeName}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Box>
-
-            <Divider />
-
-            <DocumentApprovalFields
-              userOptions={userOptions}
-              selectedApprovalUserIds={selectedApprovalUserIds}
-              referenceUserIds={referenceUserIds}
-              approvalStages={approvalStages}
-              approvalSettingsDisabled={isLoading}
-              onApprovalUserChange={handleApprovalUserChange}
-              onReferenceUserChange={handleReferenceUserChange}
-              onAddApproval={addApproval}
-              onAddAgreement={addAgreement}
-              onOpenApprovalSettings={openApprovalSettings}
-              onRemoveApprovalUser={removeApprovalUser}
-            />
-          </>
-        )}
-
-        <Divider />
-        <TextField
-          value={composerTitle}
-          onChange={(event) => setComposerTitle(event.target.value)}
-          fullWidth
-          size="small"
-          margin="none"
-          placeholder="제목을 입력하세요."
-          slotProps={{ input: { 'aria-label': '제목' } }}
-          sx={{
-            flexShrink: 0,
-            '& .MuiOutlinedInput-root': {
-              bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
-              border: 'none',
-              '& fieldset': { border: 'none' },
-            },
-            '& .MuiInputBase-root': {
-              bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
-            },
-            '& .MuiInputBase-input::placeholder': {
-              color: theme.palette.text.disabled,
-              opacity: 1,
-            },
-            '& .MuiInputBase-input': {
-              fontSize: '1.25rem',
-              lineHeight: 1.4,
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-            },
-          }}
-        />
-        <Box
-          data-testid="document-composer-editor-panel"
-          sx={{
-            display: 'flex',
-            flex: '1 0 auto',
-            flexDirection: 'column',
-            minHeight: 200,
-            width: '100%',
-            minWidth: 0,
-            bgcolor: editorSurfaceBackground,
-          }}
-        >
+        {isComposerLoading && (
           <Box
+            data-testid="document-composer-loading"
+            sx={{
+              display: 'flex',
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <CircularProgress aria-label="문서 정보 불러오는 중" />
+          </Box>
+        )}
+        <Box sx={{ display: isComposerLoading ? 'none' : 'contents' }}>
+          {activeDocumentKind === '기안서' && (
+            <>
+              <Box
+                data-testid="document-draft-metadata"
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: 'minmax(0, 1fr)',
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                  },
+                  gap: 1.25,
+                  flexShrink: 0,
+                }}
+              >
+                <TextField
+                  label="기안일"
+                  value={draftDate}
+                  fullWidth
+                  size="small"
+                  margin="none"
+                  slotProps={{ htmlInput: { readOnly: true } }}
+                  sx={formFieldSx}
+                />
+                <TextField
+                  label="기안자"
+                  value={drafterName}
+                  fullWidth
+                  size="small"
+                  margin="none"
+                  slotProps={{ htmlInput: { readOnly: true } }}
+                  sx={formFieldSx}
+                />
+                <TextField
+                  select
+                  label="구분"
+                  value={selectedCategoryId}
+                  onChange={(event) => handleCategoryChange(event.target.value)}
+                  fullWidth
+                  size="small"
+                  margin="none"
+                  disabled={isLoading || templateLoading}
+                  helperText={
+                    !isLoading && categoryItems.length === 0
+                      ? '등록된 분류가 없습니다.'
+                      : undefined
+                  }
+                  sx={formFieldSx}
+                >
+                  <MenuItem value={ALL_CATEGORY_VALUE}>전체</MenuItem>
+                  {categoryItems.map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.itemNm}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="기안양식"
+                  value={selectedFormId}
+                  onChange={(event) => handleFormChange(event.target.value)}
+                  fullWidth
+                  size="small"
+                  margin="none"
+                  disabled={
+                    isLoading || templateLoading || availableForms.length === 0
+                  }
+                  helperText={
+                    !isLoading && availableForms.length === 0
+                      ? '선택 가능한 기안양식이 없습니다.'
+                      : undefined
+                  }
+                  sx={formFieldSx}
+                >
+                  {availableForms.map((form) => (
+                    <MenuItem
+                      key={form.draftingWorkCategoryId}
+                      value={String(form.draftingWorkCategoryId)}
+                    >
+                      {form.codeName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+
+              <Divider />
+
+              <DocumentApprovalFields
+                userOptions={userOptions}
+                selectedApprovalUserIds={selectedApprovalUserIds}
+                referenceUserIds={referenceUserIds}
+                approvalStages={approvalStages}
+                approvalSettingsDisabled={isLoading}
+                onApprovalUserChange={handleApprovalUserChange}
+                onReferenceUserChange={handleReferenceUserChange}
+                onAddApproval={addApproval}
+                onAddAgreement={addAgreement}
+                onOpenApprovalSettings={openApprovalSettings}
+                onRemoveApprovalUser={removeApprovalUser}
+              />
+            </>
+          )}
+
+          <Divider />
+          <TextField
+            value={composerTitle}
+            onChange={(event) => setComposerTitle(event.target.value)}
+            fullWidth
+            size="small"
+            margin="none"
+            placeholder="제목을 입력하세요."
+            slotProps={{ input: { 'aria-label': '제목' } }}
+            sx={{
+              flexShrink: 0,
+              '& .MuiOutlinedInput-root': {
+                bgcolor: fieldSurfaceBackground,
+                borderRadius: 1.5,
+                border: 'none',
+                '& fieldset': { border: 'none' },
+              },
+              '& .MuiInputBase-root': {
+                bgcolor: fieldSurfaceBackground,
+                borderRadius: 1.5,
+              },
+              '& .MuiInputBase-input::placeholder': {
+                color: theme.palette.text.disabled,
+                opacity: 1,
+              },
+              '& .MuiInputBase-input': {
+                fontSize: '1.25rem',
+                lineHeight: 1.4,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+              },
+            }}
+          />
+          <Box
+            data-testid="document-composer-editor-panel"
             sx={{
               display: 'flex',
               flex: '1 0 auto',
               flexDirection: 'column',
+              minHeight: 200,
               width: '100%',
-              minHeight: 0,
               minWidth: 0,
-              borderTop: `1px solid ${panelBorder}`,
-              // borderBottom: `1px solid ${panelBorder}`,
+              bgcolor: editorSurfaceBackground,
             }}
           >
             <Box
               sx={{
-                minHeight: 180,
                 display: 'flex',
                 flex: '1 0 auto',
+                flexDirection: 'column',
                 width: '100%',
+                minHeight: 0,
                 minWidth: 0,
-                bgcolor: editorSurfaceBackground,
-                '& .document-composer-editor': {
-                  flex: '1 0 auto',
-                  width: '100%',
-                  minWidth: 0,
+                borderTop: `1px solid ${panelBorder}`,
+                // borderBottom: `1px solid ${panelBorder}`,
+              }}
+            >
+              <Box
+                sx={{
                   minHeight: 180,
-                  height: 'auto',
-                  position: 'relative',
                   display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'visible',
-                },
-                '& .document-composer-editor .rich-text-editor-content': {
                   flex: '1 0 auto',
-                  minHeight: 180,
-                  height: 'auto',
-                  overflow: 'visible',
-                },
-                '& .document-composer-editor .ProseMirror': {
-                  ...richTextContentStyles,
-                  display: 'block',
                   width: '100%',
                   minWidth: 0,
-                  flex: '1 0 auto',
-                  minHeight: 180,
-                  maxHeight: 'none',
-                  overflowY: 'visible',
-                  overflowX: 'auto',
-                  outline: 'none',
-                  px: 2,
-                  py: 1.5,
-                  color: editorTextColor,
-                  fontWeight: 400,
                   bgcolor: editorSurfaceBackground,
-                  boxSizing: 'border-box',
-                  '& p.is-editor-empty:first-of-type::before': {
-                    content: 'attr(data-placeholder)',
-                    color: editorPlaceholderColor,
-                    float: 'left',
-                    height: 0,
-                    pointerEvents: 'none',
+                  '& .document-composer-editor': {
+                    flex: '1 0 auto',
+                    width: '100%',
+                    minWidth: 0,
+                    minHeight: 180,
+                    height: 'auto',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'visible',
                   },
-                  '& > :first-of-type': { marginTop: 0 },
-                  '& > :last-child': { marginBottom: 0 },
-                },
-                '& .document-composer-editor .rich-text-editor-content > .ProseMirror':
-                  {
+                  '& .document-composer-editor .rich-text-editor-content': {
+                    flex: '1 0 auto',
+                    minHeight: 180,
+                    height: 'auto',
+                    overflow: 'visible',
+                  },
+                  '& .document-composer-editor .ProseMirror': {
+                    ...richTextContentStyles,
+                    display: 'block',
+                    width: '100%',
+                    minWidth: 0,
                     flex: '1 0 auto',
                     minHeight: 180,
                     maxHeight: 'none',
                     overflowY: 'visible',
+                    overflowX: 'auto',
+                    outline: 'none',
+                    px: 2,
+                    py: 1.5,
+                    color: editorTextColor,
+                    fontWeight: 400,
+                    bgcolor: editorSurfaceBackground,
+                    boxSizing: 'border-box',
+                    '& p.is-editor-empty:first-of-type::before': {
+                      content: 'attr(data-placeholder)',
+                      color: editorPlaceholderColor,
+                      float: 'left',
+                      height: 0,
+                      pointerEvents: 'none',
+                    },
+                    '& > :first-of-type': { marginTop: 0 },
+                    '& > :last-child': { marginBottom: 0 },
                   },
-              }}
-            >
-              <RichTextEditor
-                onEditorReady={handleEditorReady}
-                className="document-composer-editor"
-                readOnly={templateLoading}
-                contentSx={{
-                  ...richTextContentStyles,
-                  display: 'block',
-                  width: '100%',
-                  minWidth: 0,
-                  minHeight: 180,
-                  maxHeight: 'none',
-                  overflowY: 'visible',
-                  overflowX: 'auto',
-                  outline: 'none',
-                  px: 2,
-                  py: 1.5,
-                  color: editorTextColor,
-                  fontWeight: 400,
-                  bgcolor: editorSurfaceBackground,
-                  boxSizing: 'border-box',
-                }}
-              />
-            </Box>
-            {attachments.length > 0 && (
-              <Box
-                data-testid="document-composer-attachments"
-                sx={{
-                  display: 'grid',
-                  gap: 1,
-                  borderTop: `1px solid ${panelBorder}`,
-                  p: 1.5,
-                  bgcolor: editorSurfaceBackground,
+                  '& .document-composer-editor .rich-text-editor-content > .ProseMirror':
+                    {
+                      flex: '1 0 auto',
+                      minHeight: 180,
+                      maxHeight: 'none',
+                      overflowY: 'visible',
+                    },
                 }}
               >
-                {attachments.map((attachment) => (
-                  <Box
-                    key={attachment.clientId}
-                    data-testid={`document-composer-attachment-${attachment.status}`}
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: 'minmax(0, 1fr) auto',
-                      alignItems: 'center',
-                      columnGap: 1,
-                      rowGap: 0.5,
-                      minWidth: 0,
-                    }}
-                  >
-                    <AttachmentList
-                      files={[
-                        {
-                          id: attachment.clientId,
-                          name: attachment.file.name,
-                          size: attachment.file.size,
-                        },
-                      ]}
-                      mode="edit"
-                      isDark={theme.palette.mode === 'dark'}
-                      showActions={attachment.status !== 'unknown' && !isSaving}
-                      onRemove={removeAttachment}
-                      testId={`document-composer-attachment-list-${attachment.clientId}`}
-                    />
-                    <Typography
-                      variant="caption"
-                      color={
-                        attachment.status === 'failed' || attachment.status === 'unknown'
-                          ? 'error.main'
-                          : attachment.status === 'uploaded'
-                            ? 'success.main'
-                            : 'text.secondary'
-                      }
-                      sx={{ gridColumn: '1 / -1', minWidth: 0, overflowWrap: 'anywhere' }}
-                    >
-                      {attachment.status === 'uploaded'
-                        ? '업로드 완료'
-                        : attachment.status === 'failed'
-                          ? attachment.error || '업로드 실패'
-                          : attachment.status === 'unknown'
-                            ? attachment.error || '업로드 결과 확인 필요'
-                            : '저장 후 업로드'}
-                    </Typography>
-                    {attachment.status === 'failed' && (
-                      <Button
-                        size="small"
-                        disabled={isSaving}
-                        onClick={() => void retryFailedAttachment(attachment.clientId)}
-                      >
-                        재시도
-                      </Button>
-                    )}
-                    {attachment.status === 'unknown' && (
-                      <Button
-                        size="small"
-                        disabled={isSaving}
-                        onClick={() => void reconcileUnknownAttachment(attachment.clientId)}
-                      >
-                        상태 확인
-                      </Button>
-                    )}
-                  </Box>
-                ))}
+                <RichTextEditor
+                  onEditorReady={handleEditorReady}
+                  className="document-composer-editor"
+                  readOnly={templateLoading}
+                  contentSx={{
+                    ...richTextContentStyles,
+                    display: 'block',
+                    width: '100%',
+                    minWidth: 0,
+                    minHeight: 180,
+                    maxHeight: 'none',
+                    overflowY: 'visible',
+                    overflowX: 'auto',
+                    outline: 'none',
+                    px: 2,
+                    py: 1.5,
+                    color: editorTextColor,
+                    fontWeight: 400,
+                    bgcolor: editorSurfaceBackground,
+                    boxSizing: 'border-box',
+                  }}
+                />
               </Box>
-            )}
+              {attachments.length > 0 && (
+                <Box
+                  data-testid="document-composer-attachments"
+                  sx={{
+                    display: 'grid',
+                    gap: 1,
+                    borderTop: `1px solid ${panelBorder}`,
+                    p: 1.5,
+                    bgcolor: editorSurfaceBackground,
+                  }}
+                >
+                  {attachments.map((attachment) => (
+                    <Box
+                      key={attachment.clientId}
+                      data-testid={`document-composer-attachment-${attachment.status}`}
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) auto',
+                        alignItems: 'center',
+                        columnGap: 1,
+                        rowGap: 0.5,
+                        minWidth: 0,
+                      }}
+                    >
+                      <AttachmentList
+                        files={[
+                          {
+                            id: attachment.clientId,
+                            name: attachment.file.name,
+                            size: attachment.file.size,
+                          },
+                        ]}
+                        mode="edit"
+                        isDark={theme.palette.mode === 'dark'}
+                        showActions={attachment.status !== 'unknown' && !isSaving}
+                        onRemove={removeAttachment}
+                        testId={`document-composer-attachment-list-${attachment.clientId}`}
+                      />
+                      <Typography
+                        variant="caption"
+                        color={
+                          attachment.status === 'failed' || attachment.status === 'unknown'
+                            ? 'error.main'
+                            : attachment.status === 'uploaded'
+                              ? 'success.main'
+                              : 'text.secondary'
+                        }
+                        sx={{ gridColumn: '1 / -1', minWidth: 0, overflowWrap: 'anywhere' }}
+                      >
+                        {attachment.status === 'uploaded'
+                          ? '업로드 완료'
+                          : attachment.status === 'failed'
+                            ? attachment.error || '업로드 실패'
+                            : attachment.status === 'unknown'
+                              ? attachment.error || '업로드 결과 확인 필요'
+                              : '저장 후 업로드'}
+                      </Typography>
+                      {attachment.status === 'failed' && (
+                        <Button
+                          size="small"
+                          disabled={isSaving}
+                          onClick={() => void retryFailedAttachment(attachment.clientId)}
+                        >
+                          재시도
+                        </Button>
+                      )}
+                      {attachment.status === 'unknown' && (
+                        <Button
+                          size="small"
+                          disabled={isSaving}
+                          onClick={() => void reconcileUnknownAttachment(attachment.clientId)}
+                        >
+                          상태 확인
+                        </Button>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
           </Box>
         </Box>
       </Box>

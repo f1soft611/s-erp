@@ -23,6 +23,16 @@ const composerApi = vi.hoisted(() => ({
   deleteDocumentDraftAttachment: vi.fn(),
 }));
 
+const composerNotifications = vi.hoisted(() => ({
+  showSuccess: vi.fn(),
+  showWarning: vi.fn(),
+  showError: vi.fn(),
+}));
+
+vi.mock('../src/shared/context/NotificationContext', () => ({
+  useNotification: () => composerNotifications,
+}));
+
 vi.mock(
   '../src/pages/co/workflow/form/services/draftFormManagement.service',
   () => ({
@@ -743,7 +753,7 @@ describe('Document write page', () => {
         'rgb(30, 41, 59)',
       );
     });
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const title = screen.getByRole('textbox', { name: '제목' });
     const placeholder = editor.querySelector('p.is-editor-empty');
 
@@ -768,7 +778,7 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const editorPanel = screen.getByTestId('document-composer-editor-panel');
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const title = screen.getByRole('textbox', { name: '제목' });
 
     expect(getComputedStyle(editorPanel).backgroundColor).toBe(
@@ -788,7 +798,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const composerLayout = screen.getByTestId('document-composer-layout');
     const editorPanel = screen.getByTestId('document-composer-editor-panel');
     const dialogContent = editor.closest('.MuiDialogContent-root');
@@ -828,7 +838,7 @@ describe('Document write page', () => {
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('마지막 블록'));
 
     const firstBlock = editor.firstElementChild;
@@ -883,9 +893,14 @@ describe('Document write page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
 
+    const error = await screen.findByText('기안 분류를 불러오지 못했습니다.');
+    expect(error).toBeInTheDocument();
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(screen.getByTestId('document-composer-layout').firstElementChild)
+      .toHaveClass('MuiAlert-colorError');
     expect(
-      await screen.findByText('기안 분류를 불러오지 못했습니다.'),
-    ).toBeInTheDocument();
+      screen.queryByRole('progressbar', { name: '문서 정보 불러오는 중' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a loading status while initial draft lookups are pending', async () => {
@@ -897,15 +912,19 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
 
     expect(
-      await screen.findByText('기안서 정보를 불러오는 중입니다.'),
+      await screen.findByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '구분' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    expect(screen.queryByRole('textbox', { name: '기안자' })).toBeNull();
+    expect(screen.getByRole('tab', { name: '기안서' })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: '결재선 설정' }),
+      screen.getByLabelText('첨부 파일 선택'),
     ).toBeDisabled();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: '결재선 설정' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an error when the profile has no drafter name and explicit empty states', async () => {
@@ -1823,7 +1842,16 @@ describe('Document write page', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    expect(await screen.findByText('양식 본문 조회 실패')).toBeInTheDocument();
+    const error = await screen.findByText('양식 본문 조회 실패');
+    expect(error).toBeInTheDocument();
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(screen.getByTestId('document-composer-layout').firstElementChild)
+      .toHaveClass('MuiAlert-colorError');
+    expect(
+      screen.queryByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the editor read-only while a selected template is loading', async () => {
@@ -1840,23 +1868,38 @@ describe('Document write page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '로딩 중 보존할 제목' },
+    });
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
-    await waitFor(() =>
-      expect(editor).toHaveAttribute('contenteditable', 'false'),
-    );
     expect(
-      screen.getByText('기안양식 본문을 불러오는 중입니다.'),
+      screen.getByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '본문' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: '제목' })).toBeNull();
+    expect(screen.getByRole('tab', { name: '기안서' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '툴바 열기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
 
     await act(async () => {
       resolveTemplate?.(draftFormTemplate);
     });
 
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    expect(
+      screen.queryByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
     expect(editor).toHaveAttribute('contenteditable', 'true');
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '로딩 중 보존할 제목',
+    );
   });
 
   it('preserves the prior category and body when a dirty category change is cancelled', async () => {
@@ -1872,7 +1915,7 @@ describe('Document write page', () => {
     await waitForComposerReady();
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
     fireEvent.input(editor, {
       target: { innerHTML: '<p>작성자 수정 본문</p>' },
@@ -1938,7 +1981,7 @@ describe('Document write page', () => {
     const formSelector = screen.getByRole('combobox', { name: '기안양식' });
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
 
     fireEvent.input(editor, {
@@ -1997,7 +2040,7 @@ describe('Document write page', () => {
     const formSelector = screen.getByRole('combobox', { name: '기안양식' });
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
 
     fireEvent.input(editor, {
@@ -2095,7 +2138,15 @@ describe('Document write page', () => {
       expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(2),
     );
     expect(composerApi.saveDocumentDraft.mock.calls[1][1]).toBe(77);
+    await waitFor(() =>
+      expect(composerNotifications.showSuccess).toHaveBeenCalledTimes(2),
+    );
+    expect(composerNotifications.showSuccess).toHaveBeenNthCalledWith(
+      2,
+      '문서가 임시저장되었습니다.',
+    );
     const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
     const titleHeader = dialog.querySelector('.MuiDialogTitle-root')?.parentElement;
     expect(titleHeader).toHaveTextContent('임시저장 문서 ID: 77');
     expect(dialog.querySelector('.MuiDialogContent-root')).not.toHaveTextContent(
@@ -2124,6 +2175,14 @@ describe('Document write page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('definite failure')).toBeInTheDocument();
+    const partialUploadAlert = screen
+      .getByRole('dialog', { name: '문서 작성' })
+      .querySelector('.MuiDialogContent-root [role="alert"]');
+    expect(partialUploadAlert).toHaveClass('MuiAlert-colorError');
+    expect(partialUploadAlert).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+    expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
     expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: '재시도' }));
@@ -2134,6 +2193,143 @@ describe('Document write page', () => {
     );
     expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2);
     expect(screen.getByText('업로드 완료')).toBeInTheDocument();
+  });
+
+  it('keeps retry failures in the composer error area', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockRejectedValueOnce(new Error('definite failure'))
+      .mockRejectedValueOnce(new Error('definite failure'));
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 재시도 실패 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(
+      await screen.findByTestId('document-composer-attachment-failed'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    await waitFor(() =>
+      expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2),
+    );
+
+    const error = screen
+      .getByRole('dialog', { name: '문서 작성' })
+      .querySelector('.MuiDialogContent-root [role="alert"]');
+    expect(error).toHaveClass('MuiAlert-colorError');
+    expect(error).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+  });
+
+  it('keeps attachment deletion failures in the composer error area', async () => {
+    composerApi.deleteDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('첨부 삭제 실패'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 삭제 실패 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('document-composer-attachment-uploaded'),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftAttachment).toHaveBeenCalledTimes(1),
+    );
+
+    const error = await within(
+      screen.getByRole('dialog', { name: '문서 작성' }),
+    ).findByRole('alert');
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(error).toHaveTextContent('첨부 삭제 실패');
+    expect(error).toHaveClass('MuiAlert-colorError');
+  });
+
+  it('keeps unresolved attachment errors after deleting a confirmed file', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockResolvedValueOnce({
+        fileId: 504,
+        fileName: 'confirmed.txt',
+        fileSize: 9,
+      })
+      .mockRejectedValueOnce(new Error('definite failure'));
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 부분 실패 후 삭제 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [
+          new File(['evidence1'], 'confirmed.txt', { type: 'text/plain' }),
+          new File(['evidence2'], 'failed.txt', { type: 'text/plain' }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    const uploadedAttachment = await screen.findByTestId(
+      'document-composer-attachment-uploaded',
+    );
+    await screen.findByTestId('document-composer-attachment-failed');
+    fireEvent.click(
+      within(uploadedAttachment).getByRole('button', {
+        name: '첨부 파일 삭제',
+      }),
+    );
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftAttachment).toHaveBeenCalledTimes(1),
+    );
+
+    expect(
+      screen
+        .getByRole('dialog', { name: '문서 작성' })
+        .querySelector('.MuiDialogContent-root [role="alert"]'),
+    ).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+  });
+
+  it('keeps save failures in the composer error area without a success toast', async () => {
+    composerApi.saveDocumentDraft.mockRejectedValueOnce(
+      new Error('문서 저장 실패'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '저장 실패 초안' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    const error = await screen.findByText('문서 저장 실패');
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(error.closest('.MuiAlert-root')).toHaveClass(
+      'MuiAlert-colorError',
+    );
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '저장 실패 초안',
+    );
+    expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
   });
 
   it('marks an ambiguous upload as unknown and does not retry it automatically', async () => {
@@ -2160,9 +2356,52 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
     expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: '상태 확인' }));
-    expect(
-      await screen.findByText('파일 목록에서 업로드 여부를 확인하지 못했습니다.'),
-    ).toBeInTheDocument();
+    const error = await within(
+      screen.getByRole('dialog', { name: '문서 작성' }),
+    ).findByRole('alert');
+    expect(error).toHaveTextContent(
+      '파일 목록에서 업로드 여부를 확인하지 못했습니다.',
+    );
+    expect(error).toHaveClass('MuiAlert-colorError');
+    expect(error).toHaveTextContent(
+      '파일 목록에서 업로드 여부를 확인하지 못했습니다.',
+    );
     expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a success toast when an ambiguous attachment is confirmed', async () => {
+    composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('network disconnected'),
+    );
+    composerApi.listDocumentDraftAttachments.mockResolvedValueOnce([
+      { fileId: 503, fileName: 'evidence.txt', fileSize: 8 },
+    ]);
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 확인 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.click(await screen.findByRole('button', { name: '상태 확인' }));
+
+    await waitFor(() =>
+      expect(composerNotifications.showSuccess).toHaveBeenCalledWith(
+        '첨부파일 업로드가 확인되었습니다.',
+      ),
+    );
+    expect(
+      screen.getByTestId('document-composer-attachment-uploaded'),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('dialog', { name: '문서 작성' })
+        .querySelector('.MuiDialogContent-root [role="alert"]'),
+    ).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import dayjs from 'dayjs';
 import { useTheme } from '@mui/material/styles';
+import { useNotification } from '../../../../../shared/context/NotificationContext';
 import {
   fetchDraftFormOptions,
   fetchDraftForms,
@@ -79,6 +80,7 @@ function toUserIds(value: F1GridUserValue): string[] {
 
 export function useDocumentComposer(open: boolean, onClose: () => void) {
   const theme = useTheme();
+  const { showSuccess } = useNotification();
   const isDark = theme.palette.mode === 'dark';
   const editorSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const fieldSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
@@ -89,7 +91,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const [electronicApprovalId, setElectronicApprovalId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [saveNotice, setSaveNotice] = useState('');
   const [drafterName, setDrafterName] = useState('');
   const [categoryItems, setCategoryItems] = useState<
     Awaited<ReturnType<typeof fetchDraftFormOptions>>['categoryItems']
@@ -416,7 +417,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
           status: 'pending' as const,
         })),
       ]);
-      setSaveNotice('');
     }
     event.target.value = '';
   };
@@ -473,7 +473,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     savingRef.current = true;
     setIsSaving(true);
     setSaveError('');
-    setSaveNotice('');
     try {
       const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
         approvalStages.flatMap((stage, stageIndex) =>
@@ -516,11 +515,13 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         const status = await uploadAttachment(attachment, saved.electronicApprovalId);
         if (status !== 'uploaded') failedCount += 1;
       }
-      setSaveNotice(
-        failedCount > 0
-          ? `문서는 저장되었지만 첨부파일 ${failedCount}건의 상태 확인이 필요합니다.`
-          : '문서가 임시저장되었습니다.',
-      );
+      if (failedCount > 0) {
+        setSaveError(
+          `문서는 저장되었지만 첨부파일 ${failedCount}건의 상태 확인이 필요합니다.`,
+        );
+      } else {
+        showSuccess('문서가 임시저장되었습니다.');
+      }
     } catch (error: unknown) {
       setSaveError(
         error instanceof Error ? error.message : '문서 저장에 실패했습니다.',
@@ -537,6 +538,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     editor,
     referenceUserIds,
     selectedFormId,
+    showSuccess,
     uploadAttachment,
   ]);
 
@@ -555,9 +557,24 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       savingRef.current = true;
       setIsSaving(true);
       setSaveError('');
-      setSaveNotice('');
       try {
-        await uploadAttachment(attachment, approvalId);
+        const status = await uploadAttachment(attachment, approvalId);
+        const unresolvedCount = attachments.filter(
+          (item) =>
+            item.clientId !== clientId &&
+            (item.status === 'pending' ||
+              item.status === 'failed' ||
+              item.status === 'unknown'),
+        ).length;
+        if (status !== 'uploaded') {
+          setSaveError(
+            `문서는 저장되었지만 첨부파일 ${unresolvedCount + 1}건의 상태 확인이 필요합니다.`,
+          );
+        } else if (unresolvedCount > 0) {
+          setSaveError(
+            `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`,
+          );
+        }
       } finally {
         savingRef.current = false;
         setIsSaving(false);
@@ -602,8 +619,22 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
                 : item,
             ),
           );
-          setSaveNotice('첨부파일 업로드가 확인되었습니다.');
+          const unresolvedCount = attachments.filter(
+            (item) =>
+              item.clientId !== clientId &&
+              (item.status === 'pending' ||
+                item.status === 'failed' ||
+                item.status === 'unknown'),
+          ).length;
+          if (unresolvedCount > 0) {
+            setSaveError(
+              `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`,
+            );
+          } else {
+            showSuccess('첨부파일 업로드가 확인되었습니다.');
+          }
         } else {
+          setSaveError('파일 목록에서 업로드 여부를 확인하지 못했습니다.');
           setAttachments((current) =>
             current.map((item) =>
               item.clientId === clientId
@@ -613,12 +644,17 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
           );
         }
       } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : '첨부 상태 조회에 실패했습니다.';
+        setSaveError(message);
         setAttachments((current) =>
           current.map((item) =>
             item.clientId === clientId
               ? {
                   ...item,
-                  error: error instanceof Error ? error.message : '첨부 상태 조회에 실패했습니다.',
+                  error: message,
                 }
               : item,
           ),
@@ -628,7 +664,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         setIsSaving(false);
       }
     },
-    [attachments],
+    [attachments, showSuccess],
   );
 
   const removeAttachment = useCallback(
@@ -643,15 +679,31 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       if (approvalId === null || attachment.fileId === undefined) return;
       savingRef.current = true;
       setIsSaving(true);
-      setSaveError('');
       try {
         await deleteDocumentDraftAttachment(approvalId, attachment.fileId);
         setAttachments((current) => current.filter((item) => item.clientId !== clientId));
+        const unresolvedCount = attachments.filter(
+          (item) =>
+            item.clientId !== clientId &&
+            (item.status === 'pending' ||
+              item.status === 'failed' ||
+              item.status === 'unknown'),
+        ).length;
+        setSaveError(
+          unresolvedCount > 0
+            ? `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`
+            : '',
+        );
       } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : '첨부파일 삭제에 실패했습니다.';
+        setSaveError(message);
         setAttachments((current) =>
           current.map((item) =>
             item.clientId === clientId
-              ? { ...item, error: error instanceof Error ? error.message : '첨부파일 삭제에 실패했습니다.' }
+              ? { ...item, error: message }
               : item,
           ),
         );
@@ -669,7 +721,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     setElectronicApprovalId(null);
     setIsSaving(false);
     setSaveError('');
-    setSaveNotice('');
     setComposerTitle('');
     setAttachments([]);
     nextAttachmentId.current = 1;
@@ -733,7 +784,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     electronicApprovalId,
     isSaving,
     saveError,
-    saveNotice,
     saveDraft,
     retryFailedAttachment,
     reconcileUnknownAttachment,
