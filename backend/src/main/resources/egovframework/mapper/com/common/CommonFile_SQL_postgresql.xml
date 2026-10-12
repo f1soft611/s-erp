@@ -97,7 +97,7 @@
         WHERE tenant_id = #{tenantId}
           AND file_id = #{fileId}
           AND deleted_yn = 'N'
-          AND COALESCE(UPPER(owner_type), '') &lt;&gt; 'APPROVAL'
+          AND COALESCE(UPPER(owner_type), '') NOT IN ('APPROVAL', 'APPROVAL_COMMENT')
     </select>
 
     <select id="selectCommonFileByIdAndOwner" parameterType="map" resultMap="commonFileMap">
@@ -185,7 +185,7 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND file_id = #{fileId}
-          AND COALESCE(UPPER(owner_type), '') &lt;&gt; 'APPROVAL'
+          AND COALESCE(UPPER(owner_type), '') NOT IN ('APPROVAL', 'APPROVAL_COMMENT')
     </update>
 
     <update id="softDeleteCommonFileByOwner" parameterType="map">

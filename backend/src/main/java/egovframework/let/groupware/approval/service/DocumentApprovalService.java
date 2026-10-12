@@ -7,6 +7,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
@@ -29,6 +31,21 @@ public interface DocumentApprovalService {
             Long electronicApprovalId) throws Exception;
     DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception;
     DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception;
+    CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
+            Integer limit, Long beforeCommentId) throws Exception;
+    CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
+            String content, Long parentCommentId) throws Exception;
+    CommonCommentVO updateApprovalComment(LoginVO user, Long electronicApprovalId,
+            Long commentId, String content) throws Exception;
+    void deleteApprovalComment(LoginVO user, Long electronicApprovalId, Long commentId) throws Exception;
+    List<CommonFileVO> listApprovalCommentAttachments(LoginVO user, Long electronicApprovalId,
+            Long commentId) throws Exception;
+    CommonFileVO uploadApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, MultipartFile file) throws Exception;
+    void downloadApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, Long fileId, HttpServletResponse response) throws Exception;
+    void deleteApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, Long fileId) throws Exception;
     List<CommonFileVO> listAttachments(LoginVO user, Long electronicApprovalId) throws Exception;
     CommonFileVO uploadAttachment(LoginVO user, Long electronicApprovalId, MultipartFile file) throws Exception;
     void deleteAttachment(LoginVO user, Long electronicApprovalId, Long fileId) throws Exception;

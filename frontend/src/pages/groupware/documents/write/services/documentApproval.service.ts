@@ -1,6 +1,8 @@
 import {
   apiDelete,
+  apiDownload,
   apiGet,
+  apiGetBlob,
   apiPost,
   apiPostFormData,
   apiPut,
@@ -17,6 +19,9 @@ import type {
   DocumentApprovalSummary,
   DocumentDraftEmbeddedImageUpload,
   DocumentDraftAttachmentResponse,
+  DocumentApprovalComment,
+  DocumentApprovalCommentAttachment,
+  DocumentApprovalCommentPage,
 } from '../types/documentWrite.types';
 
 const APPROVAL_API = '/api/v1/groupware/approvals';
@@ -43,6 +48,33 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isWorkflowStatus(value: unknown): value is ApprovalDocumentStatus {
   return typeof value === 'string' && DOCUMENT_STATUSES.has(value);
+}
+
+function requireApprovalId(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label}가 올바르지 않습니다.`);
+  }
+}
+
+function isApprovalComment(value: unknown, electronicApprovalId: number): value is DocumentApprovalComment {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.commentId) &&
+    Number(value.commentId) > 0 &&
+    value.ownerId === electronicApprovalId &&
+    value.commentType === 'USER' &&
+    typeof value.content === 'string' &&
+    typeof value.writerId === 'string' &&
+    typeof value.writerName === 'string'
+  );
+}
+
+function validateCommentAttachment(value: unknown): value is DocumentDraftAttachmentResponse {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.fileId) &&
+    Number(value.fileId) > 0
+  );
 }
 
 export function isDefiniteAttachmentUploadFailure(error: unknown): boolean {
@@ -154,6 +186,193 @@ export async function getDocumentApprovalDetail(
   return item;
 }
 
+export async function listApprovalComments(
+  electronicApprovalId: number,
+  options: { limit?: number; beforeCommentId?: number } = {},
+): Promise<DocumentApprovalCommentPage> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const limit = options.limit ?? 3;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error('댓글 조회 건수가 올바르지 않습니다.');
+  }
+  if (options.beforeCommentId !== undefined) {
+    requireApprovalId(options.beforeCommentId, '이전 댓글 ID');
+  }
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (options.beforeCommentId !== undefined) {
+    query.set('beforeCommentId', String(options.beforeCommentId));
+  }
+  const response = await apiGet<{
+    resultList?: DocumentApprovalComment[];
+    comments?: DocumentApprovalComment[];
+    hasPrevious?: boolean;
+    nextBeforeCommentId: number | null;
+    resultCnt?: number;
+  }>(`${APPROVAL_API}/${electronicApprovalId}/comments?${query.toString()}`);
+  const comments = response.comments ?? response.resultList;
+  if (
+    !Array.isArray(comments) ||
+    !comments.every((comment) => isApprovalComment(comment, electronicApprovalId)) ||
+    typeof response.hasPrevious !== 'boolean' ||
+    !(response.nextBeforeCommentId === null ||
+      (Number.isSafeInteger(response.nextBeforeCommentId) && Number(response.nextBeforeCommentId) > 0)) ||
+    typeof response.resultCnt !== 'number' ||
+    !Number.isFinite(response.resultCnt)
+  ) {
+    throw new Error('전자결재 댓글 응답을 확인할 수 없습니다.');
+  }
+  return {
+    comments,
+    hasPrevious: response.hasPrevious,
+    nextBeforeCommentId: response.nextBeforeCommentId,
+    resultCnt: response.resultCnt,
+  };
+}
+
+export async function createApprovalComment(
+  electronicApprovalId: number,
+  content: string,
+  parentCommentId?: number,
+): Promise<DocumentApprovalComment> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  if (parentCommentId !== undefined) requireApprovalId(parentCommentId, '상위 댓글 ID');
+  const response = await apiPost<{ item?: DocumentApprovalComment }>(
+    `${APPROVAL_API}/${electronicApprovalId}/comments`,
+    { content, ...(parentCommentId === undefined ? {} : { parentCommentId }) },
+  );
+  if (!isApprovalComment(response.item, electronicApprovalId)) {
+    throw new Error('전자결재 댓글 등록 결과를 확인할 수 없습니다.');
+  }
+  return response.item;
+}
+
+export async function updateApprovalComment(
+  electronicApprovalId: number,
+  commentId: number,
+  content: string,
+): Promise<DocumentApprovalComment> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  requireApprovalId(commentId, '댓글 ID');
+  const response = await apiPut<{ item?: DocumentApprovalComment }>(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${commentId}`,
+    { content },
+  );
+  if (!isApprovalComment(response.item, electronicApprovalId)) {
+    throw new Error('전자결재 댓글 수정 결과를 확인할 수 없습니다.');
+  }
+  return response.item;
+}
+
+export async function deleteApprovalComment(
+  electronicApprovalId: number,
+  commentId: number | string,
+): Promise<void> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  await apiDelete(`${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}`);
+}
+
+export async function listApprovalCommentAttachments(
+  electronicApprovalId: number,
+  commentId: number | string,
+): Promise<DocumentApprovalCommentAttachment[]> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  const response = await apiGet<{ resultList?: DocumentApprovalCommentAttachment[] }>(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}/attachments`,
+  );
+  if (!Array.isArray(response.resultList) || !response.resultList.every(validateCommentAttachment)) {
+    throw new Error('댓글 첨부파일 목록 응답을 확인할 수 없습니다.');
+  }
+  return response.resultList;
+}
+
+export async function uploadApprovalCommentAttachment(
+  electronicApprovalId: number,
+  commentId: number | string,
+  file: File,
+): Promise<DocumentApprovalCommentAttachment> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiPostFormData<{ item?: DocumentApprovalCommentAttachment }>(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}/attachments`,
+    formData,
+  );
+  if (!validateCommentAttachment(response.item)) {
+    throw new UnknownAttachmentUploadOutcomeError();
+  }
+  return {
+    fileId: response.item.fileId,
+    fileName: response.item.fileName ?? file.name,
+    fileSize: response.item.fileSize ?? file.size,
+    mimeType: response.item.mimeType,
+  };
+}
+
+export async function downloadApprovalCommentAttachment(
+  electronicApprovalId: number,
+  commentId: number | string,
+  fileId: number | string,
+  fileName?: string,
+): Promise<void> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  const numericFileId = Number(fileId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  requireApprovalId(numericFileId, '첨부파일 ID');
+  await apiDownload(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}/attachments/${numericFileId}/download`,
+    fileName,
+  );
+}
+
+export async function fetchApprovalCommentAttachmentBlob(
+  electronicApprovalId: number,
+  commentId: number | string,
+  fileId: number | string,
+): Promise<Blob> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  const numericFileId = Number(fileId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  requireApprovalId(numericFileId, '첨부파일 ID');
+  return apiGetBlob(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}/attachments/${numericFileId}/download`,
+  );
+}
+
+export async function fetchApprovalEmbeddedImageBlob(
+  electronicApprovalId: number,
+  fileId: number | string,
+): Promise<Blob> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericFileId = Number(fileId);
+  requireApprovalId(numericFileId, '이미지 ID');
+  return apiGetBlob(
+    `${APPROVAL_API}/${electronicApprovalId}/embedded-images/${numericFileId}`,
+  );
+}
+
+export async function deleteApprovalCommentAttachment(
+  electronicApprovalId: number,
+  commentId: number | string,
+  fileId: number | string,
+): Promise<void> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericCommentId = Number(commentId);
+  const numericFileId = Number(fileId);
+  requireApprovalId(numericCommentId, '댓글 ID');
+  requireApprovalId(numericFileId, '첨부파일 ID');
+  await apiDelete(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/${numericCommentId}/attachments/${numericFileId}`,
+  );
+}
+
 export async function processDocumentApprovalAction(
   electronicApprovalId: number,
   request: DocumentApprovalActionRequest,
@@ -256,6 +475,20 @@ export async function listDocumentDraftAttachments(
     throw new Error('첨부 목록 응답을 확인할 수 없습니다.');
   }
   return response.resultList;
+}
+
+export async function downloadDocumentApprovalAttachment(
+  electronicApprovalId: number,
+  fileId: number | string,
+  fileName?: string,
+): Promise<void> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const numericFileId = Number(fileId);
+  requireApprovalId(numericFileId, '첨부파일 ID');
+  await apiDownload(
+    `${APPROVAL_API}/${electronicApprovalId}/attachments/${numericFileId}/download`,
+    fileName,
+  );
 }
 
 export async function deleteDocumentDraftAttachment(

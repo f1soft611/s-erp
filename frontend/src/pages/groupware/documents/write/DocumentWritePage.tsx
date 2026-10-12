@@ -9,11 +9,12 @@ import { FeedView } from '../../../../shared/components/view-mode/FeedView';
 import { ListView } from '../../../../shared/components/view-mode/ListView';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
 import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
+import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import { NoticeFilterMenu } from '../../community/notice/components/NoticeFilterMenu';
 import { ApprovalSummaryPanel } from './components/ApprovalSummaryPanel';
 import { ApprovalNoticePanel } from './components/ApprovalNoticePanel';
 import { DocumentComposerDialog } from './components/DocumentComposerDialog';
-import { DocumentApprovalDetailDialog } from './components/DocumentApprovalDetailDialog';
+import { DocumentApprovalDetailFeed } from './components/DocumentApprovalDetailFeed';
 import { DocumentFeedItem } from './components/DocumentFeedItem';
 import { DocumentStatusPanel } from './components/DocumentStatusPanel';
 import { EmptyDocumentList } from './components/EmptyDocumentList';
@@ -199,17 +200,21 @@ export function DocumentWritePage({
           refresh();
         }}
       />
-      <DocumentApprovalDetailDialog
-        open={detailDocumentId !== null}
-        electronicApprovalId={detailDocumentId}
-        onClose={closeDetail}
-        onActionComplete={refresh}
-        onEditDocument={(document) => {
-          setEditingDocument(document);
-          closeDetail();
-          openComposer();
-        }}
-      />
+      {detailDocumentId !== null && (
+        <PageAreaOverlay onClose={closeDetail}>
+          <DocumentApprovalDetailFeed
+            open
+            electronicApprovalId={detailDocumentId}
+            onClose={closeDetail}
+            onActionComplete={refresh}
+            onEditDocument={(document) => {
+              setEditingDocument(document);
+              closeDetail();
+              openComposer();
+            }}
+          />
+        </PageAreaOverlay>
+      )}
     </Box>
   );
 }

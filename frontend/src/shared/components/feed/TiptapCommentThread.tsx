@@ -38,7 +38,13 @@ function getFileBadgeMeta(fileName: string) {
   return map[extension] ?? { bg: '#e2e8f0', color: '#475569', label: 'FILE' };
 }
 
-export type FeedCommentAttachment = { id: string; name: string; size?: number };
+export type FeedCommentAttachment = {
+  id: string;
+  name: string;
+  size?: number;
+  mimeType?: string;
+  previewUrl?: string;
+};
 export type FeedCommentItem = {
   id: string | number;
   author: string;

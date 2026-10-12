@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +22,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,6 +30,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.EmbeddedImageStorageService;
@@ -99,6 +103,157 @@ class DocumentApprovalServiceImplTest {
             .containsEntry("eventType", "DRAFT_SAVED")
             .containsEntry("writerId", "login-author")
             .containsEntry("writerName", "작성자");
+    }
+
+    @Test
+    void listApprovalCommentsRequiresDocumentParticipation() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(false);
+
+        assertThatThrownBy(() -> invokeApprovalMethod(
+                "listApprovalComments",
+                new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
+                author, 77L, 3, null))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void listApprovalCommentsUsesUserOnlyPageAndRootCount() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        CommonCommentVO comment = approvalComment(55L, "login-author", "USER");
+        when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
+        when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
+        when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.<CommonFileVO>emptyList());
+
+        CommonCommentPageVO page = (CommonCommentPageVO) invokeApprovalMethod(
+                "listApprovalComments",
+                new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
+                author, 77L, 3, null);
+
+        assertThat(page.getComments()).containsExactly(comment);
+        assertThat(page.getResultCnt()).isEqualTo(1L);
+        verify(commentDAO).selectApprovalUserCommentPage(argThat(params ->
+            params.get("tenantId").equals(4L)
+                && params.get("ownerId").equals(77L)
+                && params.get("limit").equals(4)));
+        verify(commentDAO).countApprovalUserComments(argThat(params ->
+            params.get("tenantId").equals(4L) && params.get("ownerId").equals(77L)));
+    }
+
+    @Test
+    void createApprovalCommentUsesAuthenticatedWriterAndApprovalOwner() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.insertCommonComment(anyMap())).thenReturn(55L);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "login-author", "USER"));
+
+        CommonCommentVO created = (CommonCommentVO) invokeApprovalMethod(
+                "createApprovalComment",
+                new Class<?>[] {LoginVO.class, Long.class, String.class, Long.class},
+                author, 77L, "문서 댓글", null);
+
+        assertThat(created.getCommentId()).isEqualTo(55L);
+        ArgumentCaptor<Map<String, Object>> params = mapCaptor();
+        verify(commentDAO).insertCommonComment(params.capture());
+        assertThat(params.getValue())
+            .containsEntry("tenantId", 4L)
+            .containsEntry("ownerType", "APPROVAL")
+            .containsEntry("ownerId", 77L)
+            .containsEntry("commentType", "USER")
+            .containsEntry("writerId", "login-author")
+            .containsEntry("writerName", "작성자")
+            .containsEntry("content", "문서 댓글");
+    }
+
+    @Test
+    void uploadApprovalCommentAttachmentUsesCommentOwnerAndAuthenticatedUploader() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "login-author", "USER"));
+        MockMultipartFile file = new MockMultipartFile("file", "evidence.txt", "text/plain", new byte[] {1});
+
+        service().uploadApprovalCommentAttachment(author, 77L, 55L, file);
+
+        verify(fileService).uploadFile(4L, "APPROVAL_COMMENT", 55L, file, "login-author");
+    }
+
+    @Test
+    void uploadApprovalCommentAttachmentRejectsAnotherAuthorsComment() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "someone-else", "USER"));
+
+        assertThatThrownBy(() -> service().uploadApprovalCommentAttachment(
+                author, 77L, 55L, new MockMultipartFile("file", "evidence.txt", "text/plain", new byte[] {1})))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verifyNoInteractions(fileService);
+    }
+
+    @Test
+    void downloadApprovalCommentAttachmentRejectsFileOutsideComment() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "login-author", "USER"));
+        CommonFileVO file = approvalCommentFile(91L, 56L);
+        when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.singletonList(file));
+
+        assertThatThrownBy(() -> service().downloadApprovalCommentAttachment(
+                author, 77L, 55L, 91L, mock(javax.servlet.http.HttpServletResponse.class)))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(fileService, never()).downloadFile(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deleteApprovalCommentAttachmentRequiresCommentAuthorAndOwnedFile() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "someone-else", "USER"));
+
+        assertThatThrownBy(() -> service().deleteApprovalCommentAttachment(author, 77L, 55L, 91L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(fileService, never()).deleteFile(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void createApprovalCommentRejectsParentOutsideTheApproval() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> invokeApprovalMethod(
+                "createApprovalComment",
+                new Class<?>[] {LoginVO.class, Long.class, String.class, Long.class},
+                author, 77L, "답글", 99L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(commentDAO, never()).insertCommonComment(anyMap());
+    }
+
+    @Test
+    void updateApprovalCommentRejectsAnotherAuthorsComment() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(commentDAO.selectApprovalUserCommentById(anyMap()))
+            .thenReturn(approvalComment(55L, "someone-else", "USER"));
+
+        assertThatThrownBy(() -> invokeApprovalMethod(
+                "updateApprovalComment",
+                new Class<?>[] {LoginVO.class, Long.class, Long.class, String.class},
+                author, 77L, 55L, "수정"))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(commentDAO, never()).updateApprovalUserComment(anyMap());
     }
 
     @Test
@@ -445,6 +600,51 @@ class DocumentApprovalServiceImplTest {
     private DocumentApprovalServiceImpl service(EmbeddedImageStorageService imageStorageService) {
         return new DocumentApprovalServiceImpl(
             approvalDAO, commentDAO, fileService, documentSanitizer, imageStorageService);
+    }
+
+    private Object invokeApprovalMethod(String name, Class<?>[] parameterTypes, Object... arguments) throws Exception {
+        Method method = Arrays.stream(DocumentApprovalServiceImpl.class.getMethods())
+            .filter(candidate -> candidate.getName().equals(name))
+            .filter(candidate -> Arrays.equals(candidate.getParameterTypes(), parameterTypes))
+            .findFirst()
+            .orElse(null);
+        assertThat(method).as("DocumentApprovalServiceImpl.%s is implemented", name).isNotNull();
+        try {
+            return method.invoke(service(), arguments);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new IllegalStateException(cause);
+        }
+    }
+
+    private CommonCommentVO approvalComment(Long commentId, String writerId, String commentType) {
+        CommonCommentVO comment = new CommonCommentVO();
+        comment.setCommentId(commentId);
+        comment.setTenantId(4L);
+        comment.setOwnerType("APPROVAL");
+        comment.setOwnerId(77L);
+        comment.setContent("문서 댓글");
+        comment.setCommentType(commentType);
+        comment.setWriterId(writerId);
+        comment.setWriterName("작성자");
+        comment.setDeletedYn("N");
+        return comment;
+    }
+
+    private CommonFileVO approvalCommentFile(Long fileId, Long ownerId) {
+        CommonFileVO file = new CommonFileVO();
+        file.setFileId(fileId);
+        file.setTenantId(4L);
+        file.setOwnerType("APPROVAL_COMMENT");
+        file.setOwnerId(ownerId);
+        file.setFileUsageType("ATTACHMENT");
+        return file;
     }
 
     private DocumentApprovalDraftSaveRequestVO request() throws Exception {

@@ -29,6 +29,16 @@ class CommonFileApiControllerTest {
         assertForbidden(() -> controller.deleteFile(20L, "APPROVAL", 10L, user));
         assertForbidden(() -> controller.downloadFile(
             20L, "APPROVAL", 10L, user, new MockHttpServletResponse()));
+        assertForbidden(() -> controller.listFiles("APPROVAL_COMMENT", 20L, user));
+        assertForbidden(() -> controller.uploadFile(
+            "APPROVAL_COMMENT",
+            20L,
+            null,
+            new MockMultipartFile("file", "comment.txt", "text/plain", "body".getBytes()),
+            user));
+        assertForbidden(() -> controller.deleteFile(21L, "APPROVAL_COMMENT", 20L, user));
+        assertForbidden(() -> controller.downloadFile(
+            21L, "APPROVAL_COMMENT", 20L, user, new MockHttpServletResponse()));
     }
 
     private void assertForbidden(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {

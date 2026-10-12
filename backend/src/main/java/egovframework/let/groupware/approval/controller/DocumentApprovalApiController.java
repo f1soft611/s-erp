@@ -24,7 +24,10 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonFileVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
@@ -121,6 +124,103 @@ public class DocumentApprovalApiController {
             @AuthenticationPrincipal LoginVO user) throws Exception {
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", documentApprovalService.getDetail(user, electronicApprovalId));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 사용자 댓글 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/{electronicApprovalId}/comments")
+    public ResultVO listApprovalComments(@PathVariable Long electronicApprovalId,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Long beforeCommentId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        CommonCommentPageVO page = documentApprovalService.listApprovalComments(
+                user, electronicApprovalId, limit, beforeCommentId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList", page.getComments());
+        resultMap.put("comments", page.getComments());
+        resultMap.put("resultCnt", page.getResultCnt());
+        resultMap.put("hasPrevious", page.isHasPrevious());
+        resultMap.put("nextBeforeCommentId", page.getNextBeforeCommentId());
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 사용자 댓글 작성", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/comments")
+    public ResponseEntity<ResultVO> createApprovalComment(@PathVariable Long electronicApprovalId,
+            @RequestBody DocumentApprovalCommentRequestVO request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        CommonCommentVO created = documentApprovalService.createApprovalComment(
+                user, electronicApprovalId, request.getContent(), request.getParentCommentId());
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", created);
+        resultMap.put("message", "댓글이 등록되었습니다.");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "전자결재 사용자 댓글 수정", security = @SecurityRequirement(name = "Authorization"))
+    @PutMapping("/{electronicApprovalId}/comments/{commentId}")
+    public ResultVO updateApprovalComment(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @RequestBody DocumentApprovalCommentRequestVO request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.updateApprovalComment(
+                user, electronicApprovalId, commentId, request.getContent()));
+        resultMap.put("message", "댓글이 수정되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 사용자 댓글 삭제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/{electronicApprovalId}/comments/{commentId}")
+    public ResultVO deleteApprovalComment(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @AuthenticationPrincipal LoginVO user) throws Exception {
+        documentApprovalService.deleteApprovalComment(user, electronicApprovalId, commentId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "댓글이 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 댓글 첨부 목록 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/{electronicApprovalId}/comments/{commentId}/attachments")
+    public ResultVO listApprovalCommentAttachments(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList", documentApprovalService.listApprovalCommentAttachments(
+                user, electronicApprovalId, commentId));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 댓글 첨부 업로드", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/comments/{commentId}/attachments")
+    public ResponseEntity<ResultVO> uploadApprovalCommentAttachment(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        CommonFileVO uploaded = documentApprovalService.uploadApprovalCommentAttachment(
+                user, electronicApprovalId, commentId, file);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", uploaded);
+        resultMap.put("message", "댓글 첨부파일이 업로드되었습니다.");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
+    }
+
+    @Operation(summary = "전자결재 댓글 첨부 다운로드", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/{electronicApprovalId}/comments/{commentId}/attachments/{fileId}/download")
+    public void downloadApprovalCommentAttachment(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @PathVariable Long fileId,
+            @AuthenticationPrincipal LoginVO user, HttpServletResponse response) throws Exception {
+        documentApprovalService.downloadApprovalCommentAttachment(
+                user, electronicApprovalId, commentId, fileId, response);
+    }
+
+    @Operation(summary = "전자결재 댓글 첨부 삭제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/{electronicApprovalId}/comments/{commentId}/attachments/{fileId}")
+    public ResultVO deleteApprovalCommentAttachment(@PathVariable Long electronicApprovalId,
+            @PathVariable Long commentId, @PathVariable Long fileId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        documentApprovalService.deleteApprovalCommentAttachment(user, electronicApprovalId, commentId, fileId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "댓글 첨부파일이 삭제되었습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

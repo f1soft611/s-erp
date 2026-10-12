@@ -45,6 +45,25 @@ describe('shared feed components', () => {
     expect(screen.getByTestId('attachment-icon-xlsx')).toBeInTheDocument();
   });
 
+  it('renders a safe preview when an authenticated image URL is provided', () => {
+    render(
+      <AttachmentList
+        files={[{
+          id: 'file-image',
+          name: '검토.png',
+          mimeType: 'image/png',
+          previewUrl: 'blob:test-image',
+        }]}
+        showActions={false}
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: '검토.png' })).toHaveAttribute(
+      'src',
+      'blob:test-image',
+    );
+  });
+
   it('maps known and unknown file extensions to icon metadata', () => {
     expect(getAttachmentIconMeta('guide.pdf').label).toBe('PDF');
     expect(getAttachmentIconMeta('archive.unknown').label).toBe('FILE');

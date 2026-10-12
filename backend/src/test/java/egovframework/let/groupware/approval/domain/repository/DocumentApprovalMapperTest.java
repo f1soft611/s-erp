@@ -85,8 +85,8 @@ class DocumentApprovalMapperTest {
         String deleteSql = configuration
                 .getMappedStatement("CommonFileDAO.softDeleteCommonFileExcludingApproval")
                 .getBoundSql(params).getSql();
-        assertThat(downloadSql).contains("COALESCE(UPPER(owner_type), '') <> 'APPROVAL'");
-        assertThat(deleteSql).contains("COALESCE(UPPER(owner_type), '') <> 'APPROVAL'");
+        assertThat(downloadSql).contains("NOT IN ('APPROVAL', 'APPROVAL_COMMENT')");
+        assertThat(deleteSql).contains("NOT IN ('APPROVAL', 'APPROVAL_COMMENT')");
     }
 
     @Test
@@ -124,6 +124,45 @@ class DocumentApprovalMapperTest {
                 .getBoundSql(new HashMap<String, Object>())
                 .getSql();
         assertThat(detailSql).contains("drafting_work_category_id");
+    }
+
+    @Test
+    void approvalUserCommentPageAndCountStatementsAreMapped() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentPage")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.countApprovalUserComments")).isTrue();
+    }
+
+    @Test
+    void genericCommentMutationAndFileIdAccessExcludeApprovalOwnedRecords() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonFile_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("commentId", 12L);
+        params.put("fileId", 77L);
+
+        String updateCommentSql = configuration
+                .getMappedStatement("CommonCommentDAO.updateCommonComment")
+                .getBoundSql(params).getSql();
+        String deleteCommentSql = configuration
+                .getMappedStatement("CommonCommentDAO.softDeleteCommonComment")
+                .getBoundSql(params).getSql();
+        String downloadFileSql = configuration
+                .getMappedStatement("CommonFileDAO.selectCommonFileByIdExcludingApproval")
+                .getBoundSql(params).getSql();
+        String deleteFileSql = configuration
+                .getMappedStatement("CommonFileDAO.softDeleteCommonFileExcludingApproval")
+                .getBoundSql(params).getSql();
+
+        assertThat(updateCommentSql).contains("UPPER(owner_type)").contains("'APPROVAL'");
+        assertThat(deleteCommentSql).contains("UPPER(owner_type)").contains("'APPROVAL'");
+        assertThat(downloadFileSql).contains("NOT IN ('APPROVAL', 'APPROVAL_COMMENT')");
+        assertThat(deleteFileSql).contains("NOT IN ('APPROVAL', 'APPROVAL_COMMENT')");
     }
 
     private void parseMapper(Configuration configuration, String resourcePath) throws Exception {

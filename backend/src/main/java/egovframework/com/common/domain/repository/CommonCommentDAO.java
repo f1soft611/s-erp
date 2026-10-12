@@ -23,12 +23,24 @@ public class CommonCommentDAO extends EgovAbstractMapper {
         return selectList("CommonCommentDAO.selectCommonCommentPage", params);
     }
 
+    public List<CommonCommentVO> selectApprovalUserCommentPage(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentPage", params);
+    }
+
+    public Long countApprovalUserComments(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("CommonCommentDAO.countApprovalUserComments", params);
+    }
+
     public Long countCommonComments(Map<String, Object> params) throws Exception {
         return (Long) selectOne("CommonCommentDAO.countCommonComments", params);
     }
 
     public CommonCommentVO selectCommonCommentById(Map<String, Object> params) throws Exception {
         return (CommonCommentVO) selectOne("CommonCommentDAO.selectCommonCommentById", params);
+    }
+
+    public CommonCommentVO selectApprovalUserCommentById(Map<String, Object> params) throws Exception {
+        return (CommonCommentVO) selectOne("CommonCommentDAO.selectApprovalUserCommentById", params);
     }
 
     public Long insertCommonComment(Map<String, Object> params) throws Exception {
@@ -43,7 +55,15 @@ public class CommonCommentDAO extends EgovAbstractMapper {
         return update("CommonCommentDAO.updateCommonComment", params);
     }
 
+    public int updateApprovalUserComment(Map<String, Object> params) throws Exception {
+        return update("CommonCommentDAO.updateApprovalUserComment", params);
+    }
+
     public int softDeleteCommonComment(Map<String, Object> params) throws Exception {
         return update("CommonCommentDAO.softDeleteCommonComment", params);
+    }
+
+    public int softDeleteApprovalUserComment(Map<String, Object> params) throws Exception {
+        return update("CommonCommentDAO.softDeleteApprovalUserComment", params);
     }
 }

@@ -6,6 +6,8 @@ const api = vi.hoisted(() => ({
   postFormData: vi.fn(),
   put: vi.fn(),
   delete: vi.fn(),
+  download: vi.fn(),
+  getBlob: vi.fn(),
 }));
 
 vi.mock('../src/shared/services/apiClient', () => ({
@@ -14,6 +16,8 @@ vi.mock('../src/shared/services/apiClient', () => ({
   apiPostFormData: api.postFormData,
   apiPut: api.put,
   apiDelete: api.delete,
+  apiDownload: api.download,
+  apiGetBlob: api.getBlob,
   ApiResponseError: class ApiResponseError extends Error {
     constructor(message: string, readonly status: number) {
       super(message);
@@ -23,6 +27,17 @@ vi.mock('../src/shared/services/apiClient', () => ({
 
 import {
   getDocumentApprovalDetail,
+  listApprovalComments,
+  createApprovalComment,
+  updateApprovalComment,
+  deleteApprovalComment,
+  listApprovalCommentAttachments,
+  uploadApprovalCommentAttachment,
+  downloadApprovalCommentAttachment,
+  fetchApprovalCommentAttachmentBlob,
+  fetchApprovalEmbeddedImageBlob,
+  deleteApprovalCommentAttachment,
+  downloadDocumentApprovalAttachment,
   getDocumentApprovalSummary,
   listDocumentApprovals,
   processDocumentApprovalAction,
@@ -233,6 +248,92 @@ describe('document approval service', () => {
 
     expect(api.delete).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/embedded-images/temp/token%2F1?fileName=pasted+image.png',
+    );
+  });
+
+  it('uses approval-scoped comment and attachment routes with validated IDs', async () => {
+    const comment = {
+      commentId: 31,
+      ownerId: 41,
+      commentType: 'USER',
+      content: '의견',
+      writerId: 'writer-1',
+      writerName: '홍길동',
+    };
+    api.get
+      .mockResolvedValueOnce({
+        resultList: [comment],
+        comments: [comment],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 1,
+      })
+      .mockResolvedValueOnce({
+        resultList: [{ fileId: 51, fileName: 'evidence.png', fileSize: 10 }],
+      });
+    api.post.mockResolvedValueOnce({ item: comment });
+    api.put.mockResolvedValueOnce({ item: comment });
+    api.delete.mockResolvedValue({});
+    api.postFormData.mockResolvedValueOnce({
+      item: { fileId: 51, fileName: 'evidence.png', fileSize: 10 },
+    });
+    const file = new File(['data'], 'evidence.png', { type: 'image/png' });
+
+    await expect(listApprovalComments(41, { limit: 10 })).resolves.toMatchObject({
+      comments: [comment],
+      hasPrevious: false,
+      resultCnt: 1,
+    });
+    await expect(createApprovalComment(41, '의견', 30)).resolves.toEqual(comment);
+    await expect(updateApprovalComment(41, 31, '수정 의견')).resolves.toEqual(comment);
+    await deleteApprovalComment(41, 31);
+    await expect(listApprovalCommentAttachments(41, 31)).resolves.toEqual([
+      { fileId: 51, fileName: 'evidence.png', fileSize: 10 },
+    ]);
+    await expect(uploadApprovalCommentAttachment(41, 31, file)).resolves.toEqual({
+      fileId: 51,
+      fileName: 'evidence.png',
+      fileSize: 10,
+    });
+    await downloadApprovalCommentAttachment(41, 31, 51, 'evidence.png');
+    const imageBlob = new Blob(['png'], { type: 'image/png' });
+    api.getBlob.mockResolvedValue(imageBlob);
+    await expect(fetchApprovalCommentAttachmentBlob(41, 31, 51)).resolves.toBe(imageBlob);
+    await expect(fetchApprovalEmbeddedImageBlob(41, 52)).resolves.toBe(imageBlob);
+    await deleteApprovalCommentAttachment(41, 31, 51);
+    await downloadDocumentApprovalAttachment(41, 51, 'document.pdf');
+
+    expect(api.get).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/groupware/approvals/41/comments?limit=10',
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/comments',
+      { content: '의견', parentCommentId: 30 },
+    );
+    expect(api.put).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/comments/31',
+      { content: '수정 의견' },
+    );
+    expect(api.postFormData).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/comments/31/attachments',
+      expect.any(FormData),
+    );
+    expect(api.download).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/groupware/approvals/41/comments/31/attachments/51/download',
+      'evidence.png',
+    );
+    expect(api.getBlob).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/comments/31/attachments/51/download',
+    );
+    expect(api.getBlob).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/embedded-images/52',
+    );
+    expect(api.download).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/groupware/approvals/41/attachments/51/download',
+      'document.pdf',
     );
   });
 });

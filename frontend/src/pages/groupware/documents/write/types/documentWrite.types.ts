@@ -178,4 +178,31 @@ export type DocumentDraftAttachmentResponse = {
   fileId: number;
   fileName?: string;
   fileSize?: number;
+  mimeType?: string;
+};
+
+export type DocumentApprovalCommentAttachment = DocumentDraftAttachmentResponse;
+
+export type DocumentApprovalComment = {
+  commentId: number;
+  tenantId?: number;
+  ownerType?: 'APPROVAL';
+  ownerId: number;
+  parentCommentId?: number | null;
+  content: string;
+  commentType: 'USER';
+  eventType?: null;
+  writerId: string;
+  writerName: string;
+  deletedYn?: 'Y' | 'N';
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  attachments?: DocumentApprovalCommentAttachment[];
+};
+
+export type DocumentApprovalCommentPage = {
+  comments: DocumentApprovalComment[];
+  hasPrevious: boolean;
+  nextBeforeCommentId: number | null;
+  resultCnt: number;
 };

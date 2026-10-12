@@ -129,7 +129,9 @@ public class CommonFileApiController {
     }
 
     private void requireNonApprovalOwnerType(String ownerType) {
-        if (StringUtils.hasText(ownerType) && "APPROVAL".equalsIgnoreCase(ownerType.trim())) {
+        if (StringUtils.hasText(ownerType)
+                && ("APPROVAL".equalsIgnoreCase(ownerType.trim())
+                    || "APPROVAL_COMMENT".equalsIgnoreCase(ownerType.trim()))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "전자결재 첨부는 전용 권한 확인 경로를 사용해야 합니다.");
         }
     }

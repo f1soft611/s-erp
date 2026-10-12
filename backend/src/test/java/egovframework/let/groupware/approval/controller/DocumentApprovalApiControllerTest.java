@@ -6,6 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.servlet.http.HttpServletResponse;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -105,6 +112,45 @@ class DocumentApprovalApiControllerTest {
                 DocumentApprovalEmbeddedImageVO.class);
 
         assertThat(image.getWidth()).isEqualTo("320");
+    }
+
+    @Test
+    void approvalCommentAndAttachmentRoutesIncludeApprovalAndCommentIds() {
+        assertRoute("listApprovalComments", GetMapping.class, "/{electronicApprovalId}/comments");
+        assertRoute("createApprovalComment", PostMapping.class, "/{electronicApprovalId}/comments");
+        assertRoute("updateApprovalComment", PutMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}");
+        assertRoute("deleteApprovalComment", DeleteMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}");
+        assertRoute("listApprovalCommentAttachments", GetMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}/attachments");
+        assertRoute("uploadApprovalCommentAttachment", PostMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}/attachments");
+        assertRoute("downloadApprovalCommentAttachment", GetMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}/attachments/{fileId}/download");
+        assertRoute("deleteApprovalCommentAttachment", DeleteMapping.class,
+                "/{electronicApprovalId}/comments/{commentId}/attachments/{fileId}");
+    }
+
+    private void assertRoute(String methodName, Class<? extends Annotation> mappingType, String expectedPath) {
+        Method method = Arrays.stream(DocumentApprovalApiController.class.getDeclaredMethods())
+                .filter(candidate -> candidate.getName().equals(methodName))
+                .findFirst()
+                .orElse(null);
+        assertThat(method).as("controller method %s exists", methodName).isNotNull();
+        Annotation mapping = method.getAnnotation(mappingType);
+        assertThat(mapping).as("%s has %s", methodName, mappingType.getSimpleName()).isNotNull();
+        String[] paths;
+        if (mapping instanceof GetMapping) {
+            paths = ((GetMapping) mapping).value();
+        } else if (mapping instanceof PostMapping) {
+            paths = ((PostMapping) mapping).value();
+        } else if (mapping instanceof PutMapping) {
+            paths = ((PutMapping) mapping).value();
+        } else {
+            paths = ((DeleteMapping) mapping).value();
+        }
+        assertThat(paths).contains(expectedPath);
     }
 
     private LoginVO authenticatedUser() {

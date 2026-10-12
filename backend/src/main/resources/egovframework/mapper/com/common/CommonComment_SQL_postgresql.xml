@@ -104,6 +104,67 @@
         ORDER BY root_order, comment_path
     </select>
 
+    <select id="selectApprovalUserCommentPage" parameterType="map" resultMap="commonCommentMap">
+        WITH RECURSIVE all_comment_tree AS (
+            SELECT c.comment_id, c.parent_comment_id, c.deleted_yn,
+                   c.comment_id AS root_comment_id
+            FROM tb_common_comment c
+            WHERE c.tenant_id = #{tenantId}
+              AND c.owner_type = 'APPROVAL'
+              AND c.owner_id = #{ownerId}
+              AND c.comment_type = 'USER'
+            UNION ALL
+            SELECT child.comment_id, child.parent_comment_id, child.deleted_yn,
+                   tree.root_comment_id
+            FROM tb_common_comment child
+            JOIN all_comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = 'APPROVAL'
+              AND child.owner_id = #{ownerId}
+              AND child.comment_type = 'USER'
+              AND child.comment_id &lt;> tree.comment_id
+        ), root_page AS (
+            SELECT root_comment_id AS comment_id,
+                   ROW_NUMBER() OVER (ORDER BY root_comment_id DESC) AS root_order
+            FROM all_comment_tree
+            GROUP BY root_comment_id
+            HAVING BOOL_OR(deleted_yn = 'N')
+            <if test="beforeCommentId != null">
+                AND root_comment_id &lt; #{beforeCommentId}
+            </if>
+            ORDER BY root_comment_id DESC
+            LIMIT #{limit}
+        ), comment_tree AS (
+            SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id,
+                   c.parent_comment_id, c.content, c.comment_type, c.event_type,
+                   c.writer_id, c.writer_name,
+                   c.last_modified_by, c.last_modified_by_name, c.deleted_yn,
+                   c.created_at, c.updated_at, rp.root_order,
+                   ARRAY[c.comment_id] AS comment_path
+            FROM tb_common_comment c
+            JOIN root_page rp ON rp.comment_id = c.comment_id
+            UNION ALL
+            SELECT child.comment_id, child.tenant_id, child.owner_type, child.owner_id,
+                   child.parent_comment_id, child.content, child.comment_type, child.event_type,
+                   child.writer_id, child.writer_name,
+                   child.last_modified_by, child.last_modified_by_name, child.deleted_yn,
+                   child.created_at, child.updated_at, tree.root_order,
+                   tree.comment_path || child.comment_id
+            FROM tb_common_comment child
+            JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = 'APPROVAL'
+              AND child.owner_id = #{ownerId}
+              AND child.comment_type = 'USER'
+              AND NOT child.comment_id = ANY(tree.comment_path)
+        )
+        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
+               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
+               last_modified_by_name, deleted_yn, created_at, updated_at
+        FROM comment_tree
+        ORDER BY root_order, comment_path
+    </select>
+
     <select id="countCommonComments" parameterType="map" resultType="long">
         SELECT COUNT(*)
         FROM tb_common_comment
@@ -111,6 +172,30 @@
           AND owner_type = #{ownerType}
           AND owner_id = #{ownerId}
           AND parent_comment_id IS NULL
+          AND deleted_yn = 'N'
+    </select>
+
+    <select id="countApprovalUserComments" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id = #{ownerId}
+          AND comment_type = 'USER'
+          AND parent_comment_id IS NULL
+          AND deleted_yn = 'N'
+    </select>
+
+    <select id="selectApprovalUserCommentById" parameterType="map" resultMap="commonCommentMap">
+        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
+               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
+               last_modified_by_name, deleted_yn, created_at, updated_at
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id = #{ownerId}
+          AND comment_type = 'USER'
           AND deleted_yn = 'N'
     </select>
 
@@ -127,11 +212,11 @@
     <select id="insertCommonComment" parameterType="map" resultType="long">
         INSERT INTO tb_common_comment (
             tenant_id, owner_type, owner_id, parent_comment_id, content,
-            writer_id, writer_name, last_modified_by, last_modified_by_name,
+            comment_type, event_type, writer_id, writer_name, last_modified_by, last_modified_by_name,
             deleted_yn, created_at, updated_at
         ) VALUES (
             #{tenantId}, #{ownerType}, #{ownerId}, #{parentCommentId, jdbcType=BIGINT}, #{content},
-            #{writerId}, #{writerName}, #{writerId}, #{writerName}, #{deletedYn},
+            'USER', NULL, #{writerId}, #{writerName}, #{writerId}, #{writerName}, #{deletedYn},
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         RETURNING comment_id
@@ -160,6 +245,22 @@
           AND comment_id = #{commentId}
           AND writer_id = #{actorId}
           AND comment_type = 'USER'
+          AND COALESCE(UPPER(owner_type), '') &lt;&gt; 'APPROVAL'
+          AND deleted_yn = 'N'
+    </update>
+
+    <update id="updateApprovalUserComment" parameterType="map">
+        UPDATE tb_common_comment
+        SET content = #{content},
+            last_modified_by = #{actorId},
+            last_modified_by_name = #{actorName},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id = #{ownerId}
+          AND writer_id = #{actorId}
+          AND comment_type = 'USER'
           AND deleted_yn = 'N'
     </update>
 
@@ -171,6 +272,22 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND comment_id = #{commentId}
+          AND writer_id = #{actorId}
+          AND comment_type = 'USER'
+          AND COALESCE(UPPER(owner_type), '') &lt;&gt; 'APPROVAL'
+          AND deleted_yn = 'N'
+    </update>
+
+    <update id="softDeleteApprovalUserComment" parameterType="map">
+        UPDATE tb_common_comment
+        SET deleted_yn = 'Y',
+            last_modified_by = #{actorId},
+            last_modified_by_name = #{actorName},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND comment_id = #{commentId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id = #{ownerId}
           AND writer_id = #{actorId}
           AND comment_type = 'USER'
           AND deleted_yn = 'N'

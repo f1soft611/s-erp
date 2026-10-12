@@ -11,6 +11,8 @@ export type AttachmentListItem = {
   name: string;
   size?: number;
   extension?: string;
+  mimeType?: string;
+  previewUrl?: string;
 };
 
 export type AttachmentListProps = {
@@ -58,6 +60,21 @@ export function AttachmentList({
               overflow: 'hidden',
             }}
           >
+            {file.mimeType?.startsWith('image/') &&
+              file.previewUrl?.startsWith('blob:') && (
+                <Box
+                  component="img"
+                  src={file.previewUrl}
+                  alt={file.name}
+                  sx={{
+                    width: 48,
+                    height: 40,
+                    objectFit: 'cover',
+                    borderRadius: 1,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
             <Box
               sx={{
                 display: 'flex',

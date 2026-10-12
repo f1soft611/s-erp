@@ -23,6 +23,7 @@ import org.jsoup.Jsoup;
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
+import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.EmbeddedImageDocumentProcessor;
@@ -47,6 +48,8 @@ import egovframework.let.groupware.approval.service.DocumentApprovalService;
 public class DocumentApprovalServiceImpl implements DocumentApprovalService {
 
     private static final String OWNER_TYPE = "APPROVAL";
+    private static final String COMMENT_FILE_OWNER_TYPE = "APPROVAL_COMMENT";
+    private static final String USER_COMMENT_TYPE = "USER";
     private static final String SYSTEM_COMMENT_TYPE = "SYSTEM";
     private static final String DRAFT_SAVED_EVENT = "DRAFT_SAVED";
     private static final Set<String> DOCUMENT_TYPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
@@ -336,6 +339,167 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         List<CommonCommentVO> events = commonCommentDAO.selectApprovalSystemEvents(commentParams);
         detail.setSystemEvents(events == null ? Collections.<CommonCommentVO>emptyList() : events);
         return detail;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
+            Integer limit, Long beforeCommentId) throws Exception {
+        requireRelatedDocument(user, electronicApprovalId);
+        int safeLimit = limit == null ? 3 : limit;
+        if (safeLimit < 1 || safeLimit > 100 || (beforeCommentId != null && beforeCommentId <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 조회 조건이 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = approvalCommentParams(user, electronicApprovalId, null);
+        params.put("beforeCommentId", beforeCommentId);
+        params.put("limit", safeLimit + 1);
+        List<CommonCommentVO> fetched = commonCommentDAO.selectApprovalUserCommentPage(params);
+        if (fetched == null) {
+            fetched = Collections.emptyList();
+        }
+
+        List<List<CommonCommentVO>> rootGroups = new ArrayList<>();
+        for (CommonCommentVO comment : fetched) {
+            if (comment.getParentCommentId() == null || rootGroups.isEmpty()) {
+                rootGroups.add(new ArrayList<>());
+            }
+            rootGroups.get(rootGroups.size() - 1).add(comment);
+        }
+
+        boolean hasPrevious = rootGroups.size() > safeLimit;
+        List<CommonCommentVO> comments = new ArrayList<>();
+        int selectedRootCount = Math.min(safeLimit, rootGroups.size());
+        for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
+            comments.addAll(rootGroups.get(groupIndex));
+        }
+        for (CommonCommentVO comment : comments) {
+            if ("Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                comment.setContent("[삭제된 댓글입니다.]");
+                comment.setWriterName("삭제된 댓글");
+                comment.setWriterId(null);
+                comment.setAttachments(new ArrayList<>());
+            } else {
+                List<CommonFileVO> attachments = commonFileService.listFiles(
+                        user.getTenantId(), COMMENT_FILE_OWNER_TYPE, comment.getCommentId());
+                comment.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+            }
+        }
+
+        CommonCommentPageVO page = new CommonCommentPageVO();
+        page.setComments(comments);
+        page.setHasPrevious(hasPrevious);
+        page.setNextBeforeCommentId(hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
+        Long count = commonCommentDAO.countApprovalUserComments(
+                approvalCommentParams(user, electronicApprovalId, null));
+        page.setResultCnt(count == null ? 0L : count);
+        return page;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
+            String content, Long parentCommentId) throws Exception {
+        requireRelatedDocument(user, electronicApprovalId);
+        String normalizedContent = normalizeApprovalCommentContent(content);
+        if (parentCommentId != null) {
+            if (parentCommentId <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상위 댓글 ID가 올바르지 않습니다.");
+            }
+            CommonCommentVO parent = commonCommentDAO.selectApprovalUserCommentById(
+                    approvalCommentParams(user, electronicApprovalId, parentCommentId));
+            if (parent == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상위 댓글을 찾을 수 없습니다.");
+            }
+        }
+
+        Map<String, Object> params = approvalCommentParams(user, electronicApprovalId, null);
+        params.put("parentCommentId", parentCommentId);
+        params.put("content", normalizedContent);
+        params.put("commentType", USER_COMMENT_TYPE);
+        params.put("writerId", user.getId());
+        params.put("writerName", user.getName());
+        params.put("deletedYn", "N");
+        Long commentId = commonCommentDAO.insertCommonComment(params);
+        if (commentId == null) {
+            throw new IllegalStateException("등록된 댓글 ID를 확인할 수 없습니다.");
+        }
+        CommonCommentVO created = commonCommentDAO.selectApprovalUserCommentById(
+                approvalCommentParams(user, electronicApprovalId, commentId));
+        if (created == null) {
+            throw new IllegalStateException("등록된 댓글을 다시 조회할 수 없습니다.");
+        }
+        return created;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommonCommentVO updateApprovalComment(LoginVO user, Long electronicApprovalId,
+            Long commentId, String content) throws Exception {
+        CommonCommentVO comment = requireApprovalUserComment(user, electronicApprovalId, commentId);
+        requireApprovalCommentAuthor(user, comment);
+        String normalizedContent = normalizeApprovalCommentContent(content);
+        Map<String, Object> params = approvalCommentParams(user, electronicApprovalId, commentId);
+        params.put("content", normalizedContent);
+        params.put("actorId", user.getId());
+        params.put("actorName", user.getName());
+        if (commonCommentDAO.updateApprovalUserComment(params) != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        }
+        comment.setContent(normalizedContent);
+        comment.setLastModifiedBy(user.getId());
+        comment.setLastModifiedByName(user.getName());
+        return comment;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteApprovalComment(LoginVO user, Long electronicApprovalId, Long commentId) throws Exception {
+        CommonCommentVO comment = requireApprovalUserComment(user, electronicApprovalId, commentId);
+        requireApprovalCommentAuthor(user, comment);
+        Map<String, Object> params = approvalCommentParams(user, electronicApprovalId, commentId);
+        params.put("actorId", user.getId());
+        params.put("actorName", user.getName());
+        if (commonCommentDAO.softDeleteApprovalUserComment(params) != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CommonFileVO> listApprovalCommentAttachments(LoginVO user, Long electronicApprovalId,
+            Long commentId) throws Exception {
+        requireApprovalUserComment(user, electronicApprovalId, commentId);
+        return listOwnedApprovalCommentFiles(user, commentId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommonFileVO uploadApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, MultipartFile file) throws Exception {
+        CommonCommentVO comment = requireApprovalUserComment(user, electronicApprovalId, commentId);
+        requireApprovalCommentAuthor(user, comment);
+        return commonFileService.uploadFile(
+                user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentId, file, user.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void downloadApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, Long fileId, HttpServletResponse response) throws Exception {
+        requireApprovalUserComment(user, electronicApprovalId, commentId);
+        requireOwnedApprovalCommentFile(user, commentId, fileId);
+        commonFileService.downloadFile(user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentId, fileId, response);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteApprovalCommentAttachment(LoginVO user, Long electronicApprovalId,
+            Long commentId, Long fileId) throws Exception {
+        CommonCommentVO comment = requireApprovalUserComment(user, electronicApprovalId, commentId);
+        requireApprovalCommentAuthor(user, comment);
+        requireOwnedApprovalCommentFile(user, commentId, fileId);
+        commonFileService.deleteFile(user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentId, fileId);
     }
 
     @Override
@@ -763,6 +927,66 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("writerName", user.getName());
         if (commonCommentDAO.insertSystemComment(params) == null) {
             throw new IllegalStateException("임시저장 시스템 이력 기록에 실패했습니다.");
+        }
+    }
+
+    private Map<String, Object> approvalCommentParams(LoginVO user, Long electronicApprovalId, Long commentId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", user.getTenantId());
+        params.put("ownerType", OWNER_TYPE);
+        params.put("ownerId", electronicApprovalId);
+        if (commentId != null) {
+            params.put("commentId", commentId);
+        }
+        return params;
+    }
+
+    private CommonCommentVO requireApprovalUserComment(LoginVO user, Long electronicApprovalId,
+            Long commentId) throws Exception {
+        requireRelatedDocument(user, electronicApprovalId);
+        if (commentId == null || commentId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 ID가 올바르지 않습니다.");
+        }
+        CommonCommentVO comment = commonCommentDAO.selectApprovalUserCommentById(
+                approvalCommentParams(user, electronicApprovalId, commentId));
+        if (comment == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        }
+        return comment;
+    }
+
+    private void requireApprovalCommentAuthor(LoginVO user, CommonCommentVO comment) {
+        if (!user.getId().equals(comment.getWriterId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        }
+    }
+
+    private String normalizeApprovalCommentContent(String content) {
+        String normalizedContent = content == null ? "" : content.trim();
+        if (!StringUtils.hasText(normalizedContent)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 내용을 입력해 주세요.");
+        }
+        return normalizedContent;
+    }
+
+    private List<CommonFileVO> listOwnedApprovalCommentFiles(LoginVO user, Long commentId) throws Exception {
+        List<CommonFileVO> files = commonFileService.listFiles(
+                user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentId);
+        return files == null ? Collections.<CommonFileVO>emptyList() : files;
+    }
+
+    private void requireOwnedApprovalCommentFile(LoginVO user, Long commentId, Long fileId) throws Exception {
+        if (fileId == null || fileId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일 ID가 올바르지 않습니다.");
+        }
+        boolean ownedFileExists = listOwnedApprovalCommentFiles(user, commentId).stream()
+                .anyMatch(file -> fileId.equals(file.getFileId())
+                        && user.getTenantId().equals(file.getTenantId())
+                        && COMMENT_FILE_OWNER_TYPE.equals(file.getOwnerType())
+                        && commentId.equals(file.getOwnerId())
+                        && "ATTACHMENT".equals(file.getFileUsageType()));
+        if (!ownedFileExists) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일을 찾을 수 없습니다.");
         }
     }
 
