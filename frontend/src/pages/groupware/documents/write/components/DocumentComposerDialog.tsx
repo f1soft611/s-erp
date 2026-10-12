@@ -24,6 +24,7 @@ import { richTextContentStyles } from '../../../../../shared/components/rich-tex
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import type { DocumentKind } from '../types/documentWrite.types';
+import type { DocumentApprovalDetail } from '../types/documentWrite.types';
 import {
   ALL_CATEGORY_VALUE,
   useDocumentComposer,
@@ -34,11 +35,13 @@ import { DocumentApprovalSettingsDialog } from './DocumentApprovalSettingsDialog
 type DocumentComposerDialogProps = {
   open: boolean;
   onClose: () => void;
+  initialDocument?: DocumentApprovalDetail | null;
 };
 
 export function DocumentComposerDialog({
   open,
   onClose,
+  initialDocument = null,
 }: DocumentComposerDialogProps) {
   const theme = useTheme();
   const [approvalSettingsOpen, setApprovalSettingsOpen] = useState(false);
@@ -78,6 +81,7 @@ export function DocumentComposerDialog({
     isSaving,
     saveError,
     saveDraft,
+    submitDraft,
     uploadImage,
     onOrphanedImageUpload,
     onUploadingChange,
@@ -87,6 +91,7 @@ export function DocumentComposerDialog({
     reconcileUnknownAttachment,
     removeAttachment,
     canSaveDraft,
+    canSubmitDraft,
     attachmentInputRef,
     editor,
     handleEditorReady,
@@ -94,7 +99,7 @@ export function DocumentComposerDialog({
     closeComposer: resetComposer,
     editorSurfaceBackground,
     fieldSurfaceBackground,
-  } = useDocumentComposer(open, onClose);
+  } = useDocumentComposer(open, onClose, initialDocument);
   const closeComposer = () => {
     setApprovalSettingsOpen(false);
     resetComposer();
@@ -177,6 +182,21 @@ export function DocumentComposerDialog({
       footerStart={composerFooterStart}
       actions={
         <>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={() => void submitDraft()}
+            disabled={!canSubmitDraft}
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 700,
+              minWidth: 112,
+              px: 2.5,
+              boxShadow: 'none',
+            }}
+          >
+            {isSaving ? '처리 중...' : '결재신청'}
+          </Button>
           <Button
             variant="contained"
             onClick={() => void saveDraft()}

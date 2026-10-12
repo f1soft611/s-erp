@@ -12,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
@@ -44,6 +50,16 @@ class DocumentApprovalApiControllerTest {
         assertThat(item.getElectronicApprovalId()).isEqualTo(77L);
         assertThat(item.getDocumentStatus()).isEqualTo("DRAFT");
         verify(approvalService).saveDraft(user, request);
+    }
+
+    @Test
+    void submitRouteReturnsCreatedResponse() throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        mockMvc.perform(post("/api/v1/groupware/approvals/77/submit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isOk());
     }
 
     @Test

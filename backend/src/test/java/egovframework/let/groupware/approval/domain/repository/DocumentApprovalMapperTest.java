@@ -35,6 +35,37 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void draftWritesDocumentNumberAndCanUpdateRevisionRequestedDocuments() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("eabusNo", "001");
+        params.put("documentStatus", "DRAFT");
+        BoundSql insertBoundSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.insertDocumentApprovalMain")
+                .getBoundSql(params);
+        BoundSql updateBoundSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.updateDocumentApprovalMain")
+                .getBoundSql(params);
+        String ownerSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDraftDrafterId")
+                .getBoundSql(params).getSql();
+
+        assertThat(insertBoundSql.getSql()).contains("eabus_no");
+        assertThat(updateBoundSql.getSql())
+                .contains("eabus_no = ?")
+                .contains("document_status IN ('DRAFT', 'REVISION_REQUESTED')");
+        assertThat(insertBoundSql.getParameterMappings())
+                .extracting(ParameterMapping::getProperty)
+                .contains("eabusNo");
+        assertThat(updateBoundSql.getParameterMappings())
+                .extracting(ParameterMapping::getProperty)
+                .contains("eabusNo");
+        assertThat(ownerSql).contains("document_status IN ('DRAFT', 'REVISION_REQUESTED')");
+    }
+
+    @Test
     void approvalAndCommonMappersParseAndKeepGenericFileAccessOutsideApproval() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
@@ -56,6 +87,43 @@ class DocumentApprovalMapperTest {
                 .getBoundSql(params).getSql();
         assertThat(downloadSql).contains("COALESCE(UPPER(owner_type), '') <> 'APPROVAL'");
         assertThat(deleteSql).contains("COALESCE(UPPER(owner_type), '') <> 'APPROVAL'");
+    }
+
+    @Test
+    void approvalWorkflowAndSystemTimelineStatementsAreMapped() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalForUpdate")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.updateDocumentApprovalStatus")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectCurrentPendingApprovalLine")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.updateApprovalLineAction")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectPendingApprovalCountForStage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectNextWaitingApprovalStage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.activateApprovalStage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentList")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalSummary")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalLines")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDraftDocumentStatus")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalSystemEvents")).isTrue();
+
+        String draftResponseSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDraftDocumentStatus")
+                .getBoundSql(new HashMap<String, Object>())
+                .getSql();
+        assertThat(draftResponseSql)
+                .contains("eabus_no")
+                .contains("document_status")
+                .contains("submitted_at")
+                .contains("drafter_id = ?");
+
+        String detailSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")
+                .getBoundSql(new HashMap<String, Object>())
+                .getSql();
+        assertThat(detailSql).contains("drafting_work_category_id");
     }
 
     private void parseMapper(Configuration configuration, String resourcePath) throws Exception {

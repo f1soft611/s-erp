@@ -20,12 +20,15 @@ function DocumentStatusChip({ status }: { status: ApprovalStatus }) {
 type DocumentFeedItemProps = {
   item: DocumentWriteItem;
   isDark: boolean;
+  onClick?: () => void;
 };
 
-export function DocumentFeedItem({ item, isDark }: DocumentFeedItemProps) {
+export function DocumentFeedItem({ item, isDark, onClick }: DocumentFeedItemProps) {
   return (
     <Card
-      component="article"
+      component={onClick ? 'button' : 'article'}
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
       data-testid="document-write-item"
       sx={{
         width: '100%',
@@ -35,6 +38,10 @@ export function DocumentFeedItem({ item, isDark }: DocumentFeedItemProps) {
         border: '1px solid rgba(148,163,184,0.18)',
         boxShadow: 'none',
         bgcolor: isDark ? 'rgba(15, 23, 42, 0.75)' : '#ffffff',
+        color: 'inherit',
+        textAlign: 'left',
+        cursor: onClick ? 'pointer' : 'default',
+        '&:hover': onClick ? { borderColor: 'primary.main' } : undefined,
       }}
     >
       <CardContent sx={{ p: 2.5, minWidth: 0, overflow: 'hidden' }}>

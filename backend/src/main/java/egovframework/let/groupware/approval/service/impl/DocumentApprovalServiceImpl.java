@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import org.jsoup.Jsoup;
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.EmbeddedImageDocumentProcessor;
 import egovframework.com.common.service.EmbeddedImageStorageService;
@@ -30,8 +32,14 @@ import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO.ApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 
@@ -121,7 +129,213 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         insertDraftSavedMessage(user, electronicApprovalId);
         imageStorageService.completeOwnerSave(user.getTenantId(), OWNER_TYPE, electronicApprovalId,
                 toStorageUploads(request.getTemporaryImages()), imageSave.getRetainedFileIds());
-        return draftResponse(electronicApprovalId);
+        return persistedDraftResponse(user, electronicApprovalId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalDraftVO submit(LoginVO user, Long electronicApprovalId,
+            DocumentApprovalDraftSaveRequestVO request) throws Exception {
+        validateAuthenticatedUser(user);
+        validateDraftRequest(request);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null || !user.getId().equals(document.getDrafterId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "결재신청할 문서를 찾을 수 없습니다.");
+        }
+        String previousStatus = document.getDocumentStatus();
+        if (!"DRAFT".equals(previousStatus) && !"REVISION_REQUESTED".equals(previousStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 상태에서는 결재신청할 수 없습니다.");
+        }
+
+        validateCategory(request.getDraftingWorkCategoryId(), user.getTenantId());
+        Map<String, DocumentApprovalParticipantVO> participants =
+                validateParticipants(request.getApprovalLines(), user);
+        validateSubmissionLines(request.getApprovalLines(), user);
+
+        Map<String, Object> documentParams = documentParams(user, request, params);
+        EmbeddedImageDocumentProcessor.Result imageSave = processEmbeddedImages(user, electronicApprovalId, request);
+        applyProcessedBody(documentParams, imageSave);
+        if (documentApprovalDAO.updateDocumentApprovalMain(documentParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서가 변경되어 결재신청할 수 없습니다.");
+        }
+
+        replaceApprovalLinesForSubmission(user, electronicApprovalId, request.getApprovalLines(), participants);
+        Map<String, Object> statusParams = new HashMap<>(params);
+        statusParams.put("expectedDocumentStatus", previousStatus);
+        statusParams.put("nextDocumentStatus", "PENDING");
+        statusParams.put("actorId", user.getId());
+        if (documentApprovalDAO.updateDocumentApprovalStatus(statusParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서 상태가 변경되어 결재신청할 수 없습니다.");
+        }
+
+        String eventType = "REVISION_REQUESTED".equals(previousStatus) ? "RESUBMITTED" : "SUBMITTED";
+        insertSystemEvent(user, electronicApprovalId, eventType,
+                "RESUBMITTED".equals(eventType) ? "문서가 재상신되었습니다." : "문서가 결재신청되었습니다.");
+        imageStorageService.completeOwnerSave(user.getTenantId(), OWNER_TYPE, electronicApprovalId,
+                toStorageUploads(request.getTemporaryImages()), imageSave.getRetainedFileIds());
+        return persistedDraftResponse(user, electronicApprovalId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalDraftVO processAction(LoginVO user, Long electronicApprovalId,
+            DocumentApprovalActionRequestVO request) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0 || request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "결재 처리 정보가 올바르지 않습니다.");
+        }
+        String action = request.getAction();
+        if (!"APPROVED".equals(action) && !"REJECTED".equals(action) && !"RETURNED".equals(action)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 결재 처리입니다.");
+        }
+        String actionComment = request.getActionComment() == null ? null : request.getActionComment().trim();
+        if (("REJECTED".equals(action) || "RETURNED".equals(action)) && !StringUtils.hasText(actionComment)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "반려 또는 보완요청 사유를 입력해 주세요.");
+        }
+        if (!StringUtils.hasText(actionComment)) {
+            actionComment = null;
+        }
+
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "결재 문서를 찾을 수 없습니다.");
+        }
+        String previousStatus = document.getDocumentStatus();
+        if (!"PENDING".equals(previousStatus) && !"IN_PROGRESS".equals(previousStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 상태에서는 결재 처리할 수 없습니다.");
+        }
+
+        params.put("participantUserId", user.getUniqId());
+        DocumentApprovalLineVO currentLine = documentApprovalDAO.selectCurrentPendingApprovalLine(params);
+        if (currentLine == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 처리할 수 있는 결재선이 없습니다.");
+        }
+
+        Map<String, Object> lineParams = new HashMap<>(params);
+        lineParams.put("electronicApprovalLineId", currentLine.getElectronicApprovalLineId());
+        lineParams.put("participantUserId", user.getUniqId());
+        lineParams.put("actionStatus", action);
+        lineParams.put("actionComment", actionComment);
+        if (documentApprovalDAO.updateApprovalLineAction(lineParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "결재선이 변경되어 처리할 수 없습니다.");
+        }
+
+        String nextStatus;
+        boolean completed = false;
+        if ("REJECTED".equals(action)) {
+            nextStatus = "REJECTED";
+        } else if ("RETURNED".equals(action)) {
+            nextStatus = "REVISION_REQUESTED";
+        } else {
+            Map<String, Object> stageParams = new HashMap<>(params);
+            stageParams.put("stageOrder", currentLine.getStageOrder());
+            Long pendingCount = documentApprovalDAO.selectPendingApprovalCountForStage(stageParams);
+            if (pendingCount == null) {
+                throw new IllegalStateException("현재 결재 단계 정보를 확인할 수 없습니다.");
+            }
+            if (pendingCount > 0) {
+                nextStatus = "IN_PROGRESS";
+            } else {
+                Integer nextStage = documentApprovalDAO.selectNextWaitingApprovalStage(params);
+                if (nextStage == null) {
+                    nextStatus = "COMPLETED";
+                    completed = true;
+                } else {
+                    stageParams.put("stageOrder", nextStage);
+                    if (documentApprovalDAO.activateApprovalStage(stageParams) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "다음 결재 단계를 활성화할 수 없습니다.");
+                    }
+                    nextStatus = "IN_PROGRESS";
+                }
+            }
+        }
+
+        Map<String, Object> statusParams = new HashMap<>(params);
+        statusParams.put("expectedDocumentStatus", previousStatus);
+        statusParams.put("nextDocumentStatus", nextStatus);
+        statusParams.put("actorId", user.getId());
+        if (documentApprovalDAO.updateDocumentApprovalStatus(statusParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서 상태가 변경되어 처리할 수 없습니다.");
+        }
+
+        String actionText = "APPROVED".equals(action) ? "문서가 승인되었습니다."
+                : "REJECTED".equals(action) ? "문서가 반려되었습니다." : "문서 보완이 요청되었습니다.";
+        insertSystemEvent(user, electronicApprovalId, action,
+                StringUtils.hasText(actionComment) ? actionText + " 사유: " + actionComment : actionText);
+        if (completed) {
+            insertSystemEvent(user, electronicApprovalId, "COMPLETED", "문서 결재가 완료되었습니다.");
+        }
+        return workflowResponse(electronicApprovalId, nextStatus);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        Set<String> scopes = new HashSet<>(Arrays.asList(
+                "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED"));
+        if (scope == null) {
+            scope = "ALL";
+        }
+        if (!scopes.contains(scope)
+                || (documentType != null && !DOCUMENT_TYPES.contains(documentType))
+                || (electronicApprovalId != null && electronicApprovalId <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("scope", scope);
+        params.put("documentType", documentType);
+        params.put("electronicApprovalId", electronicApprovalId);
+        List<DocumentApprovalListItemVO> documents = documentApprovalDAO.selectRelatedDocumentList(params);
+        return documents == null ? Collections.<DocumentApprovalListItemVO>emptyList() : documents;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception {
+        validateAuthenticatedUser(user);
+        Map<String, Object> params = actorParams(user);
+        DocumentApprovalSummaryVO summary = documentApprovalDAO.selectDocumentApprovalSummary(params);
+        if (summary == null) {
+            throw new IllegalStateException("전자결재 요약을 조회할 수 없습니다.");
+        }
+        List<DocumentApprovalListItemVO> notices = documentApprovalDAO.selectApprovalNotices(params);
+        summary.setNotices(notices == null ? Collections.<DocumentApprovalListItemVO>emptyList() : notices);
+        return summary;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalDetailVO detail = documentApprovalDAO.selectDocumentApprovalDetail(params);
+        if (detail == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+        }
+        detail.setAttachments(commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId));
+        detail.setApprovalLines(documentApprovalDAO.selectApprovalLines(params));
+        Map<String, Object> commentParams = new HashMap<>();
+        commentParams.put("tenantId", user.getTenantId());
+        commentParams.put("ownerId", electronicApprovalId);
+        List<CommonCommentVO> events = commonCommentDAO.selectApprovalSystemEvents(commentParams);
+        detail.setSystemEvents(events == null ? Collections.<CommonCommentVO>emptyList() : events);
+        return detail;
     }
 
     @Override
@@ -142,7 +356,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     @Transactional(readOnly = true)
     public void streamEmbeddedImage(LoginVO user, Long electronicApprovalId, Long fileId,
             HttpServletResponse response) throws Exception {
-        requireDraftOwner(user, electronicApprovalId);
+        requireRelatedDocument(user, electronicApprovalId);
         imageStorageService.streamOwnedImage(
                 user.getTenantId(), OWNER_TYPE, electronicApprovalId, fileId, response);
     }
@@ -150,7 +364,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     @Override
     @Transactional(readOnly = true)
     public List<CommonFileVO> listAttachments(LoginVO user, Long electronicApprovalId) throws Exception {
-        requireDraftOwner(user, electronicApprovalId);
+        requireRelatedDocument(user, electronicApprovalId);
         return commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId);
     }
 
@@ -178,7 +392,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     @Transactional(readOnly = true)
     public void downloadAttachment(LoginVO user, Long electronicApprovalId, Long fileId,
             HttpServletResponse response) throws Exception {
-        requireDraftOwner(user, electronicApprovalId);
+        requireRelatedDocument(user, electronicApprovalId);
         commonFileService.downloadFile(user.getTenantId(), OWNER_TYPE, electronicApprovalId, fileId, response);
     }
 
@@ -273,7 +487,9 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             Map<String, Object> actor) {
         Map<String, Object> params = new HashMap<>(actor);
         params.put("draftingWorkCategoryId", request.getDraftingWorkCategoryId());
-        params.put("documentType", request.getDocumentType().trim());
+        String documentType = request.getDocumentType().trim();
+        params.put("documentType", documentType);
+        params.put("eabusNo", eabusNo(documentType));
         String title = request.getTitle().trim();
         params.put("title", title);
         params.put("contentsJson", documentSanitizer.sanitizeJson(request.getContentsJson()).toString());
@@ -282,6 +498,21 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("contentsText", Jsoup.parseBodyFragment(safeHtml).text());
         params.put("drafterDepartmentName", user.getDepartmentName());
         return params;
+    }
+
+    private String eabusNo(String documentType) {
+        switch (documentType) {
+            case "DRAFTING":
+                return "001";
+            case "BUSINESS_CONTACT":
+                return "008";
+            case "EXPENSE_RESOLUTION":
+                return "004";
+            case "ATTENDANCE_APPLICATION":
+                return "031";
+            default:
+                throw new IllegalArgumentException("지원하지 않는 문서 유형입니다.");
+        }
     }
 
     private EmbeddedImageDocumentProcessor.Result processEmbeddedImages(
@@ -396,6 +627,130 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         }
     }
 
+    private void replaceApprovalLinesForSubmission(LoginVO user, Long approvalId, List<ApprovalLineVO> approvalLines,
+            Map<String, DocumentApprovalParticipantVO> participants) throws Exception {
+        Map<Integer, List<ApprovalLineVO>> stages = new TreeMap<>();
+        for (ApprovalLineVO line : approvalLines) {
+            if (!"REFERENCE".equals(line.getParticipantType())) {
+                stages.computeIfAbsent(line.getStageOrder(), key -> new ArrayList<>()).add(line);
+            }
+        }
+        int firstRealStage = stages.keySet().stream()
+                .filter(stage -> stage != 1 || !stages.get(stage).get(0).getParticipantUserId()
+                        .trim().equals(user.getUniqId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "기안자 외 결재자가 필요합니다."));
+
+        Map<String, Object> deleteParams = new HashMap<>();
+        deleteParams.put("tenantId", user.getTenantId());
+        deleteParams.put("electronicApprovalId", approvalId);
+        documentApprovalDAO.deleteDocumentApprovalLines(deleteParams);
+
+        for (ApprovalLineVO line : approvalLines) {
+            DocumentApprovalParticipantVO participant = participants.get(line.getParticipantUserId().trim());
+            Map<String, Object> params = new HashMap<>(deleteParams);
+            params.put("stageOrder", line.getStageOrder());
+            params.put("participantOrder", line.getParticipantOrder());
+            params.put("participantType", line.getParticipantType());
+            params.put("participantUserId", participant.getUserId());
+            params.put("participantName", participant.getUserName());
+            params.put("participantDepartmentName", participant.getDepartmentName());
+            if ("REFERENCE".equals(line.getParticipantType())) {
+                params.put("actionStatus", null);
+                params.put("pendingAt", null);
+                params.put("actionAt", null);
+            } else if (line.getStageOrder() == 1 && participant.getUserId().equals(user.getUniqId())) {
+                params.put("actionStatus", "APPROVED");
+                params.put("pendingAt", null);
+                params.put("actionAt", new java.util.Date());
+            } else if (line.getStageOrder() == firstRealStage) {
+                params.put("actionStatus", "PENDING");
+                params.put("pendingAt", new java.util.Date());
+                params.put("actionAt", null);
+            } else {
+                params.put("actionStatus", "WAITING");
+                params.put("pendingAt", null);
+                params.put("actionAt", null);
+            }
+            params.put("actionComment", null);
+            if (documentApprovalDAO.insertDocumentApprovalLine(params) != 1) {
+                throw new IllegalStateException("결재선 저장에 실패했습니다.");
+            }
+        }
+    }
+
+    private void validateSubmissionLines(List<ApprovalLineVO> approvalLines, LoginVO user) {
+        Map<Integer, List<ApprovalLineVO>> stages = new TreeMap<>();
+        int maximumActionStage = 0;
+        Integer referenceStage = null;
+        int nonDrafterActionCount = 0;
+        boolean hasDrafterFirst = false;
+
+        for (ApprovalLineVO line : approvalLines) {
+            stages.computeIfAbsent(line.getStageOrder(), key -> new ArrayList<>()).add(line);
+            if ("REFERENCE".equals(line.getParticipantType())) {
+                if (referenceStage == null) {
+                    referenceStage = line.getStageOrder();
+                } else if (!referenceStage.equals(line.getStageOrder())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참조자는 마지막 한 단계에 배치해야 합니다.");
+                }
+            } else {
+                maximumActionStage = Math.max(maximumActionStage, line.getStageOrder());
+                if (!user.getUniqId().equals(line.getParticipantUserId().trim())) {
+                    nonDrafterActionCount++;
+                }
+                if (line.getStageOrder() == 1 && line.getParticipantOrder() == 1
+                        && "APPROVAL".equals(line.getParticipantType())
+                        && user.getUniqId().equals(line.getParticipantUserId().trim())) {
+                    hasDrafterFirst = true;
+                }
+            }
+        }
+
+        int expectedStage = 1;
+        for (Map.Entry<Integer, List<ApprovalLineVO>> entry : stages.entrySet()) {
+            if (entry.getKey() != expectedStage++) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "결재 단계 순서는 연속되어야 합니다.");
+            }
+            List<ApprovalLineVO> stageLines = entry.getValue();
+            stageLines.sort((left, right) -> left.getParticipantOrder().compareTo(right.getParticipantOrder()));
+            String stageType = stageLines.get(0).getParticipantType();
+            for (int index = 0; index < stageLines.size(); index++) {
+                ApprovalLineVO line = stageLines.get(index);
+                if (line.getParticipantOrder() != index + 1
+                        || !stageType.equals(line.getParticipantType())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "단계 내 결재선 순서가 올바르지 않습니다.");
+                }
+            }
+            if ("APPROVAL".equals(stageType) && stageLines.size() != 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "일반 결재자는 한 단계에 한 명만 배치할 수 있습니다.");
+            }
+            if ("REFERENCE".equals(stageType) && entry.getKey() <= maximumActionStage) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참조자는 모든 결재 단계 뒤에 배치해야 합니다.");
+            }
+        }
+
+        if (!hasDrafterFirst || nonDrafterActionCount == 0
+                || (referenceStage != null && referenceStage != maximumActionStage + 1)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "결재선 순서 또는 참여자가 올바르지 않습니다.");
+        }
+    }
+
+    private void insertSystemEvent(LoginVO user, Long approvalId, String eventType, String content) throws Exception {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", user.getTenantId());
+        params.put("ownerType", OWNER_TYPE);
+        params.put("ownerId", approvalId);
+        params.put("commentType", SYSTEM_COMMENT_TYPE);
+        params.put("eventType", eventType);
+        params.put("content", content);
+        params.put("writerId", user.getId());
+        params.put("writerName", user.getName());
+        if (commonCommentDAO.insertSystemComment(params) == null) {
+            throw new IllegalStateException("결재 시스템 이력 기록에 실패했습니다.");
+        }
+    }
+
     private void insertDraftSavedMessage(LoginVO user, Long approvalId) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", user.getTenantId());
@@ -424,6 +779,18 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         }
     }
 
+    private void requireRelatedDocument(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        if (!Boolean.TRUE.equals(documentApprovalDAO.selectIsDocumentParticipant(params))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+        }
+    }
+
     private Map<String, Object> actorParams(LoginVO user) {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", user.getTenantId());
@@ -435,9 +802,24 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     }
 
     private DocumentApprovalDraftVO draftResponse(Long approvalId) {
+        DocumentApprovalDraftVO response = workflowResponse(approvalId, "DRAFT");
+        return response;
+    }
+
+    private DocumentApprovalDraftVO persistedDraftResponse(LoginVO user, Long approvalId) throws Exception {
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", approvalId);
+        DocumentApprovalDraftVO response = documentApprovalDAO.selectDraftDocumentStatus(params);
+        if (response == null) {
+            throw new IllegalStateException("저장된 전자결재 문서 정보를 확인할 수 없습니다.");
+        }
+        return response;
+    }
+
+    private DocumentApprovalDraftVO workflowResponse(Long approvalId, String status) {
         DocumentApprovalDraftVO response = new DocumentApprovalDraftVO();
         response.setElectronicApprovalId(approvalId);
-        response.setDocumentStatus("DRAFT");
+        response.setDocumentStatus(status);
         return response;
     }
 }

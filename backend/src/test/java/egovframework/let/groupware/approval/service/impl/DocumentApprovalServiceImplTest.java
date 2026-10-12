@@ -35,6 +35,9 @@ import egovframework.com.common.service.RichTextDocumentSanitizer;
 import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
@@ -72,6 +75,7 @@ class DocumentApprovalServiceImplTest {
             .containsEntry("drafterDepartmentName", "기획팀")
             .containsEntry("documentStatus", "DRAFT")
             .containsEntry("documentType", "DRAFTING")
+            .containsEntry("eabusNo", "001")
             .containsEntry("title", "기안 요청")
             .containsEntry("contentsHtml", "<p>본문</p>")
             .containsEntry("contentsText", "본문");
@@ -122,6 +126,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("DRAFT"));
 
         DocumentApprovalDraftVO saved = service().saveDraft(author, 77L, request());
 
@@ -135,6 +140,31 @@ class DocumentApprovalServiceImplTest {
         verify(commentDAO).insertSystemComment(org.mockito.ArgumentMatchers.argThat(
             params -> params.get("ownerId").equals(77L)
                 && params.get("eventType").equals("DRAFT_SAVED")));
+    }
+
+    @Test
+    void saveDraftPreservesRevisionRequestedStatusAndReturnsPersistedDocumentMetadata() throws Exception {
+        java.util.Date submittedAt = new java.util.Date();
+        DocumentApprovalDraftVO persisted = new DocumentApprovalDraftVO();
+        persisted.setElectronicApprovalId(77L);
+        persisted.setEabusNo("001");
+        persisted.setDocumentStatus("REVISION_REQUESTED");
+        persisted.setSubmittedAt(submittedAt);
+        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(persisted);
+
+        DocumentApprovalDraftVO saved = service().saveDraft(author, 77L, request());
+
+        assertThat(saved.getDocumentStatus()).isEqualTo("REVISION_REQUESTED");
+        assertThat(saved.getEabusNo()).isEqualTo("001");
+        assertThat(saved.getSubmittedAt()).isEqualTo(submittedAt);
     }
 
     @Test
@@ -187,6 +217,89 @@ class DocumentApprovalServiceImplTest {
     }
 
     @Test
+    void submitApprovesDrafterAndActivatesOnlyTheFirstRealApprovalStage() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("DRAFT"));
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        DocumentApprovalDraftVO persisted = new DocumentApprovalDraftVO();
+        persisted.setElectronicApprovalId(77L);
+        persisted.setEabusNo("001");
+        persisted.setDocumentStatus("PENDING");
+        java.util.Date submittedAt = new java.util.Date();
+        persisted.setSubmittedAt(submittedAt);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(persisted);
+
+        DocumentApprovalDraftVO submitted = service().submit(author, 77L, request());
+
+        assertThat(submitted.getDocumentStatus()).isEqualTo("PENDING");
+        assertThat(submitted.getEabusNo()).isEqualTo("001");
+        assertThat(submitted.getSubmittedAt()).isEqualTo(submittedAt);
+        ArgumentCaptor<Map<String, Object>> lineParams = mapCaptor();
+        verify(approvalDAO, org.mockito.Mockito.times(2)).insertDocumentApprovalLine(lineParams.capture());
+        assertThat(lineParams.getAllValues()).extracting(params -> params.get("actionStatus"))
+            .containsExactly("APPROVED", "PENDING");
+        assertThat(lineParams.getAllValues().get(0).get("actionAt")).isNotNull();
+        assertThat(lineParams.getAllValues().get(0).get("pendingAt")).isNull();
+        assertThat(lineParams.getAllValues().get(1).get("pendingAt")).isNotNull();
+
+        verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
+            "DRAFT".equals(params.get("expectedDocumentStatus"))
+                && "PENDING".equals(params.get("nextDocumentStatus"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "SUBMITTED".equals(params.get("eventType")) && Long.valueOf(77L).equals(params.get("ownerId"))));
+    }
+
+    @Test
+    void approvingCurrentStageActivatesNextStageAndKeepsDocumentInProgress() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.selectPendingApprovalCountForStage(anyMap())).thenReturn(0L);
+        when(approvalDAO.selectNextWaitingApprovalStage(anyMap())).thenReturn(3);
+        when(approvalDAO.activateApprovalStage(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        DocumentApprovalDraftVO result = service().processAction(approver, 77L, request);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("IN_PROGRESS");
+        verify(approvalDAO).activateApprovalStage(argThat(params ->
+            Integer.valueOf(3).equals(params.get("stageOrder"))));
+        verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
+            "PENDING".equals(params.get("expectedDocumentStatus"))
+                && "IN_PROGRESS".equals(params.get("nextDocumentStatus"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "APPROVED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void actionRequiresCurrentPendingApprovalLine() throws Exception {
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> service().processAction(author, 77L, request))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verifyNoInteractions(commentDAO);
+        verify(approvalDAO, never()).updateApprovalLineAction(anyMap());
+    }
+
+    @Test
     void attachmentsAreUnavailableToAnotherDraftAuthor() throws Exception {
         when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("other-login");
 
@@ -226,7 +339,7 @@ class DocumentApprovalServiceImplTest {
 
     @Test
     void embeddedImageStreamUsesApprovalOwnerAfterDraftOwnerCheck() throws Exception {
-        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
 
         service(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null);
 
@@ -281,6 +394,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
         when(imageStorageService.listOwnedImages(4L, "APPROVAL", 77L)).thenReturn(Collections.emptyList());
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("DRAFT"));
         when(imageStorageService.promoteTemporaryImage(4L, "APPROVAL", 77L, "token", "image.png", "login-author"))
             .thenReturn(ownedEmbeddedImage(77L, 91L));
 
@@ -363,6 +477,43 @@ class DocumentApprovalServiceImplTest {
         participant.setUserName(name);
         participant.setDepartmentName(departmentName);
         return participant;
+    }
+
+    private DocumentApprovalWorkflowDocumentVO workflowDocument(String status) {
+        DocumentApprovalWorkflowDocumentVO document = new DocumentApprovalWorkflowDocumentVO();
+        document.setElectronicApprovalId(77L);
+        document.setDocumentType("DRAFTING");
+        document.setDocumentStatus(status);
+        document.setDrafterId("login-author");
+        return document;
+    }
+
+    private DocumentApprovalDraftVO draftResponse(String status) {
+        DocumentApprovalDraftVO response = new DocumentApprovalDraftVO();
+        response.setElectronicApprovalId(77L);
+        response.setEabusNo("001");
+        response.setDocumentStatus(status);
+        return response;
+    }
+
+    private DocumentApprovalLineVO pendingLine(Long id, int stageOrder, String participantType, String userId) {
+        DocumentApprovalLineVO line = new DocumentApprovalLineVO();
+        line.setElectronicApprovalLineId(id);
+        line.setStageOrder(stageOrder);
+        line.setParticipantOrder(1);
+        line.setParticipantType(participantType);
+        line.setParticipantUserId(userId);
+        line.setParticipantName("결재자");
+        line.setActionStatus("PENDING");
+        return line;
+    }
+
+    private LoginVO participantUser(String id, String uniqId, String name) {
+        LoginVO user = author();
+        user.setId(id);
+        user.setUniqId(uniqId);
+        user.setName(name);
+        return user;
     }
 
     private LoginVO author() {

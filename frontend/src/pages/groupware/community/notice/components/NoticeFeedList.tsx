@@ -353,6 +353,137 @@ export function removeNoticeEmbeddedImages(html: string): string {
   return document.body.innerHTML;
 }
 
+function prepareNoticeBodyHtml(item: NoticeFeedItem): string {
+  return deferNoticeEmbeddedImageSources(
+    prepareNoticeFeedHtml(
+      normalizeNoticeEmbeddedImageSources(item.bodyHtml ?? item.body, item.id),
+    ),
+  );
+}
+
+type NoticeImageDimensions = {
+  width: number;
+  height: number;
+};
+
+type NoticeImageLayout = {
+  width: string;
+  aspectRatio: string;
+};
+
+function parsePixelDimension(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = /^(\d+(?:\.\d+)?)(?:px)?$/.exec(value.trim());
+  if (!match) return null;
+  const dimension = Number(match[1]);
+  return dimension > 0 ? dimension : null;
+}
+
+function getDeclaredNoticeImageLayout(
+  image: HTMLImageElement,
+): NoticeImageLayout | null {
+  const widthAttribute = parsePixelDimension(image.getAttribute('width'));
+  const heightAttribute = parsePixelDimension(image.getAttribute('height'));
+  const widthStyle = image.style.width.trim();
+  const width =
+    widthStyle && /^(?:\d+(?:\.\d+)?(?:px|%|vw|rem|em))$/.test(widthStyle)
+      ? widthStyle
+      : widthAttribute
+        ? `${widthAttribute}px`
+        : '';
+  const widthForRatio = parsePixelDimension(widthStyle) ?? widthAttribute;
+  const heightForRatio =
+    parsePixelDimension(image.style.height) ?? heightAttribute;
+  const aspectRatio =
+    image.style.aspectRatio ||
+    (widthForRatio && heightForRatio
+      ? `${widthForRatio} / ${heightForRatio}`
+      : '');
+
+  return width && aspectRatio ? { width, aspectRatio } : null;
+}
+
+function createNoticeImageSkeleton(
+  document: Document,
+  noticeId: number,
+  index: number,
+  layout: NoticeImageLayout,
+): HTMLSpanElement {
+  const skeleton = document.createElement('span');
+  skeleton.setAttribute('data-notice-expanded-image-skeleton', 'true');
+  skeleton.setAttribute(
+    'data-testid',
+    `notice-expanded-image-skeleton-${noticeId}-${index}`,
+  );
+  skeleton.setAttribute('role', 'status');
+  skeleton.setAttribute('aria-label', '본문 이미지 불러오는 중');
+  skeleton.style.display = 'inline-block';
+  skeleton.style.width = layout.width;
+  skeleton.style.aspectRatio = layout.aspectRatio;
+  skeleton.style.maxWidth = '100%';
+  skeleton.style.height = 'auto';
+  skeleton.style.verticalAlign = 'middle';
+  return skeleton;
+}
+
+function prepareExpandedNoticeLoadingHtml(
+  html: string,
+  noticeId: number,
+): string {
+  if (!html || typeof DOMParser === 'undefined') {
+    return html;
+  }
+
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const images = Array.from(
+    document.querySelectorAll<HTMLImageElement>(
+      'img[data-notice-embedded-image-source]',
+    ),
+  );
+  images.forEach((image, index) => {
+    const layout = getDeclaredNoticeImageLayout(image);
+    if (layout) {
+      image.replaceWith(
+        createNoticeImageSkeleton(document, noticeId, index, layout),
+      );
+      return;
+    }
+    image.replaceWith(document.createComment(`notice-image-${noticeId}-${index}`));
+  });
+  return document.body.innerHTML;
+}
+
+async function decodeNoticeImage(
+  objectUrl: string,
+): Promise<NoticeImageDimensions> {
+  const image = new Image();
+  image.src = objectUrl;
+  await image.decode();
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    throw new Error('Decoded notice image has no intrinsic dimensions');
+  }
+  return { width: image.naturalWidth, height: image.naturalHeight };
+}
+
+function waitForRenderedFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'undefined') {
+      window.setTimeout(resolve, 0);
+      return;
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+type HydratedNoticeBody = {
+  noticeId: number;
+  sourceHtml: string;
+  html: string;
+  hasImageLoadError: boolean;
+};
+
 export function NoticeFeedList({
   items,
   isDark,
@@ -401,9 +532,174 @@ export function NoticeFeedList({
   const [loadedImageKeys, setLoadedImageKeys] = useState<Set<string>>(
     () => new Set(),
   );
+  const expandedNotice = items.find((item) => item.id === expandedNoticeId);
+  const expandedBodySourceHtml = expandedNotice
+    ? prepareNoticeBodyHtml(expandedNotice)
+    : '';
+  const expandedBodyLoadingHtml = expandedNotice
+    ? prepareExpandedNoticeLoadingHtml(
+        expandedBodySourceHtml,
+        expandedNotice.id,
+      )
+    : '';
+  const [hydratedNoticeBody, setHydratedNoticeBody] =
+    useState<HydratedNoticeBody | null>(null);
   const serverCommentSnapshots = useRef<Record<number, string>>({});
   const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
   const serverItemRevisionRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (
+      expandedNoticeId == null ||
+      !expandedBodySourceHtml ||
+      typeof DOMParser === 'undefined'
+    ) {
+      setHydratedNoticeBody(null);
+      return;
+    }
+
+    const document = new DOMParser().parseFromString(
+      expandedBodySourceHtml,
+      'text/html',
+    );
+    const images = Array.from(
+      document.querySelectorAll<HTMLImageElement>(
+        'img[data-notice-embedded-image-source]',
+      ),
+    );
+    const imageRecords = images.flatMap((image, index) => {
+      const source = image.getAttribute(
+        'data-notice-embedded-image-source',
+      );
+      if (!source) return [];
+      const layout = getDeclaredNoticeImageLayout(image);
+      const placeholder = layout
+        ? createNoticeImageSkeleton(document, expandedNoticeId, index, layout)
+        : null;
+      const marker = document.createComment(
+        `notice-image-${expandedNoticeId}-${index}`,
+      );
+      if (placeholder) {
+        image.replaceWith(placeholder);
+      } else {
+        image.replaceWith(marker);
+      }
+      return [
+        { image, index, source, placeholder, marker: placeholder ? null : marker },
+      ];
+    });
+    if (imageRecords.length === 0) {
+      setHydratedNoticeBody(null);
+      return;
+    }
+
+    let active = true;
+    let hasImageLoadError = false;
+    const objectUrls = new Set<string>();
+    const updateHydratedBody = () => {
+      if (active) {
+        setHydratedNoticeBody({
+          noticeId: expandedNoticeId,
+          sourceHtml: expandedBodySourceHtml,
+          html: document.body.innerHTML,
+          hasImageLoadError,
+        });
+      }
+    };
+    updateHydratedBody();
+
+    const imageRecordsBySource = new Map<string, typeof imageRecords>();
+    imageRecords.forEach((record) => {
+      const records = imageRecordsBySource.get(record.source) ?? [];
+      records.push(record);
+      imageRecordsBySource.set(record.source, records);
+    });
+
+    const hydrateImages = async (
+      source: string,
+      records: typeof imageRecords,
+    ) => {
+      let objectUrl: string | undefined;
+      try {
+        const blob = await apiGetBlob(source);
+        const resolvedObjectUrl = URL.createObjectURL(blob);
+        objectUrl = resolvedObjectUrl;
+        if (!active) {
+          URL.revokeObjectURL(resolvedObjectUrl);
+          return;
+        }
+        objectUrls.add(resolvedObjectUrl);
+        const dimensions = await decodeNoticeImage(resolvedObjectUrl);
+        if (!active) return;
+
+        const recordsWithoutPlaceholder = records.filter(
+          (record) => !record.placeholder,
+        );
+        recordsWithoutPlaceholder.forEach((record) => {
+          const skeleton = createNoticeImageSkeleton(
+            document,
+            expandedNoticeId,
+            record.index,
+            {
+              width: `${dimensions.width}px`,
+              aspectRatio: `${dimensions.width} / ${dimensions.height}`,
+            },
+          );
+          record.marker?.replaceWith(skeleton);
+          record.placeholder = skeleton;
+          record.marker = null;
+        });
+        if (recordsWithoutPlaceholder.length > 0) {
+          updateHydratedBody();
+          await waitForRenderedFrame();
+          if (!active) return;
+        }
+
+        records.forEach((record) => {
+          const { image } = record;
+          const hasDeclaredWidth =
+            Boolean(image.style.width) || image.hasAttribute('width');
+          image.setAttribute('src', resolvedObjectUrl);
+          image.removeAttribute('data-notice-embedded-image-source');
+          if (!hasDeclaredWidth) {
+            image.setAttribute('width', String(dimensions.width));
+          }
+          if (!image.hasAttribute('height')) {
+            image.setAttribute('height', String(dimensions.height));
+          }
+          image.style.maxWidth = '100%';
+          image.style.height = 'auto';
+          image.style.aspectRatio = `${dimensions.width} / ${dimensions.height}`;
+          record.placeholder?.replaceWith(image);
+          record.marker?.remove();
+          record.placeholder = null;
+          record.marker = null;
+        });
+        updateHydratedBody();
+      } catch {
+        if (objectUrl && objectUrls.delete(objectUrl)) {
+          URL.revokeObjectURL(objectUrl);
+        }
+        if (!active) return;
+        hasImageLoadError = true;
+        records.forEach((record) => {
+          record.placeholder?.remove();
+          record.marker?.remove();
+        });
+        updateHydratedBody();
+      }
+    };
+
+    Array.from(imageRecordsBySource.entries()).forEach(([source, records]) => {
+      void hydrateImages(source, records);
+    });
+
+    return () => {
+      active = false;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+      objectUrls.clear();
+    };
+  }, [expandedNoticeId, expandedBodySourceHtml]);
 
   useEffect(() => {
     const element = endRef.current;
@@ -425,55 +721,6 @@ export function NoticeFeedList({
     observer.observe(element);
     return () => observer.disconnect();
   }, [onReachEnd]);
-
-  useEffect(() => {
-    const images = Array.from(
-      document.querySelectorAll<HTMLImageElement>(
-        'img[data-notice-embedded-image-source]',
-      ),
-    );
-    const sources = Array.from(
-      new Set(
-        images
-          .map((image) =>
-            image.getAttribute('data-notice-embedded-image-source'),
-          )
-          .filter((source): source is string => Boolean(source)),
-      ),
-    );
-    const objectUrls: string[] = [];
-    let active = true;
-
-    void Promise.all(
-      sources.map(async (source) => {
-        try {
-          const objectUrl = URL.createObjectURL(await apiGetBlob(source));
-          objectUrls.push(objectUrl);
-          return [source, objectUrl] as const;
-        } catch {
-          return [source, null] as const;
-        }
-      }),
-    ).then((resolvedSources) => {
-      if (!active) {
-        return;
-      }
-      const sourceMap = new Map(resolvedSources);
-      images.forEach((image) => {
-        const source = image.getAttribute('data-notice-embedded-image-source');
-        const objectUrl = source ? sourceMap.get(source) : null;
-        if (objectUrl) {
-          image.src = objectUrl;
-          image.removeAttribute('data-notice-embedded-image-source');
-        }
-      });
-    });
-
-    return () => {
-      active = false;
-      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
-    };
-  }, [items, expandedNoticeId, serverItemRevision]);
 
   useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
@@ -624,15 +871,20 @@ export function NoticeFeedList({
           const isExpanded = expandedNoticeId === item.id;
           const hasMore = item.body !== item.summary;
           const displayBody = isExpanded ? item.body : item.summary;
-          const normalizedPreviewHtml = normalizeNoticeEmbeddedImageSources(
-            item.bodyHtml ?? item.body,
-            item.id,
-          );
           const sanitizedPreviewHtml = prepareNoticeFeedHtml(
-            normalizedPreviewHtml,
+            normalizeNoticeEmbeddedImageSources(
+              item.bodyHtml ?? item.body,
+              item.id,
+            ),
           );
-          const previewHtml =
-            deferNoticeEmbeddedImageSources(sanitizedPreviewHtml);
+          const previewHtml = deferNoticeEmbeddedImageSources(
+            sanitizedPreviewHtml,
+          );
+          const hydratedBody =
+            hydratedNoticeBody?.noticeId === item.id &&
+            hydratedNoticeBody.sourceHtml === previewHtml
+              ? hydratedNoticeBody
+              : null;
           const hasRichHtml = /<[^>]+>/.test(previewHtml);
           const embeddedImagePreviews =
             extractNoticeEmbeddedImagePreviews(sanitizedPreviewHtml);
@@ -868,9 +1120,36 @@ export function NoticeFeedList({
                       '& img': {
                         cursor: 'pointer',
                       },
+                      '& [data-notice-expanded-image-skeleton="true"]': {
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        borderRadius: 1,
+                        backgroundColor: isDark
+                          ? 'rgba(51,65,85,0.7)'
+                          : 'rgba(226,232,240,0.9)',
+                        backgroundImage: isDark
+                          ? 'linear-gradient(90deg, transparent, rgba(148,163,184,0.14), transparent)'
+                          : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
+                        backgroundSize: '200% 100%',
+                        animation:
+                          'notice-expanded-image-wave 1.5s ease-in-out infinite',
+                      },
+                      '@keyframes notice-expanded-image-wave': {
+                        '0%': { backgroundPosition: '100% 0' },
+                        '100%': { backgroundPosition: '-100% 0' },
+                      },
+                      '@media (prefers-reduced-motion: reduce)': {
+                        '& [data-notice-expanded-image-skeleton="true"]': {
+                          animation: 'none',
+                        },
+                      },
                     }}
                     dangerouslySetInnerHTML={{
-                      __html: isExpanded ? previewHtml : collapsedPreviewHtml,
+                      __html: isExpanded
+                        ? (hydratedBody?.html ??
+                          expandedBodyLoadingHtml ??
+                          previewHtml)
+                        : collapsedPreviewHtml,
                     }}
                   />
                 ) : (
@@ -898,6 +1177,17 @@ export function NoticeFeedList({
                     }}
                   >
                     {displayBody}
+                  </Typography>
+                )}
+
+                {isExpanded && hydratedBody?.hasImageLoadError && (
+                  <Typography
+                    role="alert"
+                    color="error"
+                    variant="body2"
+                    sx={{ mb: 1.5 }}
+                  >
+                    본문 이미지를 불러오지 못했습니다.
                   </Typography>
                 )}
 

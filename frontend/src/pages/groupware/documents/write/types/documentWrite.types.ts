@@ -7,7 +7,22 @@ import type { JSONContent } from '@tiptap/core';
 import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
-export type ApprovalStatus = '임시저장' | '결재대기' | '결재중' | '보완요청' | '완료';
+export type ApprovalStatus = '임시저장' | '결재대기' | '결재중' | '보완요청' | '완료' | '반려';
+export type ApprovalDocumentStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'REVISION_REQUESTED'
+  | 'COMPLETED'
+  | 'REJECTED';
+export type DocumentApprovalScope =
+  | 'ALL'
+  | 'MY_PENDING'
+  | 'IN_PROGRESS'
+  | 'DRAFT'
+  | 'COMPLETED'
+  | 'REVISION_REQUESTED'
+  | 'REJECTED';
 
 export type DocumentApprovalStage = {
   id: number;
@@ -18,6 +33,7 @@ export type DocumentApprovalStage = {
 
 export type DocumentWriteItem = {
   id: number;
+  eabusNo?: string;
   title: string;
   kind: DocumentKind;
   status: ApprovalStatus;
@@ -25,6 +41,7 @@ export type DocumentWriteItem = {
   date: string;
   summary: string;
   isPinned?: boolean;
+  documentStatus?: ApprovalDocumentStatus;
 };
 
 export type DocumentWritePageProps = {
@@ -78,7 +95,69 @@ export type DocumentDraftEmbeddedImageUpload = RichTextEditorImage & {
 
 export type DocumentApprovalDraftResponse = {
   electronicApprovalId: number;
-  documentStatus: 'DRAFT';
+  documentStatus: ApprovalDocumentStatus;
+  eabusNo?: string;
+  submittedAt?: string | null;
+};
+
+export type DocumentApprovalRecord = {
+  electronicApprovalId: number;
+  eabusNo: string;
+  documentType: DocumentApprovalDraftRequest['documentType'];
+  documentStatus: ApprovalDocumentStatus;
+  title: string;
+  drafterName: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  submittedAt?: string | null;
+  summary: string;
+  noticeType?: 'ACTION_REQUIRED' | 'REVISION_REQUESTED' | null;
+};
+
+export type DocumentApprovalSummary = {
+  actionRequiredCount: number;
+  inProgressCount: number;
+  draftCount: number;
+  completedCount: number;
+  revisionRequestedCount: number;
+  rejectedCount: number;
+  notices: DocumentApprovalRecord[];
+};
+
+export type DocumentApprovalLine = {
+  electronicApprovalLineId: number;
+  stageOrder: number;
+  participantOrder: number;
+  participantType: 'APPROVAL' | 'AGREEMENT' | 'REFERENCE';
+  participantUserId: string;
+  participantName: string;
+  participantDepartmentName?: string | null;
+  actionStatus: string;
+  pendingAt?: string | null;
+  actionAt?: string | null;
+  actionComment?: string | null;
+};
+
+export type DocumentApprovalSystemEvent = {
+  eventType: string;
+  content: string;
+  writerName: string;
+  createdAt?: string | null;
+};
+
+export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
+  summary?: string;
+  draftingWorkCategoryId: number | null;
+  contentsJson: string;
+  contentsHtml: string;
+  approvalLines: DocumentApprovalLine[];
+  attachments: DocumentDraftAttachmentResponse[];
+  systemEvents: DocumentApprovalSystemEvent[];
+};
+
+export type DocumentApprovalActionRequest = {
+  action: 'APPROVED' | 'REJECTED' | 'RETURNED';
+  actionComment?: string;
 };
 
 export type DocumentDraftAttachmentStatus =

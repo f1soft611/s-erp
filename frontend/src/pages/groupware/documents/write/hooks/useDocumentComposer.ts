@@ -25,6 +25,7 @@ import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/
 import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import type {
   DocumentApprovalDraftRequest,
+  DocumentApprovalDetail,
   DocumentApprovalStage,
   DocumentDraftAttachment,
   DocumentDraftAttachmentStatus,
@@ -36,6 +37,7 @@ import {
   isDefiniteAttachmentUploadFailure,
   listDocumentDraftAttachments,
   saveDocumentDraft,
+  submitDocumentApproval,
   UnknownAttachmentUploadOutcomeError,
   uploadDocumentDraftAttachment,
   uploadDocumentDraftEmbeddedImage,
@@ -53,6 +55,16 @@ function getDocumentType(kind: DocumentKind) {
   };
   return documentTypes[kind];
 }
+
+const kindByDocumentType: Record<
+  DocumentApprovalDraftRequest['documentType'],
+  DocumentKind
+> = {
+  DRAFTING: '기안서',
+  BUSINESS_CONTACT: '업무연락',
+  EXPENSE_RESOLUTION: '지출결의서',
+  ATTENDANCE_APPLICATION: '근태신청',
+};
 
 function toUserOption(user: DraftFormUserOption): F1GridUserOption {
   return {
@@ -81,7 +93,11 @@ function toUserIds(value: F1GridUserValue): string[] {
   return value == null ? [] : [String(value)];
 }
 
-export function useDocumentComposer(open: boolean, onClose: () => void) {
+export function useDocumentComposer(
+  open: boolean,
+  onClose: () => void,
+  initialDocument: DocumentApprovalDetail | null = null,
+) {
   const theme = useTheme();
   const { showSuccess } = useNotification();
   const isDark = theme.palette.mode === 'dark';
@@ -187,6 +203,77 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
             isFixed: true,
           },
         ]);
+        if (initialDocument) {
+          const authorLine = initialDocument.approvalLines.find(
+            (line) =>
+              line.stageOrder === 1 &&
+              line.participantType === 'APPROVAL' &&
+              line.participantUserId === signedInEmployeeId,
+          );
+          if (!authorLine) {
+            setLoadError('저장된 결재선에서 기안자를 확인할 수 없습니다.');
+            return;
+          }
+          setElectronicApprovalId(initialDocument.electronicApprovalId);
+          draftIdRef.current = initialDocument.electronicApprovalId;
+          setComposerTitle(initialDocument.title);
+          setActiveDocumentKind(kindByDocumentType[initialDocument.documentType]);
+          setSelectedFormId(
+            initialDocument.draftingWorkCategoryId === null
+              ? ''
+              : String(initialDocument.draftingWorkCategoryId),
+          );
+          const matchingForm = forms.find(
+            (form) =>
+              form.draftingWorkCategoryId === initialDocument.draftingWorkCategoryId,
+          );
+          setSelectedCategoryId(
+            matchingForm ? String(matchingForm.categoryItemId) : ALL_CATEGORY_VALUE,
+          );
+          const lineStages = new Map<number, DocumentApprovalStage>();
+          const references: string[] = [];
+          for (const line of [...initialDocument.approvalLines].sort(
+            (left, right) =>
+              left.stageOrder - right.stageOrder ||
+              left.participantOrder - right.participantOrder,
+          )) {
+            if (line.participantType === 'REFERENCE') {
+              references.push(line.participantUserId);
+              continue;
+            }
+            if (line.electronicApprovalLineId === authorLine.electronicApprovalLineId) {
+              continue;
+            }
+            let stage = lineStages.get(line.stageOrder);
+            if (!stage) {
+              stage = {
+                id: nextStageId.current++,
+                kind: line.participantType === 'AGREEMENT' ? 'agreement' : 'approval',
+                users: [],
+              };
+              lineStages.set(line.stageOrder, stage);
+            }
+            const participant =
+              availableUsers.find(
+                (user) => String(user.value) === line.participantUserId,
+              ) ?? {
+                value: line.participantUserId,
+                label: line.participantName,
+                departmentName: line.participantDepartmentName ?? undefined,
+              };
+            stage.users.push(participant);
+          }
+          setApprovalStages([
+            {
+              id: nextStageId.current++,
+              kind: 'approval',
+              users: [signedInUser],
+              isFixed: true,
+            },
+            ...Array.from(lineStages.values()),
+          ]);
+          setReferenceUserIds(references);
+        }
       })
       .catch((error: unknown) => {
         if (active) setLoadError(getErrorMessage(error));
@@ -198,7 +285,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     return () => {
       active = false;
     };
-  }, [open]);
+  }, [initialDocument, open]);
 
   const availableForms = useMemo(
     () =>
@@ -215,9 +302,14 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const handleEditorReady = useCallback((nextEditor: Editor | null) => {
     setEditor(nextEditor);
     if (nextEditor) {
+      if (initialDocument) {
+        nextEditor.commands.setContent(initialDocument.contentsHtml, {
+          emitUpdate: false,
+        });
+      }
       editorBaseline.current = JSON.stringify(nextEditor.getJSON());
     }
-  }, []);
+  }, [initialDocument]);
 
   const applyDraftSelection = useCallback(
     async (selection: { categoryId: string; formId: string }) => {
@@ -475,7 +567,101 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     [],
   );
 
-  const saveDraft = useCallback(async () => {
+  const closeComposer = useCallback(() => {
+    if (savingRef.current) return;
+    if (imageSaveLifecycle.uploadingCount > 0) {
+      setSaveError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
+      return;
+    }
+    void imageSaveLifecycle.cleanupTemporaryImages();
+    draftIdRef.current = null;
+    setElectronicApprovalId(null);
+    setIsSaving(false);
+    setSaveError('');
+    setComposerTitle('');
+    setAttachments([]);
+    nextAttachmentId.current = 1;
+    setDrafterName('');
+    setCategoryItems([]);
+    setDraftForms([]);
+    setUserOptions([]);
+    setSelectedCategoryId(ALL_CATEGORY_VALUE);
+    setSelectedFormId('');
+    setTemplateError('');
+    setTemplateLoading(false);
+    setTemplateReplaceConfirmOpen(false);
+    setPendingSelection(null);
+    setApprovalStages([]);
+    setSelectedApprovalUserIds([]);
+    setReferenceUserIds([]);
+    nextStageId.current = 1;
+    setLoadError('');
+    setInitialLookupsComplete(false);
+    templateRequestId.current += 1;
+    if (editor) {
+      editor.commands.setContent('<p></p>', { emitUpdate: false });
+      editorBaseline.current = JSON.stringify(editor.getJSON());
+    } else {
+      editorBaseline.current = null;
+    }
+    onClose();
+  }, [editor, imageSaveLifecycle, onClose]);
+
+  const buildDraftRequest = useCallback((): DocumentApprovalDraftRequest | null => {
+    if (!editor || !composerTitle.trim() || approvalStages.length === 0) return null;
+    const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
+      approvalStages.flatMap((stage, stageIndex) =>
+        stage.users.map((user, participantIndex) => ({
+          stageOrder: stageIndex + 1,
+          participantOrder: participantIndex + 1,
+          participantType:
+            stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
+          participantUserId: String(user.value),
+        })),
+      );
+    if (referenceUserIds.length > 0) {
+      approvalLines.push(
+        ...referenceUserIds.map((participantUserId, participantIndex) => ({
+          stageOrder: approvalStages.length + 1,
+          participantOrder: participantIndex + 1,
+          participantType: 'REFERENCE' as const,
+          participantUserId,
+        })),
+      );
+    }
+
+    const snapshot = imageSaveLifecycle.getSnapshot();
+    return {
+      documentType: getDocumentType(activeDocumentKind),
+      draftingWorkCategoryId: selectedFormId ? Number(selectedFormId) : null,
+      title: composerTitle.trim(),
+      contentsJson: snapshot.json,
+      contentsHtml: snapshot.html,
+      contentsText: editor.getText({ blockSeparator: '\n' }),
+      approvalLines,
+      embeddedImages: snapshot.referencedImages.map((image) => ({
+        uploadToken: image.uploadToken,
+        fileName: image.fileName,
+        imageUrl: image.src ?? null,
+        fileId: image.fileId ?? null,
+        objectKey: image.objectKey ?? null,
+        fileSize: image.fileSize ?? null,
+        mimeType: image.mimeType ?? null,
+        width: image.width ?? null,
+      })),
+      temporaryImages: snapshot.temporaryImages,
+    };
+  }, [
+    activeDocumentKind,
+    approvalStages,
+    composerTitle,
+    editor,
+    imageSaveLifecycle,
+    referenceUserIds,
+    selectedFormId,
+  ]);
+
+  const persistDocument = useCallback(async (submit: boolean) => {
     if (
       savingRef.current ||
       !editor ||
@@ -493,52 +679,15 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     setIsSaving(true);
     setSaveError('');
     try {
-      const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
-        approvalStages.flatMap((stage, stageIndex) =>
-          stage.users.map((user, participantIndex) => ({
-            stageOrder: stageIndex + 1,
-            participantOrder: participantIndex + 1,
-            participantType:
-              stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
-            participantUserId: String(user.value),
-          })),
-        );
-      if (referenceUserIds.length > 0) {
-        approvalLines.push(
-          ...referenceUserIds.map((participantUserId, participantIndex) => ({
-            stageOrder: approvalStages.length + 1,
-            participantOrder: participantIndex + 1,
-            participantType: 'REFERENCE' as const,
-            participantUserId,
-          })),
-        );
-      }
-
-      const snapshot = imageSaveLifecycle.getSnapshot();
-      const request: DocumentApprovalDraftRequest = {
-        documentType: getDocumentType(activeDocumentKind),
-        draftingWorkCategoryId: selectedFormId ? Number(selectedFormId) : null,
-        title: composerTitle.trim(),
-        contentsJson: snapshot.json,
-        contentsHtml: snapshot.html,
-        contentsText: editor.getText({ blockSeparator: '\n' }),
-        approvalLines,
-        embeddedImages: snapshot.referencedImages.map((image) => ({
-          uploadToken: image.uploadToken,
-          fileName: image.fileName,
-          imageUrl: image.src ?? null,
-          fileId: image.fileId ?? null,
-          objectKey: image.objectKey ?? null,
-          fileSize: image.fileSize ?? null,
-          mimeType: image.mimeType ?? null,
-          width: image.width ?? null,
-        })),
-        temporaryImages: snapshot.temporaryImages,
-      };
+      const request = buildDraftRequest();
+      if (!request) return;
       const saved = await saveDocumentDraft(request, draftIdRef.current);
       imageSaveLifecycle.completeSave();
       draftIdRef.current = saved.electronicApprovalId;
       setElectronicApprovalId(saved.electronicApprovalId);
+      if (submit && saved.documentStatus !== 'DRAFT' && saved.documentStatus !== 'REVISION_REQUESTED') {
+        throw new Error('현재 상태에서는 결재신청할 수 없습니다.');
+      }
 
       let failedCount = attachments.filter(
         (attachment) => attachment.status === 'failed' || attachment.status === 'unknown',
@@ -551,6 +700,18 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
         setSaveError(
           `문서는 저장되었지만 첨부파일 ${failedCount}건의 상태 확인이 필요합니다.`,
         );
+        if (submit) return;
+      } else if (submit) {
+        const latestRequest = buildDraftRequest();
+        if (!latestRequest) {
+          setSaveError('결재신청에 필요한 문서 내용을 확인할 수 없습니다.');
+          return;
+        }
+        await submitDocumentApproval(saved.electronicApprovalId, latestRequest);
+        showSuccess('문서가 결재신청되었습니다.');
+        savingRef.current = false;
+        setIsSaving(false);
+        closeComposer();
       } else {
         showSuccess('문서가 임시저장되었습니다.');
       }
@@ -563,17 +724,17 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       setIsSaving(false);
     }
   }, [
-    activeDocumentKind,
-    approvalStages,
     attachments,
-    composerTitle,
+    buildDraftRequest,
+    closeComposer,
     editor,
-    referenceUserIds,
-    selectedFormId,
+    imageSaveLifecycle,
     showSuccess,
     uploadAttachment,
-    imageSaveLifecycle,
   ]);
+
+  const saveDraft = useCallback(() => persistDocument(false), [persistDocument]);
+  const submitDraft = useCallback(() => persistDocument(true), [persistDocument]);
 
   const retryFailedAttachment = useCallback(
     async (clientId: string) => {
@@ -748,46 +909,6 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     [attachments],
   );
 
-  const closeComposer = useCallback(() => {
-    if (savingRef.current) return;
-    if (imageSaveLifecycle.uploadingCount > 0) {
-      setSaveError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
-      return;
-    }
-    void imageSaveLifecycle.cleanupTemporaryImages();
-    draftIdRef.current = null;
-    setElectronicApprovalId(null);
-    setIsSaving(false);
-    setSaveError('');
-    setComposerTitle('');
-    setAttachments([]);
-    nextAttachmentId.current = 1;
-    setDrafterName('');
-    setCategoryItems([]);
-    setDraftForms([]);
-    setUserOptions([]);
-    setSelectedCategoryId(ALL_CATEGORY_VALUE);
-    setSelectedFormId('');
-    setTemplateError('');
-    setTemplateLoading(false);
-    setTemplateReplaceConfirmOpen(false);
-    setPendingSelection(null);
-    setApprovalStages([]);
-    setSelectedApprovalUserIds([]);
-    setReferenceUserIds([]);
-    nextStageId.current = 1;
-    setLoadError('');
-    setInitialLookupsComplete(false);
-    templateRequestId.current += 1;
-    if (editor) {
-      editor.commands.setContent('<p></p>', { emitUpdate: false });
-      editorBaseline.current = JSON.stringify(editor.getJSON());
-    } else {
-      editorBaseline.current = null;
-    }
-    onClose();
-  }, [editor, imageSaveLifecycle, onClose]);
-
   return {
     activeDocumentKind,
     setActiveDocumentKind,
@@ -823,6 +944,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     isSaving,
     saveError,
     saveDraft,
+    submitDraft,
     uploadImage: imageSaveLifecycle.uploadImage,
     onOrphanedImageUpload: imageSaveLifecycle.onOrphanedImageUpload,
     onUploadingChange: imageSaveLifecycle.onUploadingChange,
@@ -839,6 +961,14 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       Boolean(composerTitle.trim()) &&
       Boolean(editor) &&
       approvalStages.length > 0,
+    canSubmitDraft:
+      !isLoading &&
+      !templateLoading &&
+      !isSaving &&
+      imageSaveLifecycle.uploadingCount === 0 &&
+      Boolean(composerTitle.trim()) &&
+      Boolean(editor) &&
+      approvalStages.some((stage, index) => index > 0 && stage.users.length > 0),
     attachmentInputRef,
     editor,
     handleEditorReady,

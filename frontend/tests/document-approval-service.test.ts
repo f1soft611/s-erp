@@ -22,9 +22,14 @@ vi.mock('../src/shared/services/apiClient', () => ({
 }));
 
 import {
+  getDocumentApprovalDetail,
+  getDocumentApprovalSummary,
+  listDocumentApprovals,
+  processDocumentApprovalAction,
   deleteDocumentDraftEmbeddedImage,
   isDefiniteAttachmentUploadFailure,
   saveDocumentDraft,
+  submitDocumentApproval,
   uploadDocumentDraftAttachment,
   uploadDocumentDraftEmbeddedImage,
 } from '../src/pages/groupware/documents/write/services/documentApproval.service';
@@ -70,6 +75,91 @@ describe('document approval service', () => {
     expect(api.put).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/drafts/41',
       request,
+    );
+  });
+
+  it('submits the latest draft body and validates the server workflow response', async () => {
+    const request = {
+      documentType: 'DRAFTING' as const,
+      draftingWorkCategoryId: null,
+      title: '초안',
+      contentsJson: { type: 'doc' },
+      contentsHtml: '<p>내용</p>',
+      contentsText: '내용',
+      approvalLines: [],
+      embeddedImages: [],
+      temporaryImages: [],
+    };
+    const submitted = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentStatus: 'PENDING',
+      submittedAt: '2026-10-12T09:00:00Z',
+    };
+    api.post.mockResolvedValue({ item: submitted });
+
+    await expect(submitDocumentApproval(41, request)).resolves.toEqual(submitted);
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/submit',
+      request,
+    );
+
+    api.post.mockResolvedValueOnce({ item: { ...submitted, documentStatus: 'DRAFT' } });
+    await expect(submitDocumentApproval(41, request)).rejects.toThrow(
+      '결재신청 응답을 확인할 수 없습니다.',
+    );
+  });
+
+  it('uses the scoped list, summary, detail, and action ResultVO contracts', async () => {
+    const document = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '초안',
+      drafterName: '홍길동',
+      summary: '본문',
+    };
+    const summary = {
+      actionRequiredCount: 1,
+      inProgressCount: 2,
+      draftCount: 3,
+      completedCount: 4,
+      revisionRequestedCount: 5,
+      rejectedCount: 6,
+      notices: [document],
+    };
+    const detail = {
+      ...document,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: '<p>본문</p>',
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+    };
+    api.get
+      .mockResolvedValueOnce({ resultList: [document] })
+      .mockResolvedValueOnce({ item: summary })
+      .mockResolvedValueOnce({ item: detail });
+    api.post.mockResolvedValueOnce({ item: { electronicApprovalId: 41, documentStatus: 'IN_PROGRESS' } });
+
+    await expect(listDocumentApprovals('MY_PENDING', 'DRAFTING')).resolves.toEqual([document]);
+    await expect(getDocumentApprovalSummary()).resolves.toEqual(summary);
+    await expect(getDocumentApprovalDetail(41)).resolves.toEqual(detail);
+    await expect(
+      processDocumentApprovalAction(41, { action: 'APPROVED' }),
+    ).resolves.toEqual({ electronicApprovalId: 41, documentStatus: 'IN_PROGRESS' });
+
+    expect(api.get).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/groupware/approvals/documents?scope=MY_PENDING&documentType=DRAFTING',
+    );
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/groupware/approvals/summary');
+    expect(api.get).toHaveBeenNthCalledWith(3, '/api/v1/groupware/approvals/documents/41');
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/actions',
+      { action: 'APPROVED' },
     );
   });
 

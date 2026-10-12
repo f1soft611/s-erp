@@ -32,6 +32,19 @@
         ORDER BY created_at ASC
     </select>
 
+    <select id="selectApprovalSystemEvents" parameterType="map" resultMap="commonCommentMap">
+        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
+               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
+               last_modified_by_name, deleted_yn, created_at, updated_at
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id = #{ownerId}
+          AND comment_type = 'SYSTEM'
+          AND deleted_yn = 'N'
+        ORDER BY created_at ASC, comment_id ASC
+    </select>
+
     <select id="selectCommonCommentPage" parameterType="map" resultMap="commonCommentMap">
         WITH RECURSIVE all_comment_tree AS (
             SELECT c.comment_id, c.parent_comment_id, c.deleted_yn,

@@ -27,6 +27,10 @@ import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -67,6 +71,56 @@ public class DocumentApprovalApiController {
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", saved);
         resultMap.put("message", "문서가 임시저장되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 문서 결재신청", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/submit")
+    public ResultVO submit(@PathVariable Long electronicApprovalId,
+            @RequestBody DocumentApprovalDraftSaveRequestVO request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.submit(user, electronicApprovalId, request));
+        resultMap.put("message", "문서가 결재신청되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 결재 처리", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/actions")
+    public ResultVO processAction(@PathVariable Long electronicApprovalId,
+            @RequestBody DocumentApprovalActionRequestVO request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.processAction(user, electronicApprovalId, request));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "내 관련 전자결재 문서 목록", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/documents")
+    public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList",
+                documentApprovalService.listDocuments(user, scope, documentType, electronicApprovalId));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "내 전자결재 요약 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/summary")
+    public ResultVO getSummary(@AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.getSummary(user));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 문서 상세 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/documents/{electronicApprovalId}")
+    public ResultVO getDetail(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.getDetail(user, electronicApprovalId));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
