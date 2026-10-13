@@ -909,7 +909,38 @@ describe('Document write page', () => {
       draftingWorkCategoryId: null,
       contentsJson: '{"type":"doc","content":[]}',
       contentsHtml: '<p>본문 내용</p>',
-      approvalLines: [],
+      approvalLines: [
+        {
+          electronicApprovalLineId: 71,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-1',
+          participantName: '결재자 A',
+          participantDepartmentName: '기획팀',
+          actionStatus: 'WAITING',
+        },
+        {
+          electronicApprovalLineId: 72,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-2',
+          participantName: '합의자 B',
+          participantDepartmentName: '재무팀',
+          actionStatus: 'PENDING',
+        },
+        {
+          electronicApprovalLineId: 73,
+          stageOrder: 3,
+          participantOrder: 1,
+          participantType: 'REFERENCE',
+          participantUserId: 'approver-3',
+          participantName: '참조자 C',
+          participantDepartmentName: '운영팀',
+          actionStatus: '',
+        },
+      ],
       attachments: [],
       systemEvents: [{
         eventType: 'SUBMITTED',
@@ -944,6 +975,15 @@ describe('Document write page', () => {
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('검토 의견입니다.');
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('문서가 결재신청되었습니다.');
     });
+    expect(screen.getByText('시스템', { exact: true })).toBeInTheDocument();
+    const approvalLine = screen.getByTestId('approval-line-readonly');
+    expect(within(approvalLine).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-approval')).toHaveTextContent('결재자 A');
+    expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent('합의자 B');
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('참조자 C');
+    expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
+    expect(screen.queryByText('첨부파일', { exact: true })).not.toBeInTheDocument();
     expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
       limit: 20,
       beforeCommentId: undefined,
@@ -1031,7 +1071,7 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('최근 댓글'),
     );
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('이전 댓글'),
     );

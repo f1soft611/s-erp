@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   Divider,
   IconButton,
@@ -14,13 +12,14 @@ import {
   Typography,
 } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
-import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
-import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
+import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
+import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
+import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import type {
@@ -920,128 +919,83 @@ export function NoticeFeedList({
             }>);
 
           return (
-            <Card
+            <FeedCard
               key={item.id}
-              data-notice-id={item.id}
-              sx={{
-                width: '100%',
-                minWidth: 0,
-                boxSizing: 'border-box',
-                borderRadius: 3,
-                border: `1px solid ${
-                  isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
-                }`,
-                boxShadow: 'none',
-                bgcolor: isDark ? 'rgba(15, 23, 42, 0.75)' : '#ffffff',
-              }}
-            >
-              <CardContent sx={{ p: 2.5, minWidth: 0, overflow: 'hidden' }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    mb: 2,
-                    minWidth: 0,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      background: isDark
-                        ? 'linear-gradient(135deg, #60a5fa, #a78bfa)'
-                        : 'linear-gradient(135deg, #dbeafe, #ede9fe)',
-                      color: isDark ? '#eff6ff' : '#1f2937',
-                    }}
+              author={item.meta.split('·')[0].trim()}
+              meta={item.meta}
+              avatar={item.meta.slice(1, 3)}
+              actions={
+                <>
+                  <IconButton
+                    size="small"
+                    aria-label={`${item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
+                    title={
+                      item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'
+                    }
+                    onClick={() => onTogglePinned?.(item)}
                   >
-                    {item.meta.slice(1, 3)}
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {item.meta.split('·')[0].trim()}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {item.meta}
-                    </Typography>
-                  </Box>
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    sx={{ alignItems: 'center' }}
-                  >
-                    <IconButton
-                      size="small"
-                      aria-label={`${item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
-                      title={
-                        item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'
-                      }
-                      onClick={() => onTogglePinned?.(item)}
-                    >
-                      <PushPinOutlinedIcon
-                        fontSize="small"
-                        color={item.isPinned === 'Y' ? 'primary' : 'inherit'}
-                      />
-                    </IconButton>
-                    {item.isPostOwner !== false && (
-                      <>
-                        <IconButton
-                          size="small"
-                          aria-label={`공지 메뉴 ${item.title}`}
-                          onClick={(event) => {
-                            setNoticeMenuId(item.id);
-                            setNoticeMenuAnchor(event.currentTarget);
-                          }}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                        <Menu
-                          anchorEl={noticeMenuAnchor}
-                          open={noticeMenuId === item.id}
-                          onClose={() => {
+                    <PushPinOutlinedIcon
+                      fontSize="small"
+                      color={item.isPinned === 'Y' ? 'primary' : 'inherit'}
+                    />
+                  </IconButton>
+                  {item.isPostOwner !== false && (
+                    <>
+                      <IconButton
+                        size="small"
+                        aria-label={`공지 메뉴 ${item.title}`}
+                        onClick={(event) => {
+                          setNoticeMenuId(item.id);
+                          setNoticeMenuAnchor(event.currentTarget);
+                        }}
+                      >
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                      <Menu
+                        anchorEl={noticeMenuAnchor}
+                        open={noticeMenuId === item.id}
+                        onClose={() => {
+                          setNoticeMenuAnchor(null);
+                          setNoticeMenuId(null);
+                        }}
+                      >
+                        <MenuItem
+                          onClick={() => {
                             setNoticeMenuAnchor(null);
                             setNoticeMenuId(null);
+                            onEdit?.(item);
                           }}
                         >
-                          <MenuItem
-                            onClick={() => {
-                              setNoticeMenuAnchor(null);
-                              setNoticeMenuId(null);
-                              onEdit?.(item);
-                            }}
-                          >
-                            수정
-                          </MenuItem>
-                          <MenuItem
-                            onClick={() => {
-                              setNoticeMenuAnchor(null);
-                              setNoticeMenuId(null);
-                              onDelete?.(item.id);
-                            }}
-                          >
-                            삭제
-                          </MenuItem>
-                        </Menu>
-                      </>
-                    )}
-                    <Chip
-                      label={item.state}
-                      size="small"
-                      sx={{
-                        bgcolor: isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe',
-                        color: '#2563eb',
-                        fontWeight: 700,
-                      }}
-                    />
-                  </Stack>
-                </Box>
-
+                          수정
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            setNoticeMenuAnchor(null);
+                            setNoticeMenuId(null);
+                            onDelete?.(item.id);
+                          }}
+                        >
+                          삭제
+                        </MenuItem>
+                      </Menu>
+                    </>
+                  )}
+                </>
+              }
+              badges={
+                <Chip
+                  label={item.state}
+                  size="small"
+                  sx={{
+                    bgcolor: isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe',
+                    color: '#2563eb',
+                    fontWeight: 700,
+                  }}
+                />
+              }
+              isDark={isDark}
+              testId={`notice-feed-card-${item.id}`}
+            >
                 <Typography
                   variant="h6"
                   onClick={() => {
@@ -1346,96 +1300,21 @@ export function NoticeFeedList({
                 )}
 
                 <Divider sx={{ my: 1.5 }} />
+                <FeedReactionBar
+                  liked={Boolean(item.liked)}
+                  likeCount={item.likeCount ?? 0}
+                  bookmarked={Boolean(item.bookmarked)}
+                  commentCount={item.commentCount}
+                  onToggleLike={() => onToggleLike?.(item.id)}
+                  onToggleBookmark={() => onToggleBookmark?.(item.id)}
+                  isDark={isDark}
+                />
+                <Divider sx={{ my: 1.5 }} />
 
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    flexWrap: 'wrap',
-                    color: 'text.secondary',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    <Button
-                      size="small"
-                      variant="text"
-                      startIcon={
-                        <FavoriteBorderOutlinedIcon fontSize="small" />
-                      }
-                      onClick={() => onToggleLike?.(item.id)}
-                      sx={{
-                        minWidth: 0,
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1.5,
-                        color: isDark ? '#cbd5e1' : '#475569',
-                        backgroundColor: 'transparent',
-                        transition: 'all 0.2s ease',
-                        '& .MuiButton-startIcon': {
-                          marginRight: 0.5,
-                          color: isDark ? '#f472b6' : '#ec4899',
-                        },
-                        '&:hover': {
-                          backgroundColor: isDark
-                            ? 'rgba(244, 114, 182, 0.12)'
-                            : 'rgba(236, 72, 153, 0.08)',
-                          color: isDark ? '#fce7f3' : '#be185d',
-                          '& .MuiButton-startIcon': {
-                            color: isDark ? '#f472b6' : '#db2777',
-                          },
-                        },
-                      }}
-                    >
-                      {item.liked ? '좋아요 취소' : '좋아요'}{' '}
-                      {item.likeCount ?? 0}
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="text"
-                      startIcon={
-                        <BookmarkBorderOutlinedIcon fontSize="small" />
-                      }
-                      onClick={() => onToggleBookmark?.(item.id)}
-                      sx={{
-                        minWidth: 0,
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1.5,
-                        color: isDark ? '#cbd5e1' : '#475569',
-                        backgroundColor: 'transparent',
-                        transition: 'all 0.2s ease',
-                        '& .MuiButton-startIcon': {
-                          marginRight: 0.5,
-                          color: isDark ? '#fbbf24' : '#f59e0b',
-                        },
-                        '&:hover': {
-                          backgroundColor: isDark
-                            ? 'rgba(251, 191, 36, 0.12)'
-                            : 'rgba(245, 158, 11, 0.08)',
-                          color: isDark ? '#fef3c7' : '#b45309',
-                          '& .MuiButton-startIcon': {
-                            color: isDark ? '#fbbf24' : '#d97706',
-                          },
-                        },
-                      }}
-                    >
-                      {item.bookmarked ? '북마크 취소' : '북마크'}
-                    </Button>
-                  </Stack>
-                  <Typography variant="body2">
-                    댓글 {item.commentCount}
-                  </Typography>
-                </Box>
-
-                {canLoadPrevious && (
-                  <Button
-                    size="small"
-                    variant="text"
-                    aria-label="이전 댓글 보기"
-                    disabled={loadingPreviousByNoticeId[item.id]}
-                    onClick={async () => {
+                <FeedCommentsSection
+                  showPrevious={canLoadPrevious}
+                  isLoadingPrevious={Boolean(loadingPreviousByNoticeId[item.id])}
+                  onLoadPrevious={async () => {
                       if (loadingPreviousByNoticeId[item.id]) return;
                       const cursor =
                         previousCursorByNoticeId[item.id] ??
@@ -1501,79 +1380,74 @@ export function NoticeFeedList({
                           [item.id]: false,
                         }));
                       }
-                    }}
-                    sx={{ mt: 1.5 }}
-                  >
-                    이전 댓글 보기
-                  </Button>
-                )}
-
-                <Box
-                  onClick={() => {
-                    if (!hasMore) {
-                      void onNoticeInteract?.(item.id);
-                    }
                   }}
                 >
-                  <CommentThread
-                    comments={normalizeCommentTree(visibleComments)}
-                    expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
-                    onSubmitComment={async (content, files) => {
-                      await handleLocalCommentAdd(
-                        item.id,
-                        content,
-                        undefined,
-                        files,
-                      );
+                  <Box
+                    onClick={() => {
+                      if (!hasMore) {
+                        void onNoticeInteract?.(item.id);
+                      }
                     }}
-                    onSubmitReply={async (
-                      commentId,
-                      content,
-                      files,
-                      parentCommentId,
-                    ) => {
-                      await handleLocalCommentAdd(
-                        item.id,
+                  >
+                    <CommentThread
+                      comments={normalizeCommentTree(visibleComments)}
+                      expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
+                      onSubmitComment={async (content, files) => {
+                        await handleLocalCommentAdd(
+                          item.id,
+                          content,
+                          undefined,
+                          files,
+                        );
+                      }}
+                      onSubmitReply={async (
+                        commentId,
                         content,
+                        files,
                         parentCommentId,
-                        files,
-                        commentId,
-                      );
-                    }}
-                    onEditComment={async (commentId, content, files) => {
-                      await handleLocalCommentEdit(
-                        item.id,
-                        commentId,
-                        content,
-                        files,
-                      );
-                    }}
-                    onDeleteComment={async (commentId) => {
-                      await handleLocalCommentDelete(item.id, commentId);
-                    }}
-                    onDownloadAttachment={(commentId, attachmentId, fileName) =>
-                      onDownloadCommentAttachment?.(
-                        commentId,
-                        attachmentId,
-                        fileName,
-                      )
-                    }
-                    onDeleteAttachment={(commentId, attachmentId) =>
-                      onDeleteCommentAttachment?.(
-                        item.id,
-                        commentId,
-                        attachmentId,
-                      )
-                    }
-                    isDark={isDark}
-                    showComposer
-                    placeholder="줄바꿈 Shift+Enter, 입력 Enter"
-                    composerLabel="댓글 입력"
-                    submitLabel="등록"
-                  />
-                </Box>
-              </CardContent>
-            </Card>
+                      ) => {
+                        await handleLocalCommentAdd(
+                          item.id,
+                          content,
+                          parentCommentId,
+                          files,
+                          commentId,
+                        );
+                      }}
+                      onEditComment={async (commentId, content, files) => {
+                        await handleLocalCommentEdit(
+                          item.id,
+                          commentId,
+                          content,
+                          files,
+                        );
+                      }}
+                      onDeleteComment={async (commentId) => {
+                        await handleLocalCommentDelete(item.id, commentId);
+                      }}
+                      onDownloadAttachment={(commentId, attachmentId, fileName) =>
+                        onDownloadCommentAttachment?.(
+                          commentId,
+                          attachmentId,
+                          fileName,
+                        )
+                      }
+                      onDeleteAttachment={(commentId, attachmentId) =>
+                        onDeleteCommentAttachment?.(
+                          item.id,
+                          commentId,
+                          attachmentId,
+                        )
+                      }
+                      isDark={isDark}
+                      showComposer
+                      placeholder="줄바꿈 Shift+Enter, 입력 Enter"
+                      composerLabel="댓글 입력"
+                      submitLabel="등록"
+                    />
+                  </Box>
+                </FeedCommentsSection>
+            </FeedCard>
           );
         }}
       />

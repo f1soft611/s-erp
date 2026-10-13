@@ -23,8 +23,10 @@ describe('DocumentFeedItem', () => {
       </ThemeProvider>,
     );
 
-    const header = screen
-      .getByTestId('document-write-item')
+    const feedCard = screen.getByTestId('document-write-item');
+    expect(feedCard).toHaveAttribute('data-feed-card', 'true');
+
+    const header = feedCard
       .querySelector('.MuiCardContent-root > .MuiBox-root');
 
     expect(header).toHaveStyle({ flexWrap: 'wrap' });

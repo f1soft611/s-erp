@@ -114,6 +114,11 @@ describe('Community notice page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('부서별_협업_일정_안내.hwp')).toBeInTheDocument();
     expect(screen.getAllByText(/댓글/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('notice-feed-list').querySelector('[data-feed-card="true"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
 
     const commentInput = screen.getByRole('textbox', { name: '댓글 입력' });
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
@@ -626,7 +631,7 @@ describe('Community notice page', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: '이전 댓글 불러오기' }),
+      screen.queryByRole('button', { name: '이전 댓글 보기' }),
     ).not.toBeInTheDocument();
   });
 
@@ -664,7 +669,7 @@ describe('Community notice page', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: '이전 댓글 불러오기' }),
+      screen.getByRole('button', { name: '이전 댓글 보기' }),
     ).toBeInTheDocument();
   });
 
@@ -740,15 +745,15 @@ describe('Community notice page', () => {
     );
 
     expect(screen.queryByText('이전 댓글')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
 
     expect(await screen.findByText('이전 댓글')).toBeInTheDocument();
     expect(screen.getByText('이전 답글 내용')).toBeInTheDocument();
-    expect(screen.getByText('남아있는 답글')).toBeInTheDocument();
+    expect(await screen.findByText('남아있는 답글')).toBeInTheDocument();
     expect(screen.getAllByText('중복 댓글')).toHaveLength(1);
     expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 3);
     expect(
-      screen.queryByRole('button', { name: '이전 댓글 불러오기' }),
+      screen.queryByRole('button', { name: '이전 댓글 보기' }),
     ).not.toBeInTheDocument();
 
     expect(onLoadPreviousComments).toHaveBeenCalledTimes(1);
@@ -785,10 +790,10 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
 
     await waitFor(() =>
@@ -839,7 +844,7 @@ describe('Community notice page', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
 
     await waitFor(() => {
       expect(onLoadPreviousCommentsError).toHaveBeenCalledWith(
@@ -848,7 +853,7 @@ describe('Community notice page', () => {
     });
     expect(screen.getByText('현재 댓글')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '이전 댓글 불러오기' }),
+      screen.getByRole('button', { name: '이전 댓글 보기' }),
     ).toBeInTheDocument();
     expect(onLoadPreviousComments).toHaveBeenCalledTimes(1);
   });
@@ -897,7 +902,7 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
 
     await waitFor(() =>
@@ -932,7 +937,7 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
     expect(await screen.findByText('이전 댓글')).toBeInTheDocument();
 
@@ -946,7 +951,7 @@ describe('Community notice page', () => {
     );
 
     expect(screen.getByText('이전 댓글')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
     await waitFor(() =>
       expect(onLoadPreviousComments).toHaveBeenLastCalledWith(1, 1),
     );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   IconButton,
   Menu,
   MenuItem,
@@ -412,6 +413,14 @@ function CommentItem({
             <Typography variant="caption" color="text.secondary">
               {comment.time}
             </Typography>
+            {isSystemEvent && (
+              <Chip
+                label="시스템"
+                size="small"
+                data-testid="system-event-badge"
+                sx={{ height: 20, fontSize: '0.68rem' }}
+              />
+            )}
             <Box sx={{ ml: 'auto' }}>
               {!isDeleted && !isSystemEvent && (
                 <IconButton

@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { FeedCard } from '../src/shared/components/feed/FeedCard';
+import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
+import { FeedReactionBar } from '../src/shared/components/feed/FeedReactionBar';
 import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import {
@@ -8,6 +11,91 @@ import {
 } from '../src/shared/components/feed/CommentThread';
 
 describe('shared feed components', () => {
+  it('renders the shared feed-card slots in notice order', () => {
+    render(
+      <FeedCard
+        author="관리자"
+        meta="2026.10.13"
+        avatar="관"
+        badges={<span>결재대기</span>}
+        actions={<button type="button">더보기</button>}
+        title="문서 제목"
+        summary="문서 요약"
+      >
+        <p>카드 본문</p>
+      </FeedCard>,
+    );
+
+    const card = screen.getByTestId('feed-card');
+    expect(card).toHaveTextContent('관리자');
+    expect(card).toHaveTextContent('2026.10.13');
+    expect(card).toHaveTextContent('결재대기');
+    expect(card).toHaveTextContent('더보기');
+    expect(card).toHaveTextContent('문서 제목');
+    expect(card).toHaveTextContent('문서 요약');
+    expect(card).toHaveTextContent('카드 본문');
+  });
+
+  it('forwards clicks from a clickable shared feed card', () => {
+    const onClick = vi.fn();
+
+    render(
+      <FeedCard author="관리자" title="문서 제목" onClick={onClick}>
+        <p>본문</p>
+      </FeedCard>,
+    );
+
+    fireEvent.click(screen.getByTestId('feed-card'));
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders controlled reaction state and forwards reaction actions', () => {
+    const onToggleLike = vi.fn();
+    const onToggleBookmark = vi.fn();
+
+    render(
+      <FeedReactionBar
+        liked={false}
+        likeCount={4}
+        bookmarked={false}
+        commentCount={8}
+        onToggleLike={onToggleLike}
+        onToggleBookmark={onToggleBookmark}
+      />,
+    );
+
+    expect(screen.getByText('댓글 8')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '좋아요 4' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '좋아요 4' }));
+    fireEvent.click(screen.getByRole('button', { name: '북마크' }));
+
+    expect(onToggleLike).toHaveBeenCalledTimes(1);
+    expect(onToggleBookmark).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders and invokes the optional previous-comments action', () => {
+    const onLoadPrevious = vi.fn();
+
+    render(
+      <FeedCommentsSection
+        showPrevious
+        isLoadingPrevious={false}
+        onLoadPrevious={onLoadPrevious}
+      >
+        <p>최신 댓글</p>
+      </FeedCommentsSection>,
+    );
+
+    expect(screen.getByText('최신 댓글')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
+
+    expect(onLoadPrevious).toHaveBeenCalledTimes(1);
+  });
+
   it('renders feed, attachment and comment blocks via reusable shared components', () => {
     render(
       <>

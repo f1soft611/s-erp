@@ -762,7 +762,7 @@ describe('CommunityNoticePage local updates', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
     expect(await screen.findByText('더 이전 댓글')).toBeInTheDocument();
 
@@ -844,7 +844,7 @@ describe('CommunityNoticePage local updates', () => {
     renderPage();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: '이전 댓글 보기' }),
     );
 
     await waitFor(() => {
@@ -967,7 +967,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByRole('button', { name: '댓글 메뉴 작성자' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
     expect(
       await screen.findByText('처음 불러온 이전 댓글'),
     ).toBeInTheDocument();
@@ -996,7 +996,7 @@ describe('CommunityNoticePage local updates', () => {
       expect(screen.queryByText('새 댓글')).not.toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
     await waitFor(() =>
       expect(loadPreviousComments).toHaveBeenNthCalledWith(2, 1, 4),
     );
