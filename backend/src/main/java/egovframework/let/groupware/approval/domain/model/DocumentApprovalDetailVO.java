@@ -22,6 +22,7 @@ public class DocumentApprovalDetailVO {
     private String contentsJson;
     private String contentsHtml;
     private String contentsText;
+    private Integer viewCount;
     private boolean isDrafter;
     private List<CommonFileVO> attachments = new ArrayList<>();
     private List<DocumentApprovalLineVO> approvalLines = new ArrayList<>();
@@ -53,6 +54,8 @@ public class DocumentApprovalDetailVO {
     public void setContentsHtml(String contentsHtml) { this.contentsHtml = contentsHtml; }
     public String getContentsText() { return contentsText; }
     public void setContentsText(String contentsText) { this.contentsText = contentsText; }
+    public Integer getViewCount() { return viewCount; }
+    public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
     @JsonProperty("isDrafter")
     public boolean isDrafter() { return isDrafter; }
     @JsonProperty("isDrafter")

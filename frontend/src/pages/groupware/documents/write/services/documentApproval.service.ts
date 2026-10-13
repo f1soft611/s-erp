@@ -178,6 +178,8 @@ export async function getDocumentApprovalDetail(
     item.electronicApprovalId !== electronicApprovalId ||
     typeof item.title !== 'string' ||
     typeof item.contentsHtml !== 'string' ||
+    !Number.isSafeInteger(item.viewCount) ||
+    item.viewCount < 0 ||
     typeof item.isDrafter !== 'boolean' ||
     !Array.isArray(item.approvalLines) ||
     !Array.isArray(item.attachments) ||

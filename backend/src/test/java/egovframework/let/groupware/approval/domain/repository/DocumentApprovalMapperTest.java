@@ -24,10 +24,12 @@ class DocumentApprovalMapperTest {
     void detailSerializesTheDrafterFlagUsingTheApiPropertyName() throws Exception {
         DocumentApprovalDetailVO detail = new DocumentApprovalDetailVO();
         detail.setDrafter(true);
+        detail.setViewCount(7);
 
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(detail));
 
         assertThat(json.path("isDrafter").asBoolean()).isTrue();
+        assertThat(json.path("viewCount").asInt()).isEqualTo(7);
         assertThat(json.has("drafter")).isFalse();
     }
 
@@ -151,6 +153,53 @@ class DocumentApprovalMapperTest {
         assertThat(deletionSql)
                 .contains("drafter_line.action_status = 'APPROVED'")
                 .contains("line.action_status NOT IN ('WAITING', 'PENDING')");
+    }
+
+    @Test
+    void detailViewCountAndViewerHistoryStatementsAreMappedWithTenantGuards() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.getResultMap("DocumentApprovalDAO.detail").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("viewCount");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("loginCode", "login-author");
+        params.put("electronicApprovalId", 77L);
+        params.put("loginId", 201L);
+
+        String detailSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")
+                .getBoundSql(params)
+                .getSql();
+        String loginSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectLoginIdByLoginCode")
+                .getBoundSql(params)
+                .getSql();
+        String historySql = configuration
+                .getMappedStatement("DocumentApprovalDAO.insertElectronicApprovalViewHistory")
+                .getBoundSql(params)
+                .getSql();
+        String counterSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.incrementElectronicApprovalViewCount")
+                .getBoundSql(params)
+                .getSql();
+
+        assertThat(detailSql).contains("m.view_count");
+        assertThat(loginSql)
+                .contains("tenant_id = ?")
+                .contains("login_code = ?")
+                .contains("use_at = 'Y'");
+        assertThat(historySql)
+                .contains("ON CONFLICT (tenant_id, electronic_approval_id, login_id) DO NOTHING")
+                .contains("RETURNING view_history_id");
+        assertThat(counterSql)
+                .contains("view_count = view_count + 1")
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("deleted_yn = 'N'");
     }
 
     @Test

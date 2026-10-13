@@ -319,7 +319,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception {
         validateAuthenticatedUser(user);
         if (electronicApprovalId == null || electronicApprovalId <= 0) {
@@ -328,6 +328,29 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         Map<String, Object> params = actorParams(user);
         params.put("electronicApprovalId", electronicApprovalId);
         DocumentApprovalDetailVO detail = documentApprovalDAO.selectDocumentApprovalDetail(params);
+        if (detail == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+        }
+
+        Map<String, Object> loginParams = new HashMap<>();
+        loginParams.put("tenantId", user.getTenantId());
+        loginParams.put("loginCode", user.getId());
+        Long loginId = documentApprovalDAO.selectLoginIdByLoginCode(loginParams);
+        if (loginId == null) {
+            throw new IllegalStateException("인증된 로그인 계정을 찾을 수 없습니다.");
+        }
+
+        Map<String, Object> viewParams = new HashMap<>();
+        viewParams.put("tenantId", user.getTenantId());
+        viewParams.put("electronicApprovalId", electronicApprovalId);
+        viewParams.put("loginId", loginId);
+        Long viewHistoryId = documentApprovalDAO.insertElectronicApprovalViewHistory(viewParams);
+        if (viewHistoryId != null
+                && documentApprovalDAO.incrementElectronicApprovalViewCount(viewParams) != 1) {
+            throw new IllegalStateException("전자결재 문서 조회수를 갱신할 수 없습니다.");
+        }
+
+        detail = documentApprovalDAO.selectDocumentApprovalDetail(params);
         if (detail == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
         }

@@ -535,6 +535,7 @@
 | drafter_department_name | varchar(150) | 작성 당시 부서명 |
 | created_at / updated_at / submitted_at | timestamp | 생성/수정/최초 상신 시각 |
 | deleted_yn | varchar(1) | 문서 논리 삭제 여부 (`N` 기본값, `Y` 삭제) |
+| view_count | integer | 인증 사용자별 최초 상세 조회 누적 수 (`0` 이상) |
 
 제약/역할:
 
@@ -544,6 +545,7 @@
 - `document_status`: `DRAFT`, `PENDING`, `IN_PROGRESS`, `REVISION_REQUESTED`, `COMPLETED`, `REJECTED`
 - `deleted_yn`은 `document_status`를 변경하지 않는 논리 삭제 표시이며, `Y/N` CHECK를 둔다. 이 컬럼은 `20261012_002` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
 - `eabus_no` 유형별 CHECK와 NOT NULL은 `20261012_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+- `view_count`는 인증 사용자가 상세 문서를 최초 조회할 때만 증가하며, 사용자별 중복 방지는 `tb_electronic_approval_view_history`에서 관리한다. `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
 - 본문 원본은 문서작성 편집기의 JSON이며 HTML/평문은 렌더링/검색을 위한 파생 표현이다.
 
 ### 2-25. tb_electronic_approval_line_info
@@ -589,11 +591,49 @@
 - unlike는 본인이 소유한 관계 행을 삭제한다. 좋아요 수는 관계 행을 집계한다.
 - SYSTEM 댓글 좋아요는 서비스/API에서 거부한다.
 
+### 2-27. tb_electronic_approval_view_history
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| view_history_id | bigserial | 조회 이력 PK |
+| tenant_id | bigint | 소속 테넌트 FK |
+| electronic_approval_id | bigint | 전자결재 문서 FK |
+| login_id | bigint | 로그인 계정 FK |
+| viewed_at | timestamp | 최초 상세 조회 시각 |
+
+제약/역할:
+
+- `(tenant_id, electronic_approval_id, login_id)` unique로 사용자별 문서 최초 조회만 기록한다.
+- `(tenant_id, electronic_approval_id)` 복합 FK로 동일 tenant의 문서를 참조하며 문서 삭제 시 이력을 cascade 삭제한다.
+- 상세 조회수 컬럼은 `tb_electronic_approval_main.view_count`에 저장한다.
+- `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+
+---
+
+### 2-27. tb_electronic_approval_view_history
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| view_history_id | bigserial | 조회 이력 PK |
+| tenant_id | bigint | 소속 테넌트 FK |
+| electronic_approval_id | bigint | 전자결재 문서 FK |
+| login_id | bigint | 로그인 계정 FK |
+| viewed_at | timestamp | 최초 상세 조회 시각 |
+
+제약/역할:
+
+- `(tenant_id, electronic_approval_id, login_id)` unique로 사용자별 문서 최초 조회만 기록한다.
+- `(tenant_id, electronic_approval_id)` 복합 FK로 동일 tenant의 문서를 참조하며 문서 삭제 시 이력을 cascade 삭제한다.
+- 상세 조회수 컬럼은 `tb_electronic_approval_main.view_count`에 저장한다.
+- `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+
 ---
 
 ## 변경 이력
 
+- 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
+- 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-08: `tb_common_comment` SYSTEM 이벤트 허용 목록에 `DRAFT_SAVED`를 추가하는 `20261008_004` migration 초안을 정의했다. 실제 DB 제약을 재확인하지 못했으며 적용하지 않았다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고.
 - 2026-10-08: 문서 결재 본문/참여자 테이블, 공통 댓글 SYSTEM 이벤트 구분, 댓글 좋아요 테이블의 미적용 SQL 초안을 정의했다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고. 실제 DB에는 적용하지 않았다.
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)

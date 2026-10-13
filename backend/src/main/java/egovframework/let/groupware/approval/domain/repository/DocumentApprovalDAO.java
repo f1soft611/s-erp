@@ -104,6 +104,18 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return (DocumentApprovalDetailVO) selectOne("DocumentApprovalDAO.selectDocumentApprovalDetail", params);
     }
 
+    public Long selectLoginIdByLoginCode(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectLoginIdByLoginCode", params);
+    }
+
+    public Long insertElectronicApprovalViewHistory(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.insertElectronicApprovalViewHistory", params);
+    }
+
+    public int incrementElectronicApprovalViewCount(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.incrementElectronicApprovalViewCount", params);
+    }
+
     public List<DocumentApprovalLineVO> selectApprovalLines(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectApprovalLines", params);
     }

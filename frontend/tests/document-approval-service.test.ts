@@ -148,6 +148,7 @@ describe('document approval service', () => {
     const detail = {
       ...document,
       isDrafter: true,
+      viewCount: 7,
       draftingWorkCategoryId: null,
       contentsJson: '{"type":"doc","content":[]}',
       contentsHtml: '<p>본문</p>',
@@ -190,6 +191,7 @@ describe('document approval service', () => {
         attachments: [],
         systemEvents: [],
         isDrafter: true,
+        viewCount: 0,
       },
     });
     await expect(getDocumentApprovalDetail(41)).resolves.toMatchObject({
@@ -204,8 +206,43 @@ describe('document approval service', () => {
         approvalLines: [],
         attachments: [],
         systemEvents: [],
+        viewCount: 0,
       },
     });
+    await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
+      '전자결재 상세 응답을 확인할 수 없습니다.',
+    );
+  });
+
+  it('requires a non-negative safe integer view count in document details', async () => {
+    const validDetail = {
+      electronicApprovalId: 41,
+      title: '초안',
+      contentsHtml: '<p>내용</p>',
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+      isDrafter: true,
+      viewCount: 7,
+    };
+    api.get.mockResolvedValueOnce({ item: validDetail });
+    await expect(getDocumentApprovalDetail(41)).resolves.toMatchObject({
+      viewCount: 7,
+    });
+
+    const missingViewCount = { ...validDetail };
+    Reflect.deleteProperty(missingViewCount, 'viewCount');
+    api.get.mockResolvedValueOnce({ item: missingViewCount });
+    await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
+      '전자결재 상세 응답을 확인할 수 없습니다.',
+    );
+
+    api.get.mockResolvedValueOnce({ item: { ...validDetail, viewCount: -1 } });
+    await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
+      '전자결재 상세 응답을 확인할 수 없습니다.',
+    );
+
+    api.get.mockResolvedValueOnce({ item: { ...validDetail, viewCount: 1.5 } });
     await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
       '전자결재 상세 응답을 확인할 수 없습니다.',
     );

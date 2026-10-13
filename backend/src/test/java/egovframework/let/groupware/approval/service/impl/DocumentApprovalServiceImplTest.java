@@ -40,6 +40,7 @@ import egovframework.com.common.service.CommonFileService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
@@ -54,6 +55,112 @@ class DocumentApprovalServiceImplTest {
     private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
     private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
     private final LoginVO author = author();
+
+    @Test
+    void detailIncrementsViewCountForFirstAuthorizedView() throws Exception {
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(0), detail(1));
+        when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(201L);
+        when(approvalDAO.insertElectronicApprovalViewHistory(anyMap())).thenReturn(401L);
+        when(approvalDAO.incrementElectronicApprovalViewCount(anyMap())).thenReturn(1);
+        when(fileService.listFiles(4L, "APPROVAL", 77L)).thenReturn(Collections.<CommonFileVO>emptyList());
+        when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
+        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
+
+        DocumentApprovalDetailVO result = service().getDetail(author, 77L);
+
+        assertThat(result.getViewCount()).isEqualTo(1);
+        verify(approvalDAO, org.mockito.Mockito.times(2)).selectDocumentApprovalDetail(anyMap());
+        verify(approvalDAO).selectLoginIdByLoginCode(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && "login-author".equals(params.get("loginCode"))));
+        verify(approvalDAO).insertElectronicApprovalViewHistory(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && Long.valueOf(201L).equals(params.get("loginId"))));
+        verify(approvalDAO).incrementElectronicApprovalViewCount(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+    }
+
+    @Test
+    void detailDoesNotIncrementViewCountForRepeatedView() throws Exception {
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(2), detail(2));
+        when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(201L);
+        when(approvalDAO.insertElectronicApprovalViewHistory(anyMap())).thenReturn(null);
+        when(fileService.listFiles(4L, "APPROVAL", 77L)).thenReturn(Collections.<CommonFileVO>emptyList());
+        when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
+        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
+
+        DocumentApprovalDetailVO result = service().getDetail(author, 77L);
+
+        assertThat(result.getViewCount()).isEqualTo(2);
+        verify(approvalDAO, org.mockito.Mockito.times(2)).selectDocumentApprovalDetail(anyMap());
+        verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
+    }
+
+    @Test
+    void detailRecordsAnotherLoginAsSeparateViewer() throws Exception {
+        LoginVO anotherUser = participantUser("login-other", "202", "다른 사용자");
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(3), detail(4));
+        when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(202L);
+        when(approvalDAO.insertElectronicApprovalViewHistory(anyMap())).thenReturn(402L);
+        when(approvalDAO.incrementElectronicApprovalViewCount(anyMap())).thenReturn(1);
+        when(fileService.listFiles(4L, "APPROVAL", 77L)).thenReturn(Collections.<CommonFileVO>emptyList());
+        when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
+        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
+
+        DocumentApprovalDetailVO result = service().getDetail(anotherUser, 77L);
+
+        assertThat(result.getViewCount()).isEqualTo(4);
+        verify(approvalDAO).selectLoginIdByLoginCode(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && "login-other".equals(params.get("loginCode"))));
+        verify(approvalDAO).insertElectronicApprovalViewHistory(argThat(params ->
+            Long.valueOf(202L).equals(params.get("loginId"))));
+    }
+
+    @Test
+    void detailDoesNotRecordViewWhenDocumentIsUnavailable() throws Exception {
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> service().getDetail(author, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verify(approvalDAO, never()).selectLoginIdByLoginCode(anyMap());
+        verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
+        verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
+        verifyNoInteractions(commentDAO, fileService);
+    }
+
+    @Test
+    void detailFailsWhenAuthenticatedLoginCannotBeResolved() throws Exception {
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(0));
+        when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> service().getDetail(author, 77L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("인증된 로그인 계정을 찾을 수 없습니다.");
+
+        verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
+        verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
+        verifyNoInteractions(commentDAO, fileService);
+    }
+
+    @Test
+    void detailFailsWhenFirstViewCannotUpdateDocumentCounter() throws Exception {
+        when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(0));
+        when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(201L);
+        when(approvalDAO.insertElectronicApprovalViewHistory(anyMap())).thenReturn(401L);
+        when(approvalDAO.incrementElectronicApprovalViewCount(anyMap())).thenReturn(0);
+
+        assertThatThrownBy(() -> service().getDetail(author, 77L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("전자결재 문서 조회수를 갱신할 수 없습니다.");
+
+        verifyNoInteractions(commentDAO, fileService);
+        verify(approvalDAO, never()).selectApprovalLines(anyMap());
+    }
 
     @Test
     void deleteDraftSoftDeletesAndWritesDeletedEvent() throws Exception {
@@ -663,6 +770,13 @@ class DocumentApprovalServiceImplTest {
     private DocumentApprovalServiceImpl service(EmbeddedImageStorageService imageStorageService) {
         return new DocumentApprovalServiceImpl(
             approvalDAO, commentDAO, fileService, documentSanitizer, imageStorageService);
+    }
+
+    private DocumentApprovalDetailVO detail(int viewCount) {
+        DocumentApprovalDetailVO detail = new DocumentApprovalDetailVO();
+        detail.setElectronicApprovalId(77L);
+        detail.setViewCount(viewCount);
+        return detail;
     }
 
     private Object invokeApprovalMethod(String name, Class<?>[] parameterTypes, Object... arguments) throws Exception {

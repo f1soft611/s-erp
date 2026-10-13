@@ -78,6 +78,7 @@
         <result property="contentsJson" column="contents_json"/>
         <result property="contentsHtml" column="contents_html"/>
         <result property="contentsText" column="contents_text"/>
+        <result property="viewCount" column="view_count"/>
         <result property="drafter" column="is_drafter"/>
     </resultMap>
 
@@ -398,6 +399,7 @@
                m.eabus_no, m.document_type, m.document_status,
                m.drafter_name, m.created_at, m.submitted_at, m.title,
                m.contents_json::text AS contents_json, m.contents_html, m.contents_text,
+               m.view_count,
                (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
@@ -414,6 +416,38 @@
               )
           )
     </select>
+
+    <select id="selectLoginIdByLoginCode" parameterType="map" resultType="long">
+        SELECT login_id
+        FROM public.tb_login_account
+        WHERE tenant_id = #{tenantId}
+          AND login_code = #{loginCode}
+          AND use_at = 'Y'
+    </select>
+
+    <select id="insertElectronicApprovalViewHistory" parameterType="map" resultType="long">
+        INSERT INTO public.tb_electronic_approval_view_history (
+            tenant_id,
+            electronic_approval_id,
+            login_id,
+            viewed_at
+        ) VALUES (
+            #{tenantId},
+            #{electronicApprovalId},
+            #{loginId},
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (tenant_id, electronic_approval_id, login_id) DO NOTHING
+        RETURNING view_history_id
+    </select>
+
+    <update id="incrementElectronicApprovalViewCount" parameterType="map">
+        UPDATE public.tb_electronic_approval_main
+        SET view_count = view_count + 1
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND deleted_yn = 'N'
+    </update>
 
     <select id="selectApprovalLines" parameterType="map" resultMap="approvalLine">
         SELECT electronic_approval_line_id, stage_order, participant_order, participant_type,

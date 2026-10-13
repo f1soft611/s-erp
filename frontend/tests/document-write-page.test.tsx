@@ -327,6 +327,7 @@ beforeEach(() => {
     title: '문서 A',
     drafterName: '김민수',
     summary: '문서 A 요약',
+    viewCount: 0,
     draftingWorkCategoryId: null,
     contentsJson: '{"type":"doc","content":[]}',
     contentsHtml: '<p>본문 내용</p>',
@@ -932,6 +933,7 @@ describe('Document write page', () => {
         draftingWorkCategoryId: null,
         contentsJson: '{"type":"doc","content":[]}',
         contentsHtml: '<p>로딩 완료 본문</p>',
+        viewCount: 0,
         approvalLines: [],
         attachments: [],
         systemEvents: [],
@@ -986,6 +988,7 @@ describe('Document write page', () => {
       title: '문서 A',
       drafterName: '김민수',
       createdAt: '2026-10-13T09:00:00Z',
+      viewCount: 7,
       draftingWorkCategoryId: null,
       contentsJson: '{"type":"doc","content":[]}',
       contentsHtml: '<p>본문 내용</p>',
@@ -1016,7 +1019,7 @@ describe('Document write page', () => {
           participantOrder: 1,
           participantType: 'APPROVAL',
           participantUserId: 'approver-4',
-          participantName: '결재자 D',
+          participantName: '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
           participantDepartmentName: '인사팀',
           actionStatus: 'PENDING',
         },
@@ -1079,6 +1082,12 @@ describe('Document write page', () => {
       screen.getByRole('img', { name: '시스템 메시지' }),
     ).toBeInTheDocument();
     const approvalLine = screen.getByTestId('approval-line-readonly');
+    const authorRow = screen.getByTestId('approval-author-row');
+    expect(authorRow).toBeInTheDocument();
+    expect(within(authorRow).getByText('김민수')).toBeInTheDocument();
+    expect(screen.getByTestId('approval-author-meta')).toHaveTextContent(
+      '기안자 · 2026.10.13 · 조회 7',
+    );
     expect(screen.getByTestId('approval-line-drafter-meta')).toHaveTextContent(
       '기안자 김민수 · 2026.10.13',
     );
@@ -1087,11 +1096,21 @@ describe('Document write page', () => {
       .not.toBeInTheDocument();
     expect(screen.getByTestId('approval-line-group-approval')).toHaveTextContent('결재자 A');
     expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent(
-      '합의 · 재무팀 합의자 B',
+      '합의',
     );
+    expect(
+      within(screen.getByTestId('approval-line-group-agreement')).getByText('2', { exact: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent('재무팀 합의자 B');
     expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent(
-      '참조 · 운영팀 참조자 C',
+      '참조',
     );
+    expect(
+      within(screen.getByTestId('approval-line-group-reference')).getByText('3', { exact: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('운영팀 참조자 C');
+    expect(screen.getByTestId('approval-line-group-agreement').querySelector('.MuiChip-root')).toBeNull();
+    expect(screen.getByTestId('approval-line-group-reference').querySelector('.MuiChip-root')).toBeNull();
     const approvalParticipants = within(
       screen.getByTestId('approval-line-group-approval'),
     ).getAllByTestId(/^approval-line-participant-/);
@@ -1144,9 +1163,17 @@ describe('Document write page', () => {
       'data-status-tone',
       'success',
     );
+    const centeredStage = screen.getByTestId('approval-line-sequence-74');
+    expect(centeredStage).toHaveStyle({ justifyContent: 'center' });
+    expect(within(centeredStage).getByText(
+      '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
+    )).toHaveAttribute(
+      'title',
+      '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
+    );
     expect(screen.getByTestId('approval-line-inner-divider')).toBeInTheDocument();
-    expect(screen.getByTestId('approval-line-chip-agreement-72')).toBeInTheDocument();
-    expect(screen.getByTestId('approval-line-chip-reference-73')).toBeInTheDocument();
+    expect(screen.queryByTestId('approval-line-chip-agreement-72')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('approval-line-chip-reference-73')).not.toBeInTheDocument();
     expect(screen.getByTestId('approval-line-divider')).toBeInTheDocument();
     expect(approvalLine.nextElementSibling).toBe(
       screen.getByTestId('approval-line-divider'),
@@ -1186,6 +1213,7 @@ describe('Document write page', () => {
       title: '문서 A',
       drafterName: '김민수',
       draftingWorkCategoryId: null,
+      viewCount: 0,
       summary: '짧은 요약',
       contentsJson: '{"type":"doc","content":[]}',
       contentsHtml: `<p>${'긴 본문 내용입니다. '.repeat(100)}</p>`,
@@ -1226,6 +1254,7 @@ describe('Document write page', () => {
         title: '문서 A',
         drafterName: '김민수',
         draftingWorkCategoryId: null,
+        viewCount: 0,
         summary: '이미지 포함',
         contentsJson: '{"type":"doc","content":[]}',
         contentsHtml:
@@ -1469,6 +1498,7 @@ describe('Document write page', () => {
       title: '보완할 기안서',
       drafterName: '김민수',
       draftingWorkCategoryId: 77,
+      viewCount: 0,
       summary: '기존 내용',
       contentsJson: JSON.stringify({
         type: 'doc',
