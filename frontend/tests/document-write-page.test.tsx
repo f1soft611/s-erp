@@ -23,6 +23,7 @@ const composerApi = vi.hoisted(() => ({
   getDocumentApprovalSummary: vi.fn(),
   getDocumentApprovalDetail: vi.fn(),
   listApprovalComments: vi.fn(),
+  fetchApprovalEmbeddedImageBlob: vi.fn(),
   createApprovalComment: vi.fn(),
   updateApprovalComment: vi.fn(),
   deleteApprovalComment: vi.fn(),
@@ -76,6 +77,7 @@ vi.mock(
     getDocumentApprovalSummary: composerApi.getDocumentApprovalSummary,
     getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
     listApprovalComments: composerApi.listApprovalComments,
+    fetchApprovalEmbeddedImageBlob: composerApi.fetchApprovalEmbeddedImageBlob,
     createApprovalComment: composerApi.createApprovalComment,
     updateApprovalComment: composerApi.updateApprovalComment,
     deleteApprovalComment: composerApi.deleteApprovalComment,
@@ -342,6 +344,9 @@ beforeEach(() => {
     nextBeforeCommentId: null,
     resultCnt: 0,
   });
+  composerApi.fetchApprovalEmbeddedImageBlob.mockResolvedValue(
+    new Blob(['image'], { type: 'image/png' }),
+  );
   composerApi.createApprovalComment.mockResolvedValue({});
   composerApi.updateApprovalComment.mockResolvedValue({});
   composerApi.deleteApprovalComment.mockResolvedValue(undefined);
@@ -990,6 +995,81 @@ describe('Document write page', () => {
     });
   });
 
+  it('wraps approval details in a card and collapses long document bodies', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '문서 A',
+      drafterName: '김민수',
+      draftingWorkCategoryId: null,
+      summary: '짧은 요약',
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: `<p>${'긴 본문 내용입니다. '.repeat(100)}</p>`,
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    const detailCard = await screen.findByTestId('approval-detail-card');
+    expect(detailCard).toBeVisible();
+    expect(detailCard).toHaveClass('MuiStack-root');
+    const body = screen.getByTestId('approval-document-body');
+    expect(body).toHaveAttribute('data-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    expect(screen.getByRole('button', { name: '접기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(body).toHaveAttribute('data-expanded', 'true');
+  });
+
+  it('shows embedded document images as clickable previews', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:approval-image-preview'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+        electronicApprovalId: 1,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'PENDING',
+        title: '문서 A',
+        drafterName: '김민수',
+        draftingWorkCategoryId: null,
+        summary: '이미지 포함',
+        contentsJson: '{"type":"doc","content":[]}',
+        contentsHtml:
+          '<p>이미지</p><img src="/api/v1/groupware/approvals/1/embedded-images/51" alt="영수증" />',
+        approvalLines: [],
+        attachments: [],
+        systemEvents: [],
+      });
+      render(<DashboardContent {...pageProps} />);
+      const listRegion = await screen.findByRole('region', {
+        name: '리스트형 문서 목록',
+      });
+      fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+      const preview = await screen.findByRole('button', {
+        name: '본문 이미지 미리보기 1: 영수증',
+      });
+      expect(preview.querySelector('img')).toHaveAttribute('alt', '영수증');
+      fireEvent.click(preview);
+      expect(await screen.findByRole('dialog', { name: '이미지 보기' })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('posts a new comment through the approval-scoped API and refreshes the thread', async () => {
     const createdComment = {
       commentId: 32,
@@ -1002,6 +1082,18 @@ describe('Document write page', () => {
       createdAt: '2026-10-12T10:00:00Z',
       attachments: [],
     };
+    const deletedComment = {
+      commentId: 30,
+      ownerId: 1,
+      parentCommentId: null,
+      content: '[삭제된 댓글입니다.]',
+      commentType: 'USER',
+      writerId: null,
+      writerName: '삭제된 댓글',
+      deletedYn: 'Y',
+      createdAt: '2026-10-12T09:00:00Z',
+      attachments: [],
+    };
     composerApi.createApprovalComment.mockResolvedValueOnce(createdComment);
     composerApi.listApprovalComments
       .mockResolvedValueOnce({
@@ -1011,10 +1103,10 @@ describe('Document write page', () => {
         resultCnt: 0,
       })
       .mockResolvedValueOnce({
-        comments: [createdComment],
-        hasPrevious: false,
-        nextBeforeCommentId: null,
-        resultCnt: 1,
+        comments: [deletedComment, createdComment],
+        hasPrevious: true,
+        nextBeforeCommentId: 30,
+        resultCnt: 22,
       });
     render(<DashboardContent {...pageProps} />);
     const listRegion = await screen.findByRole('region', {
@@ -1035,6 +1127,10 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('새 검토 의견'),
     );
+    expect(screen.getByRole('button', { name: '이전 댓글 보기' })).toBeInTheDocument();
+    expect(
+      screen.queryByText('전자결재 댓글 응답을 확인할 수 없습니다.'),
+    ).not.toBeInTheDocument();
   });
 
   it('loads and prepends an earlier approval comment page', async () => {

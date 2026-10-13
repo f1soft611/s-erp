@@ -64,7 +64,8 @@ function isApprovalComment(value: unknown, electronicApprovalId: number): value 
     value.ownerId === electronicApprovalId &&
     value.commentType === 'USER' &&
     typeof value.content === 'string' &&
-    typeof value.writerId === 'string' &&
+    (typeof value.writerId === 'string' ||
+      (value.deletedYn === 'Y' && value.writerId === null)) &&
     typeof value.writerName === 'string'
   );
 }

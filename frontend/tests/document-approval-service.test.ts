@@ -378,4 +378,31 @@ describe('document approval service', () => {
       'document.pdf',
     );
   });
+
+  it('accepts redacted deleted comments with a null writer ID', async () => {
+    const deletedComment = {
+      commentId: 52,
+      ownerId: 41,
+      parentCommentId: 31,
+      content: '[삭제된 댓글입니다.]',
+      commentType: 'USER',
+      writerId: null,
+      writerName: '삭제된 댓글',
+      deletedYn: 'Y',
+    };
+    api.get.mockResolvedValueOnce({
+      resultList: [deletedComment],
+      comments: [deletedComment],
+      hasPrevious: true,
+      nextBeforeCommentId: 52,
+      resultCnt: 22,
+    });
+
+    await expect(listApprovalComments(41, { limit: 20 })).resolves.toMatchObject({
+      comments: [deletedComment],
+      hasPrevious: true,
+      nextBeforeCommentId: 52,
+      resultCnt: 22,
+    });
+  });
 });

@@ -25,6 +25,7 @@ import type { FeedCommentItem } from '../../../../../shared/components/feed/Comm
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
+import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -75,6 +76,10 @@ function formatCommentTime(value?: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function getPlainText(html: string): string {
+  return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
 }
 
 function approvalStatusLabel(status: DocumentApprovalDetail['documentStatus']): string {
@@ -172,6 +177,8 @@ export function DocumentApprovalDetailFeed({
   const [bodyHtml, setBodyHtml] = useState('');
   const [bodyImages, setBodyImages] = useState<Array<{ url: string; alt: string }>>([]);
   const [bodyImageError, setBodyImageError] = useState('');
+  const [isBodyExpanded, setIsBodyExpanded] = useState(false);
+  const [selectedBodyImage, setSelectedBodyImage] = useState<{ url: string; alt: string } | null>(null);
   const [employeeId, setEmployeeId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isActing, setIsActing] = useState(false);
@@ -231,6 +238,8 @@ export function DocumentApprovalDetailFeed({
     setBodyHtml('');
     setBodyImages([]);
     setBodyImageError('');
+    setIsBodyExpanded(false);
+    setSelectedBodyImage(null);
     setEmployeeId('');
     void Promise.all([
       getDocumentApprovalDetail(electronicApprovalId),
@@ -407,6 +416,10 @@ export function DocumentApprovalDetailFeed({
       reference: orderedLines.filter((line) => line.participantType === 'REFERENCE'),
     };
   }, [detail?.approvalLines]);
+  const hasMoreBody = Boolean(
+    bodyHtml &&
+      getPlainText(bodyHtml) !== (detail?.summary ?? '').trim(),
+  );
   const canEditDraft = useMemo(
     () =>
       Boolean(
@@ -632,7 +645,17 @@ export function DocumentApprovalDetailFeed({
           <CircularProgress />
         </Box>
       ) : (
-        <Stack spacing={2}>
+        <Stack
+          spacing={2}
+          data-testid="approval-detail-card"
+          sx={{
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            p: { xs: 1.5, sm: 2 },
+            bgcolor: 'background.paper',
+          }}
+        >
           {loadError && <Alert severity="error">{loadError}</Alert>}
           {detail && (
             <>
@@ -872,9 +895,22 @@ export function DocumentApprovalDetailFeed({
               </Typography>
               <Box
                 data-testid="approval-document-body"
+                data-expanded={isBodyExpanded}
                 sx={{
                   minWidth: 0,
                   overflowWrap: 'anywhere',
+                  maxHeight:
+                    hasMoreBody && !isBodyExpanded ? 220 : 'none',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  maskImage:
+                    hasMoreBody && !isBodyExpanded
+                      ? 'linear-gradient(to bottom, black 72%, transparent 100%)'
+                      : 'none',
+                  WebkitMaskImage:
+                    hasMoreBody && !isBodyExpanded
+                      ? 'linear-gradient(to bottom, black 72%, transparent 100%)'
+                      : 'none',
                   '& img': { maxWidth: '100%', height: 'auto' },
                   '& table': { maxWidth: '100%', overflowX: 'auto', display: 'block' },
                   '& .approval-inline-image-reference': {
@@ -889,23 +925,54 @@ export function DocumentApprovalDetailFeed({
                 }}
                 dangerouslySetInnerHTML={{ __html: bodyHtml }}
               />
+              {hasMoreBody && (
+                <Button
+                  size="small"
+                  variant="text"
+                  aria-expanded={isBodyExpanded}
+                  onClick={() => setIsBodyExpanded((expanded) => !expanded)}
+                  sx={{ alignSelf: 'flex-start', minWidth: 0, p: 0, fontWeight: 700 }}
+                >
+                  {isBodyExpanded ? '접기' : '더보기'}
+                </Button>
+              )}
               {bodyImageError && <Alert severity="error">{bodyImageError}</Alert>}
               {bodyImages.length > 0 && (
-                <Box data-testid="approval-document-images">
+                <Box data-testid="approval-document-image-previews">
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
                     본문 이미지
                   </Typography>
-                  <Stack spacing={1}>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
                     {bodyImages.map((image, index) => (
-                      <Box key={`${image.url}-${index}`}>
-                        <Typography variant="caption" color="text.secondary">
-                          본문 이미지 {index + 1}: {image.alt}
-                        </Typography>
+                      <Box
+                        key={`${image.url}-${index}`}
+                        component="button"
+                        type="button"
+                        aria-label={`본문 이미지 미리보기 ${index + 1}: ${image.alt}`}
+                        onClick={() => setSelectedBodyImage(image)}
+                        sx={{
+                          display: 'block',
+                          width: 112,
+                          height: 76,
+                          p: 0,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          bgcolor: 'background.paper',
+                          cursor: 'pointer',
+                        }}
+                      >
                         <Box
                           component="img"
                           src={image.url}
                           alt={image.alt}
-                          sx={{ display: 'block', maxWidth: '100%', height: 'auto', borderRadius: 1 }}
+                          sx={{
+                            display: 'block',
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
                         />
                       </Box>
                     ))}
@@ -1060,6 +1127,12 @@ export function DocumentApprovalDetailFeed({
           </Button>
         </DialogActions>
       </Dialog>
+      <ImageViewerDialog
+        open={Boolean(selectedBodyImage)}
+        src={selectedBodyImage?.url ?? ''}
+        alt={selectedBodyImage?.alt ?? '본문 이미지'}
+        onClose={() => setSelectedBodyImage(null)}
+      />
     </PostDetailPanel>
   );
 }

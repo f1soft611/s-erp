@@ -193,7 +193,7 @@ export type DocumentApprovalComment = {
   content: string;
   commentType: 'USER';
   eventType?: null;
-  writerId: string;
+  writerId: string | null;
   writerName: string;
   deletedYn?: 'Y' | 'N';
   createdAt?: string | null;
