@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from '@testing-library/react';
 import { useState } from 'react';
@@ -11,10 +12,120 @@ import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NoticeFeedList } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
+import { useNoticeInteractions } from '../src/pages/groupware/community/notice/hooks/useNoticeInteractions';
+import { FeedBodyContent } from '../src/shared/components/feed/FeedBodyContent';
+import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
 import { ListView } from '../src/shared/components/view-mode/ListView';
 import { PinnedItemsPanel } from '../src/shared/components/view-mode/PinnedItemsPanel';
 
+const noticeServices = vi.hoisted(() => ({
+  fetchNoticePostDetail: vi.fn(),
+}));
+
+vi.mock(
+  '../src/pages/groupware/community/notice/services/noticeBoardService',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../src/pages/groupware/community/notice/services/noticeBoardService')
+    >()),
+    fetchNoticePostDetail: noticeServices.fetchNoticePostDetail,
+  }),
+);
+
+function NoticeDetailLoadingHarness() {
+  const [noticeItems, setNoticeItems] = useState([noticeFeed[0]]);
+  const interactions = useNoticeInteractions({
+    noticeItems,
+    setNoticeItems,
+    showError: () => undefined,
+    showSuccess: () => undefined,
+  });
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          void interactions.handleSelectNotice({ id: noticeFeed[0].id })
+        }
+      >
+        공지 선택
+      </button>
+      {interactions.selectedNotice && (
+        <PostDetailPanel
+          onClose={() => undefined}
+          isLoading={
+            interactions.selectedNoticeLoadingId ===
+            interactions.selectedNoticeId
+          }
+          loadingLabel="공지사항 상세 불러오는 중"
+        >
+          <FeedBodyContent
+            hasMore
+            isExpanded={
+              interactions.expandedNoticeId === interactions.selectedNotice.id
+            }
+            onToggleExpand={() => undefined}
+            contentTestId="selected-notice-body"
+            text={{
+              collapsed: interactions.selectedNotice.summary,
+              expanded: interactions.selectedNotice.body,
+            }}
+          />
+        </PostDetailPanel>
+      )}
+    </>
+  );
+}
+
 describe('Community notice page', () => {
+  it('shows centered shared loading while selected notice detail is pending', async () => {
+    let resolveDetail!: (detail: {
+      postId: number;
+      title: string;
+      contentsHtml: string;
+      createdAt: string;
+    }) => void;
+    noticeServices.fetchNoticePostDetail.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveDetail = resolve;
+        }),
+    );
+
+    render(<NoticeDetailLoadingHarness />);
+    fireEvent.click(screen.getByRole('button', { name: '공지 선택' }));
+
+    const loadingStatus = await screen.findByRole('status', {
+      name: '공지사항 상세 불러오는 중',
+    });
+    expect(loadingStatus).toBeInTheDocument();
+    expect(screen.getByTestId('post-detail-panel-content')).toHaveStyle({
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+
+    await act(async () => {
+      resolveDetail({
+        postId: noticeFeed[0].id,
+        title: noticeFeed[0].title,
+        contentsHtml: '<p>불러온 공지 상세</p>',
+        createdAt: '2026-10-13T09:00:00Z',
+      });
+    });
+
+    expect(await screen.findByText('불러온 공지 상세')).toBeInTheDocument();
+    expect(screen.getByTestId('selected-notice-body')).toHaveAttribute(
+      'data-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: '접기' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: '공지사항 상세 불러오는 중' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('selects list and pinned items through their common callbacks', () => {
     const onItemClick = vi.fn();
     const item = {
@@ -114,14 +225,47 @@ describe('Community notice page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('부서별_협업_일정_안내.hwp')).toBeInTheDocument();
     expect(screen.getAllByText(/댓글/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByTestId('notice-feed-list').querySelector('[data-feed-card="true"]'),
-    ).toBeInTheDocument();
+    const noticeCard = screen
+      .getByTestId('notice-feed-list')
+      .querySelector<HTMLElement>('[data-feed-card="true"]');
+    expect(noticeCard).toBeInTheDocument();
     expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
     expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
+    expect(
+      within(noticeCard).getAllByRole('separator'),
+    ).toHaveLength(1);
+    expect(screen.getByTestId('feed-reaction-bar').nextElementSibling).toBe(
+      screen.getByTestId('feed-comments-section'),
+    );
 
     const commentInput = screen.getByRole('textbox', { name: '댓글 입력' });
     expect(commentInput).toHaveAttribute('contenteditable', 'true');
+  });
+
+  it('removes direct body and previous-comments separators on notice feed cards', () => {
+    const item = {
+      ...noticeFeed[0],
+      body: '짧은 공지',
+      summary: '짧은 공지',
+      attachments: [],
+      attachmentDetails: [],
+    };
+
+    render(<NoticeFeedList items={[item]} isDark={false} />);
+
+    const noticeCard = screen
+      .getByTestId('notice-feed-list')
+      .querySelector<HTMLElement>('[data-feed-card="true"]');
+    expect(noticeCard).toBeInTheDocument();
+    expect(
+      within(noticeCard).queryAllByRole('separator'),
+    ).toHaveLength(0);
+    expect(
+      screen.getByTestId(`notice-preview-${item.id}`),
+    ).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByTestId('feed-reaction-bar').nextElementSibling).toBe(
+      screen.getByTestId('feed-comments-section'),
+    );
   });
 
   it('shows the pin toggle beside the more menu button', () => {
@@ -631,7 +775,7 @@ describe('Community notice page', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: '이전 댓글 보기' }),
+      screen.queryByRole('button', { name: /^이전 댓글 보기/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -669,7 +813,7 @@ describe('Community notice page', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: '이전 댓글 보기' }),
+      screen.getByRole('button', { name: /^이전 댓글 보기/ }),
     ).toBeInTheDocument();
   });
 
@@ -745,7 +889,7 @@ describe('Community notice page', () => {
     );
 
     expect(screen.queryByText('이전 댓글')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
 
     expect(await screen.findByText('이전 댓글')).toBeInTheDocument();
     expect(screen.getByText('이전 답글 내용')).toBeInTheDocument();
@@ -753,7 +897,7 @@ describe('Community notice page', () => {
     expect(screen.getAllByText('중복 댓글')).toHaveLength(1);
     expect(onLoadPreviousComments).toHaveBeenCalledWith(1, 3);
     expect(
-      screen.queryByRole('button', { name: '이전 댓글 보기' }),
+      screen.queryByRole('button', { name: /^이전 댓글 보기/ }),
     ).not.toBeInTheDocument();
 
     expect(onLoadPreviousComments).toHaveBeenCalledTimes(1);
@@ -790,10 +934,10 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 보기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 보기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
 
     await waitFor(() =>
@@ -844,7 +988,7 @@ describe('Community notice page', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
 
     await waitFor(() => {
       expect(onLoadPreviousCommentsError).toHaveBeenCalledWith(
@@ -853,7 +997,7 @@ describe('Community notice page', () => {
     });
     expect(screen.getByText('현재 댓글')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '이전 댓글 보기' }),
+      screen.getByRole('button', { name: /^이전 댓글 보기/ }),
     ).toBeInTheDocument();
     expect(onLoadPreviousComments).toHaveBeenCalledTimes(1);
   });
@@ -902,7 +1046,7 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 보기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
 
     await waitFor(() =>
@@ -937,7 +1081,7 @@ describe('Community notice page', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 보기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
     expect(await screen.findByText('이전 댓글')).toBeInTheDocument();
 
@@ -951,7 +1095,7 @@ describe('Community notice page', () => {
     );
 
     expect(screen.getByText('이전 댓글')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
     await waitFor(() =>
       expect(onLoadPreviousComments).toHaveBeenLastCalledWith(1, 1),
     );

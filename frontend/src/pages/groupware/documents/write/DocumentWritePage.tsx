@@ -1,5 +1,5 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Alert, Box, CircularProgress, Container, Stack } from '@mui/material';
+import { Alert, Box, Container, Stack } from '@mui/material';
 import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -7,6 +7,8 @@ import type { PermissionActionGroupDefinition } from '../../../../shared/compone
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { FeedView } from '../../../../shared/components/view-mode/FeedView';
 import { ListView } from '../../../../shared/components/view-mode/ListView';
+import { FeedViewSkeleton } from '../../../../shared/components/view-mode/FeedViewSkeleton';
+import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
 import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
@@ -132,9 +134,15 @@ export function DocumentWritePage({
                   <Box
                     role="status"
                     aria-label="문서 목록 불러오는 중"
-                    sx={{ display: 'flex', justifyContent: 'center', py: 6 }}
+                    sx={{ width: '100%', py: 2 }}
                   >
-                    <CircularProgress />
+                    {viewMode === 'list' ? (
+                      <ListViewSkeleton />
+                    ) : (
+                      <Box data-testid="document-feed-skeleton">
+                        <FeedViewSkeleton />
+                      </Box>
+                    )}
                   </Box>
                 ) : (
                   <>

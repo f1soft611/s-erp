@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
-  Chip,
   IconButton,
   Menu,
   MenuItem,
@@ -10,8 +9,10 @@ import {
   Typography,
 } from '@mui/material';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -414,11 +415,11 @@ function CommentItem({
               {comment.time}
             </Typography>
             {isSystemEvent && (
-              <Chip
-                label="시스템"
-                size="small"
-                data-testid="system-event-badge"
-                sx={{ height: 20, fontSize: '0.68rem' }}
+              <InfoOutlinedIcon
+                aria-label="시스템 메시지"
+                titleAccess="시스템 메시지"
+                data-testid="system-event-icon"
+                fontSize="small"
               />
             )}
             <Box sx={{ ml: 'auto' }}>
@@ -482,7 +483,20 @@ function CommentItem({
                 <Button
                   size="small"
                   variant="text"
-                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  aria-expanded={showReplies}
+                  endIcon={
+                    showReplies ? (
+                      <KeyboardArrowUpIcon
+                        data-testid="reply-expanded-icon"
+                        fontSize="small"
+                      />
+                    ) : (
+                      <KeyboardArrowDownIcon
+                        data-testid="reply-collapsed-icon"
+                        fontSize="small"
+                      />
+                    )
+                  }
                   onClick={() => setShowReplies((current) => !current)}
                   sx={{
                     mt: 0.5,
@@ -578,7 +592,20 @@ function CommentItem({
                 <Button
                   size="small"
                   variant="text"
-                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  aria-expanded={showReplies}
+                  endIcon={
+                    showReplies ? (
+                      <KeyboardArrowUpIcon
+                        data-testid="reply-expanded-icon"
+                        fontSize="small"
+                      />
+                    ) : (
+                      <KeyboardArrowDownIcon
+                        data-testid="reply-collapsed-icon"
+                        fontSize="small"
+                      />
+                    )
+                  }
                   onClick={() => setShowReplies((current) => !current)}
                   sx={{
                     mt: 0.5,

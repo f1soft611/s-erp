@@ -1,4 +1,10 @@
-import { Box, IconButton, Paper, Typography } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  IconButton,
+  Paper,
+  Typography,
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import type { ReactNode } from 'react';
 
@@ -6,6 +12,8 @@ type PostDetailPanelProps = {
   title?: string;
   subtitle?: string;
   onClose: () => void;
+  isLoading?: boolean;
+  loadingLabel?: string;
   children: ReactNode;
 };
 
@@ -13,6 +21,8 @@ export function PostDetailPanel({
   title = '게시글 상세',
   subtitle,
   onClose,
+  isLoading = false,
+  loadingLabel = '상세 불러오는 중',
   children,
 }: PostDetailPanelProps) {
   return (
@@ -65,6 +75,8 @@ export function PostDetailPanel({
       <Box
         data-testid="post-detail-panel-content"
         data-scroll-container="true"
+        role={isLoading ? 'status' : undefined}
+        aria-label={isLoading ? loadingLabel : undefined}
         sx={{
           minWidth: 0,
           minHeight: 0,
@@ -72,9 +84,14 @@ export function PostDetailPanel({
           overflowY: 'auto',
           overflowX: 'hidden',
           p: 1.5,
+          ...(isLoading && {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }),
         }}
       >
-        {children}
+        {isLoading ? <CircularProgress aria-label={loadingLabel} /> : children}
       </Box>
     </Paper>
   );

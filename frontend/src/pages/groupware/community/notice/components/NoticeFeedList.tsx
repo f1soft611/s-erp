@@ -117,6 +117,16 @@ function countComments(comments: NoticeCommentItem[]): number {
   return comments.filter((comment) => !comment.isDeleted).length;
 }
 
+function countLoadedComments(comments: NoticeCommentItem[]): number {
+  return comments.reduce(
+    (total, comment) =>
+      total +
+      (comment.isDeleted ? 0 : 1) +
+      countLoadedComments(comment.replies ?? []),
+    0,
+  );
+}
+
 function appendCommentToTree(
   comments: NoticeCommentItem[],
   parentCommentId: number | string | null | undefined,
@@ -827,6 +837,9 @@ export function NoticeFeedList({
 
     setLocalCommentsByNoticeId((current) => {
       const comments = current[noticeId] ?? [];
+      if (collectCommentIds(comments).has(String(createdComment.id))) {
+        return current;
+      }
       const nextComments =
         displayParentCommentId != null &&
         String(displayParentCommentId) !== String(parentCommentId)
@@ -1216,7 +1229,9 @@ export function NoticeFeedList({
                   </Box>
                 )}
 
-                <Divider sx={{ my: 1.5 }} />
+                {attachmentFiles.length > 0 && (
+                  <Divider sx={{ my: 1.5 }} />
+                )}
                 <FeedReactionBar
                   liked={Boolean(item.liked)}
                   likeCount={item.likeCount ?? 0}
@@ -1226,11 +1241,18 @@ export function NoticeFeedList({
                   onToggleBookmark={() => onToggleBookmark?.(item.id)}
                   isDark={isDark}
                 />
-                <Divider sx={{ my: 1.5 }} />
 
                 <FeedCommentsSection
                   showPrevious={canLoadPrevious}
                   isLoadingPrevious={Boolean(loadingPreviousByNoticeId[item.id])}
+                  remainingPreviousCount={
+                    Number.isFinite(item.commentCount)
+                      ? Math.max(
+                          0,
+                          item.commentCount - countLoadedComments(itemComments),
+                        )
+                      : undefined
+                  }
                   onLoadPrevious={async () => {
                       if (loadingPreviousByNoticeId[item.id]) return;
                       const cursor =

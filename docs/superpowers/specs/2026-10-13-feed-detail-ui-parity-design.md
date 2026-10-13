@@ -18,9 +18,17 @@ behaviors.
   the existing read-only system event behavior.
 - Use visually distinct reply expand/collapse icons: down when replies are
   collapsed and up when expanded. Expose expanded state to assistive technology.
-- Remove the divider immediately before the previous-comments control and the
-  divider immediately after the body in both detail experiences. Keep unrelated
-  section dividers and the approval-line divider.
+- Remove the divider immediately before the previous-comments control in
+  notice/approval and the divider immediately after the body in approval. In
+  notice, remove the body-to-reaction divider when no attachment section
+  intervenes; retain the attachment-to-reaction divider when attachments exist.
+  Keep unrelated section dividers and the approval-line divider.
+- Apply the shared SYSTEM and reply icons to both the left feed list and detail
+  views. Apply the notice reaction-to-comments divider removal to feed cards as
+  well as detail views.
+- Keep left-feed bodies collapsed by default. Leave notice loading behavior
+  unchanged, and render document-list loading with the same feed/list skeleton
+  components used by notice, matching the active view mode.
 
 ## Implementation boundaries
 
@@ -32,6 +40,11 @@ behaviors.
   selection/detail state, not globally, so feed cards are unaffected.
 - Keep system and reply indicators in `TiptapCommentThread`, shared by notice
   and approval.
+- Keep notice separator removal in `NoticeFeedList` across its list and detail
+  usage; do not add a mode-only switch. Render the remaining attachment-to-
+  reaction divider only when an attachment section is present.
+- Reuse `FeedViewSkeleton` and `ListViewSkeleton` from `DocumentWritePage` so
+  its initial loading matches notice at the corresponding view mode.
 - Do not change APIs, permissions, comment ordering, pagination, or mutations.
 
 ## Verification
@@ -41,5 +54,5 @@ behaviors.
   `aria-expanded`, and removal of the two specified dividers in both details.
 - Run related shared feed, notice, and approval Vitest tests and the frontend
   production build.
-- Verify the notice and approval detail panels in the browser at 375px, 768px,
-  and 1280px and document the result.
+- Verify notice and approval left feeds and detail panels in the browser at
+  375px, 768px, and 1280px and document the result.

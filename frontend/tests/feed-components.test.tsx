@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedCard } from '../src/shared/components/feed/FeedCard';
 import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
@@ -10,8 +16,33 @@ import {
   CommentThread,
   isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
+import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
 
 describe('shared feed components', () => {
+  it('centers detail loading in the shared panel content area', () => {
+    render(
+      <PostDetailPanel
+        onClose={() => undefined}
+        isLoading
+        loadingLabel="상세 불러오는 중"
+      >
+        <p>상세 내용</p>
+      </PostDetailPanel>,
+    );
+
+    const content = screen.getByTestId('post-detail-panel-content');
+    expect(
+      screen.getByRole('status', { name: '상세 불러오는 중' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText('상세 내용')).not.toBeInTheDocument();
+    expect(content).toHaveStyle({
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+  });
+
   it('expands rich body content and shows untitled image previews', () => {
     const onToggleExpand = vi.fn();
     const onOpenImage = vi.fn();
@@ -187,6 +218,20 @@ describe('shared feed components', () => {
     expect(onLoadPrevious).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the remaining previous-comment count in the control label', () => {
+    render(
+      <FeedCommentsSection showPrevious remainingPreviousCount={4}>
+        <p>최신 댓글</p>
+      </FeedCommentsSection>,
+    );
+
+    const previousCommentsButton = screen.getByRole('button', {
+      name: '이전 댓글 보기 (4)',
+    });
+    expect(previousCommentsButton).toHaveTextContent('이전 댓글 보기 (4)');
+    expect(previousCommentsButton).toHaveStyle({ whiteSpace: 'nowrap' });
+  });
+
   it('renders feed, attachment and comment blocks via reusable shared components', () => {
     render(
       <>
@@ -228,6 +273,10 @@ describe('shared feed components', () => {
     );
 
     expect(screen.getByText('문서가 임시저장되었습니다.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: '시스템 메시지' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('system-event-badge')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
@@ -327,10 +376,18 @@ describe('shared feed components', () => {
     );
 
     expect(screen.queryByText('두번째 답글')).not.toBeInTheDocument();
-    expect(screen.getByText('답글 2개')).toBeInTheDocument();
+    const replySummary = screen.getByRole('button', { name: '답글 2개' });
+    expect(replySummary).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(replySummary).getByTestId('reply-collapsed-icon'),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '답글 2개' }));
+    fireEvent.click(replySummary);
 
+    expect(replySummary).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      within(replySummary).getByTestId('reply-expanded-icon'),
+    ).toBeInTheDocument();
     expect(screen.getByText('첫 답글')).toBeInTheDocument();
     expect(screen.getByText('두번째 답글')).toBeInTheDocument();
     const replyButtons = screen.getAllByRole('button', { name: '답글' });
@@ -525,8 +582,15 @@ describe('shared feed components', () => {
     expect(
       screen.getByText('[작성자에 의해 삭제 되었습니다.]'),
     ).toBeInTheDocument();
+    const replySummary = screen.getByRole('button', { name: '답글 1개' });
+    expect(replySummary).toHaveAttribute('aria-expanded', 'false');
     expect(
-      screen.getByRole('button', { name: '답글 1개' }),
+      within(replySummary).getByTestId('reply-collapsed-icon'),
+    ).toBeInTheDocument();
+    fireEvent.click(replySummary);
+    expect(replySummary).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      within(replySummary).getByTestId('reply-expanded-icon'),
     ).toBeInTheDocument();
   });
 
