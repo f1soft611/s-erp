@@ -58,8 +58,10 @@ Keep approval data, actions, comments, attachments, and access rules unchanged.
   access before recording a view. Resolve the login account from authenticated
   context, insert history with conflict-safe semantics, and increment the
   document counter only when the insert creates a row.
-- Return the current counter from the existing detail endpoint. Preserve its
-  route, response envelope, and all current detail hydration.
+- Re-read the detail after every history insert attempt, including a duplicate
+  conflict, so concurrent requests return the current committed counter.
+  Preserve the existing endpoint route, response envelope, and all current
+  detail hydration.
 - Use dated SQL, matching change-history and rollback files in both
   `docs/database` and `backend/DATABASE`, and update the cumulative
   `docs/database/db-schema.md`.
