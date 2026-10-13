@@ -81,8 +81,9 @@ Keep approval data, actions, comments, attachments, and access rules unchanged.
   numbered participants, truncated names, simple chevrons, separate numbered
   agreement/reference rows, and read-only behavior.
 - Backend tests cover first view increment, repeat view idempotency, another
-  user's first view, concurrent duplicate requests, denied/missing documents,
-  and preservation of the existing detail response.
+  user's first view, denied/missing documents, and preservation of the existing
+  detail response. Mapper tests verify the unique-conflict insert and guarded
+  counter update that make concurrent duplicate requests idempotent.
 - Run focused frontend and backend tests, then the frontend production build
   and backend test suite.
 - Verify the detail at 375px, 768px, and 1280px with no page-level horizontal
