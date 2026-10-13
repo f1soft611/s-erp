@@ -986,11 +986,18 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-group-approval')).toHaveTextContent('결재자 A');
     expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent('합의자 B');
     expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('참조자 C');
+    expect(screen.getByTestId('approval-line-divider')).toBeInTheDocument();
+    expect(approvalLine.nextElementSibling).toBe(
+      screen.getByTestId('approval-line-divider'),
+    );
+    expect(screen.getByTestId('approval-line-participant-71')).toHaveStyle({
+      gridTemplateRows: '32px 64px 32px',
+    });
     expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
     expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
     expect(screen.queryByText('첨부파일', { exact: true })).not.toBeInTheDocument();
     expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
-      limit: 20,
+      limit: 3,
       beforeCommentId: undefined,
     });
   });
@@ -1059,12 +1066,28 @@ describe('Document write page', () => {
       });
       fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
 
+      await waitFor(() =>
+        expect(composerApi.fetchApprovalEmbeddedImageBlob).toHaveBeenCalledWith(1, 51),
+      );
       const preview = await screen.findByRole('button', {
         name: '본문 이미지 미리보기 1: 영수증',
       });
       expect(preview.querySelector('img')).toHaveAttribute('alt', '영수증');
+      expect(screen.queryByText(/\[본문 이미지/)).not.toBeInTheDocument();
+      expect(screen.queryByText('본문 이미지', { exact: true })).not.toBeInTheDocument();
       fireEvent.click(preview);
       expect(await screen.findByRole('dialog', { name: '이미지 보기' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '이미지 뷰어 닫기' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: '이미지 보기' })).not.toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('approval-document-body').querySelector('img')).toHaveAttribute(
+          'src',
+          'blob:approval-image-preview',
+        );
+      });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1167,6 +1190,10 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('최근 댓글'),
     );
+    expect(composerApi.listApprovalComments).toHaveBeenNthCalledWith(1, 1, {
+      limit: 3,
+      beforeCommentId: undefined,
+    });
     fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기' }));
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('이전 댓글'),

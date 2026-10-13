@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Box,
-  Button,
   Chip,
   Divider,
   IconButton,
   Menu,
   MenuItem,
   Skeleton,
-  Stack,
   Typography,
 } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
@@ -18,6 +16,7 @@ import { AttachmentList } from '../../../../../shared/components/feed/Attachment
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
+import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { FeedView } from '../../../../../shared/components/view-mode/FeedView';
@@ -26,7 +25,6 @@ import type {
   NoticeCommentItem,
   NoticeFeedItem,
 } from '../types/community.types';
-import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
@@ -869,7 +867,6 @@ export function NoticeFeedList({
         renderItem={(item) => {
           const isExpanded = expandedNoticeId === item.id;
           const hasMore = item.body !== item.summary;
-          const displayBody = isExpanded ? item.body : item.summary;
           const sanitizedPreviewHtml = prepareNoticeFeedHtml(
             normalizeNoticeEmbeddedImageSources(
               item.bodyHtml ?? item.body,
@@ -1028,240 +1025,160 @@ export function NoticeFeedList({
                   {item.title}
                 </Typography>
 
-                {hasRichHtml ? (
-                  <Box
-                    data-testid={`notice-preview-${item.id}`}
-                    data-expanded={isExpanded}
-                    data-notice-body-content="true"
-                    data-notice-id={item.id}
-                    data-has-more={hasMore}
-                    onClick={(event) => {
-                      const imageElement = (
-                        event.target as HTMLElement
-                      ).closest('img');
-                      if (imageElement) {
-                        const src = imageElement.getAttribute('src');
-                        if (src) {
-                          setViewerImage({
-                            src,
-                            alt:
-                              imageElement.getAttribute('alt') || '원본 이미지',
-                          });
-                        }
-                        if (!hasMore) {
-                          void onNoticeInteract?.(item.id);
-                        }
-                        return;
+                <FeedBodyContent
+                  hasMore={hasMore}
+                  isExpanded={isExpanded}
+                  onToggleExpand={() => onToggleExpand?.(item.id)}
+                  contentTestId={`notice-preview-${item.id}`}
+                  imagePreviewTestId={`notice-embedded-image-preview-${item.id}`}
+                  onContentClick={(event) => {
+                    const imageElement = (event.target as HTMLElement).closest('img');
+                    if (imageElement) {
+                      const src = imageElement.getAttribute('src');
+                      if (src) {
+                        setViewerImage({
+                          src,
+                          alt: imageElement.getAttribute('alt') || '원본 이미지',
+                        });
                       }
                       if (!hasMore) {
-                        void onToggleExpand?.(item.id);
+                        void onNoticeInteract?.(item.id);
                       }
-                    }}
-                    sx={{
-                      ...richTextContentStyles,
-                      color: 'text.primary',
-                      mb: 1.5,
-                      overflow: isExpanded ? 'visible' : 'hidden',
-                      maxHeight: isExpanded ? 'none' : '220px',
-                      position: 'relative',
-                      maskImage: isExpanded
-                        ? 'none'
-                        : 'linear-gradient(to bottom, black 72%, transparent 100%)',
-                      WebkitMaskImage: isExpanded
-                        ? 'none'
-                        : 'linear-gradient(to bottom, black 72%, transparent 100%)',
-                      '& br': { display: 'inline' },
-                      '& img': {
-                        cursor: 'pointer',
-                      },
+                      return;
+                    }
+                    if (!hasMore) {
+                      void onToggleExpand?.(item.id);
+                    }
+                  }}
+                  contentSx={{
+                    '& br': { display: 'inline' },
+                    '& img': { cursor: 'pointer' },
+                    '& [data-notice-expanded-image-skeleton="true"]': {
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      borderRadius: 1,
+                      backgroundColor: isDark
+                        ? 'rgba(51,65,85,0.7)'
+                        : 'rgba(226,232,240,0.9)',
+                      backgroundImage: isDark
+                        ? 'linear-gradient(90deg, transparent, rgba(148,163,184,0.14), transparent)'
+                        : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
+                      backgroundSize: '200% 100%',
+                      animation: 'notice-expanded-image-wave 1.5s ease-in-out infinite',
+                    },
+                    '@keyframes notice-expanded-image-wave': {
+                      '0%': { backgroundPosition: '100% 0' },
+                      '100%': { backgroundPosition: '-100% 0' },
+                    },
+                    '@media (prefers-reduced-motion: reduce)': {
                       '& [data-notice-expanded-image-skeleton="true"]': {
-                        boxSizing: 'border-box',
-                        overflow: 'hidden',
-                        borderRadius: 1,
-                        backgroundColor: isDark
-                          ? 'rgba(51,65,85,0.7)'
-                          : 'rgba(226,232,240,0.9)',
-                        backgroundImage: isDark
-                          ? 'linear-gradient(90deg, transparent, rgba(148,163,184,0.14), transparent)'
-                          : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
-                        backgroundSize: '200% 100%',
-                        animation:
-                          'notice-expanded-image-wave 1.5s ease-in-out infinite',
+                        animation: 'none',
                       },
-                      '@keyframes notice-expanded-image-wave': {
-                        '0%': { backgroundPosition: '100% 0' },
-                        '100%': { backgroundPosition: '-100% 0' },
-                      },
-                      '@media (prefers-reduced-motion: reduce)': {
-                        '& [data-notice-expanded-image-skeleton="true"]': {
-                          animation: 'none',
-                        },
-                      },
-                    }}
-                    dangerouslySetInnerHTML={{
-                      __html: isExpanded
-                        ? (hydratedBody?.html ??
-                          expandedBodyLoadingHtml ??
-                          previewHtml)
-                        : collapsedPreviewHtml,
-                    }}
-                  />
-                ) : (
-                  <Typography
-                    data-testid={`notice-preview-${item.id}`}
-                    data-expanded={isExpanded}
-                    onClick={() => {
-                      if (!hasMore) {
-                        void onToggleExpand?.(item.id);
-                      }
-                    }}
-                    variant="body1"
-                    sx={{
-                      fontSize: '1rem',
-                      fontWeight: 400,
-                      color: 'text.primary',
-                      lineHeight: 1.8,
-                      whiteSpace: 'pre-line',
-                      display: isExpanded ? 'block' : '-webkit-box',
-                      WebkitLineClamp: isExpanded ? 'unset' : 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      mb: 1.5,
-                      cursor: !hasMore ? 'pointer' : 'default',
-                    }}
-                  >
-                    {displayBody}
-                  </Typography>
-                )}
-
-                {isExpanded && hydratedBody?.hasImageLoadError && (
-                  <Typography
-                    role="alert"
-                    color="error"
-                    variant="body2"
-                    sx={{ mb: 1.5 }}
-                  >
-                    본문 이미지를 불러오지 못했습니다.
-                  </Typography>
-                )}
-
-                {hasMore && (
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={() => onToggleExpand?.(item.id)}
-                    sx={{
-                      minWidth: 0,
-                      p: 0,
-                      fontWeight: 700,
-                      color: 'primary.main',
-                      mb: 1.5,
-                    }}
-                  >
-                    {isExpanded ? '접기' : '더보기'}
-                  </Button>
-                )}
-
-                {!isExpanded && embeddedImagePreviews.length > 0 && (
-                  <Box
-                    data-testid={`notice-embedded-image-preview-${item.id}`}
-                    sx={{
-                      width: '100%',
-                      height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                      overflow: 'hidden',
-                      mb: 1.5,
-                      maxWidth: '100%',
-                    }}
-                  >
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{
-                        height: '100%',
-                        width: '100%',
-                        overflow: 'hidden',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                      }}
-                    >
-                      {embeddedImagePreviews.map((image, index) => {
-                        const imageKey = `${image.src}-${index}`;
-                        const isLoaded = loadedImageKeys.has(imageKey);
-
-                        return (
-                          <Box
-                            key={imageKey}
-                            sx={{
-                              position: 'relative',
-                              width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                              height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                              borderRadius: 1,
-                              flexShrink: 0,
-                            }}
-                            onClick={() => {
-                              if (!hasMore) {
-                                void onNoticeInteract?.(item.id);
-                              }
-                            }}
-                          >
-                            {!isLoaded && (
-                              <Skeleton
-                                variant="rounded"
-                                animation="wave"
-                                data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
+                    },
+                  }}
+                  richText={
+                    hasRichHtml
+                      ? {
+                          collapsedHtml: collapsedPreviewHtml,
+                          expandedHtml:
+                            hydratedBody?.html ??
+                            expandedBodyLoadingHtml ??
+                            previewHtml,
+                          images: embeddedImagePreviews,
+                          imageError:
+                            isExpanded && hydratedBody?.hasImageLoadError
+                              ? '본문 이미지를 불러오지 못했습니다.'
+                              : undefined,
+                          onOpenImage: setViewerImage,
+                          renderImagePreview: (image, index, openImage) => {
+                            const imageKey = `${image.src}-${index}`;
+                            const isLoaded = loadedImageKeys.has(imageKey);
+                            return (
+                              <Box
+                                component="button"
+                                type="button"
+                                aria-label={`본문 이미지 미리보기 ${index + 1}: ${image.alt}`}
+                                onClick={(event) => {
+                                  const imageElement =
+                                    event.currentTarget.querySelector('img');
+                                  if (isLoaded && imageElement) {
+                                    openImage({
+                                      src: imageElement.src,
+                                      alt: image.alt,
+                                    });
+                                  }
+                                  if (!hasMore) {
+                                    void onNoticeInteract?.(item.id);
+                                  }
+                                }}
                                 sx={{
-                                  position: 'absolute',
-                                  inset: 0,
+                                  position: 'relative',
+                                  display: 'block',
                                   width: NOTICE_IMAGE_PREVIEW_WIDTH,
                                   height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                  p: 0,
+                                  border: 0,
                                   borderRadius: 1,
-                                  bgcolor: isDark
-                                    ? 'rgba(51,65,85,0.7)'
-                                    : 'rgba(226,232,240,0.9)',
+                                  overflow: 'hidden',
+                                  bgcolor: 'background.paper',
+                                  cursor: isLoaded ? 'pointer' : 'default',
                                 }}
-                              />
-                            )}
-                            <AuthenticatedNoticeImage
-                              src={image.src}
-                              alt={image.alt}
-                              onLoad={() =>
-                                setLoadedImageKeys((current) => {
-                                  const next = new Set(current);
-                                  next.add(imageKey);
-                                  return next;
-                                })
-                              }
-                              onClick={(event) => {
-                                if (isLoaded) {
-                                  setViewerImage({
-                                    src: event.currentTarget.src,
-                                    alt: image.alt,
-                                  });
-                                }
-                              }}
-                              sx={{
-                                width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                                height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                                objectFit: 'cover',
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: isDark
-                                  ? 'rgba(148,163,184,0.24)'
-                                  : 'rgba(148,163,184,0.3)',
-                                bgcolor: isDark
-                                  ? 'rgba(15,23,42,0.7)'
-                                  : '#f8fafc',
-                                cursor: isLoaded ? 'pointer' : 'default',
-                                opacity: isLoaded ? 1 : 0,
-                                display: 'block',
-                              }}
-                            />
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
-                )}
+                              >
+                                {!isLoaded && (
+                                  <Skeleton
+                                    variant="rounded"
+                                    animation="wave"
+                                    data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
+                                    sx={{
+                                      position: 'absolute',
+                                      inset: 0,
+                                      width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                      height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                      borderRadius: 1,
+                                      bgcolor: isDark
+                                        ? 'rgba(51,65,85,0.7)'
+                                        : 'rgba(226,232,240,0.9)',
+                                    }}
+                                  />
+                                )}
+                                <AuthenticatedNoticeImage
+                                  src={image.src}
+                                  alt={image.alt}
+                                  onLoad={() =>
+                                    setLoadedImageKeys((current) => {
+                                      const next = new Set(current);
+                                      next.add(imageKey);
+                                      return next;
+                                    })
+                                  }
+                                  sx={{
+                                    width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                    height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                    objectFit: 'cover',
+                                    borderRadius: 1,
+                                    border: '1px solid',
+                                    borderColor: isDark
+                                      ? 'rgba(148,163,184,0.24)'
+                                      : 'rgba(148,163,184,0.3)',
+                                    bgcolor: isDark
+                                      ? 'rgba(15,23,42,0.7)'
+                                      : '#f8fafc',
+                                    cursor: isLoaded ? 'pointer' : 'default',
+                                    opacity: isLoaded ? 1 : 0,
+                                    display: 'block',
+                                  }}
+                                />
+                              </Box>
+                            );
+                          },
+                        }
+                      : undefined
+                  }
+                  text={{
+                    collapsed: item.summary,
+                    expanded: item.body,
+                  }}
+                />
 
                 {attachmentFiles.length > 0 && (
                   <Box

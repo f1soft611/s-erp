@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedCard } from '../src/shared/components/feed/FeedCard';
 import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
+import { FeedBodyContent } from '../src/shared/components/feed/FeedBodyContent';
 import { FeedReactionBar } from '../src/shared/components/feed/FeedReactionBar';
 import { AttachmentList } from '../src/shared/components/feed/AttachmentList';
 import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
@@ -11,6 +12,96 @@ import {
 } from '../src/shared/components/feed/CommentThread';
 
 describe('shared feed components', () => {
+  it('expands rich body content and shows untitled image previews', () => {
+    const onToggleExpand = vi.fn();
+    const onOpenImage = vi.fn();
+
+    render(
+      <FeedBodyContent
+        hasMore
+        isExpanded={false}
+        onToggleExpand={onToggleExpand}
+        richText={{
+          collapsedHtml: '<p>요약된 본문</p>',
+          expandedHtml: '<p>전체 본문<img src="blob:body-image" alt="영수증" /></p>',
+          images: [{ src: 'blob:body-image', alt: '영수증' }],
+          onOpenImage,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('feed-body-content')).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
+    expect(screen.getByText('요약된 본문')).toBeInTheDocument();
+    expect(screen.queryByText('본문 이미지', { exact: true })).not.toBeInTheDocument();
+    const preview = screen.getByRole('button', {
+      name: '본문 이미지 미리보기 1: 영수증',
+    });
+    expect(preview.querySelector('img')).toHaveAttribute('src', 'blob:body-image');
+
+    fireEvent.click(preview);
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+
+    expect(onOpenImage).toHaveBeenCalledWith({
+      src: 'blob:body-image',
+      alt: '영수증',
+    });
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the complete hydrated rich body when expanded', () => {
+    render(
+      <FeedBodyContent
+        hasMore
+        isExpanded
+        onToggleExpand={() => undefined}
+        richText={{
+          collapsedHtml: '<p>요약</p>',
+          expandedHtml: '<p>전체 본문<img src="blob:body-image" alt="영수증" /></p>',
+          images: [{ src: 'blob:body-image', alt: '영수증' }],
+          onOpenImage: () => undefined,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('feed-body-content')).toHaveAttribute(
+      'data-expanded',
+      'true',
+    );
+    expect(screen.getByTestId('feed-body-rich-content').querySelector('img')).toHaveAttribute(
+      'src',
+      'blob:body-image',
+    );
+    expect(screen.getByRole('button', { name: '접기' })).toBeInTheDocument();
+  });
+
+  it('clamps plain body text until the expand action is requested', () => {
+    const onToggleExpand = vi.fn();
+
+    render(
+      <FeedBodyContent
+        hasMore
+        isExpanded={false}
+        onToggleExpand={onToggleExpand}
+        contentTestId="plain-feed-body"
+        text={{
+          collapsed: '요약 본문',
+          expanded: '전체 본문',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('plain-feed-body')).toHaveTextContent('요약 본문');
+    expect(screen.getByTestId('plain-feed-body')).toHaveStyle({
+      display: '-webkit-box',
+      '-webkit-line-clamp': '3',
+    });
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the shared feed-card slots in notice order', () => {
     render(
       <FeedCard

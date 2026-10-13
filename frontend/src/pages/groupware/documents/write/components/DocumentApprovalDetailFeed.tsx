@@ -22,6 +22,8 @@ import {
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
+import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
+import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBodyContent';
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
@@ -175,10 +177,12 @@ export function DocumentApprovalDetailFeed({
   const { showSuccess, showError } = useNotification();
   const [detail, setDetail] = useState<DocumentApprovalDetail | null>(null);
   const [bodyHtml, setBodyHtml] = useState('');
-  const [bodyImages, setBodyImages] = useState<Array<{ url: string; alt: string }>>([]);
+  const [bodyImages, setBodyImages] = useState<
+    Array<FeedBodyImage & { fileId: number }>
+  >([]);
   const [bodyImageError, setBodyImageError] = useState('');
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [selectedBodyImage, setSelectedBodyImage] = useState<{ url: string; alt: string } | null>(null);
+  const [selectedBodyImage, setSelectedBodyImage] = useState<FeedBodyImage | null>(null);
   const [employeeId, setEmployeeId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isActing, setIsActing] = useState(false);
@@ -207,7 +211,7 @@ export function DocumentApprovalDetailFeed({
     setCommentError('');
     try {
       const page = await listApprovalComments(electronicApprovalId, {
-        limit: 20,
+        limit: append ? 20 : 3,
         beforeCommentId,
       });
       setCommentRecords((current) =>
@@ -295,15 +299,12 @@ export function DocumentApprovalDetailFeed({
       image.removeAttribute('src');
       if (match && Number(match[1]) === electronicApprovalId) {
         const alt = image.getAttribute('alt')?.trim() || '본문 이미지';
-        const imageNumber = imageRequests.length + 1;
+        const fileId = Number(match[2]);
         imageRequests.push({
           alt,
-          fileId: Number(match[2]),
+          fileId,
         });
-        const reference = parsed.createElement('span');
-        reference.className = 'approval-inline-image-reference';
-        reference.textContent = `[본문 이미지 ${imageNumber}: ${alt}]`;
-        image.replaceWith(reference);
+        image.setAttribute('data-approval-embedded-image-file-id', String(fileId));
       }
     });
     setBodyImageError('');
@@ -318,12 +319,13 @@ export function DocumentApprovalDetailFeed({
     void Promise.allSettled(
       imageRequests.map(async ({ alt, fileId }) => ({
         alt,
+        fileId,
         blob: await fetchApprovalEmbeddedImageBlob(electronicApprovalId, fileId),
       })),
     ).then((results) => {
       if (!active) return;
       let failed = false;
-      const loadedImages: Array<{ url: string; alt: string }> = [];
+      const loadedImages: Array<FeedBodyImage & { fileId: number }> = [];
       results.forEach((result) => {
         if (result.status !== 'fulfilled') {
           failed = true;
@@ -331,7 +333,11 @@ export function DocumentApprovalDetailFeed({
         }
         const url = URL.createObjectURL(result.value.blob);
         objectUrls.push(url);
-        loadedImages.push({ url, alt: result.value.alt });
+        loadedImages.push({
+          fileId: result.value.fileId,
+          src: url,
+          alt: result.value.alt,
+        });
       });
       setBodyImages(loadedImages);
       if (failed) setBodyImageError('일부 본문 이미지를 불러오지 못했습니다.');
@@ -341,6 +347,36 @@ export function DocumentApprovalDetailFeed({
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [detail, electronicApprovalId]);
+
+  const expandedBodyHtml = useMemo(() => {
+    if (!bodyHtml || typeof DOMParser === 'undefined') return bodyHtml;
+    const parsed = new DOMParser().parseFromString(bodyHtml, 'text/html');
+    const loadedImages = new Map(
+      bodyImages.map((image) => [image.fileId, image.src]),
+    );
+    parsed
+      .querySelectorAll<HTMLImageElement>('img[data-approval-embedded-image-file-id]')
+      .forEach((image) => {
+        const fileId = Number(
+          image.getAttribute('data-approval-embedded-image-file-id'),
+        );
+        const src = loadedImages.get(fileId);
+        if (src) {
+          image.setAttribute('src', src);
+        } else {
+          image.remove();
+        }
+        image.removeAttribute('data-approval-embedded-image-file-id');
+      });
+    return parsed.body.innerHTML;
+  }, [bodyHtml, bodyImages]);
+
+  const collapsedBodyHtml = useMemo(() => {
+    if (!bodyHtml || typeof DOMParser === 'undefined') return bodyHtml;
+    const parsed = new DOMParser().parseFromString(bodyHtml, 'text/html');
+    parsed.querySelectorAll('img').forEach((image) => image.remove());
+    return parsed.body.innerHTML;
+  }, [bodyHtml]);
 
   useEffect(() => {
     if (!open || electronicApprovalId === null) return;
@@ -418,7 +454,9 @@ export function DocumentApprovalDetailFeed({
   }, [detail?.approvalLines]);
   const hasMoreBody = Boolean(
     bodyHtml &&
-      getPlainText(bodyHtml) !== (detail?.summary ?? '').trim(),
+      (getPlainText(bodyHtml) !== (detail?.summary ?? '').trim() ||
+        bodyImages.length > 0 ||
+        bodyHtml.includes('data-approval-embedded-image-file-id')),
   );
   const canEditDraft = useMemo(
     () =>
@@ -754,28 +792,72 @@ export function DocumentApprovalDetailFeed({
                           {approvalLineGroups.approval.map((line) => (
                             <Box
                               key={line.electronicApprovalLineId}
+                              data-testid={`approval-line-participant-${line.electronicApprovalLineId}`}
                               sx={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
+                                display: 'grid',
+                                gridTemplateRows: '32px 64px 32px',
                                 width: 104,
-                                minHeight: 128,
                                 border: '1px solid',
                                 borderColor: 'divider',
                                 borderRadius: 1,
                                 overflow: 'hidden',
                               }}
                             >
-                              <Box sx={{ flex: 1, minHeight: 72 }} aria-hidden="true" />
                               <Box
                                 sx={{
-                                  display: 'flex',
-                                  alignItems: 'flex-start',
-                                  gap: 0.5,
-                                  p: 0.75,
-                                  borderTop: '1px solid',
+                                  display: 'grid',
+                                  alignItems: 'center',
+                                  minWidth: 0,
+                                  px: 0.5,
+                                  bgcolor: 'action.hover',
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  title={line.participantDepartmentName ?? ''}
+                                  noWrap
+                                  sx={{ textAlign: 'center' }}
+                                >
+                                  {line.participantDepartmentName ?? ''}
+                                </Typography>
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  alignContent: 'center',
+                                  justifyItems: 'center',
+                                  gap: 0.25,
+                                  px: 0.5,
+                                  borderBlock: '1px solid',
                                   borderColor: 'divider',
                                   minWidth: 0,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                  {approvalLineStatusLabel(line.actionStatus)}
+                                </Typography>
+                                {line.actionComment && (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    title={line.actionComment}
+                                    noWrap
+                                    sx={{ maxWidth: '100%' }}
+                                  >
+                                    {line.actionComment}
+                                  </Typography>
+                                )}
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '20px minmax(0, 1fr)',
+                                  alignItems: 'center',
+                                  columnGap: '2px',
+                                  minWidth: 0,
+                                  px: 0.25,
                                 }}
                               >
                                 <Box
@@ -796,29 +878,14 @@ export function DocumentApprovalDetailFeed({
                                 >
                                   {line.stageOrder}
                                 </Box>
-                                <Box sx={{ minWidth: 0 }}>
-                                  <Typography variant="caption" noWrap sx={{ display: 'block' }}>
-                                    {line.participantName}
-                                  </Typography>
-                                  {line.participantDepartmentName && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      noWrap
-                                      sx={{ display: 'block' }}
-                                    >
-                                      {line.participantDepartmentName}
-                                    </Typography>
-                                  )}
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ display: 'block', overflowWrap: 'anywhere' }}
-                                  >
-                                    {approvalLineStatusLabel(line.actionStatus)}
-                                    {line.actionComment ? ` · ${line.actionComment}` : ''}
-                                  </Typography>
-                                </Box>
+                                <Typography
+                                  variant="body2"
+                                  title={line.participantName}
+                                  noWrap
+                                  sx={{ minWidth: 0, textOverflow: 'ellipsis' }}
+                                >
+                                  {line.participantName}
+                                </Typography>
                               </Box>
                             </Box>
                           ))}
@@ -890,95 +957,23 @@ export function DocumentApprovalDetailFeed({
                   </Stack>
                 )}
               </Box>
+              <Divider data-testid="approval-line-divider" sx={{ my: 1.5 }} />
               <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
                 {detail.title}
               </Typography>
-              <Box
-                data-testid="approval-document-body"
-                data-expanded={isBodyExpanded}
-                sx={{
-                  minWidth: 0,
-                  overflowWrap: 'anywhere',
-                  maxHeight:
-                    hasMoreBody && !isBodyExpanded ? 220 : 'none',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  maskImage:
-                    hasMoreBody && !isBodyExpanded
-                      ? 'linear-gradient(to bottom, black 72%, transparent 100%)'
-                      : 'none',
-                  WebkitMaskImage:
-                    hasMoreBody && !isBodyExpanded
-                      ? 'linear-gradient(to bottom, black 72%, transparent 100%)'
-                      : 'none',
-                  '& img': { maxWidth: '100%', height: 'auto' },
-                  '& table': { maxWidth: '100%', overflowX: 'auto', display: 'block' },
-                  '& .approval-inline-image-reference': {
-                    display: 'inline-block',
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 0.75,
-                    bgcolor: 'action.hover',
-                    color: 'text.secondary',
-                    fontSize: '0.85em',
-                  },
+              <FeedBodyContent
+                hasMore={hasMoreBody}
+                isExpanded={isBodyExpanded}
+                onToggleExpand={() => setIsBodyExpanded((expanded) => !expanded)}
+                contentTestId="approval-document-body"
+                richText={{
+                  collapsedHtml: collapsedBodyHtml,
+                  expandedHtml: expandedBodyHtml,
+                  images: bodyImages.map(({ src, alt }) => ({ src, alt })),
+                  imageError: bodyImageError || undefined,
+                  onOpenImage: setSelectedBodyImage,
                 }}
-                dangerouslySetInnerHTML={{ __html: bodyHtml }}
               />
-              {hasMoreBody && (
-                <Button
-                  size="small"
-                  variant="text"
-                  aria-expanded={isBodyExpanded}
-                  onClick={() => setIsBodyExpanded((expanded) => !expanded)}
-                  sx={{ alignSelf: 'flex-start', minWidth: 0, p: 0, fontWeight: 700 }}
-                >
-                  {isBodyExpanded ? '접기' : '더보기'}
-                </Button>
-              )}
-              {bodyImageError && <Alert severity="error">{bodyImageError}</Alert>}
-              {bodyImages.length > 0 && (
-                <Box data-testid="approval-document-image-previews">
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                    본문 이미지
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-                    {bodyImages.map((image, index) => (
-                      <Box
-                        key={`${image.url}-${index}`}
-                        component="button"
-                        type="button"
-                        aria-label={`본문 이미지 미리보기 ${index + 1}: ${image.alt}`}
-                        onClick={() => setSelectedBodyImage(image)}
-                        sx={{
-                          display: 'block',
-                          width: 112,
-                          height: 76,
-                          p: 0,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          overflow: 'hidden',
-                          bgcolor: 'background.paper',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={image.url}
-                          alt={image.alt}
-                          sx={{
-                            display: 'block',
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                        />
-                      </Box>
-                    ))}
-                  </Stack>
-                </Box>
-              )}
               <Divider />
               <Box>
                 <AttachmentList
@@ -1129,7 +1124,7 @@ export function DocumentApprovalDetailFeed({
       </Dialog>
       <ImageViewerDialog
         open={Boolean(selectedBodyImage)}
-        src={selectedBodyImage?.url ?? ''}
+        src={selectedBodyImage?.src ?? ''}
         alt={selectedBodyImage?.alt ?? '본문 이미지'}
         onClose={() => setSelectedBodyImage(null)}
       />
