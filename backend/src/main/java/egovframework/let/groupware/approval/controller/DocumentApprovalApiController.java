@@ -98,6 +98,16 @@ public class DocumentApprovalApiController {
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
+    @Operation(summary = "전자결재 문서 논리 삭제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/{electronicApprovalId}")
+    public ResultVO deleteDocumentApproval(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        documentApprovalService.deleteDocumentApproval(user, electronicApprovalId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("message", "문서가 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
     @Operation(summary = "내 관련 전자결재 문서 목록", security = @SecurityRequirement(name = "Authorization"))
     @GetMapping("/documents")
     public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,

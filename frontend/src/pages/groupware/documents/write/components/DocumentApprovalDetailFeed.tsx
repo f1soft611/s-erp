@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
+  IconButton,
+  Menu,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -14,10 +23,17 @@ import { CommentThread } from '../../../../../shared/components/feed/CommentThre
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { getStoredAuth } from '../../../../../shared/services/authService';
 import { fetchMyProfile } from '../../../../dashboard/services/profileSettings.service';
 import {
   createApprovalComment,
+  deleteDocumentApproval,
   deleteApprovalComment,
   deleteApprovalCommentAttachment,
   downloadApprovalCommentAttachment,
@@ -62,13 +78,39 @@ function formatCommentTime(value?: string | null): string {
   });
 }
 
+function approvalStatusLabel(status: DocumentApprovalDetail['documentStatus']): string {
+  const labels: Record<DocumentApprovalDetail['documentStatus'], string> = {
+    DRAFT: '임시저장',
+    PENDING: '결재대기',
+    IN_PROGRESS: '결재중',
+    REVISION_REQUESTED: '보완요청',
+    COMPLETED: '완료',
+    REJECTED: '반려',
+  };
+  return labels[status];
+}
+
+function approvalLineStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    WAITING: '대기',
+    PENDING: '처리 중',
+    APPROVED: '승인',
+    REJECTED: '반려',
+    RETURNED: '보완요청',
+  };
+  return labels[status] ?? status;
+}
+
 function toApprovalCommentTree(
   records: DocumentApprovalComment[],
+  systemEvents: DocumentApprovalDetail['systemEvents'],
   commentImageUrls: Record<string, string>,
 ): FeedCommentItem[] {
   const comments = new Map<string, FeedCommentItem>();
+  const createdAtById = new Map<string, string | null | undefined>();
   const roots: FeedCommentItem[] = [];
   records.forEach((record) => {
+    createdAtById.set(String(record.commentId), record.createdAt);
     comments.set(String(record.commentId), {
       id: record.commentId,
       author: record.deletedYn === 'Y' ? '삭제된 댓글' : record.writerName,
@@ -98,6 +140,24 @@ function toApprovalCommentTree(
       roots.push(item);
     }
   });
+  systemEvents.forEach((event, index) => {
+    const eventId = `system-${event.eventType}-${event.createdAt ?? index}`;
+    createdAtById.set(eventId, event.createdAt);
+    roots.push({
+      id: eventId,
+      author: event.writerName || '시스템',
+      time: formatCommentTime(event.createdAt),
+      content: event.content,
+      isSystemEvent: true,
+    });
+  });
+  roots.sort((left, right) => {
+    const leftTime = new Date(createdAtById.get(String(left.id)) ?? '').getTime();
+    const rightTime = new Date(createdAtById.get(String(right.id)) ?? '').getTime();
+    if (Number.isNaN(leftTime)) return Number.isNaN(rightTime) ? 0 : -1;
+    if (Number.isNaN(rightTime)) return 1;
+    return leftTime - rightTime;
+  });
   return roots;
 }
 
@@ -111,6 +171,7 @@ export function DocumentApprovalDetailFeed({
   const { showSuccess, showError } = useNotification();
   const [detail, setDetail] = useState<DocumentApprovalDetail | null>(null);
   const [bodyHtml, setBodyHtml] = useState('');
+  const [bodyImages, setBodyImages] = useState<Array<{ url: string; alt: string }>>([]);
   const [bodyImageError, setBodyImageError] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -124,6 +185,11 @@ export function DocumentApprovalDetailFeed({
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [commentImageUrls, setCommentImageUrls] = useState<Record<string, string>>({});
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   const loadComments = useCallback(async (
     beforeCommentId?: number,
@@ -159,7 +225,10 @@ export function DocumentApprovalDetailFeed({
     setActionError('');
     setActionComment('');
     setDetail(null);
+    setIsLiked(false);
+    setIsBookmarked(false);
     setBodyHtml('');
+    setBodyImages([]);
     setBodyImageError('');
     setEmployeeId('');
     void Promise.all([
@@ -198,6 +267,7 @@ export function DocumentApprovalDetailFeed({
     const objectUrls: string[] = [];
     if (!detail || electronicApprovalId === null) {
       setBodyHtml('');
+      setBodyImages([]);
       return () => {
         active = false;
       };
@@ -205,7 +275,7 @@ export function DocumentApprovalDetailFeed({
 
     const parsed = new DOMParser().parseFromString(detail.contentsHtml, 'text/html');
     const imageElements = Array.from(parsed.querySelectorAll('img'));
-    const imageRequests: Array<{ element: HTMLImageElement; fileId: number }> = [];
+    const imageRequests: Array<{ alt: string; fileId: number }> = [];
     imageElements.forEach((image) => {
       const source = image.getAttribute('src') ?? '';
       if (!source.startsWith('/api/v1/groupware/approvals/')) return;
@@ -214,10 +284,20 @@ export function DocumentApprovalDetailFeed({
       );
       image.removeAttribute('src');
       if (match && Number(match[1]) === electronicApprovalId) {
-        imageRequests.push({ element: image, fileId: Number(match[2]) });
+        const alt = image.getAttribute('alt')?.trim() || '본문 이미지';
+        const imageNumber = imageRequests.length + 1;
+        imageRequests.push({
+          alt,
+          fileId: Number(match[2]),
+        });
+        const reference = parsed.createElement('span');
+        reference.className = 'approval-inline-image-reference';
+        reference.textContent = `[본문 이미지 ${imageNumber}: ${alt}]`;
+        image.replaceWith(reference);
       }
     });
     setBodyImageError('');
+    setBodyImages([]);
     setBodyHtml(parsed.body.innerHTML);
     if (imageRequests.length === 0) {
       return () => {
@@ -226,13 +306,14 @@ export function DocumentApprovalDetailFeed({
     }
 
     void Promise.allSettled(
-      imageRequests.map(async ({ element, fileId }) => ({
-        element,
+      imageRequests.map(async ({ alt, fileId }) => ({
+        alt,
         blob: await fetchApprovalEmbeddedImageBlob(electronicApprovalId, fileId),
       })),
     ).then((results) => {
       if (!active) return;
       let failed = false;
+      const loadedImages: Array<{ url: string; alt: string }> = [];
       results.forEach((result) => {
         if (result.status !== 'fulfilled') {
           failed = true;
@@ -240,9 +321,9 @@ export function DocumentApprovalDetailFeed({
         }
         const url = URL.createObjectURL(result.value.blob);
         objectUrls.push(url);
-        result.value.element.setAttribute('src', url);
+        loadedImages.push({ url, alt: result.value.alt });
       });
-      setBodyHtml(parsed.body.innerHTML);
+      setBodyImages(loadedImages);
       if (failed) setBodyImageError('일부 본문 이미지를 불러오지 못했습니다.');
     });
     return () => {
@@ -316,17 +397,54 @@ export function DocumentApprovalDetailFeed({
     () =>
       Boolean(
         detail &&
+          detail.isDrafter &&
           (detail.documentStatus === 'DRAFT' ||
-            detail.documentStatus === 'REVISION_REQUESTED') &&
-          detail.approvalLines.some(
-            (line) =>
-              line.stageOrder === 1 &&
-              line.participantType === 'APPROVAL' &&
-              line.participantUserId === employeeId,
-          ),
+            detail.documentStatus === 'REVISION_REQUESTED'),
       ),
-    [detail, employeeId],
+    [detail],
   );
+  const canDeleteDocument = useMemo(() => {
+    if (!detail?.isDrafter) return false;
+    if (detail.documentStatus === 'DRAFT') return true;
+    if (detail.documentStatus !== 'PENDING') return false;
+    const drafterApproval = detail.approvalLines.find(
+      (line) =>
+        line.stageOrder === 1 &&
+        line.participantType === 'APPROVAL' &&
+        line.participantUserId === employeeId,
+    );
+    return Boolean(
+      drafterApproval?.actionStatus === 'APPROVED' &&
+        drafterApproval.actionAt &&
+        detail.approvalLines
+          .filter((line) => line.participantType !== 'REFERENCE' && line !== drafterApproval)
+          .every(
+            (line) =>
+              (line.actionStatus === 'WAITING' || line.actionStatus === 'PENDING') &&
+              !line.actionAt &&
+              !line.actionComment,
+          ),
+    );
+  }, [detail, employeeId]);
+
+  const handleDeleteDocument = async () => {
+    if (electronicApprovalId === null || isDeleting) return;
+    setIsDeleting(true);
+    setActionError('');
+    try {
+      await deleteDocumentApproval(electronicApprovalId);
+      showSuccess('문서가 삭제되었습니다.');
+      setIsDeleteDialogOpen(false);
+      onActionComplete();
+      onClose();
+    } catch (error: unknown) {
+      setActionError(
+        error instanceof Error ? error.message : '문서 삭제에 실패했습니다.',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleAction = async (action: DocumentApprovalActionRequest['action']) => {
     if (electronicApprovalId === null || isActing) return;
@@ -486,7 +604,11 @@ export function DocumentApprovalDetailFeed({
   };
 
   return (
-    <PostDetailPanel title={detail?.title || '문서 상세'} onClose={onClose}>
+    <PostDetailPanel
+      title="문서 상세"
+      subtitle={electronicApprovalId === null ? undefined : `문서 ID: ${electronicApprovalId}`}
+      onClose={onClose}
+    >
       {isLoading ? (
         <Box
           role="status"
@@ -501,28 +623,113 @@ export function DocumentApprovalDetailFeed({
           {detail && (
             <>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
-                  {detail.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {detail.drafterName} · {formatDate(detail.submittedAt ?? detail.createdAt)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  상태: {detail.documentStatus}
-                </Typography>
-              </Box>
-              {canEditDraft && (
-                <Button
-                  variant="contained"
-                  onClick={() => onEditDocument(detail)}
-                  sx={{ alignSelf: 'flex-start' }}
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                 >
-                  {detail.documentStatus === 'REVISION_REQUESTED'
-                    ? '수정 후 재상신'
-                    : '문서 수정'}
-                </Button>
-              )}
-              <Divider />
+                  <Avatar sx={{ width: 32, height: 32, fontSize: '0.75rem', flexShrink: 0 }}>
+                    {detail.drafterName.slice(0, 1)}
+                  </Avatar>
+                  <Box sx={{ flex: '1 1 120px', minWidth: 120 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 700, wordBreak: 'keep-all' }}
+                    >
+                      {detail.drafterName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDate(detail.createdAt)}
+                    </Typography>
+                  </Box>
+                  <IconButton aria-label="고정된 문서" disabled size="small">
+                    <PushPinOutlinedIcon fontSize="small" />
+                  </IconButton>
+                  {detail.isDrafter && (canEditDraft || canDeleteDocument) && (
+                    <>
+                      <IconButton
+                        aria-label="문서 더보기"
+                        size="small"
+                        onClick={(event) => setMenuAnchor(event.currentTarget)}
+                      >
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                      <Menu
+                        anchorEl={menuAnchor}
+                        open={Boolean(menuAnchor)}
+                        onClose={() => setMenuAnchor(null)}
+                      >
+                        {canEditDraft && (
+                          <MenuItem
+                            onClick={() => {
+                              setMenuAnchor(null);
+                              onEditDocument(detail);
+                            }}
+                          >
+                            {detail.documentStatus === 'REVISION_REQUESTED'
+                              ? '수정 후 재상신'
+                              : '문서 수정'}
+                          </MenuItem>
+                        )}
+                        {canDeleteDocument && (
+                          <MenuItem
+                            onClick={() => {
+                              setMenuAnchor(null);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            삭제
+                          </MenuItem>
+                        )}
+                      </Menu>
+                    </>
+                  )}
+                  <Typography
+                    variant="caption"
+                    sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}
+                  >
+                    {approvalStatusLabel(detail.documentStatus)}
+                  </Typography>
+                </Stack>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                  결재선
+                </Typography>
+                <Stack spacing={0.75}>
+                  {detail.approvalLines.map((line) => (
+                    <Box
+                      key={line.electronicApprovalLineId}
+                      sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 0.75,
+                        p: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography variant="body2">
+                        {line.stageOrder}단계 · {line.participantType === 'AGREEMENT' ? '합의' : line.participantType === 'REFERENCE' ? '참조' : '결재'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {line.participantName}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {line.participantDepartmentName ?? ''}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {approvalLineStatusLabel(line.actionStatus)}
+                        {line.actionComment ? ` · ${line.actionComment}` : ''}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+                {detail.title}
+              </Typography>
               <Box
                 data-testid="approval-document-body"
                 sx={{
@@ -530,33 +737,41 @@ export function DocumentApprovalDetailFeed({
                   overflowWrap: 'anywhere',
                   '& img': { maxWidth: '100%', height: 'auto' },
                   '& table': { maxWidth: '100%', overflowX: 'auto', display: 'block' },
+                  '& .approval-inline-image-reference': {
+                    display: 'inline-block',
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 0.75,
+                    bgcolor: 'action.hover',
+                    color: 'text.secondary',
+                    fontSize: '0.85em',
+                  },
                 }}
                 dangerouslySetInnerHTML={{ __html: bodyHtml }}
               />
               {bodyImageError && <Alert severity="error">{bodyImageError}</Alert>}
-              <Divider />
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                  결재선
-                </Typography>
-                <Stack spacing={0.75}>
-                  {detail.approvalLines.map((line) => (
-                    <Box
-                      key={line.electronicApprovalLineId}
-                      sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}
-                    >
-                      <Typography variant="body2">
-                        {line.stageOrder}단계 · {line.participantType === 'AGREEMENT' ? '합의' : line.participantType === 'REFERENCE' ? '참조' : '결재'}
-                      </Typography>
-                      <Typography variant="body2">{line.participantName}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {line.actionStatus}
-                        {line.actionComment ? ` · ${line.actionComment}` : ''}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
+              {bodyImages.length > 0 && (
+                <Box data-testid="approval-document-images">
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                    본문 이미지
+                  </Typography>
+                  <Stack spacing={1}>
+                    {bodyImages.map((image, index) => (
+                      <Box key={`${image.url}-${index}`}>
+                        <Typography variant="caption" color="text.secondary">
+                          본문 이미지 {index + 1}: {image.alt}
+                        </Typography>
+                        <Box
+                          component="img"
+                          src={image.url}
+                          alt={image.alt}
+                          sx={{ display: 'block', maxWidth: '100%', height: 'auto', borderRadius: 1 }}
+                        />
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
               <Divider />
               <Box>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
@@ -588,27 +803,23 @@ export function DocumentApprovalDetailFeed({
                 )}
               </Box>
               <Divider />
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                  문서 이력
-                </Typography>
-                <Stack spacing={1}>
-                  {detail.systemEvents.map((event, index) => (
-                    <Box key={`${event.eventType}-${event.createdAt ?? index}`}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {event.content}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {event.writerName} · {formatDate(event.createdAt)}
-                      </Typography>
-                    </Box>
-                  ))}
-                  {detail.systemEvents.length === 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                      등록된 문서 이력이 없습니다.
-                    </Typography>
-                  )}
-                </Stack>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  startIcon={isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                  aria-pressed={isLiked}
+                  onClick={() => setIsLiked((value) => !value)}
+                >
+                  좋아요
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={isBookmarked ? <BookmarkIcon /> : <BookmarkBorderIcon />}
+                  aria-pressed={isBookmarked}
+                  onClick={() => setIsBookmarked((value) => !value)}
+                >
+                  북마크
+                </Button>
               </Box>
               <Divider />
               <Box>
@@ -646,13 +857,17 @@ export function DocumentApprovalDetailFeed({
                   <Box role="status" aria-label="댓글 불러오는 중" sx={{ py: 2 }}>
                     <CircularProgress size={20} />
                   </Box>
-                ) : commentRecords.length === 0 ? (
+                ) : commentRecords.length === 0 && detail.systemEvents.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
                     등록된 댓글이 없습니다.
                   </Typography>
                 ) : null}
                 <CommentThread
-                  comments={toApprovalCommentTree(commentRecords, commentImageUrls)}
+                  comments={toApprovalCommentTree(
+                    commentRecords,
+                    detail.systemEvents,
+                    commentImageUrls,
+                  )}
                   onSubmitComment={(content, files) => handleAddComment(content, files)}
                   onSubmitReply={(commentId, content, files) =>
                     handleAddComment(content, files, commentId)
@@ -708,6 +923,27 @@ export function DocumentApprovalDetailFeed({
           )}
         </Stack>
       )}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
+        aria-labelledby="approval-delete-dialog-title"
+      >
+        <DialogTitle id="approval-delete-dialog-title">문서를 삭제하시겠습니까?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다.
+          </DialogContentText>
+          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+            취소
+          </Button>
+          <Button color="error" onClick={() => void handleDeleteDocument()} disabled={isDeleting}>
+            {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PostDetailPanel>
   );
 }

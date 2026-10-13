@@ -316,7 +316,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`), USER에서는 NULL |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -330,7 +330,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 결재 처리 및 임시저장 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED`/`SUBMITTED`/`RESUBMITTED`/`COMPLETED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. 신규 결재 이벤트 허용은 `20261012_001` 검토용 migration 초안에 기록되어 있으며 DB에는 적용하지 않았다.
+- 결재 처리 및 임시저장 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED`/`SUBMITTED`/`RESUBMITTED`/`COMPLETED`/`DELETED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. 신규 결재 이벤트 허용은 `20261012_001` 검토용 migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. approval 문서 논리 삭제의 `DELETED` 허용은 `20261012_002` 검토용 migration 초안에 기록하며 DB에는 적용하지 않았다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -534,6 +534,7 @@
 | drafter_name | varchar(150) | 작성자 이름 스냅샷 |
 | drafter_department_name | varchar(150) | 작성 당시 부서명 |
 | created_at / updated_at / submitted_at | timestamp | 생성/수정/최초 상신 시각 |
+| deleted_yn | varchar(1) | 문서 논리 삭제 여부 (`N` 기본값, `Y` 삭제) |
 
 제약/역할:
 
@@ -541,6 +542,7 @@
 - `(tenant_id, electronic_approval_id)` 복합 unique 키로 결재선의 tenant 일치를 강제한다.
 - `document_type`: `DRAFTING`, `BUSINESS_CONTACT`, `EXPENSE_RESOLUTION`, `ATTENDANCE_APPLICATION`
 - `document_status`: `DRAFT`, `PENDING`, `IN_PROGRESS`, `REVISION_REQUESTED`, `COMPLETED`, `REJECTED`
+- `deleted_yn`은 `document_status`를 변경하지 않는 논리 삭제 표시이며, `Y/N` CHECK를 둔다. 이 컬럼은 `20261012_002` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
 - `eabus_no` 유형별 CHECK와 NOT NULL은 `20261012_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
 - 본문 원본은 문서작성 편집기의 JSON이며 HTML/평문은 렌더링/검색을 위한 파생 표현이다.
 
@@ -591,6 +593,7 @@
 
 ## 변경 이력
 
+- 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
 - 2026-10-08: `tb_common_comment` SYSTEM 이벤트 허용 목록에 `DRAFT_SAVED`를 추가하는 `20261008_004` migration 초안을 정의했다. 실제 DB 제약을 재확인하지 못했으며 적용하지 않았다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고.
 - 2026-10-08: 문서 결재 본문/참여자 테이블, 공통 댓글 SYSTEM 이벤트 구분, 댓글 좋아요 테이블의 미적용 SQL 초안을 정의했다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고. 실제 DB에는 적용하지 않았다.
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)

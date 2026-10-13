@@ -31,6 +31,7 @@ public interface DocumentApprovalService {
             Long electronicApprovalId) throws Exception;
     DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception;
     DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception;
+    void deleteDocumentApproval(LoginVO user, Long electronicApprovalId) throws Exception;
     CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
             Integer limit, Long beforeCommentId) throws Exception;
     CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,

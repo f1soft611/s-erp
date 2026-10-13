@@ -147,6 +147,7 @@ export type DocumentApprovalSystemEvent = {
 
 export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
   summary?: string;
+  isDrafter: boolean;
   draftingWorkCategoryId: number | null;
   contentsJson: string;
   contentsHtml: string;

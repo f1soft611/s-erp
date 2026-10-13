@@ -342,6 +342,35 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteDocumentApproval(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        params.put("participantUserId", user.getUniqId());
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null || !user.getId().equals(document.getDrafterId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 문서를 찾을 수 없습니다.");
+        }
+        boolean canDelete = "DRAFT".equals(document.getDocumentStatus())
+                || ("PENDING".equals(document.getDocumentStatus())
+                        && Boolean.TRUE.equals(
+                                documentApprovalDAO.selectCanDeletePendingDocumentApproval(params)));
+        if (!canDelete) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 상태에서는 문서를 삭제할 수 없습니다.");
+        }
+        params.put("actorId", user.getId());
+        if (documentApprovalDAO.softDeleteDocumentApproval(params) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서 상태가 변경되어 삭제할 수 없습니다.");
+        }
+        insertSystemEvent(user, electronicApprovalId, "DELETED", "문서가 삭제되었습니다.");
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
             Integer limit, Long beforeCommentId) throws Exception {

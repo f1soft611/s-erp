@@ -56,6 +56,69 @@ class DocumentApprovalServiceImplTest {
     private final LoginVO author = author();
 
     @Test
+    void deleteDraftSoftDeletesAndWritesDeletedEvent() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("DRAFT"));
+        when(approvalDAO.softDeleteDocumentApproval(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+
+        service().deleteDocumentApproval(author, 77L);
+
+        ArgumentCaptor<Map<String, Object>> deleteParams = mapCaptor();
+        verify(approvalDAO).softDeleteDocumentApproval(deleteParams.capture());
+        assertThat(deleteParams.getValue())
+            .containsEntry("tenantId", 4L)
+            .containsEntry("electronicApprovalId", 77L)
+            .containsEntry("drafterId", "login-author")
+            .containsEntry("actorId", "login-author");
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "DELETED".equals(params.get("eventType"))
+                && Long.valueOf(77L).equals(params.get("ownerId"))));
+    }
+
+    @Test
+    void deletePendingDocumentRequiresEligibleApprovalLines() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectCanDeletePendingDocumentApproval(anyMap())).thenReturn(false);
+
+        assertThatThrownBy(() -> service().deleteDocumentApproval(author, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verify(approvalDAO, never()).softDeleteDocumentApproval(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void deletePendingDocumentUsesAuthenticatedParticipantIdWhenEligible() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectCanDeletePendingDocumentApproval(anyMap())).thenReturn(true);
+        when(approvalDAO.softDeleteDocumentApproval(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+
+        service().deleteDocumentApproval(author, 77L);
+
+        verify(approvalDAO).selectCanDeletePendingDocumentApproval(argThat(params ->
+            "101".equals(params.get("participantUserId"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "DELETED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void deleteDocumentHidesOwnershipMismatch() throws Exception {
+        DocumentApprovalWorkflowDocumentVO document = workflowDocument("DRAFT");
+        document.setDrafterId("another-author");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(document);
+
+        assertThatThrownBy(() -> service().deleteDocumentApproval(author, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(approvalDAO, never()).softDeleteDocumentApproval(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
     void saveDraftPersistsAuthenticatedAuthorOrderedLinesAndSystemEvent() throws Exception {
         when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
             participant("101", "작성자", "기획팀"),

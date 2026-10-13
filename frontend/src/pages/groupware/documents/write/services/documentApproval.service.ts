@@ -177,6 +177,7 @@ export async function getDocumentApprovalDetail(
     item.electronicApprovalId !== electronicApprovalId ||
     typeof item.title !== 'string' ||
     typeof item.contentsHtml !== 'string' ||
+    typeof item.isDrafter !== 'boolean' ||
     !Array.isArray(item.approvalLines) ||
     !Array.isArray(item.attachments) ||
     !Array.isArray(item.systemEvents)
@@ -184,6 +185,11 @@ export async function getDocumentApprovalDetail(
     throw new Error('전자결재 상세 응답을 확인할 수 없습니다.');
   }
   return item;
+}
+
+export async function deleteDocumentApproval(electronicApprovalId: number): Promise<void> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  await apiDelete(`${APPROVAL_API}/${electronicApprovalId}`);
 }
 
 export async function listApprovalComments(

@@ -78,6 +78,7 @@
         <result property="contentsJson" column="contents_json"/>
         <result property="contentsHtml" column="contents_html"/>
         <result property="contentsText" column="contents_text"/>
+        <result property="drafter" column="is_drafter"/>
     </resultMap>
 
     <select id="selectActiveDraftingCategory" parameterType="map" resultType="boolean">
@@ -130,6 +131,7 @@
         FROM public.tb_electronic_approval_main
         WHERE tenant_id = #{tenantId}
           AND electronic_approval_id = #{electronicApprovalId}
+          AND deleted_yn = 'N'
         FOR UPDATE
     </select>
 
@@ -142,6 +144,50 @@
         WHERE tenant_id = #{tenantId}
           AND electronic_approval_id = #{electronicApprovalId}
           AND document_status = #{expectedDocumentStatus}
+          AND deleted_yn = 'N'
+    </update>
+
+    <select id="selectCanDeletePendingDocumentApproval" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM public.tb_electronic_approval_line_info drafter_line
+            WHERE drafter_line.tenant_id = #{tenantId}
+              AND drafter_line.electronic_approval_id = #{electronicApprovalId}
+              AND drafter_line.stage_order = 1
+              AND drafter_line.participant_type = 'APPROVAL'
+              AND drafter_line.participant_user_id = #{participantUserId}
+              AND drafter_line.action_status = 'APPROVED'
+              AND drafter_line.action_at IS NOT NULL
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.tb_electronic_approval_line_info line
+            WHERE line.tenant_id = #{tenantId}
+              AND line.electronic_approval_id = #{electronicApprovalId}
+              AND line.participant_type IN ('APPROVAL', 'AGREEMENT')
+              AND NOT (
+                  line.stage_order = 1
+                  AND line.participant_type = 'APPROVAL'
+                  AND line.participant_user_id = #{participantUserId}
+              )
+              AND (
+                  line.action_status NOT IN ('WAITING', 'PENDING')
+                  OR line.action_at IS NOT NULL
+                  OR line.action_comment IS NOT NULL
+              )
+        )
+    </select>
+
+    <update id="softDeleteDocumentApproval" parameterType="map">
+        UPDATE public.tb_electronic_approval_main
+        SET deleted_yn = 'Y',
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = #{actorId}
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND drafter_id = #{drafterId}
+          AND document_status IN ('DRAFT', 'PENDING')
+          AND deleted_yn = 'N'
     </update>
 
     <update id="updateDocumentApprovalMain" parameterType="map">
@@ -161,6 +207,7 @@
           AND electronic_approval_id = #{electronicApprovalId}
           AND drafter_id = #{drafterId}
           AND document_status IN ('DRAFT', 'REVISION_REQUESTED')
+          AND deleted_yn = 'N'
     </update>
 
     <delete id="deleteDocumentApprovalLines" parameterType="map">
@@ -244,6 +291,7 @@
                NULL::varchar AS notice_type
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
           AND (
               m.drafter_id = #{drafterId}
               OR EXISTS (
@@ -305,6 +353,7 @@
                 THEN m.electronic_approval_id END) AS rejected_count
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
           AND (
               m.drafter_id = #{drafterId}
               OR EXISTS (
@@ -325,6 +374,7 @@
                     THEN 'REVISION_REQUESTED' ELSE 'ACTION_REQUIRED' END AS notice_type
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
           AND (
               (
                   m.drafter_id = #{drafterId}
@@ -347,10 +397,12 @@
         SELECT m.electronic_approval_id, m.drafting_work_category_id,
                m.eabus_no, m.document_type, m.document_status,
                m.drafter_name, m.created_at, m.submitted_at, m.title,
-               m.contents_json::text AS contents_json, m.contents_html, m.contents_text
+               m.contents_json::text AS contents_json, m.contents_html, m.contents_text,
+               (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
           AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
           AND (
               m.drafter_id = #{drafterId}
               OR EXISTS (
@@ -379,6 +431,7 @@
             FROM public.tb_electronic_approval_main m
             WHERE m.tenant_id = #{tenantId}
               AND m.electronic_approval_id = #{electronicApprovalId}
+              AND m.deleted_yn = 'N'
               AND (
                   m.drafter_id = #{drafterId}
                   OR EXISTS (
@@ -398,6 +451,7 @@
         WHERE tenant_id = #{tenantId}
           AND electronic_approval_id = #{electronicApprovalId}
           AND document_status IN ('DRAFT', 'REVISION_REQUESTED')
+          AND deleted_yn = 'N'
     </select>
 
     <select id="selectDraftDocumentStatus" parameterType="map" resultMap="draftResponse">
@@ -406,5 +460,6 @@
         WHERE tenant_id = #{tenantId}
           AND electronic_approval_id = #{electronicApprovalId}
           AND drafter_id = #{drafterId}
+          AND deleted_yn = 'N'
     </select>
 </mapper>

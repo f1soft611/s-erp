@@ -1047,6 +1047,7 @@ describe('Document write page', () => {
       eabusNo: '004',
       documentType: 'DRAFTING',
       documentStatus: 'REVISION_REQUESTED',
+      isDrafter: true,
       title: '보완할 기안서',
       drafterName: '김민수',
       draftingWorkCategoryId: 77,
@@ -1088,7 +1089,8 @@ describe('Document write page', () => {
       await within(listRegion).findByRole('button', { name: /문서 D/ }),
     );
     await screen.findByTestId('post-detail-panel');
-    fireEvent.click(screen.getByRole('button', { name: '수정 후 재상신' }));
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
     await screen.findByRole('dialog', { name: '문서 작성' });
     await screen.findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
 

@@ -34,6 +34,25 @@ describe('shared feed components', () => {
     expect(screen.getByText('확인했습니다.')).toBeInTheDocument();
   });
 
+  it('renders system timeline items without comment mutation controls', () => {
+    render(
+      <CommentThread
+        comments={[{
+          id: 'system-DRAFT_SAVED',
+          author: '시스템',
+          time: '2026-10-12 09:52',
+          content: '문서가 임시저장되었습니다.',
+          isSystemEvent: true,
+        }]}
+        showComposer={false}
+      />,
+    );
+
+    expect(screen.getByText('문서가 임시저장되었습니다.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
+  });
+
   it('renders a file-type icon for spreadsheet attachments', () => {
     render(
       <AttachmentList

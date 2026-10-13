@@ -59,6 +59,14 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return update("DocumentApprovalDAO.updateDocumentApprovalStatus", params);
     }
 
+    public Boolean selectCanDeletePendingDocumentApproval(Map<String, Object> params) throws Exception {
+        return (Boolean) selectOne("DocumentApprovalDAO.selectCanDeletePendingDocumentApproval", params);
+    }
+
+    public int softDeleteDocumentApproval(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.softDeleteDocumentApproval", params);
+    }
+
     public DocumentApprovalLineVO selectCurrentPendingApprovalLine(Map<String, Object> params) throws Exception {
         return (DocumentApprovalLineVO) selectOne(
                 "DocumentApprovalDAO.selectCurrentPendingApprovalLine", params);

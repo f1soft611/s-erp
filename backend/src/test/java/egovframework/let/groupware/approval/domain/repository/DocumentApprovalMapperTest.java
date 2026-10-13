@@ -13,8 +13,23 @@ import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.io.Resources;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 
 class DocumentApprovalMapperTest {
+
+    @Test
+    void detailSerializesTheDrafterFlagUsingTheApiPropertyName() throws Exception {
+        DocumentApprovalDetailVO detail = new DocumentApprovalDetailVO();
+        detail.setDrafter(true);
+
+        JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(detail));
+
+        assertThat(json.path("isDrafter").asBoolean()).isTrue();
+        assertThat(json.has("drafter")).isFalse();
+    }
 
     @Test
     void nullableDraftingCategoryUsesBigIntForCreateAndUpdate() throws Exception {
@@ -96,6 +111,8 @@ class DocumentApprovalMapperTest {
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
 
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalForUpdate")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectCanDeletePendingDocumentApproval")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.softDeleteDocumentApproval")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.updateDocumentApprovalStatus")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectCurrentPendingApprovalLine")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.updateApprovalLineAction")).isTrue();
@@ -124,6 +141,16 @@ class DocumentApprovalMapperTest {
                 .getBoundSql(new HashMap<String, Object>())
                 .getSql();
         assertThat(detailSql).contains("drafting_work_category_id");
+        assertThat(detailSql)
+                .contains("m.deleted_yn = 'N'")
+                .contains("(m.drafter_id = ?) AS is_drafter");
+        String deletionSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectCanDeletePendingDocumentApproval")
+                .getBoundSql(new HashMap<String, Object>())
+                .getSql();
+        assertThat(deletionSql)
+                .contains("drafter_line.action_status = 'APPROVED'")
+                .contains("line.action_status NOT IN ('WAITING', 'PENDING')");
     }
 
     @Test
@@ -133,6 +160,36 @@ class DocumentApprovalMapperTest {
 
         assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentPage")).isTrue();
         assertThat(configuration.hasStatement("CommonCommentDAO.countApprovalUserComments")).isTrue();
+    }
+
+    @Test
+    void softDeletedDocumentsAreExcludedFromApprovalReadsAndDraftWrites() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("scope", "ALL");
+        String[] statementIds = {
+            "selectDocumentApprovalForUpdate",
+            "updateDocumentApprovalStatus",
+            "updateDocumentApprovalMain",
+            "selectDraftDrafterId",
+            "selectDraftDocumentStatus",
+            "selectRelatedDocumentList",
+            "selectDocumentApprovalSummary",
+            "selectApprovalNotices",
+            "selectDocumentApprovalDetail",
+            "selectIsDocumentParticipant"
+        };
+        for (String statementId : statementIds) {
+            String sql = configuration
+                    .getMappedStatement("DocumentApprovalDAO." + statementId)
+                    .getBoundSql(params)
+                    .getSql();
+            assertThat(sql)
+                    .as("%s excludes soft-deleted documents", statementId)
+                    .contains("deleted_yn = 'N'");
+        }
     }
 
     @Test

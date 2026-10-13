@@ -45,6 +45,7 @@ import {
   isDefiniteAttachmentUploadFailure,
   saveDocumentDraft,
   submitDocumentApproval,
+  deleteDocumentApproval,
   uploadDocumentDraftAttachment,
   uploadDocumentDraftEmbeddedImage,
 } from '../src/pages/groupware/documents/write/services/documentApproval.service';
@@ -146,6 +147,7 @@ describe('document approval service', () => {
     };
     const detail = {
       ...document,
+      isDrafter: true,
       draftingWorkCategoryId: null,
       contentsJson: '{"type":"doc","content":[]}',
       contentsHtml: '<p>본문</p>',
@@ -176,6 +178,46 @@ describe('document approval service', () => {
       '/api/v1/groupware/approvals/41/actions',
       { action: 'APPROVED' },
     );
+  });
+
+  it('requires an explicit drafter flag when reading document details', async () => {
+    api.get.mockResolvedValue({
+      item: {
+        electronicApprovalId: 41,
+        title: '초안',
+        contentsHtml: '<p>내용</p>',
+        approvalLines: [],
+        attachments: [],
+        systemEvents: [],
+        isDrafter: true,
+      },
+    });
+    await expect(getDocumentApprovalDetail(41)).resolves.toMatchObject({
+      isDrafter: true,
+    });
+
+    api.get.mockResolvedValueOnce({
+      item: {
+        electronicApprovalId: 41,
+        title: '초안',
+        contentsHtml: '<p>내용</p>',
+        approvalLines: [],
+        attachments: [],
+        systemEvents: [],
+      },
+    });
+    await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
+      '전자결재 상세 응답을 확인할 수 없습니다.',
+    );
+  });
+
+  it('deletes a document using the approval root route and validates the ID', async () => {
+    api.delete.mockResolvedValue({});
+
+    await deleteDocumentApproval(41);
+
+    expect(api.delete).toHaveBeenCalledWith(`${'/api/v1/groupware/approvals'}/41`);
+    await expect(deleteDocumentApproval(0)).rejects.toThrow('문서 ID가 올바르지 않습니다.');
   });
 
   it('uses the dedicated attachment route and reports ambiguous missing IDs', async () => {

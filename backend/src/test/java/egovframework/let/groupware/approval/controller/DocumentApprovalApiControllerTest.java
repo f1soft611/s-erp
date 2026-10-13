@@ -132,6 +132,11 @@ class DocumentApprovalApiControllerTest {
                 "/{electronicApprovalId}/comments/{commentId}/attachments/{fileId}");
     }
 
+    @Test
+    void documentDeleteRouteIsAvailableAtApprovalRoot() {
+        assertRoute("deleteDocumentApproval", DeleteMapping.class, "/{electronicApprovalId}");
+    }
+
     private void assertRoute(String methodName, Class<? extends Annotation> mappingType, String expectedPath) {
         Method method = Arrays.stream(DocumentApprovalApiController.class.getDeclaredMethods())
                 .filter(candidate -> candidate.getName().equals(methodName))

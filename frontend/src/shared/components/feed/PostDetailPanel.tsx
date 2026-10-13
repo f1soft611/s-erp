@@ -4,12 +4,14 @@ import type { ReactNode } from 'react';
 
 type PostDetailPanelProps = {
   title?: string;
+  subtitle?: string;
   onClose: () => void;
   children: ReactNode;
 };
 
 export function PostDetailPanel({
   title = '게시글 상세',
+  subtitle,
   onClose,
   children,
 }: PostDetailPanelProps) {
@@ -46,9 +48,16 @@ export function PostDetailPanel({
           borderColor: 'divider',
         }}
       >
-        <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700 }}>
-          {title}
-        </Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography variant="caption" color="text.secondary">
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
         <IconButton size="small" aria-label="상세 닫기" onClick={onClose}>
           <CloseIcon fontSize="small" />
         </IconButton>

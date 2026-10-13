@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 
@@ -21,6 +22,7 @@ public class DocumentApprovalDetailVO {
     private String contentsJson;
     private String contentsHtml;
     private String contentsText;
+    private boolean isDrafter;
     private List<CommonFileVO> attachments = new ArrayList<>();
     private List<DocumentApprovalLineVO> approvalLines = new ArrayList<>();
     private List<CommonCommentVO> systemEvents = new ArrayList<>();
@@ -51,6 +53,10 @@ public class DocumentApprovalDetailVO {
     public void setContentsHtml(String contentsHtml) { this.contentsHtml = contentsHtml; }
     public String getContentsText() { return contentsText; }
     public void setContentsText(String contentsText) { this.contentsText = contentsText; }
+    @JsonProperty("isDrafter")
+    public boolean isDrafter() { return isDrafter; }
+    @JsonProperty("isDrafter")
+    public void setDrafter(boolean drafter) { isDrafter = drafter; }
     public List<CommonFileVO> getAttachments() { return attachments; }
     public void setAttachments(List<CommonFileVO> attachments) { this.attachments = attachments; }
     public List<DocumentApprovalLineVO> getApprovalLines() { return approvalLines; }
