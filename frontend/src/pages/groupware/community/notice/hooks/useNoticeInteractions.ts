@@ -25,7 +25,10 @@ export function useNoticeInteractions({
 }: UseNoticeInteractionsOptions) {
   const [expandedNoticeId, setExpandedNoticeId] = useState<number | null>(null);
   const [selectedNoticeId, setSelectedNoticeId] = useState<number | null>(null);
-  const noticeDetailRequests = useRef(new Set<number>());
+  const [selectedNoticeLoadingId, setSelectedNoticeLoadingId] = useState<
+    number | null
+  >(null);
+  const noticeDetailRequests = useRef(new Map<number, Promise<void>>());
   const selectedNotice = useMemo(
     () =>
       [...noticeItems, ...pinnedNoticeItems].find(
@@ -35,35 +38,43 @@ export function useNoticeInteractions({
   );
 
   const loadNoticeDetail = useCallback(
-    async (noticeId: number, expand: boolean) => {
-      if (noticeDetailRequests.current.has(noticeId)) return;
-      noticeDetailRequests.current.add(noticeId);
-      if (expand) setExpandedNoticeId(noticeId);
-      try {
-        const detail = await fetchNoticePostDetail(noticeId);
-        const detailItem = mapNoticePost(detail, noticeGubunNamesRef?.current);
-        const mergeDetail = (item: NoticeFeedItem) => ({
-          ...item,
-          ...detailItem,
-          liked: item.liked,
-          likeCount: item.likeCount,
-          bookmarked: item.bookmarked,
-        });
-        setNoticeItems((current) =>
-          current.map((item) =>
-            item.id === noticeId ? mergeDetail(item) : item,
-          ),
-        );
-        setPinnedNoticeItems?.((current) =>
-          current.map((item) =>
-            item.id === noticeId ? mergeDetail(item) : item,
-          ),
-        );
-      } catch {
-        showError('공지사항 상세 정보를 불러오지 못했습니다.');
-      } finally {
-        noticeDetailRequests.current.delete(noticeId);
+    (noticeId: number, expand: boolean) => {
+      const pendingRequest = noticeDetailRequests.current.get(noticeId);
+      if (pendingRequest) {
+        if (expand) setExpandedNoticeId(noticeId);
+        return pendingRequest;
       }
+      if (expand) setExpandedNoticeId(noticeId);
+      const request = Promise.resolve()
+        .then(() => fetchNoticePostDetail(noticeId))
+        .then((detail) => {
+          const detailItem = mapNoticePost(detail, noticeGubunNamesRef?.current);
+          const mergeDetail = (item: NoticeFeedItem) => ({
+            ...item,
+            ...detailItem,
+            liked: item.liked,
+            likeCount: item.likeCount,
+            bookmarked: item.bookmarked,
+          });
+          setNoticeItems((current) =>
+            current.map((item) =>
+              item.id === noticeId ? mergeDetail(item) : item,
+            ),
+          );
+          setPinnedNoticeItems?.((current) =>
+            current.map((item) =>
+              item.id === noticeId ? mergeDetail(item) : item,
+            ),
+          );
+        })
+        .catch(() => {
+          showError('공지사항 상세 정보를 불러오지 못했습니다.');
+        })
+        .finally(() => {
+          noticeDetailRequests.current.delete(noticeId);
+        });
+      noticeDetailRequests.current.set(noticeId, request);
+      return request;
     },
     [noticeGubunNamesRef, setNoticeItems, setPinnedNoticeItems, showError],
   );
@@ -89,13 +100,21 @@ export function useNoticeInteractions({
       const noticeId = Number(item.id);
       if (!noticeId) return;
       setSelectedNoticeId(noticeId);
-      await loadNoticeDetail(noticeId, true);
+      setSelectedNoticeLoadingId(noticeId);
+      try {
+        await loadNoticeDetail(noticeId, true);
+      } finally {
+        setSelectedNoticeLoadingId((current) =>
+          current === noticeId ? null : current,
+        );
+      }
     },
     [loadNoticeDetail],
   );
 
   const handleCloseNoticeDetail = useCallback(() => {
     setSelectedNoticeId(null);
+    setSelectedNoticeLoadingId(null);
   }, []);
 
   const handleToggleLike = useCallback(
@@ -136,6 +155,7 @@ export function useNoticeInteractions({
   return {
     expandedNoticeId,
     selectedNoticeId,
+    selectedNoticeLoadingId,
     selectedNotice,
     handleToggleLike,
     handleToggleBookmark,

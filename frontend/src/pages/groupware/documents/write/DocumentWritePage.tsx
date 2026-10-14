@@ -1,21 +1,32 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Box, Container } from '@mui/material';
+import { Alert, Box, Container, Stack } from '@mui/material';
+import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { FeedView } from '../../../../shared/components/view-mode/FeedView';
 import { ListView } from '../../../../shared/components/view-mode/ListView';
+import { FeedViewSkeleton } from '../../../../shared/components/view-mode/FeedViewSkeleton';
+import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListViewSkeleton';
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
 import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
+import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import { NoticeFilterMenu } from '../../community/notice/components/NoticeFilterMenu';
 import { ApprovalSummaryPanel } from './components/ApprovalSummaryPanel';
+import { ApprovalNoticePanel } from './components/ApprovalNoticePanel';
 import { DocumentComposerDialog } from './components/DocumentComposerDialog';
+import { DocumentApprovalDetailFeed } from './components/DocumentApprovalDetailFeed';
 import { DocumentFeedItem } from './components/DocumentFeedItem';
+import { DocumentStatusPanel } from './components/DocumentStatusPanel';
 import { EmptyDocumentList } from './components/EmptyDocumentList';
-import { documentKinds, sampleDocuments } from './data/documentWriteData';
+import { documentKinds } from './data/documentWriteData';
 import { useDocumentWritePage } from './hooks/useDocumentWritePage';
-import type { DocumentKind, DocumentWritePageProps } from './types/documentWrite.types';
+import type {
+  DocumentApprovalDetail,
+  DocumentKind,
+  DocumentWritePageProps,
+} from './types/documentWrite.types';
 
 export function DocumentWritePage({
   selectedModule,
@@ -23,6 +34,8 @@ export function DocumentWritePage({
   content,
 }: DocumentWritePageProps) {
   const theme = useTheme();
+  const [editingDocument, setEditingDocument] =
+    useState<DocumentApprovalDetail | null>(null);
   const {
     viewMode,
     setViewMode,
@@ -35,6 +48,16 @@ export function DocumentWritePage({
     unpinnedDocuments,
     pinnedViewItems,
     unpinnedViewItems,
+    summary,
+    notices,
+    isLoading,
+    loadError,
+    selectScope,
+    selectNotice,
+    openDetail,
+    closeDetail,
+    detailDocumentId,
+    refresh,
   } = useDocumentWritePage();
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
@@ -102,6 +125,27 @@ export function DocumentWritePage({
                     />
                   }
                 />
+                {loadError && (
+                  <Alert severity="error" sx={{ mb: 1.5 }}>
+                    {loadError}
+                  </Alert>
+                )}
+                {isLoading ? (
+                  <Box
+                    role="status"
+                    aria-label="문서 목록 불러오는 중"
+                    sx={{ width: '100%', py: 2 }}
+                  >
+                    {viewMode === 'list' ? (
+                      <ListViewSkeleton />
+                    ) : (
+                      <Box data-testid="document-feed-skeleton">
+                        <FeedViewSkeleton />
+                      </Box>
+                    )}
+                  </Box>
+                ) : (
+                  <>
                 {pinnedDocuments.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
                     <PinnedItemsPanel
@@ -119,6 +163,7 @@ export function DocumentWritePage({
                           <DocumentFeedItem
                             item={item}
                             isDark={theme.palette.mode === 'dark'}
+                            onClick={() => openDetail(item.id)}
                           />
                         )}
                       />
@@ -132,23 +177,52 @@ export function DocumentWritePage({
                       <ListView
                         items={unpinnedViewItems}
                         ariaLabel="리스트형 문서 목록"
+                        onItemClick={(item) => openDetail(Number(item.id))}
                       />
                     ) : (
                       <EmptyDocumentList onCreate={openComposer} />
                     )}
                   </Box>
                 )}
+                  </>
+                )}
               </>
             }
-            right={<ApprovalSummaryPanel items={sampleDocuments} />}
+            right={
+              <Stack spacing={2}>
+                <ApprovalSummaryPanel summary={summary} onSelectScope={selectScope} />
+                <DocumentStatusPanel summary={summary} onSelectScope={selectScope} />
+                <ApprovalNoticePanel items={notices} onSelect={selectNotice} />
+              </Stack>
+            }
           />
         </Container>
       </Box>
 
       <DocumentComposerDialog
         open={isComposerOpen}
-        onClose={closeComposer}
+        initialDocument={editingDocument}
+        onClose={() => {
+          closeComposer();
+          setEditingDocument(null);
+          refresh();
+        }}
       />
+      {detailDocumentId !== null && (
+        <PageAreaOverlay onClose={closeDetail}>
+          <DocumentApprovalDetailFeed
+            open
+            electronicApprovalId={detailDocumentId}
+            onClose={closeDetail}
+            onActionComplete={refresh}
+            onEditDocument={(document) => {
+              setEditingDocument(document);
+              closeDetail();
+              openComposer();
+            }}
+          />
+        </PageAreaOverlay>
+      )}
     </Box>
   );
 }

@@ -9,8 +9,10 @@ import {
   Typography,
 } from '@mui/material';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -38,13 +40,20 @@ function getFileBadgeMeta(fileName: string) {
   return map[extension] ?? { bg: '#e2e8f0', color: '#475569', label: 'FILE' };
 }
 
-export type FeedCommentAttachment = { id: string; name: string; size?: number };
+export type FeedCommentAttachment = {
+  id: string;
+  name: string;
+  size?: number;
+  mimeType?: string;
+  previewUrl?: string;
+};
 export type FeedCommentItem = {
   id: string | number;
   author: string;
   time: string;
   content: string;
   isDeleted?: boolean;
+  isSystemEvent?: boolean;
   isEditable?: boolean;
   attachments?: FeedCommentAttachment[];
   replies?: FeedCommentItem[];
@@ -366,6 +375,7 @@ function CommentItem({
   const isReplying = replyTargetId === comment.id;
   const replyParentId = rootCommentId ?? comment.id;
   const isDeleted = comment.isDeleted === true;
+  const isSystemEvent = comment.isSystemEvent === true;
   const canEditAttachments = isEditing;
   const replyCount = comment.replies?.length ?? 0;
   return (
@@ -404,8 +414,16 @@ function CommentItem({
             <Typography variant="caption" color="text.secondary">
               {comment.time}
             </Typography>
+            {isSystemEvent && (
+              <InfoOutlinedIcon
+                aria-label="시스템 메시지"
+                titleAccess="시스템 메시지"
+                data-testid="system-event-icon"
+                fontSize="small"
+              />
+            )}
             <Box sx={{ ml: 'auto' }}>
-              {!isDeleted && (
+              {!isDeleted && !isSystemEvent && (
                 <IconButton
                   size="small"
                   aria-label={`댓글 메뉴 ${comment.author}`}
@@ -438,7 +456,18 @@ function CommentItem({
               </Menu>
             </Box>
           </Stack>
-          {isDeleted && (
+          {isSystemEvent ? (
+            <Box
+              sx={{
+                fontSize: '0.9rem',
+                lineHeight: 1.7,
+                overflowWrap: 'anywhere',
+                color: 'text.secondary',
+              }}
+            >
+              {comment.content}
+            </Box>
+          ) : isDeleted && (
             <>
               <Box
                 sx={{
@@ -454,7 +483,20 @@ function CommentItem({
                 <Button
                   size="small"
                   variant="text"
-                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  aria-expanded={showReplies}
+                  endIcon={
+                    showReplies ? (
+                      <KeyboardArrowUpIcon
+                        data-testid="reply-expanded-icon"
+                        fontSize="small"
+                      />
+                    ) : (
+                      <KeyboardArrowDownIcon
+                        data-testid="reply-collapsed-icon"
+                        fontSize="small"
+                      />
+                    )
+                  }
                   onClick={() => setShowReplies((current) => !current)}
                   sx={{
                     mt: 0.5,
@@ -486,7 +528,7 @@ function CommentItem({
               )}
             </>
           )}
-          {!isEditing && !isDeleted && (
+          {!isEditing && !isDeleted && !isSystemEvent && (
             <>
               <Box
                 sx={{
@@ -550,7 +592,20 @@ function CommentItem({
                 <Button
                   size="small"
                   variant="text"
-                  endIcon={<ArrowDropDownIcon fontSize="small" />}
+                  aria-expanded={showReplies}
+                  endIcon={
+                    showReplies ? (
+                      <KeyboardArrowUpIcon
+                        data-testid="reply-expanded-icon"
+                        fontSize="small"
+                      />
+                    ) : (
+                      <KeyboardArrowDownIcon
+                        data-testid="reply-collapsed-icon"
+                        fontSize="small"
+                      />
+                    )
+                  }
                   onClick={() => setShowReplies((current) => !current)}
                   sx={{
                     mt: 0.5,
@@ -582,7 +637,7 @@ function CommentItem({
               )}
             </>
           )}
-          {isEditing && !isDeleted && (
+          {isEditing && !isDeleted && !isSystemEvent && (
             <>
               {comment.attachments && comment.attachments.length > 0 && (
                 <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
@@ -624,7 +679,7 @@ function CommentItem({
               />
             </>
           )}
-          {isReplying && !isDeleted && (
+          {isReplying && !isDeleted && !isSystemEvent && (
             <CommentEditor
               label="답글 입력"
               fileInputLabel="답글 첨부파일 선택"

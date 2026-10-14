@@ -56,6 +56,7 @@ public class CommonCommentApiController {
         if (search.getOwnerType() == null || search.getOwnerId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 대상 정보가 올바르지 않습니다.");
         }
+        requireNonApprovalOwnerType(search.getOwnerType());
         search.setTenantId(user.getTenantId());
         search.setPageUnit(pageUnit != null ? pageUnit : limit);
         search.setBeforeCommentId(beforeCommentId);
@@ -81,6 +82,7 @@ public class CommonCommentApiController {
         if (request == null || !StringUtils.hasText(request.getOwnerType()) || request.getOwnerId() == null || !StringUtils.hasText(request.getContent())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 정보가 올바르지 않습니다.");
         }
+        requireNonApprovalOwnerType(request.getOwnerType());
 
         CommonCommentVO created = commonCommentService.createComment(user.getTenantId(), request.getOwnerType(), request.getOwnerId(),
                 request.getContent(), user.getId(), user.getName(), request.getParentCommentId());
@@ -123,6 +125,12 @@ public class CommonCommentApiController {
     private void requireAuthenticated(LoginVO user) {
         if (user == null || user.getTenantId() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ResponseCode.AUTH_ERROR.getMessage());
+        }
+    }
+
+    private void requireNonApprovalOwnerType(String ownerType) {
+        if ("APPROVAL".equalsIgnoreCase(ownerType.trim())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "전자결재 댓글은 전용 권한 확인 경로를 사용해야 합니다.");
         }
     }
 

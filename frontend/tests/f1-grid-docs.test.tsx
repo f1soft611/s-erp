@@ -1,6 +1,122 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { getF1GridDoc } from '../src/pages/f1-grid-docs/data/f1GridDocs';
 import { F1GridDocsPage } from '../src/pages/f1-grid-docs/F1GridDocsPage';
+
+const expectedPublicApiByContract: Record<string, string[]> = {
+  F1GridProps: `
+    rows dataSource onDataSourceError columns rowKey rowFormPlugin ariaLabel
+    columnLine stripeRows storageKey height minHeight maxHeight rowHeight
+    minRowHeight maxRowHeight resizableRows resizableColumns minColumnWidth
+    virtualizeRows virtualizeColumns rowOverscan columnOverscan
+    fixedRowHeightThreshold queryWorkerThreshold disableQueryWorker showCheckbox
+    createRow createDuplicate editorPlugins editors onBeforeEdit beforeEdit
+    onAfterEdit afterEdit onChangesChange onSelectionChange initialSelectedRowIds
+    rowProjection cellAdornment disableSorting disableFiltering canExportExcel
+    excelFileName allowAddRootInContextMenu allowAddRowInContextMenu
+    allowDuplicateRowInContextMenu allowDeleteRowInContextMenu deleteMenuDisabled
+    loading treeContextMenu
+  `
+    .trim()
+    .split(/\s+/),
+  F1GridColumn: `
+    field headerName headerGroup form search getValue onValueChange width flex
+    maxWidth editable type format decimalPlaces options userOptions selectOptionIcon
+    required min max validate onOpenCodePicker renderCell getCellStyle getCellProps
+    align headerAlign wrapText mergeRows headerCheckbox hidden pinned selectOnFocus
+    syncWithTreeCheckbox
+  `
+    .trim()
+    .split(/\s+/),
+  F1TreeProps: `
+    parentKey treeColumn treeCheckbox defaultExpandAll defaultExpanded getRowOrder
+    onDeleteBlocked onTreeCheckboxChange isDeleteDisabled
+  `
+    .trim()
+    .split(/\s+/),
+  F1GridRef: `
+    getSelectedRows getSelectedRowIds clearSelection setSelectedRowIds addRow
+    deleteSelectedRows restoreDeletedRows duplicateSelectedRows getRows getActiveRows
+    getChanges validate startEdit stopEdit setCellValue
+  `
+    .trim()
+    .split(/\s+/),
+  F1TreeRef: `
+    addChildRow expandRow collapseRow expandAll collapseAll isExpanded
+  `
+    .trim()
+    .split(/\s+/),
+  'Shared types': `
+    F1GridRowId F1GridRowState F1GridEditorType F1GridOption F1GridOption.value
+    F1GridOption.label F1GridUserOption F1GridUserOption.value F1GridUserOption.label
+    F1GridUserOption.avatarUrl F1GridUserOption.positionName
+    F1GridUserOption.departmentName F1GridDraftValue F1GridNumberFormat
+    F1GridFormMode F1GridPinSide
+  `
+    .trim()
+    .split(/\s+/),
+  'Form and search options': `
+    F1GridColumnFormOptions F1GridColumnFormOptions.hidden
+    F1GridColumnFormOptions.readOnly F1GridColumnFormOptions.label
+    F1GridColumnFormOptions.group F1GridColumnFormOptions.order
+    F1GridColumnFormOptions.span F1GridColumnFormOptions.multiple
+    F1GridColumnFormOptions.targetField F1GridColumnFormOptions.targetLabel
+    F1GridColumnSearchOptions F1GridColumnSearchOptions.hidden
+    F1GridColumnSearchOptions.label F1GridColumnSearchOptions.group
+    F1GridColumnSearchOptions.order F1GridColumnSearchOptions.span
+  `
+    .trim()
+    .split(/\s+/),
+  'Plugins and edit contexts': `
+    F1GridRowFormContext F1GridRowFormContext.mode F1GridRowFormContext.row
+    F1GridRowFormApplyContext F1GridRowFormApplyContext.mode
+    F1GridRowFormApplyContext.originalRow F1GridRowFormApplyContext.draftRow
+    F1GridRowFormPlugin F1GridRowFormPlugin.id F1GridRowFormPlugin.enabled
+    F1GridRowFormPlugin.getTitle F1GridRowFormPlugin.getDescription
+    F1GridRowFormPlugin.onBeforeApply F1GridEditLifecycle F1GridEditContext
+    F1GridEditContext.row F1GridEditContext.rowId F1GridEditContext.column
+    F1GridEditContext.field F1GridEditContext.value F1GridEditContext.defaultValue
+    F1GridEditorPlugin F1GridEditorPlugin.id F1GridEditorPlugin.name
+    F1GridEditorPlugin.enabled F1GridEditorPlugin.canEdit
+    F1GridEditorPlugin.createEditor F1GridEditorPlugin.startEdit
+    F1GridEditorPlugin.endEdit
+  `
+    .trim()
+    .split(/\s+/),
+  'Rendering contracts': `
+    F1GridCellRenderContext F1GridCellRenderContext.row
+    F1GridCellRenderContext.rowId F1GridCellRenderContext.column
+    F1GridCellRenderContext.field F1GridCellRenderContext.value
+    F1GridCellRenderContext.rowIndex F1GridCellProps F1GridCellProps.className
+    F1GridCellProps.style F1GridCellProps.title F1GridCellProps.aria-label
+  `
+    .trim()
+    .split(/\s+/),
+  'Changes, sorting, and filtering': `
+    F1GridChanges F1GridChanges.insertedRows F1GridChanges.updatedRows
+    F1GridChanges.deletedRows F1GridSortDirection F1GridSort F1GridSort.field
+    F1GridSort.direction F1GridFilterOperator F1GridFilter F1GridFilter.field
+    F1GridFilter.operator F1GridFilter.value F1GridFilter.value2
+    F1GridRowProjection F1GridRowProjection.rows
+  `
+    .trim()
+    .split(/\s+/),
+  'Data source': `
+    F1GridDataSource F1GridDataSource.pageSize F1GridDataSource.load
+    F1GridDataSourceQuery F1GridDataSourceQuery.offset F1GridDataSourceQuery.limit
+    F1GridDataSourceQuery.sorts F1GridDataSourceQuery.filters
+    F1GridDataSourceQuery.signal F1GridDataSourceResult
+    F1GridDataSourceResult.rows F1GridDataSourceResult.totalRowCount
+  `
+    .trim()
+    .split(/\s+/),
+  'Tree context menu': `
+    F1GridContextMenuTreeConfig F1GridContextMenuTreeConfig.onAddRoot
+    F1GridContextMenuTreeConfig.onAddChild
+  `
+    .trim()
+    .split(/\s+/),
+};
 
 describe('F1-Grid docs portal', () => {
   it('renders the overview document and navigation items', () => {
@@ -10,19 +126,84 @@ describe('F1-Grid docs portal', () => {
       screen.getAllByRole('heading', { name: 'F1-Grid' }),
     ).not.toHaveLength(0);
     expect(
-      screen.getByRole('button', { name: 'Cell Editing' }),
+      screen.getByRole('button', { name: '편집과 검증' }),
     ).toBeInTheDocument();
   });
 
   it('switches documents from the sidebar', () => {
     render(<F1GridDocsPage />);
 
+    fireEvent.click(screen.getByRole('button', { name: '편집과 검증' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cell Editing' }));
 
     expect(
       screen.getByRole('heading', { name: 'Cell Editing' }),
     ).toBeInTheDocument();
     expect(screen.getByTestId('f1-grid-doc-playground')).toBeInTheDocument();
+  });
+
+  it('shows only the selected document group in the default sidebar', () => {
+    render(<F1GridDocsPage />);
+
+    expect(
+      screen.getByRole('button', { name: '시작하기' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('button', { name: '그리드와 데이터' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.getByRole('button', { name: '첫 그리드 만들기' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '기본 그리드' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('navigates to the first document when a group heading is selected', () => {
+    render(<F1GridDocsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '그리드와 데이터' }));
+
+    expect(
+      screen.getByRole('heading', { name: '기본 그리드' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '그리드와 데이터' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('button', { name: '시작하기' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.getByRole('button', { name: '기본 그리드' }),
+    ).toHaveClass('active');
+  });
+
+  it('selecting the current group heading navigates to its first document', () => {
+    render(<F1GridDocsPage initialDocumentId="getting-started" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
+
+    expect(
+      screen.getAllByRole('heading', { name: 'F1-Grid' }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: '시작하기' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps matching documents from multiple groups and API results visible while searching', () => {
+    render(<F1GridDocsPage />);
+    fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
+      target: { value: '필터' },
+    });
+
+    expect(
+      screen.getByRole('button', { name: '기본 그리드' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '필터와 정렬' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('API 항목')).toBeInTheDocument();
   });
 
   it('documents a large dataset sample and exposes the 10k workload guidance', () => {
@@ -225,5 +406,76 @@ describe('F1-Grid docs portal', () => {
 
     expect(screen.getByRole('button', { name: '셀 편집' })).toBeInTheDocument();
     expect(screen.getByText('검색 결과')).toBeInTheDocument();
+  });
+
+  it('documents each public F1-Grid API identifier and nested contract field', () => {
+    const apiDoc = getF1GridDoc('api-reference');
+    for (const [heading, expectedNames] of Object.entries(
+      expectedPublicApiByContract,
+    )) {
+      const section = apiDoc.sections.find(
+        (item) => item.type === 'api' && item.heading === heading,
+      );
+      const documentedNames =
+        section?.type === 'api'
+          ? section.rows.map(([name]) => name)
+          : [];
+
+      expect(documentedNames, `Missing API contract section: ${heading}`).toEqual(
+        expect.arrayContaining(expectedNames),
+      );
+    }
+  });
+
+  it('documents the complete public literal unions', () => {
+    const apiDoc = getF1GridDoc('api-reference');
+    const apiText = apiDoc.sections
+      .flatMap((section) =>
+        section.type === 'api'
+          ? section.rows.flatMap((row) => row.filter(Boolean))
+          : [],
+      )
+      .join(' ');
+
+    expect(apiText).toContain(
+      'text | number | decimal | currency | checkbox | date | datetime | time | select | autocomplete | user | code | rownumber',
+    );
+    expect(apiText).toContain('normal | inserted | updated | deleted');
+    expect(apiText).toContain(
+      'equals | notEquals | contains | startsWith | endsWith | greaterThan | lessThan | greaterThanOrEqual | lessThanOrEqual | between | isEmpty | isNotEmpty',
+    );
+    expect(apiText).toContain('number | decimal | currency');
+    expect(apiText).toContain('asc | desc');
+    expect(apiText).toContain('left | right');
+    expect(apiText).toContain('create | edit');
+  });
+
+  it('searches by API option name and opens the matching reference entry', () => {
+    render(<F1GridDocsPage />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
+      target: { value: 'queryWorkerThreshold' },
+    });
+
+    const result = screen.getByRole('button', {
+      name: /queryWorkerThreshold/,
+    });
+    fireEvent.click(result);
+
+    expect(
+      screen.getByRole('heading', { name: 'API 참조' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('row', { name: /queryWorkerThreshold/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows grouped navigation and a section table of contents', () => {
+    render(<F1GridDocsPage />);
+
+    expect(screen.getByText('그리드와 데이터')).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: '문서 목차' }),
+    ).toBeInTheDocument();
   });
 });

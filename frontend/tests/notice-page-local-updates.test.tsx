@@ -11,14 +11,16 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
-  appendCommentToTree,
   CommunityNoticePage,
-  insertNoticeReplyAfter,
 } from '../src/pages/groupware/community/notice/CommunityNoticePage';
 import {
   mergeCommentTrees,
   NoticeFeedList,
 } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
+import {
+  appendCommentToTree,
+  insertNoticeReplyAfter,
+} from '../src/pages/groupware/community/notice/data/noticeCommentTree';
 import { noticeFeed } from '../src/pages/groupware/community/notice/data/noticeData';
 import type { NoticeFeedItem } from '../src/pages/groupware/community/notice/data/noticeData';
 
@@ -694,12 +696,151 @@ describe('CommunityNoticePage local updates', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '답글' })[0]);
     const input = screen.getByRole('textbox', { name: '답글 입력' });
     fireEvent.input(input, { target: { innerHTML: '<p>새 답글</p>' } });
-    fireEvent.click(screen.getAllByRole('button', { name: '등록' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
 
     await waitFor(() => {
       expect(screen.getByText('새 답글')).toBeInTheDocument();
       expect(screen.getByText('댓글 2')).toBeInTheDocument();
     });
+  });
+
+  it('keeps all loaded notice comments and the remaining count after creating a comment', async () => {
+    const onLoadPreviousComments = vi
+      .fn()
+      .mockResolvedValueOnce({
+        comments: [
+          { id: 20, author: '이전 작성자', time: '어제', content: '이전 댓글' },
+        ],
+        hasPrevious: true,
+        nextBeforeCommentId: 20,
+      })
+      .mockResolvedValueOnce({
+        comments: [
+          { id: 10, author: '더 이전 작성자', time: '그제', content: '더 이전 댓글' },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+      });
+    const newestComment = {
+      id: 31,
+      author: '나',
+      time: '지금',
+      content: '<p>방금 등록한 댓글</p>',
+    };
+    const initialItem = {
+      ...noticeFeed[0],
+      comments: [
+        {
+          id: 30,
+          author: '작성자 30',
+          time: '오늘',
+          content: '최신 댓글 1',
+          replies: [
+            {
+              id: 301,
+              author: '답글 작성자',
+              time: '오늘',
+              content: '기존 답글',
+            },
+          ],
+        },
+        { id: 29, author: '작성자 29', time: '오늘', content: '최신 댓글 2' },
+        { id: 28, author: '작성자 28', time: '오늘', content: '최신 댓글 3' },
+      ],
+      commentCount: 6,
+      hasPreviousComments: true,
+      nextBeforeCommentId: 28,
+    };
+    const onAddComment = vi.fn();
+
+    function StatefulNoticeFeed() {
+      const [items, setItems] = useState([initialItem]);
+      return (
+        <NoticeFeedList
+          items={items}
+          isDark={false}
+          expandedNoticeId={initialItem.id}
+          onLoadPreviousComments={onLoadPreviousComments}
+          onAddComment={async (_noticeId, content, parentCommentId) => {
+            const created =
+              parentCommentId == null
+                ? { ...newestComment, content }
+                : {
+                    id: 32,
+                    author: '나',
+                    time: '지금',
+                    content,
+                    replies: [],
+                  };
+            onAddComment(content, parentCommentId);
+            setItems((current) =>
+              current.map((item) =>
+                item.id === initialItem.id
+                  ? {
+                      ...item,
+                      comments: appendCommentToTree(
+                        item.comments ?? [],
+                        parentCommentId,
+                        created,
+                      ),
+                      commentCount: item.commentCount + 1,
+                    }
+                  : item,
+              ),
+            );
+            return created;
+          }}
+        />
+      );
+    }
+
+    render(<StatefulNoticeFeed />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '이전 댓글 보기 (2)' }),
+    );
+    expect(await screen.findByText('이전 댓글')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    ).toBeInTheDocument();
+
+    const input = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(input, { target: { innerHTML: '<p>방금 등록한 댓글</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(onAddComment).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('방금 등록한 댓글')).toBeInTheDocument();
+    expect(screen.getAllByText('방금 등록한 댓글')).toHaveLength(1);
+    expect(screen.getByText('이전 댓글')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: '답글' })[0]);
+    const replyInput = await screen.findByRole('textbox', {
+      name: '답글 입력',
+    });
+    fireEvent.input(replyInput, {
+      target: { innerHTML: '<p>방금 등록한 답글</p>' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
+
+    await waitFor(() => expect(onAddComment).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('방금 등록한 답글')).toBeInTheDocument();
+    expect(screen.getByText('이전 댓글')).toBeInTheDocument();
+    expect(screen.getByText('방금 등록한 댓글')).toBeInTheDocument();
+    expect(onAddComment).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    );
+    expect(await screen.findByText('더 이전 댓글')).toBeInTheDocument();
+    expect(onLoadPreviousComments).toHaveBeenLastCalledWith(1, 20);
   });
 
   it('renders a reply immediately when its parent was loaded from previous comments', async () => {
@@ -762,7 +903,7 @@ describe('CommunityNoticePage local updates', () => {
     );
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
     expect(await screen.findByText('더 이전 댓글')).toBeInTheDocument();
 
@@ -773,7 +914,7 @@ describe('CommunityNoticePage local updates', () => {
     fireEvent.input(replyInput, {
       target: { innerHTML: '<p>이전 댓글의 답글</p>' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: '등록' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
 
     await waitFor(() =>
       expect(
@@ -844,7 +985,7 @@ describe('CommunityNoticePage local updates', () => {
     renderPage();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: '이전 댓글 불러오기' }),
+      await screen.findByRole('button', { name: /^이전 댓글 보기/ }),
     );
 
     await waitFor(() => {
@@ -967,7 +1108,7 @@ describe('CommunityNoticePage local updates', () => {
     expect(
       await screen.findByRole('button', { name: '댓글 메뉴 작성자' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
     expect(
       await screen.findByText('처음 불러온 이전 댓글'),
     ).toBeInTheDocument();
@@ -996,7 +1137,7 @@ describe('CommunityNoticePage local updates', () => {
       expect(screen.queryByText('새 댓글')).not.toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 불러오기' }));
+    fireEvent.click(screen.getByRole('button', { name: /^이전 댓글 보기/ }));
     await waitFor(() =>
       expect(loadPreviousComments).toHaveBeenNthCalledWith(2, 1, 4),
     );

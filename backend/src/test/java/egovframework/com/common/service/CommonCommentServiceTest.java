@@ -17,17 +17,43 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentSearchVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
+import egovframework.com.common.controller.CommonCommentApiController;
 import egovframework.com.common.service.impl.CommonCommentServiceImpl;
+import egovframework.com.cmm.LoginVO;
 import egovframework.let.common.dto.ListResult;
 import egovframework.com.config.EgovConfigAppMapper;
 
 class CommonCommentServiceTest {
+
+    @Test
+    void commonCommentApiRejectsApprovalOwnerForListAndCreate() {
+        CommonCommentApiController controller = new CommonCommentApiController(null, null);
+        LoginVO user = new LoginVO();
+        user.setTenantId(1L);
+        user.setId("login-code");
+        CommonCommentSearchVO search = new CommonCommentSearchVO();
+        search.setOwnerType("APPROVAL");
+        search.setOwnerId(10L);
+        CommonCommentApiController.CommonCommentCreateRequest request =
+            new CommonCommentApiController.CommonCommentCreateRequest();
+        request.setOwnerType("APPROVAL");
+        request.setOwnerId(10L);
+        request.setContent("댓글");
+
+        assertThatThrownBy(() -> controller.listComments(search, 3, null, null, user))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> controller.createComment(request, user))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
 
     @Test
     void createCommentRejectsBlankContent() {
@@ -95,6 +121,41 @@ class CommonCommentServiceTest {
         assertThatThrownBy(() -> service.createComment(1L, "NOTICE", 10L, "답글", "user-001", "홍길동", 99L))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("상위 댓글");
+    }
+
+    @Test
+    void createCommentRejectsSystemCommentAsParent() {
+        CommonCommentVO systemParent = comment(99L);
+        systemParent.setTenantId(1L);
+        systemParent.setOwnerType("APPROVAL");
+        systemParent.setOwnerId(10L);
+        systemParent.setCommentType("SYSTEM");
+        systemParent.setDeletedYn("N");
+        CommonCommentDAO stubDao = new CommonCommentDAO() {
+            @Override
+            public CommonCommentVO selectCommonCommentById(Map<String, Object> params) {
+                if (((Number) params.get("commentId")).longValue() == 99L) {
+                    return systemParent;
+                }
+                CommonCommentVO created = comment(100L);
+                created.setTenantId(1L);
+                created.setOwnerType("APPROVAL");
+                created.setOwnerId(10L);
+                created.setCommentType("USER");
+                created.setDeletedYn("N");
+                return created;
+            }
+
+            @Override
+            public Long insertCommonComment(Map<String, Object> params) {
+                return 100L;
+            }
+        };
+
+        assertThatThrownBy(() -> new CommonCommentServiceImpl(stubDao)
+            .createComment(1L, "APPROVAL", 10L, "답글", "user-001", "홍길동", 99L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("시스템 댓글");
     }
 
     @Test
@@ -390,6 +451,17 @@ class CommonCommentServiceTest {
         String insertQuery = mapperXml.substring(insertStart,
             mapperXml.indexOf("</select>", insertStart));
         assertThat(insertQuery).contains("#{parentCommentId, jdbcType=BIGINT}");
+        int updateStart = mapperXml.indexOf("<update id=\"updateCommonComment\"");
+        String updateQuery = mapperXml.substring(updateStart,
+            mapperXml.indexOf("</update>", updateStart));
+        assertThat(updateQuery).contains("comment_type = 'USER'");
+        int deleteStart = mapperXml.indexOf("<update id=\"softDeleteCommonComment\"");
+        String deleteQuery = mapperXml.substring(deleteStart,
+            mapperXml.indexOf("</update>", deleteStart));
+        assertThat(deleteQuery).contains("comment_type = 'USER'");
+        assertThat(mapperXml).contains("<result property=\"commentType\" column=\"comment_type\"/>");
+        assertThat(mapperXml).contains("<result property=\"eventType\" column=\"event_type\"/>");
+        assertThat(mapperXml).contains("<select id=\"insertSystemComment\"");
     }
 
     private static CommonCommentVO comment(Long commentId) {
@@ -400,6 +472,7 @@ class CommonCommentServiceTest {
         CommonCommentVO comment = new CommonCommentVO();
         comment.setCommentId(commentId);
         comment.setParentCommentId(parentCommentId);
+        comment.setCommentType("USER");
         return comment;
     }
 

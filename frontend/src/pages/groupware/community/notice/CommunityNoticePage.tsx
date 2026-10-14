@@ -101,6 +101,7 @@ export function CommunityNoticePage({
   const {
     expandedNoticeId,
     selectedNoticeId,
+    selectedNoticeLoadingId,
     selectedNotice,
     handleToggleLike,
     handleToggleBookmark,
@@ -222,7 +223,11 @@ export function CommunityNoticePage({
   );
 
   const selectedNoticePanel = selectedNotice ? (
-    <PostDetailPanel onClose={handleCloseNoticeDetail}>
+    <PostDetailPanel
+      onClose={handleCloseNoticeDetail}
+      isLoading={selectedNoticeLoadingId === selectedNoticeId}
+      loadingLabel="공지사항 상세 불러오는 중"
+    >
       <NoticeFeedList
         items={[selectedNotice]}
         isDark={isDark}

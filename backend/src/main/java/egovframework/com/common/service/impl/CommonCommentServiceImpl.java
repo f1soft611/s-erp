@@ -292,5 +292,8 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
                 || !ownerId.equals(parent.getOwnerId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상위 댓글이 같은 댓글 대상에 속하지 않습니다.");
         }
+        if (!"USER".equalsIgnoreCase(parent.getCommentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시스템 댓글에는 답글을 등록할 수 없습니다.");
+        }
     }
 }

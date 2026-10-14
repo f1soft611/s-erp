@@ -11,6 +11,8 @@ export type AttachmentListItem = {
   name: string;
   size?: number;
   extension?: string;
+  mimeType?: string;
+  previewUrl?: string;
 };
 
 export type AttachmentListProps = {
@@ -20,6 +22,7 @@ export type AttachmentListProps = {
   showActions?: boolean;
   onDownload?: (id: string) => void;
   onRemove?: (id: string) => void;
+  testId?: string;
 };
 
 export function AttachmentList({
@@ -29,13 +32,14 @@ export function AttachmentList({
   showActions = true,
   onDownload,
   onRemove,
+  testId = 'notice-attachment-list',
 }: AttachmentListProps) {
   if (files.length === 0) {
     return null;
   }
 
   return (
-    <Box data-testid="notice-attachment-list" sx={{ display: 'grid', gap: 1 }}>
+    <Box data-testid={testId} sx={{ display: 'grid', gap: 1 }}>
       {files.map((file, index) => {
         const iconMeta = getAttachmentIconMeta(file.name);
 
@@ -56,6 +60,21 @@ export function AttachmentList({
               overflow: 'hidden',
             }}
           >
+            {file.mimeType?.startsWith('image/') &&
+              file.previewUrl?.startsWith('blob:') && (
+                <Box
+                  component="img"
+                  src={file.previewUrl}
+                  alt={file.name}
+                  sx={{
+                    width: 48,
+                    height: 40,
+                    objectFit: 'cover',
+                    borderRadius: 1,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
             <Box
               sx={{
                 display: 'flex',

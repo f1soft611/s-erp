@@ -1,0 +1,114 @@
+<h2>전자결재 결재선, 어떤 표현이 가장 잘 맞나요?</h2>
+<p class="subtitle">모든 안은 실제 참여자·처리 상태·의견을 보존하고, 결재/합의/참조를 구분합니다.</p>
+
+<div class="options">
+  <div class="option" data-choice="polished-cards" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>정돈된 결재 카드</h3>
+      <p>현재 3행 결재 슬롯을 유지하면서 단계 연결선, 상태 색상, 현재 차례 강조를 더합니다.</p>
+      <div style="margin-top:16px;padding:16px;border:1px solid #dce3ed;border-radius:12px;background:#f8fafc;color:#182230;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:#526174">
+          <b style="color:#182230">결재선</b><span>기안자 김민수 · 2026.10.14</span>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:#66758a;margin-bottom:7px">결재</div>
+        <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+          <div style="flex:0 0 92px;border:1px solid #cfe8db;border-radius:9px;background:white;overflow:hidden;text-align:center">
+            <div style="height:25px;padding:5px 2px;background:#eff8f2;font-size:10px;color:#53715e">기획팀</div>
+            <div style="height:47px;display:grid;place-items:center;border-block:1px solid #e7edf1"><span style="width:29px;height:29px;border:2px solid #39a36b;border-radius:50%;display:grid;place-items:center;color:#27814f;font-size:9px;font-weight:700">승인</span></div>
+            <div style="height:26px;padding:5px 2px;font-size:10px">① 김민수</div>
+          </div>
+          <div style="color:#96a3b4;font-size:17px">›</div>
+          <div style="flex:0 0 92px;border:1px solid #b8cef7;border-radius:9px;background:white;box-shadow:0 0 0 2px #eaf1ff;text-align:center;overflow:hidden">
+            <div style="height:25px;padding:5px 2px;background:#eff4ff;font-size:10px;color:#4265aa">팀장</div>
+            <div style="height:47px;display:grid;place-items:center;border-block:1px solid #e7edf1"><span style="width:31px;height:31px;border:2px solid #527fe0;border-radius:50%;display:grid;place-items:center;color:#4265aa;font-size:9px;font-weight:700">진행</span></div>
+            <div style="height:26px;padding:5px 2px;font-size:10px;font-weight:700">② 박서연</div>
+          </div>
+          <div style="color:#96a3b4;font-size:17px">›</div>
+          <div style="flex:0 0 92px;border:1px solid #dce2e9;border-radius:9px;background:white;text-align:center;overflow:hidden">
+            <div style="height:25px;padding:5px 2px;background:#f5f6f8;font-size:10px;color:#7d8998">본부장</div>
+            <div style="height:47px;display:grid;place-items:center;border-block:1px solid #e7edf1"><span style="width:27px;height:27px;border:1px dashed #aab5c3;border-radius:50%;display:grid;place-items:center;color:#8491a1;font-size:8px">대기</span></div>
+            <div style="height:26px;padding:5px 2px;font-size:10px">③ 이도윤</div>
+          </div>
+        </div>
+        <div style="height:1px;background:#dce3ed;margin:13px 0"></div>
+        <span style="display:inline-block;padding:5px 9px;border-radius:16px;background:#f0ebff;color:#6746a5;font-size:10px;margin-right:5px">합의 · 재무팀 최은지</span>
+        <span style="display:inline-block;padding:5px 9px;border-radius:16px;background:#eef2f6;color:#647286;font-size:10px">참조 · 인사팀 정하늘</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="process-timeline" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>단계 진행 타임라인</h3>
+      <p>결재 순서를 가장 직관적으로 보여주고, 현재 차례와 다음 처리자를 강조합니다.</p>
+      <div style="margin-top:16px;padding:16px;border:1px solid #dce3ed;border-radius:12px;background:#f8fafc;color:#182230;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:12px">
+          <b>결재 진행</b><span style="padding:4px 8px;border-radius:12px;background:#eaf1ff;color:#4265aa;font-size:10px">2 / 3 단계</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;min-width:300px">
+          <div style="width:31%;text-align:center;position:relative">
+            <div style="height:2px;background:#59ae7d;position:absolute;top:14px;left:50%;right:-50%"></div>
+            <div style="width:28px;height:28px;margin:auto;border-radius:50%;background:#3d9c67;color:white;display:grid;place-items:center;position:relative;font-size:12px">✓</div>
+            <div style="margin-top:8px;font-size:10px;color:#27814f;font-weight:700">승인 완료</div>
+            <div style="font-size:11px;font-weight:700;margin-top:3px">김민수</div>
+            <div style="font-size:9px;color:#748196">기획팀 · 기안</div>
+          </div>
+          <div style="width:31%;text-align:center;position:relative">
+            <div style="height:2px;background:#d8e0ec;position:absolute;top:14px;left:50%;right:-50%"></div>
+            <div style="width:30px;height:30px;margin:auto;border:3px solid #5a80da;background:white;color:#4d72cf;border-radius:50%;display:grid;place-items:center;position:relative;font-size:11px;font-weight:700">2</div>
+            <div style="margin-top:7px;font-size:10px;color:#4265aa;font-weight:700">처리 중</div>
+            <div style="font-size:11px;font-weight:700;margin-top:3px">박서연</div>
+            <div style="font-size:9px;color:#748196">팀장</div>
+          </div>
+          <div style="width:31%;text-align:center;position:relative">
+            <div style="width:28px;height:28px;margin:auto;border:1px solid #cbd4df;background:white;color:#8a97a7;border-radius:50%;display:grid;place-items:center;position:relative;font-size:11px">3</div>
+            <div style="margin-top:8px;font-size:10px;color:#8995a4">대기</div>
+            <div style="font-size:11px;font-weight:700;margin-top:3px">이도윤</div>
+            <div style="font-size:9px;color:#748196">본부장</div>
+          </div>
+        </div>
+        <div style="margin-top:15px;padding:8px 10px;border-left:3px solid #6385dc;background:#eef3ff;border-radius:0 7px 7px 0;font-size:10px;color:#465b86">현재 결재자 의견 · 검토 중입니다</div>
+        <div style="height:1px;background:#dce3ed;margin:12px 0"></div>
+        <span style="display:inline-block;padding:5px 9px;border-radius:16px;background:#f0ebff;color:#6746a5;font-size:10px;margin-right:5px">합의 · 최은지</span>
+        <span style="display:inline-block;padding:5px 9px;border-radius:16px;background:#eef2f6;color:#647286;font-size:10px">참조 · 정하늘</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="approval-board" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>문서 결재판</h3>
+      <p>전자문서에 익숙한 결재판 느낌을 살려, 결재자별 도장과 처리 정보를 단정하게 정렬합니다.</p>
+      <div style="margin-top:16px;padding:16px;border:1px solid #dce3ed;border-radius:12px;background:#f8fafc;color:#182230;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+          <b style="font-size:12px">결재</b><span style="font-size:10px;color:#778497">순서대로 처리</span>
+        </div>
+        <div style="display:flex;gap:4px;overflow:hidden">
+          <div style="flex:1;min-width:72px;border:1px solid #d5dde7;border-radius:6px;background:white;overflow:hidden">
+            <div style="padding:5px;text-align:center;background:#f1f4f8;font-size:9px;color:#566579">기안</div>
+            <div style="height:58px;display:grid;place-items:center;border-block:1px solid #e4e9ef"><span style="border:2px solid #429466;color:#318354;border-radius:50%;padding:5px 3px;font-size:8px;font-weight:700;transform:rotate(-9deg)">완료</span></div>
+            <div style="padding:6px 2px;text-align:center;font-size:9px;font-weight:700">김민수</div>
+          </div>
+          <div style="flex:1;min-width:72px;border:2px solid #6485d7;border-radius:6px;background:white;overflow:hidden">
+            <div style="padding:4px;text-align:center;background:#eef3ff;font-size:9px;color:#4265aa">팀장</div>
+            <div style="height:58px;display:grid;place-items:center;border-block:1px solid #e4e9ef"><span style="border:2px solid #6282d1;color:#4b6dbb;border-radius:50%;padding:5px 3px;font-size:8px;font-weight:700;transform:rotate(6deg)">진행</span></div>
+            <div style="padding:6px 2px;text-align:center;font-size:9px;font-weight:700">박서연</div>
+          </div>
+          <div style="flex:1;min-width:72px;border:1px solid #d5dde7;border-radius:6px;background:white;overflow:hidden">
+            <div style="padding:5px;text-align:center;background:#f1f4f8;font-size:9px;color:#566579">본부장</div>
+            <div style="height:58px;display:grid;place-items:center;border-block:1px solid #e4e9ef"><span style="border:1px dashed #aab5c3;color:#8491a1;border-radius:50%;padding:5px 3px;font-size:8px">대기</span></div>
+            <div style="padding:6px 2px;text-align:center;font-size:9px;font-weight:700">이도윤</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
+          <span style="padding:5px 8px;border:1px solid #d9cafa;border-radius:5px;background:white;color:#6746a5;font-size:9px">합의　최은지</span>
+          <span style="padding:5px 8px;border:1px solid #dce2e9;border-radius:5px;background:white;color:#647286;font-size:9px">참조　정하늘</span>
+        </div>
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #dce3ed;font-size:9px;color:#748196">단계별 처리 의견은 해당 결재 칸에서 확인</div>
+      </div>
+    </div>
+  </div>
+</div>

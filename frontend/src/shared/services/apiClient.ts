@@ -17,6 +17,16 @@ interface ApiEnvelope<T> {
   code?: number | string;
 }
 
+export class ApiResponseError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiResponseError';
+    this.status = status;
+  }
+}
+
 export function normalizeApiErrorMessage(
   message: string | null | undefined,
 ): string {
@@ -105,7 +115,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     body.resultMessage || body.message || '요청이 실패했습니다.';
 
   if (!response.ok || String(resultCode) !== '200') {
-    throw new Error(normalizeApiErrorMessage(resultMessage));
+    throw new ApiResponseError(
+      normalizeApiErrorMessage(resultMessage),
+      response.status,
+    );
   }
 
   return body.result ?? ({} as T);

@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 
 const composerApi = vi.hoisted(() => ({
@@ -17,6 +17,43 @@ const composerApi = vi.hoisted(() => ({
   fetchDraftForms: vi.fn(),
   fetchDraftFormTemplate: vi.fn(),
   fetchMyProfile: vi.fn(),
+  saveDocumentDraft: vi.fn(),
+  submitDocumentApproval: vi.fn(),
+  listDocumentApprovals: vi.fn(),
+  getDocumentApprovalSummary: vi.fn(),
+  getDocumentApprovalDetail: vi.fn(),
+  listApprovalComments: vi.fn(),
+  fetchApprovalEmbeddedImageBlob: vi.fn(),
+  createApprovalComment: vi.fn(),
+  updateApprovalComment: vi.fn(),
+  deleteApprovalComment: vi.fn(),
+  uploadApprovalCommentAttachment: vi.fn(),
+  downloadApprovalCommentAttachment: vi.fn(),
+  deleteApprovalCommentAttachment: vi.fn(),
+  downloadDocumentApprovalAttachment: vi.fn(),
+  processDocumentApprovalAction: vi.fn(),
+  uploadDocumentDraftAttachment: vi.fn(),
+  uploadDocumentDraftEmbeddedImage: vi.fn(),
+  deleteDocumentDraftEmbeddedImage: vi.fn(),
+  listDocumentDraftAttachments: vi.fn(),
+  deleteDocumentDraftAttachment: vi.fn(),
+}));
+
+const composerNotifications = vi.hoisted(() => ({
+  showSuccess: vi.fn(),
+  showWarning: vi.fn(),
+  showError: vi.fn(),
+}));
+
+let restoreImagePreloader: (() => void) | undefined;
+
+afterEach(() => {
+  restoreImagePreloader?.();
+  restoreImagePreloader = undefined;
+});
+
+vi.mock('../src/shared/context/NotificationContext', () => ({
+  useNotification: () => composerNotifications,
 }));
 
 vi.mock(
@@ -37,6 +74,35 @@ vi.mock(
 vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
   fetchMyProfile: composerApi.fetchMyProfile,
 }));
+
+vi.mock(
+  '../src/pages/groupware/documents/write/services/documentApproval.service',
+  () => ({
+    saveDocumentDraft: composerApi.saveDocumentDraft,
+    submitDocumentApproval: composerApi.submitDocumentApproval,
+    listDocumentApprovals: composerApi.listDocumentApprovals,
+    getDocumentApprovalSummary: composerApi.getDocumentApprovalSummary,
+    getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
+    listApprovalComments: composerApi.listApprovalComments,
+    fetchApprovalEmbeddedImageBlob: composerApi.fetchApprovalEmbeddedImageBlob,
+    createApprovalComment: composerApi.createApprovalComment,
+    updateApprovalComment: composerApi.updateApprovalComment,
+    deleteApprovalComment: composerApi.deleteApprovalComment,
+    uploadApprovalCommentAttachment: composerApi.uploadApprovalCommentAttachment,
+    downloadApprovalCommentAttachment: composerApi.downloadApprovalCommentAttachment,
+    deleteApprovalCommentAttachment: composerApi.deleteApprovalCommentAttachment,
+    downloadDocumentApprovalAttachment: composerApi.downloadDocumentApprovalAttachment,
+    processDocumentApprovalAction: composerApi.processDocumentApprovalAction,
+    uploadDocumentDraftAttachment: composerApi.uploadDocumentDraftAttachment,
+    uploadDocumentDraftEmbeddedImage: composerApi.uploadDocumentDraftEmbeddedImage,
+    deleteDocumentDraftEmbeddedImage: composerApi.deleteDocumentDraftEmbeddedImage,
+    listDocumentDraftAttachments: composerApi.listDocumentDraftAttachments,
+    deleteDocumentDraftAttachment: composerApi.deleteDocumentDraftAttachment,
+    isDefiniteAttachmentUploadFailure: (error: unknown) =>
+      error instanceof Error && error.message === 'definite failure',
+    UnknownAttachmentUploadOutcomeError: class extends Error {},
+  }),
+);
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
@@ -163,6 +229,157 @@ beforeEach(() => {
     employeeId: composerUser.userId,
     name: '기안자',
   });
+  composerApi.saveDocumentDraft.mockResolvedValue({
+    electronicApprovalId: 77,
+    documentStatus: 'DRAFT',
+  });
+  composerApi.submitDocumentApproval.mockResolvedValue({
+    electronicApprovalId: 77,
+    eabusNo: '001',
+    documentStatus: 'PENDING',
+    submittedAt: '2026-10-12T09:00:00Z',
+  });
+  composerApi.listDocumentApprovals.mockResolvedValue([
+    {
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '문서 A',
+      drafterName: '김민수',
+      summary: '문서 A 요약',
+      createdAt: '2026-10-12T09:00:00Z',
+    },
+    {
+      electronicApprovalId: 2,
+      eabusNo: '008',
+      documentType: 'BUSINESS_CONTACT',
+      documentStatus: 'IN_PROGRESS',
+      title: '문서 B',
+      drafterName: '김민수',
+      summary: '문서 B 요약',
+    },
+    {
+      electronicApprovalId: 3,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'DRAFT',
+      title: '문서 C',
+      drafterName: '김민수',
+      summary: '문서 C 요약',
+    },
+    {
+      electronicApprovalId: 4,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'REVISION_REQUESTED',
+      title: '문서 D',
+      drafterName: '김민수',
+      summary: '문서 D 요약',
+    },
+    {
+      electronicApprovalId: 5,
+      eabusNo: '031',
+      documentType: 'ATTENDANCE_APPLICATION',
+      documentStatus: 'COMPLETED',
+      title: '문서 E',
+      drafterName: '김민수',
+      summary: '문서 E 요약',
+    },
+    {
+      electronicApprovalId: 6,
+      eabusNo: '032',
+      documentType: 'EXPENSE_RESOLUTION',
+      documentStatus: 'PENDING',
+      title: '문서 F',
+      drafterName: '김민수',
+      summary: '문서 F 요약',
+    },
+  ]);
+  composerApi.getDocumentApprovalSummary.mockResolvedValue({
+    actionRequiredCount: 1,
+    inProgressCount: 2,
+    draftCount: 1,
+    completedCount: 1,
+    revisionRequestedCount: 1,
+    rejectedCount: 0,
+    notices: [
+      {
+        electronicApprovalId: 1,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'PENDING',
+        title: '문서 A',
+        drafterName: '김민수',
+        summary: '문서 A 요약',
+        noticeType: 'ACTION_REQUIRED',
+      },
+      {
+        electronicApprovalId: 4,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'REVISION_REQUESTED',
+        title: '문서 D',
+        drafterName: '김민수',
+        summary: '문서 D 요약',
+        noticeType: 'REVISION_REQUESTED',
+      },
+    ],
+  });
+  composerApi.getDocumentApprovalDetail.mockResolvedValue({
+    electronicApprovalId: 1,
+    eabusNo: '001',
+    documentType: 'DRAFTING',
+    documentStatus: 'PENDING',
+    title: '문서 A',
+    drafterName: '김민수',
+    summary: '문서 A 요약',
+    viewCount: 0,
+    draftingWorkCategoryId: null,
+    contentsJson: '{"type":"doc","content":[]}',
+    contentsHtml: '<p>본문 내용</p>',
+    approvalLines: [],
+    attachments: [],
+    systemEvents: [],
+  });
+  composerApi.processDocumentApprovalAction.mockResolvedValue({
+    electronicApprovalId: 1,
+    documentStatus: 'IN_PROGRESS',
+  });
+  composerApi.listApprovalComments.mockResolvedValue({
+    comments: [],
+    hasPrevious: false,
+    nextBeforeCommentId: null,
+    resultCnt: 0,
+  });
+  composerApi.fetchApprovalEmbeddedImageBlob.mockResolvedValue(
+    new Blob(['image'], { type: 'image/png' }),
+  );
+  composerApi.createApprovalComment.mockResolvedValue({});
+  composerApi.updateApprovalComment.mockResolvedValue({});
+  composerApi.deleteApprovalComment.mockResolvedValue(undefined);
+  composerApi.uploadApprovalCommentAttachment.mockResolvedValue({});
+  composerApi.downloadApprovalCommentAttachment.mockResolvedValue(undefined);
+  composerApi.deleteApprovalCommentAttachment.mockResolvedValue(undefined);
+  composerApi.downloadDocumentApprovalAttachment.mockResolvedValue(undefined);
+  composerApi.uploadDocumentDraftAttachment.mockResolvedValue({
+    fileId: 501,
+    fileName: 'evidence.txt',
+    fileSize: 8,
+  });
+  composerApi.uploadDocumentDraftEmbeddedImage.mockResolvedValue({
+    src: 'https://minio.example/approval-preview',
+    alt: 'pasted.png',
+    fileName: 'pasted.png',
+    uploadToken: 'approval-image-token',
+    fileId: 'approval-image-token',
+    objectKey: 'tenant/1/embedded-image-temp/approval-image-token/pasted.png',
+    fileSize: 8,
+    mimeType: 'image/png',
+  });
+  composerApi.deleteDocumentDraftEmbeddedImage.mockResolvedValue(undefined);
+  composerApi.listDocumentDraftAttachments.mockResolvedValue([]);
+  composerApi.deleteDocumentDraftAttachment.mockResolvedValue(undefined);
 });
 
 const pageProps = {
@@ -623,8 +840,9 @@ describe('Document write page', () => {
     ).toBeNull();
   }, 15000);
 
-  it('renders at the groupware write route instead of the coming-soon page', () => {
+  it('renders at the groupware write route instead of the coming-soon page', async () => {
     render(<DashboardContent {...pageProps} />);
+    await screen.findByRole('region', { name: '리스트형 문서 목록' });
 
     expect(screen.getByTestId('document-write-page')).toBeInTheDocument();
     expect(
@@ -635,8 +853,14 @@ describe('Document write page', () => {
     ).toBeInTheDocument();
   });
 
-  it('defaults to list mode and displays approval status and all document kinds', () => {
+  it('defaults to list mode and displays approval status and all document kinds', async () => {
     render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    await waitFor(() =>
+      expect(within(listRegion).getByRole('button', { name: /문서 A/ })).toBeInTheDocument(),
+    );
 
     expect(
       screen.getByRole('button', { name: '리스트형 보기' }),
@@ -645,17 +869,845 @@ describe('Document write page', () => {
     expect(
       screen.queryByRole('textbox', { name: '문서 제목 검색' }),
     ).not.toBeInTheDocument();
-    const listRegion = screen.getByRole('region', {
-      name: '리스트형 문서 목록',
-    });
-    expect(listRegion.querySelectorAll('button')).toHaveLength(5);
-    expect(listRegion).not.toHaveTextContent('월간 업무 계획 승인 요청');
+    expect(listRegion.querySelectorAll('button')).toHaveLength(6);
+    expect(listRegion).toHaveTextContent('문서 A');
     ['기안서', '업무연락', '지출결의서', '근태신청'].forEach((kind) => {
       expect(screen.getAllByText(kind).length).toBeGreaterThan(0);
     });
-    expect(screen.getByText('결재대기')).toBeInTheDocument();
-    expect(screen.getByText('보완요청')).toBeInTheDocument();
+    expect(screen.getAllByText('결재대기').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('보완요청').length).toBeGreaterThan(0);
   });
+
+  it('uses the view-specific skeleton while the document list is loading', () => {
+    composerApi.listDocumentApprovals.mockReturnValue(
+      new Promise(() => undefined),
+    );
+    render(<DashboardContent {...pageProps} />);
+
+    expect(screen.getByTestId('list-view-skeleton')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    expect(screen.getByTestId('feed-view-skeleton')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('centers shared loading while an approval detail is pending', async () => {
+    let resolveDetail!: (detail: {
+      electronicApprovalId: number;
+      eabusNo: string;
+      documentType: string;
+      documentStatus: string;
+      title: string;
+      drafterName: string;
+      draftingWorkCategoryId: null;
+      contentsJson: string;
+      contentsHtml: string;
+      approvalLines: never[];
+      attachments: never[];
+      systemEvents: never[];
+    }) => void;
+    composerApi.getDocumentApprovalDetail.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveDetail = resolve;
+        }),
+    );
+    render(<DashboardContent {...pageProps} />);
+
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(
+      await within(listRegion).findByRole('button', { name: /문서 A/ }),
+    );
+
+    expect(
+      await screen.findByRole('status', { name: '문서 상세 불러오는 중' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('post-detail-panel-content')).toHaveStyle({
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+
+    await act(async () => {
+      resolveDetail({
+        electronicApprovalId: 1,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'PENDING',
+        title: '문서 A',
+        drafterName: '김민수',
+        draftingWorkCategoryId: null,
+        contentsJson: '{"type":"doc","content":[]}',
+        contentsHtml: '<p>로딩 완료 본문</p>',
+        viewCount: 0,
+        approvalLines: [],
+        attachments: [],
+        systemEvents: [],
+      });
+    });
+
+    expect(await screen.findByText('로딩 완료 본문')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: '문서 상세 불러오는 중' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('loads related approval documents and opens their detail from the list', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    const documentButton = await within(listRegion).findByRole('button', {
+      name: /문서 A/,
+    });
+    expect(composerApi.listDocumentApprovals).toHaveBeenCalledWith('ALL', undefined, undefined);
+    fireEvent.click(documentButton);
+
+    expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
+    expect(screen.getByTestId('post-detail-panel')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '문서 상세' })).not.toBeInTheDocument();
+    expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledWith(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('approval-document-body')).toHaveTextContent('본문 내용'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 닫기' }));
+    await waitFor(() =>
+      expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('region', { name: '리스트형 문서 목록' })).toBeInTheDocument();
+    fireEvent.click(documentButton);
+    await screen.findByTestId('post-detail-panel');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('renders read-only system events and keeps only the required detail separators', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '문서 A',
+      drafterName: '김민수',
+      createdAt: '2026-10-13T09:00:00Z',
+      viewCount: 7,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: '<p>본문 내용</p>',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 71,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-1',
+          participantName: '결재자 A',
+          participantDepartmentName: '기획팀',
+          actionStatus: 'WAITING',
+        },
+        {
+          electronicApprovalLineId: 75,
+          stageOrder: 3,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-3',
+          participantName: '결재자 C',
+          participantDepartmentName: '운영팀',
+          actionStatus: 'APPROVED',
+          participantStampImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 74,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-4',
+          participantName: '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
+          participantDepartmentName: '인사팀',
+          actionStatus: 'PENDING',
+          participantStampImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 72,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-2',
+          participantName: '합의자 B',
+          participantDepartmentName: null,
+          actionStatus: 'PENDING',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 76,
+          stageOrder: 2,
+          participantOrder: 2,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-5',
+          participantName: '합의자 D',
+          participantDepartmentName: '재무팀',
+          actionStatus: 'APPROVED',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 77,
+          stageOrder: 2,
+          participantOrder: 3,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-6',
+          participantName: '합의자 E',
+          participantDepartmentName: '',
+          actionStatus: 'APPROVED',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 73,
+          stageOrder: 3,
+          participantOrder: 1,
+          participantType: 'REFERENCE',
+          participantUserId: 'approver-3',
+          participantName: '참조자 C',
+          participantDepartmentName: '운영팀',
+          actionStatus: '',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 78,
+          stageOrder: 3,
+          participantOrder: 2,
+          participantType: 'REFERENCE',
+          participantUserId: 'approver-7',
+          participantName: '참조자 공백부서',
+          participantDepartmentName: '   ',
+          actionStatus: '',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+      ],
+      attachments: [],
+      systemEvents: [{
+        eventType: 'SUBMITTED',
+        content: '문서가 결재신청되었습니다.',
+        writerName: '김민수',
+        createdAt: '2026-10-12T09:00:00Z',
+      }],
+    });
+    composerApi.listApprovalComments.mockResolvedValueOnce({
+      comments: [{
+        commentId: 31,
+        ownerId: 1,
+        parentCommentId: null,
+        content: '<p>검토 의견입니다.</p>',
+        commentType: 'USER',
+        writerId: 'writer-1',
+        writerName: '박서준',
+        createdAt: '2026-10-12T10:00:00Z',
+        attachments: [],
+      }],
+      hasPrevious: false,
+      nextBeforeCommentId: null,
+      resultCnt: 1,
+    });
+    const imagePreloaders: HTMLImageElement[] = [];
+    const imagePreloaderSpy = vi.spyOn(window, 'Image').mockImplementation(function MockImage(
+      width,
+      height,
+    ) {
+      const image = document.createElement('img');
+      if (width !== undefined) image.width = width;
+      if (height !== undefined) image.height = height;
+      imagePreloaders.push(image);
+      return image;
+    });
+    restoreImagePreloader = () => imagePreloaderSpy.mockRestore();
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('검토 의견입니다.');
+      expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('문서가 결재신청되었습니다.');
+    });
+    expect(
+      screen.getByRole('img', { name: '시스템 메시지' }),
+    ).toBeInTheDocument();
+    const approvalLine = screen.getByTestId('approval-line-readonly');
+    const authorRow = screen.getByTestId('approval-author-row');
+    expect(authorRow).toBeInTheDocument();
+    expect(within(authorRow).getByText('김민수')).toBeInTheDocument();
+    expect(screen.getByTestId('approval-author-meta')).toHaveTextContent(
+      '기안자 · 2026.10.13 · 조회 7',
+    );
+    expect(screen.getByTestId('approval-line-drafter-meta')).toHaveTextContent(
+      '기안자 김민수 · 2026.10.13',
+    );
+    expect(screen.getByTestId('approval-line-header-title'))
+      .toHaveClass('MuiTypography-body1');
+    expect(screen.getByTestId('approval-line-drafter-meta'))
+      .toHaveClass('MuiTypography-body1');
+    expect(screen.getByTestId('approval-line-header')).toHaveTextContent('결재선');
+    expect(
+      within(screen.getByTestId('approval-line-header')).queryByText('결재', { exact: true }),
+    ).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('approval-line-group-approval')).queryByRole('button'))
+      .not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-approval')).toHaveTextContent('결재자 A');
+    expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent(
+      '합의',
+    );
+    expect(
+      within(screen.getByTestId('approval-line-group-agreement')).getAllByText('2', { exact: true }),
+    ).toHaveLength(1);
+    const agreementStage = screen.getByTestId('approval-line-agreement-stage-2');
+    const agreementParticipants = within(agreementStage).getAllByTestId(
+      /^approval-line-agreement-participant-/,
+    );
+    expect(agreementParticipants).toHaveLength(3);
+    const agreementStageRow = screen.getByTestId('approval-line-agreement-stage-row-2');
+    const agreementStageOrder = within(agreementStageRow).getByTestId(
+      'approval-line-agreement-stage-order',
+    );
+    expect(agreementStageOrder.parentElement).toBe(agreementStageRow);
+    expect(
+      within(agreementStageRow).getByTestId('approval-line-agreement-participants').parentElement,
+    ).toBe(agreementStageRow);
+    expect(agreementParticipants.map((participant) => participant.textContent)).toEqual([
+      expect.stringContaining('합의자 B'),
+      expect.stringContaining('합의자 D'),
+      expect.stringContaining('합의자 E'),
+    ]);
+    expect(agreementParticipants[0]).toHaveStyle({
+      flexDirection: 'row',
+      minHeight: '58px',
+      borderRadius: '10px',
+    });
+    expect(agreementStage).toHaveTextContent('재무팀');
+    expect(screen.getByTestId('approval-line-agreement-participant-76')
+      .querySelectorAll('.MuiTypography-body1').length)
+      .toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('approval-line-agreement-status-72')).toHaveTextContent('처리 중');
+    expect(screen.getByTestId('approval-line-agreement-status-76')).toHaveTextContent('승인');
+    expect(screen.getByTestId('approval-line-agreement-status-72'))
+      .toHaveStyle({ borderRadius: '99px' });
+    const agreementWithoutDepartment = screen.getByTestId(
+      'approval-line-agreement-participant-72',
+    );
+    const agreementWithEmptyDepartment = screen.getByTestId(
+      'approval-line-agreement-participant-77',
+    );
+    for (const participant of [agreementWithoutDepartment, agreementWithEmptyDepartment]) {
+      expect(participant.querySelector('p[title=""]')).toBeNull();
+      expect(
+        within(participant).getByText(/합의자 [BE]/).parentElement,
+      ).toBe(screen.getByTestId(
+        `approval-line-agreement-status-${participant.dataset.testid?.split('-').pop()}`,
+      ).parentElement);
+      expect(participant).toHaveStyle({ alignItems: 'center' });
+    }
+    expect(screen.getByTestId('approval-line-agreement-participants'))
+      .toHaveStyle({ flexWrap: 'wrap' });
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent(
+      '참조',
+    );
+    expect(
+      within(screen.getByTestId('approval-line-group-reference'))
+        .queryByTestId(/^approval-line-reference-sequence-/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('참조자 C');
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('운영팀');
+    const referenceParticipant = screen.getByTestId('approval-line-reference-participant-73');
+    expect(referenceParticipant).toHaveStyle({ flexGrow: '0' });
+    expect(
+      within(referenceParticipant).getByTestId('approval-line-reference-department-73'),
+    ).toHaveTextContent('운영팀');
+    const referenceWithoutDepartment = screen.getByTestId(
+      'approval-line-reference-participant-78',
+    );
+    expect(referenceWithoutDepartment.querySelector('p[title="   "]')).toBeNull();
+    expect(referenceWithoutDepartment).toHaveTextContent('참조자 공백부서');
+    expect(
+      within(referenceWithoutDepartment).getByTestId(
+        'approval-line-reference-avatar-78',
+      ),
+    ).toBeInTheDocument();
+    expect(referenceWithoutDepartment).toHaveStyle({ alignItems: 'center' });
+    expect(screen.getByTestId('approval-line-group-agreement').querySelector('.MuiChip-root')).toBeNull();
+    expect(screen.getByTestId('approval-line-group-reference').querySelector('.MuiChip-root')).toBeNull();
+    const approvalParticipants = within(
+      screen.getByTestId('approval-line-group-approval'),
+    ).getAllByTestId(/^approval-line-participant-/);
+    expect(approvalParticipants.map((participant) => participant.textContent)).toEqual([
+      expect.stringContaining('결재자 A'),
+      expect.stringContaining('결재자 D'),
+      expect.stringContaining('결재자 C'),
+    ]);
+    expect(
+      within(screen.getByTestId('approval-line-group-approval')).getAllByTestId(
+        'approval-line-connector',
+      ),
+    ).toHaveLength(2);
+    expect(screen.getByTestId('approval-line-participant-71')).toHaveAttribute(
+      'data-status-tone',
+      'neutral',
+    );
+    expect(screen.getByTestId('approval-line-participant-74')).toHaveAttribute(
+      'data-status-tone',
+      'primary',
+    );
+    expect(screen.getByTestId('approval-line-participant-74')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    expect(screen.getByTestId('approval-line-participant-75')).toHaveAttribute(
+      'data-status-tone',
+      'success',
+    );
+    expect(screen.getByTestId('approval-line-participant-75')).not.toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-71')).toHaveTextContent('대기');
+    expect(screen.getByTestId('approval-line-status-seal-71')).toHaveAttribute(
+      'data-status-tone',
+      'neutral',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-74')).toHaveTextContent('진행');
+    expect(screen.getByTestId('approval-line-status-seal-74')).toHaveAttribute(
+      'data-status-tone',
+      'primary',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-74')).toHaveAttribute(
+      'aria-label',
+      '결재 상태 처리 중',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveAttribute(
+      'aria-label',
+      '결재 상태 승인',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveAttribute(
+      'data-status-tone',
+      'success',
+    );
+    expect(screen.getByTestId('approval-line-status-seal-75').querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    expect(screen.getByTestId('approval-line-status-seal-74').querySelector('img'))
+      .toBeNull();
+    const agreementAvatar = screen.getByTestId('approval-line-agreement-avatar-72');
+    expect(agreementAvatar.querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    const referenceGroup = screen.getByTestId('approval-line-group-reference');
+    const referenceAvatar = screen.getByTestId('approval-line-reference-avatar-73');
+    expect(referenceAvatar.querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    await waitFor(() => {
+      expect(imagePreloaders.length).toBeGreaterThan(0);
+    });
+    act(() => {
+      imagePreloaders.forEach((image) => image.onerror?.(new Event('error')));
+    });
+    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveTextContent('승인');
+    expect(agreementAvatar.querySelector('img')).toBeNull();
+    expect(agreementAvatar).toHaveTextContent('합');
+    expect(referenceAvatar.querySelector('img')).toBeNull();
+    expect(referenceAvatar).toHaveTextContent('참');
+    const centeredStage = screen.getByTestId('approval-line-sequence-74');
+    expect(centeredStage).toHaveStyle({ justifyContent: 'center' });
+    expect(within(centeredStage).getByText(
+      '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
+    )).toHaveAttribute(
+      'title',
+      '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
+    );
+    expect(screen.getByTestId('approval-line-inner-divider')).toBeInTheDocument();
+    expect(screen.queryByTestId('approval-line-chip-agreement-72')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('approval-line-chip-reference-73')).not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-divider')).toBeInTheDocument();
+    expect(approvalLine.nextElementSibling).toBe(
+      screen.getByTestId('approval-line-divider'),
+    );
+    expect(screen.getByTestId('approval-line-participant-71')).toHaveStyle({
+      gridTemplateRows: '32px 64px 32px',
+    });
+    expect(screen.getByTestId('feed-reaction-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('feed-comments-section')).toBeInTheDocument();
+    const detailCard = screen.getByTestId('approval-detail-card');
+    expect(
+      within(detailCard).getAllByRole('separator'),
+    ).toHaveLength(3);
+    const footer = screen.getByTestId('approval-feed-footer');
+    const reactionBar = screen.getByTestId('feed-reaction-bar');
+    const commentsSection = screen.getByTestId('feed-comments-section');
+    expect(reactionBar.parentElement).toBe(footer);
+    expect(commentsSection.parentElement).toBe(footer);
+    expect(parseFloat(getComputedStyle(reactionBar).marginTop)).toBe(0);
+    expect(parseFloat(getComputedStyle(commentsSection).marginTop)).toBe(0);
+    expect(
+      reactionBar.nextElementSibling,
+    ).toBe(commentsSection);
+    expect(screen.queryByText('첨부파일', { exact: true })).not.toBeInTheDocument();
+    expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
+      limit: 3,
+      beforeCommentId: undefined,
+    });
+  });
+
+  it('opens approval detail with the body expanded', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '문서 A',
+      drafterName: '김민수',
+      draftingWorkCategoryId: null,
+      viewCount: 0,
+      summary: '짧은 요약',
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: `<p>${'긴 본문 내용입니다. '.repeat(100)}</p>`,
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    const detailCard = await screen.findByTestId('approval-detail-card');
+    expect(detailCard).toBeVisible();
+    expect(detailCard).toHaveClass('MuiStack-root');
+    const body = screen.getByTestId('approval-document-body');
+    expect(body).toHaveAttribute('data-expanded', 'true');
+    const collapseButton = screen.getByRole('button', { name: '접기' });
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(collapseButton);
+    expect(screen.getByRole('button', { name: '더보기' })).toBeInTheDocument();
+    expect(body).toHaveAttribute('data-expanded', 'false');
+  });
+
+  it('shows embedded document images as clickable previews', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:approval-image-preview'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+        electronicApprovalId: 1,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'PENDING',
+        title: '문서 A',
+        drafterName: '김민수',
+        draftingWorkCategoryId: null,
+        viewCount: 0,
+        summary: '이미지 포함',
+        contentsJson: '{"type":"doc","content":[]}',
+        contentsHtml:
+          '<p>이미지</p><img src="/api/v1/groupware/approvals/1/embedded-images/51" alt="영수증" />',
+        approvalLines: [],
+        attachments: [],
+        systemEvents: [],
+      });
+      render(<DashboardContent {...pageProps} />);
+      const listRegion = await screen.findByRole('region', {
+        name: '리스트형 문서 목록',
+      });
+      fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+      await waitFor(() =>
+        expect(composerApi.fetchApprovalEmbeddedImageBlob).toHaveBeenCalledWith(1, 51),
+      );
+      const body = screen.getByTestId('approval-document-body');
+      expect(body).toHaveAttribute('data-expanded', 'true');
+      await waitFor(() =>
+        expect(body.querySelector('img')).toHaveAttribute(
+          'src',
+          'blob:approval-image-preview',
+        ),
+      );
+      expect(screen.queryByTestId('feed-body-image-previews')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '접기' }));
+      const preview = await screen.findByRole('button', {
+        name: '본문 이미지 미리보기 1: 영수증',
+      });
+      expect(preview.querySelector('img')).toHaveAttribute('alt', '영수증');
+      expect(screen.queryByText(/\[본문 이미지/)).not.toBeInTheDocument();
+      expect(screen.queryByText('본문 이미지', { exact: true })).not.toBeInTheDocument();
+      fireEvent.click(preview);
+      expect(await screen.findByRole('dialog', { name: '이미지 보기' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '이미지 뷰어 닫기' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: '이미지 보기' })).not.toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('approval-document-body').querySelector('img')).toHaveAttribute(
+          'src',
+          'blob:approval-image-preview',
+        );
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('posts a new comment through the approval API without reloading the first page', async () => {
+    const createdComment = {
+      commentId: 32,
+      ownerId: 1,
+      parentCommentId: null,
+      content: '<p>새 검토 의견</p>',
+      commentType: 'USER',
+      writerId: 'writer-1',
+      writerName: '박서준',
+      createdAt: '2026-10-12T10:00:00Z',
+      attachments: [],
+    };
+    composerApi.createApprovalComment.mockResolvedValueOnce(createdComment);
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+    const editor = await screen.findByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(editor, { target: { innerHTML: '<p>새 검토 의견</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => {
+      expect(composerApi.createApprovalComment).toHaveBeenCalledWith(
+        1,
+        '<p>새 검토 의견</p>',
+        undefined,
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('새 검토 의견'),
+    );
+    expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByText('전자결재 댓글 응답을 확인할 수 없습니다.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('loads and prepends an earlier approval comment page', async () => {
+    const createComment = (commentId: number, content: string) => ({
+      commentId,
+      ownerId: 1,
+      parentCommentId: null,
+      content: `<p>${content}</p>`,
+      commentType: 'USER',
+      writerId: `writer-${commentId}`,
+      writerName: `작성자 ${commentId}`,
+      createdAt: '2026-10-12T10:00:00Z',
+      attachments: [],
+    });
+    composerApi.listApprovalComments
+      .mockResolvedValueOnce({
+        comments: [createComment(30, '최근 댓글')],
+        hasPrevious: true,
+        nextBeforeCommentId: 30,
+        resultCnt: 2,
+      })
+      .mockResolvedValueOnce({
+        comments: [createComment(20, '이전 댓글')],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 2,
+      });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('최근 댓글'),
+    );
+    expect(composerApi.listApprovalComments).toHaveBeenNthCalledWith(1, 1, {
+      limit: 3,
+      beforeCommentId: undefined,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기 (1)' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('이전 댓글'),
+    );
+    expect(composerApi.listApprovalComments).toHaveBeenLastCalledWith(1, {
+      limit: 20,
+      beforeCommentId: 30,
+    });
+  });
+
+  it('keeps loaded approval comments and the remaining count after creating a comment', async () => {
+    const createComment = (commentId: number, content: string) => ({
+      commentId,
+      ownerId: 1,
+      parentCommentId: null,
+      content: `<p>${content}</p>`,
+      commentType: 'USER',
+      writerId: `writer-${commentId}`,
+      writerName: `작성자 ${commentId}`,
+      createdAt: '2026-10-12T10:00:00Z',
+      attachments: [],
+    });
+    const latestComments = [25, 24, 23].map((id) =>
+      createComment(id, `최근 댓글 ${id}`),
+    );
+    const previousComments = [createComment(22, '이전 댓글 22')];
+    composerApi.listApprovalComments
+      .mockResolvedValueOnce({
+        comments: latestComments,
+        hasPrevious: true,
+        nextBeforeCommentId: 23,
+        resultCnt: 5,
+      })
+      .mockResolvedValueOnce({
+        comments: previousComments,
+        hasPrevious: true,
+        nextBeforeCommentId: 22,
+        resultCnt: 5,
+      });
+    composerApi.createApprovalComment
+      .mockResolvedValueOnce(createComment(26, '새 검토 의견'))
+      .mockResolvedValueOnce({
+        ...createComment(27, '새 검토 답글'),
+        parentCommentId: 26,
+      });
+
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(
+      await within(listRegion).findByRole('button', { name: /문서 A/ }),
+    );
+    await waitFor(() =>
+      expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
+        limit: 3,
+        beforeCommentId: undefined,
+      }),
+    );
+    await screen.findByText('최근 댓글 25');
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (2)' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '이전 댓글 보기 (2)' }),
+    );
+    await screen.findByText('이전 댓글 22');
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    ).toBeInTheDocument();
+
+    const editor = screen.getByRole('textbox', { name: '댓글 입력' });
+    fireEvent.input(editor, { target: { innerHTML: '<p>새 검토 의견</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await screen.findByText('새 검토 의견');
+    expect(screen.getByText('이전 댓글 22')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    ).toBeInTheDocument();
+    expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
+    expect(composerApi.listApprovalComments).toHaveBeenLastCalledWith(1, {
+      limit: 20,
+      beforeCommentId: 23,
+    });
+
+    const replyButtons = within(
+      screen.getByTestId('post-detail-panel'),
+    ).getAllByRole('button', { name: '답글' });
+    expect(replyButtons.length).toBeGreaterThan(0);
+    fireEvent.click(replyButtons[replyButtons.length - 1]);
+    const replyEditor = screen.getByRole('textbox', { name: '답글 입력' });
+    fireEvent.input(replyEditor, {
+      target: { innerHTML: '<p>새 검토 답글</p>' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '답글 등록' }));
+
+    await screen.findByText('새 검토 답글');
+    expect(screen.getByText('이전 댓글 22')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '이전 댓글 보기 (1)' }),
+    ).toBeInTheDocument();
+    expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
+  }, 15000);
+
+  it('opens a revision-requested draft in the composer with its persisted content and approvers', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 4,
+      eabusNo: '004',
+      documentType: 'DRAFTING',
+      documentStatus: 'REVISION_REQUESTED',
+      isDrafter: true,
+      title: '보완할 기안서',
+      drafterName: '김민수',
+      draftingWorkCategoryId: 77,
+      viewCount: 0,
+      summary: '기존 내용',
+      contentsJson: JSON.stringify({
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '기존 본문' }] }],
+      }),
+      contentsHtml: '<p>기존 본문</p>',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 11,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'emp-1',
+          participantName: '홍길동',
+          actionStatus: 'APPROVED',
+        },
+        {
+          electronicApprovalLineId: 12,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'emp-2',
+          participantName: '김민수',
+          actionStatus: 'RETURNED',
+        },
+      ],
+      attachments: [],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(
+      await within(listRegion).findByRole('button', { name: /문서 D/ }),
+    );
+    await screen.findByTestId('post-detail-panel');
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
+    await screen.findByRole('dialog', { name: '문서 작성' });
+    await screen.findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '보완할 기안서',
+    );
+    expect(screen.getByRole('textbox', { name: '본문' })).toHaveTextContent(
+      '기존 본문',
+    );
+    const approvalPeople = screen.getAllByTestId('document-approval-person');
+    expect(approvalPeople[0]).toHaveAttribute(
+      'aria-label',
+      '결재 1 홍길동',
+    );
+    expect(approvalPeople[1]).toHaveAttribute('aria-label', '결재 2 김민수');
+  }, 15000);
 
   it('switches to feed mode and opens the document composer with available tabs', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -665,7 +1717,19 @@ describe('Document write page', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.getByTestId('document-feed')).toBeInTheDocument();
+    expect(await screen.findByTestId('document-feed')).toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByTestId('document-feed')).getByRole('button', {
+        name: /문서 A/,
+      }),
+    );
+    expect(await screen.findByTestId('post-detail-panel')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '문서 상세' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('page-area-overlay-backdrop'));
+    await waitFor(() =>
+      expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     expect(
@@ -715,7 +1779,7 @@ describe('Document write page', () => {
         'rgb(30, 41, 59)',
       );
     });
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const title = screen.getByRole('textbox', { name: '제목' });
     const placeholder = editor.querySelector('p.is-editor-empty');
 
@@ -740,7 +1804,7 @@ describe('Document write page', () => {
     await waitForComposerReady();
 
     const editorPanel = screen.getByTestId('document-composer-editor-panel');
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const title = screen.getByRole('textbox', { name: '제목' });
 
     expect(getComputedStyle(editorPanel).backgroundColor).toBe(
@@ -760,7 +1824,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     const composerLayout = screen.getByTestId('document-composer-layout');
     const editorPanel = screen.getByTestId('document-composer-editor-panel');
     const dialogContent = editor.closest('.MuiDialogContent-root');
@@ -800,7 +1864,7 @@ describe('Document write page', () => {
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('마지막 블록'));
 
     const firstBlock = editor.firstElementChild;
@@ -855,9 +1919,14 @@ describe('Document write page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
 
+    const error = await screen.findByText('기안 분류를 불러오지 못했습니다.');
+    expect(error).toBeInTheDocument();
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(screen.getByTestId('document-composer-layout').firstElementChild)
+      .toHaveClass('MuiAlert-colorError');
     expect(
-      await screen.findByText('기안 분류를 불러오지 못했습니다.'),
-    ).toBeInTheDocument();
+      screen.queryByRole('progressbar', { name: '문서 정보 불러오는 중' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a loading status while initial draft lookups are pending', async () => {
@@ -869,15 +1938,19 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
 
     expect(
-      await screen.findByText('기안서 정보를 불러오는 중입니다.'),
+      await screen.findByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '구분' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    expect(screen.queryByRole('textbox', { name: '기안자' })).toBeNull();
+    expect(screen.getByRole('tab', { name: '기안서' })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: '결재선 설정' }),
+      screen.getByLabelText('첨부 파일 선택'),
     ).toBeDisabled();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: '결재선 설정' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an error when the profile has no drafter name and explicit empty states', async () => {
@@ -1231,6 +2304,18 @@ describe('Document write page', () => {
     expect(screen.getByRole('button', { name: '합의 추가' })).toHaveStyle({
       height: '40px',
     });
+  });
+
+  it('wraps approval actions when the composer has a narrow viewport', async () => {
+    render(<DashboardContent {...pageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+
+    const approvalActions = screen
+      .getByRole('button', { name: '결재 추가' })
+      .parentElement;
+    expect(approvalActions).toHaveStyle({ flexWrap: 'wrap' });
   });
 
   it('renders compact accessible badges, seals, removal actions, and ellipsized names', async () => {
@@ -1783,7 +2868,16 @@ describe('Document write page', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    expect(await screen.findByText('양식 본문 조회 실패')).toBeInTheDocument();
+    const error = await screen.findByText('양식 본문 조회 실패');
+    expect(error).toBeInTheDocument();
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(screen.getByTestId('document-composer-layout').firstElementChild)
+      .toHaveClass('MuiAlert-colorError');
+    expect(
+      screen.queryByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the editor read-only while a selected template is loading', async () => {
@@ -1800,23 +2894,38 @@ describe('Document write page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '로딩 중 보존할 제목' },
+    });
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
 
-    const editor = screen.getByRole('textbox', { name: '본문' });
-    await waitFor(() =>
-      expect(editor).toHaveAttribute('contenteditable', 'false'),
-    );
     expect(
-      screen.getByText('기안양식 본문을 불러오는 중입니다.'),
+      screen.getByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '본문' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: '제목' })).toBeNull();
+    expect(screen.getByRole('tab', { name: '기안서' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '툴바 열기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
 
     await act(async () => {
       resolveTemplate?.(draftFormTemplate);
     });
 
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    expect(
+      screen.queryByRole('progressbar', {
+        name: '문서 정보 불러오는 중',
+      }),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
     expect(editor).toHaveAttribute('contenteditable', 'true');
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '로딩 중 보존할 제목',
+    );
   });
 
   it('preserves the prior category and body when a dirty category change is cancelled', async () => {
@@ -1832,7 +2941,7 @@ describe('Document write page', () => {
     await waitForComposerReady();
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '기안양식' }));
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
     fireEvent.input(editor, {
       target: { innerHTML: '<p>작성자 수정 본문</p>' },
@@ -1898,7 +3007,7 @@ describe('Document write page', () => {
     const formSelector = screen.getByRole('combobox', { name: '기안양식' });
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
 
     fireEvent.input(editor, {
@@ -1957,7 +3066,7 @@ describe('Document write page', () => {
     const formSelector = screen.getByRole('combobox', { name: '기안양식' });
     fireEvent.mouseDown(formSelector);
     fireEvent.click(await screen.findByRole('option', { name: '정기점검' }));
-    const editor = screen.getByRole('textbox', { name: '본문' });
+    const editor = await screen.findByRole('textbox', { name: '본문' });
     await waitFor(() => expect(editor).toHaveTextContent('양식 본문'));
 
     fireEvent.input(editor, {
@@ -2022,4 +3131,513 @@ describe('Document write page', () => {
         .closest('.MuiAutocomplete-root'),
     ).not.toHaveTextContent(/박서준/);
   }, 10000);
+
+  it('saves the document payload and reuses its ID on subsequent saves', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '초안 제목' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(1),
+    );
+    const firstRequest = composerApi.saveDocumentDraft.mock.calls[0][0];
+    expect(composerApi.saveDocumentDraft.mock.calls[0][1]).toBeNull();
+    expect(firstRequest).toMatchObject({
+      documentType: 'DRAFTING',
+      draftingWorkCategoryId: null,
+      title: '초안 제목',
+      approvalLines: [
+        expect.objectContaining({
+          stageOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'emp-1',
+        }),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(2),
+    );
+    expect(composerApi.saveDocumentDraft.mock.calls[1][1]).toBe(77);
+    await waitFor(() =>
+      expect(composerNotifications.showSuccess).toHaveBeenCalledTimes(2),
+    );
+    expect(composerNotifications.showSuccess).toHaveBeenNthCalledWith(
+      2,
+      '문서가 임시저장되었습니다.',
+    );
+    const dialog = screen.getByRole('dialog', { name: '문서 작성' });
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
+    const titleHeader = dialog.querySelector('.MuiDialogTitle-root')?.parentElement;
+    expect(titleHeader).toHaveTextContent('임시저장 문서 ID: 77');
+    expect(dialog.querySelector('.MuiDialogContent-root')).not.toHaveTextContent(
+      '임시저장 문서 ID: 77',
+    );
+  });
+
+  it('saves the latest draft before submitting and closes after submission succeeds', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '상신할 문서' },
+    });
+    const approverPicker = screen.getByRole('combobox', {
+      name: '결재선 2 사용자 선택',
+    });
+    fireEvent.change(approverPicker, { target: { value: '김민수' } });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    fireEvent.click(screen.getByRole('button', { name: '결재 추가' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '결재신청' }));
+
+    await waitFor(() =>
+      expect(composerApi.submitDocumentApproval).toHaveBeenCalledTimes(1),
+    );
+    expect(composerApi.saveDocumentDraft).toHaveBeenCalledTimes(1);
+    expect(composerApi.submitDocumentApproval).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({
+        title: '상신할 문서',
+        approvalLines: [
+          expect.objectContaining({
+            stageOrder: 1,
+            participantType: 'APPROVAL',
+            participantUserId: 'emp-1',
+          }),
+          expect.objectContaining({
+            stageOrder: 2,
+            participantType: 'APPROVAL',
+            participantUserId: 'emp-2',
+          }),
+        ],
+      }),
+    );
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: '문서 작성' }),
+    );
+    expect(composerNotifications.showSuccess).toHaveBeenCalledWith(
+      '문서가 결재신청되었습니다.',
+    );
+  }, 15000);
+
+  it('uploads pasted images and includes editor image metadata in the draft request', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '이미지 초안' },
+    });
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    const file = new File(['png data'], 'pasted.png', { type: 'image/png' });
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
+        getData: () => '',
+      },
+    });
+
+    await waitFor(() =>
+      expect(composerApi.uploadDocumentDraftEmbeddedImage).toHaveBeenCalledWith(file),
+    );
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/approval-preview',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledOnce(),
+    );
+
+    const request = composerApi.saveDocumentDraft.mock.calls[0][0];
+    expect(request.contentsHtml).toContain('data-upload-token="approval-image-token"');
+    expect(JSON.stringify(request.contentsJson)).toContain('"data-upload-token":"approval-image-token"');
+    expect(request).toMatchObject({
+      embeddedImages: [
+        expect.objectContaining({
+          uploadToken: 'approval-image-token',
+          fileName: 'pasted.png',
+          imageUrl: 'https://minio.example/approval-preview',
+          objectKey: 'tenant/1/embedded-image-temp/approval-image-token/pasted.png',
+          fileSize: 8,
+          mimeType: 'image/png',
+        }),
+      ],
+      temporaryImages: [
+        {
+          uploadToken: 'approval-image-token',
+          fileName: 'pasted.png',
+        },
+      ],
+    });
+    expect(composerApi.deleteDocumentDraftEmbeddedImage).not.toHaveBeenCalled();
+  });
+
+  it('prevents saving while a pasted image upload is pending and reports upload failures', async () => {
+    let resolveUpload!: (value: {
+      src: string;
+      alt: string;
+      fileName: string;
+      uploadToken: string;
+      fileSize: number;
+      mimeType: string;
+      objectKey: string;
+    }) => void;
+    composerApi.uploadDocumentDraftEmbeddedImage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      }),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '업로드 대기 초안' },
+    });
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['png'], 'pending.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '이미지 업로드 중...' })).toBeDisabled(),
+    );
+    expect(composerApi.saveDocumentDraft).not.toHaveBeenCalled();
+    resolveUpload({
+      src: 'https://minio.example/pending-preview',
+      alt: 'pending.png',
+      fileName: 'pending.png',
+      uploadToken: 'pending-token',
+      fileSize: 3,
+      mimeType: 'image/png',
+      objectKey: 'tenant/1/embedded-image-temp/pending-token/pending.png',
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '저장' })).toBeEnabled(),
+    );
+
+    composerApi.uploadDocumentDraftEmbeddedImage.mockRejectedValueOnce(
+      new Error('upload failed'),
+    );
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['bad'], 'failed.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '본문 이미지 업로드에 실패했습니다.',
+    );
+    expect(editor.querySelector('img')).not.toBeInTheDocument();
+  });
+
+  it('deletes temporary pasted images when the composer is closed without saving', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    const editor = screen.getByRole('textbox', { name: '본문' });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => new File(['png'], 'pasted.png', { type: 'image/png' }),
+          },
+        ],
+        getData: () => '',
+      },
+    });
+    await waitFor(() =>
+      expect(editor.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://minio.example/approval-preview',
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: '문서 작성' }),
+    );
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftEmbeddedImage).toHaveBeenCalledWith(
+        'approval-image-token',
+        'pasted.png',
+      ),
+    );
+  });
+
+  it('keeps failed attachments and retries them individually', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockRejectedValueOnce(new Error('definite failure'))
+      .mockResolvedValueOnce({
+        fileId: 502,
+        fileName: 'evidence.txt',
+        fileSize: 8,
+      });
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 포함 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('definite failure')).toBeInTheDocument();
+    const partialUploadAlert = screen
+      .getByRole('dialog', { name: '문서 작성' })
+      .querySelector('.MuiDialogContent-root [role="alert"]');
+    expect(partialUploadAlert).toHaveClass('MuiAlert-colorError');
+    expect(partialUploadAlert).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+    expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('document-composer-attachment-uploaded'),
+      ).toBeInTheDocument(),
+    );
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('업로드 완료')).toBeInTheDocument();
+  });
+
+  it('keeps retry failures in the composer error area', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockRejectedValueOnce(new Error('definite failure'))
+      .mockRejectedValueOnce(new Error('definite failure'));
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 재시도 실패 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(
+      await screen.findByTestId('document-composer-attachment-failed'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    await waitFor(() =>
+      expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2),
+    );
+
+    const error = screen
+      .getByRole('dialog', { name: '문서 작성' })
+      .querySelector('.MuiDialogContent-root [role="alert"]');
+    expect(error).toHaveClass('MuiAlert-colorError');
+    expect(error).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+  });
+
+  it('keeps attachment deletion failures in the composer error area', async () => {
+    composerApi.deleteDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('첨부 삭제 실패'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 삭제 실패 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('document-composer-attachment-uploaded'),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '첨부 파일 삭제' }));
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftAttachment).toHaveBeenCalledTimes(1),
+    );
+
+    const error = await within(
+      screen.getByRole('dialog', { name: '문서 작성' }),
+    ).findByRole('alert');
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(error).toHaveTextContent('첨부 삭제 실패');
+    expect(error).toHaveClass('MuiAlert-colorError');
+  });
+
+  it('keeps unresolved attachment errors after deleting a confirmed file', async () => {
+    composerApi.uploadDocumentDraftAttachment
+      .mockResolvedValueOnce({
+        fileId: 504,
+        fileName: 'confirmed.txt',
+        fileSize: 9,
+      })
+      .mockRejectedValueOnce(new Error('definite failure'));
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 부분 실패 후 삭제 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [
+          new File(['evidence1'], 'confirmed.txt', { type: 'text/plain' }),
+          new File(['evidence2'], 'failed.txt', { type: 'text/plain' }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    const uploadedAttachment = await screen.findByTestId(
+      'document-composer-attachment-uploaded',
+    );
+    await screen.findByTestId('document-composer-attachment-failed');
+    fireEvent.click(
+      within(uploadedAttachment).getByRole('button', {
+        name: '첨부 파일 삭제',
+      }),
+    );
+    await waitFor(() =>
+      expect(composerApi.deleteDocumentDraftAttachment).toHaveBeenCalledTimes(1),
+    );
+
+    expect(
+      screen
+        .getByRole('dialog', { name: '문서 작성' })
+        .querySelector('.MuiDialogContent-root [role="alert"]'),
+    ).toHaveTextContent(
+      '문서는 저장되었지만 첨부파일 1건의 상태 확인이 필요합니다.',
+    );
+  });
+
+  it('keeps save failures in the composer error area without a success toast', async () => {
+    composerApi.saveDocumentDraft.mockRejectedValueOnce(
+      new Error('문서 저장 실패'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '저장 실패 초안' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    const error = await screen.findByText('문서 저장 실패');
+    expect(error.closest('.MuiDialogContent-root')).not.toBeNull();
+    expect(error.closest('.MuiAlert-root')).toHaveClass(
+      'MuiAlert-colorError',
+    );
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
+      '저장 실패 초안',
+    );
+    expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
+  });
+
+  it('marks an ambiguous upload as unknown and does not retry it automatically', async () => {
+    composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('network disconnected'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '네트워크 확인 초안' },
+    });
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(
+      await screen.findByRole('button', { name: '상태 확인' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '재시도' }),
+    ).not.toBeInTheDocument();
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '상태 확인' }));
+    const error = await within(
+      screen.getByRole('dialog', { name: '문서 작성' }),
+    ).findByRole('alert');
+    expect(error).toHaveTextContent(
+      '파일 목록에서 업로드 여부를 확인하지 못했습니다.',
+    );
+    expect(error).toHaveClass('MuiAlert-colorError');
+    expect(error).toHaveTextContent(
+      '파일 목록에서 업로드 여부를 확인하지 못했습니다.',
+    );
+    expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a success toast when an ambiguous attachment is confirmed', async () => {
+    composerApi.uploadDocumentDraftAttachment.mockRejectedValueOnce(
+      new Error('network disconnected'),
+    );
+    composerApi.listDocumentDraftAttachments.mockResolvedValueOnce([
+      { fileId: 503, fileName: 'evidence.txt', fileSize: 8 },
+    ]);
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await waitForComposerReady();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '첨부 확인 초안' },
+    });
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [new File(['evidence'], 'evidence.txt', { type: 'text/plain' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.click(await screen.findByRole('button', { name: '상태 확인' }));
+
+    await waitFor(() =>
+      expect(composerNotifications.showSuccess).toHaveBeenCalledWith(
+        '첨부파일 업로드가 확인되었습니다.',
+      ),
+    );
+    expect(
+      screen.getByTestId('document-composer-attachment-uploaded'),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('dialog', { name: '문서 작성' })
+        .querySelector('.MuiDialogContent-root [role="alert"]'),
+    ).toBeNull();
+  });
 });

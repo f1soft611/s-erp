@@ -10,6 +10,7 @@ import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import dayjs from 'dayjs';
 import { useTheme } from '@mui/material/styles';
+import { useNotification } from '../../../../../shared/context/NotificationContext';
 import {
   fetchDraftFormOptions,
   fetchDraftForms,
@@ -21,13 +22,49 @@ import type {
   DraftFormUserOption,
 } from '../../../../co/workflow/form/types/draftFormManagement.types';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
 import type {
+  DocumentApprovalDraftRequest,
+  DocumentApprovalDetail,
   DocumentApprovalStage,
+  DocumentDraftAttachment,
+  DocumentDraftAttachmentStatus,
   DocumentKind,
 } from '../types/documentWrite.types';
+import {
+  deleteDocumentDraftAttachment,
+  deleteDocumentDraftEmbeddedImage,
+  isDefiniteAttachmentUploadFailure,
+  listDocumentDraftAttachments,
+  saveDocumentDraft,
+  submitDocumentApproval,
+  UnknownAttachmentUploadOutcomeError,
+  uploadDocumentDraftAttachment,
+  uploadDocumentDraftEmbeddedImage,
+} from '../services/documentApproval.service';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 
 export const ALL_CATEGORY_VALUE = '__all__';
+
+function getDocumentType(kind: DocumentKind) {
+  const documentTypes: Record<DocumentKind, DocumentApprovalDraftRequest['documentType']> = {
+    기안서: 'DRAFTING',
+    업무연락: 'BUSINESS_CONTACT',
+    지출결의서: 'EXPENSE_RESOLUTION',
+    근태신청: 'ATTENDANCE_APPLICATION',
+  };
+  return documentTypes[kind];
+}
+
+const kindByDocumentType: Record<
+  DocumentApprovalDraftRequest['documentType'],
+  DocumentKind
+> = {
+  DRAFTING: '기안서',
+  BUSINESS_CONTACT: '업무연락',
+  EXPENSE_RESOLUTION: '지출결의서',
+  ATTENDANCE_APPLICATION: '근태신청',
+};
 
 function toUserOption(user: DraftFormUserOption): F1GridUserOption {
   return {
@@ -56,15 +93,23 @@ function toUserIds(value: F1GridUserValue): string[] {
   return value == null ? [] : [String(value)];
 }
 
-export function useDocumentComposer(open: boolean, onClose: () => void) {
+export function useDocumentComposer(
+  open: boolean,
+  onClose: () => void,
+  initialDocument: DocumentApprovalDetail | null = null,
+) {
   const theme = useTheme();
+  const { showSuccess } = useNotification();
   const isDark = theme.palette.mode === 'dark';
   const editorSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const fieldSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const [activeDocumentKind, setActiveDocumentKind] =
     useState<DocumentKind>('기안서');
   const [composerTitle, setComposerTitle] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<DocumentDraftAttachment[]>([]);
+  const [electronicApprovalId, setElectronicApprovalId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [drafterName, setDrafterName] = useState('');
   const [categoryItems, setCategoryItems] = useState<
     Awaited<ReturnType<typeof fetchDraftFormOptions>>['categoryItems']
@@ -98,6 +143,21 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const nextStageId = useRef(1);
   const editorBaseline = useRef<string | null>(null);
   const templateRequestId = useRef(0);
+  const nextAttachmentId = useRef(1);
+  const draftIdRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
+  const imageSaveLifecycle = useRichTextEditorSaveLifecycle({
+    editor,
+    uploadImage: uploadDocumentDraftEmbeddedImage,
+    deleteTemporaryImage: ({ uploadToken, fileName }) =>
+      deleteDocumentDraftEmbeddedImage(uploadToken, fileName),
+    onImageUploadError: (message) => {
+      setSaveError((current) => {
+        if (message) return message;
+        return current === '본문 이미지 업로드에 실패했습니다.' ? '' : current;
+      });
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -143,6 +203,77 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
             isFixed: true,
           },
         ]);
+        if (initialDocument) {
+          const authorLine = initialDocument.approvalLines.find(
+            (line) =>
+              line.stageOrder === 1 &&
+              line.participantType === 'APPROVAL' &&
+              line.participantUserId === signedInEmployeeId,
+          );
+          if (!authorLine) {
+            setLoadError('저장된 결재선에서 기안자를 확인할 수 없습니다.');
+            return;
+          }
+          setElectronicApprovalId(initialDocument.electronicApprovalId);
+          draftIdRef.current = initialDocument.electronicApprovalId;
+          setComposerTitle(initialDocument.title);
+          setActiveDocumentKind(kindByDocumentType[initialDocument.documentType]);
+          setSelectedFormId(
+            initialDocument.draftingWorkCategoryId === null
+              ? ''
+              : String(initialDocument.draftingWorkCategoryId),
+          );
+          const matchingForm = forms.find(
+            (form) =>
+              form.draftingWorkCategoryId === initialDocument.draftingWorkCategoryId,
+          );
+          setSelectedCategoryId(
+            matchingForm ? String(matchingForm.categoryItemId) : ALL_CATEGORY_VALUE,
+          );
+          const lineStages = new Map<number, DocumentApprovalStage>();
+          const references: string[] = [];
+          for (const line of [...initialDocument.approvalLines].sort(
+            (left, right) =>
+              left.stageOrder - right.stageOrder ||
+              left.participantOrder - right.participantOrder,
+          )) {
+            if (line.participantType === 'REFERENCE') {
+              references.push(line.participantUserId);
+              continue;
+            }
+            if (line.electronicApprovalLineId === authorLine.electronicApprovalLineId) {
+              continue;
+            }
+            let stage = lineStages.get(line.stageOrder);
+            if (!stage) {
+              stage = {
+                id: nextStageId.current++,
+                kind: line.participantType === 'AGREEMENT' ? 'agreement' : 'approval',
+                users: [],
+              };
+              lineStages.set(line.stageOrder, stage);
+            }
+            const participant =
+              availableUsers.find(
+                (user) => String(user.value) === line.participantUserId,
+              ) ?? {
+                value: line.participantUserId,
+                label: line.participantName,
+                departmentName: line.participantDepartmentName ?? undefined,
+              };
+            stage.users.push(participant);
+          }
+          setApprovalStages([
+            {
+              id: nextStageId.current++,
+              kind: 'approval',
+              users: [signedInUser],
+              isFixed: true,
+            },
+            ...Array.from(lineStages.values()),
+          ]);
+          setReferenceUserIds(references);
+        }
       })
       .catch((error: unknown) => {
         if (active) setLoadError(getErrorMessage(error));
@@ -154,7 +285,7 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     return () => {
       active = false;
     };
-  }, [open]);
+  }, [initialDocument, open]);
 
   const availableForms = useMemo(
     () =>
@@ -171,9 +302,14 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const handleEditorReady = useCallback((nextEditor: Editor | null) => {
     setEditor(nextEditor);
     if (nextEditor) {
+      if (initialDocument) {
+        nextEditor.commands.setContent(initialDocument.contentsHtml, {
+          emitUpdate: false,
+        });
+      }
       editorBaseline.current = JSON.stringify(nextEditor.getJSON());
     }
-  }, []);
+  }, [initialDocument]);
 
   const applyDraftSelection = useCallback(
     async (selection: { categoryId: string; formId: string }) => {
@@ -380,14 +516,71 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
   const handleAttachmentSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFiles = Array.from(event.target.files ?? []);
     if (nextFiles.length > 0) {
-      setAttachments((current) => [...current, ...nextFiles]);
+      setAttachments((current) => [
+        ...current,
+        ...nextFiles.map((file) => ({
+          clientId: `attachment-${nextAttachmentId.current++}`,
+          file,
+          status: 'pending' as const,
+        })),
+      ]);
     }
     event.target.value = '';
   };
 
+  const uploadAttachment = useCallback(
+    async (
+      attachment: DocumentDraftAttachment,
+      approvalId: number,
+    ): Promise<DocumentDraftAttachmentStatus> => {
+      try {
+        const uploaded = await uploadDocumentDraftAttachment(
+          approvalId,
+          attachment.file,
+        );
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === attachment.clientId
+              ? { ...item, status: 'uploaded', fileId: uploaded.fileId, error: undefined }
+              : item,
+          ),
+        );
+        return 'uploaded';
+      } catch (error: unknown) {
+        const status = isDefiniteAttachmentUploadFailure(error) ? 'failed' : 'unknown';
+        const message =
+          error instanceof UnknownAttachmentUploadOutcomeError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : '첨부파일 업로드 결과를 확인할 수 없습니다.';
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === attachment.clientId
+              ? { ...item, status, error: message }
+              : item,
+          ),
+        );
+        return status;
+      }
+    },
+    [],
+  );
+
   const closeComposer = useCallback(() => {
+    if (savingRef.current) return;
+    if (imageSaveLifecycle.uploadingCount > 0) {
+      setSaveError('본문 이미지 업로드가 끝난 뒤 닫아 주세요.');
+      return;
+    }
+    void imageSaveLifecycle.cleanupTemporaryImages();
+    draftIdRef.current = null;
+    setElectronicApprovalId(null);
+    setIsSaving(false);
+    setSaveError('');
     setComposerTitle('');
     setAttachments([]);
+    nextAttachmentId.current = 1;
     setDrafterName('');
     setCategoryItems([]);
     setDraftForms([]);
@@ -412,7 +605,309 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
       editorBaseline.current = null;
     }
     onClose();
-  }, [editor, onClose]);
+  }, [editor, imageSaveLifecycle, onClose]);
+
+  const buildDraftRequest = useCallback((): DocumentApprovalDraftRequest | null => {
+    if (!editor || !composerTitle.trim() || approvalStages.length === 0) return null;
+    const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
+      approvalStages.flatMap((stage, stageIndex) =>
+        stage.users.map((user, participantIndex) => ({
+          stageOrder: stageIndex + 1,
+          participantOrder: participantIndex + 1,
+          participantType:
+            stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
+          participantUserId: String(user.value),
+        })),
+      );
+    if (referenceUserIds.length > 0) {
+      approvalLines.push(
+        ...referenceUserIds.map((participantUserId, participantIndex) => ({
+          stageOrder: approvalStages.length + 1,
+          participantOrder: participantIndex + 1,
+          participantType: 'REFERENCE' as const,
+          participantUserId,
+        })),
+      );
+    }
+
+    const snapshot = imageSaveLifecycle.getSnapshot();
+    return {
+      documentType: getDocumentType(activeDocumentKind),
+      draftingWorkCategoryId: selectedFormId ? Number(selectedFormId) : null,
+      title: composerTitle.trim(),
+      contentsJson: snapshot.json,
+      contentsHtml: snapshot.html,
+      contentsText: editor.getText({ blockSeparator: '\n' }),
+      approvalLines,
+      embeddedImages: snapshot.referencedImages.map((image) => ({
+        uploadToken: image.uploadToken,
+        fileName: image.fileName,
+        imageUrl: image.src ?? null,
+        fileId: image.fileId ?? null,
+        objectKey: image.objectKey ?? null,
+        fileSize: image.fileSize ?? null,
+        mimeType: image.mimeType ?? null,
+        width: image.width ?? null,
+      })),
+      temporaryImages: snapshot.temporaryImages,
+    };
+  }, [
+    activeDocumentKind,
+    approvalStages,
+    composerTitle,
+    editor,
+    imageSaveLifecycle,
+    referenceUserIds,
+    selectedFormId,
+  ]);
+
+  const persistDocument = useCallback(async (submit: boolean) => {
+    if (
+      savingRef.current ||
+      !editor ||
+      !composerTitle.trim() ||
+      approvalStages.length === 0
+    ) {
+      return;
+    }
+    if (imageSaveLifecycle.uploadingCount > 0) {
+      setSaveError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      const request = buildDraftRequest();
+      if (!request) return;
+      const saved = await saveDocumentDraft(request, draftIdRef.current);
+      imageSaveLifecycle.completeSave();
+      draftIdRef.current = saved.electronicApprovalId;
+      setElectronicApprovalId(saved.electronicApprovalId);
+      if (submit && saved.documentStatus !== 'DRAFT' && saved.documentStatus !== 'REVISION_REQUESTED') {
+        throw new Error('현재 상태에서는 결재신청할 수 없습니다.');
+      }
+
+      let failedCount = attachments.filter(
+        (attachment) => attachment.status === 'failed' || attachment.status === 'unknown',
+      ).length;
+      for (const attachment of attachments.filter((item) => item.status === 'pending')) {
+        const status = await uploadAttachment(attachment, saved.electronicApprovalId);
+        if (status !== 'uploaded') failedCount += 1;
+      }
+      if (failedCount > 0) {
+        setSaveError(
+          `문서는 저장되었지만 첨부파일 ${failedCount}건의 상태 확인이 필요합니다.`,
+        );
+        if (submit) return;
+      } else if (submit) {
+        const latestRequest = buildDraftRequest();
+        if (!latestRequest) {
+          setSaveError('결재신청에 필요한 문서 내용을 확인할 수 없습니다.');
+          return;
+        }
+        await submitDocumentApproval(saved.electronicApprovalId, latestRequest);
+        showSuccess('문서가 결재신청되었습니다.');
+        savingRef.current = false;
+        setIsSaving(false);
+        closeComposer();
+      } else {
+        showSuccess('문서가 임시저장되었습니다.');
+      }
+    } catch (error: unknown) {
+      setSaveError(
+        error instanceof Error ? error.message : '문서 저장에 실패했습니다.',
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [
+    attachments,
+    buildDraftRequest,
+    closeComposer,
+    editor,
+    imageSaveLifecycle,
+    showSuccess,
+    uploadAttachment,
+  ]);
+
+  const saveDraft = useCallback(() => persistDocument(false), [persistDocument]);
+  const submitDraft = useCallback(() => persistDocument(true), [persistDocument]);
+
+  const retryFailedAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      const approvalId = draftIdRef.current;
+      if (
+        savingRef.current ||
+        !attachment ||
+        attachment.status !== 'failed' ||
+        approvalId === null
+      ) {
+        return;
+      }
+      savingRef.current = true;
+      setIsSaving(true);
+      setSaveError('');
+      try {
+        const status = await uploadAttachment(attachment, approvalId);
+        const unresolvedCount = attachments.filter(
+          (item) =>
+            item.clientId !== clientId &&
+            (item.status === 'pending' ||
+              item.status === 'failed' ||
+              item.status === 'unknown'),
+        ).length;
+        if (status !== 'uploaded') {
+          setSaveError(
+            `문서는 저장되었지만 첨부파일 ${unresolvedCount + 1}건의 상태 확인이 필요합니다.`,
+          );
+        } else if (unresolvedCount > 0) {
+          setSaveError(
+            `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`,
+          );
+        }
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments, uploadAttachment],
+  );
+
+  const reconcileUnknownAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      const approvalId = draftIdRef.current;
+      if (
+        savingRef.current ||
+        !attachment ||
+        attachment.status !== 'unknown' ||
+        approvalId === null
+      ) {
+        return;
+      }
+      savingRef.current = true;
+      setIsSaving(true);
+      setSaveError('');
+      try {
+        const files = await listDocumentDraftAttachments(approvalId);
+        const uploadedIds = new Set(
+          attachments
+            .filter((item) => item.status === 'uploaded' && item.fileId !== undefined)
+            .map((item) => item.fileId),
+        );
+        const matches = files.filter(
+          (file) =>
+            file.fileName === attachment.file.name &&
+            file.fileSize === attachment.file.size &&
+            !uploadedIds.has(file.fileId),
+        );
+        if (matches.length === 1) {
+          setAttachments((current) =>
+            current.map((item) =>
+              item.clientId === clientId
+                ? { ...item, status: 'uploaded', fileId: matches[0].fileId, error: undefined }
+                : item,
+            ),
+          );
+          const unresolvedCount = attachments.filter(
+            (item) =>
+              item.clientId !== clientId &&
+              (item.status === 'pending' ||
+                item.status === 'failed' ||
+                item.status === 'unknown'),
+          ).length;
+          if (unresolvedCount > 0) {
+            setSaveError(
+              `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`,
+            );
+          } else {
+            showSuccess('첨부파일 업로드가 확인되었습니다.');
+          }
+        } else {
+          setSaveError('파일 목록에서 업로드 여부를 확인하지 못했습니다.');
+          setAttachments((current) =>
+            current.map((item) =>
+              item.clientId === clientId
+                ? { ...item, error: '파일 목록에서 업로드 여부를 확인하지 못했습니다.' }
+                : item,
+            ),
+          );
+        }
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : '첨부 상태 조회에 실패했습니다.';
+        setSaveError(message);
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === clientId
+              ? {
+                  ...item,
+                  error: message,
+                }
+              : item,
+          ),
+        );
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments, showSuccess],
+  );
+
+  const removeAttachment = useCallback(
+    async (clientId: string) => {
+      const attachment = attachments.find((item) => item.clientId === clientId);
+      if (!attachment || savingRef.current || attachment.status === 'unknown') return;
+      if (attachment.status !== 'uploaded') {
+        setAttachments((current) => current.filter((item) => item.clientId !== clientId));
+        return;
+      }
+      const approvalId = draftIdRef.current;
+      if (approvalId === null || attachment.fileId === undefined) return;
+      savingRef.current = true;
+      setIsSaving(true);
+      try {
+        await deleteDocumentDraftAttachment(approvalId, attachment.fileId);
+        setAttachments((current) => current.filter((item) => item.clientId !== clientId));
+        const unresolvedCount = attachments.filter(
+          (item) =>
+            item.clientId !== clientId &&
+            (item.status === 'pending' ||
+              item.status === 'failed' ||
+              item.status === 'unknown'),
+        ).length;
+        setSaveError(
+          unresolvedCount > 0
+            ? `문서는 저장되었지만 첨부파일 ${unresolvedCount}건의 상태 확인이 필요합니다.`
+            : '',
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : '첨부파일 삭제에 실패했습니다.';
+        setSaveError(message);
+        setAttachments((current) =>
+          current.map((item) =>
+            item.clientId === clientId
+              ? { ...item, error: message }
+              : item,
+          ),
+        );
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [attachments],
+  );
 
   return {
     activeDocumentKind,
@@ -445,7 +940,35 @@ export function useDocumentComposer(open: boolean, onClose: () => void) {
     loadError,
     isLoading,
     attachments,
-    setAttachments,
+    electronicApprovalId,
+    isSaving,
+    saveError,
+    saveDraft,
+    submitDraft,
+    uploadImage: imageSaveLifecycle.uploadImage,
+    onOrphanedImageUpload: imageSaveLifecycle.onOrphanedImageUpload,
+    onUploadingChange: imageSaveLifecycle.onUploadingChange,
+    onImageUploadError: imageSaveLifecycle.onImageUploadError,
+    uploadingCount: imageSaveLifecycle.uploadingCount,
+    retryFailedAttachment,
+    reconcileUnknownAttachment,
+    removeAttachment,
+    canSaveDraft:
+      !isLoading &&
+      !templateLoading &&
+      !isSaving &&
+      imageSaveLifecycle.uploadingCount === 0 &&
+      Boolean(composerTitle.trim()) &&
+      Boolean(editor) &&
+      approvalStages.length > 0,
+    canSubmitDraft:
+      !isLoading &&
+      !templateLoading &&
+      !isSaving &&
+      imageSaveLifecycle.uploadingCount === 0 &&
+      Boolean(composerTitle.trim()) &&
+      Boolean(editor) &&
+      approvalStages.some((stage, index) => index > 0 && stage.users.length > 0),
     attachmentInputRef,
     editor,
     handleEditorReady,

@@ -74,6 +74,32 @@
           AND deleted_yn = 'N'
     </select>
 
+    <select id="selectCommonFileByIdExcludingApproval" parameterType="map" resultMap="commonFileMap">
+        SELECT
+            file_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            file_name,
+            file_path,
+            object_key,
+            bucket_name,
+            storage_provider,
+            file_size,
+            mime_type,
+            content_type,
+            file_usage_type,
+            uploaded_by,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM tb_common_file
+        WHERE tenant_id = #{tenantId}
+          AND file_id = #{fileId}
+          AND deleted_yn = 'N'
+          AND COALESCE(UPPER(owner_type), '') NOT IN ('APPROVAL', 'APPROVAL_COMMENT')
+    </select>
+
     <select id="selectCommonFileByIdAndOwner" parameterType="map" resultMap="commonFileMap">
         SELECT
             file_id,
@@ -153,12 +179,13 @@
           AND deleted_yn = 'N'
     </update>
 
-    <update id="softDeleteCommonFile" parameterType="map">
+    <update id="softDeleteCommonFileExcludingApproval" parameterType="map">
         UPDATE tb_common_file
         SET deleted_yn = 'Y',
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND file_id = #{fileId}
+          AND COALESCE(UPPER(owner_type), '') NOT IN ('APPROVAL', 'APPROVAL_COMMENT')
     </update>
 
     <update id="softDeleteCommonFileByOwner" parameterType="map">
