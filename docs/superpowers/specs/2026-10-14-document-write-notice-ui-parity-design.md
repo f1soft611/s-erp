@@ -10,6 +10,8 @@ existing right-side detail panel.
 Keep the list view and its detail-panel behavior. When editing from the detail
 panel, show the composer above it; closing or saving the composer refreshes the
 list and selected detail quietly without replacing them with loading skeletons.
+Switching between feed and list always reloads the data and shows that view's
+skeleton while the request is in progress.
 
 ## Scope
 
@@ -26,7 +28,8 @@ list and selected detail quietly without replacing them with loading skeletons.
   document-specific labels and permissions.
 - Keep the detail panel open behind the composer and refresh updated content
   quietly when the composer closes or saves.
-- Do not change backend APIs, database schema, or notice behavior.
+- Extend only the existing document-list API response when explicitly asked for
+  feed details. Do not change the database schema or notice behavior.
 
 ## Design
 
@@ -45,25 +48,44 @@ summaries. Feed mode does not open the right-side detail panel when the user
 interacts with a card. List mode continues to open that panel when an item is
 selected.
 
-Preserve the document's existing permission-gated edit/delete menu in feed
-cards, following the notice feed's owner-menu pattern. Editing from a feed card
-opens the composer and quietly refreshes the list when it closes. Editing from
-the list detail panel keeps that panel open beneath the composer. Do not add
-notice-only pin actions or new document actions that have no existing document
-service.
+On each view-mode switch, reload the filtered document list and show the
+corresponding feed or list skeleton until that view's data is ready. List mode
+uses the existing lightweight list response. Feed mode requests
+`includeDetails=true` from the existing document-list endpoint; its response
+adds the complete feed payload to each matching document. Preserve the
+document's existing permission-gated edit/delete menu in feed cards, following
+the notice feed's owner-menu pattern. Editing from a feed card opens the
+composer and quietly refreshes the list and feed details when it closes.
+Editing from the list detail panel keeps that panel open beneath the composer
+and quietly refreshes the selected detail. Do not add notice-only pin actions
+or new document actions that have no existing document service.
 
-Reuse the current document detail implementation and services to avoid
-duplicating comment permissions and mutations. Adapt its presentation boundary
-so the same document-specific behavior can render inline as a feed card or in
-the existing side panel. The feed presentation omits approval-processing
-controls; those remain available only in the detail panel. Feed cards do not
-reuse notice APIs, data, or permissions.
+The detailed list response includes the fields required by the existing
+document detail presentation: the full body, approval-line data, attachments,
+and the initial user-comment page with its attachments, count, and previous
+comment cursor metadata. Older comments continue to use the existing paged
+comment API. The backend assembles this payload without recording a document
+view or incrementing its view count; the existing detail endpoint retains its
+current view-count behavior.
 
-Render each card shell immediately, then load its detail and initial comments
-as it enters the viewport. This keeps the complete filtered feed visible while
-avoiding a burst of detail/comment requests for off-screen records. Provide
-card-scoped loading, explicit errors, and retry for failed requests. Continue
-using the existing document detail service and paged comment service.
+The complete feed payload is returned by one list request and replaces the
+feed only after the response is complete. The list endpoint keeps its existing
+response shape unless `includeDetails=true` is requested. Reuse the current
+document detail presentation for panel and feed behavior; feed cards consume
+their preloaded detail/comments instead of issuing one detail/comment request
+per card. Continue using existing services for older-comment paging and
+comment/attachment mutations. The feed presentation omits
+approval-processing controls; those remain available only in the detail panel.
+Feed cards do not reuse notice APIs, data, or permissions.
+
+When details are requested, each result row keeps all existing list fields and
+adds `contentsJson`, `contentsHtml`, `contentsText`, `viewCount`, `isDrafter`,
+`draftingWorkCategoryId`, `approvalLines`, `attachments`, `systemEvents`,
+`comments`, `commentCount`, `hasPreviousComments`, and
+`nextBeforeCommentId`. `comments` contains the existing initial page of user
+comments, including each comment's attachments; older comments remain
+available through the existing cursor-based comment endpoint. The existing
+response remains unchanged when `includeDetails` is omitted or false.
 
 ### Editing from document detail
 
@@ -79,22 +101,21 @@ treated as success or close the panel.
 
 ## Alternatives considered
 
-1. **Reuse document detail behavior in inline cards (selected).** This
-   preserves existing document permissions, comment mutations, attachment
-   handling, and reaction behavior while avoiding notice/document coupling.
-2. **Build a separate document feed implementation from notice primitives.**
-   This would keep the page visually familiar but duplicate document comment
-   behavior and risk divergence from the detail panel.
-3. **Keep summary-only cards and open detail on selection.** This has the
-   smallest implementation cost but does not satisfy the requested full-detail
-   feed.
+1. **Add optional details to the existing list endpoint (selected).** This
+   matches the notice list's one-response feed data flow, keeps the current
+   lightweight list response as the default, and avoids a new endpoint.
+2. **Add a dedicated document-feed endpoint.** This separates feed and list
+   contracts but creates another endpoint with overlapping filtering and
+   document metadata.
+3. **Fetch each document's detail and comments from the frontend.** This
+   avoids a backend response change, but it is not a single list request and
+   causes request volume to grow with the number of documents.
 
 ## Error handling
 
-- Detail and comment requests show card-scoped loading and errors with an
-  explicit retry action.
-- A failed detail request does not render a success-shaped partial document;
-  the card retains its available list metadata and reports the failure.
+- A failed detailed-list request does not render a success-shaped partial
+  feed; the view shows the request error and keeps the existing data state
+  available for retry.
 - Existing document comment and attachment errors continue to use their
   current notifications/error messages.
 - Quiet list/detail refresh failures remain visible without clearing the
@@ -107,8 +128,11 @@ treated as success or close the panel.
   supports full detail, existing like toggle, comments, and attachments.
 - Test that feed interactions do not open the detail panel and that list
   selection still opens it.
-- Test per-card loading, request failure, retry, and off-screen request
-  deferral.
+- Test that mode switches refetch, show the correct skeleton, and ignore stale
+  responses; test that feed cards render together only after the detailed-list
+  response succeeds.
+- Test that detailed-list failure is explicit and does not render partial feed
+  cards, while older comments still load through the existing paging API.
 - Test that approval-processing actions are absent from feed cards and remain
   available in the detail panel.
 - Test that editing leaves the detail panel mounted and that close/save
