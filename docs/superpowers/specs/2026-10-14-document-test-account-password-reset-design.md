@@ -46,9 +46,12 @@ database as part of this task.
 - Missing or malformed hash settings, an absent or ambiguous tenant, or a
   target account count other than ten must raise an explicit error before any
   persistent update.
-- Any post-update count mismatch must fail the transaction so the operator can
-  roll it back; execution instructions must require the client's stop-on-error
-  behavior.
+- Any update-count mismatch must raise an error inside the open transaction;
+  execution instructions must require the client's stop-on-error behavior so
+  the failed transaction is not committed.
+- A successful reset has no rollback script. The prior password hash is not
+  retained because it is an authentication-equivalent secret; a later change
+  must be performed as a new authorized reset.
 - The script is a data update, not a schema change. It does not alter role
   definitions or permissions.
 - Read-only DB MCP remains read-only. Script verification is static; database
