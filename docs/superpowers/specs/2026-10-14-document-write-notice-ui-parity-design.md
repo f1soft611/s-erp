@@ -45,6 +45,13 @@ summaries. Feed mode does not open the right-side detail panel when the user
 interacts with a card. List mode continues to open that panel when an item is
 selected.
 
+Preserve the document's existing permission-gated edit/delete menu in feed
+cards, following the notice feed's owner-menu pattern. Editing from a feed card
+opens the composer and quietly refreshes the list when it closes. Editing from
+the list detail panel keeps that panel open beneath the composer. Do not add
+notice-only pin actions or new document actions that have no existing document
+service.
+
 Reuse the current document detail implementation and services to avoid
 duplicating comment permissions and mutations. Adapt its presentation boundary
 so the same document-specific behavior can render inline as a feed card or in
