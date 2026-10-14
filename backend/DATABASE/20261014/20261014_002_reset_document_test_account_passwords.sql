@@ -1,6 +1,9 @@
--- Run with psql after setting all ten session hash values in this same session.
--- Passwords and password hashes must never be stored in this file.
+-- Run this file directly with psql.
+-- WARNING: psql \prompt input is visible while typed. The expanded password SQL
+-- may also be recorded by PostgreSQL statement logging. Run only in a trusted
+-- terminal and an approved database logging environment.
 \set ON_ERROR_STOP on
+\prompt 'New password for the ten test accounts (input is visible): ' reset_password
 
 BEGIN;
 
@@ -10,17 +13,30 @@ CREATE TEMPORARY TABLE document_test_password_reset (
 ) ON COMMIT DROP;
 
 INSERT INTO document_test_password_reset (login_code, password_hash)
-VALUES
-    ('doc-write-test-user-01', current_setting('app.document_test_user_hash_01', true)),
-    ('doc-write-test-user-02', current_setting('app.document_test_user_hash_02', true)),
-    ('doc-write-test-user-03', current_setting('app.document_test_user_hash_03', true)),
-    ('doc-write-test-user-04', current_setting('app.document_test_user_hash_04', true)),
-    ('doc-write-test-user-05', current_setting('app.document_test_user_hash_05', true)),
-    ('doc-write-test-user-06', current_setting('app.document_test_user_hash_06', true)),
-    ('doc-write-test-user-07', current_setting('app.document_test_user_hash_07', true)),
-    ('doc-write-test-user-08', current_setting('app.document_test_user_hash_08', true)),
-    ('doc-write-test-user-09', current_setting('app.document_test_user_hash_09', true)),
-    ('doc-write-test-user-10', current_setting('app.document_test_user_hash_10', true));
+SELECT target.login_code,
+       encode(
+           sha256(
+               convert_to(target.login_code, 'UTF8')
+               || convert_to(:'reset_password', 'UTF8')
+           ),
+           'base64'
+       )
+FROM (
+    VALUES
+        ('doc-write-test-user-01'),
+        ('doc-write-test-user-02'),
+        ('doc-write-test-user-03'),
+        ('doc-write-test-user-04'),
+        ('doc-write-test-user-05'),
+        ('doc-write-test-user-06'),
+        ('doc-write-test-user-07'),
+        ('doc-write-test-user-08'),
+        ('doc-write-test-user-09'),
+        ('doc-write-test-user-10')
+) AS target(login_code)
+WHERE :'reset_password' <> '';
+
+\unset reset_password
 
 DO $$
 BEGIN

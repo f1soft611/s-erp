@@ -41,7 +41,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSa
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
@@ -55,6 +57,68 @@ class DocumentApprovalServiceImplTest {
     private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
     private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
     private final LoginVO author = author();
+
+    @Test
+    void feedListHydratesDocumentWithoutRecordingView() throws Exception {
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        listItem.setTitle("피드 문서");
+        listItem.setSummary("목록 요약");
+        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
+
+        DocumentApprovalDetailVO detail = detail(8);
+        detail.setContentsJson("{\"type\":\"doc\"}");
+        detail.setContentsHtml("<p>전체 본문</p>");
+        detail.setContentsText("전체 본문");
+        when(approvalDAO.selectDocumentApprovalDetail(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId")))))
+            .thenReturn(detail);
+
+        CommonFileVO attachment = new CommonFileVO();
+        attachment.setFileId(91L);
+        attachment.setOwnerId(77L);
+        when(fileService.listFiles(4L, "APPROVAL", 77L)).thenReturn(Collections.singletonList(attachment));
+        DocumentApprovalLineVO approvalLine = new DocumentApprovalLineVO();
+        when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.singletonList(approvalLine));
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+
+        CommonCommentVO comment = approvalComment(55L, "login-author", "USER");
+        when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
+        when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
+        when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.<CommonFileVO>emptyList());
+        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
+
+        List<DocumentApprovalFeedItemVO> result = service().listFeedDocuments(author, "ALL", null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getElectronicApprovalId()).isEqualTo(77L);
+        assertThat(result.get(0).getSummary()).isEqualTo("목록 요약");
+        assertThat(result.get(0).getContentsHtml()).isEqualTo("<p>전체 본문</p>");
+        assertThat(result.get(0).getApprovalLines()).containsExactly(approvalLine);
+        assertThat(result.get(0).getAttachments()).containsExactly(attachment);
+        assertThat(result.get(0).getComments()).containsExactly(comment);
+        assertThat(result.get(0).getCommentCount()).isEqualTo(1L);
+        assertThat(result.get(0).isHasPreviousComments()).isFalse();
+        assertThat(result.get(0).getNextBeforeCommentId()).isNull();
+        verify(approvalDAO, never()).selectLoginIdByLoginCode(anyMap());
+        verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
+        verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
+    }
+
+    @Test
+    void ordinaryListDoesNotHydrateDetails() throws Exception {
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
+
+        List<DocumentApprovalListItemVO> result = service().listDocuments(author, "ALL", null, null);
+
+        assertThat(result).containsExactly(listItem);
+        verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
+        verify(approvalDAO, never()).selectApprovalLines(anyMap());
+        verifyNoInteractions(commentDAO, fileService);
+    }
 
     @Test
     void detailIncrementsViewCountForFirstAuthorizedView() throws Exception {

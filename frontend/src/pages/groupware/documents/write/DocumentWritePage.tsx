@@ -1,7 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Alert, Box, Container, Stack } from '@mui/material';
+import { Alert, Box, Button, Container, Stack } from '@mui/material';
 import { useState } from 'react';
-import { useTheme } from '@mui/material/styles';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
@@ -33,9 +32,9 @@ export function DocumentWritePage({
   currentMenuName,
   content,
 }: DocumentWritePageProps) {
-  const theme = useTheme();
   const [editingDocument, setEditingDocument] =
     useState<DocumentApprovalDetail | null>(null);
+  const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const {
     viewMode,
     setViewMode,
@@ -46,12 +45,14 @@ export function DocumentWritePage({
     closeComposer,
     pinnedDocuments,
     unpinnedDocuments,
+    feedDocuments,
     pinnedViewItems,
     unpinnedViewItems,
     summary,
     notices,
     isLoading,
     loadError,
+    retry,
     selectScope,
     selectNotice,
     openDetail,
@@ -59,7 +60,10 @@ export function DocumentWritePage({
     detailDocumentId,
     refresh,
   } = useDocumentWritePage();
-
+  const hasVisibleDocuments =
+    viewMode === 'feed'
+      ? feedDocuments.length > 0
+      : pinnedDocuments.length + unpinnedDocuments.length > 0;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'document-write',
@@ -126,7 +130,15 @@ export function DocumentWritePage({
                   }
                 />
                 {loadError && (
-                  <Alert severity="error" sx={{ mb: 1.5 }}>
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 1.5 }}
+                    action={
+                      <Button color="inherit" size="small" onClick={retry}>
+                        다시 시도
+                      </Button>
+                    }
+                  >
                     {loadError}
                   </Alert>
                 )}
@@ -138,7 +150,7 @@ export function DocumentWritePage({
                   >
                     {viewMode === 'list' ? (
                       <ListViewSkeleton />
-                    ) : (
+                    ) : loadError && !hasVisibleDocuments ? null : (
                       <Box data-testid="document-feed-skeleton">
                         <FeedViewSkeleton />
                       </Box>
@@ -146,7 +158,7 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <>
-                {pinnedDocuments.length > 0 && (
+                {viewMode === 'list' && pinnedDocuments.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
                     <PinnedItemsPanel
                       items={pinnedViewItems}
@@ -156,14 +168,19 @@ export function DocumentWritePage({
                 )}
                 {viewMode === 'feed' ? (
                   <Box data-testid="document-feed">
-                    {unpinnedDocuments.length > 0 ? (
+                  {feedDocuments.length > 0 ? (
                       <FeedView
-                        items={unpinnedDocuments}
+                        items={feedDocuments}
                         renderItem={(item) => (
                           <DocumentFeedItem
+                            key={item.id}
                             item={item}
-                            isDark={theme.palette.mode === 'dark'}
-                            onClick={() => openDetail(item.id)}
+                            detailRefreshToken={detailRefreshToken}
+                            onActionComplete={refresh}
+                            onEditDocument={(document) => {
+                              setEditingDocument(document);
+                              openComposer();
+                            }}
                           />
                         )}
                       />
@@ -205,7 +222,8 @@ export function DocumentWritePage({
         onClose={() => {
           closeComposer();
           setEditingDocument(null);
-          refresh();
+          refresh({ quiet: true });
+          setDetailRefreshToken((token) => token + 1);
         }}
       />
       {detailDocumentId !== null && (
@@ -217,9 +235,9 @@ export function DocumentWritePage({
             onActionComplete={refresh}
             onEditDocument={(document) => {
               setEditingDocument(document);
-              closeDetail();
               openComposer();
             }}
+            detailRefreshToken={detailRefreshToken}
           />
         </PageAreaOverlay>
       )}

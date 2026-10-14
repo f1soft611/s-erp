@@ -42,6 +42,11 @@ export type DocumentWriteItem = {
   summary: string;
   isPinned?: boolean;
   documentStatus?: ApprovalDocumentStatus;
+  feedData?: DocumentApprovalFeedRecord;
+};
+
+export type DocumentFeedWriteItem = DocumentWriteItem & {
+  feedData: DocumentApprovalFeedRecord;
 };
 
 export type DocumentWritePageProps = {
@@ -158,6 +163,15 @@ export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
   attachments: DocumentDraftAttachmentResponse[];
   systemEvents: DocumentApprovalSystemEvent[];
 };
+
+export type DocumentApprovalFeedRecord = DocumentApprovalRecord &
+  Omit<DocumentApprovalDetail, keyof DocumentApprovalRecord> & {
+    contentsText: string;
+    comments: DocumentApprovalComment[];
+    commentCount: number;
+    hasPreviousComments: boolean;
+    nextBeforeCommentId: number | null;
+  };
 
 export type DocumentApprovalActionRequest = {
   action: 'APPROVED' | 'REJECTED' | 'RETURNED';

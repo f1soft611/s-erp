@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CommonViewMode } from '../../../../../shared/components/view-mode/commonViewTypes';
 import {
   getDocumentApprovalSummary,
@@ -6,9 +6,11 @@ import {
 } from '../services/documentApproval.service';
 import type {
   ApprovalDocumentStatus,
+  DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
   DocumentApprovalScope,
   DocumentApprovalSummary,
+  DocumentFeedWriteItem,
   DocumentKind,
   DocumentWriteItem,
 } from '../types/documentWrite.types';
@@ -56,6 +58,15 @@ function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
   };
 }
 
+function mapFeedDocument(
+  record: DocumentApprovalFeedRecord,
+): DocumentFeedWriteItem {
+  return {
+    ...mapDocument(record),
+    feedData: record,
+  };
+}
+
 export function useDocumentWritePage() {
   const [viewMode, setViewMode] = useState<CommonViewMode>('list');
   const [selectedKind, setSelectedKind] = useState<DocumentKind | ''>('');
@@ -63,34 +74,69 @@ export function useDocumentWritePage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWriteItem[]>([]);
+  const [feedDocuments, setFeedDocuments] = useState<DocumentFeedWriteItem[]>([]);
   const [summary, setSummary] = useState<DocumentApprovalSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [reloadCount, setReloadCount] = useState(0);
+  const [reloadRequest, setReloadRequest] = useState({ version: 0, quiet: false });
+  const previousReloadVersion = useRef(0);
   const [detailDocumentId, setDetailDocumentId] = useState<number | null>(null);
   const openComposer = useCallback(() => setIsComposerOpen(true), []);
   const closeComposer = useCallback(() => setIsComposerOpen(false), []);
-  const refresh = useCallback(() => setReloadCount((count) => count + 1), []);
+  const refresh = useCallback(({ quiet = false }: { quiet?: boolean } = {}) => {
+    setReloadRequest((current) => ({
+      version: current.version + 1,
+      quiet,
+    }));
+  }, []);
 
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
+    const isReload = reloadRequest.version !== previousReloadVersion.current;
+    previousReloadVersion.current = reloadRequest.version;
+    if (!isReload || !reloadRequest.quiet) setIsLoading(true);
     setLoadError('');
+    const documentType = selectedKind
+      ? documentTypeByKind[selectedKind]
+      : undefined;
+    const listRequest =
+      viewMode === 'feed'
+        ? listDocumentApprovals(
+            scope,
+            documentType,
+            selectedDocumentId,
+            true,
+          ).then((records) => {
+            const mappedRecords = records.map(mapFeedDocument);
+            return {
+              documents: mappedRecords,
+              feedDocuments: mappedRecords,
+            };
+          })
+        : listDocumentApprovals(
+            scope,
+            documentType,
+            selectedDocumentId,
+          ).then((records) => ({
+            documents: records.map(mapDocument),
+            feedDocuments: [] as DocumentFeedWriteItem[],
+          }));
     void Promise.all([
-      listDocumentApprovals(
-        scope,
-        selectedKind ? documentTypeByKind[selectedKind] : undefined,
-        selectedDocumentId,
-      ),
+      listRequest,
       getDocumentApprovalSummary(),
     ])
-      .then(([records, nextSummary]) => {
+      .then(([nextDocuments, nextSummary]) => {
         if (!active) return;
-        setDocuments(records.map(mapDocument));
+        setDocuments(nextDocuments.documents);
+        setFeedDocuments(nextDocuments.feedDocuments);
         setSummary(nextSummary);
       })
       .catch((error: unknown) => {
         if (active) {
+          if (!reloadRequest.quiet) {
+            setDocuments([]);
+            setFeedDocuments([]);
+          }
           setLoadError(
             error instanceof Error
               ? error.message
@@ -105,7 +151,7 @@ export function useDocumentWritePage() {
     return () => {
       active = false;
     };
-  }, [reloadCount, scope, selectedDocumentId, selectedKind]);
+  }, [reloadRequest, scope, selectedDocumentId, selectedKind, viewMode]);
 
   const pinnedDocuments = useMemo(
     () => documents.filter((item) => item.isPinned),
@@ -114,6 +160,13 @@ export function useDocumentWritePage() {
   const unpinnedDocuments = useMemo(
     () => documents.filter((item) => !item.isPinned),
     [documents],
+  );
+  const orderedFeedDocuments = useMemo(
+    () => [
+      ...feedDocuments.filter((item) => item.isPinned),
+      ...feedDocuments.filter((item) => !item.isPinned),
+    ],
+    [feedDocuments],
   );
   const pinnedViewItems = useMemo(
     () =>
@@ -149,6 +202,7 @@ export function useDocumentWritePage() {
     setScope('ALL');
     setSelectedDocumentId(documentId);
   }, []);
+  const retry = useCallback(() => refresh(), [refresh]);
   const openDetail = useCallback((documentId: number) => {
     setDetailDocumentId(documentId);
   }, []);
@@ -164,12 +218,14 @@ export function useDocumentWritePage() {
     closeComposer,
     pinnedDocuments,
     unpinnedDocuments,
+    feedDocuments: orderedFeedDocuments,
     pinnedViewItems,
     unpinnedViewItems,
     summary,
     notices: (summary?.notices ?? []).map(mapDocument),
     isLoading,
     loadError,
+    retry,
     scope,
     selectScope,
     selectNotice,

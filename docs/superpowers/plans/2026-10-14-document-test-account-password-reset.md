@@ -1,5 +1,7 @@
 # Document Test Account Password Reset Implementation Plan
 
+> Historical plan for the initial externally supplied hash implementation. The current psql-direct execution flow is specified in [the psql design](../specs/2026-10-14-document-test-account-password-reset-psql-design.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a fail-closed SQL script to reset only the ten document user-picker test accounts in tenant `T1358606250`, without storing credentials or hashes in repository files.

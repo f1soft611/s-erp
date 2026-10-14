@@ -9,6 +9,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,8 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 
 class DocumentApprovalApiControllerTest {
@@ -40,6 +44,34 @@ class DocumentApprovalApiControllerTest {
     private final DocumentApprovalService approvalService = mock(DocumentApprovalService.class);
     private final DocumentApprovalApiController controller =
             new DocumentApprovalApiController(new ResultVoHelper(), approvalService);
+
+    @Test
+    void listDocumentsKeepsLightweightResponseByDefault() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        List<DocumentApprovalListItemVO> list = Collections.singletonList(listItem);
+        when(approvalService.listDocuments(user, "ALL", null, null)).thenReturn(list);
+
+        ResultVO response = controller.listDocuments("ALL", null, null, false, user);
+
+        assertThat(response.getResult().get("resultList")).isSameAs(list);
+        verify(approvalService).listDocuments(user, "ALL", null, null);
+    }
+
+    @Test
+    void listDocumentsReturnsDetailedRowsWhenRequested() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
+        feedItem.setElectronicApprovalId(77L);
+        List<DocumentApprovalFeedItemVO> feed = Collections.singletonList(feedItem);
+        when(approvalService.listFeedDocuments(user, "ALL", null, null)).thenReturn(feed);
+
+        ResultVO response = controller.listDocuments("ALL", null, null, true, user);
+
+        assertThat(response.getResult().get("resultList")).isSameAs(feed);
+        verify(approvalService).listFeedDocuments(user, "ALL", null, null);
+    }
 
     @Test
     void createDraftReturnsCreatedDocumentIdentity() throws Exception {

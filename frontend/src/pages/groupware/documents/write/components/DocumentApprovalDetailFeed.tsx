@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -18,6 +19,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
@@ -25,6 +27,7 @@ import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyC
 import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBodyContent';
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
+import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
@@ -41,27 +44,40 @@ import {
   downloadApprovalCommentAttachment,
   downloadDocumentApprovalAttachment,
   fetchApprovalCommentAttachmentBlob,
-  fetchApprovalEmbeddedImageBlob,
   getDocumentApprovalDetail,
   listApprovalComments,
   processDocumentApprovalAction,
   updateApprovalComment,
   uploadApprovalCommentAttachment,
 } from '../services/documentApproval.service';
+import { statusColor } from '../data/documentWriteData';
+import { useDocumentApprovalBody } from '../hooks/useDocumentApprovalBody';
+import type { DocumentFeedWriteItem } from '../types/documentWrite.types';
 import type {
+  ApprovalStatus,
   DocumentApprovalActionRequest,
   DocumentApprovalComment,
   DocumentApprovalDetail,
   DocumentApprovalLine,
 } from '../types/documentWrite.types';
 
-type DocumentApprovalDetailFeedProps = {
+type DocumentApprovalDetailFeedSharedProps = {
   open: boolean;
   electronicApprovalId: number | null;
-  onClose: () => void;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
+  detailRefreshToken: number;
 };
+
+type DocumentApprovalDetailFeedProps =
+  | (DocumentApprovalDetailFeedSharedProps & {
+      presentation: 'feed';
+      feedItem: DocumentFeedWriteItem;
+    })
+  | (DocumentApprovalDetailFeedSharedProps & {
+      presentation?: 'panel';
+      onClose: () => void;
+    });
 
 function formatApprovalDate(value?: string | null): string {
   if (!value) return '';
@@ -85,8 +101,10 @@ function getPlainText(html: string): string {
   return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
 }
 
-function approvalStatusLabel(status: DocumentApprovalDetail['documentStatus']): string {
-  const labels: Record<DocumentApprovalDetail['documentStatus'], string> = {
+function approvalStatusLabel(
+  status: DocumentApprovalDetail['documentStatus'],
+): ApprovalStatus {
+  const labels: Record<DocumentApprovalDetail['documentStatus'], ApprovalStatus> = {
     DRAFT: '임시저장',
     PENDING: '결재대기',
     IN_PROGRESS: '결재중',
@@ -200,20 +218,25 @@ function toApprovalCommentTree(
   return roots;
 }
 
-export function DocumentApprovalDetailFeed({
-  open,
-  electronicApprovalId,
-  onClose,
-  onActionComplete,
-  onEditDocument,
-}: DocumentApprovalDetailFeedProps) {
+export function DocumentApprovalDetailFeed(
+  props: DocumentApprovalDetailFeedProps,
+) {
+  const {
+    open,
+    electronicApprovalId,
+    onActionComplete,
+    onEditDocument,
+    detailRefreshToken,
+  } = props;
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const isFeedPresentation = props.presentation === 'feed';
+  const onClose = isFeedPresentation ? undefined : props.onClose;
   const { showSuccess, showError } = useNotification();
-  const [detail, setDetail] = useState<DocumentApprovalDetail | null>(null);
-  const [bodyHtml, setBodyHtml] = useState('');
-  const [bodyImages, setBodyImages] = useState<
-    Array<FeedBodyImage & { fileId: number }>
-  >([]);
-  const [bodyImageError, setBodyImageError] = useState('');
+  const preloadedFeedData =
+    props.presentation === 'feed' ? props.feedItem.feedData : null;
+  const [detail, setDetail] =
+    useState<DocumentApprovalDetail | null>(preloadedFeedData);
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [selectedBodyImage, setSelectedBodyImage] = useState<FeedBodyImage | null>(null);
   const [employeeId, setEmployeeId] = useState('');
@@ -222,10 +245,18 @@ export function DocumentApprovalDetailFeed({
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionComment, setActionComment] = useState('');
-  const [commentRecords, setCommentRecords] = useState<DocumentApprovalComment[]>([]);
-  const [commentCount, setCommentCount] = useState(0);
-  const [hasPreviousComments, setHasPreviousComments] = useState(false);
-  const [nextBeforeCommentId, setNextBeforeCommentId] = useState<number | null>(null);
+  const [commentRecords, setCommentRecords] = useState<DocumentApprovalComment[]>(
+    preloadedFeedData?.comments ?? [],
+  );
+  const [commentCount, setCommentCount] = useState(
+    preloadedFeedData?.commentCount ?? 0,
+  );
+  const [hasPreviousComments, setHasPreviousComments] = useState(
+    preloadedFeedData?.hasPreviousComments ?? false,
+  );
+  const [nextBeforeCommentId, setNextBeforeCommentId] = useState<number | null>(
+    preloadedFeedData?.nextBeforeCommentId ?? null,
+  );
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [commentImageUrls, setCommentImageUrls] = useState<Record<string, string>>({});
@@ -234,6 +265,18 @@ export function DocumentApprovalDetailFeed({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [detailRetryToken, setDetailRetryToken] = useState(0);
+  const previousDetailRefreshToken = useRef(detailRefreshToken);
+  const {
+    bodyHtml,
+    bodyImages,
+    bodyImageError,
+    expandedBodyHtml,
+    collapsedBodyHtml,
+  } = useDocumentApprovalBody(
+    electronicApprovalId,
+    detail?.contentsHtml ?? '',
+  );
 
   const loadComments = useCallback(async (
     beforeCommentId?: number,
@@ -263,7 +306,26 @@ export function DocumentApprovalDetailFeed({
   }, [electronicApprovalId]);
 
   useEffect(() => {
-    if (!open || electronicApprovalId === null) return;
+    if (
+      !isFeedPresentation ||
+      !preloadedFeedData ||
+      !open ||
+      electronicApprovalId === null
+    ) {
+      return;
+    }
+    setDetail(preloadedFeedData);
+    setCommentRecords(preloadedFeedData.comments);
+    setCommentCount(preloadedFeedData.commentCount);
+    setHasPreviousComments(preloadedFeedData.hasPreviousComments);
+    setNextBeforeCommentId(preloadedFeedData.nextBeforeCommentId);
+    setLoadError('');
+    setCommentError('');
+    setIsLoading(false);
+  }, [electronicApprovalId, isFeedPresentation, open, preloadedFeedData]);
+
+  useEffect(() => {
+    if (!open || electronicApprovalId === null || isFeedPresentation) return;
     let active = true;
     setIsLoading(true);
     setLoadError('');
@@ -272,9 +334,6 @@ export function DocumentApprovalDetailFeed({
     setDetail(null);
     setIsLiked(false);
     setIsBookmarked(false);
-    setBodyHtml('');
-    setBodyImages([]);
-    setBodyImageError('');
     setIsBodyExpanded(true);
     setSelectedBodyImage(null);
     setEmployeeId('');
@@ -285,6 +344,10 @@ export function DocumentApprovalDetailFeed({
       .then(([nextDetail, profile]) => {
         if (!active) return;
         setDetail(nextDetail);
+        if (!profile) {
+          setLoadError('로그인 사용자의 사원 정보를 확인할 수 없습니다.');
+          return;
+        }
         const nextEmployeeId = String(profile.employeeId ?? '').trim();
         if (!nextEmployeeId) {
           setLoadError('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
@@ -307,118 +370,42 @@ export function DocumentApprovalDetailFeed({
     return () => {
       active = false;
     };
-  }, [electronicApprovalId, open]);
+  }, [detailRetryToken, electronicApprovalId, isFeedPresentation, open]);
 
   useEffect(() => {
+    if (previousDetailRefreshToken.current === detailRefreshToken) return;
+    previousDetailRefreshToken.current = detailRefreshToken;
+    if (!open || electronicApprovalId === null || isFeedPresentation) return;
+
     let active = true;
-    const objectUrls: string[] = [];
-    if (!detail || electronicApprovalId === null) {
-      setBodyHtml('');
-      setBodyImages([]);
-      return () => {
-        active = false;
-      };
-    }
-
-    const parsed = new DOMParser().parseFromString(detail.contentsHtml, 'text/html');
-    const imageElements = Array.from(parsed.querySelectorAll('img'));
-    const imageRequests: Array<{ alt: string; fileId: number }> = [];
-    imageElements.forEach((image) => {
-      const source = image.getAttribute('src') ?? '';
-      if (!source.startsWith('/api/v1/groupware/approvals/')) return;
-      const match = source.match(
-        /^\/api\/v1\/groupware\/approvals\/(\d+)\/embedded-images\/(\d+)$/,
-      );
-      image.removeAttribute('src');
-      if (match && Number(match[1]) === electronicApprovalId) {
-        const alt = image.getAttribute('alt')?.trim() || '본문 이미지';
-        const fileId = Number(match[2]);
-        imageRequests.push({
-          alt,
-          fileId,
-        });
-        image.setAttribute('data-approval-embedded-image-file-id', String(fileId));
-      }
-    });
-    setBodyImageError('');
-    setBodyImages([]);
-    setBodyHtml(parsed.body.innerHTML);
-    if (imageRequests.length === 0) {
-      return () => {
-        active = false;
-      };
-    }
-
-    void Promise.allSettled(
-      imageRequests.map(async ({ alt, fileId }) => ({
-        alt,
-        fileId,
-        blob: await fetchApprovalEmbeddedImageBlob(electronicApprovalId, fileId),
-      })),
-    ).then((results) => {
-      if (!active) return;
-      let failed = false;
-      const loadedImages: Array<FeedBodyImage & { fileId: number }> = [];
-      results.forEach((result) => {
-        if (result.status !== 'fulfilled') {
-          failed = true;
-          return;
+    setLoadError('');
+    void getDocumentApprovalDetail(electronicApprovalId)
+      .then((nextDetail) => {
+        if (active) setDetail(nextDetail);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : '전자결재 상세 정보를 불러오지 못했습니다.',
+          );
         }
-        const url = URL.createObjectURL(result.value.blob);
-        objectUrls.push(url);
-        loadedImages.push({
-          fileId: result.value.fileId,
-          src: url,
-          alt: result.value.alt,
-        });
       });
-      setBodyImages(loadedImages);
-      if (failed) setBodyImageError('일부 본문 이미지를 불러오지 못했습니다.');
-    });
+
     return () => {
       active = false;
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [detail, electronicApprovalId]);
-
-  const expandedBodyHtml = useMemo(() => {
-    if (!bodyHtml || typeof DOMParser === 'undefined') return bodyHtml;
-    const parsed = new DOMParser().parseFromString(bodyHtml, 'text/html');
-    const loadedImages = new Map(
-      bodyImages.map((image) => [image.fileId, image.src]),
-    );
-    parsed
-      .querySelectorAll<HTMLImageElement>('img[data-approval-embedded-image-file-id]')
-      .forEach((image) => {
-        const fileId = Number(
-          image.getAttribute('data-approval-embedded-image-file-id'),
-        );
-        const src = loadedImages.get(fileId);
-        if (src) {
-          image.setAttribute('src', src);
-        } else {
-          image.remove();
-        }
-        image.removeAttribute('data-approval-embedded-image-file-id');
-      });
-    return parsed.body.innerHTML;
-  }, [bodyHtml, bodyImages]);
-
-  const collapsedBodyHtml = useMemo(() => {
-    if (!bodyHtml || typeof DOMParser === 'undefined') return bodyHtml;
-    const parsed = new DOMParser().parseFromString(bodyHtml, 'text/html');
-    parsed.querySelectorAll('img').forEach((image) => image.remove());
-    return parsed.body.innerHTML;
-  }, [bodyHtml]);
+  }, [detailRefreshToken, electronicApprovalId, isFeedPresentation, open]);
 
   useEffect(() => {
-    if (!open || electronicApprovalId === null) return;
+    if (!open || electronicApprovalId === null || isFeedPresentation) return;
     setCommentRecords([]);
     setCommentCount(0);
     setHasPreviousComments(false);
     setNextBeforeCommentId(null);
     void loadComments();
-  }, [electronicApprovalId, loadComments, open]);
+  }, [electronicApprovalId, isFeedPresentation, loadComments, open]);
 
   useEffect(() => {
     let active = true;
@@ -546,7 +533,7 @@ export function DocumentApprovalDetailFeed({
       showSuccess('문서가 삭제되었습니다.');
       setIsDeleteDialogOpen(false);
       onActionComplete();
-      onClose();
+      onClose?.();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '문서 삭제에 실패했습니다.',
@@ -578,7 +565,7 @@ export function DocumentApprovalDetailFeed({
             : '문서 보완을 요청했습니다.',
       );
       onActionComplete();
-      onClose();
+      onClose?.();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
@@ -741,122 +728,154 @@ export function DocumentApprovalDetailFeed({
     }
   };
 
-  return (
-    <PostDetailPanel
-      title="문서 상세"
-      subtitle={electronicApprovalId === null ? undefined : `문서 ID: ${electronicApprovalId}`}
-      onClose={onClose}
-      isLoading={isLoading}
-      loadingLabel="문서 상세 불러오는 중"
-    >
-        <Stack
-          spacing={2}
-          data-testid="approval-detail-card"
-          sx={{
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 2,
-            p: { xs: 1.5, sm: 2 },
-            bgcolor: 'background.paper',
-          }}
+  const documentMenu =
+    detail?.isDrafter && (canEditDraft || canDeleteDocument) ? (
+      <>
+        <IconButton
+          aria-label="문서 더보기"
+          size="small"
+          onClick={(event) => setMenuAnchor(event.currentTarget)}
         >
-          {loadError && <Alert severity="error">{loadError}</Alert>}
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={() => setMenuAnchor(null)}
+        >
+          {canEditDraft && (
+            <MenuItem
+              onClick={() => {
+                setMenuAnchor(null);
+                onEditDocument(detail);
+              }}
+            >
+              {detail.documentStatus === 'REVISION_REQUESTED'
+                ? '수정 후 재상신'
+                : '문서 수정'}
+            </MenuItem>
+          )}
+          {canDeleteDocument && (
+            <MenuItem
+              onClick={() => {
+                setMenuAnchor(null);
+                setIsDeleteDialogOpen(true);
+              }}
+            >
+              삭제
+            </MenuItem>
+          )}
+        </Menu>
+      </>
+    ) : null;
+
+  const detailCard = (
+    <Stack
+      spacing={2}
+      data-testid="approval-detail-card"
+      sx={
+        isFeedPresentation
+          ? { minWidth: 0 }
+          : {
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              p: { xs: 1.5, sm: 2 },
+              bgcolor: 'background.paper',
+            }
+      }
+    >
+      {loadError && (
+        <Alert
+          severity="error"
+          action={
+            isFeedPresentation ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => setDetailRetryToken((token) => token + 1)}
+                disabled={isLoading}
+              >
+                다시 시도
+              </Button>
+            ) : undefined
+          }
+        >
+          {loadError}
+        </Alert>
+      )}
+      {isFeedPresentation && isLoading && (
+        <Stack
+          role="status"
+          aria-label="문서 상세 불러오는 중"
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', py: 1 }}
+        >
+          <CircularProgress size={18} />
+          <Typography variant="caption">문서 상세 불러오는 중</Typography>
+        </Stack>
+      )}
           {detail && (
             <>
-              <Stack
-                data-testid="approval-author-row"
-                direction="row"
-                spacing={1.5}
-                sx={{
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  rowGap: 1,
-                  minWidth: 0,
-                }}
-              >
+              {!isFeedPresentation && (
                 <Stack
+                  data-testid="approval-author-row"
                   direction="row"
                   spacing={1.5}
-                  sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
-                >
-                  <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                    {detail.drafterName.slice(0, 1)}
-                  </Avatar>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
-                      {detail.drafterName}
-                    </Typography>
-                    <Typography
-                      data-testid="approval-author-meta"
-                      variant="caption"
-                      color="text.secondary"
-                      noWrap
-                    >
-                      기안자 · {formatApprovalDate(detail.createdAt)} · 조회 {detail.viewCount}
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={0.5}
                   sx={{
                     alignItems: 'center',
-                    justifyContent: 'flex-end',
+                    justifyContent: 'space-between',
                     flexWrap: 'wrap',
+                    rowGap: 1,
                     minWidth: 0,
                   }}
                 >
-                  <IconButton aria-label="고정된 문서" disabled size="small">
-                    <PushPinOutlinedIcon fontSize="small" />
-                  </IconButton>
-                  {detail.isDrafter && (canEditDraft || canDeleteDocument) && (
-                    <>
-                      <IconButton
-                        aria-label="문서 더보기"
-                        size="small"
-                        onClick={(event) => setMenuAnchor(event.currentTarget)}
-                      >
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
-                      <Menu
-                        anchorEl={menuAnchor}
-                        open={Boolean(menuAnchor)}
-                        onClose={() => setMenuAnchor(null)}
-                      >
-                        {canEditDraft && (
-                          <MenuItem
-                            onClick={() => {
-                              setMenuAnchor(null);
-                              onEditDocument(detail);
-                            }}
-                          >
-                            {detail.documentStatus === 'REVISION_REQUESTED'
-                              ? '수정 후 재상신'
-                              : '문서 수정'}
-                          </MenuItem>
-                        )}
-                        {canDeleteDocument && (
-                          <MenuItem
-                            onClick={() => {
-                              setMenuAnchor(null);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            삭제
-                          </MenuItem>
-                        )}
-                      </Menu>
-                    </>
-                  )}
-                  <Typography
-                    variant="caption"
-                    sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}
+                  <Stack
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
                   >
-                    {approvalStatusLabel(detail.documentStatus)}
-                  </Typography>
+                    <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
+                      {detail.drafterName.slice(0, 1)}
+                    </Avatar>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
+                        {detail.drafterName}
+                      </Typography>
+                      <Typography
+                        data-testid="approval-author-meta"
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                      >
+                        기안자 · {formatApprovalDate(detail.createdAt)} · 조회 {detail.viewCount}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    sx={{
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      flexWrap: 'wrap',
+                      minWidth: 0,
+                    }}
+                  >
+                    <IconButton aria-label="고정된 문서" disabled size="small">
+                      <PushPinOutlinedIcon fontSize="small" />
+                    </IconButton>
+                    {documentMenu}
+                    <Typography
+                      variant="caption"
+                      sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}
+                    >
+                      {approvalStatusLabel(detail.documentStatus)}
+                    </Typography>
+                  </Stack>
                 </Stack>
-              </Stack>
+              )}
               <Box
                 data-testid="approval-line-readonly"
                 sx={{
@@ -1338,9 +1357,11 @@ export function DocumentApprovalDetailFeed({
                 )}
               </Box>
               <Divider data-testid="approval-line-divider" sx={{ my: 1.5 }} />
-              <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
-                {detail.title}
-              </Typography>
+              {!isFeedPresentation && (
+                <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+                  {detail.title}
+                </Typography>
+              )}
               <FeedBodyContent
                 hasMore={hasMoreBody}
                 isExpanded={isBodyExpanded}
@@ -1449,7 +1470,7 @@ export function DocumentApprovalDetailFeed({
                   </>
                 </FeedCommentsSection>
               </Box>
-              {canProcess && (
+              {!isFeedPresentation && canProcess && (
                 <>
                   <Divider />
                   <TextField
@@ -1491,7 +1512,63 @@ export function DocumentApprovalDetailFeed({
               )}
             </>
           )}
-        </Stack>
+    </Stack>
+  );
+
+  return (
+    <>
+      {props.presentation === 'feed' ? (
+        <FeedCard
+          author={detail?.drafterName ?? props.feedItem.author}
+          meta={
+            detail
+              ? `기안자 · ${formatApprovalDate(detail.createdAt)} · 조회 ${detail.viewCount}`
+              : props.feedItem.date
+          }
+          actions={documentMenu}
+          badges={
+            <>
+              <Chip label={props.feedItem.kind} size="small" color="primary" />
+              <Chip
+                label={detail ? approvalStatusLabel(detail.documentStatus) : props.feedItem.status}
+                size="small"
+                color={statusColor(
+                  detail
+                    ? approvalStatusLabel(detail.documentStatus)
+                    : props.feedItem.status,
+                )}
+                variant={
+                  (detail
+                    ? approvalStatusLabel(detail.documentStatus)
+                    : props.feedItem.status) === '임시저장'
+                    ? 'outlined'
+                    : 'filled'
+                }
+                sx={{ height: 22, fontWeight: 700 }}
+              />
+            </>
+          }
+          title={detail?.title ?? props.feedItem.title}
+          isDark={isDark}
+          testId="document-write-item"
+        >
+          {detailCard}
+        </FeedCard>
+      ) : (
+        <PostDetailPanel
+          title="문서 상세"
+          subtitle={
+            electronicApprovalId === null
+              ? undefined
+              : `문서 ID: ${electronicApprovalId}`
+          }
+          onClose={props.onClose}
+          isLoading={isLoading}
+          loadingLabel="문서 상세 불러오는 중"
+        >
+          {detailCard}
+        </PostDetailPanel>
+      )}
       <Dialog
         open={isDeleteDialogOpen}
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
@@ -1519,6 +1596,6 @@ export function DocumentApprovalDetailFeed({
         alt={selectedBodyImage?.alt ?? '본문 이미지'}
         onClose={() => setSelectedBodyImage(null)}
       />
-    </PostDetailPanel>
+    </>
   );
 }

@@ -36,6 +36,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
@@ -302,6 +303,68 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("electronicApprovalId", electronicApprovalId);
         List<DocumentApprovalListItemVO> documents = documentApprovalDAO.selectRelatedDocumentList(params);
         return documents == null ? Collections.<DocumentApprovalListItemVO>emptyList() : documents;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception {
+        List<DocumentApprovalListItemVO> documents = listDocuments(user, scope, documentType, electronicApprovalId);
+        List<DocumentApprovalFeedItemVO> feedItems = new ArrayList<>();
+        for (DocumentApprovalListItemVO listItem : documents) {
+            Long approvalId = listItem.getElectronicApprovalId();
+            DocumentApprovalDetailVO detail = loadFeedDetail(user, approvalId);
+            CommonCommentPageVO commentPage = listApprovalComments(user, approvalId, 3, null);
+
+            DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
+            feedItem.setElectronicApprovalId(listItem.getElectronicApprovalId());
+            feedItem.setEabusNo(listItem.getEabusNo());
+            feedItem.setDocumentType(listItem.getDocumentType());
+            feedItem.setDocumentStatus(listItem.getDocumentStatus());
+            feedItem.setTitle(listItem.getTitle());
+            feedItem.setDrafterName(listItem.getDrafterName());
+            feedItem.setCreatedAt(listItem.getCreatedAt());
+            feedItem.setUpdatedAt(listItem.getUpdatedAt());
+            feedItem.setSubmittedAt(listItem.getSubmittedAt());
+            feedItem.setSummary(listItem.getSummary());
+            feedItem.setNoticeType(listItem.getNoticeType());
+            feedItem.setDraftingWorkCategoryId(detail.getDraftingWorkCategoryId());
+            feedItem.setContentsJson(detail.getContentsJson());
+            feedItem.setContentsHtml(detail.getContentsHtml());
+            feedItem.setContentsText(detail.getContentsText());
+            feedItem.setViewCount(detail.getViewCount());
+            feedItem.setDrafter(detail.isDrafter());
+            feedItem.setApprovalLines(detail.getApprovalLines());
+            feedItem.setAttachments(detail.getAttachments());
+            feedItem.setSystemEvents(detail.getSystemEvents());
+            feedItem.setComments(commentPage.getComments());
+            feedItem.setCommentCount(commentPage.getResultCnt());
+            feedItem.setHasPreviousComments(commentPage.isHasPrevious());
+            feedItem.setNextBeforeCommentId(commentPage.getNextBeforeCommentId());
+            feedItems.add(feedItem);
+        }
+        return feedItems;
+    }
+
+    private DocumentApprovalDetailVO loadFeedDetail(LoginVO user, Long electronicApprovalId) throws Exception {
+        requireRelatedDocument(user, electronicApprovalId);
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalDetailVO detail = documentApprovalDAO.selectDocumentApprovalDetail(params);
+        if (detail == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+        }
+        List<CommonFileVO> attachments =
+                commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId);
+        detail.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+        List<DocumentApprovalLineVO> approvalLines = documentApprovalDAO.selectApprovalLines(params);
+        detail.setApprovalLines(
+                approvalLines == null ? Collections.<DocumentApprovalLineVO>emptyList() : approvalLines);
+        List<CommonCommentVO> systemEvents = commonCommentDAO.selectApprovalSystemEvents(
+                approvalCommentParams(user, electronicApprovalId, null));
+        detail.setSystemEvents(
+                systemEvents == null ? Collections.<CommonCommentVO>emptyList() : systemEvents);
+        return detail;
     }
 
     @Override

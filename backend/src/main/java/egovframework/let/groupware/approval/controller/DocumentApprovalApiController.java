@@ -113,10 +113,12 @@ public class DocumentApprovalApiController {
     public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
             @RequestParam(required = false) String documentType,
             @RequestParam(required = false) Long electronicApprovalId,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList",
-                documentApprovalService.listDocuments(user, scope, documentType, electronicApprovalId));
+        resultMap.put("resultList", includeDetails
+                ? documentApprovalService.listFeedDocuments(user, scope, documentType, electronicApprovalId)
+                : documentApprovalService.listDocuments(user, scope, documentType, electronicApprovalId));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

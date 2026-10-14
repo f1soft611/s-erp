@@ -214,6 +214,46 @@ describe('document approval service', () => {
     );
   });
 
+  it('requests and validates the detailed document feed payload only when requested', async () => {
+    const feedItem = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '피드 문서',
+      drafterName: '홍길동',
+      summary: '요약',
+      viewCount: 2,
+      isDrafter: false,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc"}',
+      contentsHtml: '<p>본문</p>',
+      contentsText: '본문',
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+      comments: [],
+      commentCount: 0,
+      hasPreviousComments: false,
+      nextBeforeCommentId: null,
+    };
+    api.get.mockResolvedValue({ resultList: [feedItem] });
+
+    await expect(
+      listDocumentApprovals('ALL', undefined, undefined, true),
+    ).resolves.toEqual([feedItem]);
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/documents?scope=ALL&includeDetails=true',
+    );
+
+    api.get.mockResolvedValueOnce({
+      resultList: [{ ...feedItem, comments: undefined }],
+    });
+    await expect(
+      listDocumentApprovals('ALL', undefined, undefined, true),
+    ).rejects.toThrow('전자결재 문서 피드 응답을 확인할 수 없습니다.');
+  });
+
   it('requires a non-negative safe integer view count in document details', async () => {
     const validDetail = {
       electronicApprovalId: 41,

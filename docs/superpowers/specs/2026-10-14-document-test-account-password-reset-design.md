@@ -1,5 +1,7 @@
 # Document Test Account Password Reset Design
 
+> Superseded for operator execution by [the psql-direct design](./2026-10-14-document-test-account-password-reset-psql-design.md), which replaces externally supplied session hashes with an approved visible psql prompt.
+
 ## Goal
 
 Provide a guarded, SQL-only reset script for the ten document user-picker test

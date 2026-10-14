@@ -14,6 +14,7 @@ import type {
   DocumentApprovalActionRequest,
   ApprovalDocumentStatus,
   DocumentApprovalDetail,
+  DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
   DocumentApprovalScope,
   DocumentApprovalSummary,
@@ -78,6 +79,36 @@ function validateCommentAttachment(value: unknown): value is DocumentDraftAttach
   );
 }
 
+function isDocumentApprovalFeedRecord(value: unknown): value is DocumentApprovalFeedRecord {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.electronicApprovalId) &&
+    Number(value.electronicApprovalId) > 0 &&
+    typeof value.title === 'string' &&
+    typeof value.contentsJson === 'string' &&
+    typeof value.contentsHtml === 'string' &&
+    typeof value.contentsText === 'string' &&
+    Number.isSafeInteger(value.viewCount) &&
+    Number(value.viewCount) >= 0 &&
+    typeof value.isDrafter === 'boolean' &&
+    (value.draftingWorkCategoryId === null ||
+      Number.isSafeInteger(value.draftingWorkCategoryId)) &&
+    Array.isArray(value.approvalLines) &&
+    Array.isArray(value.attachments) &&
+    Array.isArray(value.systemEvents) &&
+    Array.isArray(value.comments) &&
+    value.comments.every((comment) =>
+      isApprovalComment(comment, Number(value.electronicApprovalId)),
+    ) &&
+    Number.isSafeInteger(value.commentCount) &&
+    Number(value.commentCount) >= 0 &&
+    typeof value.hasPreviousComments === 'boolean' &&
+    (value.nextBeforeCommentId === null ||
+      (Number.isSafeInteger(value.nextBeforeCommentId) &&
+        Number(value.nextBeforeCommentId) > 0))
+  );
+}
+
 export function isDefiniteAttachmentUploadFailure(error: unknown): boolean {
   return error instanceof ApiResponseError && error.status >= 400 && error.status < 500;
 }
@@ -125,21 +156,43 @@ export async function submitDocumentApproval(
   return item;
 }
 
+export function listDocumentApprovals(
+  scope: DocumentApprovalScope | undefined,
+  documentType: DocumentApprovalRecord['documentType'] | undefined,
+  electronicApprovalId: number | undefined,
+  includeDetails: true,
+): Promise<DocumentApprovalFeedRecord[]>;
+export function listDocumentApprovals(
+  scope?: DocumentApprovalScope,
+  documentType?: DocumentApprovalRecord['documentType'],
+  electronicApprovalId?: number,
+  includeDetails?: false,
+): Promise<DocumentApprovalRecord[]>;
 export async function listDocumentApprovals(
   scope: DocumentApprovalScope = 'ALL',
   documentType?: DocumentApprovalRecord['documentType'],
   electronicApprovalId?: number,
-): Promise<DocumentApprovalRecord[]> {
+  includeDetails = false,
+): Promise<DocumentApprovalRecord[] | DocumentApprovalFeedRecord[]> {
   const query = new URLSearchParams({ scope });
   if (documentType) query.set('documentType', documentType);
   if (electronicApprovalId !== undefined) {
     query.set('electronicApprovalId', String(electronicApprovalId));
   }
-  const response = await apiGet<{ resultList?: DocumentApprovalRecord[] }>(
+  if (includeDetails) query.set('includeDetails', 'true');
+  const response = await apiGet<{
+    resultList?: Array<DocumentApprovalRecord | DocumentApprovalFeedRecord>;
+  }>(
     `${APPROVAL_API}/documents?${query.toString()}`,
   );
   if (!Array.isArray(response.resultList)) {
     throw new Error('전자결재 문서 목록 응답을 확인할 수 없습니다.');
+  }
+  if (
+    includeDetails &&
+    !response.resultList.every(isDocumentApprovalFeedRecord)
+  ) {
+    throw new Error('전자결재 문서 피드 응답을 확인할 수 없습니다.');
   }
   return response.resultList;
 }
