@@ -93,8 +93,9 @@ export function useDocumentWritePage() {
   useEffect(() => {
     let active = true;
     const isReload = reloadRequest.version !== previousReloadVersion.current;
+    const isQuietReload = isReload && reloadRequest.quiet;
     previousReloadVersion.current = reloadRequest.version;
-    if (!isReload || !reloadRequest.quiet) setIsLoading(true);
+    if (!isQuietReload) setIsLoading(true);
     setLoadError('');
     const documentType = selectedKind
       ? documentTypeByKind[selectedKind]
@@ -133,7 +134,7 @@ export function useDocumentWritePage() {
       })
       .catch((error: unknown) => {
         if (active) {
-          if (!reloadRequest.quiet) {
+          if (!isQuietReload) {
             setDocuments([]);
             setFeedDocuments([]);
           }

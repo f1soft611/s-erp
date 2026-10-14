@@ -2133,6 +2133,46 @@ describe('Document write page', () => {
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
   }, 20000);
 
+  it('clears feed cards when a filter reload fails after a quiet refresh', async () => {
+    let feedRequest = 0;
+    composerApi.listDocumentApprovals.mockImplementation(
+      (_scope, _documentType, _documentId, includeDetails) => {
+        if (!includeDetails) return Promise.resolve(defaultDocumentRecords);
+        feedRequest += 1;
+        if (feedRequest === 3) {
+          return Promise.reject(new Error('필터 적용 후 피드 조회에 실패했습니다.'));
+        }
+        return Promise.resolve(
+          defaultDocumentRecords.map((record) => toFeedRecord(record)),
+        );
+      },
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    expect(await screen.findAllByTestId('document-write-item')).toHaveLength(6);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await screen.findByRole('dialog', { name: '문서 작성' });
+    await waitForComposerReady();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: '문서 작성' }),
+    );
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenCalledTimes(3),
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '문서 업무구분 필터' }),
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: '기안서' }));
+
+    expect(
+      await screen.findByText('필터 적용 후 피드 조회에 실패했습니다.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('document-write-item')).not.toBeInTheDocument();
+  }, 20000);
+
   it('switches to feed mode and opens the document composer with available tabs', async () => {
     render(<DashboardContent {...pageProps} />);
 
