@@ -1,4 +1,5 @@
-import type { F1GridDoc } from '../types';
+import type { F1GridDoc, F1GridDocGroup } from '../types';
+import { f1GridApiReferenceDoc } from './f1GridApiReference';
 
 const code = `const columns = [
   { field: 'itemCode', headerName: '품목코드', editable: true },
@@ -7,11 +8,30 @@ const code = `const columns = [
 
 <F1Grid rows={rows} columns={columns} rowKey="id" />`;
 
+export const f1GridDocGroups: Array<{
+  id: F1GridDocGroup;
+  label: string;
+}> = [
+  { id: 'getting-started', label: '시작하기' },
+  { id: 'grid-data', label: '그리드와 데이터' },
+  { id: 'editing-validation', label: '편집과 검증' },
+  { id: 'selection-actions', label: '선택·클립보드·행 작업' },
+  { id: 'filtering-sorting', label: '필터와 정렬' },
+  { id: 'column-layout', label: '컬럼·레이아웃·행 높이' },
+  { id: 'large-data', label: '대용량 데이터' },
+  { id: 'tree-grid', label: '트리 그리드' },
+  { id: 'row-merge', label: '행 병합' },
+  { id: 'plugins', label: '플러그인과 확장' },
+  { id: 'api-reference', label: 'API 참조' },
+  { id: 'testing', label: '테스트' },
+];
+
 export const f1GridDocs: F1GridDoc[] = [
   {
     id: 'overview',
     title: 'F1-Grid',
     category: 'guide',
+    group: 'getting-started',
     description: 'ERP 화면을 위한 키보드 중심 데이터 그리드 문서입니다.',
     sections: [
       {
@@ -34,8 +54,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'getting-started',
-    title: 'Getting Started',
+    title: '첫 그리드 만들기',
     category: 'guide',
+    group: 'getting-started',
     description: '첫 Grid를 만들고 컬럼 정의를 시작합니다.',
     sections: [
       {
@@ -52,8 +73,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'core-grid',
-    title: 'Core Grid',
+    title: '기본 그리드',
     category: 'feature',
+    group: 'grid-data',
     description: '정렬, 필터, 선택과 행 상태의 기본 동작을 확인합니다.',
     sections: [
       {
@@ -111,6 +133,7 @@ export const f1GridDocs: F1GridDoc[] = [
     id: 'editing',
     title: 'Cell Editing',
     category: 'feature',
+    group: 'editing-validation',
     description: '텍스트, 숫자, 날짜, 코드 셀을 인라인으로 편집합니다.',
     sections: [
       {
@@ -212,6 +235,7 @@ export const f1GridDocs: F1GridDoc[] = [
     id: 'row-form-modal',
     title: 'Row Form Modal',
     category: 'feature',
+    group: 'plugins',
     description:
       '컬럼 정의에서 신규·수정 행 폼을 만들고 Grid 변경 상태에 적용합니다.',
     sections: [
@@ -337,8 +361,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'selection',
-    title: 'Selection & Clipboard',
+    title: '선택과 클립보드',
     category: 'feature',
+    group: 'selection-actions',
     description: '행 선택과 셀 범위 선택, 클립보드 흐름을 확인합니다.',
     sections: [
       {
@@ -403,8 +428,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'filtering-sorting',
-    title: 'Filtering & Sorting',
+    title: '필터와 정렬',
     category: 'feature',
+    group: 'filtering-sorting',
     description: '헤더 메뉴에서 정렬과 컬럼 필터를 사용합니다.',
     sections: [
       {
@@ -453,8 +479,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'column-layout',
-    title: 'Column Layout',
+    title: '컬럼 레이아웃',
     category: 'feature',
+    group: 'column-layout',
     description: '컬럼 고정, 표시, 순서 변경과 너비 조절을 다룹니다.',
     sections: [
       {
@@ -489,8 +516,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'row-height',
-    title: 'Row Height',
+    title: '행 높이',
     category: 'feature',
+    group: 'column-layout',
     description: '행 높이와 긴 텍스트 줄바꿈을 실제 화면에서 조절합니다.',
     sections: [
       {
@@ -520,6 +548,7 @@ export const f1GridDocs: F1GridDoc[] = [
     id: 'large-data',
     title: 'Large Dataset',
     category: 'feature',
+    group: 'large-data',
     description:
       '1,000건/10,000건 대용량 샘플을 클릭으로 로드해 F1-Grid의 렌더링과 선택 상태를 검증합니다.',
     sections: [
@@ -555,8 +584,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'row-merge',
-    title: 'Row Merge',
+    title: '행 병합',
     category: 'feature',
+    group: 'row-merge',
     description: '연속해서 같은 값을 가진 셀을 병합합니다.',
     sections: [
       {
@@ -591,8 +621,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'context-menu',
-    title: 'Context Menu',
+    title: '컨텍스트 메뉴',
     category: 'feature',
+    group: 'selection-actions',
     description:
       '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행합니다.',
     sections: [
@@ -654,8 +685,9 @@ export const f1GridDocs: F1GridDoc[] = [
   },
   {
     id: 'tree-grid',
-    title: 'Tree Grid',
+    title: '트리 그리드',
     category: 'feature',
+    group: 'tree-grid',
     description: '상하위 관계가 있는 데이터를 계층 구조로 표시합니다.',
     sections: [
       {
@@ -720,229 +752,12 @@ export const f1GridDocs: F1GridDoc[] = [
     ],
     playground: 'tree',
   },
-  {
-    id: 'api-reference',
-    title: 'API Reference',
-    category: 'reference',
-    description: 'F1-Grid props와 컬럼 타입을 빠르게 찾습니다.',
-    sections: [
-      {
-        type: 'api',
-        heading: 'F1GridProps',
-        rows: [
-          ['rows', 'T[]', '표시할 데이터'],
-          [
-            'dataSource',
-            'F1GridDataSource<T>',
-            '서버 정렬/필터 및 페이지 조회 데이터 소스',
-          ],
-          [
-            'onDataSourceError',
-            '(error: Error) => void',
-            '서버 데이터 조회 오류 콜백',
-          ],
-          ['columns', 'F1GridColumn<T>[]', '컬럼 정의'],
-          ['rowKey', 'keyof T', '행마다 안정적이고 고유한 행 식별자'],
-          ['ariaLabel', 'string', '접근성 레이블'],
-          ['columnLine', 'boolean', '컬럼 세로 구분선'],
-          [
-            'storageKey',
-            'string',
-            '컬럼 레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
-          ],
-          ['height / maxHeight', 'number | string', '컨테이너 높이 제한'],
-          ['rowHeight / minRowHeight / maxRowHeight', 'number', '행 높이 범위'],
-          [
-            'resizableRows / resizableColumns',
-            'boolean',
-            '행/컬럼 크기 조절 허용',
-          ],
-          [
-            'virtualizeRows / virtualizeColumns',
-            'boolean',
-            '행/컬럼 가상화 자동 판단 재정의',
-          ],
-          [
-            'rowOverscan / columnOverscan',
-            'number',
-            'viewport 밖에 추가 렌더링할 행/컬럼 수',
-          ],
-          [
-            'fixedRowHeightThreshold',
-            'number',
-            '고정 행 높이 대용량 모드 활성화 임계값',
-          ],
-          [
-            'queryWorkerThreshold / disableQueryWorker',
-            'number / boolean',
-            '로컬 Worker 정렬·필터 임계값과 비활성화 옵션',
-          ],
-          ['minColumnWidth', 'number', '컬럼 최소 너비'],
-          ['showCheckbox', 'boolean', '행 선택 체크박스 표시'],
-          [
-            'createRow / createDuplicate',
-            '() => T | (row: T) => T',
-            '행 추가/복제 시 생성 로직',
-          ],
-          ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
-          ['excelFileName', 'string', '기본 다운로드 파일명'],
-          [
-            'editorPlugins / editors',
-            'F1GridEditorPlugin<T>[]',
-            '편집기 플러그인 (editors는 호환 별칭)',
-          ],
-          [
-            'rowFormPlugin',
-            'F1GridRowFormPlugin<T>',
-            '선택형 신규·수정 행 폼과 상세 열',
-          ],
-          [
-            'onBeforeEdit / beforeEdit',
-            'F1GridEditLifecycle<T>',
-            '편집 시작 전 훅',
-          ],
-          [
-            'onAfterEdit / afterEdit',
-            'F1GridEditLifecycle<T>',
-            '편집 종료 후 훅',
-          ],
-          ['onChangesChange', '(changes) => void', '변경된 행 목록 콜백'],
-          ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
-          [
-            'rowProjection',
-            '(rows: T[]) => { rows: T[] }',
-            '표시 행 가공 (Tree 등에서 사용)',
-          ],
-          ['cellAdornment', '(row, column) => ReactNode', '셀 앞 장식 렌더링'],
-          ['minHeight', 'number | string', '그리드 최소 높이 제어'],
-          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
-          [
-            'allowAddRowInContextMenu / allowDuplicateRowInContextMenu / allowDeleteRowInContextMenu',
-            'boolean',
-            '우클릭 메뉴 액션 노출 제어',
-          ],
-          [
-            'disableSorting / disableFiltering',
-            'boolean',
-            '정렬/필터 비활성화',
-          ],
-        ],
-      },
-      {
-        type: 'api',
-        heading: 'F1GridColumn',
-        rows: [
-          ['field', 'keyof T', '데이터 필드'],
-          ['headerName', 'string', '헤더 표시명'],
-          ['headerGroup', 'string', '헤더 상단 그룹 라벨'],
-          [
-            'form',
-            'F1GridColumnFormOptions<T>',
-            '행 폼 표시·그룹·순서·폭 재정의',
-          ],
-          ['getValue / onValueChange', '함수', '표시값 계산 / 값 변경 시 패치'],
-          ['width / flex / maxWidth', 'number', '너비 정책'],
-          ['editable', 'boolean | (row) => boolean', '편집 가능 여부'],
-          ['type', 'F1GridEditorType', '편집기 유형'],
-          [
-            'format / decimalPlaces',
-            'F1GridNumberFormat / number',
-            '숫자 표시 형식',
-          ],
-          ['options', 'F1GridOption[]', 'select/autocomplete 목록'],
-          ['required / min / max / validate', '-', '검증 규칙'],
-          ['onOpenCodePicker', '함수', '코드 선택기 연동'],
-          ['align / headerAlign', 'left | center | right', '정렬'],
-          [
-            'renderCell',
-            '(context) => ReactNode',
-            '표시 모드에서만 적용되는 커스텀 셀 렌더러',
-          ],
-          [
-            'getCellStyle',
-            '(context) => CSSProperties | undefined',
-            '동적 셀 스타일 반환',
-          ],
-          [
-            'getCellProps',
-            '(context) => { className, style, title, aria-label } | undefined',
-            '셀 속성/ARIA/title 확장',
-          ],
-          ['wrapText / mergeRows', 'boolean', '줄바꿈 / 연속 값 병합'],
-          ['headerCheckbox', 'boolean', 'checkbox 컬럼 헤더 전체 선택 토글'],
-          ['hidden / pinned', 'boolean / left | right', '숨김 / 고정'],
-          ['selectOnFocus', 'boolean', '포커스 시 값 전체 선택'],
-          ['syncWithTreeCheckbox', 'boolean', 'Tree 체크박스와 동기화'],
-        ],
-      },
-      {
-        type: 'api',
-        heading: 'F1TreeProps',
-        rows: [
-          ['parentKey / treeColumn', 'keyof T', '부모 필드 / 트리 라벨 필드'],
-          ['treeCheckbox', 'boolean', '트리 체크박스 활성화'],
-          [
-            'defaultExpandAll / defaultExpanded',
-            "boolean / 'all' | 'root' | ids",
-            '초기 펼침 상태',
-          ],
-          ['getRowOrder', '(row) => number', '형제 노드 정렬 기준'],
-          [
-            'onDeleteBlocked',
-            '(rowIds) => void',
-            '자식 있는 행 삭제 차단 콜백',
-          ],
-          ['onTreeCheckboxChange', '(rowIds) => void', '체크 상태 변경 콜백'],
-        ],
-      },
-      {
-        type: 'api',
-        heading: 'F1GridRef',
-        rows: [
-          ['getSelectedRows / getSelectedRowIds', '함수', '선택된 행/id 조회'],
-          ['clearSelection', '() => void', '선택 해제'],
-          [
-            'addRow / deleteSelectedRows / restoreDeletedRows / duplicateSelectedRows',
-            '함수',
-            '행 CRUD',
-          ],
-          ['getRows / getActiveRows', '() => T[]', '전체/삭제 제외 행 조회'],
-          [
-            'getChanges',
-            '() => F1GridChanges<T>',
-            'inserted/updated/deleted 목록',
-          ],
-          ['validate', '() => boolean', '전체 검증 실행'],
-          ['startEdit / stopEdit', '함수', '편집 시작/종료 제어'],
-          ['setCellValue', '(rowId, field, value) => void', '셀 값 직접 설정'],
-        ],
-      },
-      {
-        type: 'api',
-        heading: 'F1TreeRef',
-        rows: [
-          ['addChildRow', '(parentId, row?) => void', '자식 행 추가'],
-          ['expandRow / collapseRow', '(rowId) => void', '개별 노드 펼침/접힘'],
-          ['expandAll / collapseAll', '() => void', '전체 펼침/접힘'],
-          ['isExpanded', '(rowId) => boolean', '펼침 상태 확인'],
-        ],
-      },
-      {
-        type: 'related',
-        heading: 'Related guides',
-        links: [
-          { id: 'core-grid', label: 'Core Grid' },
-          { id: 'editing', label: 'Cell Editing' },
-          { id: 'row-form-modal', label: 'Row Form Modal' },
-          { id: 'tree-grid', label: 'Tree Grid' },
-        ],
-      },
-    ],
-  },
+  f1GridApiReferenceDoc,
   {
     id: 'testing-guide',
-    title: 'Testing Guide',
+    title: '테스트 가이드',
     category: 'reference',
+    group: 'testing',
     description: 'Vitest와 실제 브라우저에서 Grid를 검증하는 방법입니다.',
     sections: [
       {

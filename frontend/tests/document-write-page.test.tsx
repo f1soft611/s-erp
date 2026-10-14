@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppTheme } from '../src/theme/theme';
 
 const composerApi = vi.hoisted(() => ({
@@ -44,6 +44,13 @@ const composerNotifications = vi.hoisted(() => ({
   showWarning: vi.fn(),
   showError: vi.fn(),
 }));
+
+let restoreImagePreloader: (() => void) | undefined;
+
+afterEach(() => {
+  restoreImagePreloader?.();
+  restoreImagePreloader = undefined;
+});
 
 vi.mock('../src/shared/context/NotificationContext', () => ({
   useNotification: () => composerNotifications,
@@ -1012,6 +1019,7 @@ describe('Document write page', () => {
           participantName: '결재자 C',
           participantDepartmentName: '운영팀',
           actionStatus: 'APPROVED',
+          participantStampImage: 'data:image/png;base64,AA==',
         },
         {
           electronicApprovalLineId: 74,
@@ -1022,6 +1030,7 @@ describe('Document write page', () => {
           participantName: '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
           participantDepartmentName: '인사팀',
           actionStatus: 'PENDING',
+          participantStampImage: 'data:image/png;base64,AA==',
         },
         {
           electronicApprovalLineId: 72,
@@ -1030,8 +1039,31 @@ describe('Document write page', () => {
           participantType: 'AGREEMENT',
           participantUserId: 'approver-2',
           participantName: '합의자 B',
-          participantDepartmentName: '재무팀',
+          participantDepartmentName: null,
           actionStatus: 'PENDING',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 76,
+          stageOrder: 2,
+          participantOrder: 2,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-5',
+          participantName: '합의자 D',
+          participantDepartmentName: '재무팀',
+          actionStatus: 'APPROVED',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 77,
+          stageOrder: 2,
+          participantOrder: 3,
+          participantType: 'AGREEMENT',
+          participantUserId: 'approver-6',
+          participantName: '합의자 E',
+          participantDepartmentName: '',
+          actionStatus: 'APPROVED',
+          participantProfileImage: 'data:image/png;base64,AA==',
         },
         {
           electronicApprovalLineId: 73,
@@ -1042,6 +1074,18 @@ describe('Document write page', () => {
           participantName: '참조자 C',
           participantDepartmentName: '운영팀',
           actionStatus: '',
+          participantProfileImage: 'data:image/png;base64,AA==',
+        },
+        {
+          electronicApprovalLineId: 78,
+          stageOrder: 3,
+          participantOrder: 2,
+          participantType: 'REFERENCE',
+          participantUserId: 'approver-7',
+          participantName: '참조자 공백부서',
+          participantDepartmentName: '   ',
+          actionStatus: '',
+          participantProfileImage: 'data:image/png;base64,AA==',
         },
       ],
       attachments: [],
@@ -1068,6 +1112,18 @@ describe('Document write page', () => {
       nextBeforeCommentId: null,
       resultCnt: 1,
     });
+    const imagePreloaders: HTMLImageElement[] = [];
+    const imagePreloaderSpy = vi.spyOn(window, 'Image').mockImplementation(function MockImage(
+      width,
+      height,
+    ) {
+      const image = document.createElement('img');
+      if (width !== undefined) image.width = width;
+      if (height !== undefined) image.height = height;
+      imagePreloaders.push(image);
+      return image;
+    });
+    restoreImagePreloader = () => imagePreloaderSpy.mockRestore();
     render(<DashboardContent {...pageProps} />);
     const listRegion = await screen.findByRole('region', {
       name: '리스트형 문서 목록',
@@ -1091,7 +1147,14 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-drafter-meta')).toHaveTextContent(
       '기안자 김민수 · 2026.10.13',
     );
+    expect(screen.getByTestId('approval-line-header-title'))
+      .toHaveClass('MuiTypography-body1');
+    expect(screen.getByTestId('approval-line-drafter-meta'))
+      .toHaveClass('MuiTypography-body1');
     expect(screen.getByTestId('approval-line-header')).toHaveTextContent('결재선');
+    expect(
+      within(screen.getByTestId('approval-line-header')).queryByText('결재', { exact: true }),
+    ).not.toBeInTheDocument();
     expect(within(screen.getByTestId('approval-line-group-approval')).queryByRole('button'))
       .not.toBeInTheDocument();
     expect(screen.getByTestId('approval-line-group-approval')).toHaveTextContent('결재자 A');
@@ -1099,16 +1162,81 @@ describe('Document write page', () => {
       '합의',
     );
     expect(
-      within(screen.getByTestId('approval-line-group-agreement')).getByText('2', { exact: true }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('approval-line-group-agreement')).toHaveTextContent('재무팀 합의자 B');
+      within(screen.getByTestId('approval-line-group-agreement')).getAllByText('2', { exact: true }),
+    ).toHaveLength(1);
+    const agreementStage = screen.getByTestId('approval-line-agreement-stage-2');
+    const agreementParticipants = within(agreementStage).getAllByTestId(
+      /^approval-line-agreement-participant-/,
+    );
+    expect(agreementParticipants).toHaveLength(3);
+    const agreementStageRow = screen.getByTestId('approval-line-agreement-stage-row-2');
+    const agreementStageOrder = within(agreementStageRow).getByTestId(
+      'approval-line-agreement-stage-order',
+    );
+    expect(agreementStageOrder.parentElement).toBe(agreementStageRow);
+    expect(
+      within(agreementStageRow).getByTestId('approval-line-agreement-participants').parentElement,
+    ).toBe(agreementStageRow);
+    expect(agreementParticipants.map((participant) => participant.textContent)).toEqual([
+      expect.stringContaining('합의자 B'),
+      expect.stringContaining('합의자 D'),
+      expect.stringContaining('합의자 E'),
+    ]);
+    expect(agreementParticipants[0]).toHaveStyle({
+      flexDirection: 'row',
+      minHeight: '58px',
+      borderRadius: '10px',
+    });
+    expect(agreementStage).toHaveTextContent('재무팀');
+    expect(screen.getByTestId('approval-line-agreement-participant-76')
+      .querySelectorAll('.MuiTypography-body1').length)
+      .toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('approval-line-agreement-status-72')).toHaveTextContent('처리 중');
+    expect(screen.getByTestId('approval-line-agreement-status-76')).toHaveTextContent('승인');
+    expect(screen.getByTestId('approval-line-agreement-status-72'))
+      .toHaveStyle({ borderRadius: '99px' });
+    const agreementWithoutDepartment = screen.getByTestId(
+      'approval-line-agreement-participant-72',
+    );
+    const agreementWithEmptyDepartment = screen.getByTestId(
+      'approval-line-agreement-participant-77',
+    );
+    for (const participant of [agreementWithoutDepartment, agreementWithEmptyDepartment]) {
+      expect(participant.querySelector('p[title=""]')).toBeNull();
+      expect(
+        within(participant).getByText(/합의자 [BE]/).parentElement,
+      ).toBe(screen.getByTestId(
+        `approval-line-agreement-status-${participant.dataset.testid?.split('-').pop()}`,
+      ).parentElement);
+      expect(participant).toHaveStyle({ alignItems: 'center' });
+    }
+    expect(screen.getByTestId('approval-line-agreement-participants'))
+      .toHaveStyle({ flexWrap: 'wrap' });
     expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent(
       '참조',
     );
     expect(
-      within(screen.getByTestId('approval-line-group-reference')).getByText('3', { exact: true }),
+      within(screen.getByTestId('approval-line-group-reference'))
+        .queryByTestId(/^approval-line-reference-sequence-/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('참조자 C');
+    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('운영팀');
+    const referenceParticipant = screen.getByTestId('approval-line-reference-participant-73');
+    expect(referenceParticipant).toHaveStyle({ flexGrow: '0' });
+    expect(
+      within(referenceParticipant).getByTestId('approval-line-reference-department-73'),
+    ).toHaveTextContent('운영팀');
+    const referenceWithoutDepartment = screen.getByTestId(
+      'approval-line-reference-participant-78',
+    );
+    expect(referenceWithoutDepartment.querySelector('p[title="   "]')).toBeNull();
+    expect(referenceWithoutDepartment).toHaveTextContent('참조자 공백부서');
+    expect(
+      within(referenceWithoutDepartment).getByTestId(
+        'approval-line-reference-avatar-78',
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('운영팀 참조자 C');
+    expect(referenceWithoutDepartment).toHaveStyle({ alignItems: 'center' });
     expect(screen.getByTestId('approval-line-group-agreement').querySelector('.MuiChip-root')).toBeNull();
     expect(screen.getByTestId('approval-line-group-reference').querySelector('.MuiChip-root')).toBeNull();
     const approvalParticipants = within(
@@ -1158,11 +1286,36 @@ describe('Document write page', () => {
       'aria-label',
       '결재 상태 처리 중',
     );
-    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveTextContent('승인');
+    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveAttribute(
+      'aria-label',
+      '결재 상태 승인',
+    );
     expect(screen.getByTestId('approval-line-status-seal-75')).toHaveAttribute(
       'data-status-tone',
       'success',
     );
+    expect(screen.getByTestId('approval-line-status-seal-75').querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    expect(screen.getByTestId('approval-line-status-seal-74').querySelector('img'))
+      .toBeNull();
+    const agreementAvatar = screen.getByTestId('approval-line-agreement-avatar-72');
+    expect(agreementAvatar.querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    const referenceGroup = screen.getByTestId('approval-line-group-reference');
+    const referenceAvatar = screen.getByTestId('approval-line-reference-avatar-73');
+    expect(referenceAvatar.querySelector('img'))
+      .toHaveAttribute('src', 'data:image/png;base64,AA==');
+    await waitFor(() => {
+      expect(imagePreloaders.length).toBeGreaterThan(0);
+    });
+    act(() => {
+      imagePreloaders.forEach((image) => image.onerror?.(new Event('error')));
+    });
+    expect(screen.getByTestId('approval-line-status-seal-75')).toHaveTextContent('승인');
+    expect(agreementAvatar.querySelector('img')).toBeNull();
+    expect(agreementAvatar).toHaveTextContent('합');
+    expect(referenceAvatar.querySelector('img')).toBeNull();
+    expect(referenceAvatar).toHaveTextContent('참');
     const centeredStage = screen.getByTestId('approval-line-sequence-74');
     expect(centeredStage).toHaveStyle({ justifyContent: 'center' });
     expect(within(centeredStage).getByText(

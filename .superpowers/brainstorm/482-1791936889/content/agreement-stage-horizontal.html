@@ -1,0 +1,200 @@
+<h2>C안 조정: 같은 순번의 합의자 가로 배치</h2>
+<p class="subtitle">합의 순번을 한 번만 표시하고 해당 단계 참여자의 프로필·이름·상태를 한 줄로 나란히 배치합니다.</p>
+
+<style>
+  .preview {
+    max-width: 820px;
+    background: white;
+    border: 1px solid #d9dee8;
+    border-radius: 14px;
+    padding: 1.25rem;
+    color: #172033;
+    font-size: 16px;
+  }
+  .heading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    align-items: baseline;
+    margin-bottom: 1rem;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .heading small { font-size: 16px; font-weight: 400; color: #566173; }
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    overflow-x: auto;
+    padding-bottom: .75rem;
+  }
+  .approver {
+    flex: 0 0 120px;
+    border: 1px solid #3c9651;
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    background: #fff;
+  }
+  .approver.pending { border-color: #3865e8; }
+  .dept { padding: .4rem .2rem; background: #edf1f6; white-space: nowrap; }
+  .stamp-slot {
+    height: 82px;
+    display: grid;
+    place-items: center;
+    border-block: 1px solid #e0e3e8;
+  }
+  .stamp {
+    width: 60px;
+    height: 60px;
+    display: grid;
+    place-items: center;
+    border: 3px solid #278245;
+    border-radius: 50%;
+    color: #278245;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .stamp.pending { border-color: #315fe7; color: #315fe7; }
+  .stamp.image {
+    border-radius: 8px;
+    border: 4px double #c84444;
+    color: #bf3737;
+    letter-spacing: .1em;
+  }
+  .approver-name { padding: .45rem .2rem; }
+  .divider { border-top: 1px solid #d6dce5; margin: .5rem 0 1rem; }
+  .section-title { font-size: 16px; font-weight: 700; margin-bottom: .6rem; }
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding: .6rem;
+    margin-bottom: .55rem;
+    border: 1px solid #d9dee8;
+    border-radius: 12px;
+    background: #f8f9fc;
+  }
+  .stage-number {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: 50%;
+    border: 1px solid #5d6a7d;
+    background: white;
+    font-weight: 700;
+  }
+  .members-track {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-width: 0;
+    flex: 1;
+    overflow-x: auto;
+    padding: .1rem .1rem .35rem;
+  }
+  .member {
+    flex: 0 0 164px;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .45rem .55rem;
+    border: 1px solid #e0e4eb;
+    border-radius: 10px;
+    background: white;
+  }
+  .avatar {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #25406b;
+    font-weight: 700;
+    background: linear-gradient(145deg, #d4e4ff, #a8bedf);
+    border: 1px solid #9db3d5;
+  }
+  .person { min-width: 0; flex: 1; }
+  .person strong, .person small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .person small { font-size: 14px; color: #667085; }
+  .status {
+    font-size: 14px;
+    font-weight: 600;
+    color: #176c34;
+    margin-top: .1rem;
+  }
+  .status.waiting { color: #31529a; }
+  .reference-people { display: flex; flex-wrap: wrap; gap: .9rem; }
+  .reference-person { display: flex; align-items: center; gap: .45rem; }
+  .reference-person .avatar { width: 36px; height: 36px; flex-basis: 36px; }
+  .note { max-width: 820px; color: #667085; font-size: 15px; margin-top: .8rem; }
+  @media (max-width: 600px) {
+    .preview { padding: .8rem; }
+    .stage-row { gap: .4rem; padding: .45rem; }
+    .members-track { gap: .4rem; }
+    .member { flex-basis: 150px; }
+  }
+</style>
+
+<div class="preview">
+  <div class="heading">결재선 <small>기안자 관리자 · 기안일 2026.10.14</small></div>
+  <div class="flow">
+    <div class="approver">
+      <div class="dept">기획팀</div>
+      <div class="stamp-slot"><span class="stamp image">관리<br>승인</span></div>
+      <div class="approver-name">① 관리자</div>
+    </div>
+    <span aria-hidden="true">›</span>
+    <div class="approver pending">
+      <div class="dept">사업부</div>
+      <div class="stamp-slot"><span class="stamp pending">진행</span></div>
+      <div class="approver-name">② 김결재</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-title">합의</div>
+  <div class="stage-row">
+    <span class="stage-number">③</span>
+    <div class="members-track">
+      <div class="member">
+        <span class="avatar">최</span>
+        <span class="person"><strong>최은지</strong><small>재무팀</small><span class="status">합의 완료</span></span>
+      </div>
+      <div class="member">
+        <span class="avatar">박</span>
+        <span class="person"><strong>박지훈</strong><small>운영팀</small><span class="status waiting">대기</span></span>
+      </div>
+      <div class="member">
+        <span class="avatar">윤</span>
+        <span class="person"><strong>윤서진</strong><small>경영지원팀</small><span class="status waiting">대기</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="stage-row">
+    <span class="stage-number">④</span>
+    <div class="members-track">
+      <div class="member">
+        <span class="avatar">한</span>
+        <span class="person"><strong>한서윤</strong><small>인사팀</small><span class="status waiting">대기</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-title">참조</div>
+  <div class="reference-people">
+    <div class="reference-person"><span class="avatar">정</span><strong>정하늘</strong></div>
+    <div class="reference-person"><span class="avatar">이</span><strong>이도윤</strong></div>
+  </div>
+</div>
+
+<p class="note">한 순번(stageOrder)에 여러 명이 있으면 번호 하나와 가로 참여자 목록으로 표시하고 participantOrder 정렬만 보존합니다. 인원이 영역 폭을 넘는 경우 합의 참여자 줄 안에서만 가로 스크롤하며, 문서 전체 가로 넘침은 만들지 않습니다. 개인별 participantOrder 번호는 표시하지 않습니다.</p>

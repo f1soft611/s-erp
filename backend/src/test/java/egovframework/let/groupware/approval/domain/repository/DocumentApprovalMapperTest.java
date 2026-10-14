@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 
 class DocumentApprovalMapperTest {
 
@@ -200,6 +201,39 @@ class DocumentApprovalMapperTest {
                 .contains("tenant_id = ?")
                 .contains("electronic_approval_id = ?")
                 .contains("deleted_yn = 'N'");
+    }
+
+    @Test
+    void approvalLineImagePropertiesUseTenantScopedLeftJoinsAndProcessedApprovalStamps() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.getResultMap("DocumentApprovalDAO.approvalLine").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("participantProfileImage", "participantStampImage");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("electronicApprovalId", 77L);
+        String approvalLinesSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalLines")
+                .getBoundSql(params)
+                .getSql();
+        assertThat(approvalLinesSql)
+                .contains("LEFT JOIN public.tb_user u")
+                .contains("u.tenant_id = line.tenant_id")
+                .contains("CAST(u.user_id AS varchar) = line.participant_user_id")
+                .contains("LEFT JOIN public.tb_login_account la")
+                .contains("la.tenant_id = u.tenant_id")
+                .contains("la.login_id = u.login_id")
+                .contains("la.profile_image")
+                .contains("line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')")
+                .contains("ORDER BY line.stage_order, line.participant_order");
+
+        JsonNode lineJson = new ObjectMapper().valueToTree(new DocumentApprovalLineVO());
+        assertThat(lineJson.has("participantProfileImage")).isTrue();
+        assertThat(lineJson.has("participantStampImage")).isTrue();
     }
 
     @Test

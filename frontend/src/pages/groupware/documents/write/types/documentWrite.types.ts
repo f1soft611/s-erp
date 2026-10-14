@@ -132,6 +132,8 @@ export type DocumentApprovalLine = {
   participantUserId: string;
   participantName: string;
   participantDepartmentName?: string | null;
+  participantProfileImage?: string | null;
+  participantStampImage?: string | null;
   actionStatus: string;
   pendingAt?: string | null;
   actionAt?: string | null;

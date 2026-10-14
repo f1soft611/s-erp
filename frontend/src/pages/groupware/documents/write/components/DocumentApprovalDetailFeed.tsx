@@ -52,6 +52,7 @@ import type {
   DocumentApprovalActionRequest,
   DocumentApprovalComment,
   DocumentApprovalDetail,
+  DocumentApprovalLine,
 } from '../types/documentWrite.types';
 
 type DocumentApprovalDetailFeedProps = {
@@ -136,6 +137,8 @@ const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
   error: 'error.light',
   warning: 'warning.light',
 };
+
+const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
 
 function toApprovalCommentTree(
   records: DocumentApprovalComment[],
@@ -482,6 +485,18 @@ export function DocumentApprovalDetailFeed({
       reference: orderedLines.filter((line) => line.participantType === 'REFERENCE'),
     };
   }, [detail?.approvalLines]);
+  const agreementStages = useMemo(() => {
+    const stages = new Map<number, DocumentApprovalLine[]>();
+    for (const line of approvalLineGroups.agreement) {
+      const participants = stages.get(line.stageOrder) ?? [];
+      participants.push(line);
+      stages.set(line.stageOrder, participants);
+    }
+    return Array.from(stages, ([stageOrder, participants]) => ({
+      stageOrder,
+      participants,
+    }));
+  }, [approvalLineGroups.agreement]);
   const hasMoreBody = Boolean(
     bodyHtml &&
       (getPlainText(bodyHtml) !== (detail?.summary ?? '').trim() ||
@@ -872,12 +887,16 @@ export function DocumentApprovalDetailFeed({
                     spacing={1}
                     sx={{ alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0 }}
                   >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    <Typography
+                      data-testid="approval-line-header-title"
+                      variant="body1"
+                      sx={{ fontWeight: 700 }}
+                    >
                       결재선
                     </Typography>
                     <Typography
                       data-testid="approval-line-drafter-meta"
-                      variant="caption"
+                      variant="body1"
                       color="text.secondary"
                     >
                       기안자 {detail.drafterName}
@@ -896,9 +915,6 @@ export function DocumentApprovalDetailFeed({
                   <Stack spacing={1.5}>
                     {approvalLineGroups.approval.length > 0 && (
                       <Box data-testid="approval-line-group-approval">
-                        <Typography variant="caption" color="text.secondary">
-                          결재
-                        </Typography>
                         <Box sx={{ maxWidth: '100%', overflowX: 'auto', pb: 0.5 }}>
                           <Stack
                             direction="row"
@@ -947,7 +963,7 @@ export function DocumentApprovalDetailFeed({
                                       }}
                                     >
                                       <Typography
-                                        variant="caption"
+                                        variant="body1"
                                         color="text.secondary"
                                         title={line.participantDepartmentName ?? ''}
                                         noWrap
@@ -969,16 +985,20 @@ export function DocumentApprovalDetailFeed({
                                         overflow: 'hidden',
                                       }}
                                     >
-                                      <Box
-                                        component="span"
+                                      <Avatar
                                         data-testid={`approval-line-status-seal-${line.electronicApprovalLineId}`}
                                         data-status-tone={statusTone}
                                         aria-label={`결재 상태 ${approvalLineStatusLabel(line.actionStatus)}`}
+                                        src={
+                                          line.participantType === 'APPROVAL' &&
+                                          completedApprovalStatuses.has(line.actionStatus)
+                                            ? line.participantStampImage ?? undefined
+                                            : undefined
+                                        }
+                                        alt={`결재 상태 ${approvalLineStatusLabel(line.actionStatus)}`}
                                         sx={{
-                                          display: 'grid',
-                                          placeItems: 'center',
-                                          width: 28,
-                                          height: 28,
+                                          width: 48,
+                                          height: 48,
                                           flexShrink: 0,
                                           border: '2px solid',
                                           borderStyle: statusTone === 'neutral' ? 'dashed' : 'solid',
@@ -986,13 +1006,13 @@ export function DocumentApprovalDetailFeed({
                                           borderRadius: '50%',
                                           bgcolor: 'background.paper',
                                           color: approvalLineStatusColors[statusTone],
-                                          fontSize: '0.62rem',
+                                          fontSize: '1rem',
                                           fontWeight: 700,
                                           boxShadow: isCurrent ? 1 : 0,
                                         }}
                                       >
                                         {approvalLineStatusDisplayLabel(line.actionStatus)}
-                                      </Box>
+                                      </Avatar>
                                       {line.actionComment && (
                                         <Typography
                                           variant="caption"
@@ -1022,19 +1042,19 @@ export function DocumentApprovalDetailFeed({
                                         sx={{
                                           display: 'grid',
                                           placeItems: 'center',
-                                          flex: '0 0 16px',
-                                          height: 16,
+                                          flex: '0 0 24px',
+                                          height: 24,
                                           border: '1px solid',
                                           borderColor: 'text.secondary',
                                           borderRadius: '50%',
-                                          fontSize: '0.6rem',
+                                          fontSize: '1rem',
                                           fontWeight: 700,
                                         }}
                                       >
                                         {line.stageOrder}
                                       </Box>
                                       <Typography
-                                        variant="body2"
+                                        variant="body1"
                                         title={line.participantName}
                                         noWrap
                                         sx={{
@@ -1074,75 +1094,243 @@ export function DocumentApprovalDetailFeed({
                           <Divider data-testid="approval-line-inner-divider" />
                         )}
                         <Stack spacing={0.75}>
-                          {[
-                            {
-                              id: 'approval-line-group-agreement',
-                              label: '합의',
-                              lines: approvalLineGroups.agreement,
-                            },
-                            {
-                              id: 'approval-line-group-reference',
-                              label: '참조',
-                              lines: approvalLineGroups.reference,
-                            },
-                          ]
-                            .filter((group) => group.lines.length > 0)
-                            .map((group) => (
-                              <Box key={group.id} data-testid={group.id} sx={{ minWidth: 0 }}>
-                                <Typography variant="caption" color="text.secondary">
-                                  {group.label}
-                                </Typography>
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  useFlexGap
-                                  sx={{ minWidth: 0, rowGap: 0.75, flexWrap: 'wrap' }}
-                                >
-                                  {group.lines.map((line) => {
-                                    const participantLabel = [
-                                      line.participantDepartmentName,
-                                      line.participantName,
-                                    ].filter(Boolean).join(' ');
-                                    return (
-                                      <Stack
-                                        key={line.electronicApprovalLineId}
-                                        direction="row"
-                                        spacing={0.5}
-                                        sx={{ minWidth: 0, maxWidth: '100%' }}
+                          {approvalLineGroups.agreement.length > 0 && (
+                            <Box data-testid="approval-line-group-agreement" sx={{ minWidth: 0 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                                합의
+                              </Typography>
+                              <Stack spacing={1}>
+                                {agreementStages.map((stage) => (
+                                  <Box
+                                    key={stage.stageOrder}
+                                    data-testid={`approval-line-agreement-stage-${stage.stageOrder}`}
+                                    sx={{
+                                      minWidth: 0,
+                                      p: 1,
+                                      border: '1px solid',
+                                      borderColor: 'divider',
+                                      borderRadius: 1.5,
+                                      bgcolor: 'background.paper',
+                                    }}
+                                  >
+                                    <Box
+                                      data-testid={`approval-line-agreement-stage-row-${stage.stageOrder}`}
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: 1,
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <Box
+                                        component="span"
+                                        data-testid="approval-line-agreement-stage-order"
+                                        sx={{
+                                          display: 'grid',
+                                          placeItems: 'center',
+                                          width: 28,
+                                          height: 28,
+                                          flex: '0 0 28px',
+                                          border: '1px solid',
+                                          borderColor: 'text.secondary',
+                                          borderRadius: '50%',
+                                          fontSize: '1rem',
+                                          fontWeight: 700,
+                                        }}
                                       >
-                                        <Box
-                                          component="span"
-                                          sx={{
-                                            display: 'grid',
-                                            placeItems: 'center',
-                                            flex: '0 0 16px',
-                                            height: 16,
-                                            border: '1px solid',
-                                            borderColor: 'text.secondary',
-                                            borderRadius: '50%',
-                                            fontSize: '0.6rem',
-                                          }}
-                                        >
-                                          {line.stageOrder}
-                                        </Box>
+                                        {stage.stageOrder}
+                                      </Box>
+                                      <Box
+                                        data-testid="approval-line-agreement-participants"
+                                        sx={{
+                                          display: 'flex',
+                                          flexWrap: 'wrap',
+                                          gap: 1,
+                                          minWidth: 0,
+                                          flex: 1,
+                                        }}
+                                      >
+                                        {stage.participants.map((line) => {
+                                          const statusTone =
+                                            approvalLineStatusTones[line.actionStatus] ?? 'neutral';
+                                          const departmentName =
+                                            line.participantDepartmentName ?? '';
+                                          const hasDepartmentName = Boolean(departmentName.trim());
+                                          const statusBadge = (
+                                            <Box
+                                              component="span"
+                                              data-testid={`approval-line-agreement-status-${line.electronicApprovalLineId}`}
+                                              sx={{
+                                                flex: '0 0 auto',
+                                                px: 0.5,
+                                                border: '1px solid',
+                                                borderColor:
+                                                  approvalLineStatusColors[statusTone],
+                                                borderRadius: '99px',
+                                                color: approvalLineStatusColors[statusTone],
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                lineHeight: 1.4,
+                                                whiteSpace: 'nowrap',
+                                              }}
+                                            >
+                                              {approvalLineStatusLabel(line.actionStatus)}
+                                            </Box>
+                                          );
+                                          return (
+                                            <Box
+                                              key={line.electronicApprovalLineId}
+                                              data-testid={`approval-line-agreement-participant-${line.electronicApprovalLineId}`}
+                                              sx={{
+                                                display: 'flex',
+                                                flex: '1 1 200px',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                minWidth: 'min(100%, 200px)',
+                                                maxWidth: '100%',
+                                                minHeight: 58,
+                                                p: 1,
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                                borderRadius: '10px',
+                                                bgcolor: 'background.paper',
+                                              }}
+                                            >
+                                              <Avatar
+                                                data-testid={`approval-line-agreement-avatar-${line.electronicApprovalLineId}`}
+                                                src={line.participantProfileImage ?? undefined}
+                                                alt={line.participantName}
+                                                sx={{ width: 40, height: 40, flexShrink: 0 }}
+                                              >
+                                                {line.participantName.slice(0, 1)}
+                                              </Avatar>
+                                              <Box
+                                                sx={{
+                                                  display: 'flex',
+                                                  flex: 1,
+                                                  minWidth: 0,
+                                                  alignItems: hasDepartmentName ? 'stretch' : 'center',
+                                                  flexDirection: hasDepartmentName ? 'column' : 'row',
+                                                  justifyContent: hasDepartmentName
+                                                    ? 'flex-start'
+                                                    : 'space-between',
+                                                  gap: hasDepartmentName ? 0 : 0.5,
+                                                }}
+                                              >
+                                                <Typography
+                                                  variant="body1"
+                                                  title={line.participantName}
+                                                  noWrap
+                                                  sx={{ display: 'block', minWidth: 0 }}
+                                                >
+                                                  {line.participantName}
+                                                </Typography>
+                                                {hasDepartmentName ? (
+                                                  <Box
+                                                    sx={{
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: 0.5,
+                                                      minWidth: 0,
+                                                      mt: 0.25,
+                                                    }}
+                                                  >
+                                                    <Typography
+                                                      variant="body1"
+                                                      title={departmentName}
+                                                      color="text.secondary"
+                                                      noWrap
+                                                      sx={{ minWidth: 0, flex: 1 }}
+                                                    >
+                                                      {departmentName}
+                                                    </Typography>
+                                                    {statusBadge}
+                                                  </Box>
+                                                ) : (
+                                                  statusBadge
+                                                )}
+                                              </Box>
+                                            </Box>
+                                          );
+                                        })}
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
+                          {approvalLineGroups.reference.length > 0 && (
+                            <Box data-testid="approval-line-group-reference" sx={{ minWidth: 0 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                                참조
+                              </Typography>
+                              <Box
+                                data-testid="approval-line-reference-participants"
+                                sx={{
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                {approvalLineGroups.reference.map((line) => {
+                                  const departmentName =
+                                    line.participantDepartmentName ?? '';
+                                  const hasDepartmentName = Boolean(departmentName.trim());
+                                  return (
+                                    <Box
+                                      key={line.electronicApprovalLineId}
+                                      data-testid={`approval-line-reference-participant-${line.electronicApprovalLineId}`}
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        flex: '0 1 240px',
+                                        minWidth: 'min(100%, 190px)',
+                                        maxWidth: '100%',
+                                        p: 1,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        borderRadius: '10px',
+                                        bgcolor: 'background.paper',
+                                      }}
+                                    >
+                                      <Avatar
+                                        data-testid={`approval-line-reference-avatar-${line.electronicApprovalLineId}`}
+                                        src={line.participantProfileImage ?? undefined}
+                                        alt={line.participantName}
+                                        sx={{ width: 36, height: 36, flexShrink: 0 }}
+                                      >
+                                        {line.participantName.slice(0, 1)}
+                                      </Avatar>
+                                      <Box sx={{ minWidth: 0, flex: 1 }}>
                                         <Typography
-                                          title={participantLabel}
+                                          variant="body1"
+                                          title={line.participantName}
                                           noWrap
-                                          sx={{
-                                            minWidth: 0,
-                                            maxWidth: 180,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                          }}
+                                          sx={{ display: 'block' }}
                                         >
-                                          {participantLabel}
+                                          {line.participantName}
                                         </Typography>
-                                      </Stack>
-                                    );
-                                  })}
-                                </Stack>
+                                        {hasDepartmentName && (
+                                          <Typography
+                                            data-testid={`approval-line-reference-department-${line.electronicApprovalLineId}`}
+                                            variant="body1"
+                                            title={departmentName}
+                                            noWrap
+                                            color="text.secondary"
+                                          >
+                                            {departmentName}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  );
+                                })}
                               </Box>
-                            ))}
+                            </Box>
+                          )}
                         </Stack>
                       </>
                     )}

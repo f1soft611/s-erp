@@ -11,6 +11,8 @@ public class DocumentApprovalLineVO {
     private String participantUserId;
     private String participantName;
     private String participantDepartmentName;
+    private String participantProfileImage;
+    private String participantStampImage;
     private String actionStatus;
     private Date pendingAt;
     private Date actionAt;
@@ -33,6 +35,14 @@ public class DocumentApprovalLineVO {
     public String getParticipantDepartmentName() { return participantDepartmentName; }
     public void setParticipantDepartmentName(String participantDepartmentName) {
         this.participantDepartmentName = participantDepartmentName;
+    }
+    public String getParticipantProfileImage() { return participantProfileImage; }
+    public void setParticipantProfileImage(String participantProfileImage) {
+        this.participantProfileImage = participantProfileImage;
+    }
+    public String getParticipantStampImage() { return participantStampImage; }
+    public void setParticipantStampImage(String participantStampImage) {
+        this.participantStampImage = participantStampImage;
     }
     public String getActionStatus() { return actionStatus; }
     public void setActionStatus(String actionStatus) { this.actionStatus = actionStatus; }

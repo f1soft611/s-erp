@@ -33,6 +33,8 @@
         <result property="participantUserId" column="participant_user_id"/>
         <result property="participantName" column="participant_name"/>
         <result property="participantDepartmentName" column="participant_department_name"/>
+        <result property="participantProfileImage" column="participant_profile_image"/>
+        <result property="participantStampImage" column="participant_stamp_image"/>
         <result property="actionStatus" column="action_status"/>
         <result property="pendingAt" column="pending_at"/>
         <result property="actionAt" column="action_at"/>
@@ -450,13 +452,26 @@
     </update>
 
     <select id="selectApprovalLines" parameterType="map" resultMap="approvalLine">
-        SELECT electronic_approval_line_id, stage_order, participant_order, participant_type,
-               participant_user_id, participant_name, participant_department_name,
-               action_status, pending_at, action_at, action_comment
-        FROM public.tb_electronic_approval_line_info
-        WHERE tenant_id = #{tenantId}
-          AND electronic_approval_id = #{electronicApprovalId}
-        ORDER BY stage_order, participant_order
+        SELECT line.electronic_approval_line_id, line.stage_order, line.participant_order,
+               line.participant_type, line.participant_user_id, line.participant_name,
+               line.participant_department_name, la.profile_image AS participant_profile_image,
+               CASE
+                   WHEN line.participant_type = 'APPROVAL'
+                    AND line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
+                   THEN la.stamp_image
+                   ELSE NULL
+               END AS participant_stamp_image,
+               line.action_status, line.pending_at, line.action_at, line.action_comment
+        FROM public.tb_electronic_approval_line_info line
+        LEFT JOIN public.tb_user u
+          ON u.tenant_id = line.tenant_id
+         AND CAST(u.user_id AS varchar) = line.participant_user_id
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = u.tenant_id
+         AND la.login_id = u.login_id
+        WHERE line.tenant_id = #{tenantId}
+          AND line.electronic_approval_id = #{electronicApprovalId}
+        ORDER BY line.stage_order, line.participant_order
     </select>
 
     <select id="selectIsDocumentParticipant" parameterType="map" resultType="boolean">

@@ -1,0 +1,316 @@
+<h2>결재선 보완 시안</h2>
+<p class="subtitle">공통 헤더·도장·참조 표현과 세 가지 합의 레이아웃을 비교합니다. 선택할 합의 안을 클릭해 주세요.</p>
+
+<style>
+  .designs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+  .design-option {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem;
+    cursor: pointer;
+  }
+  .design-option.selected {
+    border-color: var(--selected-border);
+    background: var(--selected-bg);
+  }
+  .design-title {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+    margin-bottom: .35rem;
+  }
+  .letter {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    font-weight: 700;
+  }
+  .design-option.selected .letter {
+    color: white;
+    background: var(--accent);
+  }
+  .design-title h3 { margin: 0; }
+  .description {
+    color: var(--text-secondary);
+    margin: 0 0 1rem;
+    font-size: .9rem;
+  }
+  .approval-panel {
+    background: #f5f7fb;
+    border: 1px solid #d9dee8;
+    border-radius: 12px;
+    padding: 1rem;
+    color: #172033;
+    font-size: 15px;
+  }
+  .panel-heading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: baseline;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+  .panel-heading small {
+    font-size: 14px;
+    font-weight: 400;
+    color: #566173;
+  }
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    overflow-x: auto;
+    padding: .1rem .1rem .75rem;
+  }
+  .person-card {
+    display: grid;
+    grid-template-rows: 32px 74px 34px;
+    flex: 0 0 104px;
+    border: 1px solid #339351;
+    border-radius: 9px;
+    overflow: hidden;
+    text-align: center;
+    background: white;
+  }
+  .person-card.pending { border-color: #3865e8; }
+  .department {
+    padding: 5px 4px;
+    overflow: hidden;
+    background: #edf1f6;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .seal-slot {
+    display: grid;
+    place-items: center;
+    border-block: 1px solid #e0e3e8;
+  }
+  .seal {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 3px solid #278245;
+    color: #278245;
+    font-size: 16px;
+    font-weight: 700;
+    background: #fff;
+  }
+  .seal.progress { border-color: #315fe7; color: #315fe7; }
+  .stamp-image {
+    border-radius: 7px;
+    border: 3px double #c84444;
+    color: #bf3737;
+    line-height: 1.05;
+    letter-spacing: .12em;
+    box-shadow: 0 0 0 2px #f5dede;
+  }
+  .person-name {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    gap: .25rem;
+    padding: 0 .2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sequence {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #8792a3;
+    border-radius: 50%;
+    flex: 0 0 20px;
+    font-size: 14px;
+  }
+  .chevron { color: #9099a8; font-size: 20px; }
+  .reference-row {
+    border-top: 1px solid #d6dce5;
+    margin-top: .75rem;
+    padding-top: .75rem;
+  }
+  .section-label {
+    color: #566173;
+    font-size: 14px;
+    margin-bottom: .4rem;
+  }
+  .avatar {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #d4e4ff, #a8bedf);
+    border: 1px solid #9db3d5;
+    color: #25406b;
+    font-weight: 700;
+    overflow: hidden;
+  }
+  .avatar.large { width: 46px; height: 46px; flex-basis: 46px; }
+  .agreement-cards, .avatar-list, .agreement-rows {
+    display: flex;
+    gap: .75rem;
+    overflow-x: auto;
+    padding: .25rem .1rem .5rem;
+  }
+  .agreement-card {
+    flex: 0 0 132px;
+    border: 1px solid #cfd6e1;
+    border-radius: 10px;
+    background: white;
+    padding: .65rem;
+    display: grid;
+    justify-items: center;
+    gap: .35rem;
+    text-align: center;
+  }
+  .agreement-card strong {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stage-chip, .state-chip {
+    font-size: 13px;
+    color: #39465a;
+    border-radius: 99px;
+    background: #edf1f6;
+    padding: .1rem .5rem;
+  }
+  .state-chip.ok { color: #176c34; background: #e2f3e7; }
+  .avatar-list { align-items: center; }
+  .avatar-person {
+    flex: 0 0 105px;
+    display: grid;
+    justify-items: center;
+    gap: .25rem;
+    text-align: center;
+  }
+  .avatar-person strong {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agreement-rows { flex-direction: column; }
+  .agreement-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    border: 1px solid #d7dde7;
+    border-radius: 10px;
+    padding: .5rem .65rem;
+    background: white;
+  }
+  .agreement-row .details { min-width: 0; flex: 1; }
+  .agreement-row .details strong,
+  .agreement-row .details small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agreement-row .details small { color: #657084; font-size: 14px; }
+  .note { margin-top: .5rem; color: #667085; font-size: 14px; }
+</style>
+
+<div class="designs">
+  <section class="design-option" data-choice="agreement-cards" onclick="toggleSelect(this)">
+    <div class="design-title"><span class="letter">A</span><h3>합의자 카드형</h3></div>
+    <p class="description">사진·이름·순번·처리 상태를 각 카드에 정돈해 표시합니다. 정보가 잘 보이는 대신 가로 공간을 더 씁니다.</p>
+    <div class="approval-panel">
+      <div class="panel-heading">결재선 <small>기안자 관리자 · 2026.10.14</small></div>
+      <div class="flow">
+        <div class="person-card"><div class="department">기획팀</div><div class="seal-slot"><span class="seal stamp-image">관리<br>승인</span></div><div class="person-name"><span class="sequence">1</span>관리자</div></div>
+        <span class="chevron">›</span>
+        <div class="person-card pending"><div class="department">사업부</div><div class="seal-slot"><span class="seal progress">진행</span></div><div class="person-name"><span class="sequence">2</span>김결재</div></div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">합의</div>
+        <div class="agreement-cards">
+          <div class="agreement-card"><span class="avatar">최</span><strong><span class="sequence">3</span> 최은지</strong><span class="state-chip ok">합의 완료</span></div>
+          <div class="agreement-card"><span class="avatar">박</span><strong><span class="sequence">4</span> 박지훈</strong><span class="state-chip">대기</span></div>
+        </div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">참조</div>
+        <div class="avatar-list">
+          <div class="avatar-person"><span class="avatar">정</span><strong>정하늘</strong></div>
+          <div class="avatar-person"><span class="avatar">이</span><strong>이도윤</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="design-option" data-choice="agreement-avatars" onclick="toggleSelect(this)">
+    <div class="design-title"><span class="letter">B</span><h3>순번이 있는 아바타 줄</h3></div>
+    <p class="description">사진 중심의 가벼운 가로 목록입니다. 카드보다 공간을 아끼고 인원이 많아져도 흐름이 자연스럽습니다.</p>
+    <div class="approval-panel">
+      <div class="panel-heading">결재선 <small>기안자 관리자 · 2026.10.14</small></div>
+      <div class="flow">
+        <div class="person-card"><div class="department">기획팀</div><div class="seal-slot"><span class="seal stamp-image">관리<br>승인</span></div><div class="person-name"><span class="sequence">1</span>관리자</div></div>
+        <span class="chevron">›</span>
+        <div class="person-card pending"><div class="department">사업부</div><div class="seal-slot"><span class="seal progress">진행</span></div><div class="person-name"><span class="sequence">2</span>김결재</div></div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">합의</div>
+        <div class="avatar-list">
+          <div class="avatar-person"><span class="avatar large">③</span><strong>최은지</strong><span class="state-chip ok">완료</span></div>
+          <div class="avatar-person"><span class="avatar large">④</span><strong>박지훈</strong><span class="state-chip">대기</span></div>
+        </div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">참조</div>
+        <div class="avatar-list">
+          <div class="avatar-person"><span class="avatar">정</span><strong>정하늘</strong></div>
+          <div class="avatar-person"><span class="avatar">이</span><strong>이도윤</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="design-option" data-choice="agreement-rows" onclick="toggleSelect(this)">
+    <div class="design-title"><span class="letter">C</span><h3>합의자 목록형</h3></div>
+    <p class="description">한 줄마다 사진·이름·부서·순번·상태를 표시합니다. 좁은 패널과 긴 이름에 가장 안정적이지만 세로 길이가 늘어납니다.</p>
+    <div class="approval-panel">
+      <div class="panel-heading">결재선 <small>기안자 관리자 · 2026.10.14</small></div>
+      <div class="flow">
+        <div class="person-card"><div class="department">기획팀</div><div class="seal-slot"><span class="seal stamp-image">관리<br>승인</span></div><div class="person-name"><span class="sequence">1</span>관리자</div></div>
+        <span class="chevron">›</span>
+        <div class="person-card pending"><div class="department">사업부</div><div class="seal-slot"><span class="seal progress">진행</span></div><div class="person-name"><span class="sequence">2</span>김결재</div></div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">합의</div>
+        <div class="agreement-rows">
+          <div class="agreement-row"><span class="sequence">3</span><span class="avatar">최</span><span class="details"><strong>최은지</strong><small>재무팀 · 합의 완료</small></span><span class="state-chip ok">완료</span></div>
+          <div class="agreement-row"><span class="sequence">4</span><span class="avatar">박</span><span class="details"><strong>박지훈</strong><small>운영팀 · 합의 대기</small></span><span class="state-chip">대기</span></div>
+        </div>
+      </div>
+      <div class="reference-row">
+        <div class="section-label">참조</div>
+        <div class="avatar-list">
+          <div class="avatar-person"><span class="avatar">정</span><strong>정하늘</strong></div>
+          <div class="avatar-person"><span class="avatar">이</span><strong>이도윤</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<p class="note">공통 적용 예정: 실제 저장된 도장 이미지가 있으면 이미지로 표시하고, 없으면 승인·반려·진행 상태에 맞는 시스템 도장을 사용합니다. 참조는 번호 없이 프로필 사진과 이름만 표시합니다. 모든 텍스트는 현재보다 큰 기본 읽기 크기로 정리합니다.</p>
