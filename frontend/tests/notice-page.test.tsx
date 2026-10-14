@@ -802,7 +802,7 @@ describe('Community notice page', () => {
                 content: '셋째 댓글',
               },
             ],
-            commentCount: 3,
+            commentCount: 4,
             hasPreviousComments: true,
           },
         ]}
@@ -815,6 +815,42 @@ describe('Community notice page', () => {
     expect(
       screen.getByRole('button', { name: /^이전 댓글 보기/ }),
     ).toBeInTheDocument();
+  });
+
+  it('hides the previous-comments action when all comments are already loaded', () => {
+    render(
+      <NoticeFeedList
+        items={[
+          {
+            ...noticeFeed[0],
+            comments: [
+              { id: 11, author: '첫 댓글', time: '오늘', content: '첫 댓글' },
+              {
+                id: 12,
+                author: '둘째 댓글',
+                time: '오늘',
+                content: '둘째 댓글',
+              },
+              {
+                id: 13,
+                author: '셋째 작성자',
+                time: '오늘',
+                content: '셋째 댓글',
+              },
+            ],
+            commentCount: 3,
+            hasPreviousComments: true,
+            nextBeforeCommentId: 10,
+          },
+        ]}
+        isDark={false}
+        expandedNoticeId={noticeFeed[0].id}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /^이전 댓글 보기/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('requests the previous cursor once and renders merged older comments without duplicates', async () => {
@@ -978,7 +1014,7 @@ describe('Community notice page', () => {
               },
             ],
             nextBeforeCommentId: 8,
-            commentCount: 3,
+            commentCount: 4,
           },
         ]}
         isDark={false}

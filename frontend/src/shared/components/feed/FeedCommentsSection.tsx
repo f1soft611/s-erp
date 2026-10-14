@@ -22,10 +22,16 @@ export function FeedCommentsSection({
     remainingPreviousCount >= 0
       ? `이전 댓글 보기 (${remainingPreviousCount})`
       : '이전 댓글 보기';
+  const hasNoRemainingPreviousComments =
+    typeof remainingPreviousCount === 'number' &&
+    Number.isFinite(remainingPreviousCount) &&
+    remainingPreviousCount === 0;
+  const showPreviousAction =
+    showPrevious && (isLoadingPrevious || !hasNoRemainingPreviousComments);
 
   return (
     <Box data-testid="feed-comments-section">
-      {showPrevious && (
+      {showPreviousAction && (
         <Button
           size="small"
           variant="text"

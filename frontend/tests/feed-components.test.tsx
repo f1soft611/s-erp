@@ -232,6 +232,17 @@ describe('shared feed components', () => {
     expect(previousCommentsButton).toHaveStyle({ whiteSpace: 'nowrap' });
   });
 
+  it('hides the previous-comments action when no comments remain', () => {
+    render(
+      <FeedCommentsSection showPrevious remainingPreviousCount={0}>
+        <p>모든 댓글</p>
+      </FeedCommentsSection>,
+    );
+
+    expect(screen.queryByRole('button', { name: /^이전 댓글 보기/ })).toBeNull();
+    expect(screen.getByText('모든 댓글')).toBeInTheDocument();
+  });
+
   it('renders feed, attachment and comment blocks via reusable shared components', () => {
     render(
       <>
