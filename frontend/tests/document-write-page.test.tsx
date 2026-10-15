@@ -1464,6 +1464,27 @@ describe('Document write page', () => {
       ),
     ).toBeInTheDocument();
     expect(referenceWithoutDepartment).toHaveStyle({ alignItems: 'center' });
+    const agreementLayoutGroup = screen.getByTestId('approval-line-group-agreement');
+    const referenceLayoutGroup = screen.getByTestId('approval-line-group-reference');
+    const agreementContent = within(agreementLayoutGroup).getByTestId(
+      'approval-line-agreement-content',
+    );
+    const referenceContent = within(referenceLayoutGroup).getByTestId(
+      'approval-line-reference-participants',
+    );
+    expect(agreementLayoutGroup.children).toHaveLength(2);
+    expect(agreementLayoutGroup.children[0]).toHaveTextContent('합의');
+    expect(agreementLayoutGroup.children[1]).toBe(agreementContent);
+    expect(referenceLayoutGroup.children).toHaveLength(2);
+    expect(referenceLayoutGroup.children[0]).toHaveTextContent('참조');
+    expect(referenceLayoutGroup.children[1]).toBe(referenceContent);
+    for (const row of [agreementLayoutGroup, referenceLayoutGroup]) {
+      expect(row).toHaveStyle({
+        display: 'grid',
+        gridTemplateColumns: '64px minmax(0, 1fr)',
+        minHeight: '72px',
+      });
+    }
     expect(screen.getByTestId('approval-line-group-agreement').querySelector('.MuiChip-root')).toBeNull();
     expect(screen.getByTestId('approval-line-group-reference').querySelector('.MuiChip-root')).toBeNull();
     const approvalParticipants = within(
@@ -2376,9 +2397,9 @@ describe('Document write page', () => {
       reject,
       returnForRevision,
       statusChip,
-      kindChip,
       divider,
       pin,
+      kindChip,
     ];
     const actionButtonStyles = [approve, reject, returnForRevision].map(
       (button) => getComputedStyle(button),
@@ -2386,7 +2407,10 @@ describe('Document write page', () => {
 
     expect(getComputedStyle(statusChip).height).toBe('28px');
     expect(getComputedStyle(kindChip).height).toBe('28px');
-    expect(getComputedStyle(kindChip).marginRight).toBe('4px');
+    expect(getComputedStyle(toolbar).columnGap).toBe('4px');
+    expect(getComputedStyle(statusChip).marginRight).toBe('4px');
+    expect(getComputedStyle(pin).marginLeft).toBe('4px');
+    expect(parseFloat(getComputedStyle(kindChip).marginRight)).toBe(0);
     expect(actionButtonStyles.map((style) => style.minHeight)).toEqual([
       getComputedStyle(commentSubmitButton).minHeight,
       getComputedStyle(commentSubmitButton).minHeight,

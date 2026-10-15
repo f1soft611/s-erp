@@ -94,7 +94,7 @@ class ApprovalLineTemplateApiControllerTest {
 
         ResultVO response = controller.deleteTemplate(7L, user);
 
-        assertThat(response.getCode()).isEqualTo(ResponseCode.SUCCESS.getCode());
+        assertThat(response.getResultCode()).isEqualTo(ResponseCode.SUCCESS.getCode());
         assertThat(response.getResult().get("message")).isEqualTo("자주 쓰는 결재선이 삭제되었습니다.");
         verify(templateService).deleteTemplate(user, 7L);
     }
@@ -129,7 +129,11 @@ class ApprovalLineTemplateApiControllerTest {
         } else {
             paths = ((DeleteMapping) mapping).value();
         }
-        assertThat(paths).contains(expectedPath);
+        if (expectedPath.isEmpty()) {
+            assertThat(paths).isEmpty();
+        } else {
+            assertThat(paths).contains(expectedPath);
+        }
     }
 
     private LoginVO authenticatedUser() {

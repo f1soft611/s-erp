@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getNoticeCategoryPresentation } from '../data/noticeCategoryPresentation';
 import {
   Box,
   Chip,
@@ -927,6 +928,10 @@ export function NoticeFeedList({
               objectKey?: string | null;
               bucketName?: string | null;
             }>);
+          const categoryPresentation = getNoticeCategoryPresentation(
+            item.noticeGubunCode,
+            isDark,
+          );
 
           return (
             <FeedCard
@@ -997,8 +1002,8 @@ export function NoticeFeedList({
                   label={item.state}
                   size="small"
                   sx={{
-                    bgcolor: isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe',
-                    color: '#2563eb',
+                    bgcolor: categoryPresentation.backgroundColor,
+                    color: categoryPresentation.color,
                     fontWeight: 700,
                   }}
                 />

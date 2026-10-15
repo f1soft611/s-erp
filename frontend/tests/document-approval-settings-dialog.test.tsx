@@ -1,9 +1,38 @@
-import { createEvent, fireEvent, render, screen } from '@testing-library/react';
+import {
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const templateApi = vi.hoisted(() => ({
+  create: vi.fn(),
+  list: vi.fn(),
+  get: vi.fn(),
+  rename: vi.fn(),
+  delete: vi.fn(),
+}));
+
+vi.mock(
+  '../src/pages/groupware/documents/write/services/approvalLineTemplate.service',
+  () => ({
+    createApprovalLineTemplate: templateApi.create,
+    listApprovalLineTemplates: templateApi.list,
+    getApprovalLineTemplate: templateApi.get,
+    renameApprovalLineTemplate: templateApi.rename,
+    deleteApprovalLineTemplate: templateApi.delete,
+  }),
+);
+
 import { DocumentApprovalSettingsDialog } from '../src/pages/groupware/documents/write/components/DocumentApprovalSettingsDialog';
 import type { DocumentApprovalStage } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import type { F1GridUserOption } from '../src/shared/components/f1-grid/types/grid.types';
+
+beforeEach(() => vi.resetAllMocks());
 
 const users: F1GridUserOption[] = [
   { value: 'drafter', label: '기안자' },
@@ -38,6 +67,7 @@ function renderSettings(
   overrides: Partial<{
     approvalStages: DocumentApprovalStage[];
     referenceUserIds: string[];
+    documentCode: '001' | '008' | '004' | '031';
     onClose: () => void;
     onApply: (
       stages: DocumentApprovalStage[],
@@ -50,6 +80,7 @@ function renderSettings(
   render(
     <DocumentApprovalSettingsDialog
       open
+      documentCode="001"
       userOptions={users}
       approvalStages={overrides.approvalStages ?? approvalStages}
       referenceUserIds={overrides.referenceUserIds ?? ['reference-1']}
@@ -98,11 +129,209 @@ describe('DocumentApprovalSettingsDialog', () => {
     ).toBeNull();
     expect(
       screen.getByRole('button', { name: '자주 쓰는 결재선 저장' }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(
       screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
-    ).toBeDisabled();
-    expect(screen.getByText('저장 테이블/API 준비 후 제공')).toBeVisible();
+    ).toBeEnabled();
+  });
+
+  it('saves the current draft stages and references under a required name', async () => {
+    templateApi.list.mockResolvedValue([]);
+    templateApi.create.mockResolvedValue({
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+    });
+    renderSettings();
+
+    fireEvent.click(screen.getByRole('button', { name: '자주 쓰는 결재선 저장' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '결재선 이름' }), {
+      target: { value: ' 기본 결재선 ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(templateApi.create).toHaveBeenCalledWith({
+        eabusNo: '001',
+        name: '기본 결재선',
+        approvalLines: [
+          {
+            stageOrder: 2,
+            participantOrder: 1,
+            participantType: 'APPROVAL',
+            participantUserId: 'approver',
+          },
+          {
+            stageOrder: 3,
+            participantOrder: 1,
+            participantType: 'AGREEMENT',
+            participantUserId: 'agreement-1',
+          },
+          {
+            stageOrder: 3,
+            participantOrder: 2,
+            participantType: 'AGREEMENT',
+            participantUserId: 'agreement-2',
+          },
+          {
+            stageOrder: 4,
+            participantOrder: 1,
+            participantType: 'REFERENCE',
+            participantUserId: 'reference-1',
+          },
+        ],
+      }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: '결재선 설정' }),
+    ).toBeInTheDocument();
+  });
+
+  it('loads ordered template participants into temporary state and applies them only on Apply', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.get.mockResolvedValue({
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+      approvalLines: [
+        {
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-2',
+        },
+        {
+          stageOrder: 3,
+          participantOrder: 1,
+          participantType: 'AGREEMENT',
+          participantUserId: 'agreement-2',
+        },
+        {
+          stageOrder: 3,
+          participantOrder: 2,
+          participantType: 'AGREEMENT',
+          participantUserId: 'agreement-1',
+        },
+        {
+          stageOrder: 4,
+          participantOrder: 1,
+          participantType: 'REFERENCE',
+          participantUserId: 'reference-2',
+        },
+      ],
+    });
+    const { onApply } = renderSettings();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: '결재선 선택 기본 결재선',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '불러오기' }));
+
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    expect(
+      await screen.findByRole('group', { name: '결재 1 기안자' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: '결재 2 새 결재자' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: '합의 3 합의자 2, 합의자 1' }),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(vi.mocked(onApply).mock.calls[0][0].map((stage) => stage.id)).toEqual([
+      1,
+      4,
+      5,
+    ]);
+    expect(vi.mocked(onApply).mock.calls[0][1]).toEqual(['reference-2']);
+  });
+
+  it('renames and confirms deletion of a selected template', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      { templateId: 10, name: '다른 결재선', eabusNo: '001' },
+    ]);
+    templateApi.rename.mockResolvedValue({
+      templateId: 9,
+      name: '변경된 이름',
+      eabusNo: '001',
+    });
+    templateApi.delete.mockResolvedValue(undefined);
+    renderSettings();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: '결재선 선택 기본 결재선',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '이름 변경' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '새 결재선 이름' }), {
+      target: { value: '변경된 이름' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '이름 변경 저장' }));
+
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledWith(9, '변경된 이름'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    expect(
+      screen.getByText('“변경된 이름” 결재선을 삭제하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '삭제 확인' }));
+
+    await waitFor(() => expect(templateApi.delete).toHaveBeenCalledWith(9));
+    expect(
+      screen.getByRole('button', { name: '결재선 선택 다른 결재선' }),
+    ).toBeInTheDocument();
+  });
+
+  it('preserves temporary participants when loading a template fails', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.get.mockRejectedValue(new Error('상세 조회 실패'));
+    const { onApply } = renderSettings();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: '결재선 선택 기본 결재선',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '불러오기' }));
+    expect((await screen.findAllByText('상세 조회 실패')).length).toBeGreaterThan(0);
+    fireEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
+      ).getByRole('button', { name: '템플릿 목록 닫기' }),
+    );
+
+    expect(
+      await screen.findByRole('group', { name: '결재 2 결재자' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(vi.mocked(onApply).mock.calls[0][0].map((stage) => stage.users)).toEqual([
+      [users[0]],
+      [users[1]],
+      [users[2], users[3]],
+    ]);
+    expect(vi.mocked(onApply).mock.calls[0][1]).toEqual(['reference-1']);
   });
 
   it('applies a reordered agreement stage as one unit without mutating source state', () => {

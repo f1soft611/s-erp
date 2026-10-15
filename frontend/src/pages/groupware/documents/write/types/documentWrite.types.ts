@@ -32,6 +32,36 @@ export type DocumentApprovalStage = {
   isFixed?: boolean;
 };
 
+export type ApprovalLineTemplateEabusNo = '001' | '008' | '004' | '031';
+export type ApprovalLineTemplateParticipantType =
+  | 'APPROVAL'
+  | 'AGREEMENT'
+  | 'REFERENCE';
+
+export type ApprovalLineTemplateParticipant = {
+  stageOrder: number;
+  participantOrder: number;
+  participantType: ApprovalLineTemplateParticipantType;
+  participantUserId: string;
+};
+
+export type ApprovalLineTemplateSummary = {
+  templateId: number;
+  name: string;
+  eabusNo: ApprovalLineTemplateEabusNo;
+  updatedAt?: string;
+};
+
+export type ApprovalLineTemplate = ApprovalLineTemplateSummary & {
+  approvalLines: ApprovalLineTemplateParticipant[];
+};
+
+export type ApprovalLineTemplateSaveRequest = {
+  eabusNo: ApprovalLineTemplateEabusNo;
+  name: string;
+  approvalLines: ApprovalLineTemplateParticipant[];
+};
+
 export type DocumentWriteItem = {
   id: number;
   eabusNo?: string;

@@ -79,6 +79,50 @@ function NoticeDetailLoadingHarness() {
 }
 
 describe('Community notice page', () => {
+  it.each([false, true])(
+    'uses distinct category colors without changing labels or pin state for isDark=%s',
+    (isDark) => {
+      const items = [
+        {
+          ...noticeFeed[0],
+          id: 201,
+          title: '공지 A',
+          state: '운영',
+          noticeGubunCode: 'NOTICE_A',
+          isPinned: 'Y',
+        },
+        {
+          ...noticeFeed[1],
+          id: 202,
+          title: '공지 B',
+          state: '필독',
+          noticeGubunCode: 'HR',
+          isPinned: 'N',
+        },
+      ];
+
+      render(<NoticeFeedList items={items} isDark={isDark} />);
+
+      const firstCategory = screen.getByText('운영').closest('.MuiChip-root');
+      const secondCategory = screen.getByText('필독').closest('.MuiChip-root');
+
+      expect(firstCategory).toBeInTheDocument();
+      expect(secondCategory).toBeInTheDocument();
+      expect(getComputedStyle(firstCategory!).backgroundColor).not.toBe(
+        getComputedStyle(secondCategory!).backgroundColor,
+      );
+      expect(getComputedStyle(firstCategory!).color).not.toBe(
+        getComputedStyle(secondCategory!).color,
+      );
+      expect(
+        screen.getByRole('button', { name: '상단 고정 해제 공지 A' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: '상단 고정 공지 B' }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('shows centered shared loading while selected notice detail is pending', async () => {
     let resolveDetail!: (detail: {
       postId: number;

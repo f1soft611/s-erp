@@ -7,8 +7,10 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Divider,
   IconButton,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,10 +20,24 @@ import {
   type F1GridUserValue,
 } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
-import type { DocumentApprovalStage } from '../types/documentWrite.types';
+import {
+  createApprovalLineTemplate,
+  deleteApprovalLineTemplate,
+  getApprovalLineTemplate,
+  listApprovalLineTemplates,
+  renameApprovalLineTemplate,
+} from '../services/approvalLineTemplate.service';
+import type {
+  ApprovalLineTemplate,
+  ApprovalLineTemplateEabusNo,
+  ApprovalLineTemplateParticipant,
+  ApprovalLineTemplateSummary,
+  DocumentApprovalStage,
+} from '../types/documentWrite.types';
 
 type DocumentApprovalSettingsDialogProps = {
   open: boolean;
+  documentCode: ApprovalLineTemplateEabusNo | null;
   userOptions: F1GridUserOption[];
   userOptionsError?: string;
   approvalStages: DocumentApprovalStage[];
@@ -33,8 +49,110 @@ type DocumentApprovalSettingsDialogProps = {
   ) => void;
 };
 
+type FavoriteOperation =
+  | 'list'
+  | 'load'
+  | 'save'
+  | 'rename'
+  | 'delete'
+  | null;
+
 function cloneStages(stages: DocumentApprovalStage[]): DocumentApprovalStage[] {
   return stages.map((stage) => ({ ...stage, users: [...stage.users] }));
+}
+
+function toTemplateParticipants(
+  stages: DocumentApprovalStage[],
+  referenceUserIds: string[],
+): ApprovalLineTemplateParticipant[] {
+  const mutableStages = stages.filter((stage) => !stage.isFixed);
+  const lines = mutableStages.flatMap((stage, stageIndex) =>
+    stage.users.map((user, participantIndex) => ({
+      stageOrder: stageIndex + 2,
+      participantOrder: participantIndex + 1,
+      participantType:
+        stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
+      participantUserId: String(user.value),
+    })),
+  );
+  const referenceStageOrder = mutableStages.length + 2;
+  return [
+    ...lines,
+    ...referenceUserIds.map((userId, participantIndex) => ({
+      stageOrder: referenceStageOrder,
+      participantOrder: participantIndex + 1,
+      participantType: 'REFERENCE' as const,
+      participantUserId: userId,
+    })),
+  ];
+}
+
+function fromTemplateParticipants(
+  template: ApprovalLineTemplate,
+  userOptions: F1GridUserOption[],
+  existingStages: DocumentApprovalStage[],
+): { stages: DocumentApprovalStage[]; referenceUserIds: string[] } {
+  const optionsById = new Map(
+    userOptions.map((option) => [String(option.value), option]),
+  );
+  const seenUserIds = new Set<string>();
+  const groupedStages = new Map<
+    number,
+    { kind: DocumentApprovalStage['kind']; users: F1GridUserOption[] }
+  >();
+  const references: ApprovalLineTemplateParticipant[] = [];
+  const lines = [...template.approvalLines].sort(
+    (left, right) =>
+      left.stageOrder - right.stageOrder ||
+      left.participantOrder - right.participantOrder,
+  );
+
+  for (const line of lines) {
+    const userId = line.participantUserId;
+    const user = optionsById.get(userId);
+    if (!user || seenUserIds.has(userId)) {
+      throw new Error(
+        '결재선에 현재 사용할 수 없는 사용자가 포함되어 있습니다.',
+      );
+    }
+    seenUserIds.add(userId);
+    if (line.participantType === 'REFERENCE') {
+      references.push(line);
+      continue;
+    }
+
+    const kind = line.participantType === 'APPROVAL' ? 'approval' : 'agreement';
+    const stage = groupedStages.get(line.stageOrder);
+    if (stage && stage.kind !== kind) {
+      throw new Error('결재선 템플릿의 단계 정보가 올바르지 않습니다.');
+    }
+    if (kind === 'approval' && stage) {
+      throw new Error('결재 단계에는 한 명만 지정할 수 있습니다.');
+    }
+    if (stage) {
+      stage.users.push(user);
+    } else {
+      groupedStages.set(line.stageOrder, { kind, users: [user] });
+    }
+  }
+
+  const currentFixedStages = existingStages.filter((stage) => stage.isFixed);
+  let stageId = Math.max(
+    0,
+    ...existingStages.map((stage) => stage.id),
+  ) + 1;
+  const stages = [
+    ...currentFixedStages.map((stage) => ({ ...stage, users: [...stage.users] })),
+    ...Array.from(groupedStages.values()).map((stage) => ({
+      id: stageId++,
+      kind: stage.kind,
+      users: stage.users,
+    })),
+  ];
+  return {
+    stages,
+    referenceUserIds: references.map((line) => line.participantUserId),
+  };
 }
 
 function toUserIds(value: F1GridUserValue): string[] {
@@ -49,6 +167,7 @@ function getStageName(stage: DocumentApprovalStage, index: number): string {
 
 export function DocumentApprovalSettingsDialog({
   open,
+  documentCode,
   userOptions,
   userOptionsError,
   approvalStages,
@@ -73,6 +192,19 @@ export function DocumentApprovalSettingsDialog({
   const [recentlyMovedStageId, setRecentlyMovedStageId] = useState<
     number | null
   >(null);
+  const [favoriteOperation, setFavoriteOperation] =
+    useState<FavoriteOperation>(null);
+  const [templateError, setTemplateError] = useState('');
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [templates, setTemplates] = useState<ApprovalLineTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(
+    null,
+  );
+  const [renameName, setRenameName] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const draggedStageIdRef = useRef<number | null>(null);
   const reorderFeedbackTimer = useRef<number | null>(null);
   const nextStageId = useRef(
@@ -125,6 +257,173 @@ export function DocumentApprovalSettingsDialog({
   });
   const userOptionsUnavailable =
     Boolean(userOptionsError) || userOptions.length === 0;
+  const favoritesDisabled =
+    !documentCode || userOptionsUnavailable || favoriteOperation !== null;
+
+  const closeSettings = () => {
+    setSaveDialogOpen(false);
+    setManagerOpen(false);
+    setDeleteConfirmationOpen(false);
+    onClose();
+  };
+
+  const openSaveDialog = () => {
+    setTemplateError('');
+    setSaveName('');
+    setSaveDialogOpen(true);
+  };
+
+  const saveTemplate = async () => {
+    const name = saveName.trim();
+    if (!name || name.length > 100) {
+      setTemplateError('결재선 템플릿 이름은 1~100자여야 합니다.');
+      return;
+    }
+    if (!documentCode) {
+      setTemplateError('문서 코드가 없어 결재선을 저장할 수 없습니다.');
+      return;
+    }
+    setFavoriteOperation('save');
+    setTemplateError('');
+    try {
+      const existingTemplates = await listApprovalLineTemplates(documentCode);
+      if (existingTemplates.some((template) => template.name === name)) {
+        setTemplateError('같은 이름의 결재선 템플릿이 이미 있습니다.');
+        return;
+      }
+      await createApprovalLineTemplate({
+        eabusNo: documentCode,
+        name,
+        approvalLines: toTemplateParticipants(
+          draftStages,
+          draftReferenceUserIds,
+        ),
+      });
+      setSaveDialogOpen(false);
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선을 저장하지 못했습니다.',
+      );
+    } finally {
+      setFavoriteOperation(null);
+    }
+  };
+
+  const openTemplateManager = async () => {
+    if (!documentCode) {
+      setTemplateError('문서 코드가 없어 결재선을 불러올 수 없습니다.');
+      return;
+    }
+    setTemplateError('');
+    setTemplates([]);
+    setSelectedTemplateId(null);
+    setManagerOpen(true);
+    setFavoriteOperation('list');
+    try {
+      const result = await listApprovalLineTemplates(documentCode);
+      setTemplates(result);
+      setSelectedTemplateId(result[0]?.templateId ?? null);
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선 목록을 불러오지 못했습니다.',
+      );
+    } finally {
+      setFavoriteOperation(null);
+    }
+  };
+
+  const loadTemplate = async () => {
+    if (selectedTemplateId === null) return;
+    setFavoriteOperation('load');
+    setTemplateError('');
+    try {
+      const template = await getApprovalLineTemplate(selectedTemplateId);
+      if (template.eabusNo !== documentCode) {
+        throw new Error('현재 문서에서 사용할 수 없는 결재선입니다.');
+      }
+      const draft = fromTemplateParticipants(template, userOptions, draftStages);
+      setDraftStages(draft.stages);
+      setDraftReferenceUserIds(draft.referenceUserIds);
+      setManagerOpen(false);
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선을 불러오지 못했습니다.',
+      );
+    } finally {
+      setFavoriteOperation(null);
+    }
+  };
+
+  const renameSelectedTemplate = async () => {
+    if (selectedTemplateId === null) return;
+    const name = renameName.trim();
+    if (!name || name.length > 100) {
+      setTemplateError('결재선 템플릿 이름은 1~100자여야 합니다.');
+      return;
+    }
+    if (
+      templates.some(
+        (template) =>
+          template.templateId !== selectedTemplateId && template.name === name,
+      )
+    ) {
+      setTemplateError('같은 이름의 결재선 템플릿이 이미 있습니다.');
+      return;
+    }
+    setFavoriteOperation('rename');
+    setTemplateError('');
+    try {
+      const renamed = await renameApprovalLineTemplate(selectedTemplateId, name);
+      setTemplates((current) =>
+        current.map((template) =>
+          template.templateId === renamed.templateId ? renamed : template,
+        ),
+      );
+      setIsRenaming(false);
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선 이름을 변경하지 못했습니다.',
+      );
+    } finally {
+      setFavoriteOperation(null);
+    }
+  };
+
+  const deleteSelectedTemplate = async () => {
+    if (selectedTemplateId === null) return;
+    setFavoriteOperation('delete');
+    setTemplateError('');
+    try {
+      await deleteApprovalLineTemplate(selectedTemplateId);
+      const remaining = templates.filter(
+        (template) => template.templateId !== selectedTemplateId,
+      );
+      setTemplates(remaining);
+      setSelectedTemplateId(remaining[0]?.templateId ?? null);
+      setDeleteConfirmationOpen(false);
+      setIsRenaming(false);
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선을 삭제하지 못했습니다.',
+      );
+    } finally {
+      setFavoriteOperation(null);
+    }
+  };
+
+  const selectedTemplate = templates.find(
+    (template) => template.templateId === selectedTemplateId,
+  );
 
   const updateApprovalSelection = (value: F1GridUserValue) => {
     setSelectedApprovalUserIds(
@@ -315,13 +614,14 @@ export function DocumentApprovalSettingsDialog({
 
   const handleApply = () => {
     onApply(cloneStages(draftStages), [...draftReferenceUserIds]);
-    onClose();
+    closeSettings();
   };
 
   return (
+    <>
     <CommonDialog
       open={open}
-      onClose={onClose}
+      onClose={closeSettings}
       title="결재선 설정"
       description="현재 작성 중인 결재선과 참조선을 편집합니다."
       size="md"
@@ -331,7 +631,7 @@ export function DocumentApprovalSettingsDialog({
           <Button variant="contained" onClick={handleApply}>
             적용
           </Button>
-          <Button onClick={onClose}>취소</Button>
+          <Button onClick={closeSettings}>취소</Button>
         </>
       }
       dialogProps={{ 'data-testid': 'document-approval-settings-dialog' }}
@@ -341,6 +641,7 @@ export function DocumentApprovalSettingsDialog({
         sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
       >
         {userOptionsError && <Alert severity="error">{userOptionsError}</Alert>}
+        {templateError && <Alert severity="error">{templateError}</Alert>}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -577,24 +878,222 @@ export function DocumentApprovalSettingsDialog({
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             <Button
               variant="outlined"
-              disabled
+              disabled={favoritesDisabled}
               aria-label="자주 쓰는 결재선 저장"
+              onClick={openSaveDialog}
             >
               자주 쓰는 결재선 저장
             </Button>
             <Button
               variant="outlined"
-              disabled
+              disabled={favoritesDisabled}
               aria-label="자주 쓰는 결재선 불러오기"
+              onClick={() => void openTemplateManager()}
             >
               자주 쓰는 결재선 불러오기
             </Button>
           </Box>
-          <Typography variant="caption" color="text.secondary">
-            저장 테이블/API 준비 후 제공
-          </Typography>
         </Box>
       </Box>
     </CommonDialog>
+    <CommonDialog
+      open={saveDialogOpen}
+      onClose={() => setSaveDialogOpen(false)}
+      title="결재선 템플릿 저장"
+      description="현재 결재선과 참조자를 자주 쓰는 결재선으로 저장합니다."
+      fullScreenOnMobile
+      actions={
+        <>
+          <Button
+            variant="contained"
+            onClick={() => void saveTemplate()}
+            disabled={favoriteOperation !== null}
+          >
+            {favoriteOperation === 'save' ? (
+              <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
+                <CircularProgress size={18} color="inherit" />
+                저장 중...
+              </Box>
+            ) : (
+              '저장'
+            )}
+          </Button>
+          <Button
+            onClick={() => setSaveDialogOpen(false)}
+            disabled={favoriteOperation !== null}
+          >
+            취소
+          </Button>
+        </>
+      }
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {templateError && <Alert severity="error">{templateError}</Alert>}
+        <TextField
+          autoFocus
+          fullWidth
+          label="결재선 이름"
+          value={saveName}
+          onChange={(event) => setSaveName(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 100 } }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') void saveTemplate();
+          }}
+        />
+      </Box>
+    </CommonDialog>
+    <CommonDialog
+      open={managerOpen}
+      onClose={() => setManagerOpen(false)}
+      title="자주 쓰는 결재선 불러오기"
+      description="현재 문서에 사용할 템플릿을 선택하거나 관리합니다."
+      fullScreenOnMobile
+      actions={
+        <>
+          <Button
+            variant="contained"
+            onClick={() => void loadTemplate()}
+            disabled={
+              selectedTemplateId === null || favoriteOperation !== null
+            }
+          >
+            {favoriteOperation === 'load' ? (
+              <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
+                <CircularProgress size={18} color="inherit" />
+                불러오는 중...
+              </Box>
+            ) : (
+              '불러오기'
+            )}
+          </Button>
+          <Button
+            onClick={() => setManagerOpen(false)}
+            disabled={favoriteOperation !== null}
+          >
+            템플릿 목록 닫기
+          </Button>
+        </>
+      }
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
+        {favoriteOperation === 'list' && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={18} />
+            <Typography>결재선 목록을 불러오는 중...</Typography>
+          </Box>
+        )}
+        {templateError && <Alert severity="error">{templateError}</Alert>}
+        {favoriteOperation !== 'list' && templates.length === 0 && !templateError && (
+          <Typography color="text.secondary">
+            저장된 자주 쓰는 결재선이 없습니다.
+          </Typography>
+        )}
+        <Box
+          role="group"
+          aria-label="자주 쓰는 결재선 목록"
+          sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}
+        >
+          {templates.map((template) => (
+            <Button
+              key={template.templateId}
+              aria-pressed={selectedTemplateId === template.templateId}
+              aria-label={`결재선 선택 ${template.name}`}
+              variant={
+                selectedTemplateId === template.templateId
+                  ? 'contained'
+                  : 'outlined'
+              }
+              onClick={() => {
+                setSelectedTemplateId(template.templateId);
+                setRenameName(template.name);
+                setIsRenaming(false);
+                setTemplateError('');
+              }}
+              disabled={favoriteOperation !== null}
+              sx={{ justifyContent: 'flex-start', minWidth: 0, overflowWrap: 'anywhere' }}
+            >
+              {template.name}
+            </Button>
+          ))}
+        </Box>
+        {selectedTemplate && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {isRenaming ? (
+              <>
+                <TextField
+                  fullWidth
+                  label="새 결재선 이름"
+                  value={renameName}
+                  onChange={(event) => setRenameName(event.target.value)}
+                  slotProps={{ htmlInput: { maxLength: 100 } }}
+                />
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => void renameSelectedTemplate()}
+                    disabled={favoriteOperation !== null}
+                  >
+                    이름 변경 저장
+                  </Button>
+                  <Button
+                    onClick={() => setIsRenaming(false)}
+                    disabled={favoriteOperation !== null}
+                  >
+                    취소
+                  </Button>
+                </Box>
+              </>
+            ) : (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <Button
+                  onClick={() => {
+                    setRenameName(selectedTemplate.name);
+                    setIsRenaming(true);
+                    setTemplateError('');
+                  }}
+                  disabled={favoriteOperation !== null}
+                >
+                  이름 변경
+                </Button>
+                <Button
+                  color="error"
+                  onClick={() => setDeleteConfirmationOpen(true)}
+                  disabled={favoriteOperation !== null}
+                >
+                  삭제
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
+        {deleteConfirmationOpen && selectedTemplate && (
+          <Alert
+            severity="warning"
+            action={
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <Button
+                  color="error"
+                  size="small"
+                  onClick={() => void deleteSelectedTemplate()}
+                  disabled={favoriteOperation !== null}
+                >
+                  삭제 확인
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => setDeleteConfirmationOpen(false)}
+                  disabled={favoriteOperation !== null}
+                >
+                  취소
+                </Button>
+              </Box>
+            }
+          >
+            “{selectedTemplate.name}” 결재선을 삭제하시겠습니까?
+          </Alert>
+        )}
+      </Box>
+    </CommonDialog>
+    </>
   );
 }

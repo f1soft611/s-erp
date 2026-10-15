@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import egovframework.com.cmm.LoginVO;
 import egovframework.let.groupware.approval.domain.model.ApprovalLineTemplateVO;
 import egovframework.let.groupware.approval.domain.model.ApprovalLineTemplateLineVO;
+import egovframework.let.groupware.approval.domain.model.ApprovalLineTemplateRenameRequestVO;
 import egovframework.let.groupware.approval.domain.model.ApprovalLineTemplateSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.repository.ApprovalLineTemplateDAO;
@@ -74,8 +76,129 @@ class ApprovalLineTemplateServiceImplTest {
         verify(templateDAO, never()).insertTemplate(anyMap());
     }
 
+    @Test
+    void acceptsOnlySupportedCodesWhenListingTemplates() throws Exception {
+        LoginVO user = authenticatedUser();
+        when(templateDAO.selectOwnedTemplates(anyMap())).thenReturn(Collections.emptyList());
+
+        for (String code : Arrays.asList("001", "008", "004", "031")) {
+            service().listTemplates(user, code);
+        }
+
+        verify(templateDAO, times(4)).selectOwnedTemplates(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && "login-author".equals(params.get("ownerUserId"))));
+        assertThatThrownBy(() -> service().listTemplates(user, "999"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void rejectsInvalidNamesDuplicateNamesAndInvalidParticipantOrdering() throws Exception {
+        LoginVO user = authenticatedUser();
+
+        assertBadRequest(() -> service().createTemplate(user, request("001", "   ")));
+        assertBadRequest(() -> service().createTemplate(
+                user, request("001", String.join("", Collections.nCopies(101, "x")))));
+        assertBadRequest(() -> service().createTemplate(user, request("001", "잘못된 순서",
+                line(3, 1, "APPROVAL", "201"))));
+        assertBadRequest(() -> service().createTemplate(user, request("001", "잘못된 유형",
+                line(2, 1, "OBSERVER", "201"))));
+        assertBadRequest(() -> service().createTemplate(user, request("001", "중복 사용자",
+                line(2, 1, "APPROVAL", "201"),
+                line(3, 1, "AGREEMENT", "201"))));
+        verify(templateDAO, never()).insertTemplate(anyMap());
+    }
+
+    @Test
+    void rejectsDuplicateNameWithinTheAuthenticatedOwnerAndCode() throws Exception {
+        when(templateDAO.selectOwnedTemplateNameExists(anyMap())).thenReturn(true);
+
+        assertThatThrownBy(() -> service().createTemplate(
+                authenticatedUser(), request("008", "업무 결재선")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verify(templateDAO).selectOwnedTemplateNameExists(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && "login-author".equals(params.get("ownerUserId"))
+                        && "008".equals(params.get("eabusNo"))));
+        verify(templateDAO, never()).insertTemplate(anyMap());
+    }
+
+    @Test
+    void returnsNotFoundForTemplatesOutsideTheAuthenticatedOwnerScope() throws Exception {
+        when(templateDAO.selectOwnedTemplate(anyMap())).thenReturn(null);
+        when(templateDAO.deleteOwnedTemplate(anyMap())).thenReturn(0);
+
+        assertThatThrownBy(() -> service().getTemplate(authenticatedUser(), 77L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() -> service().renameTemplate(
+                authenticatedUser(), 77L, new ApprovalLineTemplateRenameRequestVO()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() -> service().deleteTemplate(authenticatedUser(), 77L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        verify(templateDAO).deleteOwnedTemplate(anyMap());
+        verify(templateDAO, times(2)).selectOwnedTemplate(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && "login-author".equals(params.get("ownerUserId"))));
+    }
+
+    @Test
+    void rejectsTemplatesContainingParticipantsThatAreNoLongerActive() throws Exception {
+        ApprovalLineTemplateVO template = new ApprovalLineTemplateVO();
+        template.setTemplateId(77L);
+        template.setEabusNo("001");
+        when(templateDAO.selectOwnedTemplate(anyMap())).thenReturn(template);
+        when(templateDAO.selectOwnedTemplateLines(anyMap()))
+                .thenReturn(Collections.singletonList(line(2, 1, "APPROVAL", "201")));
+        when(documentApprovalDAO.selectActiveParticipants(anyMap()))
+                .thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> service().getTemplate(authenticatedUser(), 77L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verify(documentApprovalDAO).selectActiveParticipants(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && params.get("participantUserIds").equals(Collections.singletonList("201"))));
+    }
+
+    @Test
+    void propagatesDetailWriteFailureSoTransactionalCreateCanRollBack() throws Exception {
+        ApprovalLineTemplateSaveRequestVO request = request("001", "기본 결재선",
+                line(2, 1, "APPROVAL", "201"));
+        when(templateDAO.selectOwnedTemplateNameExists(anyMap())).thenReturn(false);
+        when(documentApprovalDAO.selectActiveParticipants(anyMap()))
+                .thenReturn(Collections.singletonList(participant("201")));
+        when(templateDAO.insertTemplate(anyMap())).thenReturn(41L);
+        when(templateDAO.insertTemplateLines(anyMap()))
+                .thenThrow(new IllegalStateException("detail insert failed"));
+
+        assertThatThrownBy(() -> service().createTemplate(authenticatedUser(), request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("detail insert failed");
+        verify(templateDAO).insertTemplate(anyMap());
+        verify(templateDAO).insertTemplateLines(anyMap());
+    }
+
     private ApprovalLineTemplateServiceImpl service() {
         return new ApprovalLineTemplateServiceImpl(templateDAO, documentApprovalDAO);
+    }
+
+    private void assertBadRequest(org.assertj.core.api.ThrowableAssert.ThrowingCallable operation)
+            throws Exception {
+        assertThatThrownBy(operation)
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     private LoginVO authenticatedUser() {

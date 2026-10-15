@@ -119,16 +119,16 @@ public class ApprovalLineTemplateServiceImpl implements ApprovalLineTemplateServ
             ApprovalLineTemplateRenameRequestVO request) throws Exception {
         validateAuthenticatedUser(user);
         Long id = requireTemplateId(templateId);
-        if (request == null) {
-            throw badRequest("결재선 템플릿 이름이 올바르지 않습니다.");
-        }
-        String name = normalizeName(request.getName());
         Map<String, Object> params = ownerParams(user, null);
         params.put("templateId", id);
         ApprovalLineTemplateVO existing = templateDAO.selectOwnedTemplate(params);
         if (existing == null) {
             throw notFound();
         }
+        if (request == null) {
+            throw badRequest("결재선 템플릿 이름이 올바르지 않습니다.");
+        }
+        String name = normalizeName(request.getName());
         params.put("eabusNo", existing.getEabusNo());
         params.put("name", name);
         params.put("excludeTemplateId", id);

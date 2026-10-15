@@ -57,6 +57,7 @@ import {
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
 import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
+import { DocumentApprovalToolbar } from './DocumentApprovalToolbar';
 import { useDocumentApprovalBody } from '../hooks/useDocumentApprovalBody';
 import type { DocumentFeedWriteItem } from '../types/documentWrite.types';
 import type {
@@ -834,119 +835,121 @@ export function DocumentApprovalDetailFeed(
   };
   const documentToolbar =
     statusPresentation && kindPresentation ? (
-      <Stack
-        data-testid="document-approval-toolbar"
-        direction="row"
-        spacing={0.5}
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          flexWrap: 'wrap',
-          minWidth: 0,
-          maxWidth: '100%',
-          width: { xs: '100%', sm: 'auto' },
-        }}
-      >
-        {canProcess && (
+      <DocumentApprovalToolbar
+        approvalActions={
           <>
-            <Button
-              size="small"
-              variant="contained"
-              color="primary"
-              sx={approvalActionButtonSx}
-              onClick={() => void handleAction('APPROVED')}
-              disabled={isActing}
-            >
-              승인
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              sx={approvalActionButtonSx}
-              onClick={() =>
-                isFeedPresentation
-                  ? openFeedReasonDialog('REJECTED')
-                  : void handleAction('REJECTED')
-              }
-              disabled={isActing}
-            >
-              반려
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="warning"
-              sx={approvalActionButtonSx}
-              onClick={() =>
-                isFeedPresentation
-                  ? openFeedReasonDialog('RETURNED')
-                  : void handleAction('RETURNED')
-              }
-              disabled={isActing}
-            >
-              보완요청
-            </Button>
+            {canProcess && (
+              <>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="primary"
+                  sx={approvalActionButtonSx}
+                  onClick={() => void handleAction('APPROVED')}
+                  disabled={isActing}
+                >
+                  승인
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  sx={approvalActionButtonSx}
+                  onClick={() =>
+                    isFeedPresentation
+                      ? openFeedReasonDialog('REJECTED')
+                      : void handleAction('REJECTED')
+                  }
+                  disabled={isActing}
+                >
+                  반려
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  sx={approvalActionButtonSx}
+                  onClick={() =>
+                    isFeedPresentation
+                      ? openFeedReasonDialog('RETURNED')
+                      : void handleAction('RETURNED')
+                  }
+                  disabled={isActing}
+                >
+                  보완요청
+                </Button>
+              </>
+            )}
+            {!isFeedPresentation && canCancelSubmission && (
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                sx={approvalActionButtonSx}
+                disabled={isActing}
+                onClick={() => {
+                  setActionError('');
+                  setCancelDialogType('submission');
+                }}
+              >
+                상신 취소
+              </Button>
+            )}
+            {!isFeedPresentation && canCancelApproval && (
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                sx={approvalActionButtonSx}
+                disabled={isActing}
+                onClick={() => {
+                  setActionError('');
+                  setCancelDialogType('approval');
+                }}
+              >
+                승인 취소
+              </Button>
+            )}
           </>
-        )}
-        {!isFeedPresentation && canCancelSubmission && (
-          <Button
+        }
+        status={
+          <Chip
+            label={statusPresentation.label}
             size="small"
-            variant="contained"
-            color="error"
-            sx={approvalActionButtonSx}
-            disabled={isActing}
-            onClick={() => {
-              setActionError('');
-              setCancelDialogType('submission');
+            color={statusPresentation.color}
+            variant={statusPresentation.variant}
+            style={{ marginRight: 4 }}
+            sx={{
+              height: 28,
+              fontWeight: 700,
+              borderRadius: approvalBadgeBorderRadius,
             }}
-          >
-            상신 취소
-          </Button>
-        )}
-        {!isFeedPresentation && canCancelApproval && (
-          <Button
+          />
+        }
+        pinControl={
+          <IconButton
+            aria-label="고정된 문서"
+            disabled
             size="small"
-            variant="contained"
-            color="error"
-            sx={approvalActionButtonSx}
-            disabled={isActing}
-            onClick={() => {
-              setActionError('');
-              setCancelDialogType('approval');
-            }}
+            style={{ marginLeft: 4 }}
           >
-            승인 취소
-          </Button>
-        )}
-        <Chip
-          label={statusPresentation.label}
-          size="small"
-          color={statusPresentation.color}
-          variant={statusPresentation.variant}
-          sx={{
-            height: 28,
-            fontWeight: 700,
-            borderRadius: approvalBadgeBorderRadius,
-          }}
-        />
-        <Chip
-          label={kindPresentation.label}
-          size="small"
-          color={kindPresentation.color}
-          style={{ marginRight: 4 }}
-          sx={{
-            height: 28,
-            fontWeight: 700,
-            borderRadius: approvalBadgeBorderRadius,
-          }}
-        />
-        <Divider orientation="vertical" flexItem />
-        <IconButton aria-label="고정된 문서" disabled size="small">
-          <PushPinOutlinedIcon fontSize="small" />
-        </IconButton>
-        {documentMenu}
-      </Stack>
+            <PushPinOutlinedIcon fontSize="small" />
+          </IconButton>
+        }
+        moreMenu={documentMenu}
+        documentKind={
+          <Chip
+            label={kindPresentation.label}
+            size="small"
+            color={kindPresentation.color}
+            sx={{
+              height: 28,
+              fontWeight: 700,
+              borderRadius: approvalBadgeBorderRadius,
+            }}
+          />
+        }
+      />
     ) : null;
 
   const detailCard = (
@@ -1267,11 +1270,29 @@ export function DocumentApprovalDetailFeed(
                         )}
                         <Stack spacing={0.75}>
                           {approvalLineGroups.agreement.length > 0 && (
-                            <Box data-testid="approval-line-group-agreement" sx={{ minWidth: 0 }}>
+                            <Box
+                              data-testid="approval-line-group-agreement"
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: '64px minmax(0, 1fr)',
+                                alignItems: 'center',
+                                gap: 1,
+                                minWidth: 0,
+                                minHeight: 72,
+                              }}
+                            >
                               <Typography variant="body1" sx={{ fontWeight: 700 }}>
                                 합의
                               </Typography>
-                              <Stack spacing={1}>
+                              <Stack
+                                data-testid="approval-line-agreement-content"
+                                spacing={1}
+                                sx={{
+                                  minWidth: 0,
+                                  alignSelf: 'stretch',
+                                  justifyContent: 'center',
+                                }}
+                              >
                                 {agreementStages.map((stage) => (
                                   <Box
                                     key={stage.stageOrder}
@@ -1420,7 +1441,17 @@ export function DocumentApprovalDetailFeed(
                             </Box>
                           )}
                           {approvalLineGroups.reference.length > 0 && (
-                            <Box data-testid="approval-line-group-reference" sx={{ minWidth: 0 }}>
+                            <Box
+                              data-testid="approval-line-group-reference"
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: '64px minmax(0, 1fr)',
+                                alignItems: 'center',
+                                gap: 1,
+                                minWidth: 0,
+                                minHeight: 72,
+                              }}
+                            >
                               <Typography variant="body1" sx={{ fontWeight: 700 }}>
                                 참조
                               </Typography>

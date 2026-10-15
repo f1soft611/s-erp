@@ -47,6 +47,7 @@ Implement archive-specific API/service surfaces using the existing notice and co
 - Update the board-post mapper/schema documentation and category persistence/query paths to use the shared column.
 - Add paired dated SQL, change-history, and rollback files under `backend/DATABASE/20261015` and `docs/database/20261015`, and update `docs/database/db-schema.md`.
 - The rollback drops the new tenant index/FK/column and renames `category_code` back to `notice_gubun_code`.
+- The rollback must abort if posts are assigned to more than one distinct tenant, so it cannot silently discard tenant ownership after tenant-specific posts exist.
 - Do not add a separate `archive_category_code` or a new category table. Do not recreate the already-present `ARCHIVE` type/menu seed.
 
 ## Error handling and authorization

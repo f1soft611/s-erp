@@ -23,14 +23,24 @@ import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
-import type { DocumentKind } from '../types/documentWrite.types';
-import type { DocumentApprovalDetail } from '../types/documentWrite.types';
+import type {
+  ApprovalLineTemplateEabusNo,
+  DocumentApprovalDetail,
+  DocumentKind,
+} from '../types/documentWrite.types';
 import {
   ALL_CATEGORY_VALUE,
   useDocumentComposer,
 } from '../hooks/useDocumentComposer';
 import { DocumentApprovalFields } from './DocumentApprovalFields';
 import { DocumentApprovalSettingsDialog } from './DocumentApprovalSettingsDialog';
+
+const DOCUMENT_CODE_BY_KIND: Record<DocumentKind, ApprovalLineTemplateEabusNo> = {
+  기안서: '001',
+  업무연락: '008',
+  지출결의서: '004',
+  근태신청: '031',
+};
 
 type DocumentComposerDialogProps = {
   open: boolean;
@@ -622,6 +632,7 @@ export function DocumentComposerDialog({
     <DocumentApprovalSettingsDialog
       key={approvalSettingsSession}
       open={approvalSettingsOpen}
+      documentCode={DOCUMENT_CODE_BY_KIND[activeDocumentKind]}
       userOptions={userOptions}
       userOptionsError={
         userOptions.length === 0 && !isLoading

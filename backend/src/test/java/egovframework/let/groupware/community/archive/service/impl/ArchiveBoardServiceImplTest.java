@@ -135,7 +135,7 @@ class ArchiveBoardServiceImplTest {
 
     @Test
     void titleMustFitTheVerifiedDatabaseLimit() throws Exception {
-        payload.setTitle("x".repeat(201));
+        payload.setTitle(String.join("", Collections.nCopies(201, "x")));
         assertStatus(HttpStatus.BAD_REQUEST, () -> service.createPost(payload, user));
         assertStatus(HttpStatus.BAD_REQUEST, () -> service.updatePost(13L, payload, user));
         verify(dao, never()).insertArchivePost(anyMap());
