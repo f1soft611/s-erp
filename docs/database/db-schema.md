@@ -359,6 +359,7 @@
 | 컬럼                  | 타입      | 설명                         |
 | --------------------- | --------- | ---------------------------- |
 | post_id               | bigint    | 게시글 PK                    |
+| tenant_id             | bigint    | 소속 테넌트 FK (필수)         |
 | board_type_code       | varchar   | 게시판 유형 코드             |
 | title                 | varchar   | 제목                         |
 | contents              | text      | legacy 본문 호환용           |
@@ -367,7 +368,7 @@
 | contents_text         | text      | 검색/요약용 평문             |
 | writer_id             | varchar   | 작성자 ID                    |
 | writer_name           | varchar   | 작성자 명                    |
-| notice_gubun_code     | varchar   | 공지 구분 공통코드 상세 코드 |
+| category_code         | varchar   | 게시판 종류별 공통 분류 코드 |
 | view_count            | int       | 조회수                       |
 | is_pinned             | char      | 상단 고정 여부 (`Y`/`N`)     |
 | is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
@@ -381,6 +382,8 @@
 
 - 공지사항/게시판/자료실 게시글의 원본 데이터 저장
 - 목록/상세 조회와 삭제 처리의 기본 테이블
+- `tenant_id`는 `tb_tenant.tenant_id`를 참조하며, tenant + 게시판 종류 + 최신 등록순 인덱스로 목록 조회를 지원
+- `category_code`는 NOTICE의 `NOTICE_GUBUN`, ARCHIVE의 `WF_ARCHIVE_CATEGORY` tenant별 활성 항목으로 서비스에서 검증
 
 ### 2-18. tb_board_file
 
@@ -670,6 +673,7 @@
 ## 변경 이력
 
 - 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
+- 2026-10-15: 커뮤니티 게시글의 tenant 격리 및 공유 분류 저장을 위해 `tb_board_post.tenant_id`와 `category_code` 전환 migration 초안을 정의했다. 단일 tenant guard가 충족되지 않으면 백필을 중단하며 롤백은 여러 tenant 게시글이 있으면 거부한다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
 - 2026-10-14: 전자결재 기안 상신 취소 및 결재자 승인 취소 이력을 위해 `tb_common_comment` SYSTEM event CHECK에 `SUBMISSION_CANCELED`, `APPROVAL_CANCELED` 허용을 추가하는 `20261014_003` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 이벤트 계약을 확인했으며 USER NULL 조건과 기존 SYSTEM 이벤트를 보존했다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.

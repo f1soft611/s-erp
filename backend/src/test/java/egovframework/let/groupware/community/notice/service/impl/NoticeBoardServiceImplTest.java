@@ -33,6 +33,7 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
+import egovframework.let.groupware.community.common.CommunityCategoryValidator;
 import egovframework.let.common.dto.ListResult;
 
 class NoticeBoardServiceImplTest {
@@ -271,6 +272,7 @@ class NoticeBoardServiceImplTest {
         verify(noticeBoardDAO).selectNoticePostList(paramsCaptor.capture());
         assertThat(paramsCaptor.getValue())
             .containsEntry("tenantId", 1L)
+            .containsEntry("boardTypeCode", "NOTICE")
             .containsEntry("isPinned", "Y")
             .containsEntry("firstIndex", 40)
             .containsEntry("recordCountPerPage", 20);
@@ -319,7 +321,19 @@ class NoticeBoardServiceImplTest {
             .getPost(1L, 7L, "user-a");
 
         assertThat(result.getViewCount()).isEqualTo(1);
-        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+        ArgumentCaptor<Map<String, Object>> postParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO, org.mockito.Mockito.times(2))
+            .selectNoticePostById(postParamsCaptor.capture());
+        for (Map<String, Object> params : postParamsCaptor.getAllValues()) {
+            assertThat(params).containsEntry("tenantId", 1L)
+                .containsEntry("postId", 7L)
+                .containsEntry("boardTypeCode", "NOTICE");
+        }
+        ArgumentCaptor<Map<String, Object>> viewParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(viewParamsCaptor.capture());
+        assertThat(viewParamsCaptor.getValue()).containsEntry("tenantId", 1L)
+            .containsEntry("postId", 7L)
+            .containsEntry("boardTypeCode", "NOTICE");
     }
 
     @Test
@@ -376,6 +390,7 @@ class NoticeBoardServiceImplTest {
         assertThat(viewParamsCaptor.getValue())
             .containsEntry("tenantId", 1L)
             .containsEntry("postId", 7L)
+            .containsEntry("boardTypeCode", "NOTICE")
             .containsEntry("loginId", 12L);
         verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
     }
@@ -748,5 +763,43 @@ class NoticeBoardServiceImplTest {
         verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(7L),
                 eq(Collections.emptyList()), eq(Collections.emptySet()));
         verify(noticeBoardDAO).softDeleteNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void createPostRejectsCategoryRejectedByTenantCategoryValidator() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommunityCategoryValidator categoryValidator = mock(CommunityCategoryValidator.class);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid category"))
+            .when(categoryValidator).validate(71L, "NOTICE", "DISABLED");
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContents("<p>내용</p>");
+        payload.setNoticeGubunCode("DISABLED");
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, mock(CommonFileService.class), mock(CommonCommentService.class),
+                null, categoryValidator).createPost(71L, payload));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .insertNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void updatePostRejectsCategoryRejectedByTenantCategoryValidator() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommunityCategoryValidator categoryValidator = mock(CommunityCategoryValidator.class);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid category"))
+            .when(categoryValidator).validate(71L, "NOTICE", "DISABLED");
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContents("<p>내용</p>");
+        payload.setNoticeGubunCode("DISABLED");
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, mock(CommonFileService.class), mock(CommonCommentService.class),
+                null, categoryValidator).updatePost(71L, 13L, payload));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .updateNoticePost(org.mockito.ArgumentMatchers.anyMap());
     }
 }

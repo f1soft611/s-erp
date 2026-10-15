@@ -53,6 +53,7 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
+import egovframework.let.groupware.community.common.CommunityCategoryValidator;
 import egovframework.let.common.dto.ListResult;
 import egovframework.let.common.pagination.EgovPaginationSupport;
 
@@ -67,19 +68,27 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private final CommonCommentService commonCommentService;
     private final EmbeddedImageStorageService imageStorageService;
     private final EmbeddedImageDocumentProcessor imageDocumentProcessor;
+    private final CommunityCategoryValidator categoryValidator;
 
     @Resource(name = "propertiesService")
     private EgovPropertyService propertyService;
 
     @Autowired
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
-            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService) {
+            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService,
+            CommunityCategoryValidator categoryValidator) {
         this.noticeBoardDAO = noticeBoardDAO;
         this.commonFileService = commonFileService;
         this.commonCommentService = commonCommentService;
         this.imageStorageService = imageStorageService;
+        this.categoryValidator = categoryValidator;
         this.imageDocumentProcessor = imageStorageService == null ? null
                 : new EmbeddedImageDocumentProcessor(imageStorageService, new RichTextDocumentSanitizer());
+    }
+
+    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
+            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService) {
+        this(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService, null);
     }
 
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
@@ -146,6 +155,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO post = noticeBoardDAO.selectNoticePostById(params);
         if (post == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -161,6 +171,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO post = noticeBoardDAO.selectNoticePostById(params);
         if (post == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -177,6 +188,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> viewParams = new HashMap<>();
         viewParams.put("tenantId", tenantId);
         viewParams.put("postId", postId);
+        viewParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         viewParams.put("loginId", loginId);
         Long viewHistoryId = noticeBoardDAO.insertNoticePostViewHistory(viewParams);
         if (viewHistoryId != null) {
@@ -246,6 +258,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         public NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload,
             String actorId, String actorName) throws Exception {
         validateCreatePayload(payload);
+        validateCategory(tenantId, payload.getNoticeGubunCode());
         requireImageStorageIfNeeded(payload);
         String contentsHtml = payload.getEffectiveContentsHtml();
         String contentsText = payload.getEffectiveContentsText();
@@ -306,11 +319,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (payload == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수정 요청이 비어 있습니다.");
         }
+        validateCategory(tenantId, payload.getNoticeGubunCode());
         requireImageStorageIfNeeded(payload);
 
         HashMap<String, Object> existingParams = new HashMap<>();
         existingParams.put("tenantId", tenantId);
         existingParams.put("postId", postId);
+        existingParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
@@ -321,6 +336,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("title", payload.getTitle() == null ? null : payload.getTitle().trim());
         params.put("contents", contentsHtml);
         params.put("contentsHtml", contentsHtml);
@@ -600,6 +616,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> existingParams = new HashMap<>();
         existingParams.put("tenantId", tenantId);
         existingParams.put("postId", postId);
+        existingParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
@@ -607,6 +624,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("isPinned", StringUtils.hasText(isPinned) ? isPinned.trim().toUpperCase() : "N");
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
@@ -625,6 +643,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO existing = noticeBoardDAO.selectNoticePostById(params);
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -732,6 +751,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(params) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "본문 이미지를 찾을 수 없습니다.");
         }
@@ -804,6 +824,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (payload == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "요청 본문이 비어 있습니다.");
         }
+
         if (!StringUtils.hasText(payload.getTitle())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 필수입니다.");
         }
@@ -813,6 +834,12 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         if (!StringUtils.hasText(payload.getNoticeGubunCode())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지 구분은 필수입니다.");
+        }
+    }
+
+    private void validateCategory(Long tenantId, String categoryCode) throws Exception {
+        if (categoryValidator != null) {
+            categoryValidator.validate(tenantId, BOARD_TYPE_NOTICE, categoryCode);
         }
     }
 
