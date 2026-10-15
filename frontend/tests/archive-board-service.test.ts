@@ -33,6 +33,7 @@ import {
 } from '../src/pages/groupware/community/archive/services/archiveBoardService';
 import { useArchiveCategories } from '../src/pages/groupware/community/archive/hooks/useArchiveCategories';
 import { useArchiveList } from '../src/pages/groupware/community/archive/hooks/useArchiveList';
+import type { ArchivePost } from '../src/pages/groupware/community/archive/types/archive.types';
 
 describe('archive board service', () => {
   beforeEach(() => {
@@ -44,7 +45,6 @@ describe('archive board service', () => {
       resultList: [{ postId: 7, title: 'Travel policy' }],
       resultCnt: 21,
     });
-
     await expect(
       fetchArchivePosts(2, 10, 'travel policy', 'GUIDE'),
     ).resolves.toEqual({
@@ -54,6 +54,23 @@ describe('archive board service', () => {
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
       '/api/v1/groupware/boards/archive/posts?pageIndex=2&pageUnit=10&keyword=travel+policy&categoryCode=GUIDE',
     );
+  });
+
+  it('preserves searchable content and attachment count in typed list rows', async () => {
+    const post: ArchivePost = {
+      postId: 8,
+      title: 'Guide',
+      contents: 'Description',
+      contentsText: 'Description',
+      categoryCode: 'GUIDE',
+      attachmentCount: 2,
+    };
+    apiMocks.apiGet.mockResolvedValue({ resultList: [post], resultCnt: 1 });
+
+    await expect(fetchArchivePosts(1, 20)).resolves.toEqual({
+      resultList: [post],
+      resultCnt: 1,
+    });
   });
 
   it('omits empty optional list filters and normalizes missing ResultVO fields', async () => {
@@ -275,5 +292,47 @@ describe('archive list', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.error).toBe(failure);
+  });
+
+  it('does not let an older filter response overwrite the current list', async () => {
+    let resolveOlder!: (value: {
+      resultList: Array<{ postId: number; title: string }>;
+      resultCnt: number;
+    }) => void;
+    const olderResponse = new Promise<{
+      resultList: Array<{ postId: number; title: string }>;
+      resultCnt: number;
+    }>((resolve) => {
+      resolveOlder = resolve;
+    });
+    apiMocks.apiGet
+      .mockReturnValueOnce(olderResponse)
+      .mockResolvedValueOnce({
+        resultList: [{ postId: 2, title: 'Current filter' }],
+        resultCnt: 1,
+      });
+
+    const { result } = renderHook(() => useArchiveList());
+    await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.setKeyword('current'));
+    await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(result.current.posts).toEqual([
+        { postId: 2, title: 'Current filter' },
+      ]),
+    );
+
+    await act(async () => {
+      resolveOlder({
+        resultList: [{ postId: 1, title: 'Stale filter' }],
+        resultCnt: 1,
+      });
+      await olderResponse;
+    });
+
+    expect(result.current.posts).toEqual([
+      { postId: 2, title: 'Current filter' },
+    ]);
   });
 });

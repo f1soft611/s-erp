@@ -14,7 +14,9 @@ export type ArchivePost = {
   postId: ArchiveId;
   title: string;
   contents: string;
+  contentsText: string;
   categoryCode: string;
+  attachmentCount: number;
   writerId?: string | null;
   writerName?: string | null;
   createdAt?: string | Date | null;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchArchivePosts } from '../services/archiveBoardService';
 import type { ArchivePageResult } from '../types/archive.types';
 
@@ -27,8 +27,10 @@ export function useArchiveList({ pageUnit = 20 }: UseArchiveListOptions = {}) {
   const [page, setPage] = useState<ArchivePageResult>(emptyPage);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const requestSequence = useRef(0);
 
   const loadArchivePosts = useCallback(async () => {
+    const currentRequest = ++requestSequence.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -38,16 +40,25 @@ export function useArchiveList({ pageUnit = 20 }: UseArchiveListOptions = {}) {
         filters.keyword,
         filters.categoryCode,
       );
-      setPage(result);
+      if (currentRequest === requestSequence.current) {
+        setPage(result);
+      }
     } catch (cause) {
-      setError(asError(cause));
+      if (currentRequest === requestSequence.current) {
+        setError(asError(cause));
+      }
     } finally {
-      setIsLoading(false);
+      if (currentRequest === requestSequence.current) {
+        setIsLoading(false);
+      }
     }
   }, [filters.categoryCode, filters.keyword, filters.pageIndex, pageUnit]);
 
   useEffect(() => {
     void loadArchivePosts();
+    return () => {
+      requestSequence.current += 1;
+    };
   }, [loadArchivePosts]);
 
   const setPageIndex = useCallback((pageIndex: number) => {
