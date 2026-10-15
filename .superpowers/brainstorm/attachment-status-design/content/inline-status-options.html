@@ -1,0 +1,93 @@
+<h2>첨부파일 상태 표시 위치</h2>
+<p class="subtitle">현재 아래 줄에 표시되는 상태를 파일 박스 안으로 옮기는 두 배치입니다.</p>
+
+<style>
+  .attachment-demo {
+    max-width: 760px;
+    margin: 0 auto 1.5rem;
+    padding: 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+  }
+  .file-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .state {
+    flex: 0 0 auto;
+    color: var(--success);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .state.pending { color: var(--text-secondary); }
+  .remove {
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+</style>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>삭제 버튼 바로 왼쪽에 짧은 상태</h3>
+      <div class="attachment-demo">
+        <p class="label">업로드 완료</p>
+        <div class="file-row">
+          <span aria-hidden="true">📄</span>
+          <span class="file-name">데이터바우처_검수배분 (1).xlsx</span>
+          <span class="state">완료</span>
+          <button class="remove" aria-label="삭제">▣</button>
+        </div>
+      </div>
+      <div class="attachment-demo">
+        <p class="label">저장 후 업로드</p>
+        <div class="file-row">
+          <span aria-hidden="true">📄</span>
+          <span class="file-name">데이터바우처_검수배분 (1) (2).xlsx</span>
+          <span class="state pending">저장 대기</span>
+          <button class="remove" aria-label="삭제">▣</button>
+        </div>
+      </div>
+      <p>요청한 위치에 가깝고, 상태와 제거 동작을 한곳에서 확인할 수 있습니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>파일명 오른쪽에 짧은 상태</h3>
+      <div class="attachment-demo">
+        <p class="label">업로드 완료</p>
+        <div class="file-row">
+          <span aria-hidden="true">📄</span>
+          <span class="file-name">데이터바우처_검수배분 (1).xlsx</span>
+          <span class="state">완료</span>
+          <button class="remove" aria-label="삭제">▣</button>
+        </div>
+      </div>
+      <p>상태를 파일 정보와 묶어 보여주며, 제거 버튼과는 간격을 둡니다.</p>
+    </div>
+  </div>
+</div>

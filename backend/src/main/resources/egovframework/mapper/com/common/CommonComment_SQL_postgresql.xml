@@ -103,6 +103,7 @@
           <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
               #{ownerId}
           </foreach>
+          AND parent_comment_id IS NULL
           AND deleted_yn = 'N'
         GROUP BY owner_id
     </select>
@@ -254,6 +255,87 @@
                last_modified_by_name, deleted_yn, created_at, updated_at
         FROM comment_tree
         ORDER BY root_order, comment_path
+    </select>
+
+    <select id="selectApprovalUserCommentPagesByOwnerIds" parameterType="map" resultMap="commonCommentMap">
+        WITH RECURSIVE all_comment_tree AS (
+            SELECT c.comment_id, c.parent_comment_id, c.deleted_yn, c.owner_id,
+                   c.comment_id AS root_comment_id,
+                   ARRAY[c.comment_id] AS comment_path
+            FROM tb_common_comment c
+            WHERE c.tenant_id = #{tenantId}
+              AND c.owner_type = 'APPROVAL'
+              AND c.owner_id IN
+              <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+                  #{ownerId}
+              </foreach>
+              AND c.comment_type = 'USER'
+              AND c.parent_comment_id IS NULL
+            UNION ALL
+            SELECT child.comment_id, child.parent_comment_id, child.deleted_yn, child.owner_id,
+                   tree.root_comment_id, tree.comment_path || child.comment_id
+            FROM tb_common_comment child
+            JOIN all_comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = 'APPROVAL'
+              AND child.owner_id IN
+              <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+                  #{ownerId}
+              </foreach>
+              AND child.comment_type = 'USER'
+              AND NOT child.comment_id = ANY(tree.comment_path)
+        ), root_page AS (
+            SELECT owner_id, root_comment_id AS comment_id,
+                   ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY root_comment_id DESC) AS root_order
+            FROM all_comment_tree
+            GROUP BY owner_id, root_comment_id
+            HAVING BOOL_OR(deleted_yn = 'N')
+        ), comment_tree AS (
+            SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id,
+                   c.parent_comment_id, c.content, c.comment_type, c.event_type,
+                   c.writer_id, c.writer_name, c.last_modified_by, c.last_modified_by_name,
+                   c.deleted_yn, c.created_at, c.updated_at, rp.root_order,
+                   ARRAY[c.comment_id] AS comment_path
+            FROM tb_common_comment c
+            JOIN root_page rp ON rp.comment_id = c.comment_id AND rp.owner_id = c.owner_id
+            WHERE rp.root_order &lt;= #{limit}
+            UNION ALL
+            SELECT child.comment_id, child.tenant_id, child.owner_type, child.owner_id,
+                   child.parent_comment_id, child.content, child.comment_type, child.event_type,
+                   child.writer_id, child.writer_name, child.last_modified_by, child.last_modified_by_name,
+                   child.deleted_yn, child.created_at, child.updated_at, tree.root_order,
+                   tree.comment_path || child.comment_id
+            FROM tb_common_comment child
+            JOIN comment_tree tree ON tree.comment_id = child.parent_comment_id
+            WHERE child.tenant_id = #{tenantId}
+              AND child.owner_type = 'APPROVAL'
+              AND child.owner_id IN
+              <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+                  #{ownerId}
+              </foreach>
+              AND child.comment_type = 'USER'
+              AND NOT child.comment_id = ANY(tree.comment_path)
+        )
+        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
+               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
+               last_modified_by_name, deleted_yn, created_at, updated_at
+        FROM comment_tree
+        ORDER BY owner_id, root_order, comment_path
+    </select>
+
+    <select id="selectApprovalUserCommentCountsByOwnerIds" parameterType="map" resultType="map">
+        SELECT owner_id AS ownerId, COUNT(*) AS totalCount
+        FROM tb_common_comment
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = 'APPROVAL'
+          AND owner_id IN
+          <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+              #{ownerId}
+          </foreach>
+          AND comment_type = 'USER'
+          AND parent_comment_id IS NULL
+          AND deleted_yn = 'N'
+        GROUP BY owner_id
     </select>
 
     <select id="countCommonComments" parameterType="map" resultType="long">

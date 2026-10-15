@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionR
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
@@ -398,16 +400,60 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             return Collections.emptyList();
         }
 
-        List<Long> approvalIds = new ArrayList<>();
+        Set<Long> distinctApprovalIds = new LinkedHashSet<>();
         for (DocumentApprovalListItemVO listItem : documents) {
-            if (listItem != null && listItem.getElectronicApprovalId() != null) {
-                approvalIds.add(listItem.getElectronicApprovalId());
+            if (listItem != null) {
+                if (listItem.getElectronicApprovalId() == null) {
+                    throw new IllegalStateException("전자결재 목록 항목에 문서 ID가 없습니다.");
+                }
+                distinctApprovalIds.add(listItem.getElectronicApprovalId());
             }
         }
+        if (distinctApprovalIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> approvalIds = new ArrayList<>(distinctApprovalIds);
+        Map<String, Object> detailParams = actorParams(user);
+        detailParams.put("participantUserId", user.getUniqId());
+        detailParams.put("ownerIds", approvalIds);
+        List<DocumentApprovalDetailVO> details = documentApprovalDAO.selectDocumentApprovalDetailsByIds(detailParams);
+        Map<Long, DocumentApprovalDetailVO> detailsByApprovalId = new HashMap<>();
+        if (details != null) {
+            for (DocumentApprovalDetailVO detail : details) {
+                if (detail != null && detail.getElectronicApprovalId() != null) {
+                    detailsByApprovalId.put(detail.getElectronicApprovalId(), detail);
+                }
+            }
+        }
+        for (Long approvalId : approvalIds) {
+            if (!detailsByApprovalId.containsKey(approvalId)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+            }
+        }
+
+        Map<String, Object> lineParams = new HashMap<>();
+        lineParams.put("tenantId", user.getTenantId());
+        lineParams.put("ownerIds", approvalIds);
+        List<DocumentApprovalLineBatchVO> batchLines =
+            documentApprovalDAO.selectApprovalLinesByOwnerIds(lineParams);
+        Map<Long, List<DocumentApprovalLineVO>> approvalLinesByApprovalId = new HashMap<>();
+        if (batchLines != null) {
+            for (DocumentApprovalLineBatchVO batchLine : batchLines) {
+                if (batchLine == null || batchLine.getElectronicApprovalId() == null) {
+                    continue;
+                }
+                approvalLinesByApprovalId.computeIfAbsent(
+                    batchLine.getElectronicApprovalId(), key -> new ArrayList<>())
+                    .add(copyApprovalLine(batchLine));
+            }
+        }
+
         Map<Long, List<CommonFileVO>> attachmentsByApprovalId =
                 commonFileService.listFilesByOwnerIds(user.getTenantId(), OWNER_TYPE, approvalIds);
         Map<Long, List<CommonCommentVO>> systemEventsByApprovalId =
                 listSystemEventsByApprovalIds(user, approvalIds);
+        Map<Long, CommonCommentPageVO> commentPagesByApprovalId =
+            listApprovalUserCommentPagesByOwnerIds(user, approvalIds, 3);
 
         List<DocumentApprovalFeedItemVO> feedItems = new ArrayList<>();
         for (DocumentApprovalListItemVO listItem : documents) {
@@ -415,8 +461,14 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
                 continue;
             }
             Long approvalId = listItem.getElectronicApprovalId();
-            DocumentApprovalDetailVO detail = loadFeedDetail(user, approvalId, attachmentsByApprovalId, systemEventsByApprovalId);
-            CommonCommentPageVO commentPage = listApprovalComments(user, approvalId, 3, null);
+            DocumentApprovalDetailVO detail = detailsByApprovalId.get(approvalId);
+            if (detail == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
+            }
+            CommonCommentPageVO commentPage = commentPagesByApprovalId.get(approvalId);
+            if (commentPage == null) {
+                commentPage = new CommonCommentPageVO();
+            }
 
             DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
             feedItem.setElectronicApprovalId(listItem.getElectronicApprovalId());
@@ -436,7 +488,8 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             feedItem.setContentsText(detail.getContentsText());
             feedItem.setViewCount(detail.getViewCount());
             feedItem.setDrafter(detail.isDrafter());
-            feedItem.setApprovalLines(detail.getApprovalLines());
+            feedItem.setApprovalLines(approvalLinesByApprovalId.getOrDefault(
+                approvalId, Collections.emptyList()));
             feedItem.setAttachments(attachmentsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
             feedItem.setSystemEvents(systemEventsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
             feedItem.setComments(commentPage.getComments());
@@ -446,6 +499,116 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             feedItems.add(feedItem);
         }
         return feedItems;
+    }
+
+    private Map<Long, CommonCommentPageVO> listApprovalUserCommentPagesByOwnerIds(
+            LoginVO user, List<Long> approvalIds, int limit) throws Exception {
+        Map<String, Object> params = approvalCommentParams(user, null, null);
+        params.put("ownerIds", approvalIds);
+        params.put("limit", limit + 1);
+        List<CommonCommentVO> fetched =
+            commonCommentDAO.selectApprovalUserCommentPagesByOwnerIds(params);
+
+        Map<Long, List<List<CommonCommentVO>>> rootGroupsByOwnerId = new HashMap<>();
+        for (Long approvalId : approvalIds) {
+            rootGroupsByOwnerId.put(approvalId, new ArrayList<>());
+        }
+        if (fetched != null) {
+            for (CommonCommentVO comment : fetched) {
+                if (comment == null || comment.getOwnerId() == null) {
+                    continue;
+                }
+                List<List<CommonCommentVO>> rootGroups =
+                    rootGroupsByOwnerId.computeIfAbsent(comment.getOwnerId(), key -> new ArrayList<>());
+                if (comment.getParentCommentId() == null || rootGroups.isEmpty()) {
+                    rootGroups.add(new ArrayList<>());
+                }
+                rootGroups.get(rootGroups.size() - 1).add(comment);
+            }
+        }
+
+        List<Map<String, Object>> countRows =
+            commonCommentDAO.selectApprovalUserCommentCountsByOwnerIds(params);
+        Map<Long, Long> countsByOwnerId = new HashMap<>();
+        if (countRows != null) {
+            for (Map<String, Object> row : countRows) {
+                if (row == null || !(row.get("ownerId") instanceof Number)
+                        || !(row.get("totalCount") instanceof Number)) {
+                    continue;
+                }
+                countsByOwnerId.put(
+                    ((Number) row.get("ownerId")).longValue(),
+                    ((Number) row.get("totalCount")).longValue());
+            }
+        }
+
+        Map<Long, CommonCommentPageVO> pagesByOwnerId = new HashMap<>();
+        Set<Long> commentIds = new LinkedHashSet<>();
+        for (Long approvalId : approvalIds) {
+            List<List<CommonCommentVO>> rootGroups =
+                rootGroupsByOwnerId.getOrDefault(approvalId, Collections.emptyList());
+            boolean hasPrevious = rootGroups.size() > limit;
+            List<CommonCommentVO> comments = new ArrayList<>();
+            int selectedRootCount = Math.min(limit, rootGroups.size());
+            for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
+                comments.addAll(rootGroups.get(groupIndex));
+            }
+            for (CommonCommentVO comment : comments) {
+                if (comment.getCommentId() != null && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    commentIds.add(comment.getCommentId());
+                }
+            }
+
+            CommonCommentPageVO page = new CommonCommentPageVO();
+            page.setComments(comments);
+            page.setHasPrevious(hasPrevious);
+            page.setNextBeforeCommentId(
+                hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
+            page.setResultCnt(countsByOwnerId.getOrDefault(approvalId, 0L));
+            pagesByOwnerId.put(approvalId, page);
+        }
+
+        Map<Long, List<CommonFileVO>> filesByCommentId = commentIds.isEmpty()
+            ? Collections.emptyMap()
+            : commonFileService.listFilesByOwnerIds(
+                user.getTenantId(), COMMENT_FILE_OWNER_TYPE, new ArrayList<>(commentIds));
+        if (filesByCommentId == null) {
+            throw new IllegalStateException("전자결재 댓글 첨부파일 조회 결과가 없습니다.");
+        }
+        for (CommonCommentPageVO page : pagesByOwnerId.values()) {
+            for (CommonCommentVO comment : page.getComments()) {
+                if ("Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    comment.setContent("[삭제된 댓글입니다.]");
+                    comment.setWriterName("삭제된 댓글");
+                    comment.setWriterId(null);
+                    comment.setAttachments(new ArrayList<>());
+                } else {
+                    List<CommonFileVO> attachments = filesByCommentId.getOrDefault(
+                        comment.getCommentId(), Collections.emptyList());
+                    comment.setAttachments(
+                        attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+                }
+            }
+        }
+        return pagesByOwnerId;
+    }
+
+    private DocumentApprovalLineVO copyApprovalLine(DocumentApprovalLineBatchVO batchLine) {
+        DocumentApprovalLineVO line = new DocumentApprovalLineVO();
+        line.setElectronicApprovalLineId(batchLine.getElectronicApprovalLineId());
+        line.setStageOrder(batchLine.getStageOrder());
+        line.setParticipantOrder(batchLine.getParticipantOrder());
+        line.setParticipantType(batchLine.getParticipantType());
+        line.setParticipantUserId(batchLine.getParticipantUserId());
+        line.setParticipantName(batchLine.getParticipantName());
+        line.setParticipantDepartmentName(batchLine.getParticipantDepartmentName());
+        line.setParticipantProfileImage(batchLine.getParticipantProfileImage());
+        line.setParticipantStampImage(batchLine.getParticipantStampImage());
+        line.setActionStatus(batchLine.getActionStatus());
+        line.setPendingAt(batchLine.getPendingAt());
+        line.setActionAt(batchLine.getActionAt());
+        line.setActionComment(batchLine.getActionComment());
+        return line;
     }
 
     private Map<Long, List<CommonCommentVO>> listSystemEventsByApprovalIds(LoginVO user, List<Long> approvalIds) throws Exception {
@@ -481,41 +644,6 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             }
         }
         return grouped;
-    }
-
-    private DocumentApprovalDetailVO loadFeedDetail(LoginVO user, Long electronicApprovalId) throws Exception {
-        return loadFeedDetail(user, electronicApprovalId, null, null);
-    }
-
-    private DocumentApprovalDetailVO loadFeedDetail(LoginVO user, Long electronicApprovalId,
-            Map<Long, List<CommonFileVO>> attachmentsByApprovalId,
-            Map<Long, List<CommonCommentVO>> systemEventsByApprovalId) throws Exception {
-        requireRelatedDocument(user, electronicApprovalId);
-        Map<String, Object> params = actorParams(user);
-        params.put("electronicApprovalId", electronicApprovalId);
-        DocumentApprovalDetailVO detail = documentApprovalDAO.selectDocumentApprovalDetail(params);
-        if (detail == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
-        }
-        if (attachmentsByApprovalId != null) {
-            detail.setAttachments(attachmentsByApprovalId.getOrDefault(electronicApprovalId, Collections.emptyList()));
-        } else {
-            List<CommonFileVO> attachments =
-                    commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId);
-            detail.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
-        }
-        List<DocumentApprovalLineVO> approvalLines = documentApprovalDAO.selectApprovalLines(params);
-        detail.setApprovalLines(
-                approvalLines == null ? Collections.<DocumentApprovalLineVO>emptyList() : approvalLines);
-        if (systemEventsByApprovalId != null) {
-            detail.setSystemEvents(systemEventsByApprovalId.getOrDefault(electronicApprovalId, Collections.emptyList()));
-        } else {
-            List<CommonCommentVO> systemEvents = commonCommentDAO.selectApprovalSystemEvents(
-                    approvalCommentParams(user, electronicApprovalId, null));
-            detail.setSystemEvents(
-                    systemEvents == null ? Collections.<CommonCommentVO>emptyList() : systemEvents);
-        }
-        return detail;
     }
 
     @Override

@@ -1,5 +1,12 @@
 import { createRef } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   F1Grid,
@@ -663,6 +670,45 @@ describe('F1-Grid context menu', () => {
         screen.getByRole('menuitem', { name: '정렬 해제' }),
       ).toHaveAttribute('aria-disabled', 'true');
     });
+  });
+
+  it('omits the clear-action group divider when filtering and sorting are disabled', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        disableFiltering
+        disableSorting
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+
+    const menu = screen.getByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: '필터 해제' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: '정렬 해제' })).toBeNull();
+    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
+  });
+
+  it('keeps the clear-action group divider when either action remains visible', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        disableFiltering
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+
+    const menu = screen.getByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: '필터 해제' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: '정렬 해제' })).toBeVisible();
+    expect(within(menu).getAllByRole('separator')).toHaveLength(3);
   });
 
   it('restores column order, width, and visibility to defaults and clears saved storage', async () => {

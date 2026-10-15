@@ -43,6 +43,14 @@ public class CommonCommentDAO extends EgovAbstractMapper {
         return (Long) selectOne("CommonCommentDAO.countApprovalUserComments", params);
     }
 
+    public List<CommonCommentVO> selectApprovalUserCommentPagesByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds", params);
+    }
+
+    public List<Map<String, Object>> selectApprovalUserCommentCountsByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds", params);
+    }
+
     public Long countCommonComments(Map<String, Object> params) throws Exception {
         return (Long) selectOne("CommonCommentDAO.countCommonComments", params);
     }

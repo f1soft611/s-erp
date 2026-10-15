@@ -1208,6 +1208,7 @@ export function DocumentApprovalSettingsDialog({
             disableFiltering
             allowAddRowInContextMenu={false}
             allowDuplicateRowInContextMenu={false}
+            allowDeleteRowInContextMenu={false}
             onChangesChange={(changes) =>
               setHasTemplateNameChanges(changes.updatedRows.length > 0)
             }
@@ -1246,8 +1247,8 @@ export function DocumentApprovalSettingsDialog({
         open={discardTemplateChangesOpen}
         title="저장하지 않은 변경사항"
         description="저장되지 않은 결재선명 변경을 버리고 요청한 작업을 계속하시겠습니까?"
-        continueLabel="변경 버리기"
-        cancelLabel="계속 편집"
+        continueLabel="계속"
+        cancelLabel="취소"
         onContinue={confirmDiscardTemplateChanges}
         onCancel={() => {
           setDiscardTemplateChangesOpen(false);

@@ -3,6 +3,7 @@ package egovframework.let.groupware.approval.domain.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -125,9 +126,13 @@ class DocumentApprovalMapperTest {
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentList")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalSummary")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalLines")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalLinesByOwnerIds")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDraftDocumentStatus")).isTrue();
         assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalSystemEvents")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds")).isTrue();
 
         String draftResponseSql = configuration
                 .getMappedStatement("DocumentApprovalDAO.selectDraftDocumentStatus")
@@ -138,7 +143,6 @@ class DocumentApprovalMapperTest {
                 .contains("document_status")
                 .contains("submitted_at")
                 .contains("drafter_id = ?");
-
         String detailSql = configuration
                 .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")
                 .getBoundSql(new HashMap<String, Object>())
@@ -154,6 +158,58 @@ class DocumentApprovalMapperTest {
         assertThat(deletionSql)
                 .contains("drafter_line.action_status = 'APPROVED'")
                 .contains("line.action_status NOT IN ('WAITING', 'PENDING')");
+    }
+
+    @Test
+    void feedBatchQueriesKeepTenantAuthorizationAndRootCommentSemantics() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("limit", 4);
+
+        BoundSql detailBoundSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds")
+                .getBoundSql(params);
+        String detailSql = detailBoundSql.getSql();
+        String linesSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalLinesByOwnerIds")
+                .getBoundSql(params).getSql();
+        String commentPageSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds")
+                .getBoundSql(params).getSql();
+        String commentCountSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds")
+                .getBoundSql(params).getSql();
+
+        assertThat(detailSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.electronic_approval_id IN")
+                .contains("m.deleted_yn = 'N'")
+                .contains("m.drafter_id = ?")
+                .contains("l.participant_user_id = ?");
+        assertThat(detailBoundSql.getParameterMappings()).hasSize(6);
+        assertThat(linesSql)
+                .contains("line.tenant_id = ?")
+                .contains("line.electronic_approval_id IN")
+                .contains("ORDER BY line.electronic_approval_id, line.stage_order, line.participant_order");
+        assertThat(commentPageSql)
+                .contains("tenant_id = ?")
+                .contains("owner_type = 'APPROVAL'")
+                .contains("comment_type = 'USER'")
+                .contains("PARTITION BY owner_id")
+                .contains("root_order <= ?");
+        assertThat(commentCountSql)
+                .contains("tenant_id = ?")
+                .contains("owner_type = 'APPROVAL'")
+                .contains("comment_type = 'USER'")
+                .contains("parent_comment_id IS NULL")
+                .contains("deleted_yn = 'N'");
     }
 
     @Test

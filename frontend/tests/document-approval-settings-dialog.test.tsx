@@ -1,4 +1,5 @@
 import {
+  act,
   createEvent,
   fireEvent,
   render,
@@ -483,6 +484,76 @@ describe('DocumentApprovalSettingsDialog', () => {
     );
   });
 
+  it('commits an active edit before clicking a manager action outside the Grid', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    fireEvent.doubleClick(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '기본 결재선',
+      }),
+    );
+    fireEvent.change(screen.getByDisplayValue('기본 결재선'), {
+      target: { value: '수정된 이름' },
+    });
+
+    const closeButton = getTemplateManagerCloseButton();
+    const actionBar = closeButton.parentElement;
+    if (!actionBar) throw new Error('Expected the manager action bar.');
+    act(() => fireEvent.mouseDown(actionBar, { button: 0 }));
+    expect(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    ).toBeEnabled();
+    fireEvent.click(closeButton);
+
+    expect(
+      screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toBeInTheDocument();
+  });
+
+  it('commits and saves an active name edit from the manager save action', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.rename.mockResolvedValue({
+      templateId: 9,
+      name: '수정된 이름',
+      eabusNo: '001',
+    });
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    fireEvent.doubleClick(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '기본 결재선',
+      }),
+    );
+    fireEvent.change(screen.getByDisplayValue('기본 결재선'), {
+      target: { value: '수정된 이름' },
+    });
+
+    const saveButton = within(getTemplateManager()).getByRole('button', {
+      name: '저장',
+      exact: true,
+    });
+    expect(saveButton).toBeDisabled();
+    const actionBar = saveButton.parentElement;
+    if (!actionBar) throw new Error('Expected the manager action bar.');
+    act(() => fireEvent.mouseDown(actionBar, { button: 0 }));
+
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledWith(9, '수정된 이름'),
+    );
+  });
+
   it('rejects duplicate normalized template names before saving', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },
@@ -625,7 +696,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(
       screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
     await waitFor(() =>
       expect(getTemplateGrid()).toBeInTheDocument(),
     );
@@ -639,7 +710,7 @@ describe('DocumentApprovalSettingsDialog', () => {
         name: '결재선 적용 수정된 이름',
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
     await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
     expect(
       screen.queryByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
@@ -664,7 +735,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(
       screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
     await waitFor(() =>
       expect(getTemplateGrid()).toBeInTheDocument(),
     );
@@ -678,7 +749,7 @@ describe('DocumentApprovalSettingsDialog', () => {
         name: '결재선 삭제 수정된 이름',
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
     await waitFor(() =>
       expect(
         screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
@@ -710,7 +781,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(
       screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
     await waitFor(() =>
       expect(getTemplateGrid()).toBeInTheDocument(),
     );
@@ -721,7 +792,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     fireEvent.click(
       getTemplateManagerCloseButton(),
     );
-    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
     expect(
       screen.queryByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
     ).not.toBeInTheDocument();

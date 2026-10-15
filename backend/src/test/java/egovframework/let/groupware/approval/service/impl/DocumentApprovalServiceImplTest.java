@@ -42,6 +42,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
@@ -60,52 +61,125 @@ class DocumentApprovalServiceImplTest {
 
     @Test
     void feedListHydratesDocumentWithoutRecordingView() throws Exception {
-        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
-        listItem.setElectronicApprovalId(77L);
-        listItem.setTitle("피드 문서");
-        listItem.setSummary("목록 요약");
-        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
+        DocumentApprovalListItemVO firstItem = new DocumentApprovalListItemVO();
+        firstItem.setElectronicApprovalId(77L);
+        firstItem.setTitle("첫 피드 문서");
+        firstItem.setSummary("첫 요약");
+        DocumentApprovalListItemVO secondItem = new DocumentApprovalListItemVO();
+        secondItem.setElectronicApprovalId(78L);
+        secondItem.setTitle("둘째 피드 문서");
+        secondItem.setSummary("둘째 요약");
+        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Arrays.asList(firstItem, secondItem));
 
-        DocumentApprovalDetailVO detail = detail(8);
-        detail.setContentsJson("{\"type\":\"doc\"}");
-        detail.setContentsHtml("<p>전체 본문</p>");
-        detail.setContentsText("전체 본문");
-        when(approvalDAO.selectDocumentApprovalDetail(argThat(params ->
+        DocumentApprovalDetailVO firstDetail = detail(8);
+        firstDetail.setContentsJson("{\"type\":\"doc\"}");
+        firstDetail.setContentsHtml("<p>첫 본문</p>");
+        firstDetail.setContentsText("첫 본문");
+        DocumentApprovalDetailVO secondDetail = detail(6);
+        secondDetail.setElectronicApprovalId(78L);
+        secondDetail.setContentsHtml("<p>둘째 본문</p>");
+        when(approvalDAO.selectDocumentApprovalDetailsByIds(argThat(params ->
             Long.valueOf(4L).equals(params.get("tenantId"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalId")))))
-            .thenReturn(detail);
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))
+                && ((List<?>) params.get("ownerIds")).containsAll(Arrays.asList(77L, 78L)))))
+            .thenReturn(Arrays.asList(firstDetail, secondDetail));
 
         CommonFileVO attachment = new CommonFileVO();
         attachment.setFileId(91L);
         attachment.setOwnerId(77L);
-        when(fileService.listFilesByOwnerIds(4L, "APPROVAL", Collections.singletonList(77L)))
-            .thenReturn(Collections.singletonMap(77L, Collections.singletonList(attachment)));
-        DocumentApprovalLineVO approvalLine = new DocumentApprovalLineVO();
-        when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.singletonList(approvalLine));
-        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        when(fileService.listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L)))
+            .thenReturn(Map.of(77L, Collections.singletonList(attachment),
+                78L, Collections.<CommonFileVO>emptyList()));
+        DocumentApprovalLineBatchVO firstLine = new DocumentApprovalLineBatchVO();
+        firstLine.setElectronicApprovalId(77L);
+        firstLine.setElectronicApprovalLineId(501L);
+        DocumentApprovalLineBatchVO secondLine = new DocumentApprovalLineBatchVO();
+        secondLine.setElectronicApprovalId(78L);
+        secondLine.setElectronicApprovalLineId(502L);
+        when(approvalDAO.selectApprovalLinesByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(firstLine, secondLine));
 
-        CommonCommentVO comment = approvalComment(55L, "login-author", "USER");
-        when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
-        when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
-        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Collections.singletonList(55L)))
-            .thenReturn(Collections.singletonMap(55L, Collections.<CommonFileVO>emptyList()));
+        CommonCommentVO newestRoot = approvalComment(55L, "login-author", "USER");
+        CommonCommentVO newestReply = approvalComment(56L, "login-author", "USER");
+        newestReply.setParentCommentId(55L);
+        CommonCommentVO secondRoot = approvalComment(54L, "login-author", "USER");
+        CommonCommentVO thirdRoot = approvalComment(53L, "login-author", "USER");
+        CommonCommentVO olderRoot = approvalComment(52L, "login-author", "USER");
+        CommonCommentVO otherDocumentRoot = approvalComment(81L, "login-author", "USER");
+        for (CommonCommentVO comment : Arrays.asList(newestRoot, newestReply, secondRoot, thirdRoot, olderRoot)) {
+            comment.setOwnerId(77L);
+        }
+        otherDocumentRoot.setOwnerId(78L);
+        when(commentDAO.selectApprovalUserCommentPagesByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(newestRoot, newestReply, secondRoot, thirdRoot, olderRoot, otherDocumentRoot));
+        when(commentDAO.selectApprovalUserCommentCountsByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(Map.of("ownerId", 77L, "totalCount", 4L),
+                Map.of("ownerId", 78L, "totalCount", 1L)));
+        CommonFileVO commentAttachment = approvalCommentFile(601L, 55L);
+        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(53L, 54L, 55L, 56L, 81L)))
+            .thenReturn(Collections.singletonMap(55L, Collections.singletonList(commentAttachment)));
         when(commentDAO.selectApprovalSystemEventsByOwnerIds(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
         List<DocumentApprovalFeedItemVO> result = service().listFeedDocuments(author, "ALL", null, null);
 
-        assertThat(result).hasSize(1);
+        assertThat(result).hasSize(2);
         assertThat(result.get(0).getElectronicApprovalId()).isEqualTo(77L);
-        assertThat(result.get(0).getSummary()).isEqualTo("목록 요약");
-        assertThat(result.get(0).getContentsHtml()).isEqualTo("<p>전체 본문</p>");
-        assertThat(result.get(0).getApprovalLines()).containsExactly(approvalLine);
+        assertThat(result.get(0).getSummary()).isEqualTo("첫 요약");
+        assertThat(result.get(0).getContentsHtml()).isEqualTo("<p>첫 본문</p>");
+        assertThat(result.get(0).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
+            .containsExactly(501L);
+        assertThat(result.get(0).getApprovalLines().get(0))
+            .isExactlyInstanceOf(DocumentApprovalLineVO.class);
         assertThat(result.get(0).getAttachments()).containsExactly(attachment);
-        assertThat(result.get(0).getComments()).containsExactly(comment);
-        assertThat(result.get(0).getCommentCount()).isEqualTo(1L);
-        assertThat(result.get(0).isHasPreviousComments()).isFalse();
-        assertThat(result.get(0).getNextBeforeCommentId()).isNull();
+        assertThat(result.get(0).getComments())
+            .extracting(CommonCommentVO::getCommentId).containsExactly(53L, 54L, 55L, 56L);
+        assertThat(result.get(0).getComments().get(2).getAttachments())
+            .containsExactly(commentAttachment);
+        assertThat(result.get(0).getCommentCount()).isEqualTo(4L);
+        assertThat(result.get(0).isHasPreviousComments()).isTrue();
+        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(53L);
+        assertThat(result.get(1).getElectronicApprovalId()).isEqualTo(78L);
+        assertThat(result.get(1).getContentsHtml()).isEqualTo("<p>둘째 본문</p>");
+        assertThat(result.get(1).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
+            .containsExactly(502L);
+        assertThat(result.get(1).getComments()).containsExactly(otherDocumentRoot);
+        assertThat(result.get(1).getCommentCount()).isEqualTo(1L);
+        assertThat(result.get(1).isHasPreviousComments()).isFalse();
+        verify(approvalDAO).selectDocumentApprovalDetailsByIds(anyMap());
+        verify(approvalDAO).selectApprovalLinesByOwnerIds(anyMap());
+        verify(commentDAO).selectApprovalUserCommentPagesByOwnerIds(argThat(params ->
+            params.get("ownerIds") != null && ((List<?>) params.get("ownerIds")).containsAll(Arrays.asList(77L, 78L))
+                && params.get("limit").equals(4)));
+        verify(commentDAO).selectApprovalUserCommentCountsByOwnerIds(anyMap());
+        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L));
+        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(53L, 54L, 55L, 56L, 81L));
         verify(approvalDAO, never()).selectLoginIdByLoginCode(anyMap());
         verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
         verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
+        verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
+        verify(approvalDAO, never()).selectApprovalLines(anyMap());
+        verify(approvalDAO, never()).selectIsDocumentParticipant(anyMap());
+        verify(commentDAO, never()).selectApprovalUserCommentPage(anyMap());
+        verify(commentDAO, never()).countApprovalUserComments(anyMap());
+        verify(fileService, never()).listFiles(eq(4L), eq("APPROVAL"), eq(77L));
+        verify(fileService, never()).listFiles(eq(4L), eq("APPROVAL_COMMENT"), eq(55L));
+    }
+
+    @Test
+    void feedListStopsWhenBatchDetailDoesNotAuthorizeAListedDocument() throws Exception {
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
+        when(approvalDAO.selectDocumentApprovalDetailsByIds(anyMap()))
+            .thenReturn(Collections.<DocumentApprovalDetailVO>emptyList());
+
+        assertThatThrownBy(() -> service().listFeedDocuments(author, "ALL", null, null))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verify(approvalDAO, never()).selectApprovalLinesByOwnerIds(anyMap());
+        verifyNoInteractions(commentDAO, fileService);
     }
 
     @Test

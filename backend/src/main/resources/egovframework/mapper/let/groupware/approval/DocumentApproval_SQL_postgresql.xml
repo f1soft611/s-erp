@@ -41,6 +41,12 @@
         <result property="actionComment" column="action_comment"/>
     </resultMap>
 
+    <resultMap id="approvalLineBatch"
+            type="egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO"
+            extends="approvalLine">
+        <result property="electronicApprovalId" column="electronic_approval_id"/>
+    </resultMap>
+
     <resultMap id="listItem"
             type="egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO">
         <id property="electronicApprovalId" column="electronic_approval_id"/>
@@ -509,6 +515,32 @@
           )
     </select>
 
+    <select id="selectDocumentApprovalDetailsByIds" parameterType="map" resultMap="detail">
+        SELECT m.electronic_approval_id, m.drafting_work_category_id,
+               m.eabus_no, m.document_type, m.document_status,
+               m.drafter_name, m.created_at, m.submitted_at, m.title,
+               m.contents_json::text AS contents_json, m.contents_html, m.contents_text,
+               m.view_count,
+               (m.drafter_id = #{drafterId}) AS is_drafter
+        FROM public.tb_electronic_approval_main m
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id IN
+          <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+              #{ownerId}
+          </foreach>
+          AND m.deleted_yn = 'N'
+          AND (
+              m.drafter_id = #{drafterId}
+              OR EXISTS (
+                  SELECT 1
+                  FROM public.tb_electronic_approval_line_info l
+                  WHERE l.tenant_id = m.tenant_id
+                    AND l.electronic_approval_id = m.electronic_approval_id
+                    AND l.participant_user_id = #{participantUserId}
+              )
+          )
+    </select>
+
     <select id="selectLoginIdByLoginCode" parameterType="map" resultType="long">
         SELECT login_id
         FROM public.tb_login_account
@@ -562,6 +594,33 @@
         WHERE line.tenant_id = #{tenantId}
           AND line.electronic_approval_id = #{electronicApprovalId}
         ORDER BY line.stage_order, line.participant_order
+    </select>
+
+    <select id="selectApprovalLinesByOwnerIds" parameterType="map" resultMap="approvalLineBatch">
+        SELECT line.electronic_approval_id, line.electronic_approval_line_id,
+               line.stage_order, line.participant_order,
+               line.participant_type, line.participant_user_id, line.participant_name,
+               line.participant_department_name, la.profile_image AS participant_profile_image,
+               CASE
+                   WHEN line.participant_type = 'APPROVAL'
+                    AND line.action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
+                   THEN la.stamp_image
+                   ELSE NULL
+               END AS participant_stamp_image,
+               line.action_status, line.pending_at, line.action_at, line.action_comment
+        FROM public.tb_electronic_approval_line_info line
+        LEFT JOIN public.tb_user u
+          ON u.tenant_id = line.tenant_id
+         AND CAST(u.user_id AS varchar) = line.participant_user_id
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = u.tenant_id
+         AND la.login_id = u.login_id
+        WHERE line.tenant_id = #{tenantId}
+          AND line.electronic_approval_id IN
+          <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+              #{ownerId}
+          </foreach>
+        ORDER BY line.electronic_approval_id, line.stage_order, line.participant_order
     </select>
 
     <select id="selectIsDocumentParticipant" parameterType="map" resultType="boolean">

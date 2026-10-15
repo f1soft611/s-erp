@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   IconButton,
   MenuItem,
@@ -12,7 +13,6 @@ import {
   Tabs,
   TextField,
   Divider,
-  Typography,
 } from '@mui/material';
 import {
   RichTextEditor,
@@ -552,85 +552,94 @@ export function DocumentComposerDialog({
                       bgcolor: editorSurfaceBackground,
                     }}
                   >
-                    {attachments.map((attachment) => (
-                      <Box
-                        key={attachment.clientId}
-                        data-testid={`document-composer-attachment-${attachment.status}`}
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: 'minmax(0, 1fr) auto',
-                          alignItems: 'center',
-                          columnGap: 1,
-                          rowGap: 0.5,
-                          minWidth: 0,
-                        }}
-                      >
-                        <AttachmentList
-                          files={[
-                            {
-                              id: attachment.clientId,
-                              name: attachment.file.name,
-                              size: attachment.file.size,
-                            },
-                          ]}
-                          mode="edit"
-                          isDark={theme.palette.mode === 'dark'}
-                          showActions={
-                            attachment.status !== 'unknown' && !isSaving
-                          }
-                          onRemove={removeAttachment}
-                          testId={`document-composer-attachment-list-${attachment.clientId}`}
-                        />
-                        <Typography
-                          variant="caption"
-                          color={
-                            attachment.status === 'failed' ||
-                            attachment.status === 'unknown'
-                              ? 'error.main'
-                              : attachment.status === 'uploaded'
-                                ? 'success.main'
-                                : 'text.secondary'
-                          }
-                          sx={{
-                            gridColumn: '1 / -1',
-                            minWidth: 0,
-                            overflowWrap: 'anywhere',
-                          }}
+                    {attachments.map((attachment) => {
+                      const statusPresentation = ({
+                        uploaded: { label: '완료', color: 'success' },
+                        pending: { label: '대기', color: 'default' },
+                        failed: { label: '실패', color: 'error' },
+                        unknown: { label: '확인 필요', color: 'warning' },
+                      } as const)[attachment.status];
+
+                      return (
+                        <Box
+                          key={attachment.clientId}
+                          data-testid={`document-composer-attachment-${attachment.status}`}
+                          sx={{ minWidth: 0 }}
                         >
-                          {attachment.status === 'uploaded'
-                            ? '업로드 완료'
-                            : attachment.status === 'failed'
-                              ? attachment.error || '업로드 실패'
-                              : attachment.status === 'unknown'
-                                ? attachment.error || '업로드 결과 확인 필요'
-                                : '저장 후 업로드'}
-                        </Typography>
-                        {attachment.status === 'failed' && (
-                          <Button
-                            size="small"
-                            disabled={isSaving}
-                            onClick={() =>
-                              void retryFailedAttachment(attachment.clientId)
+                          <AttachmentList
+                            files={[
+                              {
+                                id: attachment.clientId,
+                                name:
+                                  attachment.file?.name ??
+                                  attachment.fileName ??
+                                  '이름 없는 첨부파일',
+                                size:
+                                  attachment.file?.size ?? attachment.fileSize,
+                                mimeType:
+                                  attachment.file?.type ?? attachment.mimeType,
+                              },
+                            ]}
+                            mode="edit"
+                            isDark={theme.palette.mode === 'dark'}
+                            showActions={
+                              attachment.status !== 'unknown' && !isSaving
                             }
-                          >
-                            재시도
-                          </Button>
-                        )}
-                        {attachment.status === 'unknown' && (
-                          <Button
-                            size="small"
-                            disabled={isSaving}
-                            onClick={() =>
-                              void reconcileUnknownAttachment(
-                                attachment.clientId,
-                              )
+                            onRemove={removeAttachment}
+                            testId={`document-composer-attachment-list-${attachment.clientId}`}
+                            statusBadge={
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Chip
+                                  label={statusPresentation.label}
+                                  color={statusPresentation.color}
+                                  size="small"
+                                  data-testid="document-composer-attachment-status"
+                                  sx={{
+                                    height: 22,
+                                    '& .MuiChip-label': { px: 0.75 },
+                                  }}
+                                />
+                                {attachment.status === 'failed' && (
+                                  <Button
+                                    size="small"
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                      void retryFailedAttachment(
+                                        attachment.clientId,
+                                      )
+                                    }
+                                    sx={{ minWidth: 0, px: 0.75 }}
+                                  >
+                                    재시도
+                                  </Button>
+                                )}
+                                {attachment.status === 'unknown' && (
+                                  <Button
+                                    size="small"
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                      void reconcileUnknownAttachment(
+                                        attachment.clientId,
+                                      )
+                                    }
+                                    sx={{ minWidth: 0, px: 0.75 }}
+                                  >
+                                    상태 확인
+                                  </Button>
+                                )}
+                              </Box>
                             }
-                          >
-                            상태 확인
-                          </Button>
-                        )}
-                      </Box>
-                    ))}
+                          />
+                        </Box>
+                      );
+                    })}
                   </Box>
                 )}
               </Box>

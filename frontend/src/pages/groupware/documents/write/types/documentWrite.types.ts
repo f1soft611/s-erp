@@ -220,7 +220,10 @@ export type DocumentDraftAttachmentStatus =
 
 export type DocumentDraftAttachment = {
   clientId: string;
-  file: File;
+  file: File | null;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   status: DocumentDraftAttachmentStatus;
   fileId?: number;
   error?: string;

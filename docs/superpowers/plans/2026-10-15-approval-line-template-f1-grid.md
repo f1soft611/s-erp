@@ -229,9 +229,9 @@
 
   Expected: all manager behavior tests pass, including partial failure/retry and existing modal draft/apply behavior.
 
-- [x] **Step 9: Reproduce edit-to-cell-click commit in nested dialogs**
+- [x] **Step 9: Reproduce edit commit on cell and modal-action clicks**
 
-  Edit a template name, click a different template-name cell, and verify the original editor closes, only the destination cell remains selected, and the footer save action becomes enabled. Save and verify the rename API receives the edited row.
+  Edit a template name, click a different template-name cell or a manager action outside the Grid, and verify the original editor closes, dirty state enables save, and the rename API/discard guard receives the edited row.
 
 ## Task 4: Update F1-Grid and task documentation
 
@@ -286,6 +286,6 @@
 
 ## Follow-up: Commit edits on in-grid focus changes
 
-The reported behavior is not caused by drag-range selection. When the Grid is hosted in nested MUI dialogs, the dialog modal roots may be detected as editor popups; this suppresses the blur commit when focus moves between cells. The previous `disableCellRangeSelection` workaround was removed. `GridCell` now commits on blur when focus moves to another cell in the same Grid, while actual editor popups outside that Grid still defer commit. The regression test covers name edit, click to another cell, clean focus transfer, dirty/save enablement, and the resulting rename request.
+The reported behavior is not caused by drag-range selection. Two paths incorrectly treated modal roots as editor popups: GridCell blur and the document-level outside-mousedown handler. When the Grid is nested in dialogs, unrelated modal roots could defer commits on cell/footer clicks. Both paths now defer only when the event target is inside an editor popup that does not contain the Grid. Regression tests cover click-to-cell and click-to-modal-action, dirty/save enablement, the discard guard, and rename request.
 
 Verification: approval manager/service tests 28/28; F1-Grid docs portal tests 28/28; focused parent-dialog commit and default range-selection tests 2/2; frontend build succeeded with the existing large-chunk warning.

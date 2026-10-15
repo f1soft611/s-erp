@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -127,25 +128,44 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
                 postIds.add(post.getPostId());
             }
         }
+        if (postIds.isEmpty()) {
+            return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
+        }
         Map<Long, List<CommonFileVO>> filesByPostId = commonFileService.listFilesByOwnerIds(
                 search.getTenantId(), BOARD_TYPE_NOTICE, postIds);
-        Map<Long, List<CommonCommentVO>> commentsByPostId = commonCommentService.listCommentsByOwnerIds(
+        Map<Long, CommonCommentPageVO> commentPagesByPostId = commonCommentService.listCommentPagesByOwnerIds(
                 search.getTenantId(), BOARD_TYPE_NOTICE, postIds, 3);
-        Map<Long, Long> commentCountByPostId = commonCommentService.countCommentsByOwnerIds(
-                search.getTenantId(), BOARD_TYPE_NOTICE, postIds);
+        Set<Long> commentIds = new LinkedHashSet<>();
+        for (CommonCommentPageVO commentPage : commentPagesByPostId.values()) {
+            if (commentPage == null || commentPage.getComments() == null) {
+                continue;
+            }
+            for (CommonCommentVO comment : commentPage.getComments()) {
+                if (comment != null && comment.getCommentId() != null
+                        && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    commentIds.add(comment.getCommentId());
+                }
+            }
+        }
+        Map<Long, List<CommonFileVO>> commentFilesById = commentIds.isEmpty()
+            ? Collections.emptyMap()
+            : commonFileService.listFilesByOwnerIds(
+                search.getTenantId(), "NOTICE_COMMENT", new ArrayList<>(commentIds));
         for (NoticeBoardPostVO post : posts) {
             if (post == null) {
                 continue;
             }
+            CommonCommentPageVO commentPage = commentPagesByPostId.get(post.getPostId());
             hydratePost(
                     search.getTenantId(),
                     post,
                     post.getPostId(),
                     filesByPostId.getOrDefault(post.getPostId(), Collections.emptyList()),
-                    commentsByPostId.getOrDefault(post.getPostId(), Collections.emptyList()),
-                    commentCountByPostId.getOrDefault(post.getPostId(), 0L),
-                    false,
-                    null);
+                    commentPage == null ? Collections.emptyList() : commentPage.getComments(),
+                    commentPage == null ? 0L : commentPage.getResultCnt(),
+                    commentPage != null && commentPage.isHasPrevious(),
+                    commentPage == null ? null : commentPage.getNextBeforeCommentId(),
+                    commentFilesById);
         }
         return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
     }
@@ -225,17 +245,21 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
 
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
         CommonCommentPageVO commentPage = commonCommentService.listComments(tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
+        List<CommonCommentVO> comments =
+            commentPage == null ? Collections.emptyList() : commentPage.getComments();
         hydratePost(tenantId, post, postId,
             commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId),
-            commentPage == null ? Collections.emptyList() : commentPage.getComments(),
+            comments,
             commentPage == null ? 0L : commentPage.getResultCnt(),
             commentPage != null && commentPage.isHasPrevious(),
-            commentPage == null ? null : commentPage.getNextBeforeCommentId());
+            commentPage == null ? null : commentPage.getNextBeforeCommentId(),
+            listCommentFiles(tenantId, comments));
     }
 
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId,
             List<CommonFileVO> commonFiles, List<CommonCommentVO> comments, long commentCount,
-            boolean hasPreviousComments, Long nextBeforeCommentId) throws Exception {
+            boolean hasPreviousComments, Long nextBeforeCommentId,
+            Map<Long, List<CommonFileVO>> commentFilesById) throws Exception {
         List<NoticeBoardFileVO> files = new ArrayList<>();
         List<NoticeBoardFileVO> embeddedFiles = new ArrayList<>();
         List<CommonFileVO> embeddedCommonFiles = new ArrayList<CommonFileVO>();
@@ -262,19 +286,11 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         post.setAttachmentCount(files.size());
 
         List<CommonCommentVO> hydratedComments = comments == null ? new ArrayList<>() : comments;
-        List<Long> commentIds = new ArrayList<Long>();
-        for (CommonCommentVO comment : hydratedComments) {
-            if (comment != null && comment.getCommentId() != null) {
-                commentIds.add(comment.getCommentId());
-            }
-        }
-        Map<Long, List<CommonFileVO>> commentFilesById = commonFileService.listFilesByOwnerIds(
-            tenantId, "NOTICE_COMMENT", commentIds);
         for (CommonCommentVO comment : hydratedComments) {
             if (comment == null) {
                 continue;
             }
-            if (comment.getCommentId() == null) {
+            if (comment.getCommentId() == null || "Y".equalsIgnoreCase(comment.getDeletedYn())) {
                 comment.setAttachments(new ArrayList<>());
                 continue;
             }
@@ -285,6 +301,22 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         post.setHasPreviousComments(hasPreviousComments);
         post.setNextBeforeCommentId(nextBeforeCommentId);
         post.setCommentCount(Math.toIntExact(commentCount));
+    }
+
+    private Map<Long, List<CommonFileVO>> listCommentFiles(Long tenantId, List<CommonCommentVO> comments) throws Exception {
+        Set<Long> commentIds = new LinkedHashSet<>();
+        if (comments != null) {
+            for (CommonCommentVO comment : comments) {
+                if (comment != null && comment.getCommentId() != null
+                        && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    commentIds.add(comment.getCommentId());
+                }
+            }
+        }
+        if (commentIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return commonFileService.listFilesByOwnerIds(tenantId, "NOTICE_COMMENT", new ArrayList<>(commentIds));
     }
 
     @Override

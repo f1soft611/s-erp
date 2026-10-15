@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
@@ -134,6 +135,10 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return (DocumentApprovalDetailVO) selectOne("DocumentApprovalDAO.selectDocumentApprovalDetail", params);
     }
 
+    public List<DocumentApprovalDetailVO> selectDocumentApprovalDetailsByIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds", params);
+    }
+
     public Long selectLoginIdByLoginCode(Map<String, Object> params) throws Exception {
         return (Long) selectOne("DocumentApprovalDAO.selectLoginIdByLoginCode", params);
     }
@@ -148,6 +153,10 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public List<DocumentApprovalLineVO> selectApprovalLines(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectApprovalLines", params);
+    }
+
+    public List<DocumentApprovalLineBatchVO> selectApprovalLinesByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectApprovalLinesByOwnerIds", params);
     }
 
     public Boolean selectIsDocumentParticipant(Map<String, Object> params) throws Exception {

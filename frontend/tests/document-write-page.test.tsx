@@ -2206,6 +2206,171 @@ describe('Document write page', () => {
     expect(approvalPeople[1]).toHaveAttribute('aria-label', '결재 2 김민수');
   }, 15000);
 
+  it('shows and preserves existing attachments when editing a revision-requested document', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 4,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'REVISION_REQUESTED',
+      isDrafter: true,
+      title: '첨부파일이 있는 문서',
+      drafterName: '김민수',
+      draftingWorkCategoryId: null,
+      viewCount: 0,
+      summary: '기존 내용',
+      contentsJson: '{"type":"doc","content":[{"type":"paragraph"}]}',
+      contentsHtml: '<p>기존 본문</p>',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 11,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'emp-1',
+          participantName: '홍길동',
+          actionStatus: 'APPROVED',
+        },
+      ],
+      attachments: [
+        { fileId: 62, fileName: '기존자료.pdf', fileSize: 128, mimeType: 'application/pdf' },
+      ],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(
+      await within(listRegion).findByRole('button', { name: /문서 D/ }),
+    );
+    await screen.findByTestId('post-detail-panel');
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '문서 작성' });
+    await within(dialog).findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
+    expect(await within(dialog).findByText('기존자료.pdf')).toBeInTheDocument();
+    const uploadedRow = within(dialog).getByTestId(
+      'document-composer-attachment-uploaded',
+    );
+    const uploadedBadge = within(uploadedRow).getByTestId(
+      'document-composer-attachment-status',
+    );
+    expect(uploadedBadge).toHaveTextContent('완료');
+    expect(within(uploadedRow).queryByText('업로드 완료')).not.toBeInTheDocument();
+    const uploadedRemoveButton = within(uploadedRow).getByRole('button', {
+      name: '첨부 파일 삭제',
+    });
+    expect(
+      uploadedBadge.compareDocumentPosition(uploadedRemoveButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.change(within(dialog).getByLabelText('첨부 파일 선택'), {
+      target: {
+        files: [
+          new File(['new'], 'new-file.xlsx', {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }),
+        ],
+      },
+    });
+    const pendingRow = within(dialog).getByTestId(
+      'document-composer-attachment-pending',
+    );
+    const pendingBadge = within(pendingRow).getByTestId(
+      'document-composer-attachment-status',
+    );
+    expect(pendingBadge).toHaveTextContent('대기');
+    expect(within(pendingRow).queryByText('저장 후 업로드')).not.toBeInTheDocument();
+    fireEvent.click(
+      within(pendingRow).getByRole('button', { name: '첨부 파일 삭제' }),
+    );
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(composerApi.saveDocumentDraft).toHaveBeenCalledWith(
+        expect.any(Object),
+        4,
+      ),
+    );
+    expect(composerApi.uploadDocumentDraftAttachment).not.toHaveBeenCalled();
+  }, 15000);
+
+  it('loads protected existing images in the edit composer without saving blob URLs', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:approval-image-preview'),
+      revokeObjectURL: vi.fn(),
+    });
+    try {
+      composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+        electronicApprovalId: 4,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'REVISION_REQUESTED',
+        isDrafter: true,
+        title: '이미지가 있는 문서',
+        drafterName: '김민수',
+        draftingWorkCategoryId: null,
+        viewCount: 0,
+        summary: '기존 내용',
+        contentsJson: '{"type":"doc","content":[{"type":"paragraph"}]}',
+        contentsHtml:
+          '<p>기존 본문</p><img src="/api/v1/groupware/approvals/4/embedded-images/51" alt="영수증" data-file-id="51" data-upload-token="image-token" />',
+        approvalLines: [
+          {
+            electronicApprovalLineId: 11,
+            stageOrder: 1,
+            participantOrder: 1,
+            participantType: 'APPROVAL',
+            participantUserId: 'emp-1',
+            participantName: '홍길동',
+            actionStatus: 'APPROVED',
+          },
+        ],
+        attachments: [],
+        systemEvents: [],
+      });
+      render(<DashboardContent {...pageProps} />);
+      const listRegion = await screen.findByRole('region', {
+        name: '리스트형 문서 목록',
+      });
+      fireEvent.click(
+        await within(listRegion).findByRole('button', { name: /문서 D/ }),
+      );
+      await screen.findByTestId('post-detail-panel');
+      fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '문서 작성' });
+      await within(dialog).findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
+      await waitFor(() =>
+        expect(
+          dialog.querySelector('.document-composer-editor .ProseMirror img'),
+        ).toHaveAttribute('src', 'blob:approval-image-preview'),
+      );
+      expect(composerApi.fetchApprovalEmbeddedImageBlob).toHaveBeenCalledWith(4, 51);
+
+      fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+      await waitFor(() =>
+        expect(composerApi.saveDocumentDraft).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contentsHtml: expect.stringContaining(
+              '/api/v1/groupware/approvals/4/embedded-images/51',
+            ),
+          }),
+          4,
+        ),
+      );
+      expect(composerApi.saveDocumentDraft.mock.calls.at(-1)?.[0].contentsHtml).not.toContain(
+        'blob:approval-image-preview',
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }, 15000);
+
   it('keeps the detail panel open and refreshes it quietly after closing the composer', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 4,
@@ -4596,7 +4761,13 @@ describe('Document write page', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(await screen.findByText('definite failure')).toBeInTheDocument();
+    const failedRow = await screen.findByTestId(
+      'document-composer-attachment-failed',
+    );
+    expect(
+      within(failedRow).getByTestId('document-composer-attachment-status'),
+    ).toHaveTextContent('실패');
+    expect(within(failedRow).queryByText('definite failure')).not.toBeInTheDocument();
     const partialUploadAlert = screen
       .getByRole('dialog', { name: '문서 작성' })
       .querySelector('.MuiDialogContent-root [role="alert"]');
@@ -4614,7 +4785,13 @@ describe('Document write page', () => {
       ).toBeInTheDocument(),
     );
     expect(composerApi.uploadDocumentDraftAttachment).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('업로드 완료')).toBeInTheDocument();
+    const uploadedRow = screen.getByTestId(
+      'document-composer-attachment-uploaded',
+    );
+    expect(
+      within(uploadedRow).getByTestId('document-composer-attachment-status'),
+    ).toHaveTextContent('완료');
+    expect(within(uploadedRow).queryByText('업로드 완료')).not.toBeInTheDocument();
   });
 
   it('keeps retry failures in the composer error area', async () => {
@@ -4773,6 +4950,15 @@ describe('Document write page', () => {
     expect(
       await screen.findByRole('button', { name: '상태 확인' }),
     ).toBeInTheDocument();
+    const unknownRow = screen.getByTestId(
+      'document-composer-attachment-unknown',
+    );
+    expect(
+      within(unknownRow).getByTestId('document-composer-attachment-status'),
+    ).toHaveTextContent('확인 필요');
+    expect(
+      within(unknownRow).queryByText('업로드 결과 확인 필요'),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: '재시도' }),
     ).not.toBeInTheDocument();

@@ -34,6 +34,7 @@ import type {
 import {
   deleteDocumentDraftAttachment,
   deleteDocumentDraftEmbeddedImage,
+  fetchApprovalEmbeddedImageBlob,
   isDefiniteAttachmentUploadFailure,
   listDocumentDraftAttachments,
   saveDocumentDraft,
@@ -160,6 +161,74 @@ export function useDocumentComposer(
   });
 
   useEffect(() => {
+    if (!editor || !open || !initialDocument) return;
+
+    let active = true;
+    const resolvedImages: Array<{
+      image: HTMLImageElement;
+      originalSource: string;
+      objectUrl: string;
+    }> = [];
+    const imageRequests = Array.from(
+      editor.view.dom.querySelectorAll<HTMLImageElement>('img'),
+    ).flatMap((image) => {
+      const source = image.getAttribute('src') ?? '';
+      const match = source.match(
+        new RegExp(
+          `^/api/v1/groupware/approvals/${initialDocument.electronicApprovalId}/embedded-images/(\\d+)$`,
+        ),
+      );
+      const fileId = Number(match?.[1]);
+      return match && Number.isSafeInteger(fileId) && fileId > 0
+        ? [{ image, source, fileId }]
+        : [];
+    });
+
+    if (imageRequests.length === 0) return;
+
+    void Promise.allSettled(
+      imageRequests.map(async (request) => ({
+        ...request,
+        blob: await fetchApprovalEmbeddedImageBlob(
+          initialDocument.electronicApprovalId,
+          request.fileId,
+        ),
+      })),
+    ).then((results) => {
+      if (!active) return;
+
+      let failed = false;
+      results.forEach((result, index) => {
+        const request = imageRequests[index];
+        if (!request) return;
+        if (result.status === 'rejected') {
+          request.image.removeAttribute('src');
+          failed = true;
+          return;
+        }
+        const objectUrl = URL.createObjectURL(result.value.blob);
+        request.image.setAttribute('src', objectUrl);
+        resolvedImages.push({
+          image: request.image,
+          originalSource: request.source,
+          objectUrl,
+        });
+      });
+      if (failed) setSaveError('본문 이미지를 불러오지 못했습니다.');
+    });
+
+    return () => {
+      active = false;
+      resolvedImages.forEach(({ image, originalSource, objectUrl }) => {
+        if (image.getAttribute('src') === objectUrl) {
+          image.setAttribute('src', originalSource);
+        }
+        URL.revokeObjectURL(objectUrl);
+      });
+    };
+  }, [editor, initialDocument, open]);
+
+  useEffect(() => {
     if (!open) return;
 
     let active = true;
@@ -217,6 +286,17 @@ export function useDocumentComposer(
           setElectronicApprovalId(initialDocument.electronicApprovalId);
           draftIdRef.current = initialDocument.electronicApprovalId;
           setComposerTitle(initialDocument.title);
+          setAttachments(
+            initialDocument.attachments.map((attachment) => ({
+              clientId: `existing-${attachment.fileId}`,
+              file: null,
+              fileId: attachment.fileId,
+              fileName: attachment.fileName,
+              fileSize: attachment.fileSize,
+              mimeType: attachment.mimeType,
+              status: 'uploaded',
+            })),
+          );
           setActiveDocumentKind(kindByDocumentType[initialDocument.documentType]);
           setSelectedFormId(
             initialDocument.draftingWorkCategoryId === null
@@ -521,6 +601,9 @@ export function useDocumentComposer(
         ...nextFiles.map((file) => ({
           clientId: `attachment-${nextAttachmentId.current++}`,
           file,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
           status: 'pending' as const,
         })),
       ]);
@@ -534,6 +617,9 @@ export function useDocumentComposer(
       approvalId: number,
     ): Promise<DocumentDraftAttachmentStatus> => {
       try {
+        if (!attachment.file) {
+          throw new Error('업로드할 첨부파일 데이터를 확인할 수 없습니다.');
+        }
         const uploaded = await uploadDocumentDraftAttachment(
           approvalId,
           attachment.file,
@@ -748,6 +834,10 @@ export function useDocumentComposer(
       ) {
         return;
       }
+      if (!attachment.file) {
+        setSaveError('첨부파일 데이터를 확인할 수 없습니다.');
+        return;
+      }
       savingRef.current = true;
       setIsSaving(true);
       setSaveError('');
@@ -789,6 +879,11 @@ export function useDocumentComposer(
       ) {
         return;
       }
+      if (!attachment.file) {
+        setSaveError('첨부파일 데이터를 확인할 수 없습니다.');
+        return;
+      }
+      const attachmentFile = attachment.file;
       savingRef.current = true;
       setIsSaving(true);
       setSaveError('');
@@ -801,8 +896,8 @@ export function useDocumentComposer(
         );
         const matches = files.filter(
           (file) =>
-            file.fileName === attachment.file.name &&
-            file.fileSize === attachment.file.size &&
+            file.fileName === attachmentFile.name &&
+            file.fileSize === attachmentFile.size &&
             !uploadedIds.has(file.fileId),
         );
         if (matches.length === 1) {

@@ -1,6 +1,7 @@
 package egovframework.com.common.service.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -100,6 +101,81 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
             markDeletedComments(comments);
         }
         return grouped;
+    }
+
+    @Override
+    public Map<Long, CommonCommentPageVO> listCommentPagesByOwnerIds(
+            Long tenantId, String ownerType, List<Long> ownerIds, Integer limit) throws Exception {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
+        }
+        if (!StringUtils.hasText(ownerType) || ownerIds == null || ownerIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        int safeLimit = limit == null ? 3 : limit;
+        if (safeLimit < 1 || safeLimit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 조회 건수가 올바르지 않습니다.");
+        }
+
+        Set<Long> distinctIds = new HashSet<>();
+        for (Long ownerId : ownerIds) {
+            if (ownerId != null) {
+                distinctIds.add(ownerId);
+            }
+        }
+        if (distinctIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        requireDao();
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("ownerType", ownerType.trim().toUpperCase());
+        params.put("ownerIds", new ArrayList<>(distinctIds));
+        params.put("limit", safeLimit + 1);
+
+        List<CommonCommentVO> fetched = commonCommentDAO.selectCommonCommentPageByOwnerIds(params);
+        Map<Long, List<List<CommonCommentVO>>> rootGroupsByOwnerId = new HashMap<>();
+        for (Long ownerId : distinctIds) {
+            rootGroupsByOwnerId.put(ownerId, new ArrayList<>());
+        }
+        if (fetched != null) {
+            for (CommonCommentVO comment : fetched) {
+                if (comment == null || comment.getOwnerId() == null) {
+                    continue;
+                }
+                List<List<CommonCommentVO>> rootGroups =
+                    rootGroupsByOwnerId.computeIfAbsent(comment.getOwnerId(), key -> new ArrayList<>());
+                if (comment.getParentCommentId() == null || rootGroups.isEmpty()) {
+                    rootGroups.add(new ArrayList<>());
+                }
+                rootGroups.get(rootGroups.size() - 1).add(comment);
+            }
+        }
+
+        Map<Long, Long> countsByOwnerId = countCommentsByOwnerIds(
+            tenantId, ownerType, new ArrayList<>(distinctIds));
+        Map<Long, CommonCommentPageVO> pagesByOwnerId = new HashMap<>();
+        for (Long ownerId : distinctIds) {
+            List<List<CommonCommentVO>> rootGroups =
+                rootGroupsByOwnerId.getOrDefault(ownerId, Collections.emptyList());
+            boolean hasPrevious = rootGroups.size() > safeLimit;
+            List<CommonCommentVO> comments = new ArrayList<>();
+            int selectedRootCount = Math.min(safeLimit, rootGroups.size());
+            for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
+                comments.addAll(rootGroups.get(groupIndex));
+            }
+            markDeletedComments(comments);
+
+            CommonCommentPageVO page = new CommonCommentPageVO();
+            page.setComments(comments);
+            page.setHasPrevious(hasPrevious);
+            page.setNextBeforeCommentId(
+                hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
+            page.setResultCnt(countsByOwnerId.getOrDefault(ownerId, 0L));
+            pagesByOwnerId.put(ownerId, page);
+        }
+        return pagesByOwnerId;
     }
 
     @Override

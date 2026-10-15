@@ -357,8 +357,8 @@ export function DraftFormTemplateDialog({
         open={confirmDiscardOpen}
         title="저장하지 않은 변경사항"
         description="본문 변경을 버리고 닫으시겠습니까?"
-        cancelLabel="계속 편집"
-        continueLabel="변경 버리기"
+        cancelLabel="취소"
+        continueLabel="계속"
         onCancel={() => setConfirmDiscardOpen(false)}
         onContinue={handleDiscard}
       />

@@ -11,6 +11,7 @@ import egovframework.let.common.dto.ListResult;
 public interface CommonCommentService {
     List<CommonCommentVO> listComments(Long tenantId, String ownerType, Long ownerId) throws Exception;
     Map<Long, List<CommonCommentVO>> listCommentsByOwnerIds(Long tenantId, String ownerType, List<Long> ownerIds, Integer limit) throws Exception;
+    Map<Long, CommonCommentPageVO> listCommentPagesByOwnerIds(Long tenantId, String ownerType, List<Long> ownerIds, Integer limit) throws Exception;
 
     /**
      * Returns the newest root comments, including their active descendants.
