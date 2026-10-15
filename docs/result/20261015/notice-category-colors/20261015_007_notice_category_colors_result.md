@@ -18,7 +18,7 @@
 | `npm run build` | 통과. 기존 큰 번들 경고 출력 (index JS 1,052.87 kB) |
 | `git diff --check` | 통과 |
 
-브라우저에서 공지 목록을 열 때 공통코드 및 공지 목록 API가 `ERR_CONNECTION_REFUSED`로 실패했습니다. `mvn spring-boot:run`도 8080 포트 점유로 새 백엔드를 시작하지 못했고, 기존 포트 프로세스는 중단하지 않았습니다. 포트 루트는 HTTP 200을 반환했지만 현재 브라우저의 인증 갱신이 실패해 로그인 화면으로 이동했습니다. 그러므로 실제 데이터가 표시된 공지 분류 칩의 화면 캡처 및 브라우저 시각 검증은 수행하지 못했습니다. 단위/렌더링 테스트에서 라이트·다크 색상, 라벨 유지, 상단고정 상태의 독립성을 확인했습니다.
+브라우저에서 공지 목록을 열 때 공통코드 및 공지 목록 API가 HTTP 500을 반환해 페이지에 오류 상태가 표시되었습니다. `mvn spring-boot:run`도 8080 포트 점유로 새 백엔드를 시작하지 못했고, 기존 포트 프로세스는 중단하지 않았습니다. 오류 화면 캡처는 아래에 기록했지만, 실제 분류 칩이 표시된 화면의 브라우저 검증은 수행하지 못했습니다. 단위/렌더링 테스트에서 라이트·다크 색상, 라벨 유지, 상단고정 상태의 독립성을 확인했습니다.
 
 ## 구현 파일
 
@@ -26,6 +26,10 @@
 - [NoticeFeedList.tsx](../../../../frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx)
 - [notice-category-presentation.test.ts](../../../../frontend/tests/notice-category-presentation.test.ts)
 - [notice-page.test.tsx](../../../../frontend/tests/notice-page.test.tsx)
+
+## 브라우저 캡처
+
+- [공지 API 오류 상태 (HTTP 500)](./screenshots/notice-page-api-error.png) — 색상 표시 검증 화면이 아님
 
 ## 후속 확인
 

@@ -7,6 +7,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { useState } from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import { createAppTheme } from '../src/theme/theme';
+import { getNoticeCategoryPresentation } from '../src/pages/groupware/community/notice/data/noticeCategoryPresentation';
 import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
@@ -101,7 +104,12 @@ describe('Community notice page', () => {
         },
       ];
 
-      render(<NoticeFeedList items={items} isDark={isDark} />);
+      const theme = createAppTheme(isDark ? 'dark' : 'light');
+      render(
+        <ThemeProvider theme={theme}>
+          <NoticeFeedList items={items} isDark={isDark} />
+        </ThemeProvider>,
+      );
 
       const firstCategory = screen.getByText('운영').closest('.MuiChip-root');
       const secondCategory = screen.getByText('필독').closest('.MuiChip-root');
@@ -111,9 +119,21 @@ describe('Community notice page', () => {
       expect(getComputedStyle(firstCategory!).backgroundColor).not.toBe(
         getComputedStyle(secondCategory!).backgroundColor,
       );
-      expect(getComputedStyle(firstCategory!).color).not.toBe(
-        getComputedStyle(secondCategory!).color,
-      );
+      for (const [index, category] of [firstCategory, secondCategory].entries()) {
+        const { backgroundColor } = getNoticeCategoryPresentation(
+          items[index].noticeGubunCode,
+          isDark,
+        );
+        expect(category).toHaveStyle({
+          backgroundColor,
+          color:
+            items[index].state === '필독'
+              ? '#ffffff'
+              : theme.palette.getContrastText(backgroundColor),
+          height: '28px',
+          borderRadius: '8px',
+        });
+      }
       expect(
         screen.getByRole('button', { name: '상단 고정 해제 공지 A' }),
       ).toBeInTheDocument();

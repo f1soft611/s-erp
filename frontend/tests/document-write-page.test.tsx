@@ -959,7 +959,9 @@ describe('Document write page', () => {
     render(<DashboardContent {...pageProps} />);
     await screen.findByRole('region', { name: '리스트형 문서 목록' });
 
-    expect(screen.getByTestId('document-write-page')).toBeInTheDocument();
+    expect(screen.getByTestId('document-write-page')).toHaveStyle({
+      minWidth: '0px',
+    });
     expect(
       screen.queryByText('요청하신 페이지는 현재 준비 중입니다'),
     ).not.toBeInTheDocument();
@@ -986,6 +988,14 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
     expect(listRegion.querySelectorAll('button')).toHaveLength(6);
     expect(listRegion).toHaveTextContent('문서 A');
+    const firstDocumentRow = within(listRegion).getByRole('button', {
+      name: /문서 A/,
+    });
+    const badgeLabels = Array.from(
+      firstDocumentRow.querySelectorAll('.MuiChip-root'),
+      (chip) => chip.textContent,
+    );
+    expect(badgeLabels).toEqual(['결재진행중', '기안']);
     ['기안', '업무', '지출', '근태'].forEach((kind) => {
       expect(screen.getAllByText(kind).length).toBeGreaterThan(0);
     });
@@ -1411,7 +1421,6 @@ describe('Document write page', () => {
     ]);
     expect(agreementParticipants[0]).toHaveStyle({
       flexDirection: 'row',
-      minHeight: '58px',
       borderRadius: '10px',
     });
     expect(agreementStage).toHaveTextContent('재무팀');
@@ -1428,13 +1437,19 @@ describe('Document write page', () => {
     const agreementWithEmptyDepartment = screen.getByTestId(
       'approval-line-agreement-participant-77',
     );
-    for (const participant of [agreementWithoutDepartment, agreementWithEmptyDepartment]) {
-      expect(participant.querySelector('p[title=""]')).toBeNull();
+    for (const [lineId, participant] of [
+      ['72', agreementWithoutDepartment],
+      ['77', agreementWithEmptyDepartment],
+    ]) {
+      const department = within(participant).getByTestId(
+        `approval-line-agreement-department-${lineId}`,
+      );
+      const status = screen.getByTestId(`approval-line-agreement-status-${lineId}`);
+      expect(department).toHaveTextContent('부서없음');
       expect(
         within(participant).getByText(/합의자 [BE]/).parentElement,
-      ).toBe(screen.getByTestId(
-        `approval-line-agreement-status-${participant.dataset.testid?.split('-').pop()}`,
-      ).parentElement);
+      ).not.toBe(department.parentElement);
+      expect(department.parentElement).toBe(status.parentElement);
       expect(participant).toHaveStyle({ alignItems: 'center' });
     }
     expect(screen.getByTestId('approval-line-agreement-participants'))
@@ -1456,7 +1471,11 @@ describe('Document write page', () => {
     const referenceWithoutDepartment = screen.getByTestId(
       'approval-line-reference-participant-78',
     );
-    expect(referenceWithoutDepartment.querySelector('p[title="   "]')).toBeNull();
+    expect(
+      within(referenceWithoutDepartment).getByTestId(
+        'approval-line-reference-department-78',
+      ),
+    ).toHaveTextContent('부서없음');
     expect(referenceWithoutDepartment).toHaveTextContent('참조자 공백부서');
     expect(
       within(referenceWithoutDepartment).getByTestId(
@@ -1464,6 +1483,24 @@ describe('Document write page', () => {
       ),
     ).toBeInTheDocument();
     expect(referenceWithoutDepartment).toHaveStyle({ alignItems: 'center' });
+    const participantCards = [
+      screen.getByTestId('approval-line-agreement-participant-72'),
+      screen.getByTestId('approval-line-reference-participant-73'),
+    ];
+    for (const card of participantCards) {
+      expect(card).toHaveStyle({
+        flex: '0 1 240px',
+        minWidth: 'min(100%, 190px)',
+        maxWidth: '100%',
+        height: '66px',
+        boxSizing: 'border-box',
+        padding: '8px',
+      });
+    }
+    expect(screen.getByTestId('approval-line-agreement-avatar-72'))
+      .toHaveStyle({ width: '36px', height: '36px' });
+    expect(screen.getByTestId('approval-line-reference-avatar-73'))
+      .toHaveStyle({ width: '36px', height: '36px' });
     const agreementLayoutGroup = screen.getByTestId('approval-line-group-agreement');
     const referenceLayoutGroup = screen.getByTestId('approval-line-group-reference');
     const agreementContent = within(agreementLayoutGroup).getByTestId(

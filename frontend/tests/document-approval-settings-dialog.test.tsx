@@ -108,6 +108,44 @@ function dragOverAt(target: HTMLElement, clientY: number) {
   fireEvent(target, event);
 }
 
+function editTemplateName(currentName: string, nextName: string) {
+  fireEvent.doubleClick(
+    screen.getByRole('gridcell', { name: currentName }),
+  );
+  const editor = screen.getByDisplayValue(currentName);
+  fireEvent.change(editor, { target: { value: nextName } });
+  fireEvent.keyDown(editor, { key: 'Enter' });
+}
+
+function getTemplateGrid() {
+  return screen.getByRole('grid', { name: '자주 쓰는 결재선 목록' });
+}
+
+async function openTemplateManagerGrid() {
+  fireEvent.click(
+    screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
+  );
+  await screen.findByRole('grid', {
+    name: '자주 쓰는 결재선 목록',
+  });
+  await waitFor(() =>
+    expect(within(getTemplateGrid()).getAllByRole('gridcell').length).toBeGreaterThan(0),
+  );
+}
+
+function getTemplateManager() {
+  return screen.getByRole('dialog', {
+    name: '자주 쓰는 결재선 불러오기',
+  });
+}
+
+function getTemplateManagerCloseButton() {
+  const closeButtons = within(getTemplateManager()).getAllByRole('button', {
+    name: '닫기',
+  });
+  return closeButtons[closeButtons.length - 1];
+}
+
 describe('DocumentApprovalSettingsDialog', () => {
   it('loads the current approval line and references while keeping the drafter fixed', () => {
     renderSettings();
@@ -187,7 +225,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('loads ordered template participants into temporary state and applies them only on Apply', async () => {
+  it('shows templates in F1-Grid and loads a row into temporary state until Apply', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },
     ]);
@@ -227,12 +265,48 @@ describe('DocumentApprovalSettingsDialog', () => {
     fireEvent.click(
       screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
     );
-    fireEvent.click(
-      await screen.findByRole('button', {
+    const grid = await screen.findByRole('grid', {
+      name: '자주 쓰는 결재선 목록',
+    });
+    await screen.findByRole('gridcell', { name: '기본 결재선' });
+    const loadedGrid = getTemplateGrid();
+    expect(
+      within(loadedGrid).getByRole('columnheader', { name: '결재선명' }),
+    ).toBeInTheDocument();
+    expect(
+      within(loadedGrid).getByRole('columnheader', { name: '액션' }),
+    ).toBeInTheDocument();
+    expect(
+      within(loadedGrid).queryByRole('columnheader', {
+        name: '전체 행 선택',
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(loadedGrid).getByRole('gridcell', { name: '기본 결재선' }),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).queryByRole('button', {
         name: '결재선 선택 기본 결재선',
       }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).queryByRole('button', {
+        name: '불러오기',
+        exact: true,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      within(loadedGrid).getByRole('button', {
+        name: '결재선 적용 기본 결재선',
+      }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '불러오기' }));
 
     await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
     expect(
@@ -256,37 +330,47 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(vi.mocked(onApply).mock.calls[0][1]).toEqual(['reference-2']);
   });
 
-  it('renames and confirms deletion of a selected template', async () => {
+  it('saves inline template name changes and confirms deletion for that row', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },
       { templateId: 10, name: '다른 결재선', eabusNo: '001' },
     ]);
-    templateApi.rename.mockResolvedValue({
-      templateId: 9,
-      name: '변경된 이름',
+    templateApi.rename.mockImplementation(async (templateId, name) => ({
+      templateId,
+      name,
       eabusNo: '001',
-    });
+    }));
     templateApi.delete.mockResolvedValue(undefined);
     renderSettings();
 
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', ' 변경된 이름 ');
     fireEvent.click(
-      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
-    );
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: '결재선 선택 기본 결재선',
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '이름 변경' }));
-    fireEvent.change(screen.getByRole('textbox', { name: '새 결재선 이름' }), {
-      target: { value: '변경된 이름' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '이름 변경 저장' }));
 
     await waitFor(() =>
       expect(templateApi.rename).toHaveBeenCalledWith(9, '변경된 이름'),
     );
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    expect(templateApi.rename).toHaveBeenCalledTimes(1);
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', { name: '변경된 이름' }),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 삭제 변경된 이름',
+      }),
+    );
     expect(
       screen.getByText('“변경된 이름” 결재선을 삭제하시겠습니까?'),
     ).toBeInTheDocument();
@@ -294,9 +378,340 @@ describe('DocumentApprovalSettingsDialog', () => {
 
     await waitFor(() => expect(templateApi.delete).toHaveBeenCalledWith(9));
     expect(
-      screen.getByRole('button', { name: '결재선 선택 다른 결재선' }),
+      within(getTemplateManager()).getByRole('gridcell', {
+        name: '다른 결재선',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).queryByRole('gridcell', {
+        name: '변경된 이름',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('saves multiple inline name changes together and trims their values', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      { templateId: 10, name: '다른 결재선', eabusNo: '001' },
+      { templateId: 11, name: '그대로 둘 결재선', eabusNo: '001' },
+    ]);
+    templateApi.rename.mockImplementation(async (templateId, name) => ({
+      templateId,
+      name,
+      eabusNo: '001',
+    }));
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', ' 수정된 결재선 ');
+    editTemplateName('다른 결재선', ' 두 번째 수정 ');
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledTimes(2),
+    );
+    expect(templateApi.rename).toHaveBeenNthCalledWith(
+      1,
+      9,
+      '수정된 결재선',
+    );
+    expect(templateApi.rename).toHaveBeenNthCalledWith(2, 10, '두 번째 수정');
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '그대로 둘 결재선',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    ).toBeDisabled();
+  });
+
+  it('does not retain a multi-cell range when dragging across template names', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      { templateId: 10, name: '다른 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    const grid = getTemplateGrid();
+    const firstName = within(grid).getByRole('gridcell', {
+      name: '기본 결재선',
+    });
+    const secondName = within(grid).getByRole('gridcell', {
+      name: '다른 결재선',
+    });
+
+    fireEvent.mouseDown(firstName, { button: 0 });
+    fireEvent.mouseEnter(secondName);
+    fireEvent.mouseUp(secondName);
+
+    expect(
+      within(grid)
+        .getAllByRole('gridcell')
+        .filter((cell) => cell.getAttribute('data-grid-selected') === 'true'),
+    ).toHaveLength(0);
+
+    fireEvent.click(secondName);
+
+    expect(
+      within(grid)
+        .getAllByRole('gridcell')
+        .filter((cell) => cell.getAttribute('data-grid-selected') === 'true'),
+    ).toEqual([secondName]);
+  });
+
+  it('rejects duplicate normalized template names before saving', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      { templateId: 10, name: '다른 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', ' 다른 결재선 ');
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    expect(
+      await within(getTemplateManager()).findByText(
+        '같은 이름의 결재선 템플릿이 이미 있습니다.',
+      ),
+    ).toBeInTheDocument();
+    expect(templateApi.rename).not.toHaveBeenCalled();
+    expect(
+      within(getTemplateGrid()).getAllByRole('gridcell', {
+        name: '다른 결재선',
+      }),
+    ).toHaveLength(2);
+  });
+
+  it.each([
+    ['blank', '   '],
+    ['longer than 100 characters', 'a'.repeat(101)],
+  ])('rejects %s template names without calling the rename API', async (_, name) => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', name);
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    expect(
+      await within(getTemplateManager()).findByText(
+        '결재선 템플릿 이름은 1~100자여야 합니다.',
+      ),
+    ).toBeInTheDocument();
+    expect(templateApi.rename).not.toHaveBeenCalled();
+  });
+
+  it('preserves failed inline renames after partial batch failure for retry', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      { templateId: 10, name: '다른 결재선', eabusNo: '001' },
+    ]);
+    templateApi.rename
+      .mockResolvedValueOnce({
+        templateId: 9,
+        name: '서버 저장 이름',
+        eabusNo: '001',
+      })
+      .mockRejectedValueOnce(new Error('이름 변경 실패'))
+      .mockResolvedValueOnce({
+        templateId: 10,
+        name: '재시도 성공 이름',
+        eabusNo: '001',
+      });
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', '성공할 이름');
+    editTemplateName('다른 결재선', '실패 후 재시도할 이름');
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    expect(
+      await within(getTemplateManager()).findByText(/이름 변경 실패/),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '서버 저장 이름',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '실패 후 재시도할 이름',
+      }),
+    ).toBeInTheDocument();
+    const saveButton = within(getTemplateManager()).getByRole('button', {
+      name: '저장',
+      exact: true,
+    });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    fireEvent.click(saveButton);
+
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledTimes(3),
+    );
+    expect(templateApi.rename).toHaveBeenNthCalledWith(
+      3,
+      10,
+      '실패 후 재시도할 이름',
+    );
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', {
+        name: '재시도 성공 이름',
+      }),
     ).toBeInTheDocument();
   });
+
+  it('confirms before loading with unsaved names and preserves changes when cancelled', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.get.mockResolvedValue({
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+      approvalLines: [],
+    });
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', '수정된 이름');
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 적용 수정된 이름',
+      }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    await waitFor(() =>
+      expect(getTemplateGrid()).toBeInTheDocument(),
+    );
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', { name: '수정된 이름' }),
+    ).toBeInTheDocument();
+    expect(templateApi.get).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 적용 수정된 이름',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    expect(
+      screen.queryByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('confirms before deleting with unsaved names and preserves changes when cancelled', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.delete.mockResolvedValue(undefined);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', '수정된 이름');
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 삭제 수정된 이름',
+      }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    await waitFor(() =>
+      expect(getTemplateGrid()).toBeInTheDocument(),
+    );
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', { name: '수정된 이름' }),
+    ).toBeInTheDocument();
+    expect(templateApi.delete).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 삭제 수정된 이름',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText('“기본 결재선” 결재선을 삭제하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      await within(getTemplateManager()).findByRole('button', {
+        name: '삭제 확인',
+      }),
+    );
+    await waitFor(() => expect(templateApi.delete).toHaveBeenCalledWith(9));
+  }, 10_000);
+
+  it('confirms before closing with unsaved names and preserves changes when cancelled', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+
+    await openTemplateManagerGrid();
+    editTemplateName('기본 결재선', '수정된 이름');
+    fireEvent.click(
+      getTemplateManagerCloseButton(),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: '저장하지 않은 변경사항' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '계속 편집' }));
+    await waitFor(() =>
+      expect(getTemplateGrid()).toBeInTheDocument(),
+    );
+    expect(
+      within(getTemplateGrid()).getByRole('gridcell', { name: '수정된 이름' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      getTemplateManagerCloseButton(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '변경 버리기' }));
+    expect(
+      screen.queryByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
+    ).not.toBeInTheDocument();
+  }, 10_000);
 
   it('preserves temporary participants when loading a template fails', async () => {
     templateApi.list.mockResolvedValue([
@@ -305,20 +720,15 @@ describe('DocumentApprovalSettingsDialog', () => {
     templateApi.get.mockRejectedValue(new Error('상세 조회 실패'));
     const { onApply } = renderSettings();
 
+    await openTemplateManagerGrid();
     fireEvent.click(
-      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
-    );
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: '결재선 선택 기본 결재선',
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 적용 기본 결재선',
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '불러오기' }));
     expect((await screen.findAllByText('상세 조회 실패')).length).toBeGreaterThan(0);
     fireEvent.click(
-      within(
-        screen.getByRole('dialog', { name: '자주 쓰는 결재선 불러오기' }),
-      ).getByRole('button', { name: '템플릿 목록 닫기' }),
+      getTemplateManagerCloseButton(),
     );
 
     expect(
@@ -332,7 +742,7 @@ describe('DocumentApprovalSettingsDialog', () => {
       [users[2], users[3]],
     ]);
     expect(vi.mocked(onApply).mock.calls[0][1]).toEqual(['reference-1']);
-  });
+  }, 10_000);
 
   it('applies a reordered agreement stage as one unit without mutating source state', () => {
     const { onApply } = renderSettings();

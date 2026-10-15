@@ -1003,7 +1003,14 @@ export function NoticeFeedList({
                   size="small"
                   sx={{
                     bgcolor: categoryPresentation.backgroundColor,
-                    color: categoryPresentation.color,
+                    color: (theme) =>
+                      item.state === '필독'
+                        ? '#ffffff'
+                        : theme.palette.getContrastText(
+                            categoryPresentation.backgroundColor,
+                          ),
+                    height: 28,
+                    borderRadius: '8px',
                     fontWeight: 700,
                   }}
                 />

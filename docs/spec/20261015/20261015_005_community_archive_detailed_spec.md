@@ -68,6 +68,7 @@ The page must distinguish:
 - List, category, or detail load error with an actionable retry.
 - Save, delete, upload, attachment-removal, and download failure.
 - Permission-denied state or hidden mutation actions when the user lacks the required permissions.
+- When category loading is retried, only the latest request may update categories, errors, or loading state; stale responses must not overwrite current state.
 
 Do not convert failed requests into empty successful data. Preserve entered form data when a save fails. On 375px and 768px screens, prevent page-level horizontal overflow; if the table needs horizontal scrolling, confine it to the table container. Verify the detail overlay can be opened and closed at narrow widths.
 

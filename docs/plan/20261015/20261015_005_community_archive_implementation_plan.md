@@ -188,7 +188,7 @@ All archive endpoints require an authenticated `LoginVO`; reads are tenant-scope
 
 - [ ] **Step 3: Add category and list hooks**
 
-  Load the common-code group via `fetchCommonCodeGroups({ groupCode: 'WF_ARCHIVE_CATEGORY' })`, then its items via `fetchCommonCodeItems(group.id)`. Keep only `useAt === 'Y'`; surface group/item request errors through the page's error state. Load paginated list using server search and category filters; reset to page one when either filter changes.
+  Load the common-code group via `fetchCommonCodeGroups({ groupCode: 'WF_ARCHIVE_CATEGORY' })`, then its items via `fetchCommonCodeItems(group.id)`. Keep only `useAt === 'Y'`; surface group/item request errors through the page's error state. Sequence overlapping category reloads so stale success/error/finally handlers cannot override the latest state. Load paginated list using server search and category filters; reset to page one when either filter changes.
 
 - [ ] **Step 4: Run the focused frontend service tests**
 

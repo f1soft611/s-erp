@@ -167,6 +167,12 @@ export const pageContentMap: Record<string, PageContent> = {
       },
     ],
   },
+  archive: {
+    title: '자료실',
+    description: '업무에 필요한 자료를 분류별로 조회하고 첨부파일을 관리합니다.',
+    cards: [],
+    items: [],
+  },
   roles: {
     title: '권한관리',
     description: '역할별 메뉴 접근 권한과 기능 권한을 설정합니다.',

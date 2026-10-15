@@ -86,6 +86,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
+- `disableCellRangeSelection` 옵션은 마우스 드래그에 의한 다중 셀 범위 선택을 화면 단위로 비활성화한다. 기본값은 `false`이며, 비활성화한 경우에도 셀 클릭 포커스와 단일 셀 편집은 유지된다. 행 액션과 인라인 편집 위주의 목록처럼 드래그 범위 선택이 필요 없는 화면에서 사용할 수 있다.
 - 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
@@ -370,6 +371,72 @@ interface F1GridColumn<T> {
 - 액션 클릭은 `stopPropagation()`으로 Grid 행 선택/편집 이벤트와 분리한다.
 - 기존 사용자 layout 저장값에 새 pinned 컬럼이 없을 때 페이지가 저장된 순서/폭/숨김 설정을 유지하면서 신규 action pin을 1회 migration할 수 있다. Grid core의 persisted layout 초기화는 변경하지 않는다.
 - 좁은 뷰포트에서는 넓은 Grid가 내부 가로 스크롤을 사용한다. 문서 액션은 마지막 열에 두어 필요하면 내부 스크롤로 접근하며, 페이지 전체 가로 overflow를 만들지 않는다.
+
+### 업무작성 결재선 템플릿 관리
+
+결재선 템플릿 관리에서는 `name` 컬럼을 인라인 편집하고, 행별 `renderCell` 액션을 제공한다. 편집 내용은 Grid 변경 집합으로 추적하며, 페이지의 하단 저장 액션에서 기존 서비스 호출을 수행한다.
+
+```tsx
+type TemplateRow = {
+  templateId: number;
+  name: string;
+  actions: string;
+};
+
+const columns: F1GridColumn<TemplateRow>[] = [
+  {
+    field: 'name',
+    headerName: '결재선명',
+    flex: 1,
+    editable: true,
+    required: true,
+    validate: (value) => {
+      const name = String(value ?? '').trim();
+      return (
+        (name.length > 0 && name.length <= 100) ||
+        '결재선 템플릿 이름은 1~100자여야 합니다.'
+      );
+    },
+  },
+  {
+    field: 'actions',
+    headerName: '액션',
+    width: 180,
+    pinned: 'right',
+    editable: false,
+    renderCell: ({ row }) => (
+      <Button
+        aria-label={`결재선 불러오기 ${row.name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onLoad(row.templateId);
+        }}
+      >
+        불러오기
+      </Button>
+    ),
+  },
+];
+
+<F1Grid
+  ref={gridRef}
+  rows={templates.map((template) => ({ ...template, actions: '' }))}
+  columns={columns}
+  rowKey="templateId"
+  ariaLabel="자주 쓰는 결재선 목록"
+  showCheckbox={false}
+  onChangesChange={(changes) =>
+    setHasChanges(changes.updatedRows.length > 0)
+  }
+/>
+
+const changedNames = gridRef.current?.getChanges().updatedRows ?? [];
+```
+
+- `onChangesChange`로 저장 버튼의 활성 상태를 유지하고, `getChanges().updatedRows`에서 수정된 행만 저장한다.
+- 불러오기/삭제/닫기는 행 ID를 전달하며, 미저장 변경 폐기 확인은 Grid를 사용하는 페이지가 처리한다.
+- 이름 저장의 부분 실패에서는 페이지가 성공 응답으로 Grid 기준 목록을 갱신하고, 실패한 입력만 `setCellValue`로 다시 적용해 재시도 가능 상태를 만든다.
+- 이 화면은 기존 `F1Grid`, `F1GridColumn`, `F1GridRef` 공개 API만 사용하며 Grid 공통 코어는 수정하지 않는다.
 
 예:
 

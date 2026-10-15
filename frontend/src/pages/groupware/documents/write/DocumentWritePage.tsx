@@ -88,6 +88,7 @@ export function DocumentWritePage({
       sx={{
         flex: 1,
         position: 'relative',
+        minWidth: 0,
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -215,6 +216,7 @@ export function DocumentWritePage({
                       <ListView
                         items={unpinnedViewItems}
                         ariaLabel="리스트형 문서 목록"
+                        badgeOrder="status-category"
                         onItemClick={(item) => openDetail(Number(item.id))}
                       />
                     ) : (

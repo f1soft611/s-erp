@@ -15,11 +15,17 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { F1Grid } from '../../../../../shared/components/f1-grid';
 import {
   UserSelectEditor,
   type F1GridUserValue,
 } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
-import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import type {
+  F1GridColumn,
+  F1GridRef,
+  F1GridUserOption,
+} from '../../../../../shared/components/f1-grid/types/grid.types';
 import {
   createApprovalLineTemplate,
   deleteApprovalLineTemplate,
@@ -49,13 +55,16 @@ type DocumentApprovalSettingsDialogProps = {
   ) => void;
 };
 
-type FavoriteOperation =
-  | 'list'
-  | 'load'
-  | 'save'
-  | 'rename'
-  | 'delete'
-  | null;
+type FavoriteOperation = 'list' | 'load' | 'save' | 'rename' | 'delete' | null;
+
+type ApprovalLineTemplateGridRow = ApprovalLineTemplateSummary & {
+  actions: string;
+};
+
+type ApprovalLineTemplateManagerAction =
+  | { type: 'load'; templateId: number }
+  | { type: 'delete'; templateId: number }
+  | { type: 'close' };
 
 function cloneStages(stages: DocumentApprovalStage[]): DocumentApprovalStage[] {
   return stages.map((stage) => ({ ...stage, users: [...stage.users] }));
@@ -71,7 +80,9 @@ function toTemplateParticipants(
       stageOrder: stageIndex + 2,
       participantOrder: participantIndex + 1,
       participantType:
-        stage.kind === 'approval' ? ('APPROVAL' as const) : ('AGREEMENT' as const),
+        stage.kind === 'approval'
+          ? ('APPROVAL' as const)
+          : ('AGREEMENT' as const),
       participantUserId: String(user.value),
     })),
   );
@@ -137,12 +148,12 @@ function fromTemplateParticipants(
   }
 
   const currentFixedStages = existingStages.filter((stage) => stage.isFixed);
-  let stageId = Math.max(
-    0,
-    ...existingStages.map((stage) => stage.id),
-  ) + 1;
+  let stageId = Math.max(0, ...existingStages.map((stage) => stage.id)) + 1;
   const stages = [
-    ...currentFixedStages.map((stage) => ({ ...stage, users: [...stage.users] })),
+    ...currentFixedStages.map((stage) => ({
+      ...stage,
+      users: [...stage.users],
+    })),
     ...Array.from(groupedStages.values()).map((stage) => ({
       id: stageId++,
       kind: stage.kind,
@@ -199,12 +210,17 @@ export function DocumentApprovalSettingsDialog({
   const [saveName, setSaveName] = useState('');
   const [managerOpen, setManagerOpen] = useState(false);
   const [templates, setTemplates] = useState<ApprovalLineTemplateSummary[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(
-    null,
-  );
-  const [renameName, setRenameName] = useState('');
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [templateGridKey, setTemplateGridKey] = useState(0);
+  const [hasTemplateNameChanges, setHasTemplateNameChanges] = useState(false);
+  const [pendingManagerAction, setPendingManagerAction] =
+    useState<ApprovalLineTemplateManagerAction | null>(null);
+  const [discardTemplateChangesOpen, setDiscardTemplateChangesOpen] =
+    useState(false);
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<
+    number | null
+  >(null);
+  const templateGridRef = useRef<F1GridRef<ApprovalLineTemplateGridRow>>(null);
+  const failedTemplateNamesRef = useRef(new Map<number, string>());
   const draggedStageIdRef = useRef<number | null>(null);
   const reorderFeedbackTimer = useRef<number | null>(null);
   const nextStageId = useRef(
@@ -219,6 +235,22 @@ export function DocumentApprovalSettingsDialog({
     },
     [],
   );
+
+  useEffect(() => {
+    if (favoriteOperation !== null) return;
+    const failedNames = failedTemplateNamesRef.current;
+    const grid = templateGridRef.current;
+    if (failedNames.size === 0) return;
+    if (!grid) {
+      setTemplateError('저장 실패한 결재선명을 복원하지 못했습니다.');
+      return;
+    }
+
+    for (const [templateId, name] of failedNames) {
+      grid.setCellValue(templateId, 'name', name);
+    }
+    failedNames.clear();
+  }, [favoriteOperation, templateGridKey]);
 
   const assignedUserIds = useMemo(
     () =>
@@ -263,7 +295,7 @@ export function DocumentApprovalSettingsDialog({
   const closeSettings = () => {
     setSaveDialogOpen(false);
     setManagerOpen(false);
-    setDeleteConfirmationOpen(false);
+    setPendingDeleteTemplateId(null);
     onClose();
   };
 
@@ -318,13 +350,18 @@ export function DocumentApprovalSettingsDialog({
     }
     setTemplateError('');
     setTemplates([]);
-    setSelectedTemplateId(null);
+    setHasTemplateNameChanges(false);
+    setPendingManagerAction(null);
+    setDiscardTemplateChangesOpen(false);
+    setPendingDeleteTemplateId(null);
+    failedTemplateNamesRef.current.clear();
+    setTemplateGridKey((key) => key + 1);
     setManagerOpen(true);
     setFavoriteOperation('list');
     try {
       const result = await listApprovalLineTemplates(documentCode);
       setTemplates(result);
-      setSelectedTemplateId(result[0]?.templateId ?? null);
+      setTemplateGridKey((key) => key + 1);
     } catch (error) {
       setTemplateError(
         error instanceof Error
@@ -336,18 +373,22 @@ export function DocumentApprovalSettingsDialog({
     }
   };
 
-  const loadTemplate = async () => {
-    if (selectedTemplateId === null) return;
+  const loadTemplate = async (templateId: number) => {
     setFavoriteOperation('load');
     setTemplateError('');
     try {
-      const template = await getApprovalLineTemplate(selectedTemplateId);
+      const template = await getApprovalLineTemplate(templateId);
       if (template.eabusNo !== documentCode) {
         throw new Error('현재 문서에서 사용할 수 없는 결재선입니다.');
       }
-      const draft = fromTemplateParticipants(template, userOptions, draftStages);
+      const draft = fromTemplateParticipants(
+        template,
+        userOptions,
+        draftStages,
+      );
       setDraftStages(draft.stages);
       setDraftReferenceUserIds(draft.referenceUserIds);
+      setPendingDeleteTemplateId(null);
       setManagerOpen(false);
     } catch (error) {
       setTemplateError(
@@ -360,56 +401,110 @@ export function DocumentApprovalSettingsDialog({
     }
   };
 
-  const renameSelectedTemplate = async () => {
-    if (selectedTemplateId === null) return;
-    const name = renameName.trim();
-    if (!name || name.length > 100) {
+  const saveTemplateRenames = async () => {
+    const grid = templateGridRef.current;
+    if (!grid) {
+      setTemplateError(
+        '결재선 목록이 준비되지 않아 이름을 저장할 수 없습니다.',
+      );
+      return;
+    }
+    const updatedRows = grid.getChanges().updatedRows;
+    if (updatedRows.length === 0) return;
+    if (
+      updatedRows.some(
+        (row) =>
+          !templates.some((template) => template.templateId === row.templateId),
+      )
+    ) {
+      setTemplateError(
+        '결재선 목록이 변경되었습니다. 목록을 다시 불러온 후 저장해 주세요.',
+      );
+      return;
+    }
+
+    const activeRows = grid.getActiveRows();
+    const normalizedNames = activeRows.map((row) => row.name.trim());
+    if (normalizedNames.some((name) => !name || name.length > 100)) {
       setTemplateError('결재선 템플릿 이름은 1~100자여야 합니다.');
       return;
     }
-    if (
-      templates.some(
-        (template) =>
-          template.templateId !== selectedTemplateId && template.name === name,
-      )
-    ) {
+    if (new Set(normalizedNames).size !== normalizedNames.length) {
       setTemplateError('같은 이름의 결재선 템플릿이 이미 있습니다.');
       return;
     }
+
     setFavoriteOperation('rename');
     setTemplateError('');
+    const successfulRenames: ApprovalLineTemplateSummary[] = [];
+    const failedRenames: Array<{
+      templateId: number;
+      name: string;
+      message: string;
+    }> = [];
     try {
-      const renamed = await renameApprovalLineTemplate(selectedTemplateId, name);
-      setTemplates((current) =>
-        current.map((template) =>
-          template.templateId === renamed.templateId ? renamed : template,
-        ),
+      for (const row of updatedRows) {
+        const name = row.name.trim();
+        const current = templates.find(
+          (template) => template.templateId === row.templateId,
+        );
+        if (!current || current.name === name) continue;
+
+        try {
+          successfulRenames.push(
+            await renameApprovalLineTemplate(row.templateId, name),
+          );
+        } catch (error) {
+          failedRenames.push({
+            templateId: row.templateId,
+            name: row.name,
+            message:
+              error instanceof Error
+                ? error.message
+                : '자주 쓰는 결재선 이름을 변경하지 못했습니다.',
+          });
+        }
+      }
+
+      if (successfulRenames.length > 0) {
+        setTemplates((current) =>
+          current.map(
+            (template) =>
+              successfulRenames.find(
+                (renamed) => renamed.templateId === template.templateId,
+              ) ?? template,
+          ),
+        );
+      }
+
+      failedTemplateNamesRef.current = new Map(
+        failedRenames.map(({ templateId, name }) => [templateId, name]),
       );
-      setIsRenaming(false);
-    } catch (error) {
+      setHasTemplateNameChanges(false);
+      setTemplateGridKey((key) => key + 1);
       setTemplateError(
-        error instanceof Error
-          ? error.message
-          : '자주 쓰는 결재선 이름을 변경하지 못했습니다.',
+        failedRenames.length > 0
+          ? `일부 결재선 이름을 저장하지 못했습니다. ${failedRenames
+              .map(({ name, message }) => `${name}: ${message}`)
+              .join(' / ')}`
+          : '',
       );
     } finally {
       setFavoriteOperation(null);
     }
   };
 
-  const deleteSelectedTemplate = async () => {
-    if (selectedTemplateId === null) return;
+  const deleteTemplate = async (templateId: number) => {
     setFavoriteOperation('delete');
     setTemplateError('');
     try {
-      await deleteApprovalLineTemplate(selectedTemplateId);
-      const remaining = templates.filter(
-        (template) => template.templateId !== selectedTemplateId,
+      await deleteApprovalLineTemplate(templateId);
+      setTemplates((current) =>
+        current.filter((template) => template.templateId !== templateId),
       );
-      setTemplates(remaining);
-      setSelectedTemplateId(remaining[0]?.templateId ?? null);
-      setDeleteConfirmationOpen(false);
-      setIsRenaming(false);
+      setPendingDeleteTemplateId(null);
+      setHasTemplateNameChanges(false);
+      setTemplateGridKey((key) => key + 1);
     } catch (error) {
       setTemplateError(
         error instanceof Error
@@ -421,9 +516,39 @@ export function DocumentApprovalSettingsDialog({
     }
   };
 
-  const selectedTemplate = templates.find(
-    (template) => template.templateId === selectedTemplateId,
-  );
+  const executeManagerAction = (action: ApprovalLineTemplateManagerAction) => {
+    if (action.type === 'load') {
+      void loadTemplate(action.templateId);
+    } else if (action.type === 'delete') {
+      setPendingDeleteTemplateId(action.templateId);
+    } else {
+      setPendingDeleteTemplateId(null);
+      setManagerOpen(false);
+    }
+  };
+
+  const requestManagerAction = (action: ApprovalLineTemplateManagerAction) => {
+    if (favoriteOperation !== null) return;
+    const gridHasChanges =
+      hasTemplateNameChanges ||
+      (templateGridRef.current?.getChanges().updatedRows.length ?? 0) > 0;
+    if (gridHasChanges) {
+      setPendingManagerAction(action);
+      setDiscardTemplateChangesOpen(true);
+      return;
+    }
+    executeManagerAction(action);
+  };
+
+  const confirmDiscardTemplateChanges = () => {
+    const action = pendingManagerAction;
+    setDiscardTemplateChangesOpen(false);
+    setPendingManagerAction(null);
+    setHasTemplateNameChanges(false);
+    failedTemplateNamesRef.current.clear();
+    setTemplateGridKey((key) => key + 1);
+    if (action) executeManagerAction(action);
+  };
 
   const updateApprovalSelection = (value: F1GridUserValue) => {
     setSelectedApprovalUserIds(
@@ -597,7 +722,13 @@ export function DocumentApprovalSettingsDialog({
     if (sourceId !== null && Number.isFinite(sourceId)) {
       const source = draftStages.find((stage) => stage.id === sourceId);
       const target = draftStages.find((stage) => stage.id === targetId);
-      if (source && target && sourceId !== targetId && !source.isFixed && !target.isFixed) {
+      if (
+        source &&
+        target &&
+        sourceId !== targetId &&
+        !source.isFixed &&
+        !target.isFixed
+      ) {
         moveStage(sourceId, targetId, position);
         setRecentlyMovedStageId(sourceId);
         if (reorderFeedbackTimer.current !== null) {
@@ -617,483 +748,514 @@ export function DocumentApprovalSettingsDialog({
     closeSettings();
   };
 
-  return (
-    <>
-    <CommonDialog
-      open={open}
-      onClose={closeSettings}
-      title="결재선 설정"
-      description="현재 작성 중인 결재선과 참조선을 편집합니다."
-      size="md"
-      fullScreenOnMobile
-      actions={
-        <>
-          <Button variant="contained" onClick={handleApply}>
+  const pendingDeleteTemplate = templates.find(
+    (template) => template.templateId === pendingDeleteTemplateId,
+  );
+
+  const favoriteColumns: F1GridColumn<ApprovalLineTemplateGridRow>[] = [
+    {
+      field: 'name',
+      headerName: '결재선명',
+      flex: 1,
+      editable: favoriteOperation === null,
+      required: true,
+      wrapText: true,
+      validate: (value) => {
+        const name = String(value ?? '').trim();
+        return (
+          (name.length > 0 && name.length <= 100) ||
+          '결재선 템플릿 이름은 1~100자여야 합니다.'
+        );
+      },
+    },
+    {
+      field: 'actions',
+      headerName: '액션',
+      width: 110,
+      pinned: 'right',
+      editable: false,
+      align: 'center',
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex' }}>
+          <Button
+            size="small"
+            aria-label={`결재선 적용 ${row.name}`}
+            disabled={favoriteOperation !== null}
+            onClick={(event) => {
+              event.stopPropagation();
+              requestManagerAction({
+                type: 'load',
+                templateId: row.templateId,
+              });
+            }}
+          >
             적용
           </Button>
-          <Button onClick={closeSettings}>취소</Button>
-        </>
-      }
-      dialogProps={{ 'data-testid': 'document-approval-settings-dialog' }}
-    >
-      <Box
-        data-testid="document-approval-settings-content"
-        sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
+          <Button
+            size="small"
+            color="error"
+            aria-label={`결재선 삭제 ${row.name}`}
+            disabled={favoriteOperation !== null}
+            onClick={(event) => {
+              event.stopPropagation();
+              requestManagerAction({
+                type: 'delete',
+                templateId: row.templateId,
+              });
+            }}
+          >
+            삭제
+          </Button>
+        </Box>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <CommonDialog
+        open={open}
+        onClose={closeSettings}
+        title="결재선 설정"
+        description="현재 작성 중인 결재선과 참조선을 편집합니다."
+        size="md"
+        fullScreenOnMobile
+        actions={
+          <>
+            <Button variant="contained" onClick={handleApply}>
+              적용
+            </Button>
+            <Button onClick={closeSettings}>취소</Button>
+          </>
+        }
+        dialogProps={{ 'data-testid': 'document-approval-settings-dialog' }}
       >
-        {userOptionsError && <Alert severity="error">{userOptionsError}</Alert>}
-        {templateError && <Alert severity="error">{templateError}</Alert>}
+        <Box
+          data-testid="document-approval-settings-content"
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
+        >
+          {userOptionsError && (
+            <Alert severity="error">{userOptionsError}</Alert>
+          )}
+          {templateError && !managerOpen && !saveDialogOpen && (
+            <Alert severity="error">{templateError}</Alert>
+          )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            결재 단계
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            드래그하거나 이동 버튼으로 순서를 변경할 수 있습니다.
-          </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {draftStages.map((stage, index) => {
-              const stageName = getStageName(stage, index);
-              const userNames = stage.users.map((user) => user.label);
-              const description =
-                stage.kind === 'approval'
-                  ? userNames[0]
-                  : `${userNames.join(', ')}`;
-              return (
-                <Box
-                  key={stage.id}
-                  role="group"
-                  aria-label={`${stageName} ${description}`}
-                  data-testid={`document-approval-settings-stage-${stage.id}`}
-                  data-dragging={
-                    draggedStageId === stage.id ? 'true' : undefined
-                  }
-                  data-drop-position={
-                    insertionTarget?.stageId === stage.id
-                      ? insertionTarget.position
-                      : undefined
-                  }
-                  data-reordered={
-                    recentlyMovedStageId === stage.id ? 'true' : undefined
-                  }
-                  onDragOver={(event) => handleDragOver(stage.id, event)}
-                  onDragLeave={(event) => handleDragLeave(stage.id, event)}
-                  onDrop={(event) => handleDrop(stage.id, event)}
-                  sx={(theme) => ({
-                    alignItems: 'center',
-                    border: 1,
-                    borderColor:
-                      draggedStageId === stage.id
-                        ? 'primary.main'
-                        : 'divider',
-                    borderRadius: 1,
-                    display: 'flex',
-                    gap: 1,
-                    minWidth: 0,
-                    p: 1,
-                    position: 'relative',
-                    opacity: draggedStageId === stage.id ? 0.72 : 1,
-                    backgroundColor:
-                      draggedStageId === stage.id
-                        ? 'action.hover'
-                        : 'background.paper',
-                    boxShadow:
-                      draggedStageId === stage.id ? theme.shadows[4] : 'none',
-                    transform:
-                      draggedStageId === stage.id
-                        ? 'scale(1.01)'
-                        : recentlyMovedStageId === stage.id
-                          ? 'translateY(-2px)'
-                          : 'none',
-                    transition: theme.transitions.create(
-                      [
-                        'background-color',
-                        'border-color',
-                        'box-shadow',
-                        'opacity',
-                        'transform',
-                      ],
-                      { duration: theme.transitions.duration.short },
-                    ),
-                    '&[data-drop-position="before"]::before, &[data-drop-position="after"]::after':
-                      {
-                        backgroundColor: 'primary.main',
-                        borderRadius: 2,
-                        boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
-                        content: '""',
-                        height: 3,
-                        left: 8,
-                        pointerEvents: 'none',
-                        position: 'absolute',
-                        right: 8,
-                        zIndex: 1,
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              결재 단계
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              드래그하거나 이동 버튼으로 순서를 변경할 수 있습니다.
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {draftStages.map((stage, index) => {
+                const stageName = getStageName(stage, index);
+                const userNames = stage.users.map((user) => user.label);
+                const description =
+                  stage.kind === 'approval'
+                    ? userNames[0]
+                    : `${userNames.join(', ')}`;
+                return (
+                  <Box
+                    key={stage.id}
+                    role="group"
+                    aria-label={`${stageName} ${description}`}
+                    data-testid={`document-approval-settings-stage-${stage.id}`}
+                    data-dragging={
+                      draggedStageId === stage.id ? 'true' : undefined
+                    }
+                    data-drop-position={
+                      insertionTarget?.stageId === stage.id
+                        ? insertionTarget.position
+                        : undefined
+                    }
+                    data-reordered={
+                      recentlyMovedStageId === stage.id ? 'true' : undefined
+                    }
+                    onDragOver={(event) => handleDragOver(stage.id, event)}
+                    onDragLeave={(event) => handleDragLeave(stage.id, event)}
+                    onDrop={(event) => handleDrop(stage.id, event)}
+                    sx={(theme) => ({
+                      alignItems: 'center',
+                      border: 1,
+                      borderColor:
+                        draggedStageId === stage.id
+                          ? 'primary.main'
+                          : 'divider',
+                      borderRadius: 1,
+                      display: 'flex',
+                      gap: 1,
+                      minWidth: 0,
+                      p: 1,
+                      position: 'relative',
+                      opacity: draggedStageId === stage.id ? 0.72 : 1,
+                      backgroundColor:
+                        draggedStageId === stage.id
+                          ? 'action.hover'
+                          : 'background.paper',
+                      boxShadow:
+                        draggedStageId === stage.id ? theme.shadows[4] : 'none',
+                      transform:
+                        draggedStageId === stage.id
+                          ? 'scale(1.01)'
+                          : recentlyMovedStageId === stage.id
+                            ? 'translateY(-2px)'
+                            : 'none',
+                      transition: theme.transitions.create(
+                        [
+                          'background-color',
+                          'border-color',
+                          'box-shadow',
+                          'opacity',
+                          'transform',
+                        ],
+                        { duration: theme.transitions.duration.short },
+                      ),
+                      '&[data-drop-position="before"]::before, &[data-drop-position="after"]::after':
+                        {
+                          backgroundColor: 'primary.main',
+                          borderRadius: 2,
+                          boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
+                          content: '""',
+                          height: 3,
+                          left: 8,
+                          pointerEvents: 'none',
+                          position: 'absolute',
+                          right: 8,
+                          zIndex: 1,
+                        },
+                      '&[data-drop-position="before"]::before': { top: -5 },
+                      '&[data-drop-position="after"]::after': { bottom: -5 },
+                      '&[data-reordered="true"]': {
+                        animation: 'approval-stage-drop 220ms ease-out',
                       },
-                    '&[data-drop-position="before"]::before': { top: -5 },
-                    '&[data-drop-position="after"]::after': { bottom: -5 },
-                    '&[data-reordered="true"]': {
-                      animation: 'approval-stage-drop 220ms ease-out',
-                    },
-                    '@keyframes approval-stage-drop': {
-                      '0%': { transform: 'translateY(4px)' },
-                      '100%': { transform: 'translateY(-2px)' },
-                    },
-                    '@media (prefers-reduced-motion: reduce)': {
-                      transition: 'none',
-                      '&[data-reordered="true"]': { animation: 'none' },
-                    },
-                  })}
-                >
-                  <IconButton
-                    size="small"
-                    aria-label={`드래그하여 ${stageName} 이동`}
-                    disabled={stage.isFixed}
-                    draggable={!stage.isFixed}
-                    onDragStart={(event) => handleDragStart(stage.id, event)}
-                    onDragEnd={handleDragEnd}
-                    sx={{
-                      cursor: stage.isFixed ? 'default' : 'grab',
-                      '&:active': { cursor: 'grabbing' },
-                      touchAction: 'none',
-                    }}
+                      '@keyframes approval-stage-drop': {
+                        '0%': { transform: 'translateY(4px)' },
+                        '100%': { transform: 'translateY(-2px)' },
+                      },
+                      '@media (prefers-reduced-motion: reduce)': {
+                        transition: 'none',
+                        '&[data-reordered="true"]': { animation: 'none' },
+                      },
+                    })}
                   >
-                    <DragIndicatorIcon
-                      color={stage.isFixed ? 'disabled' : 'action'}
-                      fontSize="small"
-                    />
-                  </IconButton>
-                  <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {stageName}
-                      {stage.isFixed ? ' · 변경 불가' : ''}
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {stage.users.map((user) => (
-                        <Chip
-                          key={String(user.value)}
-                          label={user.label}
+                    <IconButton
+                      size="small"
+                      aria-label={`드래그하여 ${stageName} 이동`}
+                      disabled={stage.isFixed}
+                      draggable={!stage.isFixed}
+                      onDragStart={(event) => handleDragStart(stage.id, event)}
+                      onDragEnd={handleDragEnd}
+                      sx={{
+                        cursor: stage.isFixed ? 'default' : 'grab',
+                        '&:active': { cursor: 'grabbing' },
+                        touchAction: 'none',
+                      }}
+                    >
+                      <DragIndicatorIcon
+                        color={stage.isFixed ? 'disabled' : 'action'}
+                        fontSize="small"
+                      />
+                    </IconButton>
+                    <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {stageName}
+                        {stage.isFixed ? ' · 변경 불가' : ''}
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {stage.users.map((user) => (
+                          <Chip
+                            key={String(user.value)}
+                            label={user.label}
+                            size="small"
+                            onDelete={
+                              stage.isFixed
+                                ? undefined
+                                : () =>
+                                    removeParticipant(
+                                      stage.id,
+                                      String(user.value),
+                                    )
+                            }
+                            deleteIcon={
+                              stage.isFixed ? undefined : <CloseIcon />
+                            }
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                    {!stage.isFixed && (
+                      <Box sx={{ display: 'flex', flex: '0 0 auto' }}>
+                        <IconButton
                           size="small"
-                          onDelete={
-                            stage.isFixed
-                              ? undefined
-                              : () =>
-                                  removeParticipant(
-                                    stage.id,
-                                    String(user.value),
-                                  )
-                          }
-                          deleteIcon={stage.isFixed ? undefined : <CloseIcon />}
-                        />
-                      ))}
-                    </Box>
+                          aria-label={`${stageName} 위로 이동`}
+                          disabled={index <= 1}
+                          onClick={() => handleMove(stage.id, -1)}
+                        >
+                          <KeyboardArrowUpIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          aria-label={`${stageName} 아래로 이동`}
+                          disabled={index >= draftStages.length - 1}
+                          onClick={() => handleMove(stage.id, 1)}
+                        >
+                          <KeyboardArrowDownIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
                   </Box>
-                  {!stage.isFixed && (
-                    <Box sx={{ display: 'flex', flex: '0 0 auto' }}>
-                      <IconButton
-                        size="small"
-                        aria-label={`${stageName} 위로 이동`}
-                        disabled={index <= 1}
-                        onClick={() => handleMove(stage.id, -1)}
-                      >
-                        <KeyboardArrowUpIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        aria-label={`${stageName} 아래로 이동`}
-                        disabled={index >= draftStages.length - 1}
-                        onClick={() => handleMove(stage.id, 1)}
-                      >
-                        <KeyboardArrowDownIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-        </Box>
-
-        <Divider />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            결재자 및 합의자 변경
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', minWidth: 0 }}>
-            <Box sx={{ flex: '1 1 240px', minWidth: 0 }}>
-              <UserSelectEditor
-                value={selectedApprovalUserIds}
-                options={approvalOptions}
-                multiple
-                hideSelectedOptions
-                preserveSelectionOrder
-                label="결재선 사용자 선택"
-                readOnly={userOptionsUnavailable}
-                onChange={updateApprovalSelection}
-              />
+                );
+              })}
             </Box>
-            <Button
-              variant="outlined"
-              disabled={
-                userOptionsUnavailable || selectedApprovalUserIds.length === 0
-              }
-              onClick={() => addApproval('approval')}
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              결재자 및 합의자 변경
+            </Typography>
+            <Box
+              sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', minWidth: 0 }}
             >
-              결재 추가
-            </Button>
-            <Button
-              variant="outlined"
-              disabled={
-                userOptionsUnavailable || selectedApprovalUserIds.length === 0
-              }
-              onClick={() => addApproval('agreement')}
-            >
-              합의 추가
-            </Button>
+              <Box sx={{ flex: '1 1 240px', minWidth: 0 }}>
+                <UserSelectEditor
+                  value={selectedApprovalUserIds}
+                  options={approvalOptions}
+                  multiple
+                  hideSelectedOptions
+                  preserveSelectionOrder
+                  label="결재선 사용자 선택"
+                  readOnly={userOptionsUnavailable}
+                  onChange={updateApprovalSelection}
+                />
+              </Box>
+              <Button
+                variant="outlined"
+                disabled={
+                  userOptionsUnavailable || selectedApprovalUserIds.length === 0
+                }
+                onClick={() => addApproval('approval')}
+              >
+                결재 추가
+              </Button>
+              <Button
+                variant="outlined"
+                disabled={
+                  userOptionsUnavailable || selectedApprovalUserIds.length === 0
+                }
+                onClick={() => addApproval('agreement')}
+              >
+                합의 추가
+              </Button>
+            </Box>
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              참조
+            </Typography>
+            <UserSelectEditor
+              value={draftReferenceUserIds}
+              options={referenceOptions}
+              multiple
+              hideSelectedOptions
+              preserveSelectionOrder
+              label="참조자 선택"
+              readOnly={userOptionsUnavailable}
+              onChange={updateReferences}
+            />
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              자주 쓰는 결재선
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Button
+                variant="outlined"
+                disabled={favoritesDisabled}
+                aria-label="자주 쓰는 결재선 저장"
+                onClick={openSaveDialog}
+              >
+                자주 쓰는 결재선 저장
+              </Button>
+              <Button
+                variant="outlined"
+                disabled={favoritesDisabled}
+                aria-label="자주 쓰는 결재선 불러오기"
+                onClick={() => void openTemplateManager()}
+              >
+                자주 쓰는 결재선 불러오기
+              </Button>
+            </Box>
           </Box>
         </Box>
-
-        <Divider />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            참조
-          </Typography>
-          <UserSelectEditor
-            value={draftReferenceUserIds}
-            options={referenceOptions}
-            multiple
-            hideSelectedOptions
-            preserveSelectionOrder
-            label="참조자 선택"
-            readOnly={userOptionsUnavailable}
-            onChange={updateReferences}
+      </CommonDialog>
+      <CommonDialog
+        open={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        title="결재선 템플릿 저장"
+        description="현재 결재선과 참조자를 자주 쓰는 결재선으로 저장합니다."
+        fullScreenOnMobile
+        actions={
+          <>
+            <Button
+              variant="contained"
+              onClick={() => void saveTemplate()}
+              disabled={favoriteOperation !== null}
+            >
+              {favoriteOperation === 'save' ? (
+                <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
+                  <CircularProgress size={18} color="inherit" />
+                  저장 중...
+                </Box>
+              ) : (
+                '저장'
+              )}
+            </Button>
+            <Button
+              onClick={() => setSaveDialogOpen(false)}
+              disabled={favoriteOperation !== null}
+            >
+              취소
+            </Button>
+          </>
+        }
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {templateError && <Alert severity="error">{templateError}</Alert>}
+          <TextField
+            autoFocus
+            fullWidth
+            label="결재선 이름"
+            value={saveName}
+            onChange={(event) => setSaveName(event.target.value)}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void saveTemplate();
+            }}
           />
         </Box>
-
-        <Divider />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            자주 쓰는 결재선
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+      </CommonDialog>
+      <CommonDialog
+        open={managerOpen}
+        onClose={() => requestManagerAction({ type: 'close' })}
+        title="자주 쓰는 결재선 불러오기"
+        description="결재선을 불러오거나 결재선명을 관리합니다."
+        fullScreenOnMobile
+        actions={
+          <>
             <Button
-              variant="outlined"
-              disabled={favoritesDisabled}
-              aria-label="자주 쓰는 결재선 저장"
-              onClick={openSaveDialog}
+              variant="contained"
+              onClick={() => void saveTemplateRenames()}
+              disabled={!hasTemplateNameChanges || favoriteOperation !== null}
             >
-              자주 쓰는 결재선 저장
+              {favoriteOperation === 'rename' ? (
+                <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
+                  <CircularProgress size={18} color="inherit" />
+                  저장 중...
+                </Box>
+              ) : (
+                '저장'
+              )}
             </Button>
             <Button
-              variant="outlined"
-              disabled={favoritesDisabled}
-              aria-label="자주 쓰는 결재선 불러오기"
-              onClick={() => void openTemplateManager()}
-            >
-              자주 쓰는 결재선 불러오기
-            </Button>
-          </Box>
-        </Box>
-      </Box>
-    </CommonDialog>
-    <CommonDialog
-      open={saveDialogOpen}
-      onClose={() => setSaveDialogOpen(false)}
-      title="결재선 템플릿 저장"
-      description="현재 결재선과 참조자를 자주 쓰는 결재선으로 저장합니다."
-      fullScreenOnMobile
-      actions={
-        <>
-          <Button
-            variant="contained"
-            onClick={() => void saveTemplate()}
-            disabled={favoriteOperation !== null}
-          >
-            {favoriteOperation === 'save' ? (
-              <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                <CircularProgress size={18} color="inherit" />
-                저장 중...
-              </Box>
-            ) : (
-              '저장'
-            )}
-          </Button>
-          <Button
-            onClick={() => setSaveDialogOpen(false)}
-            disabled={favoriteOperation !== null}
-          >
-            취소
-          </Button>
-        </>
-      }
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {templateError && <Alert severity="error">{templateError}</Alert>}
-        <TextField
-          autoFocus
-          fullWidth
-          label="결재선 이름"
-          value={saveName}
-          onChange={(event) => setSaveName(event.target.value)}
-          slotProps={{ htmlInput: { maxLength: 100 } }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') void saveTemplate();
-          }}
-        />
-      </Box>
-    </CommonDialog>
-    <CommonDialog
-      open={managerOpen}
-      onClose={() => setManagerOpen(false)}
-      title="자주 쓰는 결재선 불러오기"
-      description="현재 문서에 사용할 템플릿을 선택하거나 관리합니다."
-      fullScreenOnMobile
-      actions={
-        <>
-          <Button
-            variant="contained"
-            onClick={() => void loadTemplate()}
-            disabled={
-              selectedTemplateId === null || favoriteOperation !== null
-            }
-          >
-            {favoriteOperation === 'load' ? (
-              <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                <CircularProgress size={18} color="inherit" />
-                불러오는 중...
-              </Box>
-            ) : (
-              '불러오기'
-            )}
-          </Button>
-          <Button
-            onClick={() => setManagerOpen(false)}
-            disabled={favoriteOperation !== null}
-          >
-            템플릿 목록 닫기
-          </Button>
-        </>
-      }
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
-        {favoriteOperation === 'list' && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CircularProgress size={18} />
-            <Typography>결재선 목록을 불러오는 중...</Typography>
-          </Box>
-        )}
-        {templateError && <Alert severity="error">{templateError}</Alert>}
-        {favoriteOperation !== 'list' && templates.length === 0 && !templateError && (
-          <Typography color="text.secondary">
-            저장된 자주 쓰는 결재선이 없습니다.
-          </Typography>
-        )}
-        <Box
-          role="group"
-          aria-label="자주 쓰는 결재선 목록"
-          sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}
-        >
-          {templates.map((template) => (
-            <Button
-              key={template.templateId}
-              aria-pressed={selectedTemplateId === template.templateId}
-              aria-label={`결재선 선택 ${template.name}`}
-              variant={
-                selectedTemplateId === template.templateId
-                  ? 'contained'
-                  : 'outlined'
-              }
-              onClick={() => {
-                setSelectedTemplateId(template.templateId);
-                setRenameName(template.name);
-                setIsRenaming(false);
-                setTemplateError('');
-              }}
+              onClick={() => requestManagerAction({ type: 'close' })}
               disabled={favoriteOperation !== null}
-              sx={{ justifyContent: 'flex-start', minWidth: 0, overflowWrap: 'anywhere' }}
             >
-              {template.name}
+              닫기
             </Button>
-          ))}
-        </Box>
-        {selectedTemplate && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {isRenaming ? (
-              <>
-                <TextField
-                  fullWidth
-                  label="새 결재선 이름"
-                  value={renameName}
-                  onChange={(event) => setRenameName(event.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 100 } }}
-                />
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          </>
+        }
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.5,
+            minWidth: 0,
+          }}
+        >
+          {templateError && <Alert severity="error">{templateError}</Alert>}
+          {favoriteOperation === 'list' && (
+            <Typography role="status">결재선 목록을 불러오는 중...</Typography>
+          )}
+          {favoriteOperation !== 'list' &&
+            templates.length === 0 &&
+            !templateError && (
+              <Typography color="text.secondary">
+                저장된 자주 쓰는 결재선이 없습니다.
+              </Typography>
+            )}
+          <F1Grid
+            key={templateGridKey}
+            ref={templateGridRef}
+            rows={templates.map((template) => ({ ...template, actions: '' }))}
+            columns={favoriteColumns}
+            rowKey="templateId"
+            ariaLabel="자주 쓰는 결재선 목록"
+            height={320}
+            showCheckbox={false}
+            disableCellRangeSelection
+            loading={favoriteOperation === 'list'}
+            disableSorting
+            disableFiltering
+            allowAddRowInContextMenu={false}
+            allowDuplicateRowInContextMenu={false}
+            onChangesChange={(changes) =>
+              setHasTemplateNameChanges(changes.updatedRows.length > 0)
+            }
+          />
+          {pendingDeleteTemplate && (
+            <Alert
+              severity="warning"
+              action={
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
                   <Button
-                    variant="outlined"
-                    onClick={() => void renameSelectedTemplate()}
+                    color="error"
+                    size="small"
+                    onClick={() =>
+                      void deleteTemplate(pendingDeleteTemplate.templateId)
+                    }
                     disabled={favoriteOperation !== null}
                   >
-                    이름 변경 저장
+                    삭제 확인
                   </Button>
                   <Button
-                    onClick={() => setIsRenaming(false)}
+                    size="small"
+                    onClick={() => setPendingDeleteTemplateId(null)}
                     disabled={favoriteOperation !== null}
                   >
                     취소
                   </Button>
                 </Box>
-              </>
-            ) : (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Button
-                  onClick={() => {
-                    setRenameName(selectedTemplate.name);
-                    setIsRenaming(true);
-                    setTemplateError('');
-                  }}
-                  disabled={favoriteOperation !== null}
-                >
-                  이름 변경
-                </Button>
-                <Button
-                  color="error"
-                  onClick={() => setDeleteConfirmationOpen(true)}
-                  disabled={favoriteOperation !== null}
-                >
-                  삭제
-                </Button>
-              </Box>
-            )}
-          </Box>
-        )}
-        {deleteConfirmationOpen && selectedTemplate && (
-          <Alert
-            severity="warning"
-            action={
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <Button
-                  color="error"
-                  size="small"
-                  onClick={() => void deleteSelectedTemplate()}
-                  disabled={favoriteOperation !== null}
-                >
-                  삭제 확인
-                </Button>
-                <Button
-                  size="small"
-                  onClick={() => setDeleteConfirmationOpen(false)}
-                  disabled={favoriteOperation !== null}
-                >
-                  취소
-                </Button>
-              </Box>
-            }
-          >
-            “{selectedTemplate.name}” 결재선을 삭제하시겠습니까?
-          </Alert>
-        )}
-      </Box>
-    </CommonDialog>
+              }
+            >
+              “{pendingDeleteTemplate.name}” 결재선을 삭제하시겠습니까?
+            </Alert>
+          )}
+        </Box>
+      </CommonDialog>
+      <UnsavedChangesConfirmDialog
+        open={discardTemplateChangesOpen}
+        title="저장하지 않은 변경사항"
+        description="저장되지 않은 결재선명 변경을 버리고 요청한 작업을 계속하시겠습니까?"
+        continueLabel="변경 버리기"
+        cancelLabel="계속 편집"
+        onContinue={confirmDiscardTemplateChanges}
+        onCancel={() => {
+          setDiscardTemplateChangesOpen(false);
+          setPendingManagerAction(null);
+        }}
+        dialogTitleId="approval-template-discard-dialog-title"
+      />
     </>
   );
 }

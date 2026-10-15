@@ -7,8 +7,7 @@ describe('getNoticeCategoryPresentation', () => {
     const repeated = getNoticeCategoryPresentation('NOTICE_A', false);
 
     expect(first).toEqual(repeated);
-    expect(first.backgroundColor).toMatch(/^hsl\(\d+ 75% 92%\)$/);
-    expect(first.color).toMatch(/^hsl\(\d+ 65% 30%\)$/);
+    expect(first.backgroundColor).toMatch(/^hsl\(\d+, 75%, 42%\)$/);
   });
 
   it('assigns different colors to representative category codes', () => {
@@ -24,24 +23,24 @@ describe('getNoticeCategoryPresentation', () => {
       true,
     );
 
-    expect(presentation.backgroundColor).toMatch(/^hsl\(\d+ 55% 24%\)$/);
-    expect(presentation.color).toMatch(/^hsl\(\d+ 80% 84%\)$/);
+    expect(presentation.backgroundColor).toMatch(/^hsl\(\d+, 65%, 55%\)$/);
+    expect(presentation).toEqual(
+      getNoticeCategoryPresentation(' TENANT_SPECIFIC_CATEGORY ', true),
+    );
   });
 
   it.each([undefined, null, '', '   '])(
-    'uses the current blue fallback for a missing category code (%s)',
+    'uses the filled primary fallback for a missing category code (%s)',
     (code) => {
       expect(getNoticeCategoryPresentation(code, false)).toEqual({
-        backgroundColor: '#dbeafe',
-        color: '#2563eb',
+        backgroundColor: '#1d4ed8',
       });
     },
   );
 
-  it('uses the current dark blue fallback for a missing category code', () => {
+  it('uses the filled dark primary fallback for a missing category code', () => {
     expect(getNoticeCategoryPresentation('   ', true)).toEqual({
-      backgroundColor: 'rgba(59,130,246,0.18)',
-      color: '#2563eb',
+      backgroundColor: '#60a5fa',
     });
   });
 });

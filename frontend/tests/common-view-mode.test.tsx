@@ -87,8 +87,39 @@ describe('common notice view mode components', () => {
     );
 
     const titleRow = screen.getByText('결재 문서').parentElement;
+    const documentRow = screen.getByRole('button', { name: /결재 문서/ });
+    const badgeLabels = Array.from(
+      documentRow.querySelectorAll('.MuiChip-root'),
+      (chip) => chip.textContent,
+    );
     expect(titleRow).toHaveTextContent('기안서');
     expect(titleRow).toHaveTextContent('결재진행중');
+    expect(badgeLabels).toEqual(['기안서', '결재진행중']);
+  });
+
+  it('renders status before category when status-first order is requested', () => {
+    render(
+      <ListView
+        badgeOrder="status-category"
+        items={[
+          {
+            id: 5,
+            title: '순서 문서',
+            authorLabel: '작성자',
+            dateLabel: '2026-10-15',
+            categoryLabel: '기안서',
+            statusLabel: '결재진행중',
+          },
+        ]}
+      />,
+    );
+
+    const documentRow = screen.getByRole('button', { name: /순서 문서/ });
+    const badgeLabels = Array.from(
+      documentRow.querySelectorAll('.MuiChip-root'),
+      (chip) => chip.textContent,
+    );
+    expect(badgeLabels).toEqual(['결재진행중', '기안서']);
   });
 
   it('renders document status variant and shared badge radius when supplied', () => {

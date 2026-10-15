@@ -1,16 +1,13 @@
 export type NoticeCategoryPresentation = {
   backgroundColor: string;
-  color: string;
 };
 
 const lightFallback: NoticeCategoryPresentation = {
-  backgroundColor: '#dbeafe',
-  color: '#2563eb',
+  backgroundColor: '#1d4ed8',
 };
 
 const darkFallback: NoticeCategoryPresentation = {
-  backgroundColor: 'rgba(59,130,246,0.18)',
-  color: '#2563eb',
+  backgroundColor: '#60a5fa',
 };
 
 export function getNoticeCategoryPresentation(
@@ -34,8 +31,7 @@ export function getNoticeCategoryPresentation(
   const hue = hash % 360;
   return {
     backgroundColor: isDark
-      ? `hsl(${hue} 55% 24%)`
-      : `hsl(${hue} 75% 92%)`,
-    color: isDark ? `hsl(${hue} 80% 84%)` : `hsl(${hue} 65% 30%)`,
+      ? `hsl(${hue}, 65%, 55%)`
+      : `hsl(${hue}, 75%, 42%)`,
   };
 }

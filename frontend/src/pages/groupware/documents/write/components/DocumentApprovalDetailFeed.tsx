@@ -105,7 +105,11 @@ function formatCommentTime(value?: string | null): string {
 }
 
 function getPlainText(html: string): string {
-  return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
+  return (
+    new DOMParser()
+      .parseFromString(html, 'text/html')
+      .body.textContent?.trim() ?? ''
+  );
 }
 
 function approvalLineStatusLabel(status: string): string {
@@ -123,7 +127,12 @@ function approvalLineStatusDisplayLabel(status: string): string {
   return status === 'PENDING' ? '진행' : approvalLineStatusLabel(status);
 }
 
-type ApprovalLineStatusTone = 'neutral' | 'primary' | 'success' | 'error' | 'warning';
+type ApprovalLineStatusTone =
+  | 'neutral'
+  | 'primary'
+  | 'success'
+  | 'error'
+  | 'warning';
 
 const approvalLineStatusTones: Record<string, ApprovalLineStatusTone> = {
   WAITING: 'neutral',
@@ -170,9 +179,11 @@ function toApprovalCommentTree(
       id: record.commentId,
       author: record.deletedYn === 'Y' ? '삭제된 댓글' : record.writerName,
       time: formatCommentTime(record.createdAt),
-      content: record.deletedYn === 'Y' ? '[삭제된 댓글입니다.]' : record.content,
+      content:
+        record.deletedYn === 'Y' ? '[삭제된 댓글입니다.]' : record.content,
       isDeleted: record.deletedYn === 'Y',
-      isEditable: record.deletedYn !== 'Y' && record.writerId === getStoredAuth()?.userId,
+      isEditable:
+        record.deletedYn !== 'Y' && record.writerId === getStoredAuth()?.userId,
       attachments: (record.attachments ?? []).map((file) => ({
         id: String(file.fileId),
         name: file.fileName ?? '첨부파일',
@@ -186,9 +197,10 @@ function toApprovalCommentTree(
   records.forEach((record) => {
     const item = comments.get(String(record.commentId));
     if (!item) return;
-    const parent = record.parentCommentId == null
-      ? undefined
-      : comments.get(String(record.parentCommentId));
+    const parent =
+      record.parentCommentId == null
+        ? undefined
+        : comments.get(String(record.parentCommentId));
     if (parent) {
       parent.replies = [...(parent.replies ?? []), item];
     } else {
@@ -207,8 +219,12 @@ function toApprovalCommentTree(
     });
   });
   roots.sort((left, right) => {
-    const leftTime = new Date(createdAtById.get(String(left.id)) ?? '').getTime();
-    const rightTime = new Date(createdAtById.get(String(right.id)) ?? '').getTime();
+    const leftTime = new Date(
+      createdAtById.get(String(left.id)) ?? '',
+    ).getTime();
+    const rightTime = new Date(
+      createdAtById.get(String(right.id)) ?? '',
+    ).getTime();
     if (Number.isNaN(leftTime)) return Number.isNaN(rightTime) ? 0 : -1;
     if (Number.isNaN(rightTime)) return 1;
     return leftTime - rightTime;
@@ -229,16 +245,17 @@ export function DocumentApprovalDetailFeed(
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isFeedPresentation = props.presentation === 'feed';
-  const feedEmployeeId =
-    props.presentation === 'feed' ? props.employeeId : '';
+  const feedEmployeeId = props.presentation === 'feed' ? props.employeeId : '';
   const onClose = isFeedPresentation ? undefined : props.onClose;
   const { showSuccess, showError } = useNotification();
   const preloadedFeedData =
     props.presentation === 'feed' ? props.feedItem.feedData : null;
-  const [detail, setDetail] =
-    useState<DocumentApprovalDetail | null>(preloadedFeedData);
+  const [detail, setDetail] = useState<DocumentApprovalDetail | null>(
+    preloadedFeedData,
+  );
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [selectedBodyImage, setSelectedBodyImage] = useState<FeedBodyImage | null>(null);
+  const [selectedBodyImage, setSelectedBodyImage] =
+    useState<FeedBodyImage | null>(null);
   const [panelEmployeeId, setPanelEmployeeId] = useState('');
   const employeeId = isFeedPresentation ? feedEmployeeId : panelEmployeeId;
   const [isLoading, setIsLoading] = useState(false);
@@ -246,12 +263,11 @@ export function DocumentApprovalDetailFeed(
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionComment, setActionComment] = useState('');
-  const [feedReasonAction, setFeedReasonAction] = useState<FeedReasonAction | null>(
-    null,
-  );
-  const [commentRecords, setCommentRecords] = useState<DocumentApprovalComment[]>(
-    preloadedFeedData?.comments ?? [],
-  );
+  const [feedReasonAction, setFeedReasonAction] =
+    useState<FeedReasonAction | null>(null);
+  const [commentRecords, setCommentRecords] = useState<
+    DocumentApprovalComment[]
+  >(preloadedFeedData?.comments ?? []);
   const [commentCount, setCommentCount] = useState(
     preloadedFeedData?.commentCount ?? 0,
   );
@@ -263,7 +279,9 @@ export function DocumentApprovalDetailFeed(
   );
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState('');
-  const [commentImageUrls, setCommentImageUrls] = useState<Record<string, string>>({});
+  const [commentImageUrls, setCommentImageUrls] = useState<
+    Record<string, string>
+  >({});
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -280,37 +298,36 @@ export function DocumentApprovalDetailFeed(
     bodyImageError,
     expandedBodyHtml,
     collapsedBodyHtml,
-  } = useDocumentApprovalBody(
-    electronicApprovalId,
-    detail?.contentsHtml ?? '',
-  );
+  } = useDocumentApprovalBody(electronicApprovalId, detail?.contentsHtml ?? '');
 
-  const loadComments = useCallback(async (
-    beforeCommentId?: number,
-    append = false,
-  ) => {
-    if (electronicApprovalId === null) return;
-    setIsLoadingComments(true);
-    setCommentError('');
-    try {
-      const page = await listApprovalComments(electronicApprovalId, {
-        limit: append ? 20 : 3,
-        beforeCommentId,
-      });
-      setCommentRecords((current) =>
-        append ? [...page.comments, ...current] : page.comments,
-      );
-      setCommentCount(page.resultCnt);
-      setHasPreviousComments(page.hasPrevious);
-      setNextBeforeCommentId(page.nextBeforeCommentId);
-    } catch (error: unknown) {
-      setCommentError(
-        error instanceof Error ? error.message : '댓글을 불러오지 못했습니다.',
-      );
-    } finally {
-      setIsLoadingComments(false);
-    }
-  }, [electronicApprovalId]);
+  const loadComments = useCallback(
+    async (beforeCommentId?: number, append = false) => {
+      if (electronicApprovalId === null) return;
+      setIsLoadingComments(true);
+      setCommentError('');
+      try {
+        const page = await listApprovalComments(electronicApprovalId, {
+          limit: append ? 20 : 3,
+          beforeCommentId,
+        });
+        setCommentRecords((current) =>
+          append ? [...page.comments, ...current] : page.comments,
+        );
+        setCommentCount(page.resultCnt);
+        setHasPreviousComments(page.hasPrevious);
+        setNextBeforeCommentId(page.nextBeforeCommentId);
+      } catch (error: unknown) {
+        setCommentError(
+          error instanceof Error
+            ? error.message
+            : '댓글을 불러오지 못했습니다.',
+        );
+      } finally {
+        setIsLoadingComments(false);
+      }
+    },
+    [electronicApprovalId],
+  );
 
   useEffect(() => {
     if (
@@ -473,7 +490,8 @@ export function DocumentApprovalDetailFeed(
   const canCancelApproval = useMemo(() => {
     if (
       !detail ||
-      (detail.documentStatus !== 'PENDING' && detail.documentStatus !== 'IN_PROGRESS')
+      (detail.documentStatus !== 'PENDING' &&
+        detail.documentStatus !== 'IN_PROGRESS')
     ) {
       return false;
     }
@@ -481,17 +499,19 @@ export function DocumentApprovalDetailFeed(
       (line) =>
         line.participantUserId === employeeId &&
         line.stageOrder > 1 &&
-        (line.participantType === 'APPROVAL' || line.participantType === 'AGREEMENT') &&
+        (line.participantType === 'APPROVAL' ||
+          line.participantType === 'AGREEMENT') &&
         line.actionStatus === 'APPROVED',
     );
     return Boolean(
       ownApprovedLine &&
-        !detail.approvalLines.some(
-          (line) =>
-            line.stageOrder > ownApprovedLine.stageOrder &&
-            (line.participantType === 'APPROVAL' || line.participantType === 'AGREEMENT') &&
-            completedApprovalStatuses.has(line.actionStatus),
-        ),
+      !detail.approvalLines.some(
+        (line) =>
+          line.stageOrder > ownApprovedLine.stageOrder &&
+          (line.participantType === 'APPROVAL' ||
+            line.participantType === 'AGREEMENT') &&
+          completedApprovalStatuses.has(line.actionStatus),
+      ),
     );
   }, [detail, employeeId]);
   const approvalLineGroups = useMemo(() => {
@@ -501,9 +521,15 @@ export function DocumentApprovalDetailFeed(
         left.participantOrder - right.participantOrder,
     );
     return {
-      approval: orderedLines.filter((line) => line.participantType === 'APPROVAL'),
-      agreement: orderedLines.filter((line) => line.participantType === 'AGREEMENT'),
-      reference: orderedLines.filter((line) => line.participantType === 'REFERENCE'),
+      approval: orderedLines.filter(
+        (line) => line.participantType === 'APPROVAL',
+      ),
+      agreement: orderedLines.filter(
+        (line) => line.participantType === 'AGREEMENT',
+      ),
+      reference: orderedLines.filter(
+        (line) => line.participantType === 'REFERENCE',
+      ),
     };
   }, [detail?.approvalLines]);
   const agreementStages = useMemo(() => {
@@ -520,18 +546,18 @@ export function DocumentApprovalDetailFeed(
   }, [approvalLineGroups.agreement]);
   const hasMoreBody = Boolean(
     bodyHtml &&
-      (getPlainText(bodyHtml) !== (detail?.summary ?? '').trim() ||
-        bodyImages.length > 0 ||
-        bodyHtml.includes('data-approval-embedded-image-file-id')),
+    (getPlainText(bodyHtml) !== (detail?.summary ?? '').trim() ||
+      bodyImages.length > 0 ||
+      bodyHtml.includes('data-approval-embedded-image-file-id')),
   );
   const shouldShowApprovalLine = !hasMoreBody || isBodyExpanded;
   const canEditDraft = useMemo(
     () =>
       Boolean(
         detail &&
-          detail.isDrafter &&
-          (detail.documentStatus === 'DRAFT' ||
-            detail.documentStatus === 'REVISION_REQUESTED'),
+        detail.isDrafter &&
+        (detail.documentStatus === 'DRAFT' ||
+          detail.documentStatus === 'REVISION_REQUESTED'),
       ),
     [detail],
   );
@@ -558,7 +584,9 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
-  const handleAction = async (action: DocumentApprovalActionRequest['action']) => {
+  const handleAction = async (
+    action: DocumentApprovalActionRequest['action'],
+  ) => {
     if (electronicApprovalId === null || isActing) return;
     const comment = actionComment.trim();
     if ((action === 'REJECTED' || action === 'RETURNED') && !comment) {
@@ -633,11 +661,9 @@ export function DocumentApprovalDetailFeed(
     const uploaded: NonNullable<DocumentApprovalComment['attachments']> = [];
     try {
       for (const file of files) {
-        uploaded.push(await uploadApprovalCommentAttachment(
-          approvalId,
-          commentId,
-          file,
-        ));
+        uploaded.push(
+          await uploadApprovalCommentAttachment(approvalId, commentId, file),
+        );
       }
     } catch (error) {
       const cleanupResults = await Promise.allSettled(
@@ -695,9 +721,15 @@ export function DocumentApprovalDetailFeed(
           ),
         );
       }
-      showSuccess(parentCommentId == null ? '댓글이 등록되었습니다.' : '답글이 등록되었습니다.');
+      showSuccess(
+        parentCommentId == null
+          ? '댓글이 등록되었습니다.'
+          : '답글이 등록되었습니다.',
+      );
     } catch (error) {
-      showError(error instanceof Error ? error.message : '댓글 저장에 실패했습니다.');
+      showError(
+        error instanceof Error ? error.message : '댓글 저장에 실패했습니다.',
+      );
       throw error;
     }
   };
@@ -709,13 +741,19 @@ export function DocumentApprovalDetailFeed(
   ) => {
     if (electronicApprovalId === null) return;
     try {
-      await updateApprovalComment(electronicApprovalId, Number(commentId), content);
+      await updateApprovalComment(
+        electronicApprovalId,
+        Number(commentId),
+        content,
+      );
       await uploadCommentFiles(electronicApprovalId, Number(commentId), files);
       showSuccess('댓글이 수정되었습니다.');
       await loadComments();
     } catch (error) {
       await loadComments();
-      showError(error instanceof Error ? error.message : '댓글 수정에 실패했습니다.');
+      showError(
+        error instanceof Error ? error.message : '댓글 수정에 실패했습니다.',
+      );
       throw error;
     }
   };
@@ -727,7 +765,9 @@ export function DocumentApprovalDetailFeed(
       showSuccess('댓글이 삭제되었습니다.');
       await loadComments();
     } catch (error) {
-      showError(error instanceof Error ? error.message : '댓글 삭제에 실패했습니다.');
+      showError(
+        error instanceof Error ? error.message : '댓글 삭제에 실패했습니다.',
+      );
     }
   };
 
@@ -750,7 +790,11 @@ export function DocumentApprovalDetailFeed(
         fileName,
       );
     } catch (error) {
-      showError(error instanceof Error ? error.message : '댓글 첨부파일을 내려받지 못했습니다.');
+      showError(
+        error instanceof Error
+          ? error.message
+          : '댓글 첨부파일을 내려받지 못했습니다.',
+      );
     }
   };
 
@@ -760,21 +804,40 @@ export function DocumentApprovalDetailFeed(
   ) => {
     if (electronicApprovalId === null) return;
     try {
-      await deleteApprovalCommentAttachment(electronicApprovalId, commentId, attachmentId);
+      await deleteApprovalCommentAttachment(
+        electronicApprovalId,
+        commentId,
+        attachmentId,
+      );
       showSuccess('댓글 첨부파일이 삭제되었습니다.');
       await loadComments();
     } catch (error) {
-      showError(error instanceof Error ? error.message : '댓글 첨부파일을 삭제하지 못했습니다.');
+      showError(
+        error instanceof Error
+          ? error.message
+          : '댓글 첨부파일을 삭제하지 못했습니다.',
+      );
       throw error;
     }
   };
 
-  const handleDownloadDocumentAttachment = async (fileId: number, fileName?: string) => {
+  const handleDownloadDocumentAttachment = async (
+    fileId: number,
+    fileName?: string,
+  ) => {
     if (electronicApprovalId === null) return;
     try {
-      await downloadDocumentApprovalAttachment(electronicApprovalId, fileId, fileName);
+      await downloadDocumentApprovalAttachment(
+        electronicApprovalId,
+        fileId,
+        fileName,
+      );
     } catch (error) {
-      showError(error instanceof Error ? error.message : '문서 첨부파일을 내려받지 못했습니다.');
+      showError(
+        error instanceof Error
+          ? error.message
+          : '문서 첨부파일을 내려받지 못했습니다.',
+      );
     }
   };
 
@@ -822,7 +885,8 @@ export function DocumentApprovalDetailFeed(
   const feedItem = props.presentation === 'feed' ? props.feedItem : null;
   const displayDocumentStatus =
     detail?.documentStatus ?? feedItem?.feedData.documentStatus;
-  const displayDocumentType = detail?.documentType ?? feedItem?.feedData.documentType;
+  const displayDocumentType =
+    detail?.documentType ?? feedItem?.feedData.documentType;
   const statusPresentation = displayDocumentStatus
     ? getApprovalStatusPresentation(displayDocumentStatus)
     : null;
@@ -842,7 +906,7 @@ export function DocumentApprovalDetailFeed(
               <>
                 <Button
                   size="small"
-                  variant="contained"
+                  variant="outlined"
                   color="primary"
                   sx={approvalActionButtonSx}
                   onClick={() => void handleAction('APPROVED')}
@@ -852,7 +916,7 @@ export function DocumentApprovalDetailFeed(
                 </Button>
                 <Button
                   size="small"
-                  variant="contained"
+                  variant="outlined"
                   color="error"
                   sx={approvalActionButtonSx}
                   onClick={() =>
@@ -883,7 +947,7 @@ export function DocumentApprovalDetailFeed(
             {!isFeedPresentation && canCancelSubmission && (
               <Button
                 size="small"
-                variant="contained"
+                variant="outlined"
                 color="error"
                 sx={approvalActionButtonSx}
                 disabled={isActing}
@@ -918,7 +982,6 @@ export function DocumentApprovalDetailFeed(
             size="small"
             color={statusPresentation.color}
             variant={statusPresentation.variant}
-            style={{ marginRight: 4 }}
             sx={{
               height: 28,
               fontWeight: 700,
@@ -927,12 +990,7 @@ export function DocumentApprovalDetailFeed(
           />
         }
         pinControl={
-          <IconButton
-            aria-label="고정된 문서"
-            disabled
-            size="small"
-            style={{ marginLeft: 4 }}
-          >
+          <IconButton aria-label="고정된 문서" disabled size="small">
             <PushPinOutlinedIcon fontSize="small" />
           </IconButton>
         }
@@ -999,51 +1057,53 @@ export function DocumentApprovalDetailFeed(
           <Typography variant="caption">문서 상세 불러오는 중</Typography>
         </Stack>
       )}
-          {detail && (
-            <>
-              {!isFeedPresentation && (
-                <Stack
-                  data-testid="approval-author-row"
-                  direction="row"
-                  spacing={1.5}
-                  sx={{
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    rowGap: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    spacing={1.5}
-                    sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
+      {detail && (
+        <>
+          {!isFeedPresentation && (
+            <Stack
+              data-testid="approval-author-row"
+              direction="row"
+              spacing={1.5}
+              sx={{
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                rowGap: 1,
+                minWidth: 0,
+              }}
+            >
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
+              >
+                <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
+                  {detail.drafterName.slice(0, 1)}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
+                    {detail.drafterName}
+                  </Typography>
+                  <Typography
+                    data-testid="approval-author-meta"
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
                   >
-                    <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                      {detail.drafterName.slice(0, 1)}
-                    </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
-                        {detail.drafterName}
-                      </Typography>
-                      <Typography
-                        data-testid="approval-author-meta"
-                        variant="caption"
-                        color="text.secondary"
-                        noWrap
-                      >
-                        기안자 · {formatApprovalDate(detail.createdAt)} · 조회 {detail.viewCount}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  {documentToolbar}
-                </Stack>
-              )}
-              {isFeedPresentation && canProcess && actionError && !feedReasonAction && (
-                <Alert severity="error">{actionError}</Alert>
-              )}
-              {shouldShowApprovalLine && (
-                <>
+                    기안자 · {formatApprovalDate(detail.createdAt)} · 조회{' '}
+                    {detail.viewCount}
+                  </Typography>
+                </Box>
+              </Stack>
+              {documentToolbar}
+            </Stack>
+          )}
+          {isFeedPresentation &&
+            canProcess &&
+            actionError &&
+            !feedReasonAction && <Alert severity="error">{actionError}</Alert>}
+          {shouldShowApprovalLine && (
+            <>
               <Box
                 data-testid="approval-line-readonly"
                 sx={{
@@ -1072,7 +1132,11 @@ export function DocumentApprovalDetailFeed(
                   <Stack
                     direction="row"
                     spacing={1}
-                    sx={{ alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0 }}
+                    sx={{
+                      alignItems: 'baseline',
+                      flexWrap: 'wrap',
+                      minWidth: 0,
+                    }}
                   >
                     <Typography
                       data-testid="approval-line-header-title"
@@ -1102,7 +1166,9 @@ export function DocumentApprovalDetailFeed(
                   <Stack spacing={1.5}>
                     {approvalLineGroups.approval.length > 0 && (
                       <Box data-testid="approval-line-group-approval">
-                        <Box sx={{ maxWidth: '100%', overflowX: 'auto', pb: 0.5 }}>
+                        <Box
+                          sx={{ maxWidth: '100%', overflowX: 'auto', pb: 0.5 }}
+                        >
                           <Stack
                             direction="row"
                             spacing={0}
@@ -1114,7 +1180,8 @@ export function DocumentApprovalDetailFeed(
                           >
                             {approvalLineGroups.approval.map((line, index) => {
                               const statusTone =
-                                approvalLineStatusTones[line.actionStatus] ?? 'neutral';
+                                approvalLineStatusTones[line.actionStatus] ??
+                                'neutral';
                               const isCurrent = line.actionStatus === 'PENDING';
                               return (
                                 <Box
@@ -1128,13 +1195,18 @@ export function DocumentApprovalDetailFeed(
                                   <Box
                                     data-testid={`approval-line-participant-${line.electronicApprovalLineId}`}
                                     data-status-tone={statusTone}
-                                    aria-current={isCurrent ? 'step' : undefined}
+                                    aria-current={
+                                      isCurrent ? 'step' : undefined
+                                    }
                                     sx={{
                                       display: 'grid',
                                       gridTemplateRows: '32px 64px 32px',
                                       width: 92,
                                       border: '1px solid',
-                                      borderColor: approvalLineStatusBorderColors[statusTone],
+                                      borderColor:
+                                        approvalLineStatusBorderColors[
+                                          statusTone
+                                        ],
                                       borderRadius: 1.5,
                                       overflow: 'hidden',
                                       boxShadow: isCurrent ? 2 : 0,
@@ -1152,7 +1224,9 @@ export function DocumentApprovalDetailFeed(
                                       <Typography
                                         variant="body1"
                                         color="text.secondary"
-                                        title={line.participantDepartmentName ?? ''}
+                                        title={
+                                          line.participantDepartmentName ?? ''
+                                        }
                                         noWrap
                                         sx={{ textAlign: 'center' }}
                                       >
@@ -1178,8 +1252,11 @@ export function DocumentApprovalDetailFeed(
                                         aria-label={`결재 상태 ${approvalLineStatusLabel(line.actionStatus)}`}
                                         src={
                                           line.participantType === 'APPROVAL' &&
-                                          completedApprovalStatuses.has(line.actionStatus)
-                                            ? line.participantStampImage ?? undefined
+                                          completedApprovalStatuses.has(
+                                            line.actionStatus,
+                                          )
+                                            ? (line.participantStampImage ??
+                                              undefined)
                                             : undefined
                                         }
                                         alt={`결재 상태 ${approvalLineStatusLabel(line.actionStatus)}`}
@@ -1188,17 +1265,28 @@ export function DocumentApprovalDetailFeed(
                                           height: 48,
                                           flexShrink: 0,
                                           border: '2px solid',
-                                          borderStyle: statusTone === 'neutral' ? 'dashed' : 'solid',
-                                          borderColor: approvalLineStatusBorderColors[statusTone],
+                                          borderStyle:
+                                            statusTone === 'neutral'
+                                              ? 'dashed'
+                                              : 'solid',
+                                          borderColor:
+                                            approvalLineStatusBorderColors[
+                                              statusTone
+                                            ],
                                           borderRadius: '50%',
                                           bgcolor: 'background.paper',
-                                          color: approvalLineStatusBorderColors[statusTone],
+                                          color:
+                                            approvalLineStatusBorderColors[
+                                              statusTone
+                                            ],
                                           fontSize: '1rem',
                                           fontWeight: 700,
                                           boxShadow: isCurrent ? 1 : 0,
                                         }}
                                       >
-                                        {approvalLineStatusDisplayLabel(line.actionStatus)}
+                                        {approvalLineStatusDisplayLabel(
+                                          line.actionStatus,
+                                        )}
                                       </Avatar>
                                       {line.actionComment && (
                                         <Typography
@@ -1244,7 +1332,8 @@ export function DocumentApprovalDetailFeed(
                                       </Typography>
                                     </Box>
                                   </Box>
-                                  {index < approvalLineGroups.approval.length - 1 && (
+                                  {index <
+                                    approvalLineGroups.approval.length - 1 && (
                                     <ChevronRightIcon
                                       aria-hidden="true"
                                       data-testid="approval-line-connector"
@@ -1281,7 +1370,10 @@ export function DocumentApprovalDetailFeed(
                                 minHeight: 72,
                               }}
                             >
-                              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                              <Typography
+                                variant="body1"
+                                sx={{ fontWeight: 700 }}
+                              >
                                 합의
                               </Typography>
                               <Stack
@@ -1332,10 +1424,19 @@ export function DocumentApprovalDetailFeed(
                                       >
                                         {stage.participants.map((line) => {
                                           const statusTone =
-                                            approvalLineStatusTones[line.actionStatus] ?? 'neutral';
+                                            approvalLineStatusTones[
+                                              line.actionStatus
+                                            ] ?? 'neutral';
                                           const departmentName =
-                                            line.participantDepartmentName ?? '';
-                                          const hasDepartmentName = Boolean(departmentName.trim());
+                                            line.participantDepartmentName ??
+                                            '';
+                                          const hasDepartmentName = Boolean(
+                                            departmentName.trim(),
+                                          );
+                                          const departmentLabel =
+                                            hasDepartmentName
+                                              ? departmentName
+                                              : '부서없음';
                                           const statusBadge = (
                                             <Box
                                               component="span"
@@ -1345,30 +1446,40 @@ export function DocumentApprovalDetailFeed(
                                                 px: 0.5,
                                                 border: '1px solid',
                                                 borderColor:
-                                                  approvalLineStatusColors[statusTone],
+                                                  approvalLineStatusColors[
+                                                    statusTone
+                                                  ],
                                                 borderRadius: '99px',
-                                                color: approvalLineStatusColors[statusTone],
+                                                color:
+                                                  approvalLineStatusColors[
+                                                    statusTone
+                                                  ],
                                                 fontSize: '1rem',
                                                 fontWeight: 600,
                                                 lineHeight: 1.4,
                                                 whiteSpace: 'nowrap',
                                               }}
                                             >
-                                              {approvalLineStatusLabel(line.actionStatus)}
+                                              {approvalLineStatusLabel(
+                                                line.actionStatus,
+                                              )}
                                             </Box>
                                           );
                                           return (
                                             <Box
-                                              key={line.electronicApprovalLineId}
+                                              key={
+                                                line.electronicApprovalLineId
+                                              }
                                               data-testid={`approval-line-agreement-participant-${line.electronicApprovalLineId}`}
                                               sx={{
                                                 display: 'flex',
-                                                flex: '1 1 200px',
+                                                flex: '0 1 240px',
                                                 alignItems: 'center',
                                                 gap: 1,
-                                                minWidth: 'min(100%, 200px)',
+                                                minWidth: 'min(100%, 190px)',
                                                 maxWidth: '100%',
-                                                minHeight: 58,
+                                                height: 66,
+                                                boxSizing: 'border-box',
                                                 p: 1,
                                                 border: '1px solid',
                                                 borderColor: 'divider',
@@ -1378,57 +1489,65 @@ export function DocumentApprovalDetailFeed(
                                             >
                                               <Avatar
                                                 data-testid={`approval-line-agreement-avatar-${line.electronicApprovalLineId}`}
-                                                src={line.participantProfileImage ?? undefined}
+                                                src={
+                                                  line.participantProfileImage ??
+                                                  undefined
+                                                }
                                                 alt={line.participantName}
-                                                sx={{ width: 40, height: 40, flexShrink: 0 }}
+                                                sx={{
+                                                  width: 36,
+                                                  height: 36,
+                                                  flexShrink: 0,
+                                                }}
                                               >
-                                                {line.participantName.slice(0, 1)}
+                                                {line.participantName.slice(
+                                                  0,
+                                                  1,
+                                                )}
                                               </Avatar>
                                               <Box
                                                 sx={{
                                                   display: 'flex',
                                                   flex: 1,
                                                   minWidth: 0,
-                                                  alignItems: hasDepartmentName ? 'stretch' : 'center',
-                                                  flexDirection: hasDepartmentName ? 'column' : 'row',
-                                                  justifyContent: hasDepartmentName
-                                                    ? 'flex-start'
-                                                    : 'space-between',
-                                                  gap: hasDepartmentName ? 0 : 0.5,
+                                                  flexDirection: 'column',
+                                                  justifyContent: 'center',
                                                 }}
                                               >
                                                 <Typography
                                                   variant="body1"
                                                   title={line.participantName}
                                                   noWrap
-                                                  sx={{ display: 'block', minWidth: 0 }}
+                                                  sx={{
+                                                    display: 'block',
+                                                    minWidth: 0,
+                                                  }}
                                                 >
                                                   {line.participantName}
                                                 </Typography>
-                                                {hasDepartmentName ? (
-                                                  <Box
+                                                <Box
+                                                  sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    minWidth: 0,
+                                                  }}
+                                                >
+                                                  <Typography
+                                                    data-testid={`approval-line-agreement-department-${line.electronicApprovalLineId}`}
+                                                    variant="body1"
+                                                    title={departmentLabel}
+                                                    color="text.secondary"
+                                                    noWrap
                                                     sx={{
-                                                      display: 'flex',
-                                                      alignItems: 'center',
-                                                      gap: 0.5,
                                                       minWidth: 0,
-                                                      mt: 0.25,
+                                                      flex: 1,
                                                     }}
                                                   >
-                                                    <Typography
-                                                      variant="body1"
-                                                      title={departmentName}
-                                                      color="text.secondary"
-                                                      noWrap
-                                                      sx={{ minWidth: 0, flex: 1 }}
-                                                    >
-                                                      {departmentName}
-                                                    </Typography>
-                                                    {statusBadge}
-                                                  </Box>
-                                                ) : (
-                                                  statusBadge
-                                                )}
+                                                    {departmentLabel}
+                                                  </Typography>
+                                                  {statusBadge}
+                                                </Box>
                                               </Box>
                                             </Box>
                                           );
@@ -1452,7 +1571,10 @@ export function DocumentApprovalDetailFeed(
                                 minHeight: 72,
                               }}
                             >
-                              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                              <Typography
+                                variant="body1"
+                                sx={{ fontWeight: 700 }}
+                              >
                                 참조
                               </Typography>
                               <Box
@@ -1467,7 +1589,12 @@ export function DocumentApprovalDetailFeed(
                                 {approvalLineGroups.reference.map((line) => {
                                   const departmentName =
                                     line.participantDepartmentName ?? '';
-                                  const hasDepartmentName = Boolean(departmentName.trim());
+                                  const hasDepartmentName = Boolean(
+                                    departmentName.trim(),
+                                  );
+                                  const departmentLabel = hasDepartmentName
+                                    ? departmentName
+                                    : '부서없음';
                                   return (
                                     <Box
                                       key={line.electronicApprovalLineId}
@@ -1479,6 +1606,8 @@ export function DocumentApprovalDetailFeed(
                                         flex: '0 1 240px',
                                         minWidth: 'min(100%, 190px)',
                                         maxWidth: '100%',
+                                        height: 66,
+                                        boxSizing: 'border-box',
                                         p: 1,
                                         border: '1px solid',
                                         borderColor: 'divider',
@@ -1488,9 +1617,16 @@ export function DocumentApprovalDetailFeed(
                                     >
                                       <Avatar
                                         data-testid={`approval-line-reference-avatar-${line.electronicApprovalLineId}`}
-                                        src={line.participantProfileImage ?? undefined}
+                                        src={
+                                          line.participantProfileImage ??
+                                          undefined
+                                        }
                                         alt={line.participantName}
-                                        sx={{ width: 36, height: 36, flexShrink: 0 }}
+                                        sx={{
+                                          width: 36,
+                                          height: 36,
+                                          flexShrink: 0,
+                                        }}
                                       >
                                         {line.participantName.slice(0, 1)}
                                       </Avatar>
@@ -1503,17 +1639,15 @@ export function DocumentApprovalDetailFeed(
                                         >
                                           {line.participantName}
                                         </Typography>
-                                        {hasDepartmentName && (
-                                          <Typography
-                                            data-testid={`approval-line-reference-department-${line.electronicApprovalLineId}`}
-                                            variant="body1"
-                                            title={departmentName}
-                                            noWrap
-                                            color="text.secondary"
-                                          >
-                                            {departmentName}
-                                          </Typography>
-                                        )}
+                                        <Typography
+                                          data-testid={`approval-line-reference-department-${line.electronicApprovalLineId}`}
+                                          variant="body1"
+                                          title={departmentLabel}
+                                          noWrap
+                                          color="text.secondary"
+                                        >
+                                          {departmentLabel}
+                                        </Typography>
                                       </Box>
                                     </Box>
                                   );
@@ -1528,139 +1662,142 @@ export function DocumentApprovalDetailFeed(
                 )}
               </Box>
               <Divider data-testid="approval-line-divider" sx={{ my: 1.5 }} />
-                </>
-              )}
-              {!isFeedPresentation && (
-                <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
-                  {detail.title}
-                </Typography>
-              )}
-              <FeedBodyContent
-                hasMore={hasMoreBody}
-                isExpanded={isBodyExpanded}
-                onToggleExpand={() => setIsBodyExpanded((expanded) => !expanded)}
-                contentTestId="approval-document-body"
-                richText={{
-                  collapsedHtml: collapsedBodyHtml,
-                  expandedHtml: expandedBodyHtml,
-                  images: bodyImages.map(({ src, alt }) => ({ src, alt })),
-                  imageError: bodyImageError || undefined,
-                  onOpenImage: setSelectedBodyImage,
-                }}
-              />
-              <Box data-testid="approval-feed-footer">
-                <Box>
-                  <AttachmentList
-                    files={detail.attachments.map((attachment) => ({
-                      id: String(attachment.fileId),
-                      name: attachment.fileName ?? `파일 ${attachment.fileId}`,
-                      size: attachment.fileSize,
-                    }))}
-                    showActions
-                    onDownload={(fileId) => {
-                      const attachment = detail.attachments.find(
-                        (file) => String(file.fileId) === fileId,
-                      );
-                      if (attachment) {
-                        void handleDownloadDocumentAttachment(
-                          attachment.fileId,
-                          attachment.fileName,
-                        );
-                      }
-                    }}
-                  />
-                </Box>
-                <Divider sx={{ my: 1.5 }} />
-                <FeedReactionBar
-                  liked={isLiked}
-                  likeCount={0}
-                  bookmarked={isBookmarked}
-                  commentCount={commentCount + detail.systemEvents.length}
-                  onToggleLike={() => setIsLiked((value) => !value)}
-                  onToggleBookmark={() => setIsBookmarked((value) => !value)}
-                />
-                <FeedCommentsSection
-                  showPrevious={hasPreviousComments}
-                  isLoadingPrevious={isLoadingComments}
-                  remainingPreviousCount={
-                    Number.isFinite(commentCount)
-                      ? Math.max(0, commentCount - commentRecords.length)
-                      : undefined
-                  }
-                  onLoadPrevious={() => void handleLoadPreviousComments()}
-                >
-                  <>
-                    {commentError && (
-                      <Alert
-                        severity="error"
-                        sx={{ mb: 1 }}
-                        action={
-                          <Button
-                            color="inherit"
-                            size="small"
-                            onClick={() => void loadComments()}
-                            disabled={isLoadingComments}
-                          >
-                            다시 시도
-                          </Button>
-                        }
-                      >
-                        {commentError}
-                      </Alert>
-                    )}
-                    {isLoadingComments && commentRecords.length === 0 ? (
-                      <Box
-                        role="status"
-                        aria-label="댓글 불러오는 중"
-                        sx={{ py: 2 }}
-                      >
-                        <CircularProgress size={20} />
-                      </Box>
-                    ) : commentRecords.length === 0 &&
-                      detail.systemEvents.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        등록된 댓글이 없습니다.
-                      </Typography>
-                    ) : null}
-                    <CommentThread
-                      comments={toApprovalCommentTree(
-                        commentRecords,
-                        detail.systemEvents,
-                        commentImageUrls,
-                      )}
-                      onSubmitComment={(content, files) =>
-                        handleAddComment(content, files)
-                      }
-                      onSubmitReply={(commentId, content, files) =>
-                        handleAddComment(content, files, commentId)
-                      }
-                      onEditComment={handleUpdateComment}
-                      onDeleteComment={handleDeleteComment}
-                      onDownloadAttachment={handleDownloadCommentAttachment}
-                      onDeleteAttachment={handleDeleteCommentAttachment}
-                      expandReplies
-                    />
-                  </>
-                </FeedCommentsSection>
-              </Box>
-              {!isFeedPresentation && canProcess && (
-                <>
-                  <Divider />
-                  <TextField
-                    label="처리 의견"
-                    value={actionComment}
-                    onChange={(event) => setActionComment(event.target.value)}
-                    multiline
-                    minRows={2}
-                    fullWidth
-                    disabled={isActing}
-                  />
-                  {actionError && <Alert severity="error">{actionError}</Alert>}
-                  {isActing && <CircularProgress size={24} />}
-                </>
-              )}
             </>
           )}
+          {!isFeedPresentation && (
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}
+            >
+              {detail.title}
+            </Typography>
+          )}
+          <FeedBodyContent
+            hasMore={hasMoreBody}
+            isExpanded={isBodyExpanded}
+            onToggleExpand={() => setIsBodyExpanded((expanded) => !expanded)}
+            contentTestId="approval-document-body"
+            richText={{
+              collapsedHtml: collapsedBodyHtml,
+              expandedHtml: expandedBodyHtml,
+              images: bodyImages.map(({ src, alt }) => ({ src, alt })),
+              imageError: bodyImageError || undefined,
+              onOpenImage: setSelectedBodyImage,
+            }}
+          />
+          <Box data-testid="approval-feed-footer">
+            <Box>
+              <AttachmentList
+                files={detail.attachments.map((attachment) => ({
+                  id: String(attachment.fileId),
+                  name: attachment.fileName ?? `파일 ${attachment.fileId}`,
+                  size: attachment.fileSize,
+                }))}
+                showActions
+                onDownload={(fileId) => {
+                  const attachment = detail.attachments.find(
+                    (file) => String(file.fileId) === fileId,
+                  );
+                  if (attachment) {
+                    void handleDownloadDocumentAttachment(
+                      attachment.fileId,
+                      attachment.fileName,
+                    );
+                  }
+                }}
+              />
+            </Box>
+            <Divider sx={{ my: 1.5 }} />
+            <FeedReactionBar
+              liked={isLiked}
+              likeCount={0}
+              bookmarked={isBookmarked}
+              commentCount={commentCount + detail.systemEvents.length}
+              onToggleLike={() => setIsLiked((value) => !value)}
+              onToggleBookmark={() => setIsBookmarked((value) => !value)}
+            />
+            <FeedCommentsSection
+              showPrevious={hasPreviousComments}
+              isLoadingPrevious={isLoadingComments}
+              remainingPreviousCount={
+                Number.isFinite(commentCount)
+                  ? Math.max(0, commentCount - commentRecords.length)
+                  : undefined
+              }
+              onLoadPrevious={() => void handleLoadPreviousComments()}
+            >
+              <>
+                {commentError && (
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 1 }}
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => void loadComments()}
+                        disabled={isLoadingComments}
+                      >
+                        다시 시도
+                      </Button>
+                    }
+                  >
+                    {commentError}
+                  </Alert>
+                )}
+                {isLoadingComments && commentRecords.length === 0 ? (
+                  <Box
+                    role="status"
+                    aria-label="댓글 불러오는 중"
+                    sx={{ py: 2 }}
+                  >
+                    <CircularProgress size={20} />
+                  </Box>
+                ) : commentRecords.length === 0 &&
+                  detail.systemEvents.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    등록된 댓글이 없습니다.
+                  </Typography>
+                ) : null}
+                <CommentThread
+                  comments={toApprovalCommentTree(
+                    commentRecords,
+                    detail.systemEvents,
+                    commentImageUrls,
+                  )}
+                  onSubmitComment={(content, files) =>
+                    handleAddComment(content, files)
+                  }
+                  onSubmitReply={(commentId, content, files) =>
+                    handleAddComment(content, files, commentId)
+                  }
+                  onEditComment={handleUpdateComment}
+                  onDeleteComment={handleDeleteComment}
+                  onDownloadAttachment={handleDownloadCommentAttachment}
+                  onDeleteAttachment={handleDeleteCommentAttachment}
+                  expandReplies
+                />
+              </>
+            </FeedCommentsSection>
+          </Box>
+          {!isFeedPresentation && canProcess && (
+            <>
+              <Divider />
+              <TextField
+                label="처리 의견"
+                value={actionComment}
+                onChange={(event) => setActionComment(event.target.value)}
+                multiline
+                minRows={2}
+                fullWidth
+                disabled={isActing}
+              />
+              {actionError && <Alert severity="error">{actionError}</Alert>}
+              {isActing && <CircularProgress size={24} />}
+            </>
+          )}
+        </>
+      )}
     </Stack>
   );
 
@@ -1727,7 +1864,11 @@ export function DocumentApprovalDetailFeed(
             fullWidth
             disabled={isActing}
           />
-          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {actionError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -1770,12 +1911,13 @@ export function DocumentApprovalDetailFeed(
               ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
               : '본인의 승인을 취소합니다.'}
           </DialogContentText>
-          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {actionError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCancelDialogType(null)} disabled={isActing}>
-            닫기
-          </Button>
           <Button
             onClick={() => void handleCancelDocumentAction()}
             disabled={isActing}
@@ -1783,8 +1925,11 @@ export function DocumentApprovalDetailFeed(
             {isActing
               ? '취소 중...'
               : cancelDialogType === 'submission'
-                ? '상신 취소 확인'
-                : '승인 취소 확인'}
+                ? '상신 취소'
+                : '승인 취소'}
+          </Button>
+          <Button onClick={() => setCancelDialogType(null)} disabled={isActing}>
+            닫기
           </Button>
         </DialogActions>
       </Dialog>
@@ -1793,18 +1938,31 @@ export function DocumentApprovalDetailFeed(
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
         aria-labelledby="approval-delete-dialog-title"
       >
-        <DialogTitle id="approval-delete-dialog-title">문서를 삭제하시겠습니까?</DialogTitle>
+        <DialogTitle id="approval-delete-dialog-title">
+          문서를 삭제하시겠습니까?
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>
             삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다.
           </DialogContentText>
-          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {actionError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+          <Button
+            onClick={() => setIsDeleteDialogOpen(false)}
+            disabled={isDeleting}
+          >
             취소
           </Button>
-          <Button color="error" onClick={() => void handleDeleteDocument()} disabled={isDeleting}>
+          <Button
+            color="error"
+            onClick={() => void handleDeleteDocument()}
+            disabled={isDeleting}
+          >
             {isDeleting ? '삭제 중...' : '삭제'}
           </Button>
         </DialogActions>

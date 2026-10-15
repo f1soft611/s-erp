@@ -13,6 +13,7 @@ import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
 import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
+import { ArchiveBoardPage } from '../../groupware/community/archive/ArchiveBoardPage';
 import { DocumentWritePage } from '../../groupware/documents/write/DocumentWritePage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
@@ -177,6 +178,18 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'groupware' && currentPageKey === 'archive') {
+    return (
+      <ArchiveBoardPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
       />
     );
   }

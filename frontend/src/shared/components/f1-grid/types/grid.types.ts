@@ -246,6 +246,7 @@ export type F1GridProps<T extends object> = {
   minColumnWidth?: number;
   virtualizeRows?: boolean;
   virtualizeColumns?: boolean;
+  disableCellRangeSelection?: boolean;
   rowOverscan?: number;
   columnOverscan?: number;
   fixedRowHeightThreshold?: number;
