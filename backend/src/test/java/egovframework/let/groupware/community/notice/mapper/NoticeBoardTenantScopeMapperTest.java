@@ -32,9 +32,10 @@ class NoticeBoardTenantScopeMapperTest {
         assertThat(detail.getSql())
                 .contains("p.tenant_id = ?", "p.post_id = ?", "p.board_type_code = ?");
         assertThat(insert.getSql())
-                .contains("tenant_id", "category_code")
+                .contains("tenant_id", "board_type_code", "category_code")
                 .doesNotContain("notice_gubun_code");
-        assertThat(parameterProperties(insert)).contains("tenantId", "noticeGubunCode");
+        assertThat(parameterProperties(insert))
+                .contains("tenantId", "boardTypeCode", "noticeGubunCode");
     }
 
     @Test
