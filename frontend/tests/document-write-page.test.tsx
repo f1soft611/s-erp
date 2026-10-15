@@ -49,6 +49,18 @@ const composerNotifications = vi.hoisted(() => ({
 
 let restoreImagePreloader: (() => void) | undefined;
 
+function getButtonGeometry(button: HTMLElement) {
+  const style = getComputedStyle(button);
+  return [
+    style.height,
+    style.minHeight,
+    style.paddingTop,
+    style.paddingBottom,
+    style.paddingLeft,
+    style.paddingRight,
+  ];
+}
+
 afterEach(() => {
   restoreImagePreloader?.();
   restoreImagePreloader = undefined;
@@ -608,9 +620,20 @@ describe('Document write page', () => {
     const firstApprover = screen.getByTestId('document-approval-person');
     expect(firstApprover).toHaveAttribute('aria-label', '결재 1 홍길동');
     const approverName = within(firstApprover).getByText('홍길동');
+    const approvalSequenceBadge = within(firstApprover).getByLabelText(
+      '참여 순번 1',
+    );
+    expect(approvalSequenceBadge).toHaveStyle({
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'grid',
+      placeItems: 'center',
+    });
     expect(approverName).not.toHaveStyle({ maxWidth: '3em' });
     expect(approverName.parentElement).toHaveStyle({
-      gridTemplateColumns: '20px minmax(0, 1fr)',
+      display: 'flex',
+      justifyContent: 'center',
     });
     expect(
       within(firstApprover).queryByRole('button', { name: /삭제/ }),
@@ -1134,6 +1157,50 @@ describe('Document write page', () => {
     );
   });
 
+  it('matches a pending approval seal to its participant border color', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'IN_PROGRESS',
+      title: '문서 A',
+      drafterName: '김민수',
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: '<p>본문 내용</p>',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 74,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-4',
+          participantName: '결재자 D',
+          actionStatus: 'PENDING',
+        },
+      ],
+      attachments: [],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    const currentParticipant = await screen.findByTestId('approval-line-participant-74');
+    const currentSeal = screen.getByTestId('approval-line-status-seal-74');
+    expect(currentParticipant).toHaveStyle({
+      borderColor: muiTheme.palette.info.main,
+    });
+    expect(currentSeal).toHaveStyle({
+      borderColor: muiTheme.palette.info.main,
+      color: muiTheme.palette.info.main,
+    });
+    expect(getComputedStyle(currentSeal).borderColor).toBe(
+      getComputedStyle(currentParticipant).borderColor,
+    );
+  });
+
   it('renders read-only system events and keeps only the required detail separators', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
@@ -1323,6 +1390,16 @@ describe('Document write page', () => {
     const agreementStageOrder = within(agreementStageRow).getByTestId(
       'approval-line-agreement-stage-order',
     );
+    const agreementSequenceBadge = within(agreementStageRow).getByLabelText(
+      /^합의 순번 /,
+    );
+    expect(agreementSequenceBadge).toHaveStyle({
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'grid',
+      placeItems: 'center',
+    });
     expect(agreementStageOrder.parentElement).toBe(agreementStageRow);
     expect(
       within(agreementStageRow).getByTestId('approval-line-agreement-participants').parentElement,
@@ -1467,6 +1544,16 @@ describe('Document write page', () => {
     expect(referenceAvatar.querySelector('img')).toBeNull();
     expect(referenceAvatar).toHaveTextContent('참');
     const centeredStage = screen.getByTestId('approval-line-sequence-74');
+    const approvalSequenceBadge = within(centeredStage).getByLabelText(
+      /^결재선 순번 /,
+    );
+    expect(approvalSequenceBadge).toHaveStyle({
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'grid',
+      placeItems: 'center',
+    });
     expect(centeredStage).toHaveStyle({ justifyContent: 'center' });
     expect(within(centeredStage).getByText(
       '결재자 D 아주 긴 이름을 가운데 정렬하고 말줄임 처리해야 합니다',
@@ -1592,6 +1679,12 @@ describe('Document write page', () => {
     const cancelSubmissionButton = await screen.findByRole('button', {
       name: '상신 취소',
     });
+    const commentSubmitButton = within(
+      screen.getByTestId('post-detail-panel'),
+    ).getByRole('button', { name: '등록' });
+    expect(getButtonGeometry(cancelSubmissionButton)).toEqual(
+      getButtonGeometry(commentSubmitButton),
+    );
     expect(cancelSubmissionButton).toHaveClass(
       'MuiButton-contained',
       'MuiButton-colorError',
@@ -1661,6 +1754,12 @@ describe('Document write page', () => {
     const cancelApprovalButton = await screen.findByRole('button', {
       name: '승인 취소',
     });
+    const commentSubmitButton = within(
+      screen.getByTestId('post-detail-panel'),
+    ).getByRole('button', { name: '등록' });
+    expect(getButtonGeometry(cancelApprovalButton)).toEqual(
+      getButtonGeometry(commentSubmitButton),
+    );
     expect(cancelApprovalButton).toHaveClass(
       'MuiButton-contained',
       'MuiButton-colorError',
@@ -2266,8 +2365,12 @@ describe('Document write page', () => {
     });
     const statusChip = within(toolbar).getByText('결재진행중').closest('.MuiChip-root');
     const kindChip = within(toolbar).getByText('기안').closest('.MuiChip-root');
+    if (!statusChip || !kindChip) throw new Error('Missing document badges.');
     const divider = within(toolbar).getByRole('separator');
     const pin = within(toolbar).getByRole('button', { name: '고정된 문서' });
+    const commentSubmitButton = within(card).getByRole('button', {
+      name: '등록',
+    });
     const orderedElements = [
       approve,
       reject,
@@ -2277,13 +2380,33 @@ describe('Document write page', () => {
       divider,
       pin,
     ];
+    const actionButtonStyles = [approve, reject, returnForRevision].map(
+      (button) => getComputedStyle(button),
+    );
 
+    expect(getComputedStyle(statusChip).height).toBe('28px');
+    expect(getComputedStyle(kindChip).height).toBe('28px');
+    expect(getComputedStyle(kindChip).marginRight).toBe('4px');
+    expect(actionButtonStyles.map((style) => style.minHeight)).toEqual([
+      getComputedStyle(commentSubmitButton).minHeight,
+      getComputedStyle(commentSubmitButton).minHeight,
+      getComputedStyle(commentSubmitButton).minHeight,
+    ]);
+    expect([approve, reject, returnForRevision].map(getButtonGeometry)).toEqual([
+      getButtonGeometry(commentSubmitButton),
+      getButtonGeometry(commentSubmitButton),
+      getButtonGeometry(commentSubmitButton),
+    ]);
+    expect(getComputedStyle(divider).marginRight).toBe('0px');
     expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary');
     expect(reject).toHaveClass('MuiButton-contained', 'MuiButton-colorError');
     expect(returnForRevision).toHaveClass('MuiButton-outlined', 'MuiButton-colorWarning');
     expect(statusChip).toHaveClass('MuiChip-filled');
     expect(statusChip).toHaveStyle({ borderRadius: '8px' });
     expect(kindChip).toHaveStyle({ borderRadius: '8px' });
+    expect(getComputedStyle(statusChip).borderRadius).toBe(
+      getComputedStyle(kindChip).borderRadius,
+    );
     expect(
       within(toolbar).queryByRole('button', { name: '상신 취소' }),
     ).not.toBeInTheDocument();
@@ -3607,6 +3730,16 @@ describe('Document write page', () => {
 
     const agreementChips = screen.getAllByTestId('document-agreement-chip');
     expect(agreementChips).toHaveLength(2);
+    const agreementSequenceBadge = within(agreementChips[0]).getByLabelText(
+      '참여 순번 2',
+    );
+    expect(agreementSequenceBadge).toHaveStyle({
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'grid',
+      placeItems: 'center',
+    });
     expect(agreementChips[0]).toHaveTextContent('2');
     expect(agreementChips[0]).toHaveTextContent('김민수');
     expect(agreementChips[1]).toHaveTextContent('2');

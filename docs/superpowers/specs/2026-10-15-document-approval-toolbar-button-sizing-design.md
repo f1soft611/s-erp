@@ -6,7 +6,8 @@ Make approval actions visually consistent in the document feed and detail toolba
 
 ## Approved behavior
 
-- Approval, rejection, revision-request, submission-cancellation, and approval-cancellation buttons share a `30px` height and the same vertical and horizontal padding.
+- Approval, rejection, revision-request, submission-cancellation, and approval-cancellation buttons use the same `size="small"` geometry as the document detail comment-registration button: theme min-height and `4px 10px` padding. Button widths remain content-based.
+- The approval-status and document-kind Chips share one `8px` border-radius rule.
 - Button widths remain content-based; labels are not truncated and button widths are not forced to a fixed value.
 - Existing semantic variants and colors remain unchanged: approval is primary contained, rejection and cancellations are error contained, and revision-request is warning outlined.
 - The toolbar is shared by feed and detail, so the same size rule applies to both.
@@ -15,7 +16,7 @@ Make approval actions visually consistent in the document feed and detail toolba
 
 ## Implementation boundary
 
-Update the action-button styles and divider spacing in `DocumentApprovalDetailFeed.tsx`. Add focused regression assertions to `document-write-page.test.tsx` for consistent action-button height/padding and the divider's absence of extra horizontal margins. Keep the existing toolbar-order and responsive-wrap behavior.
+Update the action-button styles, shared badge radius, and divider spacing in `DocumentApprovalDetailFeed.tsx`. Add focused regression assertions to `document-write-page.test.tsx` comparing action-button geometry with the actual comment-registration button and checking equal badge radii. Keep the existing toolbar-order and responsive-wrap behavior.
 
 ## Validation
 

@@ -408,60 +408,90 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('검색 결과')).toBeInTheDocument();
   });
 
-  it('documents PageSearchArea detailed-search integration', () => {
+  it('presents detailed-search guidance as an ordered implementation recipe', () => {
     const doc = getF1GridDoc('filtering-sorting');
-    const prose = doc.sections.find(
-      (section) =>
-        section.type === 'prose' &&
-        section.heading === 'PageSearchArea 상세검색 연동',
-    );
-    expect(prose?.type).toBe('prose');
-    if (!prose || prose.type !== 'prose' || typeof prose.body !== 'string') {
-      throw new Error('Detailed-search integration prose is missing');
-    }
+    const guideHeadings = doc.sections
+      .filter(
+        (section) =>
+          section.heading.includes('상세검색') ||
+          section.heading.includes('검색할 컬럼 고르기') ||
+          section.heading.includes('검색 필드 만들기') ||
+          section.heading.includes('검색 영역에 연결하기') ||
+          section.heading.includes('조회 조건으로 바꾸기') ||
+          section.heading.includes('기안양식 검색') ||
+          section.heading.includes('날짜 범위 조건') ||
+          section.heading.includes('빠른 참조'),
+      )
+      .map((section) => section.heading);
 
-    expect(prose.body).toContain('F1GridColumn.search');
-    expect(prose.body).toContain('toPageSearchFields(columns)');
-    expect(prose.body).toContain('PageSearchArea.detailFields');
-    expect(prose.body).toContain('search.hidden');
-    expect(prose.body).toContain('column.hidden');
-    expect(prose.body).toContain('search.label');
-    expect(prose.body).toContain('search.group');
-    expect(prose.body).toContain('search.order');
-    expect(prose.body).toContain('search.span');
-    expect(prose.body).toContain('form.span');
-    expect(prose.body).toContain('searchSpan');
-    expect(prose.body).toContain('미지원');
-    expect(prose.body).toContain('text');
-    expect(prose.body).toContain(
-      'number, decimal, currency, date, select, checkbox',
-    );
-    expect(prose.body).toContain('detailValues');
-    expect(prose.body).toContain('onDetailValuesChange');
-    expect(prose.body).toContain('onDetailSearch');
-    expect(prose.body).toContain('날짜 범위');
-    expect(prose.body).toContain('from');
-    expect(prose.body).toContain('to');
-    expect(prose.body).toContain('options');
-    expect(prose.body).toContain(
-      'Grid 자체가 서버 조회를 수행하지 않습니다',
-    );
+    expect(guideHeadings).toEqual([
+      '상세검색은 이렇게 연결됩니다',
+      '1단계: 검색할 컬럼 고르기',
+      '2단계: 검색 필드 만들기',
+      '3단계: 검색 영역에 연결하기',
+      '4단계: 조회 조건으로 바꾸기',
+      '전체 예제: 기안양식 검색',
+      '날짜 범위 조건이 필요한 경우',
+      '빠른 참조: 설정과 주의점',
+    ]);
+  });
 
-    const example = doc.sections.find(
-      (section) =>
-        section.type === 'code' && section.heading === '상세검색 폼 연결',
+  it('documents the real draft-form search contract and separate date example', () => {
+    const doc = getF1GridDoc('filtering-sorting');
+    const guideContent = doc.sections
+      .flatMap((section) => {
+        if (section.type === 'prose') {
+          return typeof section.body === 'string' ? [section.body] : [];
+        }
+        if (section.type === 'code') return [section.code];
+        if (section.type === 'api') {
+          return section.rows.map((row) => row.join(' '));
+        }
+        return [];
+      })
+      .join('\n');
+
+    expect(guideContent).toContain('Grid 헤더 필터');
+    expect(guideContent).toContain('categoryItemId');
+    expect(guideContent).toContain('regTermId');
+    expect(guideContent).toContain('useAt');
+    expect(guideContent).toContain(
+      'const columns: F1GridColumn<DraftFormRow>[]',
     );
-    expect(example?.type).toBe('code');
-    if (!example || example.type !== 'code') {
-      throw new Error('Detailed-search example is missing');
-    }
-    expect(example.code).toContain("type: 'date'");
-    expect(example.code).toContain('toPageSearchFields(columns)');
-    expect(example.code).toContain('detailFields={detailFields}');
-    expect(example.code).toContain('options: statusOptions');
-    expect(example.code).toContain('search: { hidden: true }');
-    expect(example.code).toContain('onDetailValuesChange={setDetailValues}');
-    expect(example.code).toContain('onDetailSearch=');
+    expect(guideContent).toContain('cataTypeCode');
+    expect(guideContent).toContain('codeName');
+    expect(guideContent).toContain('search.hidden');
+    expect(guideContent).toContain('detailFields');
+    expect(guideContent).toContain('detailValues');
+    expect(guideContent).toContain('onDetailValuesChange');
+    expect(guideContent).toContain('onDetailSearch');
+    expect(guideContent).toContain('search.label');
+    expect(guideContent).toContain('search.group');
+    expect(guideContent).toContain('search.order');
+    expect(guideContent).toContain('search.span');
+    expect(guideContent).toContain(
+      'categoryItemId: selected(values.categoryItemId)',
+    );
+    expect(guideContent).toContain('Number(selected(values.categoryItemId))');
+    expect(guideContent).toContain(
+      'regTermId: selected(values.regTermId)',
+    );
+    expect(guideContent).toContain('Number(selected(values.regTermId))');
+    expect(guideContent).toContain("useAt === 'Y' || useAt === 'N'");
+    expect(guideContent).toContain('PageSearchArea');
+    expect(guideContent).toContain('API 요청');
+    expect(guideContent).toContain('저장하지 않은 변경사항');
+    expect(guideContent).toContain("type: 'date'");
+    expect(guideContent).toContain("{ from: '2026-01-01', to: '2026-01-31' }");
+    expect(guideContent).toContain('현재 기안양식');
+    expect(guideContent).toContain('searchSpan');
+    expect(guideContent).toContain('form.span');
+    expect(guideContent).toContain('currency');
+    expect(guideContent).toContain('checkbox');
+    expect(guideContent).toContain('options');
+    expect(guideContent).toContain('label');
+    expect(guideContent).toContain('order');
+    expect(guideContent).toContain('fallback');
   });
 
   it('documents each public F1-Grid API identifier and nested contract field', () => {

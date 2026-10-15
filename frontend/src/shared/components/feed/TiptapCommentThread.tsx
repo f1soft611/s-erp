@@ -467,66 +467,68 @@ function CommentItem({
             >
               {comment.content}
             </Box>
-          ) : isDeleted && (
-            <>
-              <Box
-                sx={{
-                  fontSize: '0.9rem',
-                  lineHeight: 1.7,
-                  color: 'text.disabled',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                [작성자에 의해 삭제 되었습니다.]
-              </Box>
-              {replyCount > 0 && (
-                <Button
-                  size="small"
-                  variant="text"
-                  aria-expanded={showReplies}
-                  endIcon={
-                    showReplies ? (
-                      <KeyboardArrowUpIcon
-                        data-testid="reply-expanded-icon"
-                        fontSize="small"
-                      />
-                    ) : (
-                      <KeyboardArrowDownIcon
-                        data-testid="reply-collapsed-icon"
-                        fontSize="small"
-                      />
-                    )
-                  }
-                  onClick={() => setShowReplies((current) => !current)}
+          ) : (
+            isDeleted && (
+              <>
+                <Box
                   sx={{
-                    mt: 0.5,
-                    minWidth: 0,
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 1.25,
-                    border: `1px solid ${
-                      isDark
-                        ? 'rgba(148,163,184,0.18)'
-                        : 'rgba(148,163,184,0.2)'
-                    }`,
-                    bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
-                    color: isDark ? '#cbd5e1' : '#475569',
-                    fontSize: '0.76rem',
-                    fontWeight: 500,
-                    textTransform: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.25,
-                    lineHeight: 1.2,
-                    '& .MuiButton-endIcon': {
-                      marginLeft: 0.25,
-                    },
+                    fontSize: '0.9rem',
+                    lineHeight: 1.7,
+                    color: 'text.disabled',
+                    overflowWrap: 'anywhere',
                   }}
                 >
-                  답글 {replyCount}개
-                </Button>
-              )}
-            </>
+                  [작성자에 의해 삭제 되었습니다.]
+                </Box>
+                {replyCount > 0 && (
+                  <Button
+                    size="small"
+                    variant="text"
+                    aria-expanded={showReplies}
+                    endIcon={
+                      showReplies ? (
+                        <KeyboardArrowUpIcon
+                          data-testid="reply-expanded-icon"
+                          fontSize="small"
+                        />
+                      ) : (
+                        <KeyboardArrowDownIcon
+                          data-testid="reply-collapsed-icon"
+                          fontSize="small"
+                        />
+                      )
+                    }
+                    onClick={() => setShowReplies((current) => !current)}
+                    sx={{
+                      mt: 0.5,
+                      minWidth: 0,
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: 1.25,
+                      border: `1px solid ${
+                        isDark
+                          ? 'rgba(148,163,184,0.18)'
+                          : 'rgba(148,163,184,0.2)'
+                      }`,
+                      bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
+                      color: isDark ? '#cbd5e1' : '#475569',
+                      fontSize: '0.76rem',
+                      fontWeight: 500,
+                      textTransform: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      lineHeight: 1.2,
+                      '& .MuiButton-endIcon': {
+                        marginLeft: 0.25,
+                      },
+                    }}
+                  >
+                    답글 {replyCount}개
+                  </Button>
+                )}
+              </>
+            )
           )}
           {!isEditing && !isDeleted && !isSystemEvent && (
             <>
@@ -756,7 +758,7 @@ export function TiptapCommentThread({
   onDeleteAttachment,
   isDark = false,
   showComposer = true,
-  placeholder = '댓글을 입력하세요',
+  placeholder = '줄바꿈 Shift+Enter, 입력 Enter',
   composerLabel = '댓글 입력',
   submitLabel = '등록',
   expandReplies = false,

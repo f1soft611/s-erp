@@ -56,6 +56,7 @@ import {
   getApprovalStatusPresentation,
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
+import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
 import { useDocumentApprovalBody } from '../hooks/useDocumentApprovalBody';
 import type { DocumentFeedWriteItem } from '../types/documentWrite.types';
 import type {
@@ -147,6 +148,7 @@ const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
   warning: 'warning.light',
 };
 
+const approvalBadgeBorderRadius = '8px';
 const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
 type FeedReasonAction = Extract<
   DocumentApprovalActionRequest['action'],
@@ -826,6 +828,10 @@ export function DocumentApprovalDetailFeed(
   const kindPresentation = displayDocumentType
     ? getDocumentKindPresentation(displayDocumentType)
     : null;
+  const approvalActionButtonSx = {
+    px: 1.25,
+    py: 0.5,
+  };
   const documentToolbar =
     statusPresentation && kindPresentation ? (
       <Stack
@@ -847,6 +853,7 @@ export function DocumentApprovalDetailFeed(
               size="small"
               variant="contained"
               color="primary"
+              sx={approvalActionButtonSx}
               onClick={() => void handleAction('APPROVED')}
               disabled={isActing}
             >
@@ -856,6 +863,7 @@ export function DocumentApprovalDetailFeed(
               size="small"
               variant="contained"
               color="error"
+              sx={approvalActionButtonSx}
               onClick={() =>
                 isFeedPresentation
                   ? openFeedReasonDialog('REJECTED')
@@ -869,6 +877,7 @@ export function DocumentApprovalDetailFeed(
               size="small"
               variant="outlined"
               color="warning"
+              sx={approvalActionButtonSx}
               onClick={() =>
                 isFeedPresentation
                   ? openFeedReasonDialog('RETURNED')
@@ -885,6 +894,7 @@ export function DocumentApprovalDetailFeed(
             size="small"
             variant="contained"
             color="error"
+            sx={approvalActionButtonSx}
             disabled={isActing}
             onClick={() => {
               setActionError('');
@@ -899,6 +909,7 @@ export function DocumentApprovalDetailFeed(
             size="small"
             variant="contained"
             color="error"
+            sx={approvalActionButtonSx}
             disabled={isActing}
             onClick={() => {
               setActionError('');
@@ -913,15 +924,24 @@ export function DocumentApprovalDetailFeed(
           size="small"
           color={statusPresentation.color}
           variant={statusPresentation.variant}
-          sx={{ height: 22, fontWeight: 700, borderRadius: '8px' }}
+          sx={{
+            height: 28,
+            fontWeight: 700,
+            borderRadius: approvalBadgeBorderRadius,
+          }}
         />
         <Chip
           label={kindPresentation.label}
           size="small"
           color={kindPresentation.color}
-          sx={{ height: 22, fontWeight: 700, borderRadius: '8px' }}
+          style={{ marginRight: 4 }}
+          sx={{
+            height: 28,
+            fontWeight: 700,
+            borderRadius: approvalBadgeBorderRadius,
+          }}
         />
-        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+        <Divider orientation="vertical" flexItem />
         <IconButton aria-label="고정된 문서" disabled size="small">
           <PushPinOutlinedIcon fontSize="small" />
         </IconButton>
@@ -1166,10 +1186,10 @@ export function DocumentApprovalDetailFeed(
                                           flexShrink: 0,
                                           border: '2px solid',
                                           borderStyle: statusTone === 'neutral' ? 'dashed' : 'solid',
-                                          borderColor: approvalLineStatusColors[statusTone],
+                                          borderColor: approvalLineStatusBorderColors[statusTone],
                                           borderRadius: '50%',
                                           bgcolor: 'background.paper',
-                                          color: approvalLineStatusColors[statusTone],
+                                          color: approvalLineStatusBorderColors[statusTone],
                                           fontSize: '1rem',
                                           fontWeight: 700,
                                           boxShadow: isCurrent ? 1 : 0,
@@ -1201,22 +1221,10 @@ export function DocumentApprovalDetailFeed(
                                         px: 0.25,
                                       }}
                                     >
-                                      <Box
-                                        component="span"
-                                        sx={{
-                                          display: 'grid',
-                                          placeItems: 'center',
-                                          flex: '0 0 24px',
-                                          height: 24,
-                                          border: '1px solid',
-                                          borderColor: 'text.secondary',
-                                          borderRadius: '50%',
-                                          fontSize: '1rem',
-                                          fontWeight: 700,
-                                        }}
-                                      >
-                                        {line.stageOrder}
-                                      </Box>
+                                      <ApprovalSequenceBadge
+                                        order={line.stageOrder}
+                                        aria-label={`결재선 순번 ${line.stageOrder}`}
+                                      />
                                       <Typography
                                         variant="body1"
                                         title={line.participantName}
@@ -1286,24 +1294,11 @@ export function DocumentApprovalDetailFeed(
                                         minWidth: 0,
                                       }}
                                     >
-                                      <Box
-                                        component="span"
-                                        data-testid="approval-line-agreement-stage-order"
-                                        sx={{
-                                          display: 'grid',
-                                          placeItems: 'center',
-                                          width: 28,
-                                          height: 28,
-                                          flex: '0 0 28px',
-                                          border: '1px solid',
-                                          borderColor: 'text.secondary',
-                                          borderRadius: '50%',
-                                          fontSize: '1rem',
-                                          fontWeight: 700,
-                                        }}
-                                      >
-                                        {stage.stageOrder}
-                                      </Box>
+                                      <ApprovalSequenceBadge
+                                        order={stage.stageOrder}
+                                        aria-label={`합의 순번 ${stage.stageOrder}`}
+                                        testId="approval-line-agreement-stage-order"
+                                      />
                                       <Box
                                         data-testid="approval-line-agreement-participants"
                                         sx={{

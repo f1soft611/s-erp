@@ -5,6 +5,7 @@ import { UserSelectEditor } from '../../../../../shared/components/f1-grid/editi
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { DocumentApprovalStage } from '../types/documentWrite.types';
+import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
 
 const MIN_APPROVAL_SLOT_WIDTH = 88;
 const APPROVAL_SLOT_GAP = 4;
@@ -51,29 +52,6 @@ type DocumentApprovalFieldsProps = {
   onOpenApprovalSettings: () => void;
   onRemoveApprovalUser: (stageId: number, userId: string) => void;
 };
-
-function ParticipantSequenceBadge({ order }: { order: number }) {
-  return (
-    <Box
-      aria-label={`참여 순번 ${order}`}
-      sx={{
-        display: 'grid',
-        placeItems: 'center',
-        flex: '0 0 auto',
-        width: 15,
-        height: 15,
-        borderRadius: '50%',
-        bgcolor: 'primary.light',
-        color: 'primary.dark',
-        fontSize: '0.7rem',
-        fontWeight: 700,
-        lineHeight: 1,
-      }}
-    >
-      {order}
-    </Box>
-  );
-}
 
 function PlaceholderSealSlot() {
   return (
@@ -391,15 +369,18 @@ export function DocumentApprovalFields({
                 ></Box>
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '20px minmax(0, 1fr)',
+                    display: 'flex',
+                    justifyContent: 'center',
                     alignItems: 'center',
-                    columnGap: '2px',
+                    gap: 0.5,
                     minWidth: 0,
                     px: 0.25,
                   }}
                 >
-                  <ParticipantSequenceBadge order={order} />
+                  <ApprovalSequenceBadge
+                    order={order}
+                    aria-label={`참여 순번 ${order}`}
+                  />
                   <Typography
                     variant="body2"
                     title={user.label}
@@ -460,7 +441,10 @@ export function DocumentApprovalFields({
                       ...participantHoverSx,
                     }}
                   >
-                    <ParticipantSequenceBadge order={order} />
+                    <ApprovalSequenceBadge
+                      order={order}
+                      aria-label={`참여 순번 ${order}`}
+                    />
                     <Typography
                       variant="body2"
                       title={user.label}

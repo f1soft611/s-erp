@@ -396,32 +396,24 @@ const columns: F1GridColumn<Item>[] = [
 
 ## PageSearchArea 상세 검색 연결
 
-페이지의 접이식 상세검색은 F1-Grid 컬럼의 `search` metadata와 `toPageSearchFields(columns)`를 재사용할 수 있다. `search.label`, `search.order`, `search.span`, `search.group`으로 검색 필드 표시를 정하고 `type`/`options`는 해당 Grid 컬럼의 값을 사용한다. `column.hidden` 또는 `search.hidden`인 컬럼은 상세검색에서 제외된다.
+Grid 헤더 필터와 페이지의 상세검색은 서로 다른 기능이다. 헤더 필터는 그리드에 표시된 행을 필터링하고, `PageSearchArea` 상세검색은 컬럼의 검색 설정을 페이지 조회조건에 연결한다. 흐름은 `F1GridColumn.search` → `toPageSearchFields(columns)` → `PageSearchArea` → 페이지 필터 → 목록 API 순서다. F1-Grid는 검색 필드 설정을 제공하며 업무 API를 직접 호출하지 않는다.
 
-`search.span`은 `PageSearchField.searchSpan`으로 전달되며 기본값은 1이고, 행 폼의 `form.span`과 독립적이다. 상세검색은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox` 유형을 지원하고, 그 외 컬럼 유형은 `text`로 변환된다. `select`는 컬럼의 `options`를 사용하며 `date` 값은 `{ from, to }` 범위로 전달된다.
+실제 기안양식 상세검색 필드는 분류(`categoryItemId`), 등록주기(`regTermId`), 사용여부(`useAt`)다. 분류와 등록주기는 코드 항목의 숫자 ID를 옵션 값으로 사용하고, 사용여부 값은 `'Y'`/`'N'`이다. 양식코드(`cataTypeCode`)와 양식명(`codeName`)은 `search.hidden: true`로 상세검색에서 제외하며, 양식코드/양식명 키워드는 별도의 기본 검색 입력으로 처리한다. 현재 기안양식 화면에는 등록일 상세검색이 없다.
 
 ```typescript
-const columns: F1GridColumn<DraftFormRow>[] = [
-  {
-    field: 'categoryItemId',
-    headerName: '분류',
-    type: 'select',
-    options: categoryOptions,
-    search: { label: '분류', order: 1 },
-  },
-  {
-    field: 'cataTypeCode',
-    headerName: '구분코드',
-    search: { hidden: true },
-  },
-];
-
-const detailFields = toPageSearchFields(columns);
+const detailFields = useMemo(
+  () => toPageSearchFields(columns),
+  [columns],
+);
 ```
 
-`toPageSearchFields`는 검색 UI field definitions만 만든다. `PageSearchArea`가 확정한 값은 페이지가 검색 조건으로 변환해 조회 API에 전달하며, F1-Grid 자체가 서버 검색을 수행하지 않는다. `keyword` 등 기본 검색어와 상세 조건의 결합도 페이지가 관리한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
 
-문서 포털의 `필터와 정렬` → `PageSearchArea 상세검색 연동`에서 전체 예제를 확인할 수 있다. 포털에서 `F1GridColumn.search`를 검색하면 공개 API 참조의 해당 컬럼 항목으로 이동할 수 있다.
+페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
+
+날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
+
+포털의 `필터와 정렬` 문서에서 `상세검색은 이렇게 연결됩니다`부터 단계별 예제와 전체 기안양식 검색 예제를 확인할 수 있다. 포털에서 `toPageSearchFields`를 검색하면 상세검색 가이드로, `F1GridColumn.search`를 검색하면 공개 API 참조 항목으로 이동할 수 있다.
 
 Row Merge 설정:
 
