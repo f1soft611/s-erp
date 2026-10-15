@@ -228,7 +228,7 @@ const sections: DocSection[] = [
       api(
         'search',
         'F1GridColumnSearchOptions',
-        '검색 폼에서의 표시·그룹·순서·폭 설정.',
+        'F1GridColumn.search: 상세검색 필드의 표시·그룹·순서·폭 metadata 설정.',
         '미지정',
       ),
       api('getValue', '(row: T) => unknown', '표시 및 편집에 사용할 값을 계산.', 'row[field]'),

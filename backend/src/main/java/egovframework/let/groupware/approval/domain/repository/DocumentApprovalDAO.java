@@ -59,6 +59,36 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return update("DocumentApprovalDAO.updateDocumentApprovalStatus", params);
     }
 
+    public int resetSubmittedDocumentToDraft(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetSubmittedDocumentToDraft", params);
+    }
+
+    public int resetSubmittedApprovalLines(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetSubmittedApprovalLines", params);
+    }
+
+    public DocumentApprovalLineVO selectUserApprovedApprovalLineForUpdate(Map<String, Object> params)
+            throws Exception {
+        return (DocumentApprovalLineVO) selectOne(
+                "DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate", params);
+    }
+
+    public Boolean selectProcessedLaterApprovalStage(Map<String, Object> params) throws Exception {
+        return (Boolean) selectOne("DocumentApprovalDAO.selectProcessedLaterApprovalStage", params);
+    }
+
+    public int resetApprovalLineToPending(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetApprovalLineToPending", params);
+    }
+
+    public int resetUntouchedLaterApprovalStages(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetUntouchedLaterApprovalStages", params);
+    }
+
+    public Long countProcessedApprovalLines(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.countProcessedApprovalLines", params);
+    }
+
     public Boolean selectCanDeletePendingDocumentApproval(Map<String, Object> params) throws Exception {
         return (Boolean) selectOne("DocumentApprovalDAO.selectCanDeletePendingDocumentApproval", params);
     }

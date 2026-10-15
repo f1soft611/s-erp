@@ -398,6 +398,8 @@ const columns: F1GridColumn<Item>[] = [
 
 페이지의 접이식 상세검색은 F1-Grid 컬럼의 `search` metadata와 `toPageSearchFields(columns)`를 재사용할 수 있다. `search.label`, `search.order`, `search.span`, `search.group`으로 검색 필드 표시를 정하고 `type`/`options`는 해당 Grid 컬럼의 값을 사용한다. `column.hidden` 또는 `search.hidden`인 컬럼은 상세검색에서 제외된다.
 
+`search.span`은 `PageSearchField.searchSpan`으로 전달되며 기본값은 1이고, 행 폼의 `form.span`과 독립적이다. 상세검색은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox` 유형을 지원하고, 그 외 컬럼 유형은 `text`로 변환된다. `select`는 컬럼의 `options`를 사용하며 `date` 값은 `{ from, to }` 범위로 전달된다.
+
 ```typescript
 const columns: F1GridColumn<DraftFormRow>[] = [
   {
@@ -418,6 +420,8 @@ const detailFields = toPageSearchFields(columns);
 ```
 
 `toPageSearchFields`는 검색 UI field definitions만 만든다. `PageSearchArea`가 확정한 값은 페이지가 검색 조건으로 변환해 조회 API에 전달하며, F1-Grid 자체가 서버 검색을 수행하지 않는다. `keyword` 등 기본 검색어와 상세 조건의 결합도 페이지가 관리한다.
+
+문서 포털의 `필터와 정렬` → `PageSearchArea 상세검색 연동`에서 전체 예제를 확인할 수 있다. 포털에서 `F1GridColumn.search`를 검색하면 공개 API 참조의 해당 컬럼 항목으로 이동할 수 있다.
 
 Row Merge 설정:
 

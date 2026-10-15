@@ -41,6 +41,8 @@ import {
   getDocumentApprovalSummary,
   listDocumentApprovals,
   processDocumentApprovalAction,
+  cancelDocumentSubmission,
+  cancelDocumentApproval,
   deleteDocumentDraftEmbeddedImage,
   isDefiniteAttachmentUploadFailure,
   saveDocumentDraft,
@@ -178,6 +180,43 @@ describe('document approval service', () => {
     expect(api.post).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/41/actions',
       { action: 'APPROVED' },
+    );
+  });
+
+  it('validates drafter and approver cancellation responses', async () => {
+    api.post
+      .mockResolvedValueOnce({
+        item: { electronicApprovalId: 41, documentStatus: 'DRAFT' },
+      })
+      .mockResolvedValueOnce({
+        item: { electronicApprovalId: 41, documentStatus: 'IN_PROGRESS' },
+      });
+
+    await expect(cancelDocumentSubmission(41)).resolves.toMatchObject({
+      electronicApprovalId: 41,
+      documentStatus: 'DRAFT',
+    });
+    await expect(cancelDocumentApproval(41)).resolves.toMatchObject({
+      electronicApprovalId: 41,
+      documentStatus: 'IN_PROGRESS',
+    });
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/groupware/approvals/41/submission-cancellation',
+      undefined,
+    );
+    expect(api.post).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/groupware/approvals/41/approval-cancellation',
+      undefined,
+    );
+
+    await expect(cancelDocumentSubmission(0)).rejects.toThrow('문서 ID가 올바르지 않습니다.');
+    api.post.mockResolvedValueOnce({
+      item: { electronicApprovalId: 41, documentStatus: 'PENDING' },
+    });
+    await expect(cancelDocumentSubmission(41)).rejects.toThrow(
+      '상신 취소 응답을 확인할 수 없습니다.',
     );
   });
 

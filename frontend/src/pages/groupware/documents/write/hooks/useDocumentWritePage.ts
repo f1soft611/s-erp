@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CommonViewMode } from '../../../../../shared/components/view-mode/commonViewTypes';
+import { fetchMyProfile } from '../../../../dashboard/services/profileSettings.service';
 import {
   getDocumentApprovalSummary,
   listDocumentApprovals,
 } from '../services/documentApproval.service';
+import {
+  getApprovalStatusPresentation,
+  getDocumentKindFromType,
+  getDocumentKindPresentation,
+} from '../data/documentPresentation';
 import type {
-  ApprovalDocumentStatus,
   DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
   DocumentApprovalScope,
@@ -22,22 +27,6 @@ const documentTypeByKind: Record<DocumentKind, DocumentApprovalRecord['documentT
   근태신청: 'ATTENDANCE_APPLICATION',
 };
 
-const kindByDocumentType: Record<DocumentApprovalRecord['documentType'], DocumentKind> = {
-  DRAFTING: '기안서',
-  BUSINESS_CONTACT: '업무연락',
-  EXPENSE_RESOLUTION: '지출결의서',
-  ATTENDANCE_APPLICATION: '근태신청',
-};
-
-const statusLabelByCode: Record<ApprovalDocumentStatus, DocumentWriteItem['status']> = {
-  DRAFT: '임시저장',
-  PENDING: '결재대기',
-  IN_PROGRESS: '결재중',
-  REVISION_REQUESTED: '보완요청',
-  COMPLETED: '완료',
-  REJECTED: '반려',
-};
-
 function formatDate(value?: string | null): string {
   if (!value) return '';
   const date = value.slice(0, 10);
@@ -45,12 +34,16 @@ function formatDate(value?: string | null): string {
 }
 
 function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
+  const status = getApprovalStatusPresentation(record.documentStatus);
   return {
     id: record.electronicApprovalId,
     eabusNo: record.eabusNo,
     title: record.title,
-    kind: kindByDocumentType[record.documentType],
-    status: statusLabelByCode[record.documentStatus],
+    kind: getDocumentKindFromType(record.documentType),
+    status: status.label,
+    statusColor: status.color,
+    statusVariant: status.variant,
+    badgeBorderRadius: '8px',
     documentStatus: record.documentStatus,
     author: record.drafterName,
     date: formatDate(record.submittedAt ?? record.updatedAt ?? record.createdAt),
@@ -78,6 +71,9 @@ export function useDocumentWritePage() {
   const [summary, setSummary] = useState<DocumentApprovalSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [feedEmployeeId, setFeedEmployeeId] = useState('');
+  const [feedEmployeeError, setFeedEmployeeError] = useState('');
+  const [feedEmployeeRetryToken, setFeedEmployeeRetryToken] = useState(0);
   const [reloadRequest, setReloadRequest] = useState({ version: 0, quiet: false });
   const previousReloadVersion = useRef(0);
   const [detailDocumentId, setDetailDocumentId] = useState<number | null>(null);
@@ -154,6 +150,34 @@ export function useDocumentWritePage() {
     };
   }, [reloadRequest, scope, selectedDocumentId, selectedKind, viewMode]);
 
+  useEffect(() => {
+    if (viewMode !== 'feed') return;
+    let active = true;
+    setFeedEmployeeId('');
+    setFeedEmployeeError('');
+    void fetchMyProfile()
+      .then((profile) => {
+        const employeeId = String(profile?.employeeId ?? '').trim();
+        if (!employeeId) {
+          throw new Error('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
+        }
+        if (active) setFeedEmployeeId(employeeId);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setFeedEmployeeError(
+            error instanceof Error
+              ? error.message
+              : '로그인 사용자의 사원 정보를 불러오지 못했습니다.',
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [feedEmployeeRetryToken, viewMode]);
+
   const pinnedDocuments = useMemo(
     () => documents.filter((item) => item.isPinned),
     [documents],
@@ -182,15 +206,22 @@ export function useDocumentWritePage() {
   );
   const unpinnedViewItems = useMemo(
     () =>
-      unpinnedDocuments.map((item) => ({
-        id: item.id,
-        title: item.title,
-        authorLabel: item.author,
-        dateLabel: item.date,
-        categoryLabel: item.kind,
-        statusLabel: item.status,
-        summary: item.summary,
-      })),
+      unpinnedDocuments.map((item) => {
+        const kind = getDocumentKindPresentation(item.kind);
+        return {
+          id: item.id,
+          title: item.title,
+          authorLabel: item.author,
+          dateLabel: item.date,
+          categoryLabel: kind.label,
+          categoryColor: kind.color,
+          statusLabel: item.status,
+          statusColor: item.statusColor,
+          statusVariant: item.statusVariant,
+          badgeBorderRadius: item.badgeBorderRadius,
+          summary: item.summary,
+        };
+      }),
     [unpinnedDocuments],
   );
 
@@ -204,6 +235,10 @@ export function useDocumentWritePage() {
     setSelectedDocumentId(documentId);
   }, []);
   const retry = useCallback(() => refresh(), [refresh]);
+  const retryFeedEmployee = useCallback(
+    () => setFeedEmployeeRetryToken((token) => token + 1),
+    [],
+  );
   const openDetail = useCallback((documentId: number) => {
     setDetailDocumentId(documentId);
   }, []);
@@ -226,6 +261,9 @@ export function useDocumentWritePage() {
     notices: (summary?.notices ?? []).map(mapDocument),
     isLoading,
     loadError,
+    feedEmployeeId,
+    feedEmployeeError,
+    retryFeedEmployee,
     retry,
     scope,
     selectScope,

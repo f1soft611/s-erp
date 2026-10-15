@@ -28,6 +28,8 @@ public interface DocumentApprovalService {
             DocumentApprovalDraftSaveRequestVO request) throws Exception;
     DocumentApprovalDraftVO processAction(LoginVO user, Long electronicApprovalId,
             DocumentApprovalActionRequestVO request) throws Exception;
+    DocumentApprovalDraftVO cancelSubmission(LoginVO user, Long electronicApprovalId) throws Exception;
+    DocumentApprovalDraftVO cancelApproval(LoginVO user, Long electronicApprovalId) throws Exception;
     List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception;
     List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,

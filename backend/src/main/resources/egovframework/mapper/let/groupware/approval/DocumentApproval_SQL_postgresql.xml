@@ -150,6 +150,96 @@
           AND deleted_yn = 'N'
     </update>
 
+    <update id="resetSubmittedDocumentToDraft" parameterType="map">
+        UPDATE public.tb_electronic_approval_main
+        SET document_status = 'DRAFT',
+            submitted_at = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = #{actorId}
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND drafter_id = #{drafterId}
+          AND document_status = 'PENDING'
+          AND deleted_yn = 'N'
+    </update>
+
+    <update id="resetSubmittedApprovalLines" parameterType="map">
+        UPDATE public.tb_electronic_approval_line_info
+        SET action_status = 'WAITING',
+            pending_at = NULL,
+            action_at = NULL,
+            action_comment = NULL
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND participant_type IN ('APPROVAL', 'AGREEMENT')
+    </update>
+
+    <select id="selectUserApprovedApprovalLineForUpdate" parameterType="map" resultMap="approvalLine">
+        SELECT electronic_approval_line_id, stage_order, participant_order, participant_type,
+               participant_user_id, participant_name, participant_department_name,
+               action_status, pending_at, action_at, action_comment
+        FROM public.tb_electronic_approval_line_info
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND participant_user_id = #{participantUserId}
+          AND stage_order &gt; 1
+          AND participant_type IN ('APPROVAL', 'AGREEMENT')
+          AND action_status = 'APPROVED'
+          AND action_at IS NOT NULL
+        FOR UPDATE
+    </select>
+
+    <select id="selectProcessedLaterApprovalStage" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM public.tb_electronic_approval_line_info
+            WHERE tenant_id = #{tenantId}
+              AND electronic_approval_id = #{electronicApprovalId}
+              AND stage_order &gt; #{stageOrder}
+              AND participant_type IN ('APPROVAL', 'AGREEMENT')
+              AND action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
+        )
+    </select>
+
+    <update id="resetApprovalLineToPending" parameterType="map">
+        UPDATE public.tb_electronic_approval_line_info
+        SET action_status = 'PENDING',
+            pending_at = CURRENT_TIMESTAMP,
+            action_at = NULL,
+            action_comment = NULL
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND electronic_approval_line_id = #{electronicApprovalLineId}
+          AND participant_user_id = #{participantUserId}
+          AND participant_type IN ('APPROVAL', 'AGREEMENT')
+          AND action_status = 'APPROVED'
+    </update>
+
+    <update id="resetUntouchedLaterApprovalStages" parameterType="map">
+        UPDATE public.tb_electronic_approval_line_info
+        SET action_status = 'WAITING',
+            pending_at = NULL,
+            action_at = NULL,
+            action_comment = NULL
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND stage_order &gt; #{stageOrder}
+          AND participant_type IN ('APPROVAL', 'AGREEMENT')
+          AND action_status = 'PENDING'
+          AND action_at IS NULL
+          AND action_comment IS NULL
+    </update>
+
+    <select id="countProcessedApprovalLines" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM public.tb_electronic_approval_line_info
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND stage_order &gt; 1
+          AND participant_type IN ('APPROVAL', 'AGREEMENT')
+          AND action_status IN ('APPROVED', 'REJECTED', 'RETURNED')
+    </select>
+
     <select id="selectCanDeletePendingDocumentApproval" parameterType="map" resultType="boolean">
         SELECT EXISTS (
             SELECT 1

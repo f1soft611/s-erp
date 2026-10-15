@@ -283,6 +283,90 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalDraftVO cancelSubmission(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null || !user.getId().equals(document.getDrafterId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "결재신청할 문서를 찾을 수 없습니다.");
+        }
+        if (!"PENDING".equals(document.getDocumentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 상태에서는 결재신청을 취소할 수 없습니다.");
+        }
+
+        Map<String, Object> documentParams = new HashMap<>(params);
+        documentParams.put("actorId", user.getId());
+        if (documentApprovalDAO.resetSubmittedDocumentToDraft(documentParams) != 1
+                || documentApprovalDAO.resetSubmittedApprovalLines(params) <= 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서 상태가 변경되어 결재신청을 취소할 수 없습니다.");
+        }
+        insertSystemEvent(user, electronicApprovalId, "SUBMISSION_CANCELED", "결재신청이 취소되었습니다.");
+        return workflowResponse(electronicApprovalId, "DRAFT");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalDraftVO cancelApproval(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        params.put("participantUserId", user.getUniqId());
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "결재 문서를 찾을 수 없습니다.");
+        }
+        String previousStatus = document.getDocumentStatus();
+        if (!"PENDING".equals(previousStatus) && !"IN_PROGRESS".equals(previousStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "현재 상태에서는 승인을 취소할 수 없습니다.");
+        }
+
+        DocumentApprovalLineVO approvedLine =
+                documentApprovalDAO.selectUserApprovedApprovalLineForUpdate(params);
+        if (approvedLine == null || approvedLine.getStageOrder() == null
+                || approvedLine.getStageOrder() <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "취소할 본인의 승인 결재선이 없습니다.");
+        }
+        params.put("stageOrder", approvedLine.getStageOrder());
+        if (!Boolean.FALSE.equals(documentApprovalDAO.selectProcessedLaterApprovalStage(params))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "다음 결재 단계가 처리되어 승인을 취소할 수 없습니다.");
+        }
+
+        Map<String, Object> lineParams = new HashMap<>(params);
+        lineParams.put("electronicApprovalLineId", approvedLine.getElectronicApprovalLineId());
+        if (documentApprovalDAO.resetApprovalLineToPending(lineParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "결재선이 변경되어 승인을 취소할 수 없습니다.");
+        }
+        documentApprovalDAO.resetUntouchedLaterApprovalStages(params);
+
+        Long processedCount = documentApprovalDAO.countProcessedApprovalLines(params);
+        if (processedCount == null) {
+            throw new IllegalStateException("남은 결재 처리 상태를 확인할 수 없습니다.");
+        }
+        String nextStatus = processedCount > 0 ? "IN_PROGRESS" : "PENDING";
+        Map<String, Object> statusParams = new HashMap<>(params);
+        statusParams.put("expectedDocumentStatus", previousStatus);
+        statusParams.put("nextDocumentStatus", nextStatus);
+        statusParams.put("actorId", user.getId());
+        if (documentApprovalDAO.updateDocumentApprovalStatus(statusParams) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "문서 상태가 변경되어 승인을 취소할 수 없습니다.");
+        }
+        insertSystemEvent(user, electronicApprovalId, "APPROVAL_CANCELED", "결재 승인이 취소되었습니다.");
+        return workflowResponse(electronicApprovalId, nextStatus);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception {

@@ -7,7 +7,8 @@ import type { JSONContent } from '@tiptap/core';
 import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
-export type ApprovalStatus = '임시저장' | '결재대기' | '결재중' | '보완요청' | '완료' | '반려';
+export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청';
+export type ApprovalStatusColor = 'default' | 'info' | 'success' | 'error' | 'warning';
 export type ApprovalDocumentStatus =
   | 'DRAFT'
   | 'PENDING'
@@ -37,6 +38,9 @@ export type DocumentWriteItem = {
   title: string;
   kind: DocumentKind;
   status: ApprovalStatus;
+  statusColor?: ApprovalStatusColor;
+  statusVariant?: 'filled' | 'outlined';
+  badgeBorderRadius?: string;
   author: string;
   date: string;
   summary: string;

@@ -7,6 +7,7 @@ import type {
 
 type DocumentFeedItemProps = {
   item: DocumentFeedWriteItem;
+  employeeId: string;
   detailRefreshToken: number;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
@@ -14,6 +15,7 @@ type DocumentFeedItemProps = {
 
 export function DocumentFeedItem({
   item,
+  employeeId,
   detailRefreshToken,
   onActionComplete,
   onEditDocument,
@@ -24,6 +26,7 @@ export function DocumentFeedItem({
         key={item.id}
         presentation="feed"
         feedItem={item}
+        employeeId={employeeId}
         open
         electronicApprovalId={item.id}
         onActionComplete={onActionComplete}

@@ -290,6 +290,146 @@ class DocumentApprovalServiceImplTest {
     }
 
     @Test
+    void drafterCanCancelPendingSubmissionAndRestoreDraft() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.resetSubmittedDocumentToDraft(anyMap())).thenReturn(1);
+        when(approvalDAO.resetSubmittedApprovalLines(anyMap())).thenReturn(3);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(93L);
+
+        DocumentApprovalDraftVO result = service().cancelSubmission(author, 77L);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("DRAFT");
+        verify(approvalDAO).resetSubmittedDocumentToDraft(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && "login-author".equals(params.get("drafterId"))));
+        verify(approvalDAO).resetSubmittedApprovalLines(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "SUBMISSION_CANCELED".equals(params.get("eventType"))
+                && Long.valueOf(77L).equals(params.get("ownerId"))));
+    }
+
+    @Test
+    void drafterCannotCancelSubmissionAfterAnApprovalHasStarted() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+
+        assertThatThrownBy(() -> service().cancelSubmission(author, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(approvalDAO, never()).resetSubmittedDocumentToDraft(anyMap());
+        verify(approvalDAO, never()).resetSubmittedApprovalLines(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void drafterCannotCancelAnotherUsersSubmission() throws Exception {
+        DocumentApprovalWorkflowDocumentVO document = workflowDocument("PENDING");
+        document.setDrafterId("another-author");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(document);
+
+        assertThatThrownBy(() -> service().cancelSubmission(author, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verify(approvalDAO, never()).resetSubmittedDocumentToDraft(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void approverCanCancelOwnApprovalBeforeLaterStageProcessing() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap()))
+            .thenReturn(approvedLine(22L, 2, "AGREEMENT", "202"));
+        when(approvalDAO.selectProcessedLaterApprovalStage(anyMap())).thenReturn(false);
+        when(approvalDAO.resetApprovalLineToPending(anyMap())).thenReturn(1);
+        when(approvalDAO.resetUntouchedLaterApprovalStages(anyMap())).thenReturn(2);
+        when(approvalDAO.countProcessedApprovalLines(anyMap())).thenReturn(0L);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(94L);
+
+        DocumentApprovalDraftVO result = service().cancelApproval(approver, 77L);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("PENDING");
+        verify(approvalDAO).selectUserApprovedApprovalLineForUpdate(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && "202".equals(params.get("participantUserId"))));
+        verify(approvalDAO).resetApprovalLineToPending(argThat(params ->
+            Long.valueOf(22L).equals(params.get("electronicApprovalLineId"))
+                && "202".equals(params.get("participantUserId"))));
+        verify(approvalDAO).resetUntouchedLaterApprovalStages(argThat(params ->
+            Integer.valueOf(2).equals(params.get("stageOrder"))));
+        verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
+            "IN_PROGRESS".equals(params.get("expectedDocumentStatus"))
+                && "PENDING".equals(params.get("nextDocumentStatus"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "APPROVAL_CANCELED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void approverCannotCancelTheAutomaticFirstStageDrafterApproval() throws Exception {
+        LoginVO approver = participantUser("login-101", "101", "기안자");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap()))
+            .thenReturn(approvedLine(21L, 1, "APPROVAL", "101"));
+
+        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(approvalDAO, never()).resetApprovalLineToPending(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void approverCannotCancelApprovalAfterLaterStageProcessing() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap()))
+            .thenReturn(approvedLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.selectProcessedLaterApprovalStage(anyMap())).thenReturn(true);
+
+        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(approvalDAO, never()).resetApprovalLineToPending(anyMap());
+        verify(approvalDAO, never()).updateDocumentApprovalStatus(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
+    void approverCannotCancelFinalApprovalOrAnotherUsersLine() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("COMPLETED"));
+
+        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verify(approvalDAO, never()).selectUserApprovedApprovalLineForUpdate(anyMap());
+
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verify(approvalDAO, never()).resetApprovalLineToPending(anyMap());
+        verifyNoInteractions(commentDAO);
+    }
+
+    @Test
     void saveDraftPersistsAuthenticatedAuthorOrderedLinesAndSystemEvent() throws Exception {
         when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
             participant("101", "작성자", "기획팀"),
@@ -946,6 +1086,12 @@ class DocumentApprovalServiceImplTest {
         line.setParticipantUserId(userId);
         line.setParticipantName("결재자");
         line.setActionStatus("PENDING");
+        return line;
+    }
+
+    private DocumentApprovalLineVO approvedLine(Long id, int stageOrder, String participantType, String userId) {
+        DocumentApprovalLineVO line = pendingLine(id, stageOrder, participantType, userId);
+        line.setActionStatus("APPROVED");
         return line;
     }
 

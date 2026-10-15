@@ -88,6 +88,26 @@ public class DocumentApprovalApiController {
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
+    @Operation(summary = "전자결재 결재신청 취소", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/submission-cancellation")
+    public ResultVO cancelSubmission(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.cancelSubmission(user, electronicApprovalId));
+        resultMap.put("message", "결재신청이 취소되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 승인 취소", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/approval-cancellation")
+    public ResultVO cancelApproval(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.cancelApproval(user, electronicApprovalId));
+        resultMap.put("message", "승인이 취소되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
     @Operation(summary = "전자결재 결재 처리", security = @SecurityRequirement(name = "Authorization"))
     @PostMapping("/{electronicApprovalId}/actions")
     public ResultVO processAction(@PathVariable Long electronicApprovalId,

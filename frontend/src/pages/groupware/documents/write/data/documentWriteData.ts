@@ -1,5 +1,4 @@
 import type {
-  ApprovalStatus,
   DocumentKind,
   DocumentWriteItem,
 } from '../types/documentWrite.types';
@@ -16,7 +15,7 @@ export const sampleDocuments: DocumentWriteItem[] = [
     id: 1,
     title: '월간 업무 계획 승인 요청',
     kind: '기안서',
-    status: '결재대기',
+    status: '결재진행중',
     author: '김민수',
     date: '2026.10.02',
     summary: '10월 업무 계획 검토 및 승인을 요청합니다.',
@@ -26,7 +25,7 @@ export const sampleDocuments: DocumentWriteItem[] = [
     id: 2,
     title: '생산 일정 변경 안내',
     kind: '업무연락',
-    status: '결재중',
+    status: '결재진행중',
     author: '김민수',
     date: '2026.10.01',
     summary: '생산 일정 변경 내용을 공유합니다.',
@@ -54,7 +53,7 @@ export const sampleDocuments: DocumentWriteItem[] = [
     id: 5,
     title: '교육 참석 신청',
     kind: '근태신청',
-    status: '완료',
+    status: '승인',
     author: '박서연',
     date: '2026.09.28',
     summary: '외부 교육 참석을 신청했습니다.',
@@ -63,7 +62,7 @@ export const sampleDocuments: DocumentWriteItem[] = [
     id: 6,
     title: '현장 소모품 구입 정산',
     kind: '지출결의서',
-    status: '결재중',
+    status: '결재진행중',
     author: '이도윤',
     date: '2026.09.26',
     summary: '현장 소모품 구입 비용 정산을 요청했습니다.',
@@ -72,24 +71,9 @@ export const sampleDocuments: DocumentWriteItem[] = [
     id: 7,
     title: '품질 점검 계획 승인 요청',
     kind: '기안서',
-    status: '결재대기',
+    status: '결재진행중',
     author: '박서연',
     date: '2026.09.25',
     summary: '다음 주 품질 점검 계획 검토를 요청합니다.',
   },
 ];
-
-export const statusColor = (
-  status: ApprovalStatus,
-): 'default' | 'warning' | 'success' | 'info' => {
-  if (status === '결재대기' || status === '보완요청') {
-    return 'warning';
-  }
-  if (status === '완료') {
-    return 'success';
-  }
-  if (status === '결재중') {
-    return 'info';
-  }
-  return 'default';
-};

@@ -38,6 +38,8 @@ import { getStoredAuth } from '../../../../../shared/services/authService';
 import { fetchMyProfile } from '../../../../dashboard/services/profileSettings.service';
 import {
   createApprovalComment,
+  cancelDocumentApproval,
+  cancelDocumentSubmission,
   deleteDocumentApproval,
   deleteApprovalComment,
   deleteApprovalCommentAttachment,
@@ -50,11 +52,13 @@ import {
   updateApprovalComment,
   uploadApprovalCommentAttachment,
 } from '../services/documentApproval.service';
-import { statusColor } from '../data/documentWriteData';
+import {
+  getApprovalStatusPresentation,
+  getDocumentKindPresentation,
+} from '../data/documentPresentation';
 import { useDocumentApprovalBody } from '../hooks/useDocumentApprovalBody';
 import type { DocumentFeedWriteItem } from '../types/documentWrite.types';
 import type {
-  ApprovalStatus,
   DocumentApprovalActionRequest,
   DocumentApprovalComment,
   DocumentApprovalDetail,
@@ -73,6 +77,7 @@ type DocumentApprovalDetailFeedProps =
   | (DocumentApprovalDetailFeedSharedProps & {
       presentation: 'feed';
       feedItem: DocumentFeedWriteItem;
+      employeeId: string;
     })
   | (DocumentApprovalDetailFeedSharedProps & {
       presentation?: 'panel';
@@ -99,20 +104,6 @@ function formatCommentTime(value?: string | null): string {
 
 function getPlainText(html: string): string {
   return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
-}
-
-function approvalStatusLabel(
-  status: DocumentApprovalDetail['documentStatus'],
-): ApprovalStatus {
-  const labels: Record<DocumentApprovalDetail['documentStatus'], ApprovalStatus> = {
-    DRAFT: '임시저장',
-    PENDING: '결재대기',
-    IN_PROGRESS: '결재중',
-    REVISION_REQUESTED: '보완요청',
-    COMPLETED: '완료',
-    REJECTED: '반려',
-  };
-  return labels[status];
 }
 
 function approvalLineStatusLabel(status: string): string {
@@ -150,13 +141,17 @@ const approvalLineStatusColors: Record<ApprovalLineStatusTone, string> = {
 
 const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
   neutral: 'divider',
-  primary: 'primary.main',
+  primary: 'info.main',
   success: 'success.light',
   error: 'error.light',
   warning: 'warning.light',
 };
 
 const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
+type FeedReasonAction = Extract<
+  DocumentApprovalActionRequest['action'],
+  'REJECTED' | 'RETURNED'
+>;
 
 function toApprovalCommentTree(
   records: DocumentApprovalComment[],
@@ -231,6 +226,8 @@ export function DocumentApprovalDetailFeed(
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const isFeedPresentation = props.presentation === 'feed';
+  const feedEmployeeId =
+    props.presentation === 'feed' ? props.employeeId : '';
   const onClose = isFeedPresentation ? undefined : props.onClose;
   const { showSuccess, showError } = useNotification();
   const preloadedFeedData =
@@ -239,12 +236,16 @@ export function DocumentApprovalDetailFeed(
     useState<DocumentApprovalDetail | null>(preloadedFeedData);
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [selectedBodyImage, setSelectedBodyImage] = useState<FeedBodyImage | null>(null);
-  const [employeeId, setEmployeeId] = useState('');
+  const [panelEmployeeId, setPanelEmployeeId] = useState('');
+  const employeeId = isFeedPresentation ? feedEmployeeId : panelEmployeeId;
   const [isLoading, setIsLoading] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionComment, setActionComment] = useState('');
+  const [feedReasonAction, setFeedReasonAction] = useState<FeedReasonAction | null>(
+    null,
+  );
   const [commentRecords, setCommentRecords] = useState<DocumentApprovalComment[]>(
     preloadedFeedData?.comments ?? [],
   );
@@ -263,6 +264,9 @@ export function DocumentApprovalDetailFeed(
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [cancelDialogType, setCancelDialogType] = useState<
+    'submission' | 'approval' | null
+  >(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [detailRetryToken, setDetailRetryToken] = useState(0);
@@ -336,7 +340,7 @@ export function DocumentApprovalDetailFeed(
     setIsBookmarked(false);
     setIsBodyExpanded(true);
     setSelectedBodyImage(null);
-    setEmployeeId('');
+    setPanelEmployeeId('');
     void Promise.all([
       getDocumentApprovalDetail(electronicApprovalId),
       fetchMyProfile(),
@@ -353,7 +357,7 @@ export function DocumentApprovalDetailFeed(
           setLoadError('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
           return;
         }
-        setEmployeeId(nextEmployeeId);
+        setPanelEmployeeId(nextEmployeeId);
       })
       .catch((error: unknown) => {
         if (active) {
@@ -460,6 +464,33 @@ export function DocumentApprovalDetailFeed(
       ),
     [detail, employeeId],
   );
+  const canCancelSubmission = Boolean(
+    detail?.isDrafter && detail.documentStatus === 'PENDING',
+  );
+  const canCancelApproval = useMemo(() => {
+    if (
+      !detail ||
+      (detail.documentStatus !== 'PENDING' && detail.documentStatus !== 'IN_PROGRESS')
+    ) {
+      return false;
+    }
+    const ownApprovedLine = detail.approvalLines.find(
+      (line) =>
+        line.participantUserId === employeeId &&
+        line.stageOrder > 1 &&
+        (line.participantType === 'APPROVAL' || line.participantType === 'AGREEMENT') &&
+        line.actionStatus === 'APPROVED',
+    );
+    return Boolean(
+      ownApprovedLine &&
+        !detail.approvalLines.some(
+          (line) =>
+            line.stageOrder > ownApprovedLine.stageOrder &&
+            (line.participantType === 'APPROVAL' || line.participantType === 'AGREEMENT') &&
+            completedApprovalStatuses.has(line.actionStatus),
+        ),
+    );
+  }, [detail, employeeId]);
   const approvalLineGroups = useMemo(() => {
     const orderedLines = [...(detail?.approvalLines ?? [])].sort(
       (left, right) =>
@@ -490,6 +521,7 @@ export function DocumentApprovalDetailFeed(
         bodyImages.length > 0 ||
         bodyHtml.includes('data-approval-embedded-image-file-id')),
   );
+  const shouldShowApprovalLine = !hasMoreBody || isBodyExpanded;
   const canEditDraft = useMemo(
     () =>
       Boolean(
@@ -501,28 +533,8 @@ export function DocumentApprovalDetailFeed(
     [detail],
   );
   const canDeleteDocument = useMemo(() => {
-    if (!detail?.isDrafter) return false;
-    if (detail.documentStatus === 'DRAFT') return true;
-    if (detail.documentStatus !== 'PENDING') return false;
-    const drafterApproval = detail.approvalLines.find(
-      (line) =>
-        line.stageOrder === 1 &&
-        line.participantType === 'APPROVAL' &&
-        line.participantUserId === employeeId,
-    );
-    return Boolean(
-      drafterApproval?.actionStatus === 'APPROVED' &&
-        drafterApproval.actionAt &&
-        detail.approvalLines
-          .filter((line) => line.participantType !== 'REFERENCE' && line !== drafterApproval)
-          .every(
-            (line) =>
-              (line.actionStatus === 'WAITING' || line.actionStatus === 'PENDING') &&
-              !line.actionAt &&
-              !line.actionComment,
-          ),
-    );
-  }, [detail, employeeId]);
+    return Boolean(detail?.isDrafter && detail.documentStatus === 'DRAFT');
+  }, [detail]);
 
   const handleDeleteDocument = async () => {
     if (electronicApprovalId === null || isDeleting) return;
@@ -564,11 +576,46 @@ export function DocumentApprovalDetailFeed(
             ? '문서가 반려되었습니다.'
             : '문서 보완을 요청했습니다.',
       );
+      if (isFeedPresentation && action !== 'APPROVED') {
+        setFeedReasonAction(null);
+        setActionComment('');
+      }
       onActionComplete();
       onClose?.();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
+      );
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const openFeedReasonDialog = (action: FeedReasonAction) => {
+    setActionError('');
+    setActionComment('');
+    setFeedReasonAction(action);
+  };
+
+  const handleCancelDocumentAction = async () => {
+    if (electronicApprovalId === null || !cancelDialogType || isActing) return;
+    const cancelType = cancelDialogType;
+    setIsActing(true);
+    setActionError('');
+    try {
+      if (cancelType === 'submission') {
+        await cancelDocumentSubmission(electronicApprovalId);
+        showSuccess('결재신청이 취소되었습니다.');
+      } else {
+        await cancelDocumentApproval(electronicApprovalId);
+        showSuccess('승인이 취소되었습니다.');
+      }
+      setCancelDialogType(null);
+      onActionComplete();
+      setDetailRetryToken((token) => token + 1);
+    } catch (error: unknown) {
+      setActionError(
+        error instanceof Error ? error.message : '결재 취소에 실패했습니다.',
       );
     } finally {
       setIsActing(false);
@@ -769,6 +816,119 @@ export function DocumentApprovalDetailFeed(
       </>
     ) : null;
 
+  const feedItem = props.presentation === 'feed' ? props.feedItem : null;
+  const displayDocumentStatus =
+    detail?.documentStatus ?? feedItem?.feedData.documentStatus;
+  const displayDocumentType = detail?.documentType ?? feedItem?.feedData.documentType;
+  const statusPresentation = displayDocumentStatus
+    ? getApprovalStatusPresentation(displayDocumentStatus)
+    : null;
+  const kindPresentation = displayDocumentType
+    ? getDocumentKindPresentation(displayDocumentType)
+    : null;
+  const documentToolbar =
+    statusPresentation && kindPresentation ? (
+      <Stack
+        data-testid="document-approval-toolbar"
+        direction="row"
+        spacing={0.5}
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap',
+          minWidth: 0,
+          maxWidth: '100%',
+          width: { xs: '100%', sm: 'auto' },
+        }}
+      >
+        {canProcess && (
+          <>
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              onClick={() => void handleAction('APPROVED')}
+              disabled={isActing}
+            >
+              승인
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() =>
+                isFeedPresentation
+                  ? openFeedReasonDialog('REJECTED')
+                  : void handleAction('REJECTED')
+              }
+              disabled={isActing}
+            >
+              반려
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              onClick={() =>
+                isFeedPresentation
+                  ? openFeedReasonDialog('RETURNED')
+                  : void handleAction('RETURNED')
+              }
+              disabled={isActing}
+            >
+              보완요청
+            </Button>
+          </>
+        )}
+        {!isFeedPresentation && canCancelSubmission && (
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            disabled={isActing}
+            onClick={() => {
+              setActionError('');
+              setCancelDialogType('submission');
+            }}
+          >
+            상신 취소
+          </Button>
+        )}
+        {!isFeedPresentation && canCancelApproval && (
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            disabled={isActing}
+            onClick={() => {
+              setActionError('');
+              setCancelDialogType('approval');
+            }}
+          >
+            승인 취소
+          </Button>
+        )}
+        <Chip
+          label={statusPresentation.label}
+          size="small"
+          color={statusPresentation.color}
+          variant={statusPresentation.variant}
+          sx={{ height: 22, fontWeight: 700, borderRadius: '8px' }}
+        />
+        <Chip
+          label={kindPresentation.label}
+          size="small"
+          color={kindPresentation.color}
+          sx={{ height: 22, fontWeight: 700, borderRadius: '8px' }}
+        />
+        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+        <IconButton aria-label="고정된 문서" disabled size="small">
+          <PushPinOutlinedIcon fontSize="small" />
+        </IconButton>
+        {documentMenu}
+      </Stack>
+    ) : null;
+
   const detailCard = (
     <Stack
       spacing={2}
@@ -853,29 +1013,14 @@ export function DocumentApprovalDetailFeed(
                       </Typography>
                     </Box>
                   </Stack>
-                  <Stack
-                    direction="row"
-                    spacing={0.5}
-                    sx={{
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      flexWrap: 'wrap',
-                      minWidth: 0,
-                    }}
-                  >
-                    <IconButton aria-label="고정된 문서" disabled size="small">
-                      <PushPinOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    {documentMenu}
-                    <Typography
-                      variant="caption"
-                      sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}
-                    >
-                      {approvalStatusLabel(detail.documentStatus)}
-                    </Typography>
-                  </Stack>
+                  {documentToolbar}
                 </Stack>
               )}
+              {isFeedPresentation && canProcess && actionError && !feedReasonAction && (
+                <Alert severity="error">{actionError}</Alert>
+              )}
+              {shouldShowApprovalLine && (
+                <>
               <Box
                 data-testid="approval-line-readonly"
                 sx={{
@@ -1357,6 +1502,8 @@ export function DocumentApprovalDetailFeed(
                 )}
               </Box>
               <Divider data-testid="approval-line-divider" sx={{ my: 1.5 }} />
+                </>
+              )}
               {!isFeedPresentation && (
                 <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
                   {detail.title}
@@ -1483,31 +1630,7 @@ export function DocumentApprovalDetailFeed(
                     disabled={isActing}
                   />
                   {actionError && <Alert severity="error">{actionError}</Alert>}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => void handleAction('APPROVED')}
-                      disabled={isActing}
-                    >
-                      승인
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={() => void handleAction('REJECTED')}
-                      disabled={isActing}
-                    >
-                      반려
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={() => void handleAction('RETURNED')}
-                      disabled={isActing}
-                    >
-                      보완요청
-                    </Button>
-                    {isActing && <CircularProgress size={24} />}
-                  </Box>
+                  {isActing && <CircularProgress size={24} />}
                 </>
               )}
             </>
@@ -1525,29 +1648,8 @@ export function DocumentApprovalDetailFeed(
               ? `기안자 · ${formatApprovalDate(detail.createdAt)} · 조회 ${detail.viewCount}`
               : props.feedItem.date
           }
-          actions={documentMenu}
-          badges={
-            <>
-              <Chip label={props.feedItem.kind} size="small" color="primary" />
-              <Chip
-                label={detail ? approvalStatusLabel(detail.documentStatus) : props.feedItem.status}
-                size="small"
-                color={statusColor(
-                  detail
-                    ? approvalStatusLabel(detail.documentStatus)
-                    : props.feedItem.status,
-                )}
-                variant={
-                  (detail
-                    ? approvalStatusLabel(detail.documentStatus)
-                    : props.feedItem.status) === '임시저장'
-                    ? 'outlined'
-                    : 'filled'
-                }
-                sx={{ height: 22, fontWeight: 700 }}
-              />
-            </>
-          }
+          actions={documentToolbar}
+          badges={null}
           title={detail?.title ?? props.feedItem.title}
           isDark={isDark}
           testId="document-write-item"
@@ -1569,6 +1671,97 @@ export function DocumentApprovalDetailFeed(
           {detailCard}
         </PostDetailPanel>
       )}
+      <Dialog
+        open={isFeedPresentation && feedReasonAction !== null}
+        onClose={() => {
+          if (isActing) return;
+          setFeedReasonAction(null);
+          setActionComment('');
+          setActionError('');
+        }}
+        aria-labelledby="feed-approval-reason-dialog-title"
+      >
+        <DialogTitle id="feed-approval-reason-dialog-title">
+          {feedReasonAction === 'REJECTED' ? '반려 사유' : '보완요청 사유'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1 }}>
+            처리 사유를 입력해 주세요.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            label="처리 사유"
+            value={actionComment}
+            onChange={(event) => {
+              setActionComment(event.target.value);
+              setActionError('');
+            }}
+            multiline
+            minRows={3}
+            fullWidth
+            disabled={isActing}
+          />
+          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setFeedReasonAction(null);
+              setActionComment('');
+              setActionError('');
+            }}
+            disabled={isActing}
+          >
+            취소
+          </Button>
+          <Button
+            variant={feedReasonAction === 'REJECTED' ? 'contained' : 'outlined'}
+            color={feedReasonAction === 'REJECTED' ? 'error' : 'warning'}
+            onClick={() => {
+              if (feedReasonAction) void handleAction(feedReasonAction);
+            }}
+            disabled={isActing}
+          >
+            {isActing
+              ? '처리 중...'
+              : feedReasonAction === 'REJECTED'
+                ? '반려 확인'
+                : '보완요청 확인'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={cancelDialogType !== null}
+        onClose={() => !isActing && setCancelDialogType(null)}
+        aria-labelledby="approval-cancel-dialog-title"
+      >
+        <DialogTitle id="approval-cancel-dialog-title">
+          {cancelDialogType === 'submission' ? '결재신청 취소' : '승인 취소'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {cancelDialogType === 'submission'
+              ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
+              : '본인의 승인을 취소합니다.'}
+          </DialogContentText>
+          {actionError && <Alert severity="error" sx={{ mt: 1 }}>{actionError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogType(null)} disabled={isActing}>
+            닫기
+          </Button>
+          <Button
+            onClick={() => void handleCancelDocumentAction()}
+            disabled={isActing}
+          >
+            {isActing
+              ? '취소 중...'
+              : cancelDialogType === 'submission'
+                ? '상신 취소 확인'
+                : '승인 취소 확인'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={isDeleteDialogOpen}
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}

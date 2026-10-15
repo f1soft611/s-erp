@@ -475,6 +475,58 @@ export const f1GridDocs: F1GridDoc[] = [
         heading: 'Disable when needed',
         code: '<F1Grid disableSorting disableFiltering {...props} />',
       },
+      {
+        type: 'prose',
+        heading: 'PageSearchArea 상세검색 연동',
+        body: '페이지의 접이식 상세검색은 F1GridColumn.search metadata를 toPageSearchFields(columns)로 변환해 PageSearchArea.detailFields에 전달합니다. search.hidden 또는 column.hidden이 true인 컬럼은 제외됩니다. search.label은 검색 필드 레이블이며 미지정 시 headerName을 사용하고, search.group은 필드를 묶으며, search.order는 지정한 필드를 오름차순으로 배치하고 미지정 필드는 기존 컬럼 순서를 유지한 채 뒤에 둡니다. search.span은 검색 폼 폭으로 변환된 searchSpan에 반영되며 기본값은 1, 허용 범위는 1~5입니다. 행 폼의 form.span과는 별개입니다. type과 options는 컬럼에서 가져옵니다. 상세검색 입력은 text, number, decimal, currency, date, select, checkbox를 지원하며 미지원 컬럼 유형은 text로 변환됩니다. select는 컬럼 options를 사용하고 date 값은 { from, to } 날짜 범위입니다. PageSearchArea의 detailValues와 onDetailValuesChange로 입력 상태를 연결하고 onDetailSearch에서 확정된 조건을 페이지로 전달합니다. 기본 키워드와 상세 조건을 조회 파라미터로 결합하고 API 요청 및 오류 처리를 하는 것은 업무 페이지 책임이며, Grid 자체가 서버 조회를 수행하지 않습니다. 문서 포털에서 toPageSearchFields를 검색하면 이 가이드를, F1GridColumn.search를 검색하면 공개 API 참조 항목을 찾을 수 있습니다.',
+      },
+      {
+        type: 'code',
+        heading: '상세검색 폼 연결',
+        code: `const columns = useMemo<F1GridColumn<Row>[]>(
+  () => [
+    {
+      field: 'name',
+      headerName: '이름',
+      search: { label: '양식명', group: '기본', order: 1, span: 2 },
+    },
+    {
+      field: 'createdAt',
+      headerName: '등록일',
+      type: 'date',
+      search: { group: '기간', order: 2, span: 3 },
+    },
+    {
+      field: 'status',
+      headerName: '상태',
+      type: 'select',
+      options: statusOptions,
+      search: { order: 3 },
+    },
+    {
+      field: 'internalCode',
+      headerName: '내부 코드',
+      search: { hidden: true },
+    },
+  ],
+  [statusOptions],
+);
+
+const detailFields = useMemo(
+  () => toPageSearchFields(columns),
+  [columns],
+);
+
+return (
+  <PageSearchArea
+    searchField={defaultSearchInput}
+    detailFields={detailFields}
+    detailValues={detailValues}
+    onDetailValuesChange={setDetailValues}
+    onDetailSearch={(values) => loadRows(toQuery(values))}
+  />
+);`,
+      },
     ],
   },
   {

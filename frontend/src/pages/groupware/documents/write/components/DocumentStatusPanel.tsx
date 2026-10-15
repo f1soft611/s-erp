@@ -27,7 +27,7 @@ export function DocumentStatusPanel({
         </Typography>
         <Stack spacing={1}>
           {[
-            ['완료', summary?.completedCount ?? 0, 'COMPLETED'],
+            ['승인', summary?.completedCount ?? 0, 'COMPLETED'],
             ['보완요청', summary?.revisionRequestedCount ?? 0, 'REVISION_REQUESTED'],
             ['반려', summary?.rejectedCount ?? 0, 'REJECTED'],
           ].map(([label, count, scope]) => (

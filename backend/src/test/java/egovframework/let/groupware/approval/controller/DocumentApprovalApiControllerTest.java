@@ -169,6 +169,30 @@ class DocumentApprovalApiControllerTest {
         assertRoute("deleteDocumentApproval", DeleteMapping.class, "/{electronicApprovalId}");
     }
 
+    @Test
+    void cancellationRoutesDelegateAndReturnWorkflowItems() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalDraftVO submission = new DocumentApprovalDraftVO();
+        submission.setElectronicApprovalId(77L);
+        submission.setDocumentStatus("DRAFT");
+        DocumentApprovalDraftVO approval = new DocumentApprovalDraftVO();
+        approval.setElectronicApprovalId(77L);
+        approval.setDocumentStatus("IN_PROGRESS");
+        when(approvalService.cancelSubmission(user, 77L)).thenReturn(submission);
+        when(approvalService.cancelApproval(user, 77L)).thenReturn(approval);
+
+        assertRoute("cancelSubmission", PostMapping.class, "/{electronicApprovalId}/submission-cancellation");
+        assertRoute("cancelApproval", PostMapping.class, "/{electronicApprovalId}/approval-cancellation");
+
+        ResultVO submissionResponse = controller.cancelSubmission(77L, user);
+        ResultVO approvalResponse = controller.cancelApproval(77L, user);
+
+        assertThat(submissionResponse.getResult().get("item")).isSameAs(submission);
+        assertThat(approvalResponse.getResult().get("item")).isSameAs(approval);
+        verify(approvalService).cancelSubmission(user, 77L);
+        verify(approvalService).cancelApproval(user, 77L);
+    }
+
     private void assertRoute(String methodName, Class<? extends Annotation> mappingType, String expectedPath) {
         Method method = Arrays.stream(DocumentApprovalApiController.class.getDeclaredMethods())
                 .filter(candidate -> candidate.getName().equals(methodName))

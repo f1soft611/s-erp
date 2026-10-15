@@ -408,6 +408,62 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('검색 결과')).toBeInTheDocument();
   });
 
+  it('documents PageSearchArea detailed-search integration', () => {
+    const doc = getF1GridDoc('filtering-sorting');
+    const prose = doc.sections.find(
+      (section) =>
+        section.type === 'prose' &&
+        section.heading === 'PageSearchArea 상세검색 연동',
+    );
+    expect(prose?.type).toBe('prose');
+    if (!prose || prose.type !== 'prose' || typeof prose.body !== 'string') {
+      throw new Error('Detailed-search integration prose is missing');
+    }
+
+    expect(prose.body).toContain('F1GridColumn.search');
+    expect(prose.body).toContain('toPageSearchFields(columns)');
+    expect(prose.body).toContain('PageSearchArea.detailFields');
+    expect(prose.body).toContain('search.hidden');
+    expect(prose.body).toContain('column.hidden');
+    expect(prose.body).toContain('search.label');
+    expect(prose.body).toContain('search.group');
+    expect(prose.body).toContain('search.order');
+    expect(prose.body).toContain('search.span');
+    expect(prose.body).toContain('form.span');
+    expect(prose.body).toContain('searchSpan');
+    expect(prose.body).toContain('미지원');
+    expect(prose.body).toContain('text');
+    expect(prose.body).toContain(
+      'number, decimal, currency, date, select, checkbox',
+    );
+    expect(prose.body).toContain('detailValues');
+    expect(prose.body).toContain('onDetailValuesChange');
+    expect(prose.body).toContain('onDetailSearch');
+    expect(prose.body).toContain('날짜 범위');
+    expect(prose.body).toContain('from');
+    expect(prose.body).toContain('to');
+    expect(prose.body).toContain('options');
+    expect(prose.body).toContain(
+      'Grid 자체가 서버 조회를 수행하지 않습니다',
+    );
+
+    const example = doc.sections.find(
+      (section) =>
+        section.type === 'code' && section.heading === '상세검색 폼 연결',
+    );
+    expect(example?.type).toBe('code');
+    if (!example || example.type !== 'code') {
+      throw new Error('Detailed-search example is missing');
+    }
+    expect(example.code).toContain("type: 'date'");
+    expect(example.code).toContain('toPageSearchFields(columns)');
+    expect(example.code).toContain('detailFields={detailFields}');
+    expect(example.code).toContain('options: statusOptions');
+    expect(example.code).toContain('search: { hidden: true }');
+    expect(example.code).toContain('onDetailValuesChange={setDetailValues}');
+    expect(example.code).toContain('onDetailSearch=');
+  });
+
   it('documents each public F1-Grid API identifier and nested contract field', () => {
     const apiDoc = getF1GridDoc('api-reference');
     for (const [heading, expectedNames] of Object.entries(
@@ -450,15 +506,15 @@ describe('F1-Grid docs portal', () => {
     expect(apiText).toContain('create | edit');
   });
 
-  it('searches by API option name and opens the matching reference entry', () => {
+  it('searches F1GridColumn.search and opens its API reference row', () => {
     render(<F1GridDocsPage />);
 
     fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
-      target: { value: 'queryWorkerThreshold' },
+      target: { value: 'F1GridColumn.search' },
     });
 
     const result = screen.getByRole('button', {
-      name: /queryWorkerThreshold/,
+      name: /^searchF1GridColumn$/,
     });
     fireEvent.click(result);
 
@@ -466,7 +522,9 @@ describe('F1-Grid docs portal', () => {
       screen.getByRole('heading', { name: 'API 참조' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('row', { name: /queryWorkerThreshold/ }),
+      screen.getByRole('row', {
+        name: /search F1GridColumnSearchOptions/,
+      }),
     ).toBeInTheDocument();
   });
 

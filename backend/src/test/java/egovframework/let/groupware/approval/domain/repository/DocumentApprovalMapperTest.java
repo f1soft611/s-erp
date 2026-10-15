@@ -157,6 +157,101 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void cancellationStatementsAreMapped() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetSubmittedDocumentToDraft")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetSubmittedApprovalLines")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectProcessedLaterApprovalStage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetApprovalLineToPending")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetUntouchedLaterApprovalStages")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.countProcessedApprovalLines")).isTrue();
+    }
+
+    @Test
+    void cancellationSqlEnforcesTenantOwnershipAndWorkflowBoundaries() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("electronicApprovalId", 77L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "202");
+        params.put("electronicApprovalLineId", 22L);
+        params.put("stageOrder", 2);
+
+        String resetDocumentSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetSubmittedDocumentToDraft")
+                .getBoundSql(params).getSql();
+        String resetLinesSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetSubmittedApprovalLines")
+                .getBoundSql(params).getSql();
+        String approvedLineSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate")
+                .getBoundSql(params).getSql();
+        String laterStageSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectProcessedLaterApprovalStage")
+                .getBoundSql(params).getSql();
+        String resetActorSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetApprovalLineToPending")
+                .getBoundSql(params).getSql();
+        String resetLaterSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetUntouchedLaterApprovalStages")
+                .getBoundSql(params).getSql();
+        String processedCountSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.countProcessedApprovalLines")
+                .getBoundSql(params).getSql();
+
+        assertThat(resetDocumentSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("drafter_id = ?")
+                .contains("document_status = 'PENDING'")
+                .contains("submitted_at = NULL");
+        assertThat(resetLinesSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_comment = NULL");
+        assertThat(approvedLineSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("participant_user_id = ?")
+                .contains("stage_order > 1")
+                .contains("action_status = 'APPROVED'")
+                .contains("FOR UPDATE");
+        assertThat(laterStageSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > ?")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_status IN ('APPROVED', 'REJECTED', 'RETURNED')");
+        assertThat(resetActorSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_line_id = ?")
+                .contains("participant_user_id = ?")
+                .contains("action_status = 'APPROVED'")
+                .contains("action_comment = NULL");
+        assertThat(resetLaterSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > ?")
+                .contains("action_status = 'PENDING'")
+                .contains("pending_at = NULL");
+        assertThat(processedCountSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > 1")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_status IN ('APPROVED', 'REJECTED', 'RETURNED')");
+    }
+
+    @Test
     void detailViewCountAndViewerHistoryStatementsAreMappedWithTenantGuards() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");

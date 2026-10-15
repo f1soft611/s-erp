@@ -52,6 +52,9 @@ export function DocumentWritePage({
     notices,
     isLoading,
     loadError,
+    feedEmployeeId,
+    feedEmployeeError,
+    retryFeedEmployee,
     retry,
     selectScope,
     selectNotice,
@@ -142,6 +145,23 @@ export function DocumentWritePage({
                     {loadError}
                   </Alert>
                 )}
+                {viewMode === 'feed' && feedEmployeeError && (
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 1.5 }}
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={retryFeedEmployee}
+                      >
+                        사원 정보 다시 시도
+                      </Button>
+                    }
+                  >
+                    {feedEmployeeError}
+                  </Alert>
+                )}
                 {isLoading ? (
                   <Box
                     role="status"
@@ -175,6 +195,7 @@ export function DocumentWritePage({
                           <DocumentFeedItem
                             key={item.id}
                             item={item}
+                            employeeId={feedEmployeeId}
                             detailRefreshToken={detailRefreshToken}
                             onActionComplete={refresh}
                             onEditDocument={(document) => {

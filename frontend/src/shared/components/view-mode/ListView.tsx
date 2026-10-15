@@ -78,15 +78,24 @@ export function ListView<T extends CommonViewItem>({
               </Typography>
               {item.categoryLabel && (
                 <Chip
+                  data-testid="list-category-chip"
                   label={item.categoryLabel}
                   size="small"
+                  color={item.categoryColor}
                   sx={{
                     flexShrink: 0,
                     ml: 'auto',
                     height: 22,
-                    bgcolor: 'rgba(59,130,246,0.18)',
-                    color: '#2563eb',
                     fontWeight: 700,
+                    ...(item.categoryColor
+                      ? {}
+                      : {
+                          bgcolor: 'rgba(59,130,246,0.18)',
+                          color: '#2563eb',
+                        }),
+                    ...(item.badgeBorderRadius
+                      ? { borderRadius: item.badgeBorderRadius }
+                      : {}),
                   }}
                 />
               )}
@@ -95,11 +104,14 @@ export function ListView<T extends CommonViewItem>({
                   label={item.statusLabel}
                   size="small"
                   color={item.statusColor ?? 'default'}
-                  variant="outlined"
+                  variant={item.statusVariant ?? 'outlined'}
                   sx={{
                     flexShrink: 0,
                     height: 22,
                     fontWeight: 700,
+                    ...(item.badgeBorderRadius
+                      ? { borderRadius: item.badgeBorderRadius }
+                      : {}),
                   }}
                 />
               )}

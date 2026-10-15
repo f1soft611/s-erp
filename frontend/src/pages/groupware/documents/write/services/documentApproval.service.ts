@@ -456,6 +456,44 @@ export async function processDocumentApprovalAction(
   };
 }
 
+export async function cancelDocumentSubmission(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalDraftResponse> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: DocumentApprovalDraftResponse }>(
+    `${APPROVAL_API}/${electronicApprovalId}/submission-cancellation`,
+    undefined,
+  );
+  const item = response.item;
+  if (
+    !item ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    item.documentStatus !== 'DRAFT'
+  ) {
+    throw new Error('상신 취소 응답을 확인할 수 없습니다.');
+  }
+  return item;
+}
+
+export async function cancelDocumentApproval(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalDraftResponse> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: DocumentApprovalDraftResponse }>(
+    `${APPROVAL_API}/${electronicApprovalId}/approval-cancellation`,
+    undefined,
+  );
+  const item = response.item;
+  if (
+    !item ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    (item.documentStatus !== 'PENDING' && item.documentStatus !== 'IN_PROGRESS')
+  ) {
+    throw new Error('승인 취소 응답을 확인할 수 없습니다.');
+  }
+  return item;
+}
+
 export async function uploadDocumentDraftAttachment(
   electronicApprovalId: number,
   file: File,

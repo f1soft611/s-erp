@@ -316,7 +316,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`), USER에서는 NULL |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -330,7 +330,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 결재 처리 및 임시저장 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED`/`SUBMITTED`/`RESUBMITTED`/`COMPLETED`/`DELETED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. 신규 결재 이벤트 허용은 `20261012_001` 검토용 migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. approval 문서 논리 삭제의 `DELETED` 허용은 `20261012_002` 검토용 migration 초안에 기록하며 DB에는 적용하지 않았다.
+- 결재 처리 및 임시저장/취소 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED`/`SUBMITTED`/`RESUBMITTED`/`COMPLETED`/`DELETED`/`SUBMISSION_CANCELED`/`APPROVAL_CANCELED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. 신규 결재 이벤트 허용은 `20261012_001` 검토용 migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. approval 문서 논리 삭제의 `DELETED` 허용은 `20261012_002` 검토용 migration 초안에 기록하며 DB에는 적용하지 않았다. 취소 이벤트 허용은 `20261014_003` 초안에 기록하며 DB에는 적용하지 않았다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -631,6 +631,7 @@
 
 ## 변경 이력
 
+- 2026-10-14: 전자결재 기안 상신 취소 및 결재자 승인 취소 이력을 위해 `tb_common_comment` SYSTEM event CHECK에 `SUBMISSION_CANCELED`, `APPROVAL_CANCELED` 허용을 추가하는 `20261014_003` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 이벤트 계약을 확인했으며 USER NULL 조건과 기존 SYSTEM 이벤트를 보존했다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
 - 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
