@@ -1464,7 +1464,6 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('참조자 C');
     expect(screen.getByTestId('approval-line-group-reference')).toHaveTextContent('운영팀');
     const referenceParticipant = screen.getByTestId('approval-line-reference-participant-73');
-    expect(referenceParticipant).toHaveStyle({ flexGrow: '0' });
     expect(
       within(referenceParticipant).getByTestId('approval-line-reference-department-73'),
     ).toHaveTextContent('운영팀');
@@ -1489,18 +1488,36 @@ describe('Document write page', () => {
     ];
     for (const card of participantCards) {
       expect(card).toHaveStyle({
-        flex: '0 1 240px',
+        flex: '1 1 240px',
         minWidth: 'min(100%, 190px)',
         maxWidth: '100%',
-        height: '66px',
+        height: '56px',
         boxSizing: 'border-box',
-        padding: '8px',
+        paddingTop: '6px',
+        paddingBottom: '6px',
       });
     }
     expect(screen.getByTestId('approval-line-agreement-avatar-72'))
-      .toHaveStyle({ width: '36px', height: '36px' });
+      .toHaveStyle({ width: '32px', height: '32px' });
     expect(screen.getByTestId('approval-line-reference-avatar-73'))
-      .toHaveStyle({ width: '36px', height: '36px' });
+      .toHaveStyle({ width: '32px', height: '32px' });
+    expect(
+      within(screen.getByTestId('approval-line-participant-71')).getByTitle('결재자 A'),
+    ).toHaveStyle({ fontSize: '14px' });
+    expect(
+      within(screen.getByTestId('approval-line-agreement-participant-72')).getByTitle('합의자 B'),
+    ).toHaveStyle({ fontSize: '14px' });
+    expect(
+      within(screen.getByTestId('approval-line-reference-participant-73')).getByTitle('참조자 C'),
+    ).toHaveStyle({ fontSize: '14px' });
+    expect(
+      screen.getByTestId('approval-line-agreement-department-72'),
+    ).toHaveStyle({ fontSize: '14px', lineHeight: '18px' });
+    expect(
+      screen.getByTestId('approval-line-reference-department-73'),
+    ).toHaveStyle({ fontSize: '14px', lineHeight: '18px' });
+    expect(screen.getByTestId('approval-line-agreement-status-72'))
+      .toHaveStyle({ fontSize: '14px', lineHeight: '18px' });
     const agreementLayoutGroup = screen.getByTestId('approval-line-group-agreement');
     const referenceLayoutGroup = screen.getByTestId('approval-line-group-reference');
     const agreementContent = within(agreementLayoutGroup).getByTestId(
@@ -1586,7 +1603,6 @@ describe('Document write page', () => {
     const agreementAvatar = screen.getByTestId('approval-line-agreement-avatar-72');
     expect(agreementAvatar.querySelector('img'))
       .toHaveAttribute('src', 'data:image/png;base64,AA==');
-    const referenceGroup = screen.getByTestId('approval-line-group-reference');
     const referenceAvatar = screen.getByTestId('approval-line-reference-avatar-73');
     expect(referenceAvatar.querySelector('img'))
       .toHaveAttribute('src', 'data:image/png;base64,AA==');

@@ -394,10 +394,28 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     public List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception {
         List<DocumentApprovalListItemVO> documents = listDocuments(user, scope, documentType, electronicApprovalId);
+        if (documents == null || documents.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> approvalIds = new ArrayList<>();
+        for (DocumentApprovalListItemVO listItem : documents) {
+            if (listItem != null && listItem.getElectronicApprovalId() != null) {
+                approvalIds.add(listItem.getElectronicApprovalId());
+            }
+        }
+        Map<Long, List<CommonFileVO>> attachmentsByApprovalId =
+                commonFileService.listFilesByOwnerIds(user.getTenantId(), OWNER_TYPE, approvalIds);
+        Map<Long, List<CommonCommentVO>> systemEventsByApprovalId =
+                listSystemEventsByApprovalIds(user, approvalIds);
+
         List<DocumentApprovalFeedItemVO> feedItems = new ArrayList<>();
         for (DocumentApprovalListItemVO listItem : documents) {
+            if (listItem == null) {
+                continue;
+            }
             Long approvalId = listItem.getElectronicApprovalId();
-            DocumentApprovalDetailVO detail = loadFeedDetail(user, approvalId);
+            DocumentApprovalDetailVO detail = loadFeedDetail(user, approvalId, attachmentsByApprovalId, systemEventsByApprovalId);
             CommonCommentPageVO commentPage = listApprovalComments(user, approvalId, 3, null);
 
             DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
@@ -419,8 +437,8 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             feedItem.setViewCount(detail.getViewCount());
             feedItem.setDrafter(detail.isDrafter());
             feedItem.setApprovalLines(detail.getApprovalLines());
-            feedItem.setAttachments(detail.getAttachments());
-            feedItem.setSystemEvents(detail.getSystemEvents());
+            feedItem.setAttachments(attachmentsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
+            feedItem.setSystemEvents(systemEventsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
             feedItem.setComments(commentPage.getComments());
             feedItem.setCommentCount(commentPage.getResultCnt());
             feedItem.setHasPreviousComments(commentPage.isHasPrevious());
@@ -430,7 +448,48 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         return feedItems;
     }
 
+    private Map<Long, List<CommonCommentVO>> listSystemEventsByApprovalIds(LoginVO user, List<Long> approvalIds) throws Exception {
+        if (approvalIds == null || approvalIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Set<Long> distinctIds = new HashSet<>();
+        for (Long approvalId : approvalIds) {
+            if (approvalId != null) {
+                distinctIds.add(approvalId);
+            }
+        }
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", user.getTenantId());
+        params.put("ownerType", OWNER_TYPE);
+        params.put("ownerIds", new ArrayList<>(distinctIds));
+        List<CommonCommentVO> events = commonCommentDAO.selectApprovalSystemEventsByOwnerIds(params);
+
+        Map<Long, List<CommonCommentVO>> grouped = new HashMap<>();
+        for (Long approvalId : distinctIds) {
+            grouped.put(approvalId, new ArrayList<>());
+        }
+        if (events != null) {
+            for (CommonCommentVO event : events) {
+                if (event == null || event.getOwnerId() == null) {
+                    continue;
+                }
+                grouped.computeIfAbsent(event.getOwnerId(), key -> new ArrayList<>()).add(event);
+            }
+        }
+        return grouped;
+    }
+
     private DocumentApprovalDetailVO loadFeedDetail(LoginVO user, Long electronicApprovalId) throws Exception {
+        return loadFeedDetail(user, electronicApprovalId, null, null);
+    }
+
+    private DocumentApprovalDetailVO loadFeedDetail(LoginVO user, Long electronicApprovalId,
+            Map<Long, List<CommonFileVO>> attachmentsByApprovalId,
+            Map<Long, List<CommonCommentVO>> systemEventsByApprovalId) throws Exception {
         requireRelatedDocument(user, electronicApprovalId);
         Map<String, Object> params = actorParams(user);
         params.put("electronicApprovalId", electronicApprovalId);
@@ -438,16 +497,24 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         if (detail == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
         }
-        List<CommonFileVO> attachments =
-                commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId);
-        detail.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+        if (attachmentsByApprovalId != null) {
+            detail.setAttachments(attachmentsByApprovalId.getOrDefault(electronicApprovalId, Collections.emptyList()));
+        } else {
+            List<CommonFileVO> attachments =
+                    commonFileService.listFiles(user.getTenantId(), OWNER_TYPE, electronicApprovalId);
+            detail.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+        }
         List<DocumentApprovalLineVO> approvalLines = documentApprovalDAO.selectApprovalLines(params);
         detail.setApprovalLines(
                 approvalLines == null ? Collections.<DocumentApprovalLineVO>emptyList() : approvalLines);
-        List<CommonCommentVO> systemEvents = commonCommentDAO.selectApprovalSystemEvents(
-                approvalCommentParams(user, electronicApprovalId, null));
-        detail.setSystemEvents(
-                systemEvents == null ? Collections.<CommonCommentVO>emptyList() : systemEvents);
+        if (systemEventsByApprovalId != null) {
+            detail.setSystemEvents(systemEventsByApprovalId.getOrDefault(electronicApprovalId, Collections.emptyList()));
+        } else {
+            List<CommonCommentVO> systemEvents = commonCommentDAO.selectApprovalSystemEvents(
+                    approvalCommentParams(user, electronicApprovalId, null));
+            detail.setSystemEvents(
+                    systemEvents == null ? Collections.<CommonCommentVO>emptyList() : systemEvents);
+        }
         return detail;
     }
 
@@ -572,15 +639,27 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
             comments.addAll(rootGroups.get(groupIndex));
         }
+        List<Long> commentIds = new ArrayList<>();
         for (CommonCommentVO comment : comments) {
+            if (comment != null && comment.getCommentId() != null) {
+                commentIds.add(comment.getCommentId());
+            }
+        }
+        Map<Long, List<CommonFileVO>> attachmentsByCommentId = commonFileService.listFilesByOwnerIds(
+                user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentIds);
+
+        for (CommonCommentVO comment : comments) {
+            if (comment == null) {
+                continue;
+            }
             if ("Y".equalsIgnoreCase(comment.getDeletedYn())) {
                 comment.setContent("[삭제된 댓글입니다.]");
                 comment.setWriterName("삭제된 댓글");
                 comment.setWriterId(null);
                 comment.setAttachments(new ArrayList<>());
             } else {
-                List<CommonFileVO> attachments = commonFileService.listFiles(
-                        user.getTenantId(), COMMENT_FILE_OWNER_TYPE, comment.getCommentId());
+                List<CommonFileVO> attachments = attachmentsByCommentId.getOrDefault(
+                        comment.getCommentId(), Collections.emptyList());
                 comment.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
             }
         }

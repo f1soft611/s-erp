@@ -2,7 +2,7 @@
 
 ## Status
 
-This specification records the approved community archive design and the implementation-level contracts for review. Implementation and database migration remain blocked until the user reviews this document and confirms the shared-worktree/database gate.
+This specification records the user-approved community archive design and implementation-level contracts. The implementation is complete; the database migration is documented but has not been applied.
 
 ## References
 
@@ -55,7 +55,9 @@ The list is newest-first and paginated. Search matches title, plain-text content
 - Each attachment has its own authenticated download action. Do not provide preview or bulk download.
 - Administrators create/edit a post with a title, multiline plain-text description, one category, and zero or more files.
 - Editing retains existing attachments unless the administrator explicitly removes them. New uploads and existing-file removals are handled as individual attachment operations.
+- Disable editor inputs and attachment controls while save/upload/removal operations are pending so users cannot make unsaved changes that would be lost when the submitted operation completes.
 - Post deletion uses the existing confirmation pattern. Deleting a post soft-deletes the post and cleans up its owned ordinary attachment records using the existing common-file service behavior.
+- Disable the detail-panel delete action while a post deletion is pending, preventing duplicate confirmations or mutations.
 - Serialize uploads and post deletion by locking the same tenant-owned post row inside their transactions. An upload waiting behind deletion must observe the deleted/missing post and fail; deletion must see uploads that completed before it acquired the lock.
 - A newly created post is persisted before individual file uploads because each file is owned by a post ID. If any upload or removal fails, show the failed file operation and allow retry; do not report the entire operation as successful.
 

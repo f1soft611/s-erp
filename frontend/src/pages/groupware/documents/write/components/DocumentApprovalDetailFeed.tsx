@@ -1326,6 +1326,7 @@ export function DocumentApprovalDetailFeed(
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
                                           textAlign: 'center',
+                                          fontSize: 14,
                                         }}
                                       >
                                         {line.participantName}
@@ -1454,9 +1455,9 @@ export function DocumentApprovalDetailFeed(
                                                   approvalLineStatusColors[
                                                     statusTone
                                                   ],
-                                                fontSize: '1rem',
                                                 fontWeight: 600,
-                                                lineHeight: 1.4,
+                                                fontSize: 14,
+                                                lineHeight: '18px',
                                                 whiteSpace: 'nowrap',
                                               }}
                                             >
@@ -1473,14 +1474,15 @@ export function DocumentApprovalDetailFeed(
                                               data-testid={`approval-line-agreement-participant-${line.electronicApprovalLineId}`}
                                               sx={{
                                                 display: 'flex',
-                                                flex: '0 1 240px',
+                                                flex: '1 1 240px',
                                                 alignItems: 'center',
                                                 gap: 1,
                                                 minWidth: 'min(100%, 190px)',
                                                 maxWidth: '100%',
-                                                height: 66,
+                                                height: 56,
                                                 boxSizing: 'border-box',
-                                                p: 1,
+                                                px: 1,
+                                                py: 0.75,
                                                 border: '1px solid',
                                                 borderColor: 'divider',
                                                 borderRadius: '10px',
@@ -1495,8 +1497,8 @@ export function DocumentApprovalDetailFeed(
                                                 }
                                                 alt={line.participantName}
                                                 sx={{
-                                                  width: 36,
-                                                  height: 36,
+                                                  width: 32,
+                                                  height: 32,
                                                   flexShrink: 0,
                                                 }}
                                               >
@@ -1521,6 +1523,8 @@ export function DocumentApprovalDetailFeed(
                                                   sx={{
                                                     display: 'block',
                                                     minWidth: 0,
+                                                    fontSize: 14,
+                                                    lineHeight: '18px',
                                                   }}
                                                 >
                                                   {line.participantName}
@@ -1542,6 +1546,8 @@ export function DocumentApprovalDetailFeed(
                                                     sx={{
                                                       minWidth: 0,
                                                       flex: 1,
+                                                      fontSize: 14,
+                                                      lineHeight: '18px',
                                                     }}
                                                   >
                                                     {departmentLabel}
@@ -1603,12 +1609,13 @@ export function DocumentApprovalDetailFeed(
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: 1,
-                                        flex: '0 1 240px',
+                                        flex: '1 1 240px',
                                         minWidth: 'min(100%, 190px)',
                                         maxWidth: '100%',
-                                        height: 66,
+                                        height: 56,
                                         boxSizing: 'border-box',
-                                        p: 1,
+                                        px: 1,
+                                        py: 0.75,
                                         border: '1px solid',
                                         borderColor: 'divider',
                                         borderRadius: '10px',
@@ -1623,8 +1630,8 @@ export function DocumentApprovalDetailFeed(
                                         }
                                         alt={line.participantName}
                                         sx={{
-                                          width: 36,
-                                          height: 36,
+                                          width: 32,
+                                          height: 32,
                                           flexShrink: 0,
                                         }}
                                       >
@@ -1635,7 +1642,11 @@ export function DocumentApprovalDetailFeed(
                                           variant="body1"
                                           title={line.participantName}
                                           noWrap
-                                          sx={{ display: 'block' }}
+                                          sx={{
+                                            display: 'block',
+                                            fontSize: 14,
+                                            lineHeight: '18px',
+                                          }}
                                         >
                                           {line.participantName}
                                         </Typography>
@@ -1645,6 +1656,10 @@ export function DocumentApprovalDetailFeed(
                                           title={departmentLabel}
                                           noWrap
                                           color="text.secondary"
+                                          sx={{
+                                            fontSize: 14,
+                                            lineHeight: '18px',
+                                          }}
                                         >
                                           {departmentLabel}
                                         </Typography>

@@ -144,7 +144,6 @@ function F1GridInner<T extends object>(
     minColumnWidth = 50,
     virtualizeRows,
     virtualizeColumns,
-    disableCellRangeSelection = false,
     rowOverscan = DEFAULT_GRID_ROW_OVERSCAN,
     columnOverscan = 2,
     fixedRowHeightThreshold = 10000,
@@ -2767,7 +2766,6 @@ function F1GridInner<T extends object>(
             selectedCellRangeBounds={selectedCellRangeBounds}
             copiedCellRange={copiedCellRange}
             isCellSelectionDragging={isCellSelectionDragging}
-            disableCellRangeSelection={disableCellRangeSelection}
             dragSelectionStateRef={dragSelectionStateRef}
             draftValue={draftValue}
             dirtyCellMap={dirtyCellMap}

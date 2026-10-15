@@ -1203,7 +1203,6 @@ export function DocumentApprovalSettingsDialog({
             ariaLabel="자주 쓰는 결재선 목록"
             height={320}
             showCheckbox={false}
-            disableCellRangeSelection
             loading={favoriteOperation === 'list'}
             disableSorting
             disableFiltering

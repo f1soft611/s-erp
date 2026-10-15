@@ -227,7 +227,7 @@ All archive endpoints require an authenticated `LoginVO`; reads are tenant-scope
 
 - [ ] **Step 4: Implement detail and administrator editor**
 
-  Use `PostDetailPanel`/`PageAreaOverlay` to show plain-text description and per-file downloads. Build an archive-specific simple multiline text editor; do not reuse notice embedded-image routes. Support selecting multiple files, retaining existing files while editing, removing selected existing attachments, and confirmation before deletion. After mutations, reload the current list and surface failed uploads/deletions without a success message.
+  Use `PostDetailPanel`/`PageAreaOverlay` to show plain-text description and per-file downloads. Build an archive-specific simple multiline text editor; do not reuse notice embedded-image routes. Support selecting multiple files, retaining existing files while editing, removing selected existing attachments, and confirmation before deletion. Disable editor controls while saving and the delete action while deletion is pending. After mutations, reload the current list and surface failed uploads/deletions without a success message.
 
 - [ ] **Step 5: Run focused frontend tests and production build**
 

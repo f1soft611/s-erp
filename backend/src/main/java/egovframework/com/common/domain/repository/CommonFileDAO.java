@@ -15,6 +15,10 @@ public class CommonFileDAO extends EgovAbstractMapper {
         return selectList("CommonFileDAO.selectCommonFileList", params);
     }
 
+    public List<CommonFileVO> selectCommonFileListByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonFileDAO.selectCommonFileListByOwnerIds", params);
+    }
+
     public CommonFileVO selectCommonFileById(Map<String, Object> params) throws Exception {
         return (CommonFileVO) selectOne("CommonFileDAO.selectCommonFileById", params);
     }

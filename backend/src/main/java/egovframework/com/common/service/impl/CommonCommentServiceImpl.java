@@ -2,7 +2,10 @@ package egovframework.com.common.service.impl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +51,55 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         List<CommonCommentVO> comments = commonCommentDAO.selectCommonCommentList(params);
         markDeletedComments(comments);
         return comments == null ? new ArrayList<>() : comments;
+    }
+
+    @Override
+    public Map<Long, List<CommonCommentVO>> listCommentsByOwnerIds(Long tenantId, String ownerType, List<Long> ownerIds, Integer limit) throws Exception {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
+        }
+        if (!StringUtils.hasText(ownerType) || ownerIds == null || ownerIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        int safeLimit = limit == null ? 3 : limit;
+        if (safeLimit < 1 || safeLimit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 조회 건수가 올바르지 않습니다.");
+        }
+
+        Set<Long> distinctIds = new HashSet<>();
+        for (Long ownerId : ownerIds) {
+            if (ownerId != null) {
+                distinctIds.add(ownerId);
+            }
+        }
+        if (distinctIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        requireDao();
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("ownerType", ownerType.trim().toUpperCase());
+        params.put("ownerIds", new ArrayList<>(distinctIds));
+        params.put("limit", safeLimit);
+
+        List<CommonCommentVO> fetched = commonCommentDAO.selectCommonCommentPageByOwnerIds(params);
+        Map<Long, List<CommonCommentVO>> grouped = new HashMap<>();
+        for (Long ownerId : distinctIds) {
+            grouped.put(ownerId, new ArrayList<CommonCommentVO>());
+        }
+        if (fetched != null) {
+            for (CommonCommentVO comment : fetched) {
+                if (comment == null || comment.getOwnerId() == null) {
+                    continue;
+                }
+                grouped.computeIfAbsent(comment.getOwnerId(), key -> new ArrayList<>()).add(comment);
+            }
+        }
+        for (List<CommonCommentVO> comments : grouped.values()) {
+            markDeletedComments(comments);
+        }
+        return grouped;
     }
 
     @Override
@@ -137,6 +189,55 @@ public class CommonCommentServiceImpl extends EgovAbstractServiceImpl implements
         params.put("ownerId", ownerId);
         Long count = commonCommentDAO.countCommonComments(params);
         return count == null ? 0L : count;
+    }
+
+    @Override
+    public Map<Long, Long> countCommentsByOwnerIds(Long tenantId, String ownerType, List<Long> ownerIds) throws Exception {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
+        }
+        if (!StringUtils.hasText(ownerType) || ownerIds == null || ownerIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        Set<Long> distinctIds = new HashSet<>();
+        for (Long ownerId : ownerIds) {
+            if (ownerId != null) {
+                distinctIds.add(ownerId);
+            }
+        }
+        if (distinctIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        requireDao();
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("ownerType", ownerType.trim().toUpperCase());
+        params.put("ownerIds", new ArrayList<>(distinctIds));
+
+        List<Map<String, Object>> rows = commonCommentDAO.selectCommonCommentCountsByOwnerIds(params);
+        Map<Long, Long> countsByOwnerId = new HashMap<>();
+        if (rows != null) {
+            for (Map<String, Object> row : rows) {
+                Object ownerIdValue = row.get("ownerId");
+                Object countValue = row.get("totalCount");
+                if (ownerIdValue == null || countValue == null) {
+                    continue;
+                }
+                Long ownerId = null;
+                if (ownerIdValue instanceof Number) {
+                    ownerId = ((Number) ownerIdValue).longValue();
+                } else {
+                    ownerId = Long.valueOf(ownerIdValue.toString());
+                }
+                long count = countValue instanceof Number ? ((Number) countValue).longValue() : Long.parseLong(countValue.toString());
+                countsByOwnerId.put(ownerId, count);
+            }
+        }
+        for (Long ownerId : distinctIds) {
+            countsByOwnerId.putIfAbsent(ownerId, 0L);
+        }
+        return countsByOwnerId;
     }
 
     private void validateListRequest(Long tenantId, String ownerType, Long ownerId) {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
@@ -276,6 +276,59 @@ describe('Archive dashboard page', () => {
     expect(screen.getByRole('textbox', { name: '설명' })).toHaveValue('설명 초안');
   });
 
+  it('disables editor fields and attachment controls while a file upload is pending', async () => {
+    let resolveUpload!: (value: ArchiveAttachment) => void;
+    const pendingUpload = new Promise<ArchiveAttachment>((resolve) => {
+      resolveUpload = resolve;
+    });
+    archiveServices.fetchArchivePostDetail.mockResolvedValueOnce({
+      ...archivePost,
+      attachments: [
+        attachment,
+        { ...attachment, boardFileId: 32, fileName: 'template.docx' },
+      ],
+    });
+    archiveServices.uploadArchiveAttachment.mockReturnValueOnce(pendingUpload);
+    renderArchive();
+    await openPostDetail();
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    const title = await screen.findByRole('textbox', { name: '제목' });
+    const category = screen.getByRole('combobox', { name: '자료 분류' });
+    const fileInput = screen.getByLabelText('첨부파일 추가');
+    fireEvent.click((await screen.findAllByRole('button', { name: '제거' }))[0]);
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['file'], 'pending.txt', { type: 'text/plain' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(archiveServices.uploadArchiveAttachment).toHaveBeenCalled(),
+    );
+    expect(title).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: '설명' })).toBeDisabled();
+    expect(category).toHaveAttribute('aria-disabled', 'true');
+    expect(fileInput).toBeDisabled();
+    expect(screen.getByRole('button', { name: '파일 추가' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    screen
+      .getAllByRole('button', { name: '제거' })
+      .forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getByRole('button', { name: '복원' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '제외' })).toBeDisabled();
+
+    await act(async () => {
+      resolveUpload(attachment);
+      await pendingUpload;
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: '자료 수정' }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it('retains existing attachments during edits unless they are explicitly removed', async () => {
     renderArchive();
     await openPostDetail();
@@ -321,6 +374,36 @@ describe('Archive dashboard page', () => {
     await waitFor(() =>
       expect(archiveServices.deleteArchivePost).toHaveBeenCalledWith(12),
     );
+  });
+
+  it('disables the detail delete action while deletion is pending', async () => {
+    let resolveDelete!: () => void;
+    const pendingDelete = new Promise<void>((resolve) => {
+      resolveDelete = resolve;
+    });
+    archiveServices.deleteArchivePost.mockReturnValueOnce(pendingDelete);
+    renderArchive();
+    await openPostDetail();
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: /자료 삭제 확인/,
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '삭제 확인' }));
+
+    await waitFor(() =>
+      expect(archiveServices.deleteArchivePost).toHaveBeenCalledWith(12),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: /자료 삭제 확인/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled();
+
+    await act(async () => {
+      resolveDelete();
+      await pendingDelete;
+    });
   });
 
   it('renders a retry action for list failures rather than an empty success state', async () => {

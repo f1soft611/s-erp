@@ -21,6 +21,7 @@ type ArchivePostDetailProps = {
   onDownload: (post: ArchivePost, fileIndex: number) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  isDeletePending?: boolean;
 };
 
 function formatDate(value?: string | Date | null) {
@@ -38,6 +39,7 @@ export function ArchivePostDetail({
   onDownload,
   onEdit,
   onDelete,
+  isDeletePending = false,
 }: ArchivePostDetailProps) {
   const category =
     categories.find((item) => item.code === post.categoryCode)?.name ??
@@ -74,6 +76,7 @@ export function ArchivePostDetail({
                 color="error"
                 startIcon={<DeleteOutlineOutlined />}
                 onClick={onDelete}
+                disabled={isDeletePending}
               >
                 삭제
               </Button>

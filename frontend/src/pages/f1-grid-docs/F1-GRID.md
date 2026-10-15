@@ -86,7 +86,6 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
-- `disableCellRangeSelection` 옵션은 마우스 드래그에 의한 다중 셀 범위 선택을 화면 단위로 비활성화한다. 기본값은 `false`이며, 비활성화한 경우에도 셀 클릭 포커스와 단일 셀 편집은 유지된다. 행 액션과 인라인 편집 위주의 목록처럼 드래그 범위 선택이 필요 없는 화면에서 사용할 수 있다.
 - 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
@@ -95,7 +94,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
 - 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
-- 인라인 편집 중 blur는 Grid 바깥의 실제 editor popup으로 포커스가 이동할 때 보류한다. Grid 자체를 감싸는 상위 MUI Dialog/Modal은 popup으로 오인하지 않으므로, 같은 Dialog 안에서 다른 셀을 클릭하면 현재 edit가 commit되어 dirty 상태에 반영된다.
+- 인라인 편집 중 포커스가 같은 Grid의 다른 셀로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. 이 동작은 Grid가 중첩 MUI Dialog/Modal 안에 있어도 유지된다. Grid 바깥의 실제 editor popup으로 포커스가 이동할 때만 blur commit을 보류한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
@@ -436,7 +435,7 @@ const changedNames = gridRef.current?.getChanges().updatedRows ?? [];
 - `onChangesChange`로 저장 버튼의 활성 상태를 유지하고, `getChanges().updatedRows`에서 수정된 행만 저장한다.
 - 불러오기/삭제/닫기는 행 ID를 전달하며, 미저장 변경 폐기 확인은 Grid를 사용하는 페이지가 처리한다.
 - 이름 저장의 부분 실패에서는 페이지가 성공 응답으로 Grid 기준 목록을 갱신하고, 실패한 입력만 `setCellValue`로 다시 적용해 재시도 가능 상태를 만든다.
-- 이 화면은 기존 `F1Grid`, `F1GridColumn`, `F1GridRef` 공개 API만 사용하며 Grid 공통 코어는 수정하지 않는다.
+- 이 화면은 기존 `F1Grid`, `F1GridColumn`, `F1GridRef` 공개 API를 사용한다. 같은 Grid 내부 포커스 이동 시 blur commit을 보장하는 공통 Grid 동작을 적용한다.
 
 예:
 

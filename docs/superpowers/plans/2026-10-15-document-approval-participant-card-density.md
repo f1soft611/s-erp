@@ -65,16 +65,18 @@ for (const card of participantCards) {
     paddingTop: '6px',
     paddingBottom: '6px',
   });
-  expect(card.querySelector('[data-testid^="approval-line-"][data-testid$="-avatar-"]'))
-    .toHaveStyle({ width: '32px', height: '32px' });
 }
+expect(screen.getByTestId('approval-line-agreement-avatar-72'))
+  .toHaveStyle({ width: '32px', height: '32px' });
+expect(screen.getByTestId('approval-line-reference-avatar-73'))
+  .toHaveStyle({ width: '32px', height: '32px' });
 ```
 
 Keep the existing `flexWrap: 'wrap'` assertions for both participant collections.
 
 - [ ] **Step 2: Assert user-name and secondary text typography**
 
-Use the known card IDs already rendered by the test (`approval-line-participant-*`, `approval-line-agreement-participant-*`, and `approval-line-reference-participant-*`). Assert that each corresponding participant-name Typography has `fontSize: 14px`. Assert the agreement/reference department Typography and agreement status badge also use 14px, with agreement status `lineHeight: 18px`. Retain assertions for `부서없음`, status labels, sequence, participant ordering, and profile image fallback.
+Use the known card IDs already rendered by the test. The approval cards use `approval-line-participant-<id>`; the existing approval fixture contains IDs 71, 74, and 75, the agreement fixture contains 72 and 76, and the reference fixture contains 73 and 78. Query each card's participant-name Typography by its `title` attribute and assert `fontSize: 14px`. Assert agreement/reference department Typography and agreement status badge also use 14px, with agreement status `lineHeight: 18px`. Retain assertions for `부서없음`, status labels, sequence, participant ordering, and profile image fallback.
 
 - [ ] **Step 3: Run the focused test and verify expected failure**
 

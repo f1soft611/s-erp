@@ -148,17 +148,19 @@ export function ArchiveComposerDialog({
             label="제목"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            disabled={isSaving}
             required
             fullWidth
             slotProps={{ htmlInput: { maxLength: 200 } }}
           />
-          <FormControl fullWidth required>
+          <FormControl fullWidth required disabled={isSaving}>
             <InputLabel id="archive-composer-category-label">자료 분류</InputLabel>
             <Select
               labelId="archive-composer-category-label"
               label="자료 분류"
               value={categoryCode}
               onChange={(event) => setCategoryCode(event.target.value)}
+              disabled={isSaving}
             >
               {categories.map((category) => (
                 <MenuItem key={category.code} value={category.code}>
@@ -171,19 +173,25 @@ export function ArchiveComposerDialog({
             label="설명"
             value={contents}
             onChange={(event) => setContents(event.target.value)}
+            disabled={isSaving}
             multiline
             minRows={5}
             fullWidth
             required
           />
           <Box>
-            <Button component="label" variant="outlined">
+            <Button
+              component="label"
+              variant="outlined"
+              disabled={isSaving}
+            >
               파일 추가
               <input
                 aria-label="첨부파일 추가"
                 type="file"
                 multiple
                 hidden
+                disabled={isSaving}
                 onChange={(event) => {
                   handleFileChange(event.target.files);
                   event.target.value = '';
@@ -211,6 +219,7 @@ export function ArchiveComposerDialog({
                       size="small"
                       color="error"
                       onClick={() => removeAttachment(attachment)}
+                      disabled={isSaving}
                     >
                       제거
                     </Button>
@@ -238,6 +247,7 @@ export function ArchiveComposerDialog({
                       type="button"
                       size="small"
                       onClick={() => restoreAttachment(attachment)}
+                      disabled={isSaving}
                     >
                       복원
                     </Button>
@@ -264,6 +274,7 @@ export function ArchiveComposerDialog({
                     <Button
                       type="button"
                       size="small"
+                      disabled={isSaving}
                       onClick={() =>
                         setFiles((current) =>
                           current.filter((_, fileIndex) => fileIndex !== index),

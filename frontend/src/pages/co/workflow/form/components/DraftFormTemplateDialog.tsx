@@ -292,8 +292,7 @@ export function DraftFormTemplateDialog({
             display: 'flex',
             flexDirection: 'column',
             gap: 1.5,
-            height: '100%',
-            minHeight: 0,
+            minHeight: '100%',
           }}
         >
           {error && <Alert severity="error">{error}</Alert>}
@@ -312,13 +311,10 @@ export function DraftFormTemplateDialog({
             <Box
               data-testid="draft-form-template-editor"
               sx={{
-                flex: 1,
+                flex: '1 0 auto',
                 minHeight: 0,
                 minWidth: 0,
-                overflow: 'hidden',
-                borderTop: 1,
-                borderBottom: 1,
-                borderColor: 'divider',
+                overflow: 'visible',
                 bgcolor: 'background.paper',
               }}
             >
@@ -336,12 +332,10 @@ export function DraftFormTemplateDialog({
                 onUploadingChange={editorSaveLifecycle.onUploadingChange}
                 onImageUploadError={editorSaveLifecycle.onImageUploadError}
                 className="draft-form-template-rich-text-editor"
+                scrollMode="container"
                 contentSx={{
-                  minHeight: '100%',
                   outline: 'none',
                   lineHeight: 1.7,
-                  overflowX: 'auto',
-                  overflowY: 'auto',
                   boxSizing: 'border-box',
                   px: 2,
                   py: 2,

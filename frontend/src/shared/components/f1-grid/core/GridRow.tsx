@@ -41,7 +41,6 @@ type GridRowProps<T extends object> = {
   selectedCellRange?: F1GridCellRange;
   selectedCellRangeBounds?: F1GridCellRangeBounds;
   isCellSelectionDragging?: boolean;
-  disableCellRangeSelection: boolean;
   dragSelectionStateRef: {
     current: {
       active: boolean;
@@ -192,7 +191,6 @@ const areGridRowPropsEqual = <T extends object>(
     Object.is(prev.selectedCellRange, next.selectedCellRange) &&
     Object.is(prev.selectedCellRangeBounds, next.selectedCellRangeBounds) &&
     prev.isCellSelectionDragging === next.isCellSelectionDragging &&
-    prev.disableCellRangeSelection === next.disableCellRangeSelection &&
     Object.is(prev.copiedCellRange, next.copiedCellRange) &&
     prev.draftValue === next.draftValue &&
     prev.dirtyCellMap === next.dirtyCellMap &&
@@ -232,7 +230,6 @@ const GridRowInner = <T extends object>({
   selectedCellRange,
   selectedCellRangeBounds,
   isCellSelectionDragging = false,
-  disableCellRangeSelection,
   dragSelectionStateRef,
   copiedCellRange,
   draftValue,
@@ -320,8 +317,6 @@ const GridRowInner = <T extends object>({
         onSetFocusedCell(cell);
         onSelectRow(rowId, event as unknown as MouseEvent<HTMLElement>);
       }
-      if (disableCellRangeSelection) return;
-
       const previousCell = previousDragCellRef.current;
       const isSameDragCell =
         previousCell?.rowId === cell.rowId &&
@@ -340,7 +335,6 @@ const GridRowInner = <T extends object>({
     },
     [
       dragSelectionStateRef,
-      disableCellRangeSelection,
       onCellSelectionStart,
       onSelectRow,
       onSetFocusedCell,
@@ -351,7 +345,6 @@ const GridRowInner = <T extends object>({
 
   const handleCellMouseEnter = useCallback(
     (cell: { rowId: F1GridRowId; columnIndex: number }) => {
-      if (disableCellRangeSelection) return;
       const dragState = dragSelectionStateRef.current;
       const dragAlreadyActive =
         isCellSelectionDragging || dragState.active || !!selectedCellRange;
@@ -372,7 +365,6 @@ const GridRowInner = <T extends object>({
     },
     [
       dragSelectionStateRef,
-      disableCellRangeSelection,
       isCellSelectionDragging,
       onCellSelectionDrag,
       selectedCellRange,

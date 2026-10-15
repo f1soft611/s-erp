@@ -328,6 +328,7 @@ export function ArchiveBoardPage({
                   onDelete={
                     canDelete ? () => setDeleteTarget(selectedPost) : undefined
                   }
+                  isDeletePending={mutations.isDeleting}
                 />
               )}
             </PageAreaOverlay>

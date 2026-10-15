@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 업무작성 결재선 설정의 템플릿 관리 목록을 F1-Grid 인라인 편집 화면으로 바꾸고, 행별 불러오기/삭제와 하단 일괄 저장을 제공한다.
+**Goal:** 업무작성 결재선 설정의 템플릿 관리 목록을 F1-Grid 인라인 편집 화면으로 바꾸고, 행별 적용/삭제와 하단 일괄 저장을 제공한다.
 
 **Architecture:** 기존 `DocumentApprovalSettingsDialog` 안의 템플릿 관리 `CommonDialog`를 F1-Grid 목록으로 교체한다. 기존 목록·상세·이름 변경·삭제 API를 재사용하며, Grid `getChanges()`로 이름 변경을 모아 저장하고 부분 실패 시 실패 편집을 유지한다. 미저장 변경을 폐기하는 행 액션/닫기는 확인을 거친다.
 
@@ -17,7 +17,8 @@
 - Created `docs/spec/20261015/20261015_011_업무작성_자주쓰는결재선_F1Grid_상세사양서.md`: accepted screen, persistence, discard-confirmation and failure contract.
 - Modify `frontend/src/pages/groupware/documents/write/components/DocumentApprovalSettingsDialog.tsx`: F1-Grid columns, row actions, edit tracking, save/validation and discard confirmation.
 - Modify `frontend/tests/document-approval-settings-dialog.test.tsx`: assert list, per-row actions, inline edits, batch save, partial failure and discard behavior.
-- Modify `frontend/src/pages/f1-grid-docs/F1-GRID.md`: document the approval-template screen’s use of editable name and row action columns, without changing the shared Grid contract.
+- Modify `frontend/src/shared/components/f1-grid/core/GridCell.tsx`: commit inline edits when focus moves to another cell in the same Grid, including when nested in MUI dialogs.
+- Modify `frontend/src/pages/f1-grid-docs/F1-GRID.md`: document editable name and row action columns plus same-grid blur commit behavior.
 - Modify `docs/result/20261015/document-approval-line-favorites/20261015_002_업무작성_자주쓰는결재선_결과보고서.md` and add updated screenshots beneath its `screenshots` directory.
 
 ## Task 1: Verify the dated screen contract
@@ -30,7 +31,7 @@
 
 - [x] **Step 2: Write the detailed screen specification from the approved design**
 
-  Specify the two visible columns (`결재선명`, `액션`), row-level `불러오기` and `삭제`, the bottom `저장`, name constraints, partial API failure behavior, and the accepted discard confirmation cases. State that existing API and database contracts remain unchanged.
+  Specify the two visible columns (`결재선명`, `액션`), row-level `적용` and `삭제`, the bottom `저장`, name constraints, partial API failure behavior, and the accepted discard confirmation cases. State that existing API and database contracts remain unchanged.
 
 - [x] **Step 3: Check the three dated documents for consistent terminology**
 
@@ -66,9 +67,9 @@
   );
   ```
 
-- [x] **Step 3: Add row-specific load and deletion tests**
+- [x] **Step 3: Add row-specific apply and deletion tests**
 
-  Click the `불러오기` action whose accessible label includes a specific template name and assert `getApprovalLineTemplate` receives that row’s ID without selecting a row or using a shared footer load action. Verify the existing `적용` boundary and fixed drafter. Click a row’s `삭제`, verify the existing confirmation, and assert only that row ID is deleted.
+  Click the `적용` action whose accessible label includes a specific template name and assert `getApprovalLineTemplate` receives that row’s ID without selecting a row or using a shared footer load action. Verify the existing `적용` boundary and fixed drafter. Click a row’s `삭제`, verify the existing confirmation, and assert only that row ID is deleted.
 
 - [x] **Step 4: Add validation and partial-failure tests**
 
@@ -125,13 +126,13 @@
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <Button
-            aria-label={`결재선 불러오기 ${row.name}`}
+            aria-label={`결재선 적용 ${row.name}`}
             onClick={(event) => {
               event.stopPropagation();
               requestManagerAction({ type: 'load', templateId: row.templateId });
             }}
           >
-            불러오기
+            적용
           </Button>
           <Button
             aria-label={`결재선 삭제 ${row.name}`}
@@ -169,7 +170,7 @@
   />
   ```
 
-- [x] **Step 3: Implement row-specific load**
+- [x] **Step 3: Implement row-specific apply**
 
   Move the existing detail request/apply logic behind a handler receiving `templateId`. Keep the document-code check, participant validation, fixed drafter, and error behavior. On successful load close the manager; do not call the parent `onApply`.
 
@@ -218,7 +219,7 @@
 
 - [x] **Step 7: Replace the manager body and footer**
 
-  Render the F1-Grid in the existing manager dialog with an accessible label, loading state, a clear empty state, and existing errors. Remove the selected-template and separate rename form UI. Replace the footer `불러오기` action with `저장`, disabled when there are no changes or a favorite operation is running; retain the close action and disable conflicting operations during requests.
+  Render the F1-Grid in the existing manager dialog with an accessible label, loading state, a clear empty state, and existing errors. Remove the selected-template and separate rename form UI. Replace the footer load action with `저장`, disabled when there are no changes or a favorite operation is running; retain the close action and disable conflicting operations during requests.
 
 - [x] **Step 8: Run the focused tests**
 
@@ -228,13 +229,17 @@
 
   Expected: all manager behavior tests pass, including partial failure/retry and existing modal draft/apply behavior.
 
+- [x] **Step 9: Reproduce edit-to-cell-click commit in nested dialogs**
+
+  Edit a template name, click a different template-name cell, and verify the original editor closes, only the destination cell remains selected, and the footer save action becomes enabled. Save and verify the rename API receives the edited row.
+
 ## Task 4: Update F1-Grid and task documentation
 
 **Files:** Modify `frontend/src/pages/f1-grid-docs/F1-GRID.md` and `docs/result/20261015/document-approval-line-favorites/20261015_002_업무작성_자주쓰는결재선_결과보고서.md`; add browser captures.
 
 - [x] **Step 1: Document the existing F1-Grid APIs used by this screen**
 
-  Add a focused integration example/reference for an editable text column, a `renderCell` row-action column, `getChanges()`/`onChangesChange` dirty tracking, and `stopPropagation()`. State that no shared Grid core behavior was added.
+  Add a focused integration example/reference for an editable text column, a `renderCell` row-action column, `getChanges()`/`onChangesChange` dirty tracking, `stopPropagation()`, and same-grid blur commit behavior inside nested dialogs.
 
 - [x] **Step 2: Update the feature result report**
 
@@ -266,7 +271,7 @@
   npm run build
   ```
 
-  Result: command ran but failed on TypeScript errors in out-of-scope concurrent community archive files `ArchiveComposerDialog.tsx` and `ArchivePostDetail.tsx`; recorded in the result report.
+  Result: build succeeded. Vite reported a large-chunk warning; recorded in the result report.
 
 - [x] **Step 3: Run final whitespace and scope checks**
 
@@ -277,4 +282,10 @@
 
   Result: `git diff --check` reported no whitespace errors. The shared worktree contains unrelated concurrent changes; they were preserved and not attributed to this task.
 
-  Focused verification: both targeted test files passed (27 tests total). Browser captures were saved at all three requested viewport widths with synthetic template data only.
+  Focused verification from the initial F1-Grid attempt: the approval manager and service tests passed (28 total); the full F1-Grid test file reported 110 passing and 46 failing tests across several other areas. The stale-range-selection diagnosis was corrected later: this was a blur-commit failure inside nested dialogs. See the follow-up note below for current targeted verification.
+
+## Follow-up: Commit edits on in-grid focus changes
+
+The reported behavior is not caused by drag-range selection. When the Grid is hosted in nested MUI dialogs, the dialog modal roots may be detected as editor popups; this suppresses the blur commit when focus moves between cells. The previous `disableCellRangeSelection` workaround was removed. `GridCell` now commits on blur when focus moves to another cell in the same Grid, while actual editor popups outside that Grid still defer commit. The regression test covers name edit, click to another cell, clean focus transfer, dirty/save enablement, and the resulting rename request.
+
+Verification: approval manager/service tests 28/28; F1-Grid docs portal tests 28/28; focused parent-dialog commit and default range-selection tests 2/2; frontend build succeeded with the existing large-chunk warning.

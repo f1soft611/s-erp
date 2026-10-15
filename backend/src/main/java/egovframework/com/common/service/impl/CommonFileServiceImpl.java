@@ -5,9 +5,11 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -67,6 +69,48 @@ public class CommonFileServiceImpl extends EgovAbstractServiceImpl implements Co
         params.put("ownerId", ownerId);
         List<CommonFileVO> files = commonFileDAO.selectCommonFileList(params);
         return files == null ? new ArrayList<>() : files;
+    }
+
+    @Override
+    public Map<Long, List<CommonFileVO>> listFilesByOwnerIds(Long tenantId, String ownerType, List<Long> ownerIds) throws Exception {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 없습니다.");
+        }
+        if (!StringUtils.hasText(ownerType) || ownerIds == null || ownerIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        if (commonFileDAO == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 정보를 조회할 수 없습니다.");
+        }
+
+        Set<Long> distinctIds = new HashSet<>();
+        for (Long ownerId : ownerIds) {
+            if (ownerId != null) {
+                distinctIds.add(ownerId);
+            }
+        }
+        if (distinctIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("ownerType", ownerType.trim().toUpperCase());
+        params.put("ownerIds", new ArrayList<>(distinctIds));
+        List<CommonFileVO> files = commonFileDAO.selectCommonFileListByOwnerIds(params);
+        Map<Long, List<CommonFileVO>> grouped = new HashMap<>();
+        for (Long ownerId : distinctIds) {
+            grouped.put(ownerId, new ArrayList<>());
+        }
+        if (files != null) {
+            for (CommonFileVO file : files) {
+                if (file == null || file.getOwnerId() == null) {
+                    continue;
+                }
+                grouped.computeIfAbsent(file.getOwnerId(), key -> new ArrayList<>()).add(file);
+            }
+        }
+        return grouped;
     }
 
     @Override

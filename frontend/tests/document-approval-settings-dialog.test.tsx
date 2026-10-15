@@ -434,39 +434,53 @@ describe('DocumentApprovalSettingsDialog', () => {
     ).toBeDisabled();
   });
 
-  it('does not retain a multi-cell range when dragging across template names', async () => {
+  it('commits an edited name when another cell is clicked and enables save', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },
       { templateId: 10, name: '다른 결재선', eabusNo: '001' },
     ]);
+    templateApi.rename.mockImplementation(async (templateId, name) => ({
+      templateId,
+      name,
+      eabusNo: '001',
+    }));
     renderSettings();
 
     await openTemplateManagerGrid();
     const grid = getTemplateGrid();
-    const firstName = within(grid).getByRole('gridcell', {
-      name: '기본 결재선',
-    });
-    const secondName = within(grid).getByRole('gridcell', {
+    fireEvent.doubleClick(
+      within(grid).getByRole('gridcell', { name: '기본 결재선' }),
+    );
+    const editor = screen.getByDisplayValue('기본 결재선');
+    fireEvent.change(editor, { target: { value: '수정된 이름' } });
+    const nextCell = within(grid).getByRole('gridcell', {
       name: '다른 결재선',
     });
+    fireEvent.mouseDown(nextCell, { button: 0 });
+    fireEvent.click(nextCell);
 
-    fireEvent.mouseDown(firstName, { button: 0 });
-    fireEvent.mouseEnter(secondName);
-    fireEvent.mouseUp(secondName);
-
+    expect(screen.queryByDisplayValue('수정된 이름')).not.toBeInTheDocument();
+    expect(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    ).toBeEnabled();
     expect(
       within(grid)
         .getAllByRole('gridcell')
         .filter((cell) => cell.getAttribute('data-grid-selected') === 'true'),
-    ).toHaveLength(0);
+    ).toEqual([nextCell]);
 
-    fireEvent.click(secondName);
-
-    expect(
-      within(grid)
-        .getAllByRole('gridcell')
-        .filter((cell) => cell.getAttribute('data-grid-selected') === 'true'),
-    ).toEqual([secondName]);
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledWith(9, '수정된 이름'),
+    );
   });
 
   it('rejects duplicate normalized template names before saving', async () => {

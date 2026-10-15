@@ -78,7 +78,8 @@ class DocumentApprovalServiceImplTest {
         CommonFileVO attachment = new CommonFileVO();
         attachment.setFileId(91L);
         attachment.setOwnerId(77L);
-        when(fileService.listFiles(4L, "APPROVAL", 77L)).thenReturn(Collections.singletonList(attachment));
+        when(fileService.listFilesByOwnerIds(4L, "APPROVAL", Collections.singletonList(77L)))
+            .thenReturn(Collections.singletonMap(77L, Collections.singletonList(attachment)));
         DocumentApprovalLineVO approvalLine = new DocumentApprovalLineVO();
         when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.singletonList(approvalLine));
         when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
@@ -86,8 +87,9 @@ class DocumentApprovalServiceImplTest {
         CommonCommentVO comment = approvalComment(55L, "login-author", "USER");
         when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
         when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
-        when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.<CommonFileVO>emptyList());
-        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
+        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Collections.singletonList(55L)))
+            .thenReturn(Collections.singletonMap(55L, Collections.<CommonFileVO>emptyList()));
+        when(commentDAO.selectApprovalSystemEventsByOwnerIds(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
         List<DocumentApprovalFeedItemVO> result = service().listFeedDocuments(author, "ALL", null, null);
 

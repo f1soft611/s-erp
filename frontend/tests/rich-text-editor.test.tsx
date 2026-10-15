@@ -83,6 +83,32 @@ describe('RichTextEditor', () => {
     expect(getComputedStyle(editor).overflowY).toBe('auto');
   });
 
+  it('lets the parent container own vertical scrolling when requested', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <RichTextEditor
+          ariaLabel="본문"
+          className="scroll-test-editor"
+          scrollMode="container"
+        />
+      </ThemeProvider>,
+    );
+    const editor = await screen.findByRole('textbox', { name: '본문' });
+    const root = editor.closest('.scroll-test-editor');
+    const contentWrapper = editor.parentElement;
+
+    expect(root).not.toBeNull();
+    expect(contentWrapper).toHaveClass('rich-text-editor-content');
+    if (root === null || contentWrapper === null) {
+      throw new Error('Container-scroll editor elements were not rendered.');
+    }
+    expect(getComputedStyle(root).height).toBe('auto');
+    expect(getComputedStyle(root).overflowY).toBe('visible');
+    expect(getComputedStyle(contentWrapper).overflowY).toBe('visible');
+    expect(getComputedStyle(editor).overflowY).toBe('visible');
+    expect(getComputedStyle(editor).maxHeight).toBe('none');
+  });
+
   it('uploads pasted images through the caller adapter and updates that image node', async () => {
     const uploadImage = vi.fn().mockResolvedValue({
       src: '/images/pasted.png',
