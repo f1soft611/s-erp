@@ -23,6 +23,9 @@ export function useArchiveCategories() {
       const groups = await fetchCommonCodeGroups({
         groupCode: 'WF_ARCHIVE_CATEGORY',
       });
+      if (currentRequest !== requestSequence.current) {
+        return;
+      }
       const group = groups.find(
         (candidate) => candidate.groupCode === 'WF_ARCHIVE_CATEGORY',
       );

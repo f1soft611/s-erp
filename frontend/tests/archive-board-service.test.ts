@@ -269,9 +269,6 @@ describe('archive categories', () => {
     commonCodeMocks.fetchCommonCodeItems
       .mockResolvedValueOnce([
         { itemCode: 'NEW', itemNm: 'New category', useAt: 'Y' },
-      ])
-      .mockResolvedValueOnce([
-        { itemCode: 'OLD', itemNm: 'Old category', useAt: 'Y' },
       ]);
 
     const { result } = renderHook(() => useArchiveCategories());
@@ -293,10 +290,8 @@ describe('archive categories', () => {
       ]);
       await olderGroups.promise;
     });
-    await waitFor(() =>
-      expect(commonCodeMocks.fetchCommonCodeItems).toHaveBeenCalledTimes(2),
-    );
 
+    expect(commonCodeMocks.fetchCommonCodeItems).toHaveBeenCalledTimes(1);
     expect(result.current.categories).toEqual([
       { code: 'NEW', name: 'New category' },
     ]);
@@ -338,6 +333,30 @@ describe('archive categories', () => {
       await newerGroups.promise;
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it('does not fetch category items after unmounting during group loading', async () => {
+    const pendingGroups = deferred<
+      Array<{ id: string; groupCode: string; useAt: string }>
+    >();
+    commonCodeMocks.fetchCommonCodeGroups.mockReturnValueOnce(
+      pendingGroups.promise,
+    );
+
+    const { unmount } = renderHook(() => useArchiveCategories());
+    await waitFor(() =>
+      expect(commonCodeMocks.fetchCommonCodeGroups).toHaveBeenCalledTimes(1),
+    );
+    unmount();
+
+    await act(async () => {
+      pendingGroups.resolve([
+        { id: 'archive', groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
+      ]);
+      await pendingGroups.promise;
+    });
+
+    expect(commonCodeMocks.fetchCommonCodeItems).not.toHaveBeenCalled();
   });
 });
 
