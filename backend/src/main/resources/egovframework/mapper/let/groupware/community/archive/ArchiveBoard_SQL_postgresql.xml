@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ArchiveBoardDAO">
+    <resultMap id="archivePostMap" type="egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO">
+        <id property="postId" column="post_id"/>
+        <result property="boardTypeCode" column="board_type_code"/>
+        <result property="title" column="title"/>
+        <result property="contents" column="contents"/>
+        <result property="contentsText" column="contents_text"/>
+        <result property="categoryCode" column="category_code"/>
+        <result property="writerId" column="writer_id"/>
+        <result property="writerName" column="writer_name"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="attachmentCount" column="attachment_count"/>
+    </resultMap>
+    <resultMap id="archiveFileMap" type="egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileVO">
+        <id property="boardFileId" column="file_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="ownerType" column="owner_type"/>
+        <result property="postId" column="owner_id"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="mimeType" column="mime_type"/>
+        <result property="contentType" column="content_type"/>
+        <result property="fileUsageType" column="file_usage_type"/>
+        <result property="deletedYn" column="deleted_yn"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="postColumns">
+        p.post_id, p.board_type_code, p.title, p.contents, p.contents_text, p.category_code,
+        p.writer_id, p.writer_name, p.created_at, p.updated_at,
+        (SELECT COUNT(*) FROM tb_common_file bf
+         WHERE bf.tenant_id = #{tenantId} AND bf.owner_type = 'ARCHIVE' AND bf.owner_id = p.post_id
+           AND bf.file_usage_type = 'ATTACHMENT' AND bf.deleted_yn = 'N') AS attachment_count
+    </sql>
+    <sql id="postScope">
+        p.tenant_id = #{tenantId} AND p.board_type_code = 'ARCHIVE' AND p.is_deleted = 'N'
+    </sql>
+    <sql id="searchFilters">
+        <if test="keyword != null and keyword != ''">
+            AND (p.title ILIKE '%' || #{keyword} || '%'
+                 OR p.contents_text ILIKE '%' || #{keyword} || '%'
+                 OR p.writer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="categoryCode != null and categoryCode != ''">
+            AND p.category_code = #{categoryCode}
+        </if>
+    </sql>
+    <select id="selectArchivePostList" parameterType="map" resultMap="archivePostMap">
+        SELECT <include refid="postColumns"/>
+        FROM tb_board_post p WHERE <include refid="postScope"/>
+        <include refid="searchFilters"/>
+        ORDER BY p.created_at DESC, p.post_id DESC
+        LIMIT #{recordCountPerPage} OFFSET #{firstIndex}
+    </select>
+    <select id="selectArchivePostCount" parameterType="map" resultType="long">
+        SELECT COUNT(*) FROM tb_board_post p WHERE <include refid="postScope"/>
+        <include refid="searchFilters"/>
+    </select>
+    <select id="selectArchivePostById" parameterType="map" resultMap="archivePostMap">
+        SELECT <include refid="postColumns"/>
+        FROM tb_board_post p WHERE <include refid="postScope"/> AND p.post_id = #{postId}
+    </select>
+    <select id="insertArchivePost" parameterType="map" resultType="long">
+        INSERT INTO tb_board_post (
+            tenant_id, board_type_code, title, category_code, contents, contents_text,
+            writer_id, writer_name, last_modified_by, last_modified_by_name,
+            is_deleted, created_at, updated_at
+        ) VALUES (
+            #{tenantId}, 'ARCHIVE', #{title}, #{categoryCode}, #{contents}, #{contents},
+            #{writerId}, #{writerName}, #{lastModifiedBy}, #{lastModifiedByName},
+            'N', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ) RETURNING post_id
+    </select>
+    <update id="updateArchivePost" parameterType="map">
+        UPDATE tb_board_post SET title = #{title}, category_code = #{categoryCode},
+            contents = #{contents}, contents_text = #{contents},
+            last_modified_by = #{lastModifiedBy}, last_modified_by_name = #{lastModifiedByName},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND board_type_code = 'ARCHIVE'
+          AND post_id = #{postId} AND is_deleted = 'N'
+    </update>
+    <update id="softDeleteArchivePost" parameterType="map">
+        UPDATE tb_board_post SET is_deleted = 'Y', updated_at = CURRENT_TIMESTAMP,
+            last_modified_by = #{lastModifiedBy}, last_modified_by_name = #{lastModifiedByName}
+        WHERE tenant_id = #{tenantId} AND board_type_code = 'ARCHIVE'
+          AND post_id = #{postId} AND is_deleted = 'N'
+    </update>
+
+    <sql id="attachmentScope">
+        tenant_id = #{tenantId} AND owner_type = 'ARCHIVE' AND owner_id = #{postId}
+        AND file_usage_type = 'ATTACHMENT' AND deleted_yn = 'N'
+    </sql>
+    <sql id="attachmentColumns">
+        file_id, tenant_id, owner_type, owner_id, file_name, file_size, mime_type,
+        content_type, file_usage_type, deleted_yn, created_at, updated_at
+    </sql>
+    <select id="selectArchiveAttachmentList" parameterType="map" resultMap="archiveFileMap">
+        SELECT <include refid="attachmentColumns"/>
+        FROM tb_common_file WHERE <include refid="attachmentScope"/>
+        ORDER BY created_at, file_id
+    </select>
+    <select id="selectArchiveAttachmentById" parameterType="map" resultMap="archiveFileMap">
+        SELECT <include refid="attachmentColumns"/>
+        FROM tb_common_file WHERE <include refid="attachmentScope"/> AND file_id = #{boardFileId}
+    </select>
+    <select id="selectArchiveBoardConfig" resultType="map">
+        SELECT use_yn AS "useYn", write_auth_level AS "writeAuthLevel", file_upload_yn AS "fileUploadYn"
+        FROM tb_board_type WHERE board_type_code = 'ARCHIVE'
+    </select>
+</mapper>
