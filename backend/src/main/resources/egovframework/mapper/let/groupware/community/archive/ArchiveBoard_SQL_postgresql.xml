@@ -64,6 +64,13 @@
         SELECT <include refid="postColumns"/>
         FROM tb_board_post p WHERE <include refid="postScope"/> AND p.post_id = #{postId}
     </select>
+    <select id="selectArchivePostForUpdate" parameterType="map" resultMap="archivePostMap">
+        SELECT p.post_id
+        FROM tb_board_post p
+        WHERE p.tenant_id = #{tenantId} AND p.board_type_code = 'ARCHIVE'
+          AND p.post_id = #{postId} AND p.is_deleted = 'N'
+        FOR UPDATE OF p
+    </select>
     <select id="insertArchivePost" parameterType="map" resultType="long">
         INSERT INTO tb_board_post (
             tenant_id, board_type_code, title, category_code, contents, contents_text,

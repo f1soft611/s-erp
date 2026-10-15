@@ -117,7 +117,7 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
     @Transactional(rollbackFor = Exception.class)
     public void deletePost(Long postId, LoginVO user) throws Exception {
         requireMutation(user, false);
-        requirePost(postId, user);
+        requirePostForUpdate(postId, user);
         for (CommonFileVO file : ownedFiles(postId, user)) {
             commonFileService.deleteFile(user.getTenantId(), ARCHIVE, postId, file.getFileId());
         }
@@ -133,7 +133,7 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 파일이 없습니다.");
         }
-        requirePost(postId, user);
+        requirePostForUpdate(postId, user);
         CommonFileVO uploaded = commonFileService.uploadFile(user.getTenantId(), ARCHIVE, postId, file, user.getId());
         if (!isOwnedAttachment(uploaded, postId, user)) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일을 저장하지 못했습니다.");
@@ -188,6 +188,15 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
     private ArchiveBoardPostVO requirePost(Long postId, LoginVO user) throws Exception {
         requireId(postId);
         ArchiveBoardPostVO post = archiveBoardDAO.selectArchivePostById(postParams(user, postId));
+        if (post == null) {
+            throw missingPost();
+        }
+        return post;
+    }
+
+    private ArchiveBoardPostVO requirePostForUpdate(Long postId, LoginVO user) throws Exception {
+        requireId(postId);
+        ArchiveBoardPostVO post = archiveBoardDAO.selectArchivePostForUpdate(postParams(user, postId));
         if (post == null) {
             throw missingPost();
         }

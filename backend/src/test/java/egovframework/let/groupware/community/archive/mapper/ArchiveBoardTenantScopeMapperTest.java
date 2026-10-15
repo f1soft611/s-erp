@@ -41,6 +41,16 @@ class ArchiveBoardTenantScopeMapperTest {
     }
 
     @Test
+    void uploadAndDeletePostLookupLocksOnlyAnActiveTenantArchivePost() throws Exception {
+        BoundSql sql = sql(parse(), "selectArchivePostForUpdate");
+
+        assertThat(sql.getSql()).contains("tenant_id = ?", "board_type_code = 'ARCHIVE'",
+                "post_id = ?", "is_deleted = 'N'", "FOR UPDATE");
+        assertThat(properties(sql)).contains("tenantId", "postId").doesNotContain("boardTypeCode");
+        assertThat(sql(parse(), "selectArchivePostById").getSql()).doesNotContain("FOR UPDATE");
+    }
+
+    @Test
     void attachmentsAndCountsRequireTenantArchiveOwnerAndOrdinaryUsage() throws Exception {
         Configuration configuration = parse();
         for (String id : new String[] {"selectArchiveAttachmentList", "selectArchiveAttachmentById"}) {

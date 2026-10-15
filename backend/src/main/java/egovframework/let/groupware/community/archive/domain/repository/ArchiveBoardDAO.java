@@ -23,6 +23,10 @@ public class ArchiveBoardDAO extends EgovAbstractMapper {
         return selectOne("ArchiveBoardDAO.selectArchivePostById", params);
     }
 
+    public ArchiveBoardPostVO selectArchivePostForUpdate(Map<String, Object> params) throws Exception {
+        return selectOne("ArchiveBoardDAO.selectArchivePostForUpdate", params);
+    }
+
     public Long insertArchivePost(Map<String, Object> params) throws Exception {
         return selectOne("ArchiveBoardDAO.insertArchivePost", params);
     }

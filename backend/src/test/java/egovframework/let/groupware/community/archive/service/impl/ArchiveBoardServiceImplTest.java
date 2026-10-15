@@ -14,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
@@ -58,6 +59,7 @@ class ArchiveBoardServiceImplTest {
         ArchiveBoardPostVO post = new ArchiveBoardPostVO();
         post.setPostId(13L);
         when(dao.selectArchivePostById(anyMap())).thenReturn(post);
+        when(dao.selectArchivePostForUpdate(anyMap())).thenReturn(post);
         when(dao.updateArchivePost(anyMap())).thenReturn(1);
         when(dao.softDeleteArchivePost(anyMap())).thenReturn(1);
         when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.emptyList());
@@ -233,6 +235,20 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
+    void uploadLocksTenantPostBeforeWritingFileStorage() throws Exception {
+        when(files.uploadFile(eq(71L), eq("ARCHIVE"), eq(13L), any(), eq("test-admin")))
+                .thenReturn(ownedFile(31L));
+
+        service.uploadAttachment(13L, upload(), user);
+
+        InOrder order = inOrder(dao, files);
+        order.verify(dao).selectArchivePostForUpdate(argThat(map -> Long.valueOf(71).equals(map.get("tenantId"))
+                && Long.valueOf(13).equals(map.get("postId"))));
+        order.verify(files).uploadFile(eq(71L), eq("ARCHIVE"), eq(13L), any(), eq("test-admin"));
+        verify(dao, never()).selectArchivePostById(anyMap());
+    }
+
+    @Test
     void deleteCleansOnlyOwnedActiveOrdinaryFilesBeforeSoftDelete() throws Exception {
         CommonFileVO ordinary = ownedFile(31L);
         CommonFileVO embedded = ownedFile(32L);
@@ -248,6 +264,21 @@ class ArchiveBoardServiceImplTest {
         verify(files, times(1)).deleteFile(anyLong(), anyString(), anyLong(), anyLong());
         verify(dao).softDeleteArchivePost(argThat(map -> Long.valueOf(71).equals(map.get("tenantId"))
                 && Long.valueOf(13).equals(map.get("postId")) && "ARCHIVE".equals(map.get("boardTypeCode"))));
+    }
+
+    @Test
+    void deleteLocksTenantPostBeforeListingAndRemovingAttachments() throws Exception {
+        when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.singletonList(ownedFile(31L)));
+
+        service.deletePost(13L, user);
+
+        InOrder order = inOrder(dao, files);
+        order.verify(dao).selectArchivePostForUpdate(argThat(map -> Long.valueOf(71).equals(map.get("tenantId"))
+                && Long.valueOf(13).equals(map.get("postId"))));
+        order.verify(files).listFiles(71L, "ARCHIVE", 13L);
+        order.verify(files).deleteFile(71L, "ARCHIVE", 13L, 31L);
+        order.verify(dao).softDeleteArchivePost(anyMap());
+        verify(dao, never()).selectArchivePostById(anyMap());
     }
 
     @Test
@@ -294,10 +325,13 @@ class ArchiveBoardServiceImplTest {
     void missingPostAuthenticationAndStorageFailuresAreNotSuccess() throws Exception {
         assertStatus(HttpStatus.UNAUTHORIZED, () -> service.listPosts(new ArchiveBoardPostSearchVO(), null));
         when(dao.selectArchivePostById(anyMap())).thenReturn(null);
+        when(dao.selectArchivePostForUpdate(anyMap())).thenReturn(null);
         assertStatus(HttpStatus.NOT_FOUND, () -> service.getPost(13L, user));
         assertStatus(HttpStatus.NOT_FOUND, () -> service.deletePost(13L, user));
+        assertStatus(HttpStatus.NOT_FOUND, () -> service.uploadAttachment(13L, upload(), user));
         verifyNoInteractions(files);
         when(dao.selectArchivePostById(anyMap())).thenReturn(new ArchiveBoardPostVO());
+        when(dao.selectArchivePostForUpdate(anyMap())).thenReturn(new ArchiveBoardPostVO());
         doThrow(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR)).when(files)
                 .listFiles(71L, "ARCHIVE", 13L);
         assertStatus(HttpStatus.INTERNAL_SERVER_ERROR, () -> service.getPost(13L, user));
