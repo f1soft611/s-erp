@@ -591,7 +591,45 @@
 - unlike는 본인이 소유한 관계 행을 삭제한다. 좋아요 수는 관계 행을 집계한다.
 - SYSTEM 댓글 좋아요는 서비스/API에서 거부한다.
 
-### 2-27. tb_electronic_approval_view_history
+### 2-27. tb_electronic_approval_line_template
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| template_id | bigserial | 사용자 결재선 템플릿 PK |
+| tenant_id | bigint | 소속 tenant FK |
+| owner_user_id | varchar(100) | 인증된 템플릿 소유 사용자 ID |
+| eabus_no | varchar(3) | 문서번호 코드 (`001`, `008`, `004`, `031`) |
+| template_name | varchar(100) | 사용자별 템플릿 이름 |
+| created_at / updated_at | timestamp | 생성/수정 시각 |
+
+제약/역할:
+
+- `(tenant_id, owner_user_id, eabus_no, template_name)` unique로 같은 사용자의 같은 문서 종류에서 이름 중복을 방지한다.
+- tenant FK 및 `(tenant_id, template_id)` unique 키로 템플릿 상세의 tenant 일치를 강제한다.
+- 지원 문서 코드는 기안 `001`, 업무 `008`, 지출 `004`, 근태 `031`이다.
+- 사용자 소유권은 API에서 인증 `LoginVO`의 tenant 및 사용자 ID로 제한한다.
+- 2026-10-15: 결재선 자주 쓰기 기능을 위한 검토용 migration 초안. 실제 DB 적용 전 검토가 필요하다.
+
+### 2-28. tb_electronic_approval_line_template_info
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| template_line_id | bigserial | 템플릿 참여자 행 PK |
+| tenant_id / template_id | bigint | 템플릿 마스터 복합 FK |
+| stage_order / participant_order | integer | 단계 및 단계 내 참여 순서(1부터) |
+| participant_type | varchar(20) | `APPROVAL`, `AGREEMENT`, `REFERENCE` |
+| participant_user_id | varchar(100) | 참여자 사용자 ID |
+
+제약/역할:
+
+- `(tenant_id, template_id)` 복합 FK로 동일 tenant 템플릿을 참조하고 마스터 삭제 시 상세를 cascade 삭제한다.
+- `(tenant_id, template_id, stage_order, participant_order)` unique 및 양수 CHECK로 참여자 순서를 보호한다.
+- 템플릿 내 participant user ID는 중복될 수 없다.
+- 참여자 활성/tenant 검증은 템플릿 저장 및 불러오기 서비스에서 수행한다.
+- 기안자 고정 단계는 상세에 저장하지 않으며 참조자는 결재/합의 단계 뒤에 정렬한다.
+- 2026-10-15: 결재선 자주 쓰기 기능을 위한 검토용 migration 초안. 실제 DB 적용 전 검토가 필요하다.
+
+### 2-29. tb_electronic_approval_view_history
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -610,7 +648,7 @@
 
 ---
 
-### 2-27. tb_electronic_approval_view_history
+### 2-30. tb_electronic_approval_view_history
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -631,6 +669,7 @@
 
 ## 변경 이력
 
+- 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
 - 2026-10-14: 전자결재 기안 상신 취소 및 결재자 승인 취소 이력을 위해 `tb_common_comment` SYSTEM event CHECK에 `SUBMISSION_CANCELED`, `APPROVAL_CANCELED` 허용을 추가하는 `20261014_003` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 이벤트 계약을 확인했으며 USER NULL 조건과 기존 SYSTEM 이벤트를 보존했다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
 - 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
