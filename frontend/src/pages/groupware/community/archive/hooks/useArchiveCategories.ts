@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
@@ -13,8 +13,10 @@ export function useArchiveCategories() {
   const [categories, setCategories] = useState<ArchiveCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const requestSequence = useRef(0);
 
   const loadCategories = useCallback(async () => {
+    const currentRequest = ++requestSequence.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -31,20 +33,29 @@ export function useArchiveCategories() {
       }
 
       const items = await fetchCommonCodeItems(group.id);
-      setCategories(
-        items
-          .filter((item) => item.useAt === 'Y')
-          .map((item) => ({ code: item.itemCode, name: item.itemNm })),
-      );
+      if (currentRequest === requestSequence.current) {
+        setCategories(
+          items
+            .filter((item) => item.useAt === 'Y')
+            .map((item) => ({ code: item.itemCode, name: item.itemNm })),
+        );
+      }
     } catch (cause) {
-      setError(asError(cause));
+      if (currentRequest === requestSequence.current) {
+        setError(asError(cause));
+      }
     } finally {
-      setIsLoading(false);
+      if (currentRequest === requestSequence.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void loadCategories();
+    return () => {
+      requestSequence.current += 1;
+    };
   }, [loadCategories]);
 
   return { categories, isLoading, error, loadCategories };

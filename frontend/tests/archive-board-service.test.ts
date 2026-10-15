@@ -35,6 +35,16 @@ import { useArchiveCategories } from '../src/pages/groupware/community/archive/h
 import { useArchiveList } from '../src/pages/groupware/community/archive/hooks/useArchiveList';
 import type { ArchivePost } from '../src/pages/groupware/community/archive/types/archive.types';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('archive board service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -245,6 +255,89 @@ describe('archive categories', () => {
 
     await act(async () => result.current.loadCategories());
     expect(result.current.error).toBeNull();
+  });
+
+  it('does not let stale category success overwrite a newer load', async () => {
+    const olderGroups = deferred<
+      Array<{ id: string; groupCode: string; useAt: string }>
+    >();
+    commonCodeMocks.fetchCommonCodeGroups
+      .mockReturnValueOnce(olderGroups.promise)
+      .mockResolvedValueOnce([
+        { id: 'new', groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
+      ]);
+    commonCodeMocks.fetchCommonCodeItems
+      .mockResolvedValueOnce([
+        { itemCode: 'NEW', itemNm: 'New category', useAt: 'Y' },
+      ])
+      .mockResolvedValueOnce([
+        { itemCode: 'OLD', itemNm: 'Old category', useAt: 'Y' },
+      ]);
+
+    const { result } = renderHook(() => useArchiveCategories());
+    await waitFor(() =>
+      expect(commonCodeMocks.fetchCommonCodeGroups).toHaveBeenCalledTimes(1),
+    );
+    act(() => {
+      void result.current.loadCategories();
+    });
+    await waitFor(() =>
+      expect(result.current.categories).toEqual([
+        { code: 'NEW', name: 'New category' },
+      ]),
+    );
+
+    await act(async () => {
+      olderGroups.resolve([
+        { id: 'old', groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
+      ]);
+      await olderGroups.promise;
+    });
+    await waitFor(() =>
+      expect(commonCodeMocks.fetchCommonCodeItems).toHaveBeenCalledTimes(2),
+    );
+
+    expect(result.current.categories).toEqual([
+      { code: 'NEW', name: 'New category' },
+    ]);
+  });
+
+  it('ignores stale category failures and loading updates while a newer load is pending', async () => {
+    const olderGroups = deferred<
+      Array<{ id: string; groupCode: string; useAt: string }>
+    >();
+    const newerGroups = deferred<
+      Array<{ id: string; groupCode: string; useAt: string }>
+    >();
+    commonCodeMocks.fetchCommonCodeGroups
+      .mockReturnValueOnce(olderGroups.promise)
+      .mockReturnValueOnce(newerGroups.promise);
+
+    const { result } = renderHook(() => useArchiveCategories());
+    await waitFor(() =>
+      expect(commonCodeMocks.fetchCommonCodeGroups).toHaveBeenCalledTimes(1),
+    );
+    act(() => {
+      void result.current.loadCategories();
+    });
+    await waitFor(() =>
+      expect(commonCodeMocks.fetchCommonCodeGroups).toHaveBeenCalledTimes(2),
+    );
+
+    await act(async () => {
+      olderGroups.reject(new Error('stale category failure'));
+      await olderGroups.promise.catch(() => undefined);
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      newerGroups.resolve([
+        { id: 'new', groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
+      ]);
+      await newerGroups.promise;
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
   });
 });
 
