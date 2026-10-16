@@ -31,6 +31,7 @@ import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReact
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -164,7 +165,7 @@ const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
 
 const approvalBadgeBorderRadius = '8px';
 const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
-type FeedReasonAction = Extract<
+type ReasonAction = Extract<
   DocumentApprovalActionRequest['action'],
   'REJECTED' | 'RETURNED'
 >;
@@ -216,7 +217,8 @@ function toApprovalCommentTree(
   });
   systemEvents.forEach((event, index) => {
     const eventId =
-      event.commentId ?? `system-${event.eventType}-${event.createdAt ?? index}`;
+      event.commentId ??
+      `system-${event.eventType}-${event.createdAt ?? index}`;
     const eventKey = String(eventId);
     createdAtById.set(eventKey, event.createdAt);
     if (typeof event.commentId === 'number') {
@@ -289,8 +291,7 @@ export function DocumentApprovalDetailFeed(
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionComment, setActionComment] = useState('');
-  const [feedReasonAction, setFeedReasonAction] =
-    useState<FeedReasonAction | null>(null);
+  const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
   const [commentRecords, setCommentRecords] = useState<
     DocumentApprovalComment[]
   >(preloadedFeedData?.comments ?? []);
@@ -652,8 +653,8 @@ export function DocumentApprovalDetailFeed(
             ? '문서가 반려되었습니다.'
             : '문서 보완을 요청했습니다.',
       );
-      if (isFeedPresentation && action !== 'APPROVED') {
-        setFeedReasonAction(null);
+      if (action !== 'APPROVED') {
+        setReasonAction(null);
         setActionComment('');
       }
       onActionComplete();
@@ -667,10 +668,17 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
-  const openFeedReasonDialog = (action: FeedReasonAction) => {
+  const openReasonDialog = (action: ReasonAction) => {
     setActionError('');
     setActionComment('');
-    setFeedReasonAction(action);
+    setReasonAction(action);
+  };
+
+  const closeReasonDialog = () => {
+    if (isActing) return;
+    setReasonAction(null);
+    setActionComment('');
+    setActionError('');
   };
 
   const handleCancelDocumentAction = async () => {
@@ -977,11 +985,7 @@ export function DocumentApprovalDetailFeed(
                   variant="outlined"
                   color="error"
                   sx={approvalActionButtonSx}
-                  onClick={() =>
-                    isFeedPresentation
-                      ? openFeedReasonDialog('REJECTED')
-                      : void handleAction('REJECTED')
-                  }
+                  onClick={() => openReasonDialog('REJECTED')}
                   disabled={isActing}
                 >
                   반려
@@ -991,11 +995,7 @@ export function DocumentApprovalDetailFeed(
                   variant="outlined"
                   color="warning"
                   sx={approvalActionButtonSx}
-                  onClick={() =>
-                    isFeedPresentation
-                      ? openFeedReasonDialog('RETURNED')
-                      : void handleAction('RETURNED')
-                  }
+                  onClick={() => openReasonDialog('RETURNED')}
                   disabled={isActing}
                 >
                   보완요청
@@ -1156,10 +1156,9 @@ export function DocumentApprovalDetailFeed(
               {documentToolbar}
             </Stack>
           )}
-          {isFeedPresentation &&
-            canProcess &&
-            actionError &&
-            !feedReasonAction && <Alert severity="error">{actionError}</Alert>}
+          {isFeedPresentation && canProcess && actionError && !reasonAction && (
+            <Alert severity="error">{actionError}</Alert>
+          )}
           {shouldShowApprovalLine && (
             <>
               <Box
@@ -1869,11 +1868,6 @@ export function DocumentApprovalDetailFeed(
                   >
                     <CircularProgress size={20} />
                   </Box>
-                ) : commentRecords.length === 0 &&
-                  commentSystemEvents.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    등록된 댓글이 없습니다.
-                  </Typography>
                 ) : null}
                 <CommentThread
                   comments={toApprovalCommentTree(
@@ -1908,7 +1902,9 @@ export function DocumentApprovalDetailFeed(
                 fullWidth
                 disabled={isActing}
               />
-              {actionError && <Alert severity="error">{actionError}</Alert>}
+              {actionError && !reasonAction && (
+                <Alert severity="error">{actionError}</Alert>
+              )}
               {isActing && <CircularProgress size={24} />}
             </>
           )}
@@ -1962,7 +1958,7 @@ export function DocumentApprovalDetailFeed(
             'aria-label': '반려 사유',
             sx: {
               p: 1.5,
-              width: 320,
+              width: 300,
               maxWidth: 'calc(100vw - 32px)',
               maxHeight: 'calc(100dvh - 32px)',
               overflowY: 'auto',
@@ -1977,69 +1973,53 @@ export function DocumentApprovalDetailFeed(
           {rejectionReasonPopover?.reason}
         </Typography>
       </Popover>
-      <Dialog
-        open={isFeedPresentation && feedReasonAction !== null}
-        onClose={() => {
-          if (isActing) return;
-          setFeedReasonAction(null);
-          setActionComment('');
-          setActionError('');
-        }}
-        aria-labelledby="feed-approval-reason-dialog-title"
+      <CommonDialog
+        open={reasonAction !== null}
+        onClose={closeReasonDialog}
+        title={reasonAction === 'REJECTED' ? '반려 사유' : '보완요청 사유'}
+        description="처리 사유를 입력해 주세요."
+        size="xs"
+        actions={
+          <>
+            <Button onClick={closeReasonDialog} disabled={isActing}>
+              취소
+            </Button>
+            <Button
+              variant={reasonAction === 'REJECTED' ? 'outlined' : 'outlined'}
+              color={reasonAction === 'REJECTED' ? 'error' : 'warning'}
+              onClick={() => {
+                if (reasonAction) void handleAction(reasonAction);
+              }}
+              disabled={isActing}
+            >
+              {isActing
+                ? '처리 중...'
+                : reasonAction === 'REJECTED'
+                  ? '반려 확인'
+                  : '보완요청 확인'}
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="feed-approval-reason-dialog-title">
-          {feedReasonAction === 'REJECTED' ? '반려 사유' : '보완요청 사유'}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 1 }}>
-            처리 사유를 입력해 주세요.
-          </DialogContentText>
-          <TextField
-            autoFocus
-            label="처리 사유"
-            value={actionComment}
-            onChange={(event) => {
-              setActionComment(event.target.value);
-              setActionError('');
-            }}
-            multiline
-            minRows={3}
-            fullWidth
-            disabled={isActing}
-          />
-          {actionError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {actionError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setFeedReasonAction(null);
-              setActionComment('');
-              setActionError('');
-            }}
-            disabled={isActing}
-          >
-            취소
-          </Button>
-          <Button
-            variant={feedReasonAction === 'REJECTED' ? 'contained' : 'outlined'}
-            color={feedReasonAction === 'REJECTED' ? 'error' : 'warning'}
-            onClick={() => {
-              if (feedReasonAction) void handleAction(feedReasonAction);
-            }}
-            disabled={isActing}
-          >
-            {isActing
-              ? '처리 중...'
-              : feedReasonAction === 'REJECTED'
-                ? '반려 확인'
-                : '보완요청 확인'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <TextField
+          autoFocus
+          label="처리 사유"
+          value={actionComment}
+          onChange={(event) => {
+            setActionComment(event.target.value);
+            setActionError('');
+          }}
+          multiline
+          minRows={3}
+          fullWidth
+          disabled={isActing}
+        />
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {actionError}
+          </Alert>
+        )}
+      </CommonDialog>
       <Dialog
         open={cancelDialogType !== null}
         onClose={() => !isActing && setCancelDialogType(null)}

@@ -487,6 +487,7 @@ function CommentItem({
               sx={{
                 fontSize: '0.9rem',
                 lineHeight: 1.7,
+                whiteSpace: 'pre-wrap',
                 overflowWrap: 'anywhere',
                 color: 'text.secondary',
               }}

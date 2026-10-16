@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +34,8 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionR
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -131,14 +134,22 @@ public class DocumentApprovalApiController {
     @Operation(summary = "내 관련 전자결재 문서 목록", security = @SecurityRequirement(name = "Authorization"))
     @GetMapping("/documents")
     public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
-            @RequestParam(required = false) String documentType,
             @RequestParam(required = false) Long electronicApprovalId,
             @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
+            @ModelAttribute DocumentApprovalListQueryVO query,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", includeDetails
-                ? documentApprovalService.listFeedDocuments(user, scope, documentType, electronicApprovalId)
-                : documentApprovalService.listDocuments(user, scope, documentType, electronicApprovalId));
+        if (includeDetails) {
+            resultMap.put("resultList", documentApprovalService.listFeedDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId));
+        } else if (query.isPageRequest()) {
+            DocumentApprovalListPageVO page = documentApprovalService.searchDocuments(user, scope, query);
+            resultMap.put("resultList", page.getResultList());
+            resultMap.put("totalRowCount", page.getTotalRowCount());
+        } else {
+            resultMap.put("resultList", documentApprovalService.listDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId));
+        }
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

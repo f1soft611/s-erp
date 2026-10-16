@@ -3,6 +3,8 @@ package egovframework.let.groupware.approval.domain.model;
 public class DocumentApprovalListQueryVO {
 
     private String keyword;
+    private String eabusNo;
+    private String title;
     private String documentType;
     private String documentStatus;
     private String submittedAtFrom;
@@ -19,6 +21,10 @@ public class DocumentApprovalListQueryVO {
 
     public String getKeyword() { return keyword; }
     public void setKeyword(String keyword) { this.keyword = keyword; }
+    public String getEabusNo() { return eabusNo; }
+    public void setEabusNo(String eabusNo) { this.eabusNo = eabusNo; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public String getDocumentType() { return documentType; }
     public void setDocumentType(String documentType) { this.documentType = documentType; }
     public String getDocumentStatus() { return documentStatus; }
@@ -50,8 +56,9 @@ public class DocumentApprovalListQueryVO {
 
     public boolean isPageRequest() {
         return offset != null || limit != null || sortField != null || sortDirection != null
-                || hasText(keyword) || hasText(documentStatus) || hasText(submittedAtFrom)
-                || hasText(submittedAtTo) || hasText(drafterName) || hasText(drafterDepartmentName)
+                || hasText(keyword) || hasText(eabusNo) || hasText(title)
+                || hasText(documentStatus) || hasText(submittedAtFrom) || hasText(submittedAtTo)
+                || hasText(drafterName) || hasText(drafterDepartmentName)
                 || hasText(participantName) || hasText(updatedAtFrom) || hasText(updatedAtTo);
     }
 

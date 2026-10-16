@@ -101,7 +101,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                 {[
                   ['업무구분', item.kind],
                   ['기안자', item.author],
-                  ['상신일', item.submittedDate || '—'],
+                  [item.dateSourceLabel ?? '일자', item.date || '—'],
                 ].map(([label, value]) => (
                   <Fragment key={label}>
                     <Typography component="span" variant="caption" color="text.secondary">

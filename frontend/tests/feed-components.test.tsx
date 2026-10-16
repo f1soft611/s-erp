@@ -292,6 +292,18 @@ describe('shared feed components', () => {
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
 
+  it('preserves multiline system reasons as plain text', () => {
+    const content = '반려 하였습니다.\n사유: 첫 번째 줄\n두 번째 줄\n\n<b>마지막 줄</b>';
+    render(<CommentThread comments={[{
+      id: 'system-rejected', author: '시스템', time: '방금',
+      content, isSystemEvent: true,
+    }]} showComposer={false} />);
+    const message = screen.getByText((_, element) => element?.textContent === content);
+    expect(message.textContent).toBe(content);
+    expect(message).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' });
+    expect(message.querySelector('b')).toBeNull();
+  });
+
   it.each([
     ['임시저장', 'default', 'outlined'],
     ['결재신청', 'info', 'filled'],

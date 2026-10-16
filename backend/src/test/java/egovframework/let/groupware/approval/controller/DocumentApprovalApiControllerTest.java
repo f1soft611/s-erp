@@ -1,6 +1,9 @@
 package egovframework.let.groupware.approval.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import egovframework.com.cmm.LoginVO;
@@ -39,6 +43,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalComment
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 
 class DocumentApprovalApiControllerTest {
@@ -55,9 +62,11 @@ class DocumentApprovalApiControllerTest {
         List<DocumentApprovalListItemVO> list = Collections.singletonList(listItem);
         when(approvalService.listDocuments(user, "ALL", null, null)).thenReturn(list);
 
-        ResultVO response = controller.listDocuments("ALL", null, null, false, user);
+        ResultVO response = controller.listDocuments(
+                "ALL", null, false, new DocumentApprovalListQueryVO(), user);
 
         assertThat(response.getResult().get("resultList")).isSameAs(list);
+        assertThat(response.getResult()).doesNotContainKey("totalRowCount");
         verify(approvalService).listDocuments(user, "ALL", null, null);
     }
 
@@ -69,10 +78,78 @@ class DocumentApprovalApiControllerTest {
         List<DocumentApprovalFeedItemVO> feed = Collections.singletonList(feedItem);
         when(approvalService.listFeedDocuments(user, "ALL", null, null)).thenReturn(feed);
 
-        ResultVO response = controller.listDocuments("ALL", null, null, true, user);
+        ResultVO response = controller.listDocuments(
+                "ALL", null, true, new DocumentApprovalListQueryVO(), user);
 
         assertThat(response.getResult().get("resultList")).isSameAs(feed);
+        assertThat(response.getResult()).doesNotContainKey("totalRowCount");
         verify(approvalService).listFeedDocuments(user, "ALL", null, null);
+    }
+
+    @Test
+    void listDocumentsReturnsResultListAndTotalForRemoteQuery() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalStatusListItemVO row = new DocumentApprovalStatusListItemVO();
+        row.setElectronicApprovalId(77L);
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(Collections.singletonList(row));
+        page.setTotalRowCount(42L);
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setOffset(0);
+        query.setLimit(25);
+        when(approvalService.searchDocuments(user, "ALL", query)).thenReturn(page);
+
+        ResultVO response = controller.listDocuments("ALL", null, false, query, user);
+
+        assertThat(response.getResult())
+                .containsEntry("resultList", page.getResultList())
+                .containsEntry("totalRowCount", 42L);
+        verify(approvalService).searchDocuments(user, "ALL", query);
+    }
+
+    @Test
+    void listDocumentsBindsRemoteSearchFiltersAndReturnsPageMetadata() throws Exception {
+        DocumentApprovalStatusListItemVO row = new DocumentApprovalStatusListItemVO();
+        row.setElectronicApprovalId(77L);
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(Collections.singletonList(row));
+        page.setTotalRowCount(42L);
+        when(approvalService.searchDocuments(any(LoginVO.class), eq("ALL"), any(DocumentApprovalListQueryVO.class)))
+                .thenReturn(page);
+
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc.perform(get("/api/v1/groupware/approvals/documents")
+                .param("keyword", "annual")
+                .param("documentType", "DRAFTING")
+                .param("documentStatus", "COMPLETED")
+                .param("submittedAtFrom", "2026-09-16")
+                .param("submittedAtTo", "2026-10-16")
+                .param("drafterName", "Morgan")
+                .param("drafterDepartmentName", "Finance")
+                .param("participantName", "Sam")
+                .param("updatedAtFrom", "2026-10-01")
+                .param("updatedAtTo", "2026-10-16")
+                .param("offset", "0")
+                .param("limit", "25")
+                .param("sortField", "submittedAt")
+                .param("sortDirection", "ASC"))
+                .andExpect(status().isOk());
+
+        verify(approvalService).searchDocuments(any(LoginVO.class), eq("ALL"), argThat(query ->
+            "annual".equals(query.getKeyword())
+                && "DRAFTING".equals(query.getDocumentType())
+                && "COMPLETED".equals(query.getDocumentStatus())
+                && "2026-09-16".equals(query.getSubmittedAtFrom())
+                && "2026-10-16".equals(query.getSubmittedAtTo())
+                && "Morgan".equals(query.getDrafterName())
+                && "Finance".equals(query.getDrafterDepartmentName())
+                && "Sam".equals(query.getParticipantName())
+                && "2026-10-01".equals(query.getUpdatedAtFrom())
+                && "2026-10-16".equals(query.getUpdatedAtTo())
+                && Integer.valueOf(0).equals(query.getOffset())
+                && Integer.valueOf(25).equals(query.getLimit())
+                && "submittedAt".equals(query.getSortField())
+                && "ASC".equals(query.getSortDirection())));
     }
 
     @Test

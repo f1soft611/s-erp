@@ -40,6 +40,8 @@ export function DocumentWritePage({
     setViewMode,
     selectedKind,
     setSelectedKind,
+    hasActiveFilters,
+    resetFilters,
     isComposerOpen,
     openComposer,
     closeComposer,
@@ -120,17 +122,36 @@ export function DocumentWritePage({
                   countLabel="상단고정"
                   modeLabel="문서 보기 방식"
                   filterAction={
-                    <NoticeFilterMenu
-                      ariaLabel="문서 업무구분 필터"
-                      filters={documentKinds.map((kind) => ({
-                        code: kind,
-                        name: kind,
-                      }))}
-                      selectedCode={selectedKind}
-                      onChange={(code) =>
-                        setSelectedKind(code as DocumentKind | '')
-                      }
-                    />
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{
+                        minWidth: 0,
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <NoticeFilterMenu
+                        ariaLabel="문서 업무구분 필터"
+                        filters={documentKinds.map((kind) => ({
+                          code: kind,
+                          name: kind,
+                        }))}
+                        selectedCode={selectedKind}
+                        onChange={(code) =>
+                          setSelectedKind(code as DocumentKind | '')
+                        }
+                      />
+                      {hasActiveFilters && (
+                        <Button
+                          size="small"
+                          onClick={resetFilters}
+                          sx={{ minWidth: 'auto', whiteSpace: 'nowrap' }}
+                        >
+                          전체 조회
+                        </Button>
+                      )}
+                    </Stack>
                   }
                 />
                 {loadError && (

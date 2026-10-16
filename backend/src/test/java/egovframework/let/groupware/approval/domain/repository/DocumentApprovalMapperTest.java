@@ -23,6 +23,51 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 class DocumentApprovalMapperTest {
 
     @Test
+    void documentReadsAllowOwnDraftsButRequireNonDraftStatusForOtherParticipants() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("electronicApprovalId", 77L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        String[] statementIds = {
+            "selectRelatedDocumentList",
+            "selectRelatedDocumentPage",
+            "countRelatedDocuments",
+            "selectDocumentApprovalSummary",
+            "selectApprovalNotices",
+            "selectDocumentApprovalDetail",
+            "selectDocumentApprovalDetailsByIds",
+            "selectIsDocumentParticipant"
+        };
+        String accessPredicate = "AND ( m.drafter_id = ? OR ( m.document_status != 'DRAFT' AND EXISTS ( "
+                + "SELECT 1 FROM public.tb_electronic_approval_line_info l "
+                + "WHERE l.tenant_id = m.tenant_id "
+                + "AND l.electronic_approval_id = m.electronic_approval_id "
+                + "AND l.participant_user_id = ? ) ) )";
+
+        for (String scope : Arrays.asList("ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT",
+                "COMPLETED", "REVISION_REQUESTED", "REJECTED")) {
+            params.put("scope", scope);
+            for (String statementId : statementIds) {
+                BoundSql boundSql = configuration.getMappedStatement("DocumentApprovalDAO." + statementId)
+                        .getBoundSql(params);
+                assertThat(boundSql.getSql().replaceAll("\\s+", " "))
+                        .as("%s with scope %s keeps own drafts and excludes other users' drafts", statementId, scope)
+                        .contains("m.tenant_id = ?")
+                        .contains("m.deleted_yn = 'N'")
+                        .contains(accessPredicate);
+                assertThat(boundSql.getParameterMappings())
+                        .extracting(ParameterMapping::getProperty)
+                        .contains("tenantId", "drafterId", "participantUserId");
+            }
+        }
+    }
+
+    @Test
     void detailSerializesTheDrafterFlagUsingTheApiPropertyName() throws Exception {
         DocumentApprovalDetailVO detail = new DocumentApprovalDetailVO();
         detail.setDrafter(true);
@@ -516,6 +561,8 @@ class DocumentApprovalMapperTest {
         params.put("documentType", "GENERAL");
         params.put("documentStatus", "COMPLETED");
         params.put("keyword", "annual");
+        params.put("eabusNoFilter", "001");
+        params.put("titleFilter", "budget");
         params.put("drafterNameFilter", "Alex");
         params.put("drafterDepartmentName", "Finance");
         params.put("participantName", "Sam");
@@ -540,9 +587,11 @@ class DocumentApprovalMapperTest {
         assertThat(normalizedPageSql)
                 .contains("m.tenant_id = ?")
                 .contains("m.drafter_id = ?")
-                .contains("actor_line.participant_user_id = ?")
+                .contains("l.participant_user_id = ?")
                 .contains("m.eabus_no ILIKE")
                 .contains("m.title ILIKE")
+                .contains("m.eabus_no ILIKE '%' || ? || '%'")
+                .contains("m.title ILIKE '%' || ? || '%'")
                 .contains("m.drafter_name ILIKE")
                 .contains("m.drafter_department_name ILIKE")
                 .contains("participant_line.participant_name ILIKE")
@@ -555,17 +604,30 @@ class DocumentApprovalMapperTest {
         assertThat(normalizedCountSql)
                 .contains("m.tenant_id = ?")
                 .contains("m.drafter_id = ?")
-                .contains("actor_line.participant_user_id = ?")
+                .contains("l.participant_user_id = ?")
                 .contains("m.eabus_no ILIKE")
                 .contains("m.submitted_at >= CAST(? AS date)")
                 .contains("m.updated_at < CAST(? AS date) + INTERVAL '1 day'");
         assertThat(pageSql.getParameterMappings())
                 .extracting(ParameterMapping::getProperty)
                 .contains("tenantId", "drafterId", "participantUserId", "keyword",
+                        "eabusNoFilter", "titleFilter",
                         "documentType", "documentStatus", "drafterNameFilter",
                         "drafterDepartmentName", "participantName",
                         "submittedAtFrom", "submittedAtTo",
                         "updatedAtFrom", "updatedAtTo", "limit", "offset");
+
+        params.put("sortField", "participantName");
+        String participantSortSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(participantSortSql).contains("ORDER BY participant_name DESC");
+
+        params.put("sortField", "approvalProgress");
+        String progressSortSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(progressSortSql).contains("ORDER BY approval_progress DESC");
     }
 
     @Test

@@ -71,7 +71,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED")));
     private static final Set<String> DOCUMENT_SORT_FIELDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "eabusNo", "title", "documentType", "documentStatus", "submittedAt",
-            "drafterName", "drafterDepartmentName", "updatedAt")));
+            "drafterName", "drafterDepartmentName", "participantName", "approvalProgress", "updatedAt")));
 
     private final DocumentApprovalDAO documentApprovalDAO;
     private final CommonCommentDAO commonCommentDAO;
@@ -457,6 +457,8 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("documentType", documentType);
         params.put("documentStatus", documentStatus);
         params.put("keyword", normalizeText(query.getKeyword()));
+        params.put("eabusNoFilter", normalizeText(query.getEabusNo()));
+        params.put("titleFilter", normalizeText(query.getTitle()));
         params.put("drafterNameFilter", normalizeText(query.getDrafterName()));
         params.put("drafterDepartmentName", normalizeText(query.getDrafterDepartmentName()));
         params.put("participantName", normalizeText(query.getParticipantName()));

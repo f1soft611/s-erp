@@ -5,6 +5,7 @@ import type {
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { JSONContent } from '@tiptap/core';
 import type { RichTextEditorImage } from '../../../../../shared/components/rich-text-editor/richTextEditor.types';
+import type { DocumentDateSourceLabel } from '../data/documentDate';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
 export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청';
@@ -73,6 +74,7 @@ export type DocumentWriteItem = {
   badgeBorderRadius?: string;
   author: string;
   date: string;
+  dateSourceLabel?: DocumentDateSourceLabel;
   submittedDate?: string;
   summary: string;
   isPinned?: boolean;

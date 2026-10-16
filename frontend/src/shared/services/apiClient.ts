@@ -124,7 +124,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body.result ?? ({} as T);
 }
 
-export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
+export const apiGet = <T>(
+  path: string,
+  signal?: AbortSignal,
+): Promise<T> => request<T>(path, signal ? { signal } : undefined);
 
 export async function apiGetBlob(path: string): Promise<Blob> {
   const auth = await getAuthorizedAuth();

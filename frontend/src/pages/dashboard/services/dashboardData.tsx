@@ -139,6 +139,13 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '보안 점검 결과 보고서', meta: 'IT팀 · 3일 전', status: '보관' },
     ],
   },
+  read: {
+    title: '문서현황',
+    description:
+      '과거 전자결재 문서를 검색하고 상세 내용을 읽기 전용으로 확인합니다.',
+    cards: [],
+    items: [],
+  },
   notice: {
     title: '공지사항',
     description:

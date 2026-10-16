@@ -391,19 +391,26 @@
           AND action_status = 'WAITING'
     </update>
 
+    <sql id="documentReadAccess">
+        AND (
+            m.drafter_id = #{drafterId}
+            OR (
+                m.document_status != 'DRAFT'
+                AND EXISTS (
+                    SELECT 1
+                    FROM public.tb_electronic_approval_line_info l
+                    WHERE l.tenant_id = m.tenant_id
+                      AND l.electronic_approval_id = m.electronic_approval_id
+                      AND l.participant_user_id = #{participantUserId}
+                )
+            )
+        )
+    </sql>
+
     <sql id="relatedDocumentStatusFilters">
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
-          AND (
-              m.drafter_id = #{drafterId}
-              OR EXISTS (
-                  SELECT 1
-                  FROM public.tb_electronic_approval_line_info actor_line
-                  WHERE actor_line.tenant_id = m.tenant_id
-                    AND actor_line.electronic_approval_id = m.electronic_approval_id
-                    AND actor_line.participant_user_id = #{participantUserId}
-              )
-          )
+        <include refid="documentReadAccess"/>
         <if test="scope == 'MY_PENDING'">
             AND EXISTS (
                 SELECT 1
@@ -439,6 +446,12 @@
                 OR m.title ILIKE '%' || #{keyword} || '%'
                 OR m.drafter_name ILIKE '%' || #{keyword} || '%'
             )
+        </if>
+        <if test="eabusNoFilter != null and eabusNoFilter != ''">
+            AND m.eabus_no ILIKE '%' || #{eabusNoFilter} || '%'
+        </if>
+        <if test="titleFilter != null and titleFilter != ''">
+            AND m.title ILIKE '%' || #{titleFilter} || '%'
         </if>
         <if test="drafterNameFilter != null and drafterNameFilter != ''">
             AND m.drafter_name ILIKE '%' || #{drafterNameFilter} || '%'
@@ -500,6 +513,8 @@
             <when test="sortField == 'submittedAt'">m.submitted_at</when>
             <when test="sortField == 'drafterName'">m.drafter_name</when>
             <when test="sortField == 'drafterDepartmentName'">m.drafter_department_name</when>
+            <when test="sortField == 'participantName'">participant_name</when>
+            <when test="sortField == 'approvalProgress'">approval_progress</when>
             <otherwise>m.updated_at</otherwise>
         </choose>
         <choose>
@@ -524,16 +539,7 @@
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
-          AND (
-              m.drafter_id = #{drafterId}
-              OR EXISTS (
-                  SELECT 1
-                  FROM public.tb_electronic_approval_line_info l
-                  WHERE l.tenant_id = m.tenant_id
-                    AND l.electronic_approval_id = m.electronic_approval_id
-                    AND l.participant_user_id = #{participantUserId}
-              )
-          )
+        <include refid="documentReadAccess"/>
         <if test="documentType != null and documentType != ''">
             AND m.document_type = #{documentType}
         </if>
@@ -586,16 +592,7 @@
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
-          AND (
-              m.drafter_id = #{drafterId}
-              OR EXISTS (
-                  SELECT 1
-                  FROM public.tb_electronic_approval_line_info l
-                  WHERE l.tenant_id = m.tenant_id
-                    AND l.electronic_approval_id = m.electronic_approval_id
-                    AND l.participant_user_id = #{participantUserId}
-              )
-          )
+        <include refid="documentReadAccess"/>
     </select>
 
     <select id="selectApprovalNotices" parameterType="map" resultMap="listItem">
@@ -607,6 +604,7 @@
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
+        <include refid="documentReadAccess"/>
           AND (
               (
                   m.drafter_id = #{drafterId}
@@ -636,16 +634,7 @@
         WHERE m.tenant_id = #{tenantId}
           AND m.electronic_approval_id = #{electronicApprovalId}
           AND m.deleted_yn = 'N'
-          AND (
-              m.drafter_id = #{drafterId}
-              OR EXISTS (
-                  SELECT 1
-                  FROM public.tb_electronic_approval_line_info l
-                  WHERE l.tenant_id = m.tenant_id
-                    AND l.electronic_approval_id = m.electronic_approval_id
-                    AND l.participant_user_id = #{participantUserId}
-              )
-          )
+        <include refid="documentReadAccess"/>
     </select>
 
     <select id="selectDocumentApprovalDetailsByIds" parameterType="map" resultMap="detail">
@@ -662,16 +651,7 @@
               #{ownerId}
           </foreach>
           AND m.deleted_yn = 'N'
-          AND (
-              m.drafter_id = #{drafterId}
-              OR EXISTS (
-                  SELECT 1
-                  FROM public.tb_electronic_approval_line_info l
-                  WHERE l.tenant_id = m.tenant_id
-                    AND l.electronic_approval_id = m.electronic_approval_id
-                    AND l.participant_user_id = #{participantUserId}
-              )
-          )
+        <include refid="documentReadAccess"/>
     </select>
 
     <select id="selectLoginIdByLoginCode" parameterType="map" resultType="long">
@@ -763,16 +743,7 @@
             WHERE m.tenant_id = #{tenantId}
               AND m.electronic_approval_id = #{electronicApprovalId}
               AND m.deleted_yn = 'N'
-              AND (
-                  m.drafter_id = #{drafterId}
-                  OR EXISTS (
-                      SELECT 1
-                      FROM public.tb_electronic_approval_line_info l
-                      WHERE l.tenant_id = m.tenant_id
-                        AND l.electronic_approval_id = m.electronic_approval_id
-                        AND l.participant_user_id = #{participantUserId}
-                  )
-              )
+            <include refid="documentReadAccess"/>
         )
     </select>
 

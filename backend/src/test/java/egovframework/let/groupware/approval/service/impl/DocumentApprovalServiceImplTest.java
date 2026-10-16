@@ -227,6 +227,8 @@ class DocumentApprovalServiceImplTest {
     void statusPageForwardsFiltersAndKeepsAuthenticatedActorScope() throws Exception {
         DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
         query.setKeyword("annual");
+        query.setEabusNo("001");
+        query.setTitle("budget");
         query.setDocumentType("DRAFTING");
         query.setDocumentStatus("COMPLETED");
         query.setSubmittedAtFrom("2026-09-16");
@@ -236,7 +238,7 @@ class DocumentApprovalServiceImplTest {
         query.setParticipantName("Sam");
         query.setOffset(25);
         query.setLimit(100);
-        query.setSortField("submittedAt");
+        query.setSortField("approvalProgress");
         query.setSortDirection("ASC");
 
         DocumentApprovalStatusListItemVO item = new DocumentApprovalStatusListItemVO();
@@ -253,6 +255,8 @@ class DocumentApprovalServiceImplTest {
         assertThat(page.getTotalRowCount()).isEqualTo(321L);
         verify(approvalDAO).selectRelatedDocumentPage(argThat(params ->
             "annual".equals(params.get("keyword"))
+                && "001".equals(params.get("eabusNoFilter"))
+                && "budget".equals(params.get("titleFilter"))
                 && "DRAFTING".equals(params.get("documentType"))
                 && "COMPLETED".equals(params.get("documentStatus"))
                 && "2026-09-16".equals(params.get("submittedAtFrom"))
@@ -263,7 +267,7 @@ class DocumentApprovalServiceImplTest {
                 && "Sam".equals(params.get("participantName"))
                 && Integer.valueOf(25).equals(params.get("offset"))
                 && Integer.valueOf(100).equals(params.get("limit"))
-                && "submittedAt".equals(params.get("sortField"))
+                && "approvalProgress".equals(params.get("sortField"))
                 && "ASC".equals(params.get("sortDirection"))
                 && Long.valueOf(4L).equals(params.get("tenantId"))
                 && "login-author".equals(params.get("drafterId"))
@@ -273,6 +277,36 @@ class DocumentApprovalServiceImplTest {
                 && "login-author".equals(params.get("drafterId"))
                 && "101".equals(params.get("participantUserId"))
                 && "COMPLETED".equals(params.get("documentStatus"))));
+    }
+
+    @Test
+    void statusPageRejectsInvalidPagingSortingAndDateRanges() throws Exception {
+        DocumentApprovalListQueryVO negativeOffset = new DocumentApprovalListQueryVO();
+        negativeOffset.setOffset(-1);
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", negativeOffset))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO excessiveLimit = new DocumentApprovalListQueryVO();
+        excessiveLimit.setLimit(201);
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", excessiveLimit))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO unsafeSort = new DocumentApprovalListQueryVO();
+        unsafeSort.setSortField("submittedAt; DROP TABLE tb_user");
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", unsafeSort))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO reversedDateRange = new DocumentApprovalListQueryVO();
+        reversedDateRange.setSubmittedAtFrom("2026-10-17");
+        reversedDateRange.setSubmittedAtTo("2026-10-16");
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", reversedDateRange))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        verifyNoInteractions(approvalDAO);
     }
 
     @Test

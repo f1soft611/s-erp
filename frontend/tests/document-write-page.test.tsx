@@ -121,6 +121,7 @@ vi.mock(
 );
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { DocumentApprovalDetailFeed } from '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed';
 import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
 import type {
   DocumentApprovalDetail,
@@ -1005,6 +1006,70 @@ describe('Document write page', () => {
     expect(screen.getAllByText('보완요청').length).toBeGreaterThan(0);
   });
 
+  it('returns the filtered list to all documents without leaving list mode', async () => {
+    render(<DashboardContent {...pageProps} />);
+    await screen.findByTestId('document-list');
+    expect(
+      screen.queryByRole('button', { name: '전체 조회' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /결재 진행 중/ }));
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'IN_PROGRESS',
+        undefined,
+        undefined,
+      ),
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '전체 조회' }));
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'ALL',
+        undefined,
+        undefined,
+      ),
+    );
+    expect(screen.getByTestId('document-list')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '리스트형 보기' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.queryByRole('button', { name: '전체 조회' }),
+    ).not.toBeInTheDocument();
+  }, 20000);
+
+  it('returns the filtered feed to all documents without leaving feed mode', async () => {
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    await screen.findByTestId('document-feed');
+
+    fireEvent.click(screen.getByRole('button', { name: /결재 진행 중/ }));
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'IN_PROGRESS',
+        undefined,
+        undefined,
+        true,
+      ),
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '전체 조회' }));
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'ALL',
+        undefined,
+        undefined,
+        true,
+      ),
+    );
+    expect(screen.getByTestId('document-feed')).toBeInTheDocument();
+    expect(screen.queryByTestId('document-list')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '피드형 보기' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  }, 20000);
+
   it('uses the view-specific skeleton while the document list is loading', () => {
     composerApi.listDocumentApprovals.mockReturnValue(
       new Promise(() => undefined),
@@ -1808,6 +1873,20 @@ describe('Document write page', () => {
     expect(screen.queryByTestId('approval-line-readonly')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '더보기' }));
     expect(screen.getByTestId('approval-line-readonly')).toBeInTheDocument();
+  });
+
+  it('hides the empty comment message while keeping the comment composer available', async () => {
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+
+    expect(
+      await screen.findByRole('textbox', { name: '댓글 입력' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 댓글이 없습니다.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '등록' })).toBeInTheDocument();
   });
 
   it('lets the drafter cancel a pending submission after confirmation', async () => {
@@ -2954,6 +3033,148 @@ describe('Document write page', () => {
       screen.getByRole('textbox', { name: '처리 의견' }),
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['REJECTED', '반려', '반려 사유', '반려 확인'],
+    ['RETURNED', '보완요청', '보완요청 사유', '보완요청 확인'],
+  ] as const)('processes a detail %s through a reason dialog with retry', async (
+    action, label, dialogTitle, confirmLabel,
+  ) => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    composerApi.getDocumentApprovalDetail.mockResolvedValue(toFeedRecord(record, {
+      isDrafter: false,
+      approvalLines: [{
+        electronicApprovalLineId: 93,
+        stageOrder: 2,
+        participantOrder: 1,
+        participantType: 'APPROVAL',
+        participantUserId: 'emp-1',
+        participantName: '결재자',
+        actionStatus: 'PENDING',
+      }],
+    }));
+    const onClose = vi.fn();
+    const onActionComplete = vi.fn();
+    render(<DocumentApprovalDetailFeed
+      open electronicApprovalId={1} detailRefreshToken={0}
+      onClose={onClose} onActionComplete={onActionComplete} onEditDocument={vi.fn()}
+    />);
+    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    let dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    expect(dialog).toHaveStyle({ maxWidth: '480px' });
+    expect(dialog).toHaveAccessibleDescription('처리 사유를 입력해 주세요.');
+    expect(within(dialog).getByTestId('common-dialog-actions')).toContainElement(
+      within(dialog).getByRole('button', { name: confirmLabel }),
+    );
+    expect(within(dialog).getByRole('button', { name: '닫기', exact: true })).toBeInTheDocument();
+    expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '처리 사유' }), {
+      target: { value: '취소할 사유' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogTitle })).not.toBeInTheDocument());
+    expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    expect(within(dialog).getByRole('textbox', { name: '처리 사유' })).toHaveValue('');
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogTitle })).not.toBeInTheDocument());
+    expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    expect(within(dialog).getByRole('textbox', { name: '처리 사유' })).toHaveValue('');
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '처리 사유' }), {
+      target: { value: ' \n ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: confirmLabel }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('반려 또는 보완요청 사유를 입력해 주세요.');
+    expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
+    const reason = '첫 번째 사유\n두 번째 사유\n\n마지막 사유 <b>확인</b>';
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '처리 사유' }), {
+      target: { value: `  ${reason}  ` },
+    });
+    composerApi.processDocumentApprovalAction.mockRejectedValueOnce(new Error('결재 처리 실패'));
+    fireEvent.click(within(dialog).getByRole('button', { name: confirmLabel }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('결재 처리 실패');
+    expect(within(dialog).getByRole('textbox', { name: '처리 사유' })).toHaveValue(`  ${reason}  `);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: confirmLabel }));
+    await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
+    expect(composerApi.processDocumentApprovalAction).toHaveBeenCalledTimes(2);
+    expect(composerApi.processDocumentApprovalAction).toHaveBeenLastCalledWith(1, {
+      action, actionComment: reason,
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogTitle })).not.toBeInTheDocument());
+  }, 15000);
+
+  it('submits a detail approval directly with its optional opinion', async () => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    composerApi.getDocumentApprovalDetail.mockResolvedValue(toFeedRecord(record, {
+      isDrafter: false,
+      approvalLines: [{
+        electronicApprovalLineId: 93,
+        stageOrder: 2,
+        participantOrder: 1,
+        participantType: 'APPROVAL',
+        participantUserId: 'emp-1',
+        participantName: '결재자',
+        actionStatus: 'PENDING',
+      }],
+    }));
+    const onClose = vi.fn();
+    const onActionComplete = vi.fn();
+    render(<DocumentApprovalDetailFeed
+      open electronicApprovalId={1} detailRefreshToken={0}
+      onClose={onClose} onActionComplete={onActionComplete} onEditDocument={vi.fn()}
+    />);
+    fireEvent.change(await screen.findByRole('textbox', { name: '처리 의견' }), {
+      target: { value: '승인 의견' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '승인', exact: true }));
+    await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
+    expect(composerApi.processDocumentApprovalAction).toHaveBeenCalledWith(1, {
+      action: 'APPROVED', actionComment: '승인 의견',
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['submission', '상신 취소', '결재신청 취소'],
+    ['approval', '승인 취소', '승인 취소'],
+  ] as const)('submits the detail %s cancellation from its confirmation dialog', async (
+    kind, buttonLabel, dialogTitle,
+  ) => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    composerApi.getDocumentApprovalDetail.mockResolvedValue(toFeedRecord(record, {
+      isDrafter: kind === 'submission',
+      approvalLines: kind === 'approval' ? [{
+        electronicApprovalLineId: 93,
+        stageOrder: 2,
+        participantOrder: 1,
+        participantType: 'APPROVAL',
+        participantUserId: 'emp-1',
+        participantName: '결재자',
+        actionStatus: 'APPROVED',
+      }] : [],
+    }));
+    const onActionComplete = vi.fn();
+    const cancelApi = kind === 'submission'
+      ? composerApi.cancelDocumentSubmission : composerApi.cancelDocumentApproval;
+    render(<DocumentApprovalDetailFeed
+      open electronicApprovalId={1} detailRefreshToken={0}
+      onClose={vi.fn()} onActionComplete={onActionComplete} onEditDocument={vi.fn()}
+    />);
+    fireEvent.click(await screen.findByRole('button', { name: buttonLabel, exact: true }));
+    const dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    expect(cancelApi).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel, exact: true }));
+    await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
+    expect(cancelApi).toHaveBeenCalledWith(1);
+  }, 15000);
 
   it('shows a feed approval error when the direct approval request fails', async () => {
     mockPendingFeedForCurrentApprover();

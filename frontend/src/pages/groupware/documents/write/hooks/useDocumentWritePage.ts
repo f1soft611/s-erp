@@ -10,6 +10,7 @@ import {
   getDocumentKindFromType,
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
+import { getDocumentDisplayDate } from '../data/documentDate';
 import type {
   DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
@@ -35,6 +36,7 @@ function formatDate(value?: string | null): string {
 
 function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
   const status = getApprovalStatusPresentation(record.documentStatus);
+  const displayDate = getDocumentDisplayDate(record);
   return {
     id: record.electronicApprovalId,
     eabusNo: record.eabusNo,
@@ -46,7 +48,8 @@ function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
     badgeBorderRadius: '8px',
     documentStatus: record.documentStatus,
     author: record.drafterName,
-    date: formatDate(record.submittedAt ?? record.updatedAt ?? record.createdAt),
+    date: formatDate(displayDate.value),
+    dateSourceLabel: displayDate.sourceLabel,
     submittedDate: formatDate(record.submittedAt),
     summary: record.summary,
   };
@@ -66,6 +69,8 @@ export function useDocumentWritePage() {
   const [selectedKind, setSelectedKind] = useState<DocumentKind | ''>('');
   const [scope, setScope] = useState<DocumentApprovalScope>('ALL');
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
+  const hasActiveFilters =
+    scope !== 'ALL' || selectedKind !== '' || selectedDocumentId !== undefined;
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWriteItem[]>([]);
   const [feedDocuments, setFeedDocuments] = useState<DocumentFeedWriteItem[]>([]);
@@ -230,6 +235,11 @@ export function useDocumentWritePage() {
     setSelectedDocumentId(undefined);
     setScope(nextScope);
   }, []);
+  const resetFilters = useCallback(() => {
+    setScope('ALL');
+    setSelectedKind('');
+    setSelectedDocumentId(undefined);
+  }, []);
   const selectNotice = useCallback((documentId: number) => {
     setSelectedKind('');
     setScope('ALL');
@@ -250,6 +260,8 @@ export function useDocumentWritePage() {
     setViewMode,
     selectedKind,
     setSelectedKind,
+    hasActiveFilters,
+    resetFilters,
     isComposerOpen,
     openComposer,
     closeComposer,
