@@ -6,6 +6,7 @@ import {
   listDocumentApprovals,
 } from '../services/documentApproval.service';
 import {
+  getDocumentApprovalScopeLabel,
   getApprovalStatusPresentation,
   getDocumentKindFromType,
   getDocumentKindPresentation,
@@ -20,6 +21,13 @@ import type {
   DocumentKind,
   DocumentWriteItem,
 } from '../types/documentWrite.types';
+
+type ActiveDocumentFilterChip = {
+  key: 'scope' | 'kind' | 'document';
+  label: string;
+  deleteLabel: string;
+  onDelete: () => void;
+};
 
 const documentTypeByKind: Record<DocumentKind, DocumentApprovalRecord['documentType']> = {
   기안서: 'DRAFTING',
@@ -69,8 +77,6 @@ export function useDocumentWritePage() {
   const [selectedKind, setSelectedKind] = useState<DocumentKind | ''>('');
   const [scope, setScope] = useState<DocumentApprovalScope>('ALL');
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
-  const hasActiveFilters =
-    scope !== 'ALL' || selectedKind !== '' || selectedDocumentId !== undefined;
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWriteItem[]>([]);
   const [feedDocuments, setFeedDocuments] = useState<DocumentFeedWriteItem[]>([]);
@@ -235,9 +241,13 @@ export function useDocumentWritePage() {
     setSelectedDocumentId(undefined);
     setScope(nextScope);
   }, []);
-  const resetFilters = useCallback(() => {
+  const clearScopeFilter = useCallback(() => {
     setScope('ALL');
+  }, []);
+  const clearKindFilter = useCallback(() => {
     setSelectedKind('');
+  }, []);
+  const clearDocumentFilter = useCallback(() => {
     setSelectedDocumentId(undefined);
   }, []);
   const selectNotice = useCallback((documentId: number) => {
@@ -255,13 +265,57 @@ export function useDocumentWritePage() {
   }, []);
   const closeDetail = useCallback(() => setDetailDocumentId(null), []);
 
+  const activeFilterChips = useMemo<ActiveDocumentFilterChip[]>(() => {
+    const chips: ActiveDocumentFilterChip[] = [];
+    if (scope !== 'ALL') {
+      const label = getDocumentApprovalScopeLabel(scope);
+      chips.push({
+        key: 'scope',
+        label: `#${label}`,
+        deleteLabel: `결재 범위 필터 ${label} 취소`,
+        onDelete: clearScopeFilter,
+      });
+    }
+    if (selectedKind) {
+      chips.push({
+        key: 'kind',
+        label: `#${selectedKind}`,
+        deleteLabel: `업무구분 필터 ${selectedKind} 취소`,
+        onDelete: clearKindFilter,
+      });
+    }
+    if (selectedDocumentId !== undefined) {
+      const documentTitle =
+        summary?.notices
+          .find((record) => record.electronicApprovalId === selectedDocumentId)
+          ?.title.trim() || `문서 ${selectedDocumentId}`;
+      chips.push({
+        key: 'document',
+        label: `#${documentTitle}`,
+        deleteLabel: `문서 필터 ${documentTitle} 취소`,
+        onDelete: clearDocumentFilter,
+      });
+    }
+    return chips;
+  }, [
+    clearDocumentFilter,
+    clearKindFilter,
+    clearScopeFilter,
+    scope,
+    selectedDocumentId,
+    selectedKind,
+    summary,
+  ]);
+
   return {
     viewMode,
     setViewMode,
     selectedKind,
     setSelectedKind,
-    hasActiveFilters,
-    resetFilters,
+    activeFilterChips,
+    clearScopeFilter,
+    clearKindFilter,
+    clearDocumentFilter,
     isComposerOpen,
     openComposer,
     closeComposer,

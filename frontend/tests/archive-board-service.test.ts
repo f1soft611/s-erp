@@ -102,6 +102,18 @@ describe('archive board service', () => {
     await expect(fetchArchivePosts(1, 20, '')).rejects.toBe(failure);
   });
 
+  it('passes the grid request signal to the list API', async () => {
+    const signal = new AbortController().signal;
+    apiMocks.apiGet.mockResolvedValue({ resultList: [], resultCnt: 0 });
+
+    await fetchArchivePosts(2, 10, ' policy ', 'GUIDE', signal);
+
+    expect(apiMocks.apiGet).toHaveBeenCalledWith(
+      '/api/v1/groupware/boards/archive/posts?pageIndex=2&pageUnit=10&keyword=policy&categoryCode=GUIDE',
+      signal,
+    );
+  });
+
   it('uses the detail, create, update, and delete archive endpoints', async () => {
     const payload = {
       title: 'Guide',
@@ -366,85 +378,73 @@ describe('archive list', () => {
     apiMocks.apiGet.mockResolvedValue({ resultList: [], resultCnt: 0 });
   });
 
-  it('loads server filters and resets pagination when search or category changes', async () => {
+  it('loads the requested grid range with the applied search filters and abort signal', async () => {
+    const signal = new AbortController().signal;
+    const post = { postId: 2, title: 'Current filter' };
+    apiMocks.apiGet.mockResolvedValue({
+      resultList: [post],
+      resultCnt: 21,
+    });
     const { result } = renderHook(() => useArchiveList({ pageUnit: 10 }));
-    await waitFor(() =>
-      expect(apiMocks.apiGet).toHaveBeenLastCalledWith(
-        '/api/v1/groupware/boards/archive/posts?pageIndex=1&pageUnit=10',
-      ),
-    );
+    apiMocks.apiGet.mockClear();
 
-    act(() => result.current.setPageIndex(4));
-    await waitFor(() =>
-      expect(apiMocks.apiGet).toHaveBeenLastCalledWith(
-        '/api/v1/groupware/boards/archive/posts?pageIndex=4&pageUnit=10',
-      ),
-    );
+    act(() => {
+      result.current.setKeyword(' policy ');
+      result.current.setCategoryCode('GUIDE');
+    });
+    const dataSource = result.current.dataSource;
+    const response = await dataSource.load({
+      offset: 15,
+      limit: 10,
+      sorts: [],
+      filters: [],
+      signal,
+    });
 
-    act(() => result.current.setKeyword('  policy  '));
-    await waitFor(() =>
-      expect(apiMocks.apiGet).toHaveBeenLastCalledWith(
-        '/api/v1/groupware/boards/archive/posts?pageIndex=1&pageUnit=10&keyword=policy',
-      ),
+    expect(apiMocks.apiGet).toHaveBeenCalledWith(
+      '/api/v1/groupware/boards/archive/posts?pageIndex=2&pageUnit=10&keyword=policy&categoryCode=GUIDE',
+      signal,
     );
-
-    act(() => result.current.setCategoryCode('GUIDE'));
-    await waitFor(() =>
-      expect(apiMocks.apiGet).toHaveBeenLastCalledWith(
-        '/api/v1/groupware/boards/archive/posts?pageIndex=1&pageUnit=10&keyword=policy&categoryCode=GUIDE',
-      ),
-    );
+    expect(response).toEqual({ rows: [post], totalRowCount: 21 });
   });
 
-  it('exposes list load errors instead of reporting an empty success', async () => {
+  it('rethrows grid list errors for the grid error handler', async () => {
     const failure = new Error('archive list unavailable');
     apiMocks.apiGet.mockRejectedValue(failure);
 
     const { result } = renderHook(() => useArchiveList());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    apiMocks.apiGet.mockClear();
 
-    expect(result.current.error).toBe(failure);
+    await expect(
+      result.current.dataSource.load({
+        offset: 0,
+        limit: 20,
+        sorts: [],
+        filters: [],
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toBe(failure);
   });
 
-  it('does not let an older filter response overwrite the current list', async () => {
-    let resolveOlder!: (value: {
-      resultList: Array<{ postId: number; title: string }>;
-      resultCnt: number;
-    }) => void;
-    const olderResponse = new Promise<{
-      resultList: Array<{ postId: number; title: string }>;
-      resultCnt: number;
-    }>((resolve) => {
-      resolveOlder = resolve;
-    });
-    apiMocks.apiGet
-      .mockReturnValueOnce(olderResponse)
-      .mockResolvedValueOnce({
-        resultList: [{ postId: 2, title: 'Current filter' }],
-        resultCnt: 1,
-      });
-
+  it('creates a fresh data source only after applied filters change', () => {
     const { result } = renderHook(() => useArchiveList());
-    await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledTimes(1));
+    const initialDataSource = result.current.dataSource;
 
-    act(() => result.current.setKeyword('current'));
-    await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(result.current.posts).toEqual([
-        { postId: 2, title: 'Current filter' },
-      ]),
-    );
+    act(() => result.current.setKeyword('policy'));
 
-    await act(async () => {
-      resolveOlder({
-        resultList: [{ postId: 1, title: 'Stale filter' }],
-        resultCnt: 1,
-      });
-      await olderResponse;
+    expect(result.current.dataSource).not.toBe(initialDataSource);
+    expect(apiMocks.apiGet).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current data source when filters are unchanged', () => {
+    const { result } = renderHook(() => useArchiveList());
+    const initialDataSource = result.current.dataSource;
+
+    act(() => {
+      result.current.setKeyword('');
+      result.current.setCategoryCode('');
     });
 
-    expect(result.current.posts).toEqual([
-      { postId: 2, title: 'Current filter' },
-    ]);
+    expect(result.current.dataSource).toBe(initialDataSource);
   });
 });

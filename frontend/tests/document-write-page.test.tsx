@@ -1006,12 +1006,13 @@ describe('Document write page', () => {
     expect(screen.getAllByText('보완요청').length).toBeGreaterThan(0);
   });
 
-  it('returns the filtered list to all documents without leaving list mode', async () => {
+  it('shows a removable scope filter chip without leaving list mode', async () => {
     render(<DashboardContent {...pageProps} />);
     await screen.findByTestId('document-list');
     expect(
       screen.queryByRole('button', { name: '전체 조회' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^#/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /결재 진행 중/ }));
     await waitFor(() =>
@@ -1022,7 +1023,16 @@ describe('Document write page', () => {
       ),
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '전체 조회' }));
+    expect(await screen.findByText('#결재 진행 중')).toBeInTheDocument();
+    const scopeChip = screen.getByRole('button', {
+      name: '결재 범위 필터 결재 진행 중 취소',
+    });
+    expect(
+      screen.getAllByRole('button', {
+        name: '결재 범위 필터 결재 진행 중 취소',
+      }),
+    ).toHaveLength(1);
+    fireEvent.keyUp(scopeChip, { key: 'Delete' });
     await waitFor(() =>
       expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
         'ALL',
@@ -1030,6 +1040,7 @@ describe('Document write page', () => {
         undefined,
       ),
     );
+    expect(screen.queryByText('#결재 진행 중')).not.toBeInTheDocument();
     expect(screen.getByTestId('document-list')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '리스트형 보기' }),
@@ -1039,7 +1050,7 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
   }, 20000);
 
-  it('returns the filtered feed to all documents without leaving feed mode', async () => {
+  it('removes a scope filter chip without leaving feed mode', async () => {
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
     await screen.findByTestId('document-feed');
@@ -1054,7 +1065,14 @@ describe('Document write page', () => {
       ),
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '전체 조회' }));
+    expect(await screen.findByText('#결재 진행 중')).toBeInTheDocument();
+    fireEvent.click(
+      within(
+        screen.getByRole('button', {
+          name: '결재 범위 필터 결재 진행 중 취소',
+        }),
+      ).getByTestId('filter-delete-icon-scope'),
+    );
     await waitFor(() =>
       expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
         'ALL',
@@ -1068,6 +1086,41 @@ describe('Document write page', () => {
     expect(
       screen.getByRole('button', { name: '피드형 보기' }),
     ).toHaveAttribute('aria-pressed', 'true');
+  }, 20000);
+
+  it('shows and removes the selected document kind filter chip', async () => {
+    render(<DashboardContent {...pageProps} />);
+    await screen.findByTestId('document-list');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '문서 업무구분 필터' }),
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: '기안서' }));
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'ALL',
+        'DRAFTING',
+        undefined,
+      ),
+    );
+
+    expect(await screen.findByText('#기안서')).toBeInTheDocument();
+    fireEvent.click(
+      within(
+        screen.getByRole('button', {
+          name: '업무구분 필터 기안서 취소',
+        }),
+      ).getByTestId('filter-delete-icon-kind'),
+    );
+    await waitFor(() =>
+      expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+        'ALL',
+        undefined,
+        undefined,
+      ),
+    );
+    expect(screen.queryByText('#기안서')).not.toBeInTheDocument();
+    expect(screen.getByTestId('document-list')).toBeInTheDocument();
   }, 20000);
 
   it('uses the view-specific skeleton while the document list is loading', () => {
@@ -1233,7 +1286,42 @@ describe('Document write page', () => {
     );
   });
 
-  it('shows each rejection reason only in a dismissible message popover', async () => {
+  it.each(['panel', 'feed'] as const)('formats legacy system reasons in the %s presentation', async (presentation) => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    const events = [
+      { commentId: 101, ownerId: 1, commentType: 'SYSTEM' as const, eventType: 'RETURNED',
+        writerName: '결재자', content: '문서 보완이 요청되었습니다. 사유: 첫 줄\n둘째 줄' },
+      { commentId: 102, ownerId: 1, commentType: 'SYSTEM' as const, eventType: 'REJECTED',
+        writerName: '결재자', content: '문서가 반려되었습니다. 사유: 첫 줄\n둘째 줄' },
+    ];
+    const detail = toFeedRecord(record, { systemEvents: events });
+    if (presentation === 'panel') {
+      composerApi.getDocumentApprovalDetail.mockResolvedValueOnce(detail);
+      composerApi.listApprovalComments.mockResolvedValueOnce({
+        comments: [], systemEvents: events, resultCnt: 2,
+        hasPrevious: false, nextBeforeCommentId: null,
+      });
+    }
+    const sharedProps = {
+      open: true, electronicApprovalId: 1, detailRefreshToken: 0,
+      onActionComplete: vi.fn(), onEditDocument: vi.fn(),
+    };
+    render(presentation === 'panel'
+      ? <DocumentApprovalDetailFeed {...sharedProps} onClose={vi.fn()} />
+      : <DocumentApprovalDetailFeed {...sharedProps} presentation="feed"
+          employeeId="emp-1"
+          feedItem={{ id: 1, title: detail.title, author: detail.drafterName,
+            kind: '기안서', status: '결재진행중', summary: '',
+            date: '', feedData: detail }} />);
+    for (const prefix of ['문서 보완이 요청되었습니다.', '문서가 반려되었습니다.']) {
+      const message = await screen.findByText((_, el) =>
+        el?.textContent === `${prefix}\n사유: 첫 줄\n둘째 줄`);
+      expect(message).toHaveStyle({ whiteSpace: 'pre-wrap' });
+    }
+  }, 20000);
+
+  it('shows rejection and revision reasons only in dismissible message popovers', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -1282,24 +1370,48 @@ describe('Document write page', () => {
           participantUserId: 'reviewer-3',
           participantName: '보완 결재자',
           actionStatus: 'RETURNED',
-          actionComment: '보완 의견 유지',
+          actionComment: '보완 의견 첫 줄\n둘째 줄\n\n마지막 줄',
+        },
+        ...[null, '', '   '].map((actionComment, index) => ({
+          electronicApprovalLineId: 87 + index,
+          stageOrder: 7 + index,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: `empty-revision-${index}`,
+          participantName: `사유 없는 보완자 ${index}`,
+          actionStatus: 'RETURNED',
+          actionComment,
+        })),
+        {
+          electronicApprovalLineId: 90,
+          stageOrder: 10,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approved-reviewer',
+          participantName: '승인자',
+          actionStatus: 'APPROVED',
+          actionComment: '승인 의견 유지',
         },
       ],
       attachments: [],
       systemEvents: [],
     });
-    render(<DashboardContent {...pageProps} />);
-    const listRegion = await screen.findByRole('region', {
-      name: '리스트형 문서 목록',
-    });
-    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+    render(<DocumentApprovalDetailFeed
+      open electronicApprovalId={1} detailRefreshToken={0}
+      onClose={vi.fn()} onActionComplete={vi.fn()} onEditDocument={vi.fn()}
+    />);
     const group = await screen.findByTestId('approval-line-group-approval');
     const message = within(group).getByRole('button', {
       name: '결재자 반려 사유 보기', exact: true,
     });
-    expect(within(group).getAllByRole('button')).toHaveLength(2);
+    expect(within(group).getAllByRole('button')).toHaveLength(3);
     expect(screen.queryByText('결재 내용을 확인해 주세요')).not.toBeInTheDocument();
-    expect(group).toHaveTextContent('보완 의견 유지');
+    expect(group).not.toHaveTextContent('보완 의견 첫 줄');
+    expect(group).toHaveTextContent('승인 의견 유지');
+    const revisionSeal = screen.getByTestId('approval-line-status-seal-86');
+    expect(revisionSeal.textContent).toBe('보완\n요청');
+    expect(revisionSeal).toHaveStyle({ whiteSpace: 'pre-line', textAlign: 'center' });
+    expect(revisionSeal).toHaveAccessibleName('결재 상태 보완요청');
 
     fireEvent.click(message);
     let popover = await screen.findByRole('dialog', { name: '반려 사유' });
@@ -1320,7 +1432,15 @@ describe('Document write page', () => {
     fireEvent.click(backdrop!);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '반려 사유' }))
       .not.toBeInTheDocument());
-  });
+    fireEvent.click(within(group).getByRole('button', { name: '보완 결재자 보완요청 사유 보기' }));
+    popover = await screen.findByRole('dialog', { name: '보완요청 사유' });
+    const reason = within(popover).getByText((_, el) =>
+      el?.textContent === '보완 의견 첫 줄\n둘째 줄\n\n마지막 줄');
+    expect(reason).toHaveStyle({ whiteSpace: 'pre-wrap' });
+    expect(popover).not.toHaveTextContent('결재 내용을 확인해 주세요');
+    fireEvent.keyDown(popover, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '보완요청 사유' })).not.toBeInTheDocument());
+  }, 20000);
 
   it('matches a pending approval seal to its participant border color', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
@@ -1374,7 +1494,9 @@ describe('Document write page', () => {
       documentStatus: 'PENDING',
       title: '문서 A',
       drafterName: '김민수',
-      createdAt: '2026-10-13T09:00:00Z',
+      createdAt: '2026-10-12T09:00:00Z',
+      updatedAt: '2026-10-15T11:00:00Z',
+      submittedAt: null,
       viewCount: 7,
       draftingWorkCategoryId: null,
       contentsJson: '{"type":"doc","content":[]}',
@@ -1533,10 +1655,13 @@ describe('Document write page', () => {
     expect(within(authorRow).getByText('결재진행중')).toBeInTheDocument();
     expect(within(authorRow).getByText('기안', { exact: true })).toBeInTheDocument();
     expect(screen.getByTestId('approval-author-meta')).toHaveTextContent(
-      '기안자 · 2026.10.13 · 조회 7',
+      '기안자 · 2026.10.15 · 조회 7',
     );
+    expect(
+      getComputedStyle(screen.getByTestId('approval-author-meta')).whiteSpace,
+    ).not.toBe('nowrap');
     expect(screen.getByTestId('approval-line-drafter-meta')).toHaveTextContent(
-      '기안자 김민수 · 2026.10.13',
+      '기안자 김민수 · 2026.10.15',
     );
     expect(screen.getByTestId('approval-line-header-title'))
       .toHaveClass('MuiTypography-body1');
@@ -2800,6 +2925,13 @@ describe('Document write page', () => {
           includeDetails
             ? defaultDocumentRecords.map((record) =>
                 toFeedRecord(record, {
+                  ...(record.electronicApprovalId === 1
+                    ? {
+                        submittedAt: '2026-10-14T11:00:00Z',
+                        updatedAt: '2026-10-15T11:00:00Z',
+                        createdAt: '2026-10-12T09:00:00Z',
+                      }
+                    : {}),
                   title: `상세 문서 ${record.electronicApprovalId}`,
                   viewCount: 3,
                   contentsHtml: `<p>전체 본문 ${record.electronicApprovalId}</p>`,
@@ -2840,6 +2972,9 @@ describe('Document write page', () => {
       const documentId = index + 1;
       const card = cards[index];
       if (!card) throw new Error(`Missing document card ${documentId}.`);
+      if (documentId === 1) {
+        expect(card).toHaveTextContent('기안자 · 2026.10.14 · 조회 3');
+      }
       expect(
         await within(card).findByText(`전체 본문 ${documentId}`),
       ).toBeInTheDocument();

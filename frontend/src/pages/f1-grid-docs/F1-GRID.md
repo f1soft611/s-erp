@@ -479,7 +479,9 @@ const detailFields = useMemo(
 
 날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
 
-문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지하며 본문 상세는 행 선택 후 별도의 읽기 전용 API로 요청한다.
+문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
+
+커뮤니티 자료실은 기본 영역의 통합검색어를 기존 `keyword` 파라미터로 보내고, `categoryCode` 컬럼의 `search` 설정만 상세검색에 노출한다. API가 `pageIndex`/`pageUnit`을 사용하므로 자료실의 `F1GridDataSource`는 `floor(offset / limit) + 1`과 `limit`으로 변환하고, 요청 취소 signal을 서비스까지 전달한다. 이 화면은 서버의 최신순을 유지하기 위해 그리드 정렬/필터를 비활성화하고, 조회 실패는 `onDataSourceError`에서 오류와 재시도 상태로 표시한다. 제목 셀은 버튼으로 렌더링하여 상세 패널 열기를 명시적으로 실행하며 분류, 작성자, 등록일, 첨부 수는 읽기 전용 컬럼으로 표시한다.
 
 포털의 `필터와 정렬` 문서에서 `상세검색은 이렇게 연결됩니다`부터 단계별 예제와 전체 기안양식 검색 예제를 확인할 수 있다. 포털에서 `toPageSearchFields`를 검색하면 상세검색 가이드로, `F1GridColumn.search`를 검색하면 공개 API 참조 항목으로 이동할 수 있다.
 

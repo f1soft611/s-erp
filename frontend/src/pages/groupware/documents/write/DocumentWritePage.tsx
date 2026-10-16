@@ -1,5 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Alert, Box, Button, Container, Stack } from '@mui/material';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
 import { useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
@@ -40,8 +41,7 @@ export function DocumentWritePage({
     setViewMode,
     selectedKind,
     setSelectedKind,
-    hasActiveFilters,
-    resetFilters,
+    activeFilterChips,
     isComposerOpen,
     openComposer,
     closeComposer,
@@ -142,15 +142,32 @@ export function DocumentWritePage({
                           setSelectedKind(code as DocumentKind | '')
                         }
                       />
-                      {hasActiveFilters && (
-                        <Button
+                      {activeFilterChips.map((filter) => (
+                        <Chip
+                          key={filter.key}
+                          label={filter.label}
                           size="small"
-                          onClick={resetFilters}
-                          sx={{ minWidth: 'auto', whiteSpace: 'nowrap' }}
-                        >
-                          전체 조회
-                        </Button>
-                      )}
+                          aria-label={filter.deleteLabel}
+                          onDelete={filter.onDelete}
+                          deleteIcon={
+                            <CloseOutlinedIcon
+                              data-testid={`filter-delete-icon-${filter.key}`}
+                              fontSize="small"
+                              aria-hidden="true"
+                            />
+                          }
+                          sx={{
+                            maxWidth: '100%',
+                            minWidth: 0,
+                            height: 'auto',
+                            '& .MuiChip-label': {
+                              minWidth: 0,
+                              whiteSpace: 'normal',
+                              overflowWrap: 'anywhere',
+                            },
+                          }}
+                        />
+                      ))}
                     </Stack>
                   }
                 />

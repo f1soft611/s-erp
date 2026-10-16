@@ -108,7 +108,16 @@ function renderArchive(
 
 async function openPostDetail() {
   fireEvent.click(await screen.findByRole('button', { name: /업무 가이드/ }));
-  return screen.findByRole('region', { name: /게시글 상세/ });
+  return screen.findByRole('region', { name: '자료 상세' });
+}
+
+async function openPostActions() {
+  fireEvent.click(await screen.findByRole('button', { name: '자료 더보기' }));
+}
+
+async function choosePostAction(name: string) {
+  await openPostActions();
+  fireEvent.click(await screen.findByRole('menuitem', { name }));
 }
 
 describe('Archive dashboard page', () => {
@@ -145,20 +154,40 @@ describe('Archive dashboard page', () => {
     expect('archive' in pageContentMap).toBe(true);
     renderArchive();
 
-    expect(await screen.findByText('자료실')).toBeInTheDocument();
-    expect(await screen.findByRole('table', { name: '자료실 목록' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('table', { name: '자료실 목록' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: '자료 검색' })).toHaveLength(
+      1,
+    );
   });
 
-  it('shows only active common-code categories in filter and editor', async () => {
+  it('provides active common-code categories in detailed search and the editor', async () => {
     renderArchive();
 
-    const filter = await screen.findByRole('combobox', { name: '분류 필터' });
+    fireEvent.click(
+      await screen.findByRole('button', { name: '상세 검색 열기' }),
+    );
+    const detailSearch = screen.getByRole('dialog', { name: '상세 검색' });
+    const filter = within(detailSearch).getByRole('combobox', { name: '분류' });
     fireEvent.mouseDown(filter);
     expect(await screen.findByRole('option', { name: '업무양식' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '매뉴얼' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: '비활성 분류' })).not.toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole('option', { name: '업무양식' }));
+    fireEvent.click(await screen.findByRole('option', { name: '매뉴얼' }));
+    fireEvent.click(within(detailSearch).getByRole('button', { name: '조회' }));
+    await waitFor(() =>
+      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
+        1,
+        expect.any(Number),
+        '',
+        'MANUAL',
+        expect.any(AbortSignal),
+      ),
+    );
+
     fireEvent.click(screen.getByRole('button', { name: '새 자료 등록' }));
     const editorCategory = await screen.findByRole('combobox', { name: '자료 분류' });
     fireEvent.mouseDown(editorCategory);
@@ -166,7 +195,7 @@ describe('Archive dashboard page', () => {
     expect(screen.queryByRole('option', { name: '비활성 분류' })).not.toBeInTheDocument();
   });
 
-  it('sends title, content, and author search through the server keyword and resets pagination', async () => {
+  it('sends integrated search through the server keyword and resets pagination', async () => {
     renderArchive();
 
     const search = await screen.findByRole('textbox', { name: '자료 검색' });
@@ -179,37 +208,60 @@ describe('Archive dashboard page', () => {
         expect.any(Number),
         '홍길동',
         '',
+        expect.any(AbortSignal),
       ),
     );
   });
 
-  it('filters with the selected active category code', async () => {
+  it('preserves integrated search when applying a detailed category filter', async () => {
     renderArchive();
 
-    const filter = await screen.findByRole('combobox', { name: '분류 필터' });
-    fireEvent.mouseDown(filter);
+    const search = await screen.findByRole('textbox', { name: '자료 검색' });
+    fireEvent.change(search, { target: { value: 'policy' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+    await waitFor(() =>
+      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
+        1,
+        expect.any(Number),
+        'policy',
+        '',
+        expect.any(AbortSignal),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const detailSearch = screen.getByRole('dialog', { name: '상세 검색' });
+    fireEvent.mouseDown(
+      within(detailSearch).getByRole('combobox', { name: '분류' }),
+    );
     fireEvent.click(await screen.findByRole('option', { name: '매뉴얼' }));
+    fireEvent.click(within(detailSearch).getByRole('button', { name: '조회' }));
 
     await waitFor(() =>
       expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
         1,
         expect.any(Number),
-        '',
+        'policy',
         'MANUAL',
+        expect.any(AbortSignal),
       ),
     );
   });
 
   it('loads detail, preserves multiline plain text, and downloads each attachment individually', async () => {
     renderArchive();
-    await openPostDetail();
+    const detail = await openPostDetail();
 
     expect(archiveServices.fetchArchivePostDetail).toHaveBeenCalledWith(12);
     expect(screen.getByLabelText('자료 설명').textContent).toBe(
       '첫 번째 줄\n두 번째 줄',
     );
+    expect(within(detail).getByText('업무양식')).toBeInTheDocument();
     expect(screen.getByText('guide.pdf')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '다운로드 guide.pdf' }));
+    expect(screen.getByTestId('archive-attachment-list')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: '첨부 파일 다운로드' }),
+    );
     await waitFor(() =>
       expect(archiveServices.downloadArchiveAttachment).toHaveBeenCalledWith(
         attachment,
@@ -220,12 +272,13 @@ describe('Archive dashboard page', () => {
   it('shows each mutation only when tenant-admin and its menu permission are both granted', async () => {
     const permissions = { ...adminPermissions, create: false, update: false, delete: true };
     renderArchive(permissions, true);
-    expect(await screen.findByRole('table', { name: '자료실 목록' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '새 자료 등록' })).not.toBeInTheDocument();
 
     await openPostDetail();
-    expect(screen.queryByRole('button', { name: '수정' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '삭제' })).toBeInTheDocument();
+    await openPostActions();
+    expect(screen.queryByRole('menuitem', { name: '수정' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '삭제' })).toBeInTheDocument();
   });
 
   it('hides all mutation actions when the user is not a tenant administrator', async () => {
@@ -233,8 +286,9 @@ describe('Archive dashboard page', () => {
     expect(screen.queryByRole('button', { name: '새 자료 등록' })).not.toBeInTheDocument();
 
     await openPostDetail();
-    expect(screen.queryByRole('button', { name: '수정' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '삭제' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '자료 더보기' }),
+    ).not.toBeInTheDocument();
   });
 
   it('creates the post before uploading files and reports partial upload failure without discarding the draft', async () => {
@@ -291,7 +345,7 @@ describe('Archive dashboard page', () => {
     archiveServices.uploadArchiveAttachment.mockReturnValueOnce(pendingUpload);
     renderArchive();
     await openPostDetail();
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    await choosePostAction('수정');
     const title = await screen.findByRole('textbox', { name: '제목' });
     const category = screen.getByRole('combobox', { name: '자료 분류' });
     const fileInput = screen.getByLabelText('첨부파일 추가');
@@ -332,7 +386,7 @@ describe('Archive dashboard page', () => {
   it('retains existing attachments during edits unless they are explicitly removed', async () => {
     renderArchive();
     await openPostDetail();
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    await choosePostAction('수정');
     expect(await screen.findAllByText('guide.pdf')).not.toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
@@ -351,7 +405,7 @@ describe('Archive dashboard page', () => {
     );
     renderArchive();
     await openPostDetail();
-    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    await choosePostAction('수정');
     fireEvent.click(await screen.findByRole('button', { name: '제거' }));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
@@ -365,7 +419,7 @@ describe('Archive dashboard page', () => {
   it('requires confirmation before deleting a post', async () => {
     renderArchive();
     await openPostDetail();
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    await choosePostAction('삭제');
 
     const dialog = await screen.findByRole('dialog', { name: /자료 삭제 확인/ });
     expect(within(dialog).getByText(/삭제하시겠습니까/)).toBeInTheDocument();
@@ -384,7 +438,7 @@ describe('Archive dashboard page', () => {
     archiveServices.deleteArchivePost.mockReturnValueOnce(pendingDelete);
     renderArchive();
     await openPostDetail();
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    await choosePostAction('삭제');
     const dialog = await screen.findByRole('dialog', {
       name: /자료 삭제 확인/,
     });
@@ -398,7 +452,11 @@ describe('Archive dashboard page', () => {
         screen.queryByRole('dialog', { name: /자료 삭제 확인/ }),
       ).not.toBeInTheDocument(),
     );
-    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled();
+    await openPostActions();
+    expect(screen.getByRole('menuitem', { name: '삭제' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
     await act(async () => {
       resolveDelete();

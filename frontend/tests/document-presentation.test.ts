@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatApprovalSystemEventContent,
   getApprovalStatusPresentation,
   getApprovalSystemEventPresentation,
   getDocumentKindPresentation,
 } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('document presentation metadata', () => {
+  it.each([
+    ['REJECTED', '문서가 반려되었습니다.'],
+    ['RETURNED', '문서 보완이 요청되었습니다.'],
+  ])('separates the %s event description from its multiline reason', (eventType, prefix) => {
+    const reason = '첫째\n둘째\n\n사유: 본문에 포함한 문구';
+    const formatted = `${prefix}\n사유: ${reason}`;
+    expect(formatApprovalSystemEventContent(eventType, `${prefix} 사유: ${reason}`)).toBe(formatted);
+    expect(formatApprovalSystemEventContent(eventType, formatted)).toBe(formatted);
+    expect(formatApprovalSystemEventContent(eventType, prefix)).toBe(prefix);
+  });
+
+  it.each(['APPROVED', 'USER', 'UNKNOWN'])('does not reformat an unrelated %s event', (eventType) => {
+    const content = '문서 보완이 요청되었습니다. 사유: 원문\n사유: 유지';
+    expect(formatApprovalSystemEventContent(eventType, content)).toBe(content);
+  });
+
+  it('leaves an unrecognized message unchanged', () => {
+    const content = '설명 사유: 원문';
+    expect(formatApprovalSystemEventContent('RETURNED', content)).toBe(content);
+  });
+
   it.each([
     ['DRAFT_SAVED', '임시저장', 'default', 'outlined', 'DRAFT'],
     ['SUBMITTED', '결재신청', 'info', 'filled', 'PENDING'],

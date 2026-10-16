@@ -56,10 +56,12 @@ import {
   uploadApprovalCommentAttachment,
 } from '../services/documentApproval.service';
 import {
+  formatApprovalSystemEventContent,
   getApprovalStatusPresentation,
   getApprovalSystemEventPresentation,
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
+import { getDocumentDisplayDate } from '../data/documentDate';
 import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
 import { DocumentApprovalToolbar } from './DocumentApprovalToolbar';
 import { useDocumentApprovalBody } from '../hooks/useDocumentApprovalBody';
@@ -228,7 +230,7 @@ function toApprovalCommentTree(
       id: eventId,
       author: event.writerName || '시스템',
       time: formatCommentTime(event.createdAt),
-      content: event.content,
+      content: formatApprovalSystemEventContent(event.eventType, event.content),
       isSystemEvent: true,
       systemEventBadge: getApprovalSystemEventPresentation(event.eventType),
     });
@@ -317,9 +319,10 @@ export function DocumentApprovalDetailFeed(
     Record<string, string>
   >({});
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
-  const [rejectionReasonPopover, setRejectionReasonPopover] = useState<{
+  const [reasonPopover, setReasonPopover] = useState<{
     anchorEl: HTMLElement;
     reason: string;
+    title: string;
   } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -337,6 +340,9 @@ export function DocumentApprovalDetailFeed(
     expandedBodyHtml,
     collapsedBodyHtml,
   } = useDocumentApprovalBody(electronicApprovalId, detail?.contentsHtml ?? '');
+  const displayDate = detail
+    ? formatApprovalDate(getDocumentDisplayDate(detail).value)
+    : '';
 
   const loadComments = useCallback(
     async (beforeCommentId?: number, append = false) => {
@@ -1146,9 +1152,8 @@ export function DocumentApprovalDetailFeed(
                     data-testid="approval-author-meta"
                     variant="caption"
                     color="text.secondary"
-                    noWrap
                   >
-                    기안자 · {formatApprovalDate(detail.createdAt)} · 조회{' '}
+                    기안자 · {displayDate} · 조회{' '}
                     {detail.viewCount}
                   </Typography>
                 </Box>
@@ -1208,8 +1213,7 @@ export function DocumentApprovalDetailFeed(
                       color="text.secondary"
                     >
                       기안자 {detail.drafterName}
-                      {formatApprovalDate(detail.createdAt) &&
-                        ` · ${formatApprovalDate(detail.createdAt)}`}
+                      {displayDate && ` · ${displayDate}`}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -1236,10 +1240,17 @@ export function DocumentApprovalDetailFeed(
                             }}
                           >
                             {approvalLineGroups.approval.map((line, index) => {
-                              const rejectionReason =
-                                line.actionStatus === 'REJECTED'
+                              const hasReasonPopover =
+                                line.actionStatus === 'REJECTED' ||
+                                line.actionStatus === 'RETURNED';
+                              const actionReason =
+                                hasReasonPopover
                                   ? line.actionComment
                                   : null;
+                              const reasonTitle =
+                                line.actionStatus === 'RETURNED'
+                                  ? '보완요청 사유'
+                                  : '반려 사유';
                               const statusTone =
                                 approvalLineStatusTones[line.actionStatus] ??
                                 'neutral';
@@ -1343,23 +1354,31 @@ export function DocumentApprovalDetailFeed(
                                             ],
                                           fontSize: '1rem',
                                           fontWeight: 700,
+                                          ...(line.actionStatus === 'RETURNED' && {
+                                            whiteSpace: 'pre-line',
+                                            textAlign: 'center',
+                                            lineHeight: 1.05,
+                                          }),
                                           boxShadow: isCurrent ? 1 : 0,
                                         }}
                                       >
-                                        {approvalLineStatusDisplayLabel(
-                                          line.actionStatus,
-                                        )}
+                                        {line.actionStatus === 'RETURNED'
+                                          ? '보완\n요청'
+                                          : approvalLineStatusDisplayLabel(
+                                              line.actionStatus,
+                                            )}
                                       </Avatar>
-                                      {rejectionReason &&
-                                        rejectionReason.trim() && (
+                                      {actionReason &&
+                                        actionReason.trim() && (
                                           <IconButton
                                             size="small"
-                                            aria-label={`${line.participantName} 반려 사유 보기`}
+                                            aria-label={`${line.participantName} ${reasonTitle} 보기`}
                                             aria-haspopup="dialog"
                                             onClick={(event) =>
-                                              setRejectionReasonPopover({
+                                              setReasonPopover({
                                                 anchorEl: event.currentTarget,
-                                                reason: rejectionReason,
+                                                reason: actionReason,
+                                                title: reasonTitle,
                                               })
                                             }
                                             sx={{
@@ -1369,7 +1388,7 @@ export function DocumentApprovalDetailFeed(
                                               width: 24,
                                               height: 24,
                                               bgcolor: 'background.paper',
-                                              color: 'error.main',
+                                              color: approvalLineStatusColors[statusTone],
                                               '&:hover': {
                                                 bgcolor: 'background.default',
                                               },
@@ -1380,7 +1399,7 @@ export function DocumentApprovalDetailFeed(
                                             />
                                           </IconButton>
                                         )}
-                                      {line.actionStatus !== 'REJECTED' &&
+                                      {!hasReasonPopover &&
                                         line.actionComment && (
                                           <Typography
                                             variant="caption"
@@ -1920,7 +1939,7 @@ export function DocumentApprovalDetailFeed(
           author={detail?.drafterName ?? props.feedItem.author}
           meta={
             detail
-              ? `기안자 · ${formatApprovalDate(detail.createdAt)} · 조회 ${detail.viewCount}`
+              ? `기안자 · ${displayDate} · 조회 ${detail.viewCount}`
               : props.feedItem.date
           }
           actions={documentToolbar}
@@ -1947,15 +1966,15 @@ export function DocumentApprovalDetailFeed(
         </PostDetailPanel>
       )}
       <Popover
-        open={rejectionReasonPopover !== null}
-        anchorEl={rejectionReasonPopover?.anchorEl}
-        onClose={() => setRejectionReasonPopover(null)}
+        open={reasonPopover !== null}
+        anchorEl={reasonPopover?.anchorEl}
+        onClose={() => setReasonPopover(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
         slotProps={{
           paper: {
             role: 'dialog',
-            'aria-label': '반려 사유',
+            'aria-label': reasonPopover?.title,
             sx: {
               p: 1.5,
               width: 300,
@@ -1967,10 +1986,10 @@ export function DocumentApprovalDetailFeed(
         }}
       >
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-          반려 사유
+          {reasonPopover?.title}
         </Typography>
         <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-          {rejectionReasonPopover?.reason}
+          {reasonPopover?.reason}
         </Typography>
       </Popover>
       <CommonDialog

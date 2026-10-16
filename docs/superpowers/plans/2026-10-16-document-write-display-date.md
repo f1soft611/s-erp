@@ -150,7 +150,7 @@ Expected: PASS for source priority, empty-string fallback, list mapping, and not
 
 - [ ] **Step 1: Add an integration regression for detail-backed dates**
 
-Extend the existing document-detail test data with distinct values:
+Extend the existing document-detail test data with a missing submission date and distinct fallback values:
 
 ```ts
 submittedAt: '2026-10-14T11:00:00Z',
@@ -158,7 +158,7 @@ updatedAt: '2026-10-15T11:00:00Z',
 createdAt: '2026-10-12T09:00:00Z',
 ```
 
-Change assertions for `approval-author-meta` and `approval-line-drafter-meta` to expect `2026.10.14`. Add a fallback case with `submittedAt: null` and `updatedAt` present, expecting `2026.10.15` in both metadata nodes. Add a feed assertion that its author metadata shows the selected submitted date rather than creation date.
+Set `submittedAt: null`, `updatedAt: '2026-10-15T11:00:00Z'`, and `createdAt: '2026-10-12T09:00:00Z'` in the detail fixture; expect `2026.10.15` in both `approval-author-meta` and `approval-line-drafter-meta`. Assert that the author metadata is not `white-space: nowrap`. The feed fixture has all three values and asserts that its author metadata uses the selected submission date `2026.10.14`.
 
 - [ ] **Step 2: Run the focused UI test to verify it fails**
 
@@ -168,7 +168,7 @@ Expected: FAIL because detail/feed metadata currently renders `createdAt` direct
 
 - [ ] **Step 3: Select the display date for detail metadata**
 
-Import `getDocumentDisplayDate` into `DocumentApprovalDetailFeed.tsx`. For the detail author row, approval-line drafter metadata, and feed-card `meta`, compute the date with `getDocumentDisplayDate(detail).value` and pass it through the existing `formatApprovalDate`. Preserve the current author text, view count, separators, and fallback to `props.feedItem.date` when no detail is available. Do not change comment timestamps or action dates.
+Import `getDocumentDisplayDate` into `DocumentApprovalDetailFeed.tsx`. For the detail author row, approval-line drafter metadata, and feed-card `meta`, compute the date with `getDocumentDisplayDate(detail).value` and pass it through the existing `formatApprovalDate`. Preserve the current author text, view count, separators, and fallback to `props.feedItem.date` when no detail is available. Remove `noWrap` from the detail author metadata so its date remains fully visible on narrow screens. Do not change comment timestamps or action dates.
 
 - [ ] **Step 4: Run focused date and page tests**
 

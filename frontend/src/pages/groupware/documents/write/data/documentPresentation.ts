@@ -3,6 +3,7 @@ import type {
   ApprovalStatusColor,
   ApprovalStatus,
   DocumentApprovalRecord,
+  DocumentApprovalScope,
   DocumentKind,
 } from '../types/documentWrite.types';
 
@@ -46,6 +47,16 @@ const documentKindByType: Record<DocumentApprovalRecord['documentType'], Documen
   ATTENDANCE_APPLICATION: '근태신청',
 };
 
+const documentApprovalScopeLabels: Record<DocumentApprovalScope, string> = {
+  ALL: '전체',
+  MY_PENDING: '내가 처리할 결재',
+  IN_PROGRESS: '결재 진행 중',
+  DRAFT: '작성 중 문서',
+  COMPLETED: '승인',
+  REVISION_REQUESTED: '보완요청',
+  REJECTED: '반려',
+};
+
 function isDocumentType(
   value: DocumentKind | DocumentApprovalRecord['documentType'],
 ): value is DocumentApprovalRecord['documentType'] {
@@ -56,6 +67,20 @@ export function getApprovalStatusPresentation(
   status: ApprovalDocumentStatus,
 ): ApprovalStatusPresentation {
   return approvalStatusPresentation[status];
+}
+
+export function formatApprovalSystemEventContent(
+  eventType: string,
+  content: string,
+): string {
+  const prefix =
+    eventType === 'REJECTED'
+      ? '문서가 반려되었습니다.'
+      : eventType === 'RETURNED'
+        ? '문서 보완이 요청되었습니다.'
+        : null;
+  if (!prefix || !content.startsWith(`${prefix} 사유: `)) return content;
+  return `${prefix}\n${content.slice(prefix.length + 1)}`;
 }
 
 export function getApprovalSystemEventPresentation(
@@ -83,6 +108,12 @@ export function getDocumentKindFromType(
   documentType: DocumentApprovalRecord['documentType'],
 ): DocumentKind {
   return documentKindByType[documentType];
+}
+
+export function getDocumentApprovalScopeLabel(
+  scope: DocumentApprovalScope,
+): string {
+  return documentApprovalScopeLabels[scope];
 }
 
 export function getDocumentKindPresentation(

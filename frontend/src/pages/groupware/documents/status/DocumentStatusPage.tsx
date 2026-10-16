@@ -10,10 +10,14 @@ import {
   toPageSearchFields,
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
+import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import type {
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
+import { DocumentApprovalDetailFeed } from '../write/components/DocumentApprovalDetailFeed';
+import { DocumentComposerDialog } from '../write/components/DocumentComposerDialog';
+import type { DocumentApprovalDetail } from '../write/types/documentWrite.types';
 import { createDocumentStatusDataSource } from './services/documentStatus.service';
 import type {
   DocumentStatusFilters,
@@ -23,7 +27,6 @@ import {
   createDocumentStatusColumns,
   DocumentStatusGrid,
 } from './components/DocumentStatusGrid';
-import { DocumentStatusDetailPanel } from './components/DocumentStatusDetailPanel';
 
 const DOCUMENT_TYPES = new Set<string>([
   'DRAFTING',
@@ -166,6 +169,10 @@ export function DocumentStatusPage({
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(
     null,
   );
+  const [editingDocument, setEditingDocument] =
+    useState<DocumentApprovalDetail | null>(null);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [totalRowCount, setTotalRowCount] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -210,6 +217,25 @@ export function DocumentStatusPage({
     );
   }, []);
 
+  const closeDetail = useCallback(() => {
+    setSelectedDocumentId(null);
+  }, []);
+
+  const refreshStatusList = useCallback(() => {
+    setError('');
+    setHasLoaded(false);
+    setRetryToken((current) => current + 1);
+    setDetailRefreshToken((current) => current + 1);
+  }, []);
+
+  const handleEditDocument = useCallback(
+    (document: DocumentApprovalDetail) => {
+      setEditingDocument(document);
+      setIsComposerOpen(true);
+    },
+    [],
+  );
+
   const handleDataSourceError = useCallback((loadError: Error) => {
     setError(loadError.message);
   }, []);
@@ -234,6 +260,7 @@ export function DocumentStatusPage({
     <Box
       sx={{
         flex: 1,
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -344,11 +371,28 @@ export function DocumentStatusPage({
             </Button>
           </Box>
         ) : null}
-        <DocumentStatusDetailPanel
-          electronicApprovalId={selectedDocumentId}
-          onClose={() => setSelectedDocumentId(null)}
-        />
       </Box>
+      {selectedDocumentId !== null ? (
+        <PageAreaOverlay onClose={closeDetail}>
+          <DocumentApprovalDetailFeed
+            open
+            electronicApprovalId={selectedDocumentId}
+            onClose={closeDetail}
+            onActionComplete={refreshStatusList}
+            onEditDocument={handleEditDocument}
+            detailRefreshToken={detailRefreshToken}
+          />
+        </PageAreaOverlay>
+      ) : null}
+      <DocumentComposerDialog
+        open={isComposerOpen}
+        initialDocument={editingDocument}
+        onClose={() => {
+          setIsComposerOpen(false);
+          setEditingDocument(null);
+          refreshStatusList();
+        }}
+      />
     </Box>
   );
 }

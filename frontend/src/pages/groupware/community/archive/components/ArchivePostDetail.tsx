@@ -1,15 +1,19 @@
 import {
   Box,
-  Button,
+  Chip,
   Divider,
+  IconButton,
+  Menu,
+  MenuItem,
   Stack,
   Typography,
 } from '@mui/material';
-import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
-import EditOutlined from '@mui/icons-material/EditOutlined';
-import DeleteOutlineOutlined from '@mui/icons-material/DeleteOutlineOutlined';
+import MoreVertOutlined from '@mui/icons-material/MoreVertOutlined';
+import { useState } from 'react';
+import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import type {
+  ArchiveAttachment,
   ArchiveCategory,
   ArchivePost,
 } from '../types/archive.types';
@@ -18,7 +22,7 @@ type ArchivePostDetailProps = {
   post: ArchivePost;
   categories: ArchiveCategory[];
   onClose: () => void;
-  onDownload: (post: ArchivePost, fileIndex: number) => void;
+  onDownload: (attachment: ArchiveAttachment) => void;
   onEdit?: () => void;
   onDelete?: () => void;
   isDeletePending?: boolean;
@@ -41,48 +45,87 @@ export function ArchivePostDetail({
   onDelete,
   isDeletePending = false,
 }: ArchivePostDetailProps) {
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const category =
     categories.find((item) => item.code === post.categoryCode)?.name ??
     post.categoryCode;
+  const attachments = post.attachments ?? [];
 
   return (
     <PostDetailPanel onClose={onClose} title="자료 상세">
-      <Stack spacing={2}>
+      <Stack spacing={2.5}>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" color="text.secondary">
+                {post.writerName ?? post.writerId ?? '—'} ·{' '}
+                {formatDate(post.createdAt)}
+              </Typography>
+            </Box>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{ alignItems: 'center' }}
+            >
+              <Chip label={category} size="small" variant="outlined" />
+              {(onEdit || onDelete) && (
+                <>
+                  <IconButton
+                    type="button"
+                    size="small"
+                    aria-label="자료 더보기"
+                    aria-haspopup="menu"
+                    aria-expanded={menuAnchor !== null}
+                    onClick={(event) => setMenuAnchor(event.currentTarget)}
+                  >
+                    <MoreVertOutlined fontSize="small" />
+                  </IconButton>
+                  <Menu
+                    anchorEl={menuAnchor}
+                    open={menuAnchor !== null}
+                    onClose={() => setMenuAnchor(null)}
+                  >
+                    {onEdit && (
+                      <MenuItem
+                        onClick={() => {
+                          setMenuAnchor(null);
+                          onEdit();
+                        }}
+                      >
+                        수정
+                      </MenuItem>
+                    )}
+                    {onDelete && (
+                      <MenuItem
+                        disabled={isDeletePending}
+                        onClick={() => {
+                          setMenuAnchor(null);
+                          onDelete();
+                        }}
+                      >
+                        삭제
+                      </MenuItem>
+                    )}
+                  </Menu>
+                </>
+              )}
+            </Stack>
+          </Stack>
+          <Typography
+            component="h3"
+            variant="h5"
+            sx={{ mt: 1.5, fontWeight: 700, overflowWrap: 'anywhere' }}
+          >
             {post.title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {category} · {post.writerName ?? post.writerId ?? '—'} ·{' '}
-            {formatDate(post.createdAt)}
-          </Typography>
         </Box>
-        {(onEdit || onDelete) && (
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-            {onEdit && (
-              <Button
-                type="button"
-                size="small"
-                startIcon={<EditOutlined />}
-                onClick={onEdit}
-              >
-                수정
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                type="button"
-                size="small"
-                color="error"
-                startIcon={<DeleteOutlineOutlined />}
-                onClick={onDelete}
-                disabled={isDeletePending}
-              >
-                삭제
-              </Button>
-            )}
-          </Stack>
-        )}
         <Divider />
         <Typography
           component="div"
@@ -92,42 +135,24 @@ export function ArchivePostDetail({
         >
           {post.contents}
         </Typography>
-        {Boolean(post.attachments?.length) && (
+        {attachments.length > 0 && (
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
               첨부파일
             </Typography>
-            <Stack spacing={0.75}>
-              {post.attachments?.map((attachment, index) => (
-                <Box
-                  key={attachment.boardFileId}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    minWidth: 0,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    p: 1,
-                  }}
-                >
-                  <Typography sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                    {attachment.fileName}
-                  </Typography>
-                  <Button
-                    type="button"
-                    size="small"
-                    startIcon={<DownloadOutlined />}
-                    aria-label={`다운로드 ${attachment.fileName}`}
-                    onClick={() => onDownload(post, index)}
-                  >
-                    다운로드
-                  </Button>
-                </Box>
-              ))}
-            </Stack>
+            <AttachmentList
+              files={attachments.map((attachment) => ({
+                id: String(attachment.boardFileId),
+                name: attachment.fileName,
+              }))}
+              onDownload={(id) => {
+                const attachment = attachments.find(
+                  (item) => String(item.boardFileId) === id,
+                );
+                if (attachment) onDownload(attachment);
+              }}
+              testId="archive-attachment-list"
+            />
           </Box>
         )}
       </Stack>

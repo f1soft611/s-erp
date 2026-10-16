@@ -34,6 +34,9 @@ Use the same selected date for the “놓치지 마세요” panel. Its date lab
 reflects the selected source (`상신일`, `수정일`, or `작성일`) rather than
 always claiming the date is a submission date.
 
+Allow the detail-panel author metadata to wrap on narrow screens so the
+selected date remains fully visible; keep its content and desktop presentation.
+
 No date values are synthesized. Null, undefined, and empty-string fields are
 treated as unavailable and fall through to the next source. If all values are
 unavailable, preserve the surface's existing empty-date behavior.

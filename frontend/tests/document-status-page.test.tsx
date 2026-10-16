@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -9,8 +10,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
-  getDetail: vi.fn(),
-  getEmbeddedImage: vi.fn(),
 }));
 
 vi.mock('../src/shared/services/apiClient', () => ({
@@ -18,16 +17,24 @@ vi.mock('../src/shared/services/apiClient', () => ({
 }));
 
 vi.mock(
-  '../src/pages/groupware/documents/write/services/documentApproval.service',
+  '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed',
   () => ({
-    getDocumentApprovalDetail: api.getDetail,
-    fetchApprovalEmbeddedImageBlob: api.getEmbeddedImage,
+    DocumentApprovalDetailFeed: vi.fn(() => null),
+  }),
+);
+vi.mock(
+  '../src/pages/groupware/documents/write/components/DocumentComposerDialog',
+  () => ({
+    DocumentComposerDialog: vi.fn(() => null),
   }),
 );
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
+import { DocumentApprovalDetailFeed } from '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed';
+import { DocumentComposerDialog } from '../src/pages/groupware/documents/write/components/DocumentComposerDialog';
 import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/components/DocumentStatusGrid';
+import type { DocumentApprovalDetail } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import type { DocumentStatusRow } from '../src/pages/groupware/documents/status/types/documentStatus.types';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';
 
@@ -45,13 +52,13 @@ const row: DocumentStatusRow = {
   updatedAt: '2026-10-11T10:00:00',
 };
 
-const detail = {
+const detail: DocumentApprovalDetail = {
   ...row,
   viewCount: 1,
   isDrafter: false,
   draftingWorkCategoryId: null,
   contentsJson: '{}',
-  contentsHtml: '<p>Read-only body</p>',
+  contentsHtml: '<p>Approval body</p>',
   approvalLines: [
     {
       electronicApprovalLineId: 501,
@@ -101,6 +108,12 @@ function getListRequest(): URLSearchParams {
   return new URL(String(call[0]), 'http://localhost').searchParams;
 }
 
+function getListRequests(): number {
+  return api.get.mock.calls.filter(([path]) =>
+    String(path).includes('/api/v1/groupware/approvals/documents?'),
+  ).length;
+}
+
 function expectedRecentMonthRange(today: Date) {
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -127,7 +140,6 @@ describe('document status page', () => {
         ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
         : Promise.resolve({}),
     );
-    api.getDetail.mockResolvedValue(detail);
   });
 
   it('derives detailed search fields from the F1-Grid column metadata', () => {
@@ -165,7 +177,7 @@ describe('document status page', () => {
 
   it('provides document status content for the read route alias', () => {
     expect(pageContentMap.read.description).toBe(
-      '과거 전자결재 문서를 검색하고 상세 내용을 읽기 전용으로 확인합니다.',
+      '과거 전자결재 문서를 검색하고 권한에 따라 상세 및 후속 업무를 처리합니다.',
     );
   });
 
@@ -177,7 +189,7 @@ describe('document status page', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the documents menu with a one-month submitted date range and read-only detail', async () => {
+  it('opens the documents menu with a one-month submitted date range', async () => {
     renderDocumentStatusPage();
 
     expect(await screen.findByText('001')).toBeInTheDocument();
@@ -189,15 +201,46 @@ describe('document status page', () => {
     expect(request.get('submittedAtFrom')).toBe(expectedRange.from);
     expect(request.get('submittedAtTo')).toBe(expectedRange.to);
 
+  });
+
+  it('opens the existing approval detail overlay for the selected document and closes it', async () => {
+    renderDocumentStatusPage();
+    await screen.findByText('001');
+
     const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
     fireEvent.click(within(selectedRow).getByRole('checkbox'));
 
-    expect(await screen.findByText('Read-only body')).toBeInTheDocument();
-    expect(api.getDetail).toHaveBeenCalledWith(41);
-    expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: '문서 수정' }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
+    const feedCall = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1);
+    expect(feedCall?.[0].electronicApprovalId).toBe(41);
+
+    fireEvent.click(screen.getByTestId('page-area-overlay-backdrop'));
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+  });
+
+  it('forwards detail actions to the existing composer and refreshes the list', async () => {
+    renderDocumentStatusPage();
+    await screen.findByText('001');
+    const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
+    fireEvent.click(within(selectedRow).getByRole('checkbox'));
+    await screen.findByTestId('page-area-overlay');
+
+    const initialFeedCall = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1);
+    expect(initialFeedCall).toBeDefined();
+    if (!initialFeedCall) throw new Error('Detail panel props were not captured.');
+
+    act(() => initialFeedCall[0].onEditDocument(detail));
+    await waitFor(() => {
+      const composerProps = vi.mocked(DocumentComposerDialog).mock.calls.at(-1)?.[0];
+      expect(composerProps?.open).toBe(true);
+      expect(composerProps?.initialDocument).toEqual(detail);
+    });
+
+    const previousListRequests = getListRequests();
+    act(() => initialFeedCall[0].onActionComplete());
+    await waitFor(() =>
+      expect(getListRequests()).toBeGreaterThan(previousListRequests),
+    );
   });
 
   it('applies the detailed title filter to the next remote query', async () => {

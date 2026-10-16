@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -9,15 +9,24 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  MenuItem,
+  IconButton,
+  InputAdornment,
   TextField,
   Typography,
 } from '@mui/material';
 import AddOutlined from '@mui/icons-material/AddOutlined';
+import ClearIcon from '@mui/icons-material/Clear';
+import SearchIcon from '@mui/icons-material/Search';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
+import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import { PostDetailPanel } from '../../../../shared/components/feed/PostDetailPanel';
+import {
+  toPageSearchFields,
+  type PageSearchFieldValue,
+} from '../../../../shared/components/page-search/searchFields';
+import type { F1GridDataSource } from '../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import type {
   MenuPermission,
@@ -26,12 +35,19 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { ArchiveComposerDialog } from './components/ArchiveComposerDialog';
 import { ArchivePostDetail } from './components/ArchivePostDetail';
-import { ArchivePostTable } from './components/ArchivePostTable';
+import {
+  ArchivePostGrid,
+  createArchivePostColumns,
+} from './components/ArchivePostGrid';
 import { useArchiveCategories } from './hooks/useArchiveCategories';
 import { useArchiveList } from './hooks/useArchiveList';
 import { useArchiveMutations } from './hooks/useArchiveMutations';
-import { downloadArchiveAttachment, fetchArchivePostDetail } from './services/archiveBoardService';
+import {
+  downloadArchiveAttachment,
+  fetchArchivePostDetail,
+} from './services/archiveBoardService';
 import type {
+  ArchiveAttachment,
   ArchiveId,
   ArchivePost,
   ArchivePostSavePayload,
@@ -53,27 +69,24 @@ export function ArchiveBoardPage({
   isTenantAdmin = false,
 }: ArchiveBoardPageProps) {
   const { showError, showSuccess } = useNotification();
-  const {
-    posts,
-    resultCnt,
-    pageIndex,
-    pageUnit,
-    keyword,
-    categoryCode,
-    isLoading,
-    error: listError,
-    setPageIndex,
-    setKeyword,
-    setCategoryCode,
-    loadArchivePosts,
-  } = useArchiveList();
+  const [searchDraft, setSearchDraft] = useState('');
+  const [detailValues, setDetailValues] = useState<
+    Record<string, PageSearchFieldValue>
+  >({});
+  const [listError, setListError] = useState<Error | null>(null);
+  const [listErrorDismissed, setListErrorDismissed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [totalRowCount, setTotalRowCount] = useState(0);
+  const { dataSource, setKeyword, setCategoryCode } = useArchiveList({
+    retryToken,
+  });
   const {
     categories,
     isLoading: categoriesLoading,
     error: categoriesError,
     loadCategories,
   } = useArchiveCategories();
-  const [searchDraft, setSearchDraft] = useState(keyword);
   const [selectedPost, setSelectedPost] = useState<ArchivePost | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<Error | null>(null);
@@ -85,24 +98,28 @@ export function ArchiveBoardPage({
   const canCreate = isTenantAdmin && Boolean(selectedMenuPermissions?.create);
   const canUpdate = isTenantAdmin && Boolean(selectedMenuPermissions?.update);
   const canDelete = isTenantAdmin && Boolean(selectedMenuPermissions?.delete);
-  const loadDetail = useCallback(async (postId: ArchiveId) => {
-    const request = ++detailRequest.current;
-    setIsDetailLoading(true);
-    setDetailError(null);
-    try {
-      const detail = await fetchArchivePostDetail(postId);
-      if (request === detailRequest.current) setSelectedPost(detail);
-    } catch (cause) {
-      if (request === detailRequest.current) {
-        const error =
-          cause instanceof Error ? cause : new Error(String(cause));
-        setDetailError(error);
-        showError(`자료 상세를 불러오지 못했습니다: ${error.message}`);
+
+  const loadDetail = useCallback(
+    async (postId: ArchiveId) => {
+      const request = ++detailRequest.current;
+      setIsDetailLoading(true);
+      setDetailError(null);
+      try {
+        const detail = await fetchArchivePostDetail(postId);
+        if (request === detailRequest.current) setSelectedPost(detail);
+      } catch (cause) {
+        if (request === detailRequest.current) {
+          const error =
+            cause instanceof Error ? cause : new Error(String(cause));
+          setDetailError(error);
+          showError(`자료 상세를 불러오지 못했습니다: ${error.message}`);
+        }
+      } finally {
+        if (request === detailRequest.current) setIsDetailLoading(false);
       }
-    } finally {
-      if (request === detailRequest.current) setIsDetailLoading(false);
-    }
-  }, [showError]);
+    },
+    [showError],
+  );
 
   const closeDetail = useCallback(() => {
     detailRequest.current += 1;
@@ -111,13 +128,56 @@ export function ArchiveBoardPage({
     setIsDetailLoading(false);
   }, []);
 
-  const handleSelectPost = (post: ArchivePost) => {
-    setSelectedPost(post);
-    void loadDetail(post.postId);
-  };
+  const handleSelectPost = useCallback(
+    (post: ArchivePost) => {
+      setSelectedPost(post);
+      void loadDetail(post.postId);
+    },
+    [loadDetail],
+  );
+
+  const columns = useMemo(
+    () => createArchivePostColumns(categories, handleSelectPost),
+    [categories, handleSelectPost],
+  );
+  const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
+  const gridDataSource = useMemo<F1GridDataSource<ArchivePost>>(
+    () => ({
+      pageSize: dataSource.pageSize,
+      async load(query) {
+        const result = await dataSource.load(query);
+        setHasLoaded(true);
+        setTotalRowCount(result.totalRowCount);
+        return result;
+      },
+    }),
+    [dataSource],
+  );
+
+  useEffect(() => {
+    setHasLoaded(false);
+    setTotalRowCount(0);
+    setListError(null);
+    setListErrorDismissed(false);
+  }, [gridDataSource]);
+
+  const reloadList = useCallback(async () => {
+    setListError(null);
+    setListErrorDismissed(false);
+    setRetryToken((current) => current + 1);
+  }, []);
+  const handleDataSourceError = useCallback((error: Error) => {
+    setHasLoaded(false);
+    setListErrorDismissed(false);
+    setListError(error);
+  }, []);
+  const handleListErrorClose = useCallback(
+    () => setListErrorDismissed(true),
+    [],
+  );
 
   const mutations = useArchiveMutations({
-    reloadList: loadArchivePosts,
+    reloadList,
     reloadDetail: loadDetail,
     onPostDeleted: closeDetail,
     showError,
@@ -131,19 +191,24 @@ export function ArchiveBoardPage({
     removedAttachments: Parameters<typeof mutations.savePost>[3],
   ) => mutations.savePost(postId, payload, files, removedAttachments);
 
-  const handleDownload = async (post: ArchivePost, fileIndex: number) => {
-    const attachment = post.attachments?.[fileIndex];
-    if (!attachment) return;
+  const handleDownload = async (attachment: ArchiveAttachment) => {
     try {
       await downloadArchiveAttachment(attachment);
     } catch (cause) {
-      const message =
-        cause instanceof Error ? cause.message : String(cause);
+      const message = cause instanceof Error ? cause.message : String(cause);
       showError(`파일 다운로드에 실패했습니다: ${message}`);
     }
   };
 
   const handleSearch = () => setKeyword(searchDraft.trim());
+  const handleDetailSearch = (
+    values: Record<string, PageSearchFieldValue>,
+  ) => {
+    const value = values.categoryCode;
+    setCategoryCode(
+      value == null || typeof value === 'object' ? '' : String(value).trim(),
+    );
+  };
   const showReadDenied =
     selectedMenuPermissions != null && !selectedMenuPermissions.read;
 
@@ -151,9 +216,14 @@ export function ArchiveBoardPage({
     <Box
       sx={{
         width: '100%',
+        height: '100%',
+        flex: 1,
         minWidth: 0,
+        minHeight: 0,
         maxWidth: '100%',
-        overflowX: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
         position: 'relative',
       }}
     >
@@ -189,57 +259,62 @@ export function ArchiveBoardPage({
         <>
           <PageSearchArea
             searchField={
-              <Button type="button" variant="contained" onClick={handleSearch}>
-                검색
-              </Button>
+              <TextField
+                size="small"
+                margin="none"
+                placeholder="제목, 본문, 작성자 통합검색"
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                slotProps={{
+                  htmlInput: { 'aria-label': '자료 검색' },
+                  input: {
+                    endAdornment: searchDraft ? (
+                      <InputAdornment position="end">
+                        <IconButton
+                          type="button"
+                          size="small"
+                          edge="end"
+                          aria-label="자료 검색어 초기화"
+                          onClick={() => setSearchDraft('')}
+                          sx={{ p: 0.25 }}
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  },
+                }}
+                sx={{ width: '100%', height: 40 }}
+              />
             }
             onDefaultSearch={handleSearch}
+            detailFields={detailFields}
+            detailValues={detailValues}
+            onDetailValuesChange={setDetailValues}
+            onDetailSearch={handleDetailSearch}
           >
-            <TextField
-              label="자료 검색"
+            <Button
+              type="button"
+              variant="contained"
               size="small"
-              value={searchDraft}
-              onChange={(event) => setSearchDraft(event.target.value)}
-              sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 220 } }}
-            />
-            <TextField
-              select
-              label="분류 필터"
-              size="small"
-              value={categoryCode}
-              onChange={(event) => setCategoryCode(event.target.value)}
-              sx={{ flex: '1 1 180px', minWidth: { xs: '100%', sm: 180 } }}
+              startIcon={<SearchIcon fontSize="small" />}
+              onClick={handleSearch}
+              sx={{ minHeight: 40, whiteSpace: 'nowrap' }}
             >
-              <MenuItem value="">전체 분류</MenuItem>
-              {categories.map((category) => (
-                <MenuItem key={category.code} value={category.code}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </TextField>
+              검색
+            </Button>
           </PageSearchArea>
-          <Container
-            maxWidth="xl"
-            sx={{
-              py: 3,
-              px: { xs: 1.5, sm: 3 },
-              minWidth: 0,
-              maxWidth: '100%',
-            }}
-          >
-            <Typography
-              component="h1"
-              variant="h5"
-              sx={{ mb: 2, fontWeight: 700, overflowWrap: 'anywhere' }}
+          {categoriesLoading && (
+            <Box
+              role="status"
+              aria-label="분류 불러오는 중"
+              sx={{ px: 3, pt: 1 }}
             >
-              {content.title}
-            </Typography>
-            {categoriesLoading && (
-              <Box role="status" aria-label="분류 불러오는 중" sx={{ mb: 2 }}>
-                <CircularProgress size={20} />
-              </Box>
-            )}
-            {categoriesError && (
+              <CircularProgress size={20} />
+            </Box>
+          )}
+          {categoriesError && (
+            <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1 }}>
               <Alert
                 severity="error"
                 action={
@@ -251,39 +326,65 @@ export function ArchiveBoardPage({
                     분류 다시 시도
                   </Button>
                 }
-                sx={{ mb: 2 }}
               >
                 분류를 불러오지 못했습니다: {categoriesError.message}
               </Alert>
-            )}
-            {listError ? (
-              <Alert
-                severity="error"
-                action={
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={() => void loadArchivePosts()}
-                  >
-                    다시 시도
-                  </Button>
-                }
+            </Box>
+          )}
+          <PageMessageArea
+            message={
+              listError && !listErrorDismissed
+                ? `자료 목록을 불러오지 못했습니다: ${listError.message}`
+                : ''
+            }
+            onClose={handleListErrorClose}
+          />
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              px: { xs: 1, sm: 2 },
+              pb: 2,
+              pt: 1,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {listError && (
+              <Button
+                type="button"
+                size="small"
+                onClick={() => void reloadList()}
+                aria-label="다시 시도"
+                sx={{ alignSelf: 'flex-start', mb: 1 }}
               >
-                자료 목록을 불러오지 못했습니다: {listError.message}
-              </Alert>
-            ) : (
-              <ArchivePostTable
-                posts={posts}
-                categories={categories}
-                isLoading={isLoading}
-                pageIndex={pageIndex}
-                pageUnit={pageUnit}
-                resultCnt={resultCnt}
-                onSelect={handleSelectPost}
-                onPageChange={setPageIndex}
-              />
+                다시 시도
+              </Button>
             )}
-          </Container>
+            <ArchivePostGrid
+              columns={columns}
+              dataSource={gridDataSource}
+              onDataSourceError={handleDataSourceError}
+            />
+            {hasLoaded && totalRowCount === 0 && !listError && (
+              <Box
+                role="status"
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  px: 2,
+                  py: 1.5,
+                  mt: 1,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  등록된 자료가 없습니다.
+                </Typography>
+              </Box>
+            )}
+          </Box>
           {selectedPost && (
             <PageAreaOverlay onClose={closeDetail}>
               {isDetailLoading ? (
@@ -343,7 +444,9 @@ export function ArchiveBoardPage({
           />
           <Dialog
             open={deleteTarget != null}
-            onClose={mutations.isDeleting ? undefined : () => setDeleteTarget(null)}
+            onClose={
+              mutations.isDeleting ? undefined : () => setDeleteTarget(null)
+            }
             aria-labelledby="archive-delete-title"
           >
             <DialogTitle id="archive-delete-title">자료 삭제 확인</DialogTitle>

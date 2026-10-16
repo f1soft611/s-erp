@@ -99,6 +99,7 @@ describe('useDocumentWritePage date metadata', () => {
         date: expectedDate,
         dateSourceLabel: expectedLabel,
       });
+      expect(result.current.unpinnedViewItems[0]?.dateLabel).toBe(expectedDate);
       expect(result.current.notices[0]).toMatchObject({
         author: record.drafterName,
         kind: '기안서',
@@ -109,13 +110,39 @@ describe('useDocumentWritePage date metadata', () => {
       });
     });
 
-  describe('useDocumentWritePage filter reset', () => {
+  describe('useDocumentWritePage active filter chips', () => {
     beforeEach(() => {
       vi.mocked(listDocumentApprovals).mockResolvedValue([]);
       vi.mocked(getDocumentApprovalSummary).mockResolvedValue(emptySummary);
     });
 
-    it('resets the scope and kind and reloads the unfiltered list', async () => {
+    it('starts without active filter chips', async () => {
+      const { result } = renderHook(() => useDocumentWritePage());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.activeFilterChips).toEqual([]);
+    });
+
+    it.each([
+      ['MY_PENDING', '#내가 처리할 결재'],
+      ['IN_PROGRESS', '#결재 진행 중'],
+      ['DRAFT', '#작성 중 문서'],
+      ['COMPLETED', '#승인'],
+      ['REVISION_REQUESTED', '#보완요청'],
+      ['REJECTED', '#반려'],
+    ] as const)('shows the %s scope label as a filter chip', async (scope, label) => {
+      const { result } = renderHook(() => useDocumentWritePage());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.selectScope(scope));
+      await waitFor(() =>
+        expect(result.current.activeFilterChips).toEqual([
+          expect.objectContaining({ key: 'scope', label }),
+        ]),
+      );
+    });
+
+    it('removes only the scope filter and preserves the selected kind', async () => {
       const { result } = renderHook(() => useDocumentWritePage());
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
@@ -130,44 +157,107 @@ describe('useDocumentWritePage date metadata', () => {
           undefined,
         ),
       );
-      expect(result.current.hasActiveFilters).toBe(true);
+      expect(result.current.activeFilterChips).toEqual([
+        expect.objectContaining({ key: 'scope', label: '#결재 진행 중' }),
+        expect.objectContaining({ key: 'kind', label: '#업무연락' }),
+      ]);
 
-      act(() => result.current.resetFilters());
+      act(() => result.current.clearScopeFilter());
       await waitFor(() =>
         expect(listDocumentApprovals).toHaveBeenLastCalledWith(
           'ALL',
-          undefined,
+          'BUSINESS_CONTACT',
           undefined,
         ),
       );
       expect(result.current.scope).toBe('ALL');
-      expect(result.current.selectedKind).toBe('');
-      expect(result.current.hasActiveFilters).toBe(false);
+      expect(result.current.selectedKind).toBe('업무연락');
+      expect(result.current.activeFilterChips).toEqual([
+        expect.objectContaining({ key: 'kind', label: '#업무연락' }),
+      ]);
     });
 
-    it('clears a specific document selection', async () => {
+    it('removes only the kind filter and preserves the selected scope', async () => {
+      const { result } = renderHook(() => useDocumentWritePage());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => {
+        result.current.selectScope('IN_PROGRESS');
+        result.current.setSelectedKind('업무연락');
+      });
+      await waitFor(() =>
+        expect(listDocumentApprovals).toHaveBeenLastCalledWith(
+          'IN_PROGRESS',
+          'BUSINESS_CONTACT',
+          undefined,
+        ),
+      );
+
+      act(() => result.current.clearKindFilter());
+      await waitFor(() =>
+        expect(listDocumentApprovals).toHaveBeenLastCalledWith(
+          'IN_PROGRESS',
+          undefined,
+          undefined,
+        ),
+      );
+      expect(result.current.scope).toBe('IN_PROGRESS');
+      expect(result.current.selectedKind).toBe('');
+      expect(result.current.activeFilterChips).toEqual([
+        expect.objectContaining({ key: 'scope', label: '#결재 진행 중' }),
+      ]);
+    });
+
+    it('shows a notice title and removes only the selected document filter', async () => {
+      vi.mocked(getDocumentApprovalSummary).mockResolvedValue({
+        ...emptySummary,
+        notices: [record],
+      });
       const { result } = renderHook(() => useDocumentWritePage());
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       act(() => result.current.selectNotice(42));
       await waitFor(() =>
-        expect(listDocumentApprovals).toHaveBeenLastCalledWith(
-          'ALL',
-          undefined,
-          42,
-        ),
+        expect(result.current.activeFilterChips).toEqual([
+          expect.objectContaining({
+            key: 'document',
+            label: '#검증 문서',
+          }),
+        ]),
       );
-      expect(result.current.hasActiveFilters).toBe(true);
-
-      act(() => result.current.resetFilters());
+      act(() => result.current.setSelectedKind('업무연락'));
       await waitFor(() =>
         expect(listDocumentApprovals).toHaveBeenLastCalledWith(
           'ALL',
-          undefined,
+          'BUSINESS_CONTACT',
+          42,
+        ),
+      );
+
+      act(() => result.current.clearDocumentFilter());
+      await waitFor(() =>
+        expect(listDocumentApprovals).toHaveBeenLastCalledWith(
+          'ALL',
+          'BUSINESS_CONTACT',
           undefined,
         ),
       );
-      expect(result.current.hasActiveFilters).toBe(false);
+      expect(result.current.selectedKind).toBe('업무연락');
+      expect(result.current.activeFilterChips).toEqual([
+        expect.objectContaining({ key: 'kind', label: '#업무연락' }),
+      ]);
+    });
+
+    it('uses a document identifier fallback when its notice is unavailable', async () => {
+      const { result } = renderHook(() => useDocumentWritePage());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.selectNotice(42));
+      await waitFor(() =>
+        expect(result.current.activeFilterChips).toEqual([
+          expect.objectContaining({ key: 'document', label: '#문서 42' }),
+        ]),
+      );
     });
   });
 });

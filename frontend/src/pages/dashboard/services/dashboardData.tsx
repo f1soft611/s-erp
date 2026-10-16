@@ -142,7 +142,7 @@ export const pageContentMap: Record<string, PageContent> = {
   read: {
     title: '문서현황',
     description:
-      '과거 전자결재 문서를 검색하고 상세 내용을 읽기 전용으로 확인합니다.',
+      '과거 전자결재 문서를 검색하고 권한에 따라 상세 및 후속 업무를 처리합니다.',
     cards: [],
     items: [],
   },

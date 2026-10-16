@@ -35,6 +35,7 @@ export async function fetchArchivePosts(
   pageUnit: number,
   keyword?: string,
   categoryCode?: string,
+  signal?: AbortSignal,
 ): Promise<ArchivePageResult> {
   const query = new URLSearchParams({
     pageIndex: String(pageIndex),
@@ -44,9 +45,11 @@ export async function fetchArchivePosts(
   if (normalizedKeyword) query.set('keyword', normalizedKeyword);
   if (categoryCode?.trim()) query.set('categoryCode', categoryCode.trim());
 
-  const response = await apiGet<ArchiveListApiResponse>(
-    `/api/v1/groupware/boards/archive/posts?${query.toString()}`,
-  );
+  const url = `/api/v1/groupware/boards/archive/posts?${query.toString()}`;
+  const response =
+    signal === undefined
+      ? await apiGet<ArchiveListApiResponse>(url)
+      : await apiGet<ArchiveListApiResponse>(url, signal);
   return {
     resultList: response.resultList ?? [],
     resultCnt: Number(response.resultCnt ?? 0) || 0,
