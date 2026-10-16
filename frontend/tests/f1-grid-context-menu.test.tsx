@@ -1,5 +1,13 @@
 import { createRef } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   F1Grid,
@@ -79,6 +87,65 @@ describe('F1-Grid context menu', () => {
 
     fireEvent.contextMenu(getGridBody('테스트 그리드'));
     expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+  });
+
+  it('suppresses the F1Grid context menu while preserving right-click selection', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="메뉴 비활성 그리드"
+        disableContextMenu
+      />,
+    );
+
+    const cell = screen.getByRole('gridcell', { name: 'Beta' });
+    const event = createEvent.contextMenu(cell, { button: 2 });
+    fireEvent(cell, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('suppresses the F1Tree context menu while preserving right-click selection', () => {
+    render(
+      <F1Tree
+        rows={treeRows}
+        columns={treeColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="메뉴 비활성 트리"
+        disableContextMenu
+      />,
+    );
+
+    const cell = screen.getByRole('gridcell', { name: 'Alpha' });
+    const event = createEvent.contextMenu(cell, { button: 2 });
+    fireEvent(cell, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('closes an open context menu when context menus are disabled', async () => {
+    const props = {
+      rows: flatRows,
+      columns: flatColumns,
+      rowKey: 'id' as const,
+      ariaLabel: '동적 메뉴 비활성 그리드',
+    };
+    const view = render(<F1Grid {...props} />);
+
+    fireEvent.contextMenu(getGridBody(props.ariaLabel));
+    expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+
+    view.rerender(<F1Grid {...props} disableContextMenu />);
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   });
 
   it.each([
@@ -663,6 +730,45 @@ describe('F1-Grid context menu', () => {
         screen.getByRole('menuitem', { name: '정렬 해제' }),
       ).toHaveAttribute('aria-disabled', 'true');
     });
+  });
+
+  it('omits the clear-action group divider when filtering and sorting are disabled', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        disableFiltering
+        disableSorting
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+
+    const menu = screen.getByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: '필터 해제' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: '정렬 해제' })).toBeNull();
+    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
+  });
+
+  it('keeps the clear-action group divider when either action remains visible', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="테스트 그리드"
+        disableFiltering
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('테스트 그리드'));
+
+    const menu = screen.getByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: '필터 해제' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: '정렬 해제' })).toBeVisible();
+    expect(within(menu).getAllByRole('separator')).toHaveLength(3);
   });
 
   it('restores column order, width, and visibility to defaults and clears saved storage', async () => {

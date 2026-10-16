@@ -3,6 +3,7 @@ package egovframework.let.groupware.approval.domain.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +21,51 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailV
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 
 class DocumentApprovalMapperTest {
+
+    @Test
+    void documentReadsAllowOwnDraftsButRequireNonDraftStatusForOtherParticipants() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("electronicApprovalId", 77L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        String[] statementIds = {
+            "selectRelatedDocumentList",
+            "selectRelatedDocumentPage",
+            "countRelatedDocuments",
+            "selectDocumentApprovalSummary",
+            "selectApprovalNotices",
+            "selectDocumentApprovalDetail",
+            "selectDocumentApprovalDetailsByIds",
+            "selectIsDocumentParticipant"
+        };
+        String accessPredicate = "AND ( m.drafter_id = ? OR ( m.document_status != 'DRAFT' AND EXISTS ( "
+                + "SELECT 1 FROM public.tb_electronic_approval_line_info l "
+                + "WHERE l.tenant_id = m.tenant_id "
+                + "AND l.electronic_approval_id = m.electronic_approval_id "
+                + "AND l.participant_user_id = ? ) ) )";
+
+        for (String scope : Arrays.asList("ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT",
+                "COMPLETED", "REVISION_REQUESTED", "REJECTED")) {
+            params.put("scope", scope);
+            for (String statementId : statementIds) {
+                BoundSql boundSql = configuration.getMappedStatement("DocumentApprovalDAO." + statementId)
+                        .getBoundSql(params);
+                assertThat(boundSql.getSql().replaceAll("\\s+", " "))
+                        .as("%s with scope %s keeps own drafts and excludes other users' drafts", statementId, scope)
+                        .contains("m.tenant_id = ?")
+                        .contains("m.deleted_yn = 'N'")
+                        .contains(accessPredicate);
+                assertThat(boundSql.getParameterMappings())
+                        .extracting(ParameterMapping::getProperty)
+                        .contains("tenantId", "drafterId", "participantUserId");
+            }
+        }
+    }
 
     @Test
     void detailSerializesTheDrafterFlagUsingTheApiPropertyName() throws Exception {
@@ -125,9 +171,13 @@ class DocumentApprovalMapperTest {
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentList")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalSummary")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalLines")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalLinesByOwnerIds")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectDraftDocumentStatus")).isTrue();
         assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalSystemEvents")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds")).isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds")).isTrue();
 
         String draftResponseSql = configuration
                 .getMappedStatement("DocumentApprovalDAO.selectDraftDocumentStatus")
@@ -138,7 +188,6 @@ class DocumentApprovalMapperTest {
                 .contains("document_status")
                 .contains("submitted_at")
                 .contains("drafter_id = ?");
-
         String detailSql = configuration
                 .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetail")
                 .getBoundSql(new HashMap<String, Object>())
@@ -154,6 +203,228 @@ class DocumentApprovalMapperTest {
         assertThat(deletionSql)
                 .contains("drafter_line.action_status = 'APPROVED'")
                 .contains("line.action_status NOT IN ('WAITING', 'PENDING')");
+    }
+
+    @Test
+    void feedBatchQueriesKeepTenantAuthorizationAndRootCommentSemantics() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("limit", 4);
+
+        BoundSql detailBoundSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds")
+                .getBoundSql(params);
+        String detailSql = detailBoundSql.getSql();
+        String linesSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalLinesByOwnerIds")
+                .getBoundSql(params).getSql();
+        String commentPageSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds")
+                .getBoundSql(params).getSql();
+        String commentCountSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds")
+                .getBoundSql(params).getSql();
+
+        assertThat(detailSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.electronic_approval_id IN")
+                .contains("m.deleted_yn = 'N'")
+                .contains("m.drafter_id = ?")
+                .contains("l.participant_user_id = ?");
+        assertThat(detailBoundSql.getParameterMappings()).hasSize(6);
+        assertThat(linesSql)
+                .contains("line.tenant_id = ?")
+                .contains("line.electronic_approval_id IN")
+                .contains("ORDER BY line.electronic_approval_id, line.stage_order, line.participant_order");
+        assertThat(commentPageSql)
+                .contains("tenant_id = ?")
+                .contains("owner_type = 'APPROVAL'")
+                .contains("comment_type = 'USER'")
+                .contains("PARTITION BY owner_id")
+                .contains("root_order <= ?");
+        assertThat(commentCountSql)
+                .contains("tenant_id = ?")
+                .contains("owner_type = 'APPROVAL'")
+                .contains("comment_type = 'USER'")
+                .contains("parent_comment_id IS NULL")
+                .contains("deleted_yn = 'N'");
+    }
+
+    @Test
+    void cancellationStatementsAreMapped() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetSubmittedDocumentToDraft")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetSubmittedApprovalLines")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectProcessedLaterApprovalStage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetApprovalLineToPending")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.resetUntouchedLaterApprovalStages")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.countProcessedApprovalLines")).isTrue();
+    }
+
+    @Test
+    void cancellationSqlEnforcesTenantOwnershipAndWorkflowBoundaries() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("electronicApprovalId", 77L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "202");
+        params.put("electronicApprovalLineId", 22L);
+        params.put("stageOrder", 2);
+
+        String resetDocumentSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetSubmittedDocumentToDraft")
+                .getBoundSql(params).getSql();
+        String resetLinesSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetSubmittedApprovalLines")
+                .getBoundSql(params).getSql();
+        String approvedLineSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate")
+                .getBoundSql(params).getSql();
+        String laterStageSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectProcessedLaterApprovalStage")
+                .getBoundSql(params).getSql();
+        String resetActorSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetApprovalLineToPending")
+                .getBoundSql(params).getSql();
+        String resetLaterSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.resetUntouchedLaterApprovalStages")
+                .getBoundSql(params).getSql();
+        String processedCountSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.countProcessedApprovalLines")
+                .getBoundSql(params).getSql();
+
+        assertThat(resetDocumentSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("drafter_id = ?")
+                .contains("document_status = 'PENDING'")
+                .contains("submitted_at = NULL");
+        assertThat(resetLinesSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_comment = NULL");
+        assertThat(approvedLineSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("participant_user_id = ?")
+                .contains("stage_order > 1")
+                .contains("action_status = 'APPROVED'")
+                .contains("FOR UPDATE");
+        assertThat(laterStageSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > ?")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_status IN ('APPROVED', 'REJECTED', 'RETURNED')");
+        assertThat(resetActorSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_line_id = ?")
+                .contains("participant_user_id = ?")
+                .contains("action_status = 'APPROVED'")
+                .contains("action_comment = NULL");
+        assertThat(resetLaterSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > ?")
+                .contains("action_status = 'PENDING'")
+                .contains("pending_at = NULL");
+        assertThat(processedCountSql)
+                .contains("tenant_id = ?")
+                .contains("electronic_approval_id = ?")
+                .contains("stage_order > 1")
+                .contains("participant_type IN ('APPROVAL', 'AGREEMENT')")
+                .contains("action_status IN ('APPROVED', 'REJECTED', 'RETURNED')");
+    }
+
+    @Test
+    void approvalCommentStreamQueriesPageMixedRootsAndCountVisibleThreads() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamCursor"))
+                .isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        params.put("rootIds", Arrays.asList(103L, 104L));
+        params.put("limit", 4);
+        params.put("beforeCommentId", null);
+
+        org.apache.ibatis.mapping.BoundSql initialPageBoundSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
+                .getBoundSql(params);
+        String pageSql = initialPageBoundSql.getSql();
+        String threadSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds")
+                .getBoundSql(params)
+                .getSql();
+        String countSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds")
+                .getBoundSql(params)
+                .getSql();
+        String cursorSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamCursor")
+                .getBoundSql(params)
+                .getSql();
+
+        params.put("beforeCommentId", 103L);
+        org.apache.ibatis.mapping.BoundSql olderPageBoundSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
+                .getBoundSql(params);
+        String olderPageSql = olderPageBoundSql.getSql();
+
+        assertThat(pageSql)
+                .contains("comment_type = 'USER'")
+                .contains("comment_type = 'SYSTEM'")
+                .contains("PARTITION BY owner_id")
+                .contains("created_at DESC, comment_id DESC")
+                .doesNotContain("cursor_item");
+        assertThat(initialPageBoundSql.getParameterMappings())
+                .extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
+                .doesNotContain("beforeCommentId");
+        assertThat(threadSql)
+                .contains("parent_comment_id")
+                .contains("comment_type = 'USER'")
+                .contains("tenant_id = ?");
+        assertThat(countSql)
+                .contains("BOOL_OR(deleted_yn = 'N')")
+                .contains("comment_type = 'SYSTEM'")
+                .contains("comment_type = 'USER'")
+                .contains("owner_id AS \"ownerId\"")
+                .contains("COUNT(*) AS \"totalCount\"");
+        assertThat(cursorSql)
+                .contains("tenant_id = ?")
+                .contains("owner_id = ?")
+                .contains("comment_id = ?");
+        assertThat(olderPageSql)
+                .contains("JOIN cursor_item cursor")
+                .contains("(root.created_at, root.comment_id) < (cursor.created_at, cursor.comment_id)");
+        assertThat(olderPageBoundSql.getParameterMappings())
+                .extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
+                .contains("beforeCommentId");
     }
 
     @Test
@@ -273,6 +544,90 @@ class DocumentApprovalMapperTest {
                     .as("%s excludes soft-deleted documents", statementId)
                     .contains("deleted_yn = 'N'");
         }
+    }
+
+    @Test
+    void documentStatusPageUsesActorScopedBoundFiltersAndMatchingCount() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentPage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.countRelatedDocuments")).isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("documentType", "GENERAL");
+        params.put("documentStatus", "COMPLETED");
+        params.put("keyword", "annual");
+        params.put("eabusNoFilter", "001");
+        params.put("titleFilter", "budget");
+        params.put("drafterNameFilter", "Alex");
+        params.put("drafterDepartmentName", "Finance");
+        params.put("participantName", "Sam");
+        params.put("submittedAtFrom", "2026-09-16");
+        params.put("submittedAtTo", "2026-10-16");
+        params.put("updatedAtFrom", "2026-10-01");
+        params.put("updatedAtTo", "2026-10-16");
+        params.put("offset", 0);
+        params.put("limit", 200);
+        params.put("sortField", "submittedAt");
+        params.put("sortDirection", "DESC");
+
+        BoundSql pageSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params);
+        BoundSql countSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.countRelatedDocuments")
+                .getBoundSql(params);
+        String normalizedPageSql = pageSql.getSql().replaceAll("\\s+", " ");
+        String normalizedCountSql = countSql.getSql().replaceAll("\\s+", " ");
+
+        assertThat(normalizedPageSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.drafter_id = ?")
+                .contains("l.participant_user_id = ?")
+                .contains("m.eabus_no ILIKE")
+                .contains("m.title ILIKE")
+                .contains("m.eabus_no ILIKE '%' || ? || '%'")
+                .contains("m.title ILIKE '%' || ? || '%'")
+                .contains("m.drafter_name ILIKE")
+                .contains("m.drafter_department_name ILIKE")
+                .contains("participant_line.participant_name ILIKE")
+                .contains("m.submitted_at >= CAST(? AS date)")
+                .contains("m.submitted_at < CAST(? AS date) + INTERVAL '1 day'")
+                .contains("m.updated_at >= CAST(? AS date)")
+                .contains("m.updated_at < CAST(? AS date) + INTERVAL '1 day'")
+                .contains("ORDER BY m.submitted_at DESC")
+                .contains("LIMIT ? OFFSET ?");
+        assertThat(normalizedCountSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.drafter_id = ?")
+                .contains("l.participant_user_id = ?")
+                .contains("m.eabus_no ILIKE")
+                .contains("m.submitted_at >= CAST(? AS date)")
+                .contains("m.updated_at < CAST(? AS date) + INTERVAL '1 day'");
+        assertThat(pageSql.getParameterMappings())
+                .extracting(ParameterMapping::getProperty)
+                .contains("tenantId", "drafterId", "participantUserId", "keyword",
+                        "eabusNoFilter", "titleFilter",
+                        "documentType", "documentStatus", "drafterNameFilter",
+                        "drafterDepartmentName", "participantName",
+                        "submittedAtFrom", "submittedAtTo",
+                        "updatedAtFrom", "updatedAtTo", "limit", "offset");
+
+        params.put("sortField", "participantName");
+        String participantSortSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(participantSortSql).contains("ORDER BY participant_name DESC");
+
+        params.put("sortField", "approvalProgress");
+        String progressSortSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(progressSortSql).contains("ORDER BY approval_progress DESC");
     }
 
     @Test

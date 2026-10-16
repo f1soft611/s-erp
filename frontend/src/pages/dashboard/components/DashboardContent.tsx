@@ -10,10 +10,11 @@ import {
   useTheme,
 } from '@mui/material';
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
-import { DocumentsPage } from '../../groupware/DocumentsPage';
 import { OverviewPage } from '../../groupware/OverviewPage';
 import { CommunityNoticePage } from '../../groupware/community/notice/CommunityNoticePage';
+import { ArchiveBoardPage } from '../../groupware/community/archive/ArchiveBoardPage';
 import { DocumentWritePage } from '../../groupware/documents/write/DocumentWritePage';
+import { DocumentStatusPage } from '../../groupware/documents/status/DocumentStatusPage';
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
@@ -151,9 +152,12 @@ export function DashboardContent({
     );
   }
 
-  if (selectedModule.id === 'groupware' && currentPageKey === 'documents') {
+  if (
+    selectedModule.id === 'groupware' &&
+    (currentPageKey === 'documents' || currentPageKey === 'read')
+  ) {
     return (
-      <DocumentsPage
+      <DocumentStatusPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
@@ -177,6 +181,18 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'groupware' && currentPageKey === 'archive') {
+    return (
+      <ArchiveBoardPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
       />
     );
   }

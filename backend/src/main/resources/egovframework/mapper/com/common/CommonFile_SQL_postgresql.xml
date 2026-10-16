@@ -49,6 +49,36 @@
         ORDER BY created_at DESC
     </select>
 
+    <select id="selectCommonFileListByOwnerIds" parameterType="map" resultMap="commonFileMap">
+        SELECT
+            file_id,
+            tenant_id,
+            owner_type,
+            owner_id,
+            file_name,
+            file_path,
+            object_key,
+            bucket_name,
+            storage_provider,
+            file_size,
+            mime_type,
+            content_type,
+            file_usage_type,
+            uploaded_by,
+            deleted_yn,
+            created_at,
+            updated_at
+        FROM tb_common_file
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = #{ownerType}
+          AND owner_id IN
+          <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
+              #{ownerId}
+          </foreach>
+          AND deleted_yn = 'N'
+        ORDER BY owner_id, created_at DESC
+    </select>
+
     <select id="selectCommonFileById" parameterType="map" resultMap="commonFileMap">
         SELECT
             file_id,

@@ -1,7 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Alert, Box, Container, Stack } from '@mui/material';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
 import { useState } from 'react';
-import { useTheme } from '@mui/material/styles';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
@@ -33,25 +33,31 @@ export function DocumentWritePage({
   currentMenuName,
   content,
 }: DocumentWritePageProps) {
-  const theme = useTheme();
   const [editingDocument, setEditingDocument] =
     useState<DocumentApprovalDetail | null>(null);
+  const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const {
     viewMode,
     setViewMode,
     selectedKind,
     setSelectedKind,
+    activeFilterChips,
     isComposerOpen,
     openComposer,
     closeComposer,
     pinnedDocuments,
     unpinnedDocuments,
+    feedDocuments,
     pinnedViewItems,
     unpinnedViewItems,
     summary,
     notices,
     isLoading,
     loadError,
+    feedEmployeeId,
+    feedEmployeeError,
+    retryFeedEmployee,
+    retry,
     selectScope,
     selectNotice,
     openDetail,
@@ -59,7 +65,10 @@ export function DocumentWritePage({
     detailDocumentId,
     refresh,
   } = useDocumentWritePage();
-
+  const hasVisibleDocuments =
+    viewMode === 'feed'
+      ? feedDocuments.length > 0
+      : pinnedDocuments.length + unpinnedDocuments.length > 0;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'document-write',
@@ -81,6 +90,7 @@ export function DocumentWritePage({
       sx={{
         flex: 1,
         position: 'relative',
+        minWidth: 0,
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -112,22 +122,83 @@ export function DocumentWritePage({
                   countLabel="상단고정"
                   modeLabel="문서 보기 방식"
                   filterAction={
-                    <NoticeFilterMenu
-                      ariaLabel="문서 업무구분 필터"
-                      filters={documentKinds.map((kind) => ({
-                        code: kind,
-                        name: kind,
-                      }))}
-                      selectedCode={selectedKind}
-                      onChange={(code) =>
-                        setSelectedKind(code as DocumentKind | '')
-                      }
-                    />
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{
+                        minWidth: 0,
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <NoticeFilterMenu
+                        ariaLabel="문서 업무구분 필터"
+                        filters={documentKinds.map((kind) => ({
+                          code: kind,
+                          name: kind,
+                        }))}
+                        selectedCode={selectedKind}
+                        onChange={(code) =>
+                          setSelectedKind(code as DocumentKind | '')
+                        }
+                      />
+                      {activeFilterChips.map((filter) => (
+                        <Chip
+                          key={filter.key}
+                          label={filter.label}
+                          size="small"
+                          aria-label={filter.deleteLabel}
+                          onDelete={filter.onDelete}
+                          deleteIcon={
+                            <CloseOutlinedIcon
+                              data-testid={`filter-delete-icon-${filter.key}`}
+                              fontSize="small"
+                              aria-hidden="true"
+                            />
+                          }
+                          sx={{
+                            maxWidth: '100%',
+                            minWidth: 0,
+                            height: 'auto',
+                            '& .MuiChip-label': {
+                              minWidth: 0,
+                              whiteSpace: 'normal',
+                              overflowWrap: 'anywhere',
+                            },
+                          }}
+                        />
+                      ))}
+                    </Stack>
                   }
                 />
                 {loadError && (
-                  <Alert severity="error" sx={{ mb: 1.5 }}>
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 1.5 }}
+                    action={
+                      <Button color="inherit" size="small" onClick={retry}>
+                        다시 시도
+                      </Button>
+                    }
+                  >
                     {loadError}
+                  </Alert>
+                )}
+                {viewMode === 'feed' && feedEmployeeError && (
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 1.5 }}
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={retryFeedEmployee}
+                      >
+                        사원 정보 다시 시도
+                      </Button>
+                    }
+                  >
+                    {feedEmployeeError}
                   </Alert>
                 )}
                 {isLoading ? (
@@ -138,7 +209,7 @@ export function DocumentWritePage({
                   >
                     {viewMode === 'list' ? (
                       <ListViewSkeleton />
-                    ) : (
+                    ) : loadError && !hasVisibleDocuments ? null : (
                       <Box data-testid="document-feed-skeleton">
                         <FeedViewSkeleton />
                       </Box>
@@ -146,7 +217,7 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <>
-                {pinnedDocuments.length > 0 && (
+                {viewMode === 'list' && pinnedDocuments.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
                     <PinnedItemsPanel
                       items={pinnedViewItems}
@@ -156,14 +227,20 @@ export function DocumentWritePage({
                 )}
                 {viewMode === 'feed' ? (
                   <Box data-testid="document-feed">
-                    {unpinnedDocuments.length > 0 ? (
+                  {feedDocuments.length > 0 ? (
                       <FeedView
-                        items={unpinnedDocuments}
+                        items={feedDocuments}
                         renderItem={(item) => (
                           <DocumentFeedItem
+                            key={item.id}
                             item={item}
-                            isDark={theme.palette.mode === 'dark'}
-                            onClick={() => openDetail(item.id)}
+                            employeeId={feedEmployeeId}
+                            detailRefreshToken={detailRefreshToken}
+                            onActionComplete={refresh}
+                            onEditDocument={(document) => {
+                              setEditingDocument(document);
+                              openComposer();
+                            }}
                           />
                         )}
                       />
@@ -177,6 +254,7 @@ export function DocumentWritePage({
                       <ListView
                         items={unpinnedViewItems}
                         ariaLabel="리스트형 문서 목록"
+                        badgeOrder="status-category"
                         onItemClick={(item) => openDetail(Number(item.id))}
                       />
                     ) : (
@@ -205,7 +283,8 @@ export function DocumentWritePage({
         onClose={() => {
           closeComposer();
           setEditingDocument(null);
-          refresh();
+          refresh({ quiet: true });
+          setDetailRefreshToken((token) => token + 1);
         }}
       />
       {detailDocumentId !== null && (
@@ -217,9 +296,9 @@ export function DocumentWritePage({
             onActionComplete={refresh}
             onEditDocument={(document) => {
               setEditingDocument(document);
-              closeDetail();
               openComposer();
             }}
+            detailRefreshToken={detailRefreshToken}
           />
         </PageAreaOverlay>
       )}

@@ -1,0 +1,75 @@
+<h2>자료실 상세 패널 배치</h2>
+<p class="subtitle">기안양식관리의 F1-Grid 목록과 전체 높이 우측 상세 패널을 기준으로, 상세 상단 정보 배치를 골라 주세요.</p>
+
+<div class="split">
+  <div class="card" data-choice="metadata-first" onclick="toggleSelect(this)">
+    <div class="mockup-header">A · 분류와 더보기 우선</div>
+    <div style="position:relative;height:510px;background:#e8e8ea;overflow:hidden;padding:16px">
+      <div style="height:100%;background:#fff;border:1px solid #d1d1d6;border-radius:8px;padding:16px;opacity:.55">
+        <div style="height:34px;background:#f1f1f4;border-radius:5px;margin-bottom:12px"></div>
+        <div style="height:42px;background:#f1f1f4;border-radius:5px;margin-bottom:8px"></div>
+        <div style="height:42px;background:#f1f1f4;border-radius:5px;margin-bottom:8px"></div>
+        <div style="height:42px;background:#f1f1f4;border-radius:5px"></div>
+      </div>
+      <div style="position:absolute;right:0;top:0;width:76%;height:100%;background:#fff;box-shadow:-8px 0 24px #0002;padding:18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ddd;padding-bottom:10px">
+          <b>자료 상세</b><span>×</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="border-radius:7px;background:#e8f1ff;color:#1759a8;padding:5px 10px;font-size:12px">업무양식</span>
+          <span style="font-size:12px;color:#777">작성자 · 홍길동 · 2026.10.16</span>
+          <span style="margin-left:auto;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:12px">⋮ 더보기</span>
+        </div>
+        <h3 style="margin:0">출장 신청서 최신 양식</h3>
+        <div style="height:1px;background:#ddd"></div>
+        <div style="min-height:88px;white-space:pre-wrap;line-height:1.7">출장 전 결재를 위해 사용하는 신청서입니다.
+작성 후 결재선에 따라 제출해 주세요.</div>
+        <div style="border-top:1px solid #ddd;padding-top:12px;font-weight:600">첨부파일</div>
+        <div style="border:1px solid #ddd;border-radius:8px;padding:10px;display:flex;justify-content:space-between;gap:8px">
+          <span>출장신청서.xlsx <small style="color:#777"> · 42 KB</small></span><span style="color:#1769aa">다운로드</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 메타 행을 제목 위에</h3>
+      <p>분류와 작성정보, 더보기 메뉴를 한 줄에 배치하고 제목·일반 텍스트 본문·공통 첨부파일 목록을 아래에 둡니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="title-first" onclick="toggleSelect(this)">
+    <div class="mockup-header">B · 제목 우선</div>
+    <div style="position:relative;height:510px;background:#e8e8ea;overflow:hidden;padding:16px">
+      <div style="height:100%;background:#fff;border:1px solid #d1d1d6;border-radius:8px;padding:16px;opacity:.55">
+        <div style="height:34px;background:#f1f1f4;border-radius:5px;margin-bottom:12px"></div>
+        <div style="height:42px;background:#f1f1f4;border-radius:5px;margin-bottom:8px"></div>
+        <div style="height:42px;background:#f1f1f4;border-radius:5px"></div>
+      </div>
+      <div style="position:absolute;right:0;top:0;width:76%;height:100%;background:#fff;box-shadow:-8px 0 24px #0002;padding:18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ddd;padding-bottom:10px">
+          <b>자료 상세</b><span>×</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <h3 style="margin:0">출장 신청서 최신 양식</h3>
+          <span style="border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:12px;white-space:nowrap">⋮ 더보기</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="border-radius:7px;background:#e8f1ff;color:#1759a8;padding:5px 10px;font-size:12px">업무양식</span>
+          <span style="font-size:12px;color:#777">홍길동 · 2026.10.16</span>
+        </div>
+        <div style="height:1px;background:#ddd"></div>
+        <div style="min-height:88px;white-space:pre-wrap;line-height:1.7">출장 전 결재를 위해 사용하는 신청서입니다.
+작성 후 결재선에 따라 제출해 주세요.</div>
+        <div style="border-top:1px solid #ddd;padding-top:12px;font-weight:600">첨부파일</div>
+        <div style="border:1px solid #ddd;border-radius:8px;padding:10px;display:flex;justify-content:space-between;gap:8px">
+          <span>출장신청서.xlsx <small style="color:#777"> · 42 KB</small></span><span style="color:#1769aa">다운로드</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 제목과 더보기 우선</h3>
+      <p>제목 옆에 더보기 메뉴를 두고, 분류 칩과 작성정보를 다음 줄에 배치합니다.</p>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:1rem;color:var(--text-secondary);font-size:.85rem">목록 상단은 통합검색 하나와 F1-Grid 상세검색(분류)을 사용합니다. 제목 클릭 시 전체 높이 우측 오버레이가 열립니다.</p>

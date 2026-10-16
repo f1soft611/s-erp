@@ -14,6 +14,7 @@ import type {
   DocumentApprovalActionRequest,
   ApprovalDocumentStatus,
   DocumentApprovalDetail,
+  DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
   DocumentApprovalScope,
   DocumentApprovalSummary,
@@ -22,6 +23,7 @@ import type {
   DocumentApprovalComment,
   DocumentApprovalCommentAttachment,
   DocumentApprovalCommentPage,
+  DocumentApprovalPageSystemEvent,
 } from '../types/documentWrite.types';
 
 const APPROVAL_API = '/api/v1/groupware/approvals';
@@ -70,11 +72,63 @@ function isApprovalComment(value: unknown, electronicApprovalId: number): value 
   );
 }
 
+function isApprovalPageSystemEvent(
+  value: unknown,
+  electronicApprovalId: number,
+): value is DocumentApprovalPageSystemEvent {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.commentId) &&
+    Number(value.commentId) > 0 &&
+    value.ownerId === electronicApprovalId &&
+    value.commentType === 'SYSTEM' &&
+    typeof value.eventType === 'string' &&
+    typeof value.content === 'string' &&
+    typeof value.writerName === 'string' &&
+    (value.createdAt === undefined ||
+      value.createdAt === null ||
+      typeof value.createdAt === 'string')
+  );
+}
+
 function validateCommentAttachment(value: unknown): value is DocumentDraftAttachmentResponse {
   return (
     isObject(value) &&
     Number.isSafeInteger(value.fileId) &&
     Number(value.fileId) > 0
+  );
+}
+
+function isDocumentApprovalFeedRecord(value: unknown): value is DocumentApprovalFeedRecord {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.electronicApprovalId) &&
+    Number(value.electronicApprovalId) > 0 &&
+    typeof value.title === 'string' &&
+    typeof value.contentsJson === 'string' &&
+    typeof value.contentsHtml === 'string' &&
+    typeof value.contentsText === 'string' &&
+    Number.isSafeInteger(value.viewCount) &&
+    Number(value.viewCount) >= 0 &&
+    typeof value.isDrafter === 'boolean' &&
+    (value.draftingWorkCategoryId === null ||
+      Number.isSafeInteger(value.draftingWorkCategoryId)) &&
+    Array.isArray(value.approvalLines) &&
+    Array.isArray(value.attachments) &&
+    Array.isArray(value.systemEvents) &&
+    value.systemEvents.every((event) =>
+      isApprovalPageSystemEvent(event, Number(value.electronicApprovalId)),
+    ) &&
+    Array.isArray(value.comments) &&
+    value.comments.every((comment) =>
+      isApprovalComment(comment, Number(value.electronicApprovalId)),
+    ) &&
+    Number.isSafeInteger(value.commentCount) &&
+    Number(value.commentCount) >= 0 &&
+    typeof value.hasPreviousComments === 'boolean' &&
+    (value.nextBeforeCommentId === null ||
+      (Number.isSafeInteger(value.nextBeforeCommentId) &&
+        Number(value.nextBeforeCommentId) > 0))
   );
 }
 
@@ -125,21 +179,43 @@ export async function submitDocumentApproval(
   return item;
 }
 
+export function listDocumentApprovals(
+  scope: DocumentApprovalScope | undefined,
+  documentType: DocumentApprovalRecord['documentType'] | undefined,
+  electronicApprovalId: number | undefined,
+  includeDetails: true,
+): Promise<DocumentApprovalFeedRecord[]>;
+export function listDocumentApprovals(
+  scope?: DocumentApprovalScope,
+  documentType?: DocumentApprovalRecord['documentType'],
+  electronicApprovalId?: number,
+  includeDetails?: false,
+): Promise<DocumentApprovalRecord[]>;
 export async function listDocumentApprovals(
   scope: DocumentApprovalScope = 'ALL',
   documentType?: DocumentApprovalRecord['documentType'],
   electronicApprovalId?: number,
-): Promise<DocumentApprovalRecord[]> {
+  includeDetails = false,
+): Promise<DocumentApprovalRecord[] | DocumentApprovalFeedRecord[]> {
   const query = new URLSearchParams({ scope });
   if (documentType) query.set('documentType', documentType);
   if (electronicApprovalId !== undefined) {
     query.set('electronicApprovalId', String(electronicApprovalId));
   }
-  const response = await apiGet<{ resultList?: DocumentApprovalRecord[] }>(
+  if (includeDetails) query.set('includeDetails', 'true');
+  const response = await apiGet<{
+    resultList?: Array<DocumentApprovalRecord | DocumentApprovalFeedRecord>;
+  }>(
     `${APPROVAL_API}/documents?${query.toString()}`,
   );
   if (!Array.isArray(response.resultList)) {
     throw new Error('전자결재 문서 목록 응답을 확인할 수 없습니다.');
+  }
+  if (
+    includeDetails &&
+    !response.resultList.every(isDocumentApprovalFeedRecord)
+  ) {
+    throw new Error('전자결재 문서 피드 응답을 확인할 수 없습니다.');
   }
   return response.resultList;
 }
@@ -214,24 +290,32 @@ export async function listApprovalComments(
   const response = await apiGet<{
     resultList?: DocumentApprovalComment[];
     comments?: DocumentApprovalComment[];
+    systemEvents?: DocumentApprovalPageSystemEvent[];
     hasPrevious?: boolean;
     nextBeforeCommentId: number | null;
     resultCnt?: number;
   }>(`${APPROVAL_API}/${electronicApprovalId}/comments?${query.toString()}`);
   const comments = response.comments ?? response.resultList;
+  const systemEvents = response.systemEvents;
   if (
     !Array.isArray(comments) ||
     !comments.every((comment) => isApprovalComment(comment, electronicApprovalId)) ||
+    !Array.isArray(systemEvents) ||
+    !systemEvents.every((event) =>
+      isApprovalPageSystemEvent(event, electronicApprovalId),
+    ) ||
     typeof response.hasPrevious !== 'boolean' ||
     !(response.nextBeforeCommentId === null ||
       (Number.isSafeInteger(response.nextBeforeCommentId) && Number(response.nextBeforeCommentId) > 0)) ||
     typeof response.resultCnt !== 'number' ||
-    !Number.isFinite(response.resultCnt)
+    !Number.isSafeInteger(response.resultCnt) ||
+    Number(response.resultCnt) < 0
   ) {
     throw new Error('전자결재 댓글 응답을 확인할 수 없습니다.');
   }
   return {
     comments,
+    systemEvents,
     hasPrevious: response.hasPrevious,
     nextBeforeCommentId: response.nextBeforeCommentId,
     resultCnt: response.resultCnt,
@@ -401,6 +485,44 @@ export async function processDocumentApprovalAction(
     electronicApprovalId: item.electronicApprovalId,
     documentStatus: item.documentStatus,
   };
+}
+
+export async function cancelDocumentSubmission(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalDraftResponse> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: DocumentApprovalDraftResponse }>(
+    `${APPROVAL_API}/${electronicApprovalId}/submission-cancellation`,
+    undefined,
+  );
+  const item = response.item;
+  if (
+    !item ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    item.documentStatus !== 'DRAFT'
+  ) {
+    throw new Error('상신 취소 응답을 확인할 수 없습니다.');
+  }
+  return item;
+}
+
+export async function cancelDocumentApproval(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalDraftResponse> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: DocumentApprovalDraftResponse }>(
+    `${APPROVAL_API}/${electronicApprovalId}/approval-cancellation`,
+    undefined,
+  );
+  const item = response.item;
+  if (
+    !item ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    (item.documentStatus !== 'PENDING' && item.documentStatus !== 'IN_PROGRESS')
+  ) {
+    throw new Error('승인 취소 응답을 확인할 수 없습니다.');
+  }
+  return item;
 }
 
 export async function uploadDocumentDraftAttachment(

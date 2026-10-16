@@ -206,6 +206,7 @@ export function RichTextEditor({
   placeholder = '본문을 입력하세요.',
   ariaLabel = '본문',
   className,
+  scrollMode = 'editor',
   contentSx,
   uploadImage,
   onOrphanedImageUpload,
@@ -632,6 +633,28 @@ export function RichTextEditor({
         },
         richTextEditorContentStyles,
         contentSx ? { '& .ProseMirror': contentSx } : {},
+        scrollMode === 'container'
+          ? {
+              display: 'block',
+              flex: 'none',
+              height: 'auto',
+              overflow: 'visible',
+              '& .rich-text-editor-content': {
+                display: 'block',
+                flex: 'none',
+                height: 'auto',
+                overflow: 'visible',
+              },
+              '& .rich-text-editor-content > .ProseMirror': {
+                flex: 'none',
+                minHeight: 180,
+                maxHeight: 'none',
+                overflowX: 'visible',
+                overflowY: 'visible',
+                overflow: 'visible',
+              },
+            }
+          : {},
       ]}
     >
       <EditorContent editor={editor} className="rich-text-editor-content" />

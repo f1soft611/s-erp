@@ -16,7 +16,7 @@ import { useTheme } from '@mui/material/styles';
 import { useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-export type CommonDialogSize = 'md' | 'lg';
+export type CommonDialogSize = 'xs' | 'md' | 'lg';
 export type CommonDialogBodyMode = 'content' | 'fill';
 
 export type CommonDialogProps = {
@@ -58,7 +58,7 @@ export function CommonDialog({
   const fullScreen = fullScreenOnMobile && isMobile;
   const titleId = useId();
   const descriptionId = useId();
-  const maxWidth = size === 'lg' ? 990 : 820;
+  const maxWidth = size === 'xs' ? 480 : size === 'lg' ? 990 : 820;
   const hasFooter = Boolean(footerStart || actions);
   const surfaceBackground =
     surfaceBackgroundColor ??

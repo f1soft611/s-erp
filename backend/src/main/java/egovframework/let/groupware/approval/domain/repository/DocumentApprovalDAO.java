@@ -9,8 +9,10 @@ import org.springframework.stereotype.Repository;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 
@@ -59,6 +61,36 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return update("DocumentApprovalDAO.updateDocumentApprovalStatus", params);
     }
 
+    public int resetSubmittedDocumentToDraft(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetSubmittedDocumentToDraft", params);
+    }
+
+    public int resetSubmittedApprovalLines(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetSubmittedApprovalLines", params);
+    }
+
+    public DocumentApprovalLineVO selectUserApprovedApprovalLineForUpdate(Map<String, Object> params)
+            throws Exception {
+        return (DocumentApprovalLineVO) selectOne(
+                "DocumentApprovalDAO.selectUserApprovedApprovalLineForUpdate", params);
+    }
+
+    public Boolean selectProcessedLaterApprovalStage(Map<String, Object> params) throws Exception {
+        return (Boolean) selectOne("DocumentApprovalDAO.selectProcessedLaterApprovalStage", params);
+    }
+
+    public int resetApprovalLineToPending(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetApprovalLineToPending", params);
+    }
+
+    public int resetUntouchedLaterApprovalStages(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.resetUntouchedLaterApprovalStages", params);
+    }
+
+    public Long countProcessedApprovalLines(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.countProcessedApprovalLines", params);
+    }
+
     public Boolean selectCanDeletePendingDocumentApproval(Map<String, Object> params) throws Exception {
         return (Boolean) selectOne("DocumentApprovalDAO.selectCanDeletePendingDocumentApproval", params);
     }
@@ -92,6 +124,15 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return selectList("DocumentApprovalDAO.selectRelatedDocumentList", params);
     }
 
+    public List<DocumentApprovalStatusListItemVO> selectRelatedDocumentPage(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectRelatedDocumentPage", params);
+    }
+
+    public Long countRelatedDocuments(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.countRelatedDocuments", params);
+    }
+
     public DocumentApprovalSummaryVO selectDocumentApprovalSummary(Map<String, Object> params) throws Exception {
         return (DocumentApprovalSummaryVO) selectOne("DocumentApprovalDAO.selectDocumentApprovalSummary", params);
     }
@@ -102,6 +143,10 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public DocumentApprovalDetailVO selectDocumentApprovalDetail(Map<String, Object> params) throws Exception {
         return (DocumentApprovalDetailVO) selectOne("DocumentApprovalDAO.selectDocumentApprovalDetail", params);
+    }
+
+    public List<DocumentApprovalDetailVO> selectDocumentApprovalDetailsByIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectDocumentApprovalDetailsByIds", params);
     }
 
     public Long selectLoginIdByLoginCode(Map<String, Object> params) throws Exception {
@@ -118,6 +163,10 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public List<DocumentApprovalLineVO> selectApprovalLines(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectApprovalLines", params);
+    }
+
+    public List<DocumentApprovalLineBatchVO> selectApprovalLinesByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectApprovalLinesByOwnerIds", params);
     }
 
     public Boolean selectIsDocumentParticipant(Map<String, Object> params) throws Exception {

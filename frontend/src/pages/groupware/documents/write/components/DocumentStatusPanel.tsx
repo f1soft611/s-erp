@@ -3,6 +3,7 @@ import type {
   DocumentApprovalScope,
   DocumentApprovalSummary,
 } from '../types/documentWrite.types';
+import { getDocumentApprovalScopeLabel } from '../data/documentPresentation';
 
 type DocumentStatusPanelProps = {
   summary: DocumentApprovalSummary | null;
@@ -13,6 +14,12 @@ export function DocumentStatusPanel({
   summary,
   onSelectScope,
 }: DocumentStatusPanelProps) {
+  const scopes: Array<{ scope: DocumentApprovalScope; count: number }> = [
+    { scope: 'COMPLETED', count: summary?.completedCount ?? 0 },
+    { scope: 'REVISION_REQUESTED', count: summary?.revisionRequestedCount ?? 0 },
+    { scope: 'REJECTED', count: summary?.rejectedCount ?? 0 },
+  ];
+
   return (
     <Card
       sx={{
@@ -26,15 +33,11 @@ export function DocumentStatusPanel({
           문서 상태
         </Typography>
         <Stack spacing={1}>
-          {[
-            ['완료', summary?.completedCount ?? 0, 'COMPLETED'],
-            ['보완요청', summary?.revisionRequestedCount ?? 0, 'REVISION_REQUESTED'],
-            ['반려', summary?.rejectedCount ?? 0, 'REJECTED'],
-          ].map(([label, count, scope]) => (
+          {scopes.map(({ scope, count }) => (
             <Button
-              key={String(label)}
+              key={scope}
               variant="text"
-              onClick={() => onSelectScope(scope as DocumentApprovalScope)}
+              onClick={() => onSelectScope(scope)}
               sx={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -48,7 +51,7 @@ export function DocumentStatusPanel({
               }}
             >
               <Typography variant="body2" color="text.secondary">
-                {label}
+                {getDocumentApprovalScopeLabel(scope)}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 800 }}>
                 {count}건

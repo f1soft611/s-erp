@@ -166,6 +166,12 @@ const sections: DocSection[] = [
       ),
       api('disableSorting', 'boolean', '그리드 정렬 UI와 동작을 비활성화.', 'false'),
       api('disableFiltering', 'boolean', '그리드 필터 UI와 동작을 비활성화.', 'false'),
+      api(
+        'disableContextMenu',
+        'boolean',
+        'F1Grid/F1Tree 바디 우클릭 메뉴와 브라우저 기본 메뉴를 비활성화하며 대상 선택은 유지.',
+        'false',
+      ),
       api('canExportExcel', 'boolean', '컨텍스트 메뉴의 Excel 내보내기를 허용.', 'false'),
       api(
         'excelFileName',
@@ -228,7 +234,7 @@ const sections: DocSection[] = [
       api(
         'search',
         'F1GridColumnSearchOptions',
-        '검색 폼에서의 표시·그룹·순서·폭 설정.',
+        'F1GridColumn.search: 상세검색 필드의 표시·그룹·순서·폭 metadata 설정.',
         '미지정',
       ),
       api('getValue', '(row: T) => unknown', '표시 및 편집에 사용할 값을 계산.', 'row[field]'),

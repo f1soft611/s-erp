@@ -139,6 +139,13 @@ export const pageContentMap: Record<string, PageContent> = {
       { title: '보안 점검 결과 보고서', meta: 'IT팀 · 3일 전', status: '보관' },
     ],
   },
+  read: {
+    title: '문서현황',
+    description:
+      '과거 전자결재 문서를 검색하고 권한에 따라 상세 및 후속 업무를 처리합니다.',
+    cards: [],
+    items: [],
+  },
   notice: {
     title: '공지사항',
     description:
@@ -166,6 +173,12 @@ export const pageContentMap: Record<string, PageContent> = {
         status: '필독',
       },
     ],
+  },
+  archive: {
+    title: '자료실',
+    description: '업무에 필요한 자료를 분류별로 조회하고 첨부파일을 관리합니다.',
+    cards: [],
+    items: [],
   },
   roles: {
     title: '권한관리',

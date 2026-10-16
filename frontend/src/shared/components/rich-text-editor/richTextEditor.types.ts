@@ -13,6 +13,8 @@ export type RichTextEditorImage = {
   mimeType?: string | null;
 };
 
+export type RichTextEditorScrollMode = 'editor' | 'container';
+
 export type RichTextEditorProps = {
   content?: string | JSONContent;
   uploadImage?: (file: File) => Promise<RichTextEditorImage>;
@@ -26,6 +28,7 @@ export type RichTextEditorProps = {
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  scrollMode?: RichTextEditorScrollMode;
   contentSx?: SystemStyleObject<Theme>;
 };
 

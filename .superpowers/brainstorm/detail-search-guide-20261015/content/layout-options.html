@@ -1,0 +1,53 @@
+<h2>상세검색 가이드, 어떤 설명 순서가 가장 이해하기 쉬울까요?</h2>
+<p class="subtitle">실제 페이지에 붙여 볼 수 있는 전체 흐름 예제를 공통으로 포함하고, 설명을 읽는 순서만 다르게 구성했습니다.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>따라 하기: 단계별 레시피 <span class="badge">추천</span></h3>
+      <p>먼저 “무엇을 만들지” 보여주고, 컬럼 설정 → 상세검색 필드 만들기 → 화면 연결 → 검색 결과 조회 순서로 안내합니다.</p>
+      <div class="mockup">
+        <div class="mockup-title">상세검색 연동하기</div>
+        <div class="mockup-step"><b>1. 검색할 항목 정하기</b><small>컬럼에 label / type / options 설정</small></div>
+        <div class="mockup-step"><b>2. 검색 필드 만들기</b><small>toPageSearchFields(columns)</small></div>
+        <div class="mockup-step"><b>3. 검색 영역에 연결하기</b><small>detailFields + values + callbacks</small></div>
+        <div class="mockup-step"><b>4. 실제 조회하기</b><small>페이지가 값을 API 조건으로 변환</small></div>
+        <pre>columns → detailFields → PageSearchArea → query → API</pre>
+        <p class="caption">완성된 한 화면 예제와 필드별 결과값, 흔한 실수를 단계 뒤에 둡니다.</p>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>예제 먼저: 전체 코드 해설</h3>
+      <p>완성 코드 한 덩어리를 처음에 보여주고, 코드 줄을 따라가며 각 부분의 역할을 설명합니다.</p>
+      <div class="mockup">
+        <div class="mockup-title">한 번에 보는 예제</div>
+        <pre>const columns = [...]
+const detailFields = ...
+&lt;PageSearchArea ... /&gt;
+// 조회 조건 만들고 API 호출</pre>
+        <div class="mockup-step"><b>① columns</b><small>검색 폼에 노출할 필드 지정</small></div>
+        <div class="mockup-step"><b>② detailFields</b><small>Grid 컬럼 정의를 폼 정의로 변환</small></div>
+        <div class="mockup-step"><b>③ callbacks</b><small>입력값 보관과 검색 실행</small></div>
+        <p class="caption">전체 그림이 빨리 보이지만 초보자에게 코드가 먼저 길게 느껴질 수 있습니다.</p>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>찾아보기: 설정표와 짧은 샘플</h3>
+      <p>설정 속성을 표로 먼저 훑고, 날짜·select·숨김 필드 샘플을 필요한 부분만 골라 읽습니다.</p>
+      <div class="mockup">
+        <div class="mockup-title">속성별 빠른 참고</div>
+        <div class="mockup-table"><b>설정</b><b>역할</b><b>예시</b><span>search.label</span><span>표시 이름</span><span>상태</span><span>type: date</span><span>기간 입력</span><span>{ from, to }</span></div>
+        <div class="mockup-step"><b>선택 필드</b><small>type: select + options</small></div>
+        <div class="mockup-step"><b>숨길 필드</b><small>search.hidden: true</small></div>
+        <p class="caption">참조용으로 빠르지만 전체 연결 순서를 독자가 직접 조합해야 합니다.</p>
+      </div>
+    </div>
+  </div>
+</div>

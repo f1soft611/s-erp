@@ -86,7 +86,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
-- 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
+- 우클릭 컨텍스트 메뉴에서 `disableContextMenu`로 전체 메뉴를 끄거나 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`로 항목별 노출을 제어할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
@@ -94,7 +94,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
 - 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
-- 인라인 편집 중 blur는 Grid 바깥의 실제 editor popup으로 포커스가 이동할 때 보류한다. Grid 자체를 감싸는 상위 MUI Dialog/Modal은 popup으로 오인하지 않으므로, 같은 Dialog 안에서 다른 셀을 클릭하면 현재 edit가 commit되어 dirty 상태에 반영된다.
+- 인라인 편집 중 같은 Grid의 다른 셀 또는 툴바/액션으로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. Grid가 중첩 MUI Dialog/Modal 안에 있어도 조상 모달의 이벤트를 editor popup으로 오인하지 않는다. 실제 editor popup으로 포인터/포커스가 이동할 때만 commit을 보류한다. 따라서 폼 바깥의 저장 버튼도 편집 commit으로 갱신된 dirty 상태를 기준으로 동작한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
 - `column.getValue`로 값을 파생시키는 컬럼(예: 여러 체크박스가 하나의 배열 필드를 공유하는 권한 체크박스)은 dirty 판정도 `getValue(row)`를 원본 값과 비교해 계산한다. `onValueChange`가 실제로 갱신하는 필드명이 `column.field`와 다르더라도(예: `permissionCodes` 배열을 갱신하지만 컬럼은 `readPermission`) 해당 컬럼 셀에 정확히 dirty 마크가 표시된다.
@@ -371,6 +371,72 @@ interface F1GridColumn<T> {
 - 기존 사용자 layout 저장값에 새 pinned 컬럼이 없을 때 페이지가 저장된 순서/폭/숨김 설정을 유지하면서 신규 action pin을 1회 migration할 수 있다. Grid core의 persisted layout 초기화는 변경하지 않는다.
 - 좁은 뷰포트에서는 넓은 Grid가 내부 가로 스크롤을 사용한다. 문서 액션은 마지막 열에 두어 필요하면 내부 스크롤로 접근하며, 페이지 전체 가로 overflow를 만들지 않는다.
 
+### 업무작성 결재선 템플릿 관리
+
+결재선 템플릿 관리에서는 `name` 컬럼을 인라인 편집하고, 행별 `renderCell` 액션을 제공한다. 편집 내용은 Grid 변경 집합으로 추적하며, 페이지의 하단 저장 액션에서 기존 서비스 호출을 수행한다.
+
+```tsx
+type TemplateRow = {
+  templateId: number;
+  name: string;
+  actions: string;
+};
+
+const columns: F1GridColumn<TemplateRow>[] = [
+  {
+    field: 'name',
+    headerName: '결재선명',
+    flex: 1,
+    editable: true,
+    required: true,
+    validate: (value) => {
+      const name = String(value ?? '').trim();
+      return (
+        (name.length > 0 && name.length <= 100) ||
+        '결재선 템플릿 이름은 1~100자여야 합니다.'
+      );
+    },
+  },
+  {
+    field: 'actions',
+    headerName: '액션',
+    width: 180,
+    pinned: 'right',
+    editable: false,
+    renderCell: ({ row }) => (
+      <Button
+        aria-label={`결재선 불러오기 ${row.name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onLoad(row.templateId);
+        }}
+      >
+        불러오기
+      </Button>
+    ),
+  },
+];
+
+<F1Grid
+  ref={gridRef}
+  rows={templates.map((template) => ({ ...template, actions: '' }))}
+  columns={columns}
+  rowKey="templateId"
+  ariaLabel="자주 쓰는 결재선 목록"
+  showCheckbox={false}
+  onChangesChange={(changes) =>
+    setHasChanges(changes.updatedRows.length > 0)
+  }
+/>
+
+const changedNames = gridRef.current?.getChanges().updatedRows ?? [];
+```
+
+- `onChangesChange`로 저장 버튼의 활성 상태를 유지하고, `getChanges().updatedRows`에서 수정된 행만 저장한다.
+- 불러오기/삭제/닫기는 행 ID를 전달하며, 미저장 변경 폐기 확인은 Grid를 사용하는 페이지가 처리한다.
+- 이름 저장의 부분 실패에서는 페이지가 성공 응답으로 Grid 기준 목록을 갱신하고, 실패한 입력만 `setCellValue`로 다시 적용해 재시도 가능 상태를 만든다.
+- 이 화면은 기존 `F1Grid`, `F1GridColumn`, `F1GridRef` 공개 API를 사용한다. 같은 Grid 내부 포커스 이동 시 blur commit을 보장하는 공통 Grid 동작을 적용한다.
+
 예:
 
 ```typescript
@@ -396,28 +462,28 @@ const columns: F1GridColumn<Item>[] = [
 
 ## PageSearchArea 상세 검색 연결
 
-페이지의 접이식 상세검색은 F1-Grid 컬럼의 `search` metadata와 `toPageSearchFields(columns)`를 재사용할 수 있다. `search.label`, `search.order`, `search.span`, `search.group`으로 검색 필드 표시를 정하고 `type`/`options`는 해당 Grid 컬럼의 값을 사용한다. `column.hidden` 또는 `search.hidden`인 컬럼은 상세검색에서 제외된다.
+Grid 헤더 필터와 페이지의 상세검색은 서로 다른 기능이다. 헤더 필터는 그리드에 표시된 행을 필터링하고, `PageSearchArea` 상세검색은 컬럼의 검색 설정을 페이지 조회조건에 연결한다. 흐름은 `F1GridColumn.search` → `toPageSearchFields(columns)` → `PageSearchArea` → 페이지 필터 → 목록 API 순서다. F1-Grid는 검색 필드 설정을 제공하며 업무 API를 직접 호출하지 않는다.
+
+실제 기안양식 상세검색 필드는 분류(`categoryItemId`), 등록주기(`regTermId`), 사용여부(`useAt`)다. 분류와 등록주기는 코드 항목의 숫자 ID를 옵션 값으로 사용하고, 사용여부 값은 `'Y'`/`'N'`이다. 양식코드(`cataTypeCode`)와 양식명(`codeName`)은 `search.hidden: true`로 상세검색에서 제외하며, 양식코드/양식명 키워드는 별도의 기본 검색 입력으로 처리한다. 현재 기안양식 화면에는 등록일 상세검색이 없다.
 
 ```typescript
-const columns: F1GridColumn<DraftFormRow>[] = [
-  {
-    field: 'categoryItemId',
-    headerName: '분류',
-    type: 'select',
-    options: categoryOptions,
-    search: { label: '분류', order: 1 },
-  },
-  {
-    field: 'cataTypeCode',
-    headerName: '구분코드',
-    search: { hidden: true },
-  },
-];
-
-const detailFields = toPageSearchFields(columns);
+const detailFields = useMemo(
+  () => toPageSearchFields(columns),
+  [columns],
+);
 ```
 
-`toPageSearchFields`는 검색 UI field definitions만 만든다. `PageSearchArea`가 확정한 값은 페이지가 검색 조건으로 변환해 조회 API에 전달하며, F1-Grid 자체가 서버 검색을 수행하지 않는다. `keyword` 등 기본 검색어와 상세 조건의 결합도 페이지가 관리한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
+
+페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
+
+날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
+
+문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `search.span`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 그룹 행은 결재신청일(span 4), 결재상태·문서종류(span 2씩), 제목(span 4), 기안자·기안부서·결재 참여자(기본 span 1) 순이다. 날짜 범위 위에 별도 날짜 제목은 표시하지 않지만, 두 입력은 시작일/종료일 라벨로 식별한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
+
+커뮤니티 자료실은 기본 영역의 통합검색어를 기존 `keyword` 파라미터로 보내고, `categoryCode` 컬럼의 `search` 설정만 상세검색에 노출한다. API가 `pageIndex`/`pageUnit`을 사용하므로 자료실의 `F1GridDataSource`는 `floor(offset / limit) + 1`과 `limit`으로 변환하고, 요청 취소 signal을 서비스까지 전달한다. 이 화면은 서버의 최신순을 유지하기 위해 그리드 정렬/필터를 비활성화하고, 조회 실패는 `onDataSourceError`에서 오류와 재시도 상태로 표시한다. 제목 셀은 버튼으로 렌더링하여 상세 패널 열기를 명시적으로 실행하며 분류, 작성자, 등록일, 첨부 수는 읽기 전용 컬럼으로 표시한다.
+
+포털의 `필터와 정렬` 문서에서 `상세검색은 이렇게 연결됩니다`부터 단계별 예제와 전체 기안양식 검색 예제를 확인할 수 있다. 포털에서 `toPageSearchFields`를 검색하면 상세검색 가이드로, `F1GridColumn.search`를 검색하면 공개 API 참조 항목으로 이동할 수 있다.
 
 Row Merge 설정:
 
@@ -1450,7 +1516,7 @@ interface GridDataState<T> {
 
 # 25. Grid Context Menu
 
-F1-Grid 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)를 그대로 사용한다.
+기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 우클릭 대상 셀/행 선택은 유지한다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
 
 일반 F1Grid의 메뉴 구성:
 
@@ -1472,8 +1538,11 @@ F1-Grid 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우
 
 F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 추가` 위에 추가로 표시된다. F1Tree도 `F1Grid`와 동일하게 호출자가 전달한 `disableSorting`/`disableFiltering` 정책을 따르므로, 두 기능이 활성화된 화면에서는 필터 해제/정렬 해제 항목을 사용할 수 있다.
 
+`disableFiltering`과 `disableSorting`으로 필터 해제/정렬 해제 항목이 모두 숨겨지면 해당 빈 그룹 앞 구분선도 숨기고, 설정 복원 앞 구분선만 유지한다. 두 항목 중 하나라도 표시되면 그룹 구분선은 기존처럼 표시된다.
+
 관련 Props:
 
+- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
 - `canExportExcel?: boolean` — 엑셀 내보내기 메뉴 노출 여부. 기본값 `false`(미표시). 페이지별 엑셀 권한과 연동해서 사용한다(예: 메뉴관리 화면).
 - `excelFileName?: string` — 내보낼 파일명(확장자 `.xlsx`는 자동 부여). 기본값은 `${ariaLabel}-export`.
 - `allowAddRowInContextMenu?: boolean` — 우클릭 메뉴에 `행 추가` 및 일반 F1Grid의 `위에 행 삽입`/`아래에 행 삽입`을 노출할지 여부. 기본값 `true`.

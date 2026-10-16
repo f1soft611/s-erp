@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   IconButton,
   Menu,
   MenuItem,
   Stack,
   Typography,
 } from '@mui/material';
+import type { ChipProps } from '@mui/material';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -54,6 +56,11 @@ export type FeedCommentItem = {
   content: string;
   isDeleted?: boolean;
   isSystemEvent?: boolean;
+  systemEventBadge?: {
+    label: string;
+    color: ChipProps['color'];
+    variant: ChipProps['variant'];
+  };
   isEditable?: boolean;
   attachments?: FeedCommentAttachment[];
   replies?: FeedCommentItem[];
@@ -407,7 +414,15 @@ function CommentItem({
           {comment.author.slice(0, 2)}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" sx={{ mb: 0.5, alignItems: 'center', gap: 1 }}>
+          <Stack
+            direction="row"
+            sx={{
+              mb: 0.5,
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: isSystemEvent ? 'wrap' : 'nowrap',
+            }}
+          >
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {comment.author}
             </Typography>
@@ -415,12 +430,23 @@ function CommentItem({
               {comment.time}
             </Typography>
             {isSystemEvent && (
-              <InfoOutlinedIcon
-                aria-label="시스템 메시지"
-                titleAccess="시스템 메시지"
-                data-testid="system-event-icon"
-                fontSize="small"
-              />
+              comment.systemEventBadge ? (
+                <Chip
+                  data-testid="system-event-badge"
+                  size="small"
+                  label={comment.systemEventBadge.label}
+                  color={comment.systemEventBadge.color}
+                  variant={comment.systemEventBadge.variant}
+                  sx={{ borderRadius: '8px' }}
+                />
+              ) : (
+                <InfoOutlinedIcon
+                  aria-label="시스템 메시지"
+                  titleAccess="시스템 메시지"
+                  data-testid="system-event-icon"
+                  fontSize="small"
+                />
+              )
             )}
             <Box sx={{ ml: 'auto' }}>
               {!isDeleted && !isSystemEvent && (
@@ -461,72 +487,75 @@ function CommentItem({
               sx={{
                 fontSize: '0.9rem',
                 lineHeight: 1.7,
+                whiteSpace: 'pre-wrap',
                 overflowWrap: 'anywhere',
                 color: 'text.secondary',
               }}
             >
               {comment.content}
             </Box>
-          ) : isDeleted && (
-            <>
-              <Box
-                sx={{
-                  fontSize: '0.9rem',
-                  lineHeight: 1.7,
-                  color: 'text.disabled',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                [작성자에 의해 삭제 되었습니다.]
-              </Box>
-              {replyCount > 0 && (
-                <Button
-                  size="small"
-                  variant="text"
-                  aria-expanded={showReplies}
-                  endIcon={
-                    showReplies ? (
-                      <KeyboardArrowUpIcon
-                        data-testid="reply-expanded-icon"
-                        fontSize="small"
-                      />
-                    ) : (
-                      <KeyboardArrowDownIcon
-                        data-testid="reply-collapsed-icon"
-                        fontSize="small"
-                      />
-                    )
-                  }
-                  onClick={() => setShowReplies((current) => !current)}
+          ) : (
+            isDeleted && (
+              <>
+                <Box
                   sx={{
-                    mt: 0.5,
-                    minWidth: 0,
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 1.25,
-                    border: `1px solid ${
-                      isDark
-                        ? 'rgba(148,163,184,0.18)'
-                        : 'rgba(148,163,184,0.2)'
-                    }`,
-                    bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
-                    color: isDark ? '#cbd5e1' : '#475569',
-                    fontSize: '0.76rem',
-                    fontWeight: 500,
-                    textTransform: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.25,
-                    lineHeight: 1.2,
-                    '& .MuiButton-endIcon': {
-                      marginLeft: 0.25,
-                    },
+                    fontSize: '0.9rem',
+                    lineHeight: 1.7,
+                    color: 'text.disabled',
+                    overflowWrap: 'anywhere',
                   }}
                 >
-                  답글 {replyCount}개
-                </Button>
-              )}
-            </>
+                  [작성자에 의해 삭제 되었습니다.]
+                </Box>
+                {replyCount > 0 && (
+                  <Button
+                    size="small"
+                    variant="text"
+                    aria-expanded={showReplies}
+                    endIcon={
+                      showReplies ? (
+                        <KeyboardArrowUpIcon
+                          data-testid="reply-expanded-icon"
+                          fontSize="small"
+                        />
+                      ) : (
+                        <KeyboardArrowDownIcon
+                          data-testid="reply-collapsed-icon"
+                          fontSize="small"
+                        />
+                      )
+                    }
+                    onClick={() => setShowReplies((current) => !current)}
+                    sx={{
+                      mt: 0.5,
+                      minWidth: 0,
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: 1.25,
+                      border: `1px solid ${
+                        isDark
+                          ? 'rgba(148,163,184,0.18)'
+                          : 'rgba(148,163,184,0.2)'
+                      }`,
+                      bgcolor: isDark ? 'rgba(30,41,59,0.65)' : '#f8fafc',
+                      color: isDark ? '#cbd5e1' : '#475569',
+                      fontSize: '0.76rem',
+                      fontWeight: 500,
+                      textTransform: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      lineHeight: 1.2,
+                      '& .MuiButton-endIcon': {
+                        marginLeft: 0.25,
+                      },
+                    }}
+                  >
+                    답글 {replyCount}개
+                  </Button>
+                )}
+              </>
+            )
           )}
           {!isEditing && !isDeleted && !isSystemEvent && (
             <>
@@ -756,7 +785,7 @@ export function TiptapCommentThread({
   onDeleteAttachment,
   isDark = false,
   showComposer = true,
-  placeholder = '댓글을 입력하세요',
+  placeholder = '줄바꿈 Shift+Enter, 입력 Enter',
   composerLabel = '댓글 입력',
   submitLabel = '등록',
   expandReplies = false,

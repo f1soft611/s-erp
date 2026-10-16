@@ -165,6 +165,7 @@ function F1GridInner<T extends object>(
     cellAdornment,
     disableSorting = false,
     disableFiltering = false,
+    disableContextMenu = false,
     canExportExcel = false,
     excelFileName,
     allowAddRootInContextMenu = true,
@@ -1621,12 +1622,19 @@ function F1GridInner<T extends object>(
       const node = editingCellNodeRef.current;
       if (node && event.target instanceof Node && node.contains(event.target))
         return;
-      if (
-        event.target instanceof Element &&
-        event.target.closest(
-          '.MuiPopover-root, .MuiModal-root, .MuiAutocomplete-popper',
-        )
-      ) {
+      const grid = node?.closest('[role="grid"]');
+      const targetNode = event.target instanceof Node ? event.target : null;
+      const clickedEditorPopup =
+        targetNode !== null &&
+        Array.from(
+          document.querySelectorAll(
+            '.MuiPopover-root, .MuiMenu-paper, .MuiModal-root, .MuiAutocomplete-popper',
+          ),
+        ).some(
+          (popup) =>
+            popup.contains(targetNode) && !popup.contains(grid ?? null),
+        );
+      if (clickedEditorPopup) {
         return;
       }
       commitEditRef.current();
@@ -2280,6 +2288,12 @@ function F1GridInner<T extends object>(
       contextMenuReopenTimeoutRef.current = undefined;
     }
 
+    if (disableContextMenu) {
+      applySelection();
+      closeContextMenu();
+      return;
+    }
+
     if (contextMenu) {
       setContextMenu(undefined);
       applySelection();
@@ -2301,6 +2315,12 @@ function F1GridInner<T extends object>(
     }
     setContextMenu(undefined);
   }
+
+  useEffect(() => {
+    if (disableContextMenu) {
+      closeContextMenu();
+    }
+  }, [disableContextMenu]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -2882,7 +2902,7 @@ function F1GridInner<T extends object>(
         </Box>
       ) : null}
       <Menu
-        open={Boolean(contextMenu)}
+        open={Boolean(contextMenu) && !disableContextMenu}
         onClose={closeContextMenu}
         anchorReference="anchorPosition"
         anchorPosition={
@@ -2949,7 +2969,7 @@ function F1GridInner<T extends object>(
             행 삭제
           </MenuItem>
         ) : null}
-        <Divider />
+        {!disableFiltering || !disableSorting ? <Divider /> : null}
         {!disableFiltering ? (
           <MenuItem
             disabled={filterState.length === 0}

@@ -431,7 +431,7 @@ export const f1GridDocs: F1GridDoc[] = [
     title: '필터와 정렬',
     category: 'feature',
     group: 'filtering-sorting',
-    description: '헤더 메뉴에서 정렬과 컬럼 필터를 사용합니다.',
+    description: 'Grid 헤더 필터와 페이지 상세검색의 차이 및 연결 방법을 안내합니다.',
     sections: [
       {
         type: 'prose',
@@ -474,6 +474,279 @@ export const f1GridDocs: F1GridDoc[] = [
         type: 'code',
         heading: 'Disable when needed',
         code: '<F1Grid disableSorting disableFiltering {...props} />',
+      },
+      {
+        type: 'prose',
+        heading: '상세검색은 이렇게 연결됩니다',
+        body: '먼저 두 가지 검색을 구분하세요. Grid 헤더 필터는 이미 그리드에 표시된 행을 필터링하고, PageSearchArea 상세검색은 컬럼 설정을 페이지 검색 폼에 연결해 목록 조회 조건으로 사용합니다. 전체 흐름은 F1GridColumn.search → toPageSearchFields(columns) → PageSearchArea → 페이지 필터 → 목록 API입니다. F1-Grid는 검색 폼을 만들기 위한 정보를 제공할 뿐, 업무 API를 호출하지 않습니다. 이 안내에서는 실제 기안양식 관리 화면의 분류, 등록주기, 사용여부 검색을 따라가며 일반 날짜 범위는 별도 예제로 분리합니다.',
+      },
+      {
+        type: 'prose',
+        heading: '검색 필드는 컬럼 기준으로 고릅니다',
+        body: '검색 폼에 보여 줄 컬럼만 검색 메타데이터를 설정합니다. 아래는 실제 createDraftFormColumns에서 상세검색과 관련된 컬럼을 발췌한 예입니다. 양식코드와 양식명은 상세검색 폼에서 숨기지만, 별도의 기본 키워드 입력으로 검색합니다.',
+      },
+      {
+        type: 'code',
+        heading: '1단계: 검색할 컬럼 고르기',
+        code: `const columns: F1GridColumn<DraftFormRow>[] = [
+  {
+    field: 'cataTypeCode',
+    headerName: '양식코드',
+    search: { hidden: true },
+  },
+  {
+    field: 'codeName',
+    headerName: '양식명',
+    search: { hidden: true },
+  },
+  {
+    field: 'categoryItemId',
+    headerName: '분류',
+    type: 'select',
+    options: categoryItems.map((item) => ({
+      value: Number(item.id),
+      label: item.itemNm,
+    })),
+    search: { label: '분류', order: 1 },
+  },
+  {
+    field: 'regTermId',
+    headerName: '등록주기',
+    type: 'select',
+    options: cycleItems.map((item) => ({
+      value: Number(item.id),
+      label: item.itemNm,
+    })),
+    search: { label: '등록주기', order: 2 },
+  },
+  {
+    field: 'useAt',
+    headerName: '사용여부',
+    type: 'select',
+    options: [
+      { value: 'Y', label: '사용' },
+      { value: 'N', label: '미사용' },
+    ],
+    search: { label: '사용여부', order: 3 },
+  },
+];`,
+      },
+      {
+        type: 'prose',
+        heading: '검색 메타데이터 한눈에 보기',
+        body: 'search.hidden은 검색 폼에서만 제외하며, column.hidden은 그리드에서 컬럼 자체를 숨깁니다. 실제 기안양식 화면에서는 양식코드와 양식명에 search.hidden을 사용하고 양식명/코드 키워드 검색은 기본 검색 입력이 담당합니다.',
+      },
+      {
+        type: 'api',
+        heading: '검색 필드 설정과 변환 결과',
+        rows: [
+          ['search.hidden', 'boolean', 'true이면 상세검색 필드에서 제외'],
+          ['column.hidden', 'boolean', 'true이면 숨겨진 컬럼이므로 검색 필드에서도 제외'],
+          ['search.label', 'string', '검색 필드 레이블; 생략하면 headerName 사용'],
+          ['search.group', 'string', '필드 그룹 이름'],
+          ['search.order', 'number', '지정한 순서대로 배치; 미지정 필드는 컬럼 순서대로 뒤에 배치'],
+          ['search.span', '1 | 2 | 3 | 4 | 5', '검색 필드 너비인 searchSpan으로 변환; 기본값 1'],
+          ['type / options', 'F1GridColumn', '지원 타입과 select 선택지를 컬럼에서 가져옴'],
+          ['form.span', 'number', '행 편집 폼의 너비이며 search.span과 별도'],
+        ],
+      },
+      {
+        type: 'prose',
+        heading: '검색 필드 설정을 준비합니다',
+        body: 'toPageSearchFields(columns)는 컬럼 메타데이터를 PageSearchArea가 읽을 UI 설정으로 바꿉니다. 결과에는 field, label, type, searchSpan과 설정한 경우 group/options가 들어갑니다. 이 함수는 검색 파라미터나 서버 요청을 만들지 않습니다.',
+      },
+      {
+        type: 'code',
+        heading: '2단계: 검색 필드 만들기',
+        code: `const detailFields = useMemo(
+  () => toPageSearchFields(columns),
+  [columns],
+);`,
+      },
+      {
+        type: 'prose',
+        heading: '입력값은 페이지 상태로 관리합니다',
+        body: 'PageSearchArea는 detailValues에 담긴 값을 표시하고 사용자가 입력을 바꾸면 onDetailValuesChange로 새 값을 알립니다. 상세검색 버튼을 누르면 onDetailSearch(values)가 호출됩니다. 양식코드/양식명 같은 기본 키워드는 별도 입력과 onDefaultSearch를 사용하며, 상세 조건에 합칠지는 페이지가 결정합니다.',
+      },
+      {
+        type: 'code',
+        heading: '3단계: 검색 영역에 연결하기',
+        code: `<PageSearchArea
+  searchField={defaultSearchInput}
+  onDefaultSearch={handleDefaultSearch}
+  detailFields={detailFields}
+  detailValues={detailValues}
+  onDetailValuesChange={setDetailValues}
+  onDetailSearch={handleDetailSearch}
+  detailLoading={management.loading}
+/>`,
+      },
+      {
+        type: 'prose',
+        heading: '페이지에서 조회 조건을 만듭니다',
+        body: '검색 입력값을 현재 화면의 필터 타입으로 바꾸는 것도 페이지의 책임입니다. 분류와 등록주기는 숫자 ID로 바꾸고, 사용여부는 Y 또는 N일 때만 넣습니다. 실제 기안양식 화면은 미저장 Grid 변경이 있으면 확인 대화상자를 먼저 보여 줍니다. 확인 후 변경을 버리고 검색을 적용하며, 목록 API 요청과 로딩/오류 처리는 페이지와 management hook/service가 맡습니다.',
+      },
+      {
+        type: 'code',
+        heading: '4단계: 조회 조건으로 바꾸기',
+        code: `const selected = (value: PageSearchFieldValue | undefined) =>
+  value == null || typeof value === 'object' ? '' : String(value).trim();
+
+const handleDetailSearch = (
+  values: Record<string, PageSearchFieldValue>,
+) => {
+  const useAt = selected(values.useAt);
+  requestSearch({
+    keyword: searchQuery.trim() || undefined,
+    categoryItemId: selected(values.categoryItemId)
+      ? Number(selected(values.categoryItemId))
+      : undefined,
+    regTermId: selected(values.regTermId)
+      ? Number(selected(values.regTermId))
+      : undefined,
+    useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
+  });
+};`,
+      },
+      {
+        type: 'prose',
+        heading: '예제에서 생략한 실제 화면 맥락',
+        body: '다음은 기존 DraftFormManagementPage 함수 안의 검색 연결을 한 흐름으로 묶은 예제입니다. management는 useDraftFormManagement()에서 오며 columns는 createDraftFormColumns(management.categoryItems, management.cycleItems, management.users, ...)를 useMemo로 만든 값입니다. 코드는 해당 화면의 기존 React/MUI 컴포넌트와 타입 import를 사용하는 검색 연동 발췌이며, 전체 CRUD 화면을 대체하지 않습니다. PageMessageArea는 management.error를 표시하고 실제 화면은 권한, 미저장 편집 확인, 오류 표시 및 다이얼로그 흐름을 유지합니다.',
+      },
+      {
+        type: 'code',
+        heading: '전체 예제: 기안양식 검색',
+        code: `const [searchQuery, setSearchQuery] = useState('');
+const [detailValues, setDetailValues] = useState<
+  Record<string, PageSearchFieldValue>
+>({});
+const [pendingFilters, setPendingFilters] =
+  useState<DraftFormFilters | null>(null);
+const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+
+const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
+
+const requestSearch = (filters: DraftFormFilters) => {
+  if (management.hasChanges) {
+    setPendingFilters(filters);
+    setRefreshConfirmOpen(true);
+    return;
+  }
+  management.applyFilters(filters);
+};
+
+const selected = (value: PageSearchFieldValue | undefined) =>
+  value == null || typeof value === 'object' ? '' : String(value).trim();
+
+const handleDetailSearch = (
+  values: Record<string, PageSearchFieldValue>,
+) => {
+  const useAt = selected(values.useAt);
+  requestSearch({
+    keyword: searchQuery.trim() || undefined,
+    categoryItemId: selected(values.categoryItemId)
+      ? Number(selected(values.categoryItemId))
+      : undefined,
+    regTermId: selected(values.regTermId)
+      ? Number(selected(values.regTermId))
+      : undefined,
+    useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
+  });
+};
+
+const handleDefaultSearch = () => {
+  requestSearch({
+    ...management.appliedFilters,
+    keyword: searchQuery.trim() || undefined,
+  });
+};
+
+const defaultSearchInput = (
+  <TextField
+    size="small"
+    placeholder="양식코드/양식명 검색"
+    value={searchQuery}
+    onChange={(event) => setSearchQuery(event.target.value)}
+  />
+);
+
+return (
+  <>
+    <PageSearchArea
+      searchField={defaultSearchInput}
+      onDefaultSearch={handleDefaultSearch}
+      detailFields={detailFields}
+      detailValues={detailValues}
+      onDetailValuesChange={setDetailValues}
+      onDetailSearch={handleDetailSearch}
+      detailLoading={management.loading}
+    />
+    <PageMessageArea
+      message={management.error}
+      onClose={() => management.setError('')}
+    />
+    <UnsavedChangesConfirmDialog
+      open={refreshConfirmOpen}
+      title="저장하지 않은 변경사항"
+      description="변경사항을 버리고 기안양식 목록을 다시 불러오시겠습니까?"
+      cancelLabel="취소"
+      continueLabel="계속"
+      onCancel={() => {
+        setRefreshConfirmOpen(false);
+        setPendingFilters(null);
+      }}
+      onContinue={() => {
+        const filters = pendingFilters;
+        setRefreshConfirmOpen(false);
+        setPendingFilters(null);
+        if (!filters) return;
+        management.discardChanges();
+        management.applyFilters(filters);
+      }}
+    />
+  </>
+);`,
+      },
+      {
+        type: 'prose',
+        heading: '날짜 검색은 필요한 화면에 별도로 추가합니다',
+        body: '현재 기안양식 관리 화면은 등록일 상세검색을 제공하지 않습니다. 아래는 날짜 범위가 필요한 다른 화면에서 사용할 수 있는 일반 예제입니다. 날짜 입력값의 모양까지만 설명하며, 서버 파라미터 이름이나 조회 동작은 각 API 계약에 맞춰 페이지에서 정해야 합니다.',
+      },
+      {
+        type: 'code',
+        heading: '날짜 범위 조건이 필요한 경우',
+        code: `const dateColumns: F1GridColumn<OtherRow>[] = [
+  {
+    field: 'createdAt',
+    headerName: '등록일',
+    type: 'date',
+    search: { label: '등록일', order: 1, span: 2 },
+  },
+];
+
+const detailFields = toPageSearchFields(dateColumns);
+const detailValues = {
+  createdAt: { from: '2026-01-01', to: '2026-01-31' },
+};`,
+      },
+      {
+        type: 'prose',
+        heading: '검색 동작을 끝까지 확인합니다',
+        body: '상세검색 지원 타입은 text, number, decimal, currency, date, select, checkbox입니다. 지원하지 않는 컬럼 타입은 text로 변환되고, select 옵션은 컬럼 options에서 가져옵니다. search.hidden은 상세검색 폼에서만 필드를 제외하고 column.hidden은 컬럼 자체를 숨깁니다. 검색 메타데이터가 없는 컬럼도 기본 설정으로 포함될 수 있으므로 화면에서 제외할 컬럼은 명시적으로 숨기세요. F1GridColumn.search를 포털에서 검색하면 API 참조의 관련 항목으로 이동할 수 있습니다.',
+      },
+      {
+        type: 'api',
+        heading: '빠른 참조: 설정과 주의점',
+        rows: [
+          ['지원 type', 'text | number | decimal | currency | date | select | checkbox', '상세검색 입력 필드 종류'],
+          ['미지원 type', 'text fallback', '검색 UI에서 문자열 입력으로 처리'],
+          ['select options', 'F1GridOption[]', '각 항목의 value/label을 사용'],
+          ['search.order', 'number', '미지정 필드는 컬럼 순서대로 뒤에 배치'],
+          ['search.span', '1–5', '검색 필드 너비(searchSpan); 기본값 1'],
+          ['form.span', 'number', '행 편집 폼 너비; 검색 필드 너비와 무관'],
+          ['검색 요청', 'PageSearchArea callback', '조건 변환, API 요청, 로딩과 오류 처리는 페이지 책임'],
+          ['Grid 헤더 필터', 'F1-Grid', '표시 중인 행의 컬럼 필터이며 페이지 상세검색과 별도'],
+        ],
       },
     ],
   },
@@ -625,17 +898,22 @@ export const f1GridDocs: F1GridDoc[] = [
     category: 'feature',
     group: 'selection-actions',
     description:
-      '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행합니다.',
+      '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행하며 전체 메뉴를 비활성화할 수도 있습니다.',
     sections: [
       {
         type: 'prose',
         heading: 'Fast actions at the cursor',
-        body: 'F1-Grid 바디 영역을 우클릭하면 커서 위치에 컨텍스트 메뉴가 열립니다. 헤더 영역은 기존 정렬/필터/고정/숨김 메뉴를 유지하고, 바디 메뉴는 행 추가, 복사, 삭제, 컬럼 자동 맞춤, 엑셀 내보내기처럼 작업 성격이 강한 액션을 한 곳에 모아줍니다.',
+        body: '기본적으로 F1Grid와 F1Tree의 바디 영역을 우클릭하면 커서 위치에 컨텍스트 메뉴가 열립니다. disableContextMenu를 켜면 그리드 메뉴와 브라우저 기본 메뉴를 모두 막되 우클릭 대상 셀/행 선택은 유지합니다. 헤더의 정렬/필터/고정/숨김 메뉴는 영향을 받지 않습니다.',
       },
       {
         type: 'api',
         heading: 'Context menu props',
         rows: [
+          [
+            'disableContextMenu',
+            'boolean',
+            'F1Grid/F1Tree 바디 우클릭 메뉴 전체 비활성화 여부',
+          ],
           ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
           ['excelFileName', 'string', '다운로드 파일명 기본값'],
           [
@@ -665,19 +943,14 @@ export const f1GridDocs: F1GridDoc[] = [
       },
       {
         type: 'code',
-        heading: 'Enable the export menu',
+        heading: 'Disable the body context menu',
         code: `const columns = [{ field: 'name', headerName: '메뉴명', width: 220, editable: true }];
 
 <F1Grid
   rows={rows}
   columns={columns}
   rowKey="id"
-  canExportExcel
-  excelFileName="menu-export"
-  allowAddRowInContextMenu
-  allowDuplicateRowInContextMenu
-  allowDeleteRowInContextMenu
-  createDuplicate={(row) => ({ ...row, id: crypto.randomUUID() })}
+  disableContextMenu
 />`,
       },
     ],

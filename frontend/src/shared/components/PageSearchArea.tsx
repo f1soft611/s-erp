@@ -10,7 +10,6 @@ import {
   Paper,
   Select,
   TextField,
-  Typography,
 } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
@@ -19,6 +18,31 @@ import type {
   PageSearchField,
   PageSearchFieldValue,
 } from './page-search/searchFields';
+
+type SearchRenderBlock =
+  | { group: string; fields: PageSearchField[] }
+  | { field: PageSearchField };
+
+function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
+  const blocks: SearchRenderBlock[] = [];
+
+  fields.forEach((field) => {
+    if (!field.group) {
+      blocks.push({ field });
+      return;
+    }
+
+    const lastBlock = blocks[blocks.length - 1];
+    if (lastBlock && 'group' in lastBlock && lastBlock.group === field.group) {
+      lastBlock.fields.push(field);
+      return;
+    }
+
+    blocks.push({ group: field.group, fields: [field] });
+  });
+
+  return blocks;
+}
 
 export type PageSearchAreaProps = {
   children?: ReactNode;
@@ -99,6 +123,111 @@ export function PageSearchArea({
     setDetailOpen(false);
     onDetailClose?.();
   };
+
+  const renderSearchField = (field: PageSearchField) => {
+    const value = getFieldValue(draftValues, field);
+    const span = field.searchSpan ?? 1;
+    const gridColumn = {
+      xs: 'span 1',
+      sm: `span ${Math.min(span, 2)}`,
+      md: `span ${span}`,
+    };
+
+    return (
+      <Box
+        key={field.field}
+        data-search-field={field.field}
+        data-search-span={span}
+        sx={{ gridColumn, minWidth: 0 }}
+      >
+        {field.type === 'date' ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+              gap: 1,
+              minWidth: 0,
+            }}
+          >
+            <TextField
+              size="small"
+              margin="none"
+              type="date"
+              label={`${field.label} 시작일`}
+              value={getDateValue(value, 'from')}
+              onChange={(event) =>
+                updateValue(field.field, {
+                  from: event.target.value,
+                  to: getDateValue(value, 'to'),
+                })
+              }
+              slotProps={{
+                htmlInput: { 'aria-label': `${field.label} 시작일` },
+              }}
+            />
+            <TextField
+              size="small"
+              margin="none"
+              type="date"
+              label={`${field.label} 종료일`}
+              value={getDateValue(value, 'to')}
+              onChange={(event) =>
+                updateValue(field.field, {
+                  from: getDateValue(value, 'from'),
+                  to: event.target.value,
+                })
+              }
+              slotProps={{
+                htmlInput: { 'aria-label': `${field.label} 종료일` },
+              }}
+            />
+          </Box>
+        ) : field.type === 'select' || field.type === 'checkbox' ? (
+          <FormControl size="small" fullWidth>
+            <InputLabel id={`${field.field}-search-label`}>
+              {field.label}
+            </InputLabel>
+            <Select
+              labelId={`${field.field}-search-label`}
+              label={field.label}
+              value={
+                value === null || value === undefined ? '' : String(value)
+              }
+              onChange={(event) => updateValue(field.field, event.target.value)}
+              inputProps={{ 'aria-label': field.label }}
+            >
+              <MenuItem value="">전체</MenuItem>
+              {(field.options ?? []).map((option) => (
+                <MenuItem
+                  key={String(option.value)}
+                  value={String(option.value)}
+                >
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        ) : (
+          <TextField
+            fullWidth
+            size="small"
+            margin="none"
+            type={
+              ['number', 'decimal', 'currency'].includes(field.type)
+                ? 'number'
+                : 'text'
+            }
+            label={field.label}
+            value={value == null || typeof value === 'object' ? '' : String(value)}
+            onChange={(event) => updateValue(field.field, event.target.value)}
+            slotProps={{ htmlInput: { 'aria-label': field.label } }}
+          />
+        )}
+      </Box>
+    );
+  };
+
+  const searchRenderBlocks = groupSearchFields(detailFields);
 
   const handleDefaultSearchKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' && onDefaultSearch) {
@@ -321,129 +450,29 @@ export function PageSearchArea({
               gap: 1.5,
             }}
           >
-            {detailFields.map((field) => {
-              const value = getFieldValue(draftValues, field);
-              const span = field.searchSpan ?? 1;
-              const gridColumn = {
-                xs: 'span 1',
-                sm: `span ${Math.min(span, 2)}`,
-                md: `span ${span}`,
-              };
-
-              if (field.type === 'date') {
-                return (
-                  <Box key={field.field} sx={{ gridColumn }}>
-                    <Typography
-                      variant="caption"
-                      sx={{ display: 'block', mb: 0.5 }}
-                    >
-                      {field.label}
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 1,
-                      }}
-                    >
-                      <TextField
-                        size="small"
-                        margin="none"
-                        type="date"
-                        label={`${field.label} 시작일`}
-                        value={getDateValue(value, 'from')}
-                        onChange={(event) =>
-                          updateValue(field.field, {
-                            from: event.target.value,
-                            to: getDateValue(value, 'to'),
-                          })
-                        }
-                        slotProps={{
-                          htmlInput: { 'aria-label': `${field.label} 시작일` },
-                        }}
-                      />
-                      <TextField
-                        size="small"
-                        margin="none"
-                        type="date"
-                        label={`${field.label} 종료일`}
-                        value={getDateValue(value, 'to')}
-                        onChange={(event) =>
-                          updateValue(field.field, {
-                            from: getDateValue(value, 'from'),
-                            to: event.target.value,
-                          })
-                        }
-                        slotProps={{
-                          htmlInput: { 'aria-label': `${field.label} 종료일` },
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                );
-              }
-
-              if (field.type === 'select' || field.type === 'checkbox') {
-                return (
-                  <FormControl
-                    key={field.field}
-                    size="small"
-                    sx={{ gridColumn }}
-                  >
-                    <InputLabel id={`${field.field}-search-label`}>
-                      {field.label}
-                    </InputLabel>
-                    <Select
-                      labelId={`${field.field}-search-label`}
-                      label={field.label}
-                      value={
-                        value === null || value === undefined
-                          ? ''
-                          : String(value)
-                      }
-                      onChange={(event) =>
-                        updateValue(field.field, event.target.value)
-                      }
-                      inputProps={{ 'aria-label': field.label }}
-                    >
-                      <MenuItem value="">전체</MenuItem>
-                      {(field.options ?? []).map((option) => (
-                        <MenuItem
-                          key={String(option.value)}
-                          value={String(option.value)}
-                        >
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                );
-              }
-
-              return (
-                <TextField
-                  key={field.field}
-                  size="small"
-                  margin="none"
-                  type={
-                    ['number', 'decimal', 'currency'].includes(field.type)
-                      ? 'number'
-                      : 'text'
-                  }
-                  label={field.label}
-                  value={
-                    value == null || typeof value === 'object'
-                      ? ''
-                      : String(value)
-                  }
-                  onChange={(event) =>
-                    updateValue(field.field, event.target.value)
-                  }
-                  slotProps={{ htmlInput: { 'aria-label': field.label } }}
-                  sx={{ gridColumn }}
-                />
-              );
-            })}
+            {searchRenderBlocks.map((block, index) =>
+              'group' in block ? (
+                <Box
+                  key={`${block.group}-${index}`}
+                  data-search-group={block.group}
+                  sx={{
+                    gridColumn: '1 / -1',
+                    display: 'grid',
+                    gridTemplateColumns: {
+                      xs: 'minmax(0, 1fr)',
+                      sm: 'repeat(2, minmax(0, 1fr))',
+                      md: 'repeat(5, minmax(0, 1fr))',
+                    },
+                    gap: 1.5,
+                    minWidth: 0,
+                  }}
+                >
+                  {block.fields.map(renderSearchField)}
+                </Box>
+              ) : (
+                renderSearchField(block.field)
+              ),
+            )}
           </Box>
           <Divider
             role="separator"

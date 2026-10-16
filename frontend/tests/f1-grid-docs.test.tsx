@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getF1GridDoc } from '../src/pages/f1-grid-docs/data/f1GridDocs';
 import { F1GridDocsPage } from '../src/pages/f1-grid-docs/F1GridDocsPage';
@@ -12,8 +18,8 @@ const expectedPublicApiByContract: Record<string, string[]> = {
     fixedRowHeightThreshold queryWorkerThreshold disableQueryWorker showCheckbox
     createRow createDuplicate editorPlugins editors onBeforeEdit beforeEdit
     onAfterEdit afterEdit onChangesChange onSelectionChange initialSelectedRowIds
-    rowProjection cellAdornment disableSorting disableFiltering canExportExcel
-    excelFileName allowAddRootInContextMenu allowAddRowInContextMenu
+    rowProjection cellAdornment disableSorting disableFiltering
+    disableContextMenu canExportExcel excelFileName allowAddRootInContextMenu allowAddRowInContextMenu
     allowDuplicateRowInContextMenu allowDeleteRowInContextMenu deleteMenuDisabled
     loading treeContextMenu
   `
@@ -246,6 +252,30 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('공통코드')).toBeInTheDocument();
   });
 
+  it('demonstrates disabling and re-enabling the context menu in the playground', () => {
+    render(<F1GridDocsPage initialDocumentId="context-menu" />);
+
+    const grid = screen.getByRole('grid', {
+      name: 'F1-Grid context menu example',
+    });
+    const cell = within(grid).getAllByRole('gridcell')[0];
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Disable context menu' }),
+    );
+    fireEvent.contextMenu(cell);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Enable context menu' }),
+    );
+    fireEvent.contextMenu(cell);
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
   it('opens an inline editor on the cell editing playground', () => {
     render(<F1GridDocsPage initialDocumentId="editing" />);
 
@@ -408,6 +438,92 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('검색 결과')).toBeInTheDocument();
   });
 
+  it('presents detailed-search guidance as an ordered implementation recipe', () => {
+    const doc = getF1GridDoc('filtering-sorting');
+    const guideHeadings = doc.sections
+      .filter(
+        (section) =>
+          section.heading.includes('상세검색') ||
+          section.heading.includes('검색할 컬럼 고르기') ||
+          section.heading.includes('검색 필드 만들기') ||
+          section.heading.includes('검색 영역에 연결하기') ||
+          section.heading.includes('조회 조건으로 바꾸기') ||
+          section.heading.includes('기안양식 검색') ||
+          section.heading.includes('날짜 범위 조건') ||
+          section.heading.includes('빠른 참조'),
+      )
+      .map((section) => section.heading);
+
+    expect(guideHeadings).toEqual([
+      '상세검색은 이렇게 연결됩니다',
+      '1단계: 검색할 컬럼 고르기',
+      '2단계: 검색 필드 만들기',
+      '3단계: 검색 영역에 연결하기',
+      '4단계: 조회 조건으로 바꾸기',
+      '전체 예제: 기안양식 검색',
+      '날짜 범위 조건이 필요한 경우',
+      '빠른 참조: 설정과 주의점',
+    ]);
+  });
+
+  it('documents the real draft-form search contract and separate date example', () => {
+    const doc = getF1GridDoc('filtering-sorting');
+    const guideContent = doc.sections
+      .flatMap((section) => {
+        if (section.type === 'prose') {
+          return typeof section.body === 'string' ? [section.body] : [];
+        }
+        if (section.type === 'code') return [section.code];
+        if (section.type === 'api') {
+          return section.rows.map((row) => row.join(' '));
+        }
+        return [];
+      })
+      .join('\n');
+
+    expect(guideContent).toContain('Grid 헤더 필터');
+    expect(guideContent).toContain('categoryItemId');
+    expect(guideContent).toContain('regTermId');
+    expect(guideContent).toContain('useAt');
+    expect(guideContent).toContain(
+      'const columns: F1GridColumn<DraftFormRow>[]',
+    );
+    expect(guideContent).toContain('cataTypeCode');
+    expect(guideContent).toContain('codeName');
+    expect(guideContent).toContain('search.hidden');
+    expect(guideContent).toContain('detailFields');
+    expect(guideContent).toContain('detailValues');
+    expect(guideContent).toContain('onDetailValuesChange');
+    expect(guideContent).toContain('onDetailSearch');
+    expect(guideContent).toContain('search.label');
+    expect(guideContent).toContain('search.group');
+    expect(guideContent).toContain('search.order');
+    expect(guideContent).toContain('search.span');
+    expect(guideContent).toContain(
+      'categoryItemId: selected(values.categoryItemId)',
+    );
+    expect(guideContent).toContain('Number(selected(values.categoryItemId))');
+    expect(guideContent).toContain(
+      'regTermId: selected(values.regTermId)',
+    );
+    expect(guideContent).toContain('Number(selected(values.regTermId))');
+    expect(guideContent).toContain("useAt === 'Y' || useAt === 'N'");
+    expect(guideContent).toContain('PageSearchArea');
+    expect(guideContent).toContain('API 요청');
+    expect(guideContent).toContain('저장하지 않은 변경사항');
+    expect(guideContent).toContain("type: 'date'");
+    expect(guideContent).toContain("{ from: '2026-01-01', to: '2026-01-31' }");
+    expect(guideContent).toContain('현재 기안양식');
+    expect(guideContent).toContain('searchSpan');
+    expect(guideContent).toContain('form.span');
+    expect(guideContent).toContain('currency');
+    expect(guideContent).toContain('checkbox');
+    expect(guideContent).toContain('options');
+    expect(guideContent).toContain('label');
+    expect(guideContent).toContain('order');
+    expect(guideContent).toContain('fallback');
+  });
+
   it('documents each public F1-Grid API identifier and nested contract field', () => {
     const apiDoc = getF1GridDoc('api-reference');
     for (const [heading, expectedNames] of Object.entries(
@@ -450,15 +566,15 @@ describe('F1-Grid docs portal', () => {
     expect(apiText).toContain('create | edit');
   });
 
-  it('searches by API option name and opens the matching reference entry', () => {
+  it('searches F1GridColumn.search and opens its API reference row', () => {
     render(<F1GridDocsPage />);
 
     fireEvent.change(screen.getByRole('textbox', { name: '문서 검색' }), {
-      target: { value: 'queryWorkerThreshold' },
+      target: { value: 'F1GridColumn.search' },
     });
 
     const result = screen.getByRole('button', {
-      name: /queryWorkerThreshold/,
+      name: /^searchF1GridColumn$/,
     });
     fireEvent.click(result);
 
@@ -466,7 +582,9 @@ describe('F1-Grid docs portal', () => {
       screen.getByRole('heading', { name: 'API 참조' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('row', { name: /queryWorkerThreshold/ }),
+      screen.getByRole('row', {
+        name: /search F1GridColumnSearchOptions/,
+      }),
     ).toBeInTheDocument();
   });
 

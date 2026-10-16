@@ -1,6 +1,9 @@
 package egovframework.let.groupware.approval.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,6 +12,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -24,15 +29,23 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 
 class DocumentApprovalApiControllerTest {
@@ -40,6 +53,131 @@ class DocumentApprovalApiControllerTest {
     private final DocumentApprovalService approvalService = mock(DocumentApprovalService.class);
     private final DocumentApprovalApiController controller =
             new DocumentApprovalApiController(new ResultVoHelper(), approvalService);
+
+    @Test
+    void listDocumentsKeepsLightweightResponseByDefault() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        List<DocumentApprovalListItemVO> list = Collections.singletonList(listItem);
+        when(approvalService.listDocuments(user, "ALL", null, null)).thenReturn(list);
+
+        ResultVO response = controller.listDocuments(
+                "ALL", null, false, new DocumentApprovalListQueryVO(), user);
+
+        assertThat(response.getResult().get("resultList")).isSameAs(list);
+        assertThat(response.getResult()).doesNotContainKey("totalRowCount");
+        verify(approvalService).listDocuments(user, "ALL", null, null);
+    }
+
+    @Test
+    void listDocumentsReturnsDetailedRowsWhenRequested() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
+        feedItem.setElectronicApprovalId(77L);
+        List<DocumentApprovalFeedItemVO> feed = Collections.singletonList(feedItem);
+        when(approvalService.listFeedDocuments(user, "ALL", null, null)).thenReturn(feed);
+
+        ResultVO response = controller.listDocuments(
+                "ALL", null, true, new DocumentApprovalListQueryVO(), user);
+
+        assertThat(response.getResult().get("resultList")).isSameAs(feed);
+        assertThat(response.getResult()).doesNotContainKey("totalRowCount");
+        verify(approvalService).listFeedDocuments(user, "ALL", null, null);
+    }
+
+    @Test
+    void listDocumentsReturnsResultListAndTotalForRemoteQuery() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalStatusListItemVO row = new DocumentApprovalStatusListItemVO();
+        row.setElectronicApprovalId(77L);
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(Collections.singletonList(row));
+        page.setTotalRowCount(42L);
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setOffset(0);
+        query.setLimit(25);
+        when(approvalService.searchDocuments(user, "ALL", query)).thenReturn(page);
+
+        ResultVO response = controller.listDocuments("ALL", null, false, query, user);
+
+        assertThat(response.getResult())
+                .containsEntry("resultList", page.getResultList())
+                .containsEntry("totalRowCount", 42L);
+        verify(approvalService).searchDocuments(user, "ALL", query);
+    }
+
+    @Test
+    void listDocumentsBindsRemoteSearchFiltersAndReturnsPageMetadata() throws Exception {
+        DocumentApprovalStatusListItemVO row = new DocumentApprovalStatusListItemVO();
+        row.setElectronicApprovalId(77L);
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(Collections.singletonList(row));
+        page.setTotalRowCount(42L);
+        when(approvalService.searchDocuments(any(LoginVO.class), eq("ALL"), any(DocumentApprovalListQueryVO.class)))
+                .thenReturn(page);
+
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc.perform(get("/api/v1/groupware/approvals/documents")
+                .param("keyword", "annual")
+                .param("documentType", "DRAFTING")
+                .param("documentStatus", "COMPLETED")
+                .param("submittedAtFrom", "2026-09-16")
+                .param("submittedAtTo", "2026-10-16")
+                .param("drafterName", "Morgan")
+                .param("drafterDepartmentName", "Finance")
+                .param("participantName", "Sam")
+                .param("updatedAtFrom", "2026-10-01")
+                .param("updatedAtTo", "2026-10-16")
+                .param("offset", "0")
+                .param("limit", "25")
+                .param("sortField", "submittedAt")
+                .param("sortDirection", "ASC"))
+                .andExpect(status().isOk());
+
+        verify(approvalService).searchDocuments(any(LoginVO.class), eq("ALL"), argThat(query ->
+            "annual".equals(query.getKeyword())
+                && "DRAFTING".equals(query.getDocumentType())
+                && "COMPLETED".equals(query.getDocumentStatus())
+                && "2026-09-16".equals(query.getSubmittedAtFrom())
+                && "2026-10-16".equals(query.getSubmittedAtTo())
+                && "Morgan".equals(query.getDrafterName())
+                && "Finance".equals(query.getDrafterDepartmentName())
+                && "Sam".equals(query.getParticipantName())
+                && "2026-10-01".equals(query.getUpdatedAtFrom())
+                && "2026-10-16".equals(query.getUpdatedAtTo())
+                && Integer.valueOf(0).equals(query.getOffset())
+                && Integer.valueOf(25).equals(query.getLimit())
+                && "submittedAt".equals(query.getSortField())
+                && "ASC".equals(query.getSortDirection())));
+    }
+
+    @Test
+    void listApprovalCommentsReturnsTheUnifiedPageContract() throws Exception {
+        LoginVO user = authenticatedUser();
+        CommonCommentVO comment = new CommonCommentVO();
+        comment.setCommentId(104L);
+        CommonCommentVO systemEvent = new CommonCommentVO();
+        systemEvent.setCommentId(103L);
+        DocumentApprovalCommentPageVO page = new DocumentApprovalCommentPageVO();
+        page.setComments(Collections.singletonList(comment));
+        page.setSystemEvents(Collections.singletonList(systemEvent));
+        page.setResultCnt(4L);
+        page.setHasPrevious(true);
+        page.setNextBeforeCommentId(103L);
+        when(approvalService.listApprovalComments(user, 77L, 3, 103L)).thenReturn(page);
+
+        ResultVO response = controller.listApprovalComments(77L, 3, 103L, user);
+
+        assertThat(response.getResult())
+            .containsEntry("resultList", page.getComments())
+            .containsEntry("comments", page.getComments())
+            .containsEntry("systemEvents", page.getSystemEvents())
+            .containsEntry("resultCnt", 4L)
+            .containsEntry("hasPrevious", true)
+            .containsEntry("nextBeforeCommentId", 103L);
+        verify(approvalService).listApprovalComments(user, 77L, 3, 103L);
+    }
 
     @Test
     void createDraftReturnsCreatedDocumentIdentity() throws Exception {
@@ -135,6 +273,30 @@ class DocumentApprovalApiControllerTest {
     @Test
     void documentDeleteRouteIsAvailableAtApprovalRoot() {
         assertRoute("deleteDocumentApproval", DeleteMapping.class, "/{electronicApprovalId}");
+    }
+
+    @Test
+    void cancellationRoutesDelegateAndReturnWorkflowItems() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalDraftVO submission = new DocumentApprovalDraftVO();
+        submission.setElectronicApprovalId(77L);
+        submission.setDocumentStatus("DRAFT");
+        DocumentApprovalDraftVO approval = new DocumentApprovalDraftVO();
+        approval.setElectronicApprovalId(77L);
+        approval.setDocumentStatus("IN_PROGRESS");
+        when(approvalService.cancelSubmission(user, 77L)).thenReturn(submission);
+        when(approvalService.cancelApproval(user, 77L)).thenReturn(approval);
+
+        assertRoute("cancelSubmission", PostMapping.class, "/{electronicApprovalId}/submission-cancellation");
+        assertRoute("cancelApproval", PostMapping.class, "/{electronicApprovalId}/approval-cancellation");
+
+        ResultVO submissionResponse = controller.cancelSubmission(77L, user);
+        ResultVO approvalResponse = controller.cancelApproval(77L, user);
+
+        assertThat(submissionResponse.getResult().get("item")).isSameAs(submission);
+        assertThat(approvalResponse.getResult().get("item")).isSameAs(approval);
+        verify(approvalService).cancelSubmission(user, 77L);
+        verify(approvalService).cancelApproval(user, 77L);
     }
 
     private void assertRoute(String methodName, Class<? extends Annotation> mappingType, String expectedPath) {

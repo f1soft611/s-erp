@@ -6,7 +6,7 @@
         <id property="postId" column="post_id"/>
         <result property="boardTypeCode" column="board_type_code"/>
         <result property="title" column="title"/>
-        <result property="noticeGubunCode" column="notice_gubun_code"/>
+        <result property="noticeGubunCode" column="category_code"/>
         <result property="contents" column="contents"/>
         <result property="contentsHtml" column="contents_html"/>
         <result property="contentsJson" column="contents_json"/>
@@ -47,7 +47,7 @@
             p.post_id,
             p.board_type_code,
             p.title,
-            p.notice_gubun_code,
+            p.category_code,
             COALESCE(p.contents_html, p.contents, '') AS contents,
             p.contents_html,
             p.contents_json,
@@ -70,7 +70,8 @@
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
-        WHERE p.board_type_code = #{boardTypeCode}
+        WHERE p.tenant_id = #{tenantId}
+          AND p.board_type_code = #{boardTypeCode}
           AND p.is_deleted = 'N'
         <if test="keyword != null and keyword != ''">
           AND (
@@ -80,7 +81,7 @@
           )
         </if>
                 <if test="noticeGubunCode != null and noticeGubunCode != ''">
-                    AND p.notice_gubun_code = #{noticeGubunCode}
+                    AND p.category_code = #{noticeGubunCode}
                 </if>
                 <if test="isPinned != null and isPinned != ''">
                     AND p.is_pinned = #{isPinned}
@@ -92,7 +93,8 @@
     <select id="selectNoticePostCount" parameterType="map" resultType="long">
         SELECT COUNT(*)
         FROM tb_board_post p
-        WHERE p.board_type_code = #{boardTypeCode}
+        WHERE p.tenant_id = #{tenantId}
+          AND p.board_type_code = #{boardTypeCode}
           AND p.is_deleted = 'N'
         <if test="keyword != null and keyword != ''">
           AND (
@@ -102,7 +104,7 @@
           )
         </if>
         <if test="noticeGubunCode != null and noticeGubunCode != ''">
-            AND p.notice_gubun_code = #{noticeGubunCode}
+            AND p.category_code = #{noticeGubunCode}
         </if>
         <if test="isPinned != null and isPinned != ''">
             AND p.is_pinned = #{isPinned}
@@ -114,7 +116,7 @@
             p.post_id,
             p.board_type_code,
             p.title,
-            p.notice_gubun_code,
+            p.category_code,
             COALESCE(p.contents_html, p.contents, '') AS contents,
             p.contents_html,
             p.contents_json,
@@ -137,7 +139,9 @@
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
-        WHERE p.post_id = #{postId}
+        WHERE p.tenant_id = #{tenantId}
+          AND p.post_id = #{postId}
+          AND p.board_type_code = #{boardTypeCode}
           AND p.is_deleted = 'N'
     </select>
 
@@ -168,15 +172,18 @@
     <update id="incrementNoticePostViewCount" parameterType="map">
         UPDATE tb_board_post
         SET view_count = view_count + 1
-        WHERE post_id = #{postId}
+        WHERE tenant_id = #{tenantId}
+          AND post_id = #{postId}
+          AND board_type_code = #{boardTypeCode}
           AND is_deleted = 'N'
     </update>
 
     <select id="insertNoticePost" parameterType="map" resultType="long">
         INSERT INTO tb_board_post (
+            tenant_id,
             board_type_code,
             title,
-            notice_gubun_code,
+            category_code,
             contents,
             contents_html,
             contents_json,
@@ -191,6 +198,7 @@
             created_at,
             updated_at
         ) VALUES (
+            #{tenantId},
             #{boardTypeCode},
             #{title},
             #{noticeGubunCode},
@@ -214,7 +222,7 @@
     <update id="updateNoticePost" parameterType="map">
         UPDATE tb_board_post
         SET title = #{title},
-            notice_gubun_code = #{noticeGubunCode},
+            category_code = #{noticeGubunCode},
             contents = #{contents},
             contents_html = #{contentsHtml},
             contents_json = CAST(#{contentsJson} AS json),
@@ -224,7 +232,9 @@
             last_modified_by_name = #{lastModifiedByName},
             is_pinned = #{isPinned},
             updated_at = CURRENT_TIMESTAMP
-        WHERE post_id = #{postId}
+        WHERE tenant_id = #{tenantId}
+          AND post_id = #{postId}
+          AND board_type_code = #{boardTypeCode}
           AND is_deleted = 'N'
     </update>
 
@@ -234,7 +244,9 @@
             last_modified_by = #{lastModifiedBy},
             last_modified_by_name = #{lastModifiedByName},
             updated_at = CURRENT_TIMESTAMP
-        WHERE post_id = #{postId}
+        WHERE tenant_id = #{tenantId}
+          AND post_id = #{postId}
+          AND board_type_code = #{boardTypeCode}
           AND is_deleted = 'N'
     </update>
 
@@ -244,7 +256,9 @@
             last_modified_by = #{lastModifiedBy},
             last_modified_by_name = #{lastModifiedByName},
             updated_at = CURRENT_TIMESTAMP
-        WHERE post_id = #{postId}
+        WHERE tenant_id = #{tenantId}
+          AND post_id = #{postId}
+          AND board_type_code = #{boardTypeCode}
     </update>
 
     <select id="selectNoticeAttachmentList" parameterType="map" resultMap="noticeFileMap">

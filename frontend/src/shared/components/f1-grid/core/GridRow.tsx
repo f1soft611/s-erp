@@ -317,7 +317,6 @@ const GridRowInner = <T extends object>({
         onSetFocusedCell(cell);
         onSelectRow(rowId, event as unknown as MouseEvent<HTMLElement>);
       }
-
       const previousCell = previousDragCellRef.current;
       const isSameDragCell =
         previousCell?.rowId === cell.rowId &&

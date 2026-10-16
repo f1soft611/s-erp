@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostVO;
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
+import egovframework.let.groupware.community.common.CommunityCategoryValidator;
 import egovframework.let.common.dto.ListResult;
 
 class NoticeBoardServiceImplTest {
@@ -266,11 +268,13 @@ class NoticeBoardServiceImplTest {
         assertThat(result.getResultCnt()).isEqualTo(41L);
         assertThat(search.getFirstIndex()).isEqualTo(40);
         assertThat(search.getRecordCountPerPage()).isEqualTo(20);
+        verifyNoInteractions(commonFileService, commonCommentService);
 
         ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
         verify(noticeBoardDAO).selectNoticePostList(paramsCaptor.capture());
         assertThat(paramsCaptor.getValue())
             .containsEntry("tenantId", 1L)
+            .containsEntry("boardTypeCode", "NOTICE")
             .containsEntry("isPinned", "Y")
             .containsEntry("firstIndex", 40)
             .containsEntry("recordCountPerPage", 20);
@@ -319,7 +323,19 @@ class NoticeBoardServiceImplTest {
             .getPost(1L, 7L, "user-a");
 
         assertThat(result.getViewCount()).isEqualTo(1);
-        verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
+        ArgumentCaptor<Map<String, Object>> postParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO, org.mockito.Mockito.times(2))
+            .selectNoticePostById(postParamsCaptor.capture());
+        for (Map<String, Object> params : postParamsCaptor.getAllValues()) {
+            assertThat(params).containsEntry("tenantId", 1L)
+                .containsEntry("postId", 7L)
+                .containsEntry("boardTypeCode", "NOTICE");
+        }
+        ArgumentCaptor<Map<String, Object>> viewParamsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(noticeBoardDAO).incrementNoticePostViewCount(viewParamsCaptor.capture());
+        assertThat(viewParamsCaptor.getValue()).containsEntry("tenantId", 1L)
+            .containsEntry("postId", 7L)
+            .containsEntry("boardTypeCode", "NOTICE");
     }
 
     @Test
@@ -376,6 +392,7 @@ class NoticeBoardServiceImplTest {
         assertThat(viewParamsCaptor.getValue())
             .containsEntry("tenantId", 1L)
             .containsEntry("postId", 7L)
+            .containsEntry("boardTypeCode", "NOTICE")
             .containsEntry("loginId", 12L);
         verify(noticeBoardDAO).incrementNoticePostViewCount(org.mockito.ArgumentMatchers.anyMap());
     }
@@ -462,12 +479,25 @@ class NoticeBoardServiceImplTest {
         firstPost.setPostId(7L);
         NoticeBoardPostVO secondPost = new NoticeBoardPostVO();
         secondPost.setPostId(8L);
-        CommonCommentVO comment = new CommonCommentVO();
-        comment.setCommentId(10L);
-        CommonCommentPageVO commentPage = new CommonCommentPageVO();
-        commentPage.setComments(Arrays.asList(comment));
-        commentPage.setHasPrevious(true);
-        commentPage.setNextBeforeCommentId(9L);
+        CommonCommentVO firstRoot = new CommonCommentVO();
+        firstRoot.setCommentId(8L);
+        CommonCommentVO firstReply = new CommonCommentVO();
+        firstReply.setCommentId(9L);
+        firstReply.setParentCommentId(8L);
+        CommonCommentVO secondRoot = new CommonCommentVO();
+        secondRoot.setCommentId(10L);
+        CommonCommentVO thirdRoot = new CommonCommentVO();
+        thirdRoot.setCommentId(11L);
+        CommonCommentPageVO firstCommentPage = new CommonCommentPageVO();
+        firstCommentPage.setComments(Arrays.asList(firstRoot, firstReply, secondRoot, thirdRoot));
+        firstCommentPage.setResultCnt(4L);
+        firstCommentPage.setHasPrevious(true);
+        firstCommentPage.setNextBeforeCommentId(8L);
+        CommonCommentVO secondPostComment = new CommonCommentVO();
+        secondPostComment.setCommentId(20L);
+        CommonCommentPageVO secondCommentPage = new CommonCommentPageVO();
+        secondCommentPage.setComments(Collections.singletonList(secondPostComment));
+        secondCommentPage.setResultCnt(1L);
         CommonFileVO commentFile = new CommonFileVO();
         commentFile.setFileId(101L);
         CommonFileVO postFile = new CommonFileVO();
@@ -475,18 +505,12 @@ class NoticeBoardServiceImplTest {
         postFile.setOwnerId(7L);
         when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(Arrays.asList(firstPost, secondPost));
-        when(commonFileService.listFiles(1L, "NOTICE", 7L))
-            .thenReturn(Arrays.asList(postFile));
-        when(commonFileService.listFiles(1L, "NOTICE", 8L))
-            .thenReturn(Collections.emptyList());
-        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
-            .thenReturn(commentPage);
-        when(commonCommentService.listComments(1L, "NOTICE", 8L, 3, null))
-            .thenReturn(new CommonCommentPageVO());
-        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(4L);
-        when(commonCommentService.countComments(1L, "NOTICE", 8L)).thenReturn(0L);
-        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L))
-            .thenReturn(Arrays.asList(commentFile));
+        when(commonFileService.listFilesByOwnerIds(1L, "NOTICE", Arrays.asList(7L, 8L)))
+            .thenReturn(immutableMapOf(7L, Arrays.asList(postFile), 8L, Collections.<CommonFileVO>emptyList()));
+        when(commonCommentService.listCommentPagesByOwnerIds(1L, "NOTICE", Arrays.asList(7L, 8L), 3))
+            .thenReturn(immutableMapOf(7L, firstCommentPage, 8L, secondCommentPage));
+        when(commonFileService.listFilesByOwnerIds(1L, "NOTICE_COMMENT", Arrays.asList(8L, 9L, 10L, 11L, 20L)))
+            .thenReturn(Collections.singletonMap(10L, Arrays.asList(commentFile)));
 
         List<NoticeBoardPostVO> result = new NoticeBoardServiceImpl(
             noticeBoardDAO, commonFileService, commonCommentService)
@@ -496,20 +520,29 @@ class NoticeBoardServiceImplTest {
         assertThat(result.get(0).getAttachments()).hasSize(1);
         assertThat(result.get(0).getAttachments().get(0).getBoardFileId()).isEqualTo(201L);
         assertThat(result.get(0).getAttachmentCount()).isEqualTo(1);
-        assertThat(result.get(0).getComments()).containsExactly(comment);
+        assertThat(result.get(0).getComments()).containsExactly(firstRoot, firstReply, secondRoot, thirdRoot);
         assertThat(result.get(0).getCommentCount()).isEqualTo(4);
         assertThat(result.get(0).isHasPreviousComments()).isTrue();
-        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(9L);
-        assertThat(comment.getAttachments()).containsExactly(commentFile);
+        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(8L);
+        assertThat(firstRoot.getAttachments()).isEmpty();
+        assertThat(secondRoot.getAttachments()).containsExactly(commentFile);
         assertThat(result.get(1).getAttachments()).isEmpty();
         assertThat(result.get(1).getAttachmentCount()).isEqualTo(0);
-        assertThat(result.get(1).getComments()).isEmpty();
-        assertThat(result.get(1).getCommentCount()).isZero();
-        verify(commonCommentService).listComments(1L, "NOTICE", 7L, 3, null);
-        verify(commonCommentService).listComments(1L, "NOTICE", 8L, 3, null);
-        verify(commonFileService).listFiles(1L, "NOTICE", 7L);
-        verify(commonFileService).listFiles(1L, "NOTICE", 8L);
-        verify(commonFileService).listFiles(1L, "NOTICE_COMMENT", 10L);
+        assertThat(result.get(1).getComments()).containsExactly(secondPostComment);
+        assertThat(result.get(1).getCommentCount()).isEqualTo(1);
+        verify(commonCommentService).listCommentPagesByOwnerIds(1L, "NOTICE", Arrays.asList(7L, 8L), 3);
+        verify(commonCommentService, org.mockito.Mockito.never())
+            .listCommentsByOwnerIds(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.anyInt());
+        verify(commonCommentService, org.mockito.Mockito.never())
+            .countCommentsByOwnerIds(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
+        verify(commonFileService).listFilesByOwnerIds(1L, "NOTICE", Arrays.asList(7L, 8L));
+        verify(commonFileService).listFilesByOwnerIds(1L, "NOTICE_COMMENT", Arrays.asList(8L, 9L, 10L, 11L, 20L));
+        verify(commonFileService, org.mockito.Mockito.times(2))
+            .listFilesByOwnerIds(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test
@@ -525,15 +558,12 @@ class NoticeBoardServiceImplTest {
         CommonFileVO embeddedImage = new CommonFileVO();
         embeddedImage.setFileId(202L);
         embeddedImage.setFileUsageType("EMBEDDED");
-        CommonCommentPageVO commentPage = new CommonCommentPageVO();
-        commentPage.setComments(Collections.emptyList());
         when(noticeBoardDAO.selectNoticePostList(org.mockito.ArgumentMatchers.anyMap()))
             .thenReturn(Arrays.asList(post));
-        when(commonFileService.listFiles(1L, "NOTICE", 7L))
-            .thenReturn(Arrays.asList(attachment, embeddedImage));
-        when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null))
-            .thenReturn(commentPage);
-        when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(0L);
+        when(commonFileService.listFilesByOwnerIds(1L, "NOTICE", Arrays.asList(7L)))
+            .thenReturn(Collections.singletonMap(7L, Arrays.asList(attachment, embeddedImage)));
+        when(commonCommentService.listCommentPagesByOwnerIds(1L, "NOTICE", Arrays.asList(7L), 3))
+            .thenReturn(Collections.singletonMap(7L, new CommonCommentPageVO()));
 
         NoticeBoardPostVO result = new NoticeBoardServiceImpl(
             noticeBoardDAO, commonFileService, commonCommentService)
@@ -565,16 +595,16 @@ class NoticeBoardServiceImplTest {
         when(commonFileService.listFiles(1L, "NOTICE", 7L)).thenReturn(Collections.emptyList());
         when(commonCommentService.listComments(1L, "NOTICE", 7L, 3, null)).thenReturn(commentPage);
         when(commonCommentService.countComments(1L, "NOTICE", 7L)).thenReturn(2L);
-        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 10L)).thenReturn(Arrays.asList(firstFile));
-        when(commonFileService.listFiles(1L, "NOTICE_COMMENT", 11L)).thenReturn(Collections.emptyList());
+        when(commonFileService.listFilesByOwnerIds(1L, "NOTICE_COMMENT", Arrays.asList(10L, 11L)))
+            .thenReturn(immutableMapOf(10L, Arrays.asList(firstFile), 11L,
+                Collections.<CommonFileVO>emptyList()));
 
         NoticeBoardPostVO result = new NoticeBoardServiceImpl(
                 noticeBoardDAO, commonFileService, commonCommentService).getPost(1L, 7L);
 
         assertThat(result.getComments().get(0).getAttachments()).containsExactly(firstFile);
         assertThat(result.getComments().get(1).getAttachments()).isEmpty();
-        verify(commonFileService).listFiles(1L, "NOTICE_COMMENT", 10L);
-        verify(commonFileService).listFiles(1L, "NOTICE_COMMENT", 11L);
+        verify(commonFileService).listFilesByOwnerIds(1L, "NOTICE_COMMENT", Arrays.asList(10L, 11L));
     }
 
     @Test
@@ -748,5 +778,50 @@ class NoticeBoardServiceImplTest {
         verify(imageStorageService).completeOwnerSave(eq(1L), eq("NOTICE"), eq(7L),
                 eq(Collections.emptyList()), eq(Collections.emptySet()));
         verify(noticeBoardDAO).softDeleteNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void createPostRejectsCategoryRejectedByTenantCategoryValidator() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommunityCategoryValidator categoryValidator = mock(CommunityCategoryValidator.class);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid category"))
+            .when(categoryValidator).validate(71L, "NOTICE", "DISABLED");
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContents("<p>내용</p>");
+        payload.setNoticeGubunCode("DISABLED");
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, mock(CommonFileService.class), mock(CommonCommentService.class),
+                null, categoryValidator).createPost(71L, payload));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .insertNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void updatePostRejectsCategoryRejectedByTenantCategoryValidator() throws Exception {
+        NoticeBoardDAO noticeBoardDAO = mock(NoticeBoardDAO.class);
+        CommunityCategoryValidator categoryValidator = mock(CommunityCategoryValidator.class);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid category"))
+            .when(categoryValidator).validate(71L, "NOTICE", "DISABLED");
+        NoticeBoardPostSaveRequestVO payload = new NoticeBoardPostSaveRequestVO();
+        payload.setTitle("공지");
+        payload.setContents("<p>내용</p>");
+        payload.setNoticeGubunCode("DISABLED");
+
+        assertThrows(ResponseStatusException.class, () -> new NoticeBoardServiceImpl(
+                noticeBoardDAO, mock(CommonFileService.class), mock(CommonCommentService.class),
+                null, categoryValidator).updatePost(71L, 13L, payload));
+
+        verify(noticeBoardDAO, org.mockito.Mockito.never())
+            .updateNoticePost(org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    private static <K, V> Map<K, V> immutableMapOf(K firstKey, V firstValue, K secondKey, V secondValue) {
+        Map<K, V> map = new HashMap<>();
+        map.put(firstKey, firstValue);
+        map.put(secondKey, secondValue);
+        return Collections.unmodifiableMap(map);
     }
 }

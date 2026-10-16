@@ -1,0 +1,49 @@
+<h2>자료실 상세 — 피드 상세 패턴</h2>
+<p class="subtitle">요청하신 공지 상세/업무 상세의 공통 구조를 반영했습니다: 상단 영역 → 일반 텍스트 본문 → 공통 첨부파일 목록.</p>
+
+<div class="mockup" style="max-width:1000px;margin:auto">
+  <div class="mockup-header">제목을 눌렀을 때 · 우측 전체 높이 상세 오버레이</div>
+  <div style="position:relative;height:610px;background:#e8e8ea;overflow:hidden;padding:20px">
+    <div style="height:100%;background:#fff;border:1px solid #d1d1d6;border-radius:8px;padding:18px;opacity:.5">
+      <div style="height:40px;background:#f1f1f4;border-radius:5px;margin-bottom:12px"></div>
+      <div style="height:46px;background:#f1f1f4;border-radius:5px;margin-bottom:8px"></div>
+      <div style="height:46px;background:#f1f1f4;border-radius:5px;margin-bottom:8px"></div>
+      <div style="height:46px;background:#f1f1f4;border-radius:5px"></div>
+    </div>
+    <div style="position:absolute;right:0;top:0;width:min(78%,760px);height:100%;background:#fff;box-shadow:-8px 0 24px #0002;display:flex;flex-direction:column">
+      <div style="padding:14px 18px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between">
+        <b style="font-size:16px">자료 상세</b><span style="font-size:22px;color:#666">×</span>
+      </div>
+      <div style="padding:18px;overflow:auto;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:10px;min-height:36px">
+          <div style="width:34px;height:34px;border-radius:50%;background:#dbeafe;color:#1759a8;display:grid;place-items:center;font-weight:700">홍</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:650">홍길동</div>
+            <div style="font-size:12px;color:#777">2026.10.16 · 조회 12</div>
+          </div>
+          <span style="border-radius:7px;background:#e8f1ff;color:#1759a8;padding:6px 10px;font-size:12px;font-weight:650">업무양식</span>
+          <span style="border:1px solid #ccc;border-radius:6px;padding:5px 8px;font-size:12px;white-space:nowrap">⋮ 더보기</span>
+        </div>
+        <h3 style="margin:0;font-size:21px">출장 신청서 최신 양식</h3>
+        <div style="height:1px;background:#e3e3e6"></div>
+        <div style="min-height:130px;white-space:pre-wrap;line-height:1.75;overflow-wrap:anywhere">출장 전 결재를 위해 사용하는 신청서입니다.
+
+작성 후 결재선에 따라 제출해 주세요. 본문은 에디터가 아닌 일반 텍스트로 표시됩니다.</div>
+        <div style="height:1px;background:#e3e3e6"></div>
+        <div style="font-weight:700">첨부파일 <span style="font-weight:400;color:#777;font-size:13px">(2)</span></div>
+        <div style="border:1px solid #dfe2e7;border-radius:8px;padding:11px 12px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">▤</span>
+          <span style="flex:1;min-width:0">출장신청서.xlsx <small style="color:#777"> · 42 KB</small></span>
+          <span style="color:#1769aa;font-size:13px">다운로드</span>
+        </div>
+        <div style="border:1px solid #dfe2e7;border-radius:8px;padding:11px 12px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">▤</span>
+          <span style="flex:1;min-width:0">출장비 작성 안내.pdf <small style="color:#777"> · 218 KB</small></span>
+          <span style="color:#1769aa;font-size:13px">다운로드</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="max-width:1000px;margin:1rem auto 0;color:var(--text-secondary);font-size:.85rem">목록은 기안양식관리처럼 PageHeader → 통합검색/PageSearchArea → F1-Grid로 구성하고, 상세검색은 분류 조건을 제공합니다. 수정/삭제는 분류 칩 옆 더보기 메뉴에서 수행합니다.</p>

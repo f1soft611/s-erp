@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +54,7 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPostSearchVO;
 import egovframework.let.groupware.community.notice.domain.repository.NoticeBoardDAO;
 import egovframework.let.groupware.community.notice.service.NoticeBoardService;
+import egovframework.let.groupware.community.common.CommunityCategoryValidator;
 import egovframework.let.common.dto.ListResult;
 import egovframework.let.common.pagination.EgovPaginationSupport;
 
@@ -67,19 +69,27 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     private final CommonCommentService commonCommentService;
     private final EmbeddedImageStorageService imageStorageService;
     private final EmbeddedImageDocumentProcessor imageDocumentProcessor;
+    private final CommunityCategoryValidator categoryValidator;
 
     @Resource(name = "propertiesService")
     private EgovPropertyService propertyService;
 
     @Autowired
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
-            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService) {
+            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService,
+            CommunityCategoryValidator categoryValidator) {
         this.noticeBoardDAO = noticeBoardDAO;
         this.commonFileService = commonFileService;
         this.commonCommentService = commonCommentService;
         this.imageStorageService = imageStorageService;
+        this.categoryValidator = categoryValidator;
         this.imageDocumentProcessor = imageStorageService == null ? null
                 : new EmbeddedImageDocumentProcessor(imageStorageService, new RichTextDocumentSanitizer());
+    }
+
+    public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
+            CommonCommentService commonCommentService, EmbeddedImageStorageService imageStorageService) {
+        this(noticeBoardDAO, commonFileService, commonCommentService, imageStorageService, null);
     }
 
     public NoticeBoardServiceImpl(NoticeBoardDAO noticeBoardDAO, CommonFileService commonFileService,
@@ -112,8 +122,50 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (posts == null) {
             posts = new ArrayList<>();
         }
+        List<Long> postIds = new ArrayList<>();
         for (NoticeBoardPostVO post : posts) {
-            hydratePost(search.getTenantId(), post, post.getPostId());
+            if (post != null && post.getPostId() != null) {
+                postIds.add(post.getPostId());
+            }
+        }
+        if (postIds.isEmpty()) {
+            return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
+        }
+        Map<Long, List<CommonFileVO>> filesByPostId = commonFileService.listFilesByOwnerIds(
+                search.getTenantId(), BOARD_TYPE_NOTICE, postIds);
+        Map<Long, CommonCommentPageVO> commentPagesByPostId = commonCommentService.listCommentPagesByOwnerIds(
+                search.getTenantId(), BOARD_TYPE_NOTICE, postIds, 3);
+        Set<Long> commentIds = new LinkedHashSet<>();
+        for (CommonCommentPageVO commentPage : commentPagesByPostId.values()) {
+            if (commentPage == null || commentPage.getComments() == null) {
+                continue;
+            }
+            for (CommonCommentVO comment : commentPage.getComments()) {
+                if (comment != null && comment.getCommentId() != null
+                        && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    commentIds.add(comment.getCommentId());
+                }
+            }
+        }
+        Map<Long, List<CommonFileVO>> commentFilesById = commentIds.isEmpty()
+            ? Collections.emptyMap()
+            : commonFileService.listFilesByOwnerIds(
+                search.getTenantId(), "NOTICE_COMMENT", new ArrayList<>(commentIds));
+        for (NoticeBoardPostVO post : posts) {
+            if (post == null) {
+                continue;
+            }
+            CommonCommentPageVO commentPage = commentPagesByPostId.get(post.getPostId());
+            hydratePost(
+                    search.getTenantId(),
+                    post,
+                    post.getPostId(),
+                    filesByPostId.getOrDefault(post.getPostId(), Collections.emptyList()),
+                    commentPage == null ? Collections.emptyList() : commentPage.getComments(),
+                    commentPage == null ? 0L : commentPage.getResultCnt(),
+                    commentPage != null && commentPage.isHasPrevious(),
+                    commentPage == null ? null : commentPage.getNextBeforeCommentId(),
+                    commentFilesById);
         }
         return new ListResult<>(posts, totalCount == null ? 0L : totalCount);
     }
@@ -146,6 +198,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO post = noticeBoardDAO.selectNoticePostById(params);
         if (post == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -161,6 +214,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO post = noticeBoardDAO.selectNoticePostById(params);
         if (post == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -177,6 +231,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> viewParams = new HashMap<>();
         viewParams.put("tenantId", tenantId);
         viewParams.put("postId", postId);
+        viewParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         viewParams.put("loginId", loginId);
         Long viewHistoryId = noticeBoardDAO.insertNoticePostViewHistory(viewParams);
         if (viewHistoryId != null) {
@@ -189,7 +244,22 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
     }
 
     private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId) throws Exception {
-        List<CommonFileVO> commonFiles = commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId);
+        CommonCommentPageVO commentPage = commonCommentService.listComments(tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
+        List<CommonCommentVO> comments =
+            commentPage == null ? Collections.emptyList() : commentPage.getComments();
+        hydratePost(tenantId, post, postId,
+            commonFileService.listFiles(tenantId, BOARD_TYPE_NOTICE, postId),
+            comments,
+            commentPage == null ? 0L : commentPage.getResultCnt(),
+            commentPage != null && commentPage.isHasPrevious(),
+            commentPage == null ? null : commentPage.getNextBeforeCommentId(),
+            listCommentFiles(tenantId, comments));
+    }
+
+    private void hydratePost(Long tenantId, NoticeBoardPostVO post, Long postId,
+            List<CommonFileVO> commonFiles, List<CommonCommentVO> comments, long commentCount,
+            boolean hasPreviousComments, Long nextBeforeCommentId,
+            Map<Long, List<CommonFileVO>> commentFilesById) throws Exception {
         List<NoticeBoardFileVO> files = new ArrayList<>();
         List<NoticeBoardFileVO> embeddedFiles = new ArrayList<>();
         List<CommonFileVO> embeddedCommonFiles = new ArrayList<CommonFileVO>();
@@ -215,24 +285,38 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         post.setAttachments(files);
         post.setAttachmentCount(files.size());
 
-        CommonCommentPageVO commentPage = commonCommentService.listComments(
-            tenantId, BOARD_TYPE_NOTICE, postId, 3, null);
-        List<CommonCommentVO> comments = commentPage == null || commentPage.getComments() == null
-            ? new ArrayList<>() : commentPage.getComments();
-        for (CommonCommentVO comment : comments) {
-            if (comment.getCommentId() == null) {
+        List<CommonCommentVO> hydratedComments = comments == null ? new ArrayList<>() : comments;
+        for (CommonCommentVO comment : hydratedComments) {
+            if (comment == null) {
+                continue;
+            }
+            if (comment.getCommentId() == null || "Y".equalsIgnoreCase(comment.getDeletedYn())) {
                 comment.setAttachments(new ArrayList<>());
                 continue;
             }
-            List<CommonFileVO> commentFiles = commonFileService.listFiles(
-                tenantId, "NOTICE_COMMENT", comment.getCommentId());
+            List<CommonFileVO> commentFiles = commentFilesById.getOrDefault(comment.getCommentId(), Collections.emptyList());
             comment.setAttachments(commentFiles == null ? new ArrayList<>() : commentFiles);
         }
-        post.setComments(comments);
-        post.setHasPreviousComments(commentPage != null && commentPage.isHasPrevious());
-        post.setNextBeforeCommentId(commentPage == null ? null : commentPage.getNextBeforeCommentId());
-        post.setCommentCount(Math.toIntExact(
-            commonCommentService.countComments(tenantId, BOARD_TYPE_NOTICE, postId)));
+        post.setComments(hydratedComments);
+        post.setHasPreviousComments(hasPreviousComments);
+        post.setNextBeforeCommentId(nextBeforeCommentId);
+        post.setCommentCount(Math.toIntExact(commentCount));
+    }
+
+    private Map<Long, List<CommonFileVO>> listCommentFiles(Long tenantId, List<CommonCommentVO> comments) throws Exception {
+        Set<Long> commentIds = new LinkedHashSet<>();
+        if (comments != null) {
+            for (CommonCommentVO comment : comments) {
+                if (comment != null && comment.getCommentId() != null
+                        && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                    commentIds.add(comment.getCommentId());
+                }
+            }
+        }
+        if (commentIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return commonFileService.listFilesByOwnerIds(tenantId, "NOTICE_COMMENT", new ArrayList<>(commentIds));
     }
 
     @Override
@@ -246,6 +330,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         public NoticeBoardPostVO createPost(Long tenantId, NoticeBoardPostSaveRequestVO payload,
             String actorId, String actorName) throws Exception {
         validateCreatePayload(payload);
+        validateCategory(tenantId, payload.getNoticeGubunCode());
         requireImageStorageIfNeeded(payload);
         String contentsHtml = payload.getEffectiveContentsHtml();
         String contentsText = payload.getEffectiveContentsText();
@@ -306,11 +391,13 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (payload == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "수정 요청이 비어 있습니다.");
         }
+        validateCategory(tenantId, payload.getNoticeGubunCode());
         requireImageStorageIfNeeded(payload);
 
         HashMap<String, Object> existingParams = new HashMap<>();
         existingParams.put("tenantId", tenantId);
         existingParams.put("postId", postId);
+        existingParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
@@ -321,6 +408,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("title", payload.getTitle() == null ? null : payload.getTitle().trim());
         params.put("contents", contentsHtml);
         params.put("contentsHtml", contentsHtml);
@@ -600,6 +688,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> existingParams = new HashMap<>();
         existingParams.put("tenantId", tenantId);
         existingParams.put("postId", postId);
+        existingParams.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(existingParams) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
         }
@@ -607,6 +696,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         params.put("isPinned", StringUtils.hasText(isPinned) ? isPinned.trim().toUpperCase() : "N");
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
@@ -625,6 +715,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         NoticeBoardPostVO existing = noticeBoardDAO.selectNoticePostById(params);
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다.");
@@ -732,6 +823,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         HashMap<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", tenantId);
         params.put("postId", postId);
+        params.put("boardTypeCode", BOARD_TYPE_NOTICE);
         if (noticeBoardDAO.selectNoticePostById(params) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "본문 이미지를 찾을 수 없습니다.");
         }
@@ -804,6 +896,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         if (payload == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "요청 본문이 비어 있습니다.");
         }
+
         if (!StringUtils.hasText(payload.getTitle())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 필수입니다.");
         }
@@ -813,6 +906,12 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         }
         if (!StringUtils.hasText(payload.getNoticeGubunCode())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "공지 구분은 필수입니다.");
+        }
+    }
+
+    private void validateCategory(Long tenantId, String categoryCode) throws Exception {
+        if (categoryValidator != null) {
+            categoryValidator.validate(tenantId, BOARD_TYPE_NOTICE, categoryCode);
         }
     }
 

@@ -15,8 +15,20 @@ public class CommonCommentDAO extends EgovAbstractMapper {
         return selectList("CommonCommentDAO.selectCommonCommentList", params);
     }
 
+    public List<CommonCommentVO> selectCommonCommentPageByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectCommonCommentPageByOwnerIds", params);
+    }
+
+    public List<Map<String, Object>> selectCommonCommentCountsByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectCommonCommentCountsByOwnerIds", params);
+    }
+
     public List<CommonCommentVO> selectApprovalSystemEvents(Map<String, Object> params) throws Exception {
         return selectList("CommonCommentDAO.selectApprovalSystemEvents", params);
+    }
+
+    public List<CommonCommentVO> selectApprovalSystemEventsByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalSystemEventsByOwnerIds", params);
     }
 
     public List<CommonCommentVO> selectCommonCommentPage(Map<String, Object> params) throws Exception {
@@ -29,6 +41,31 @@ public class CommonCommentDAO extends EgovAbstractMapper {
 
     public Long countApprovalUserComments(Map<String, Object> params) throws Exception {
         return (Long) selectOne("CommonCommentDAO.countApprovalUserComments", params);
+    }
+
+    public List<CommonCommentVO> selectApprovalUserCommentPagesByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentPagesByOwnerIds", params);
+    }
+
+    public List<Map<String, Object>> selectApprovalUserCommentCountsByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentCountsByOwnerIds", params);
+    }
+
+    public List<CommonCommentVO> selectApprovalCommentStreamPagesByOwnerIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds", params);
+    }
+
+    public List<CommonCommentVO> selectApprovalUserCommentThreadsByRootIds(Map<String, Object> params) throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds", params);
+    }
+
+    public List<Map<String, Object>> selectApprovalCommentStreamCountsByOwnerIds(Map<String, Object> params)
+            throws Exception {
+        return selectList("CommonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds", params);
+    }
+
+    public CommonCommentVO selectApprovalCommentStreamCursor(Map<String, Object> params) throws Exception {
+        return (CommonCommentVO) selectOne("CommonCommentDAO.selectApprovalCommentStreamCursor", params);
     }
 
     public Long countCommonComments(Map<String, Object> params) throws Exception {

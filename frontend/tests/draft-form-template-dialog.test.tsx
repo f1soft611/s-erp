@@ -165,18 +165,22 @@ describe('DraftFormTemplateDialog', () => {
     expect(apiMocks.apiPut).not.toHaveBeenCalled();
   });
 
-  it('scrolls the editor content from the top of its frame and keeps inner padding', async () => {
+  it('lets the dialog body own vertical scrolling and removes editor frame separators', async () => {
     renderDialog();
 
     const editor = await screen.findByRole('textbox', { name: '본문' });
     const frame = screen.getByTestId('draft-form-template-editor');
 
     expect(editor).toHaveClass('ProseMirror');
-    expect(frame).toHaveStyle({ overflow: 'hidden' });
+    expect(frame).toHaveStyle({ overflow: 'visible' });
+    expect(getComputedStyle(frame).borderTopStyle).not.toBe('solid');
+    expect(getComputedStyle(frame).borderBottomStyle).not.toBe('solid');
     expect(editor).toHaveStyle({
-      overflowX: 'auto',
-      overflowY: 'auto',
+      overflowY: 'visible',
       padding: '16px',
+    });
+    expect(frame.closest('.MuiDialogContent-root')).toHaveStyle({
+      overflowY: 'auto',
     });
   });
 

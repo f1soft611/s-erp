@@ -211,6 +211,16 @@ describe('CommonDialog', () => {
     });
 
     rerender(
+      <CommonDialog open title="작은 모달" onClose={vi.fn()} size="xs">
+        <p>본문</p>
+      </CommonDialog>,
+    );
+
+    expect(screen.getByRole('dialog')).toHaveStyle({
+      maxWidth: '480px',
+    });
+
+    rerender(
       <CommonDialog
         open
         title="큰 채움 모달"
@@ -223,7 +233,7 @@ describe('CommonDialog', () => {
     );
 
     expect(screen.getByRole('dialog')).toHaveStyle({
-      maxWidth: '960px',
+      maxWidth: '990px',
       height: '90vh',
       maxHeight: '880px',
     });

@@ -41,6 +41,8 @@ import {
   getDocumentApprovalSummary,
   listDocumentApprovals,
   processDocumentApprovalAction,
+  cancelDocumentSubmission,
+  cancelDocumentApproval,
   deleteDocumentDraftEmbeddedImage,
   isDefiniteAttachmentUploadFailure,
   saveDocumentDraft,
@@ -181,6 +183,43 @@ describe('document approval service', () => {
     );
   });
 
+  it('validates drafter and approver cancellation responses', async () => {
+    api.post
+      .mockResolvedValueOnce({
+        item: { electronicApprovalId: 41, documentStatus: 'DRAFT' },
+      })
+      .mockResolvedValueOnce({
+        item: { electronicApprovalId: 41, documentStatus: 'IN_PROGRESS' },
+      });
+
+    await expect(cancelDocumentSubmission(41)).resolves.toMatchObject({
+      electronicApprovalId: 41,
+      documentStatus: 'DRAFT',
+    });
+    await expect(cancelDocumentApproval(41)).resolves.toMatchObject({
+      electronicApprovalId: 41,
+      documentStatus: 'IN_PROGRESS',
+    });
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/groupware/approvals/41/submission-cancellation',
+      undefined,
+    );
+    expect(api.post).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/groupware/approvals/41/approval-cancellation',
+      undefined,
+    );
+
+    await expect(cancelDocumentSubmission(0)).rejects.toThrow('문서 ID가 올바르지 않습니다.');
+    api.post.mockResolvedValueOnce({
+      item: { electronicApprovalId: 41, documentStatus: 'PENDING' },
+    });
+    await expect(cancelDocumentSubmission(41)).rejects.toThrow(
+      '상신 취소 응답을 확인할 수 없습니다.',
+    );
+  });
+
   it('requires an explicit drafter flag when reading document details', async () => {
     api.get.mockResolvedValue({
       item: {
@@ -212,6 +251,46 @@ describe('document approval service', () => {
     await expect(getDocumentApprovalDetail(41)).rejects.toThrow(
       '전자결재 상세 응답을 확인할 수 없습니다.',
     );
+  });
+
+  it('requests and validates the detailed document feed payload only when requested', async () => {
+    const feedItem = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '피드 문서',
+      drafterName: '홍길동',
+      summary: '요약',
+      viewCount: 2,
+      isDrafter: false,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc"}',
+      contentsHtml: '<p>본문</p>',
+      contentsText: '본문',
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+      comments: [],
+      commentCount: 0,
+      hasPreviousComments: false,
+      nextBeforeCommentId: null,
+    };
+    api.get.mockResolvedValue({ resultList: [feedItem] });
+
+    await expect(
+      listDocumentApprovals('ALL', undefined, undefined, true),
+    ).resolves.toEqual([feedItem]);
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/documents?scope=ALL&includeDetails=true',
+    );
+
+    api.get.mockResolvedValueOnce({
+      resultList: [{ ...feedItem, comments: undefined }],
+    });
+    await expect(
+      listDocumentApprovals('ALL', undefined, undefined, true),
+    ).rejects.toThrow('전자결재 문서 피드 응답을 확인할 수 없습니다.');
   });
 
   it('requires a non-negative safe integer view count in document details', async () => {
@@ -339,13 +418,22 @@ describe('document approval service', () => {
       writerId: 'writer-1',
       writerName: '홍길동',
     };
+    const systemEvent = {
+      commentId: 32,
+      ownerId: 41,
+      commentType: 'SYSTEM',
+      eventType: 'SUBMITTED',
+      content: '문서가 결재신청되었습니다.',
+      writerName: '시스템',
+      createdAt: '2026-10-12T09:00:00Z',
+    };
     api.get
       .mockResolvedValueOnce({
-        resultList: [comment],
         comments: [comment],
+        systemEvents: [systemEvent],
         hasPrevious: false,
         nextBeforeCommentId: null,
-        resultCnt: 1,
+        resultCnt: 2,
       })
       .mockResolvedValueOnce({
         resultList: [{ fileId: 51, fileName: 'evidence.png', fileSize: 10 }],
@@ -360,8 +448,9 @@ describe('document approval service', () => {
 
     await expect(listApprovalComments(41, { limit: 10 })).resolves.toMatchObject({
       comments: [comment],
+      systemEvents: [systemEvent],
       hasPrevious: false,
-      resultCnt: 1,
+      resultCnt: 2,
     });
     await expect(createApprovalComment(41, '의견', 30)).resolves.toEqual(comment);
     await expect(updateApprovalComment(41, 31, '수정 의견')).resolves.toEqual(comment);
@@ -369,6 +458,16 @@ describe('document approval service', () => {
     await expect(listApprovalCommentAttachments(41, 31)).resolves.toEqual([
       { fileId: 51, fileName: 'evidence.png', fileSize: 10 },
     ]);
+    api.get.mockResolvedValueOnce({
+      comments: [comment],
+      systemEvents: [{ ...systemEvent, commentId: undefined }],
+      hasPrevious: false,
+      nextBeforeCommentId: null,
+      resultCnt: 2,
+    });
+    await expect(listApprovalComments(41)).rejects.toThrow(
+      '전자결재 댓글 응답을 확인할 수 없습니다.',
+    );
     await expect(uploadApprovalCommentAttachment(41, 31, file)).resolves.toEqual({
       fileId: 51,
       fileName: 'evidence.png',
@@ -430,6 +529,7 @@ describe('document approval service', () => {
     api.get.mockResolvedValueOnce({
       resultList: [deletedComment],
       comments: [deletedComment],
+      systemEvents: [],
       hasPrevious: true,
       nextBeforeCommentId: 52,
       resultCnt: 22,

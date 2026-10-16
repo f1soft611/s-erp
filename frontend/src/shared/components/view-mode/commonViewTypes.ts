@@ -1,4 +1,5 @@
 export type CommonViewMode = 'feed' | 'list';
+export type CommonViewCategoryColor = 'primary' | 'info' | 'warning' | 'secondary';
 
 export type CommonViewItem = {
   id: string | number;
@@ -7,8 +8,11 @@ export type CommonViewItem = {
   dateLabel: string;
   isPinned?: boolean;
   categoryLabel?: string;
+  categoryColor?: CommonViewCategoryColor;
+  badgeBorderRadius?: string;
   statusLabel?: string;
   statusColor?: 'default' | 'error' | 'info' | 'success' | 'warning';
+  statusVariant?: 'filled' | 'outlined';
   metaLabel?: string;
   summary?: string;
 };

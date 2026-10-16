@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
@@ -22,6 +23,7 @@ export type AttachmentListProps = {
   showActions?: boolean;
   onDownload?: (id: string) => void;
   onRemove?: (id: string) => void;
+  statusBadge?: ReactNode;
   testId?: string;
 };
 
@@ -32,6 +34,7 @@ export function AttachmentList({
   showActions = true,
   onDownload,
   onRemove,
+  statusBadge,
   testId = 'notice-attachment-list',
 }: AttachmentListProps) {
   if (files.length === 0) {
@@ -118,6 +121,8 @@ export function AttachmentList({
                 {file.name}
               </Typography>
             </Box>
+
+            {statusBadge}
 
             {showActions && (
               <IconButton

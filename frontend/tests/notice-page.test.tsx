@@ -7,6 +7,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { useState } from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import { createAppTheme } from '../src/theme/theme';
+import { getNoticeCategoryPresentation } from '../src/pages/groupware/community/notice/data/noticeCategoryPresentation';
 import { normalizeNoticeEmbeddedImageSources } from '../src/pages/groupware/community/notice/components/NoticeFeedList';
 import { describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
@@ -79,6 +82,67 @@ function NoticeDetailLoadingHarness() {
 }
 
 describe('Community notice page', () => {
+  it.each([false, true])(
+    'uses distinct category colors without changing labels or pin state for isDark=%s',
+    (isDark) => {
+      const items = [
+        {
+          ...noticeFeed[0],
+          id: 201,
+          title: '공지 A',
+          state: '운영',
+          noticeGubunCode: 'NOTICE_A',
+          isPinned: 'Y',
+        },
+        {
+          ...noticeFeed[1],
+          id: 202,
+          title: '공지 B',
+          state: '필독',
+          noticeGubunCode: 'HR',
+          isPinned: 'N',
+        },
+      ];
+
+      const theme = createAppTheme(isDark ? 'dark' : 'light');
+      render(
+        <ThemeProvider theme={theme}>
+          <NoticeFeedList items={items} isDark={isDark} />
+        </ThemeProvider>,
+      );
+
+      const firstCategory = screen.getByText('운영').closest('.MuiChip-root');
+      const secondCategory = screen.getByText('필독').closest('.MuiChip-root');
+
+      expect(firstCategory).toBeInTheDocument();
+      expect(secondCategory).toBeInTheDocument();
+      expect(getComputedStyle(firstCategory!).backgroundColor).not.toBe(
+        getComputedStyle(secondCategory!).backgroundColor,
+      );
+      for (const [index, category] of [firstCategory, secondCategory].entries()) {
+        const { backgroundColor } = getNoticeCategoryPresentation(
+          items[index].noticeGubunCode,
+          isDark,
+        );
+        expect(category).toHaveStyle({
+          backgroundColor,
+          color:
+            items[index].state === '필독'
+              ? '#ffffff'
+              : theme.palette.getContrastText(backgroundColor),
+          height: '28px',
+          borderRadius: '8px',
+        });
+      }
+      expect(
+        screen.getByRole('button', { name: '상단 고정 해제 공지 A' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: '상단 고정 공지 B' }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('shows centered shared loading while selected notice detail is pending', async () => {
     let resolveDetail!: (detail: {
       postId: number;

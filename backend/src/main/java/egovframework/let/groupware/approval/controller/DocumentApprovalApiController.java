@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,15 +25,17 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonFileVO;
-import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -88,6 +91,26 @@ public class DocumentApprovalApiController {
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
+    @Operation(summary = "전자결재 결재신청 취소", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/submission-cancellation")
+    public ResultVO cancelSubmission(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.cancelSubmission(user, electronicApprovalId));
+        resultMap.put("message", "결재신청이 취소되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 승인 취소", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/approval-cancellation")
+    public ResultVO cancelApproval(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", documentApprovalService.cancelApproval(user, electronicApprovalId));
+        resultMap.put("message", "승인이 취소되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
     @Operation(summary = "전자결재 결재 처리", security = @SecurityRequirement(name = "Authorization"))
     @PostMapping("/{electronicApprovalId}/actions")
     public ResultVO processAction(@PathVariable Long electronicApprovalId,
@@ -111,12 +134,22 @@ public class DocumentApprovalApiController {
     @Operation(summary = "내 관련 전자결재 문서 목록", security = @SecurityRequirement(name = "Authorization"))
     @GetMapping("/documents")
     public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
-            @RequestParam(required = false) String documentType,
             @RequestParam(required = false) Long electronicApprovalId,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
+            @ModelAttribute DocumentApprovalListQueryVO query,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList",
-                documentApprovalService.listDocuments(user, scope, documentType, electronicApprovalId));
+        if (includeDetails) {
+            resultMap.put("resultList", documentApprovalService.listFeedDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId));
+        } else if (query.isPageRequest()) {
+            DocumentApprovalListPageVO page = documentApprovalService.searchDocuments(user, scope, query);
+            resultMap.put("resultList", page.getResultList());
+            resultMap.put("totalRowCount", page.getTotalRowCount());
+        } else {
+            resultMap.put("resultList", documentApprovalService.listDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId));
+        }
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -143,12 +176,13 @@ public class DocumentApprovalApiController {
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Long beforeCommentId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
-        CommonCommentPageVO page = documentApprovalService.listApprovalComments(
+        DocumentApprovalCommentPageVO page = documentApprovalService.listApprovalComments(
                 user, electronicApprovalId, limit, beforeCommentId);
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("resultList", page.getComments());
         resultMap.put("comments", page.getComments());
         resultMap.put("resultCnt", page.getResultCnt());
+        resultMap.put("systemEvents", page.getSystemEvents());
         resultMap.put("hasPrevious", page.isHasPrevious());
         resultMap.put("nextBeforeCommentId", page.getNextBeforeCommentId());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);

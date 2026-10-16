@@ -210,12 +210,18 @@ const GridCellInner = <T extends object>({
       ) {
         return;
       }
-      const hasOpenEditorPopup = Array.from(
-        document.querySelectorAll(
-          '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root, .MuiAutocomplete-popper',
-        ),
-      ).some((popup) => !popup.contains(event.currentTarget));
-      if (hasOpenEditorPopup) return;
+      const currentGrid = event.currentTarget.closest('[role="grid"]');
+      const focusMovesIntoEditorPopup =
+        nextTarget instanceof Node &&
+        Array.from(
+          document.querySelectorAll(
+            '.MuiPopover-root, .MuiMenu-paper, .MuiDialog-root, .MuiModal-root, .MuiAutocomplete-popper',
+          ),
+        ).some(
+          (popup) =>
+            popup.contains(nextTarget) && !popup.contains(currentGrid),
+        );
+      if (focusMovesIntoEditorPopup) return;
       onBlur?.();
     },
     [onBlur],

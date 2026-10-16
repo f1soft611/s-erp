@@ -17,6 +17,7 @@ import {
   isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
 import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
+import { getApprovalSystemEventPresentation } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('shared feed components', () => {
   it('centers detail loading in the shared panel content area', () => {
@@ -291,6 +292,68 @@ describe('shared feed components', () => {
     expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
+
+  it('preserves multiline system reasons as plain text', () => {
+    const content = '반려 하였습니다.\n사유: 첫 번째 줄\n두 번째 줄\n\n<b>마지막 줄</b>';
+    render(<CommentThread comments={[{
+      id: 'system-rejected', author: '시스템', time: '방금',
+      content, isSystemEvent: true,
+    }]} showComposer={false} />);
+    const message = screen.getByText((_, element) => element?.textContent === content);
+    expect(message.textContent).toBe(content);
+    expect(message).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' });
+    expect(message.querySelector('b')).toBeNull();
+  });
+
+  it.each([
+    ['임시저장', 'default', 'outlined'],
+    ['결재신청', 'info', 'filled'],
+    ['결재신청 취소', 'error', 'outlined'],
+    ['결재 승인 취소', 'error', 'outlined'],
+    ['반려', 'error', 'filled'],
+    ['승인', 'success', 'filled'],
+    ['완료', 'success', 'filled'],
+    ['보완요청', 'warning', 'filled'],
+  ] as const)('replaces the system icon with the %s badge without mutation controls', (label, color, variant) => {
+    render(
+      <CommentThread
+        comments={[{
+          id: 'system-event',
+          author: '시스템',
+          time: '2026-10-16 10:00',
+          content: '시스템 처리 내용',
+          isSystemEvent: true,
+          systemEventBadge: { label, color, variant },
+        }]}
+        showComposer={false}
+      />,
+    );
+
+    const badge = screen.getByTestId('system-event-badge');
+    expect(badge).toHaveTextContent(label);
+    expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
+    expect(badge).toHaveClass(`MuiChip-${variant}`);
+    expect(badge).toHaveStyle({ borderRadius: '8px' });
+    expect(screen.queryByRole('img', { name: '시스템 메시지' })).not.toBeInTheDocument();
+    expect(screen.getByText('시스템 처리 내용')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
+  });
+
+  it.each(['SUBMISSION_CANCELED', 'APPROVAL_CANCELED'])(
+    'renders both the border and text red for %s',
+    (eventType) => {
+      render(<CommentThread comments={[{
+        id: eventType, author: '시스템', time: '방금', content: '취소 처리',
+        isSystemEvent: true,
+        systemEventBadge: getApprovalSystemEventPresentation(eventType),
+      }]} showComposer={false} />);
+      const badge = screen.getByTestId('system-event-badge');
+      expect(badge).toHaveClass('MuiChip-colorError', 'MuiChip-outlined');
+      expect(badge).toHaveStyle({ borderColor: 'rgba(211, 47, 47, 0.7)', borderRadius: '8px' });
+      expect(badge).toHaveStyle({ color: '#d32f2f' });
+    },
+  );
 
   it('renders a file-type icon for spreadsheet attachments', () => {
     render(
