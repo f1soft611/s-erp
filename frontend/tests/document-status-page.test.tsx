@@ -160,19 +160,37 @@ describe('document status page', () => {
       'updatedAt',
     ]);
     expect(fields.map((field) => field.field)).toEqual([
-      'eabusNo',
-      'title',
-      'documentType',
-      'documentStatus',
       'submittedAt',
+      'documentStatus',
+      'documentType',
+      'title',
       'drafterName',
       'drafterDepartmentName',
       'participantName',
-      'updatedAt',
     ]);
     expect(fields.find((field) => field.field === 'submittedAt')?.type).toBe(
       'date',
     );
+    expect(fields.map((field) => field.group)).toEqual([
+      '결재신청일',
+      '결재상태',
+      '결재상태',
+      '제목',
+      '기안정보',
+      '기안정보',
+      '기안정보',
+    ]);
+    expect(
+      fields.map((field) => [field.field, field.searchSpan]),
+    ).toEqual([
+      ['submittedAt', 4],
+      ['documentStatus', 2],
+      ['documentType', 2],
+      ['title', 4],
+      ['drafterName', 1],
+      ['drafterDepartmentName', 1],
+      ['participantName', 1],
+    ]);
   });
 
   it('provides document status content for the read route alias', () => {

@@ -31,6 +31,8 @@ describe('document presentation metadata', () => {
   it.each([
     ['DRAFT_SAVED', '임시저장', 'default', 'outlined', 'DRAFT'],
     ['SUBMITTED', '결재신청', 'info', 'filled', 'PENDING'],
+    ['SUBMISSION_CANCELED', '결재신청 취소', 'error', 'outlined', 'DRAFT'],
+    ['APPROVAL_CANCELED', '결재 승인 취소', 'error', 'outlined', 'DRAFT'],
     ['REJECTED', '반려', 'error', 'filled', 'REJECTED'],
     ['APPROVED', '승인', 'success', 'filled', 'COMPLETED'],
     ['COMPLETED', '완료', 'success', 'filled', 'COMPLETED'],
@@ -38,12 +40,14 @@ describe('document presentation metadata', () => {
   ] as const)('maps system event %s to the existing status colors', (eventType, label, color, variant, status) => {
     expect(getApprovalSystemEventPresentation(eventType)).toEqual({ label, color, variant });
     expect(getApprovalSystemEventPresentation(eventType)).toMatchObject({
-      color: getApprovalStatusPresentation(status).color,
+      color: eventType.endsWith('_CANCELED')
+        ? getApprovalStatusPresentation('REJECTED').color
+        : getApprovalStatusPresentation(status).color,
       variant: getApprovalStatusPresentation(status).variant,
     });
   });
 
-  it.each(['RESUBMITTED', 'SUBMISSION_CANCELED', 'APPROVAL_CANCELED', 'DELETED', 'UNKNOWN', 'toString', ''])(
+  it.each(['RESUBMITTED', 'DELETED', 'UNKNOWN', 'toString', ''])(
     'preserves the existing display for unsupported event %s',
     (eventType) => {
       expect(getApprovalSystemEventPresentation(eventType)).toBeUndefined();

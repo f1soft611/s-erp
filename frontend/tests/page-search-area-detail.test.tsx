@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
 import type { PageSearchField } from '../src/shared/components/page-search/searchFields';
@@ -13,6 +13,65 @@ describe('PageSearchArea 상세 검색', () => {
       type: 'select',
       searchSpan: 1,
       options: [{ value: 'Y', label: '사용' }],
+    },
+  ];
+  const groupedFields: PageSearchField[] = [
+    {
+      field: 'submittedAt',
+      label: '결재신청일',
+      type: 'date',
+      searchSpan: 4,
+      group: 'date',
+    },
+    {
+      field: 'documentStatus',
+      label: '결재상태',
+      type: 'select',
+      searchSpan: 2,
+      group: 'approval',
+      options: [{ value: 'PENDING', label: '결재대기' }],
+    },
+    {
+      field: 'documentType',
+      label: '문서종류',
+      type: 'select',
+      searchSpan: 2,
+      group: 'approval',
+      options: [{ value: 'DRAFTING', label: '기안서' }],
+    },
+    {
+      field: 'title',
+      label: '제목',
+      type: 'text',
+      searchSpan: 4,
+      group: 'title',
+    },
+    {
+      field: 'drafter',
+      label: '기안자',
+      type: 'text',
+      searchSpan: 1,
+      group: 'participants',
+    },
+    {
+      field: 'department',
+      label: '기안부서',
+      type: 'text',
+      searchSpan: 1,
+      group: 'participants',
+    },
+    {
+      field: 'participant',
+      label: '결재 참여자',
+      type: 'text',
+      searchSpan: 1,
+      group: 'participants',
+    },
+    {
+      field: 'standalone',
+      label: '단독 필드',
+      type: 'text',
+      searchSpan: 3,
     },
   ];
 
@@ -34,6 +93,7 @@ describe('PageSearchArea 상세 검색', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
 
     expect(screen.getByRole('textbox', { name: '이름' })).toBeVisible();
+    expect(screen.queryByText('생성일', { exact: true })).not.toBeInTheDocument();
     expect(screen.getByLabelText('생성일 시작일')).toBeVisible();
     expect(screen.getByLabelText('생성일 종료일')).toBeVisible();
     expect(screen.getByRole('combobox', { name: '상태' })).toBeVisible();
@@ -47,7 +107,7 @@ describe('PageSearchArea 상세 검색', () => {
     fireEvent.change(screen.getByLabelText('생성일 종료일'), {
       target: { value: '2026-12-31' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
 
     expect(onDetailValuesChange).toHaveBeenCalled();
     expect(onDetailSearch).toHaveBeenCalledWith(
@@ -59,6 +119,41 @@ describe('PageSearchArea 상세 검색', () => {
     expect(
       screen.queryByRole('button', { name: '검색 닫기' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('group은 행을 나누고 span은 그룹 안의 필드 너비를 유지한다', () => {
+    const { container } = render(
+      <PageSearchArea detailFields={groupedFields}>
+        <button type="button">기본 검색</button>
+      </PageSearchArea>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+
+    const groupRows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-search-group]'),
+    );
+    expect(groupRows.map((group) => group.dataset.searchGroup)).toEqual([
+      'date',
+      'approval',
+      'title',
+      'participants',
+    ]);
+    expect(
+      groupRows[1].querySelector('[data-search-field="documentStatus"]'),
+    ).toHaveAttribute('data-search-span', '2');
+    expect(
+      groupRows[1].querySelector('[data-search-field="documentType"]'),
+    ).toHaveAttribute('data-search-span', '2');
+    expect(
+      groupRows[2].querySelector('[data-search-field="title"]'),
+    ).toHaveAttribute('data-search-span', '4');
+    expect(within(groupRows[3]).getAllByRole('textbox')).toHaveLength(3);
+    const standaloneField = container.querySelector(
+      '[data-search-field="standalone"]',
+    );
+    expect(standaloneField).toHaveAttribute('data-search-span', '3');
+    expect(standaloneField?.closest('[data-search-group]')).toBeNull();
   });
 
   it('상세 검색 필드와 하단 액션 사이에 가로 구분선을 표시한다', () => {

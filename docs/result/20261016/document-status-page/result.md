@@ -12,7 +12,7 @@
 
 - 프런트엔드 타깃 테스트: `npm run test -- tests/document-status-page.test.tsx tests/document-status-service.test.ts` — 11개 테스트 통과.
 - 프런트엔드 빌드: `npm run build` — TypeScript 및 Vite 빌드 성공. 기존 번들 크기 경고가 표시된다.
-- 백엔드 타깃 테스트: `mvn "-Dtest=DocumentApprovalApiControllerTest,DocumentApprovalServiceImplTest,DocumentApprovalMapperTest" test` — 83개 테스트 통과.
+- 백엔드 타깃 테스트: `mvn "-Dtest=DocumentApprovalApiControllerTest,DocumentApprovalServiceImplTest,DocumentApprovalMapperTest" test` — 84개 테스트 통과.
 - 기존 문서작성 상세 테스트에서 작업트리의 기대값 불일치를 확인했다. 승인 취소 테스트는 현재 상신취소 버튼 스타일(`outlined`)과 취소 확인 버튼명(`승인 취소`)을 테스트 기대값(`contained`, `승인 취소 확인`)과 다르게 본다. 추가 상세 테스트 6개 중 5개는 통과했으며, 나머지 하나는 현재 결재 도구 모음에 없는 접근성 `separator`를 기대한다. 해당 공유 상세 컴포넌트/테스트는 이번 작업에서 수정하지 않았다.
 - 이전 검증에서 별도로 실행한 `dashboard-data.test.tsx`의 모듈 아이콘 테스트도 `moduleItems[0]`가 `undefined`인 오류로 실패했다. 이번 작업에서 해당 파일 동작은 변경하지 않았다.
 - 브라우저의 `/groupware/doc/read`에서 문서 목록 응답과 그리드 렌더링을 확인했다. 행 선택으로 기존 상세 오버레이가 열리고 닫히는 것을 확인했으며, 375px·768px·1280px에서 페이지와 body의 가로 넘침은 없었다. 실제 상세 본문이나 문서 데이터는 검사·기록하지 않았다.

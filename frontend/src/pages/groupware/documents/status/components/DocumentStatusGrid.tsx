@@ -51,8 +51,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       headerName: '문서번호',
       width: 140,
       pinned: 'left',
-      editable: false,
-      search: { label: '문서번호', order: 1, group: '문서' },
+      search: { hidden: true },
     },
     {
       field: 'title',
@@ -60,7 +59,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       width: 260,
       pinned: 'left',
       editable: false,
-      search: { label: '제목', order: 2, group: '문서' },
+      search: { label: '제목', order: 4, span: 4, group: '제목' },
     },
     {
       field: 'documentType',
@@ -69,7 +68,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       options: DOCUMENT_TYPE_OPTIONS,
       width: 140,
       editable: false,
-      search: { label: '문서종류', order: 3, group: '문서' },
+      search: { label: '문서종류', order: 3, span: 2, group: '결재상태' },
     },
     {
       field: 'documentStatus',
@@ -78,7 +77,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       options: DOCUMENT_STATUS_OPTIONS,
       width: 130,
       editable: false,
-      search: { label: '결재상태', order: 4, group: '결재' },
+      search: { label: '결재상태', order: 2, span: 2, group: '결재상태' },
       renderCell: ({ row }) => (
         <Chip
           size="small"
@@ -93,28 +92,28 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       type: 'date',
       width: 170,
       editable: false,
-      search: { label: '결재신청일', order: 5, group: '결재' },
+      search: { label: '결재신청일', order: 1, span: 4, group: '결재신청일' },
     },
     {
       field: 'drafterName',
       headerName: '기안자',
       width: 120,
       editable: false,
-      search: { label: '기안자', order: 6, group: '기안자' },
+      search: { label: '기안자', order: 6, group: '기안정보' },
     },
     {
       field: 'drafterDepartmentName',
       headerName: '기안부서',
       width: 160,
       editable: false,
-      search: { label: '기안부서', order: 7, group: '기안자' },
+      search: { label: '기안부서', order: 7, group: '기안정보' },
     },
     {
       field: 'participantName',
       headerName: '결재 참여자',
       width: 220,
       editable: false,
-      search: { label: '결재 참여자', order: 8, group: '결재' },
+      search: { label: '결재 참여자', order: 8, group: '기안정보' },
     },
     {
       field: 'approvalProgress',
@@ -130,7 +129,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       type: 'date',
       width: 170,
       editable: false,
-      search: { label: '최종 변경일', order: 9, group: '변경일' },
+      search: { hidden: true },
     },
   ];
 }

@@ -4,10 +4,7 @@ import {
   type F1GridColumn,
   type F1GridDataSource,
 } from '../../../../../shared/components/f1-grid';
-import type {
-  ArchiveCategory,
-  ArchivePost,
-} from '../types/archive.types';
+import type { ArchiveCategory, ArchivePost } from '../types/archive.types';
 
 type ArchivePostGridProps = {
   columns: F1GridColumn<ArchivePost>[];
@@ -61,7 +58,7 @@ export function createArchivePostColumns(
       field: 'categoryCode',
       headerName: '분류',
       type: 'select',
-      width: 140,
+      align: 'center',
       editable: false,
       options: categories.map((category) => ({
         value: category.code,
@@ -74,7 +71,7 @@ export function createArchivePostColumns(
     {
       field: 'writerName',
       headerName: '작성자',
-      width: 140,
+      align: 'center',
       editable: false,
       search: { hidden: true },
       renderCell: ({ row }) => row.writerName ?? row.writerId ?? '—',
@@ -82,7 +79,7 @@ export function createArchivePostColumns(
     {
       field: 'createdAt',
       headerName: '등록일',
-      width: 160,
+      align: 'center',
       editable: false,
       search: { hidden: true },
       renderCell: ({ row }) => formatDate(row.createdAt),
@@ -90,9 +87,7 @@ export function createArchivePostColumns(
     {
       field: 'attachmentCount',
       headerName: '첨부 수',
-      width: 100,
-      align: 'right',
-      headerAlign: 'right',
+      align: 'center',
       editable: false,
       search: { hidden: true },
       renderCell: ({ row }) => row.attachmentCount ?? 0,
@@ -117,11 +112,13 @@ export function ArchivePostGrid({
         height="100%"
         minHeight={320}
         stripeRows
-        disableSorting
-        disableFiltering
-        disableContextMenu
-        showCheckbox={false}
+        // disableContextMenu
+        // showCheckbox={false}
+        allowAddRowInContextMenu={false}
+        allowDeleteRowInContextMenu={false}
+        allowDuplicateRowInContextMenu={false}
         canExportExcel={false}
+        columnLine={false}
       />
     </Box>
   );

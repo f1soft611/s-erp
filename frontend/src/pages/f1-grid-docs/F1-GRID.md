@@ -473,13 +473,13 @@ const detailFields = useMemo(
 );
 ```
 
-`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
 
 페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
 
 날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
 
-문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
+문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `search.span`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 그룹 행은 결재신청일(span 4), 결재상태·문서종류(span 2씩), 제목(span 4), 기안자·기안부서·결재 참여자(기본 span 1) 순이다. 날짜 범위 위에 별도 날짜 제목은 표시하지 않지만, 두 입력은 시작일/종료일 라벨로 식별한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
 
 커뮤니티 자료실은 기본 영역의 통합검색어를 기존 `keyword` 파라미터로 보내고, `categoryCode` 컬럼의 `search` 설정만 상세검색에 노출한다. API가 `pageIndex`/`pageUnit`을 사용하므로 자료실의 `F1GridDataSource`는 `floor(offset / limit) + 1`과 `limit`으로 변환하고, 요청 취소 signal을 서비스까지 전달한다. 이 화면은 서버의 최신순을 유지하기 위해 그리드 정렬/필터를 비활성화하고, 조회 실패는 `onDataSourceError`에서 오류와 재시도 상태로 표시한다. 제목 셀은 버튼으로 렌더링하여 상세 패널 열기를 명시적으로 실행하며 분류, 작성자, 등록일, 첨부 수는 읽기 전용 컬럼으로 표시한다.
 

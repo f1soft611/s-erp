@@ -17,6 +17,7 @@ import {
   isCommentSubmitKey,
 } from '../src/shared/components/feed/CommentThread';
 import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
+import { getApprovalSystemEventPresentation } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('shared feed components', () => {
   it('centers detail loading in the shared panel content area', () => {
@@ -307,6 +308,8 @@ describe('shared feed components', () => {
   it.each([
     ['임시저장', 'default', 'outlined'],
     ['결재신청', 'info', 'filled'],
+    ['결재신청 취소', 'error', 'outlined'],
+    ['결재 승인 취소', 'error', 'outlined'],
     ['반려', 'error', 'filled'],
     ['승인', 'success', 'filled'],
     ['완료', 'success', 'filled'],
@@ -336,6 +339,21 @@ describe('shared feed components', () => {
     expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
+
+  it.each(['SUBMISSION_CANCELED', 'APPROVAL_CANCELED'])(
+    'renders both the border and text red for %s',
+    (eventType) => {
+      render(<CommentThread comments={[{
+        id: eventType, author: '시스템', time: '방금', content: '취소 처리',
+        isSystemEvent: true,
+        systemEventBadge: getApprovalSystemEventPresentation(eventType),
+      }]} showComposer={false} />);
+      const badge = screen.getByTestId('system-event-badge');
+      expect(badge).toHaveClass('MuiChip-colorError', 'MuiChip-outlined');
+      expect(badge).toHaveStyle({ borderColor: 'rgba(211, 47, 47, 0.7)', borderRadius: '8px' });
+      expect(badge).toHaveStyle({ color: '#d32f2f' });
+    },
+  );
 
   it('renders a file-type icon for spreadsheet attachments', () => {
     render(
