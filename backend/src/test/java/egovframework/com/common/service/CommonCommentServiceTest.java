@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -437,9 +438,13 @@ class CommonCommentServiceTest {
 
             @Override
             public List<Map<String, Object>> selectCommonCommentCountsByOwnerIds(Map<String, Object> params) {
-                return Arrays.asList(
-                    Map.of("ownerId", 10L, "totalCount", 4L),
-                    Map.of("ownerId", 20L, "totalCount", 1L));
+                Map<String, Object> firstOwnerCount = new HashMap<>();
+                firstOwnerCount.put("ownerId", 10L);
+                firstOwnerCount.put("totalCount", 4L);
+                Map<String, Object> secondOwnerCount = new HashMap<>();
+                secondOwnerCount.put("ownerId", 20L);
+                secondOwnerCount.put("totalCount", 1L);
+                return Arrays.asList(firstOwnerCount, secondOwnerCount);
             }
         };
 

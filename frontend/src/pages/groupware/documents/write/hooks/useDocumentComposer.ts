@@ -164,11 +164,22 @@ export function useDocumentComposer(
     if (!editor || !open || !initialDocument) return;
 
     let active = true;
-    const resolvedImages: Array<{
-      image: HTMLImageElement;
-      originalSource: string;
-      objectUrl: string;
-    }> = [];
+    const previewUrls = new Map<string, string>();
+    const failedSources = new Set<string>();
+    const syncImagePreviews = () => {
+      editor.view.dom
+        .querySelectorAll<HTMLImageElement>('img')
+        .forEach((image) => {
+          const source = image.getAttribute('src') ?? '';
+          const previewUrl = previewUrls.get(source);
+          if (previewUrl) {
+            image.setAttribute('src', previewUrl);
+          } else if (failedSources.has(source)) {
+            image.removeAttribute('src');
+          }
+        });
+    };
+    const requestedSources = new Set<string>();
     const imageRequests = Array.from(
       editor.view.dom.querySelectorAll<HTMLImageElement>('img'),
     ).flatMap((image) => {
@@ -179,13 +190,21 @@ export function useDocumentComposer(
         ),
       );
       const fileId = Number(match?.[1]);
-      return match && Number.isSafeInteger(fileId) && fileId > 0
-        ? [{ image, source, fileId }]
-        : [];
+      if (
+        !match ||
+        !Number.isSafeInteger(fileId) ||
+        fileId <= 0 ||
+        requestedSources.has(source)
+      ) {
+        return [];
+      }
+      requestedSources.add(source);
+      return [{ source, fileId }];
     });
 
     if (imageRequests.length === 0) return;
 
+    editor.on('update', syncImagePreviews);
     void Promise.allSettled(
       imageRequests.map(async (request) => ({
         ...request,
@@ -202,29 +221,34 @@ export function useDocumentComposer(
         const request = imageRequests[index];
         if (!request) return;
         if (result.status === 'rejected') {
-          request.image.removeAttribute('src');
+          failedSources.add(request.source);
           failed = true;
           return;
         }
         const objectUrl = URL.createObjectURL(result.value.blob);
-        request.image.setAttribute('src', objectUrl);
-        resolvedImages.push({
-          image: request.image,
-          originalSource: request.source,
-          objectUrl,
-        });
+        previewUrls.set(request.source, objectUrl);
       });
+      syncImagePreviews();
       if (failed) setSaveError('본문 이미지를 불러오지 못했습니다.');
     });
 
     return () => {
       active = false;
-      resolvedImages.forEach(({ image, originalSource, objectUrl }) => {
-        if (image.getAttribute('src') === objectUrl) {
-          image.setAttribute('src', originalSource);
-        }
-        URL.revokeObjectURL(objectUrl);
-      });
+      editor.off('update', syncImagePreviews);
+      const originalSourcesByPreviewUrl = new Map(
+        Array.from(previewUrls, ([source, previewUrl]) => [
+          previewUrl,
+          source,
+        ]),
+      );
+      editor.view.dom
+        .querySelectorAll<HTMLImageElement>('img')
+        .forEach((image) => {
+          const source = image.getAttribute('src') ?? '';
+          const originalSource = originalSourcesByPreviewUrl.get(source);
+          if (originalSource) image.setAttribute('src', originalSource);
+        });
+      previewUrls.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
     };
   }, [editor, initialDocument, open]);
 

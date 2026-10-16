@@ -16,6 +16,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -88,9 +89,11 @@ class DocumentApprovalServiceImplTest {
         CommonFileVO attachment = new CommonFileVO();
         attachment.setFileId(91L);
         attachment.setOwnerId(77L);
+        Map<Long, List<CommonFileVO>> attachmentsByOwnerId = new HashMap<>();
+        attachmentsByOwnerId.put(77L, Collections.singletonList(attachment));
+        attachmentsByOwnerId.put(78L, Collections.<CommonFileVO>emptyList());
         when(fileService.listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L)))
-            .thenReturn(Map.of(77L, Collections.singletonList(attachment),
-                78L, Collections.<CommonFileVO>emptyList()));
+            .thenReturn(attachmentsByOwnerId);
         DocumentApprovalLineBatchVO firstLine = new DocumentApprovalLineBatchVO();
         firstLine.setElectronicApprovalId(77L);
         firstLine.setElectronicApprovalLineId(501L);
@@ -113,9 +116,14 @@ class DocumentApprovalServiceImplTest {
         otherDocumentRoot.setOwnerId(78L);
         when(commentDAO.selectApprovalUserCommentPagesByOwnerIds(anyMap()))
             .thenReturn(Arrays.asList(newestRoot, newestReply, secondRoot, thirdRoot, olderRoot, otherDocumentRoot));
+        Map<String, Object> firstOwnerCount = new HashMap<>();
+        firstOwnerCount.put("ownerId", 77L);
+        firstOwnerCount.put("totalCount", 4L);
+        Map<String, Object> secondOwnerCount = new HashMap<>();
+        secondOwnerCount.put("ownerId", 78L);
+        secondOwnerCount.put("totalCount", 1L);
         when(commentDAO.selectApprovalUserCommentCountsByOwnerIds(anyMap()))
-            .thenReturn(Arrays.asList(Map.of("ownerId", 77L, "totalCount", 4L),
-                Map.of("ownerId", 78L, "totalCount", 1L)));
+            .thenReturn(Arrays.asList(firstOwnerCount, secondOwnerCount));
         CommonFileVO commentAttachment = approvalCommentFile(601L, 55L);
         when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(53L, 54L, 55L, 56L, 81L)))
             .thenReturn(Collections.singletonMap(55L, Collections.singletonList(commentAttachment)));

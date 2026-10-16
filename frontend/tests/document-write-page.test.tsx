@@ -2352,6 +2352,50 @@ describe('Document write page', () => {
       );
       expect(composerApi.fetchApprovalEmbeddedImageBlob).toHaveBeenCalledWith(4, 51);
 
+      const image = dialog.querySelector<HTMLImageElement>(
+        '.document-composer-editor .ProseMirror img',
+      );
+      if (!image) throw new Error('Expected the existing document image in the editor');
+      const elementFromPointDescriptor = Object.getOwnPropertyDescriptor(
+        document,
+        'elementFromPoint',
+      );
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: vi.fn(() => image),
+      });
+      try {
+        fireEvent.mouseDown(image);
+      } finally {
+        if (elementFromPointDescriptor) {
+          Object.defineProperty(
+            document,
+            'elementFromPoint',
+            elementFromPointDescriptor,
+          );
+        } else {
+          delete (document as Document & { elementFromPoint?: unknown })
+            .elementFromPoint;
+        }
+      }
+      const resizeHandle = await screen.findByLabelText(
+        'se 방향 이미지 크기 조절',
+      );
+      fireEvent.pointerDown(resizeHandle, { clientX: 0, clientY: 0 });
+      fireEvent.pointerMove(window, { clientX: 50, clientY: 50 });
+      fireEvent.pointerUp(window);
+      await waitFor(() =>
+        expect(
+          dialog.querySelector('.document-composer-editor .ProseMirror img'),
+        ).toHaveAttribute('src', 'blob:approval-image-preview'),
+      );
+      expect(
+        dialog.querySelector('.document-composer-editor .ProseMirror img'),
+      ).toHaveAttribute('width', '400px');
+      expect(
+        dialog.querySelector('.document-composer-editor .ProseMirror img'),
+      ).toHaveAttribute('height', '250px');
+
       fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
       await waitFor(() =>
         expect(composerApi.saveDocumentDraft).toHaveBeenCalledWith(
@@ -2363,9 +2407,17 @@ describe('Document write page', () => {
           4,
         ),
       );
-      expect(composerApi.saveDocumentDraft.mock.calls.at(-1)?.[0].contentsHtml).not.toContain(
-        'blob:approval-image-preview',
+      const savedRequest = composerApi.saveDocumentDraft.mock.calls.at(-1)?.[0];
+      expect(savedRequest?.contentsHtml).not.toContain('blob:approval-image-preview');
+      expect(savedRequest?.contentsHtml).toContain('width="400px"');
+      expect(savedRequest?.contentsHtml).toContain('height="250px"');
+      const savedContentsJson = JSON.stringify(savedRequest?.contentsJson);
+      expect(savedContentsJson).toContain(
+        '/api/v1/groupware/approvals/4/embedded-images/51',
       );
+      expect(savedContentsJson).toContain('"width":"400px"');
+      expect(savedContentsJson).toContain('"height":"250px"');
+      expect(savedContentsJson).not.toContain('blob:approval-image-preview');
     } finally {
       vi.unstubAllGlobals();
     }

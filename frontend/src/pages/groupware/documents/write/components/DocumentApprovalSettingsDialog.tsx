@@ -10,10 +10,11 @@ import {
   CircularProgress,
   Divider,
   IconButton,
+  MenuItem,
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { F1Grid } from '../../../../../shared/components/f1-grid';
@@ -210,6 +211,14 @@ export function DocumentApprovalSettingsDialog({
   const [saveName, setSaveName] = useState('');
   const [managerOpen, setManagerOpen] = useState(false);
   const [templates, setTemplates] = useState<ApprovalLineTemplateSummary[]>([]);
+  const [favoriteTemplates, setFavoriteTemplates] = useState<
+    ApprovalLineTemplateSummary[]
+  >([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(
+    null,
+  );
+  const [templateListLoading, setTemplateListLoading] = useState(false);
+  const [templateListError, setTemplateListError] = useState('');
   const [templateGridKey, setTemplateGridKey] = useState(0);
   const [hasTemplateNameChanges, setHasTemplateNameChanges] = useState(false);
   const [pendingManagerAction, setPendingManagerAction] =
@@ -235,6 +244,41 @@ export function DocumentApprovalSettingsDialog({
     },
     [],
   );
+
+  const refreshTemplateList = useCallback(async () => {
+    if (!documentCode) return null;
+
+    setTemplateListLoading(true);
+    setTemplateListError('');
+    try {
+      const result = await listApprovalLineTemplates(documentCode);
+      setFavoriteTemplates(result);
+      setSelectedTemplateId((currentId) =>
+        currentId !== null &&
+        result.some((template) => template.templateId === currentId)
+          ? currentId
+          : null,
+      );
+      return result;
+    } catch (error) {
+      setTemplateListError(
+        error instanceof Error
+          ? error.message
+          : '자주 쓰는 결재선 목록을 불러오지 못했습니다.',
+      );
+      return null;
+    } finally {
+      setTemplateListLoading(false);
+    }
+  }, [documentCode]);
+
+  useEffect(() => {
+    if (!open) return;
+    setFavoriteTemplates([]);
+    setSelectedTemplateId(null);
+    setTemplateError('');
+    void refreshTemplateList();
+  }, [open, refreshTemplateList]);
 
   useEffect(() => {
     if (favoriteOperation !== null) return;
@@ -323,7 +367,7 @@ export function DocumentApprovalSettingsDialog({
         setTemplateError('같은 이름의 결재선 템플릿이 이미 있습니다.');
         return;
       }
-      await createApprovalLineTemplate({
+      const created = await createApprovalLineTemplate({
         eabusNo: documentCode,
         name,
         approvalLines: toTemplateParticipants(
@@ -331,6 +375,25 @@ export function DocumentApprovalSettingsDialog({
           draftReferenceUserIds,
         ),
       });
+      const refreshedTemplates = await refreshTemplateList();
+      if (refreshedTemplates) {
+        setFavoriteTemplates((current) =>
+          current.some((template) => template.templateId === created.templateId)
+            ? current
+            : [...current, created],
+        );
+      } else {
+        setFavoriteTemplates((current) => [
+          ...current.filter(
+            (template) => template.templateId !== created.templateId,
+          ),
+          created,
+        ]);
+        setTemplateListError(
+          '결재선 저장은 완료했지만 목록 갱신에 실패했습니다. 목록을 다시 시도해 주세요.',
+        );
+      }
+      setSelectedTemplateId(created.templateId);
       setSaveDialogOpen(false);
     } catch (error) {
       setTemplateError(
@@ -374,6 +437,7 @@ export function DocumentApprovalSettingsDialog({
   };
 
   const loadTemplate = async (templateId: number) => {
+    setSelectedTemplateId(templateId);
     setFavoriteOperation('load');
     setTemplateError('');
     try {
@@ -502,6 +566,9 @@ export function DocumentApprovalSettingsDialog({
       setTemplates((current) =>
         current.filter((template) => template.templateId !== templateId),
       );
+      setSelectedTemplateId((currentId) =>
+        currentId === templateId ? null : currentId,
+      );
       setPendingDeleteTemplateId(null);
       setHasTemplateNameChanges(false);
       setTemplateGridKey((key) => key + 1);
@@ -524,6 +591,7 @@ export function DocumentApprovalSettingsDialog({
     } else {
       setPendingDeleteTemplateId(null);
       setManagerOpen(false);
+      void refreshTemplateList();
     }
   };
 
@@ -820,6 +888,16 @@ export function DocumentApprovalSettingsDialog({
         description="현재 작성 중인 결재선과 참조선을 편집합니다."
         size="md"
         fullScreenOnMobile
+        footerStart={
+          <Button
+            variant="outlined"
+            disabled={favoritesDisabled}
+            aria-label="자주 쓰는 결재선 저장"
+            onClick={openSaveDialog}
+          >
+            자주 쓰는 결재선 저장
+          </Button>
+        }
         actions={
           <>
             <Button variant="contained" onClick={handleApply}>
@@ -836,9 +914,6 @@ export function DocumentApprovalSettingsDialog({
         >
           {userOptionsError && (
             <Alert severity="error">{userOptionsError}</Alert>
-          )}
-          {templateError && !managerOpen && !saveDialogOpen && (
-            <Alert severity="error">{templateError}</Alert>
           )}
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -1077,24 +1152,89 @@ export function DocumentApprovalSettingsDialog({
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
               자주 쓰는 결재선
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Button
-                variant="outlined"
-                disabled={favoritesDisabled}
-                aria-label="자주 쓰는 결재선 저장"
-                onClick={openSaveDialog}
+            <Box
+              sx={{
+                alignItems: 'flex-start',
+                display: 'flex',
+                gap: 1,
+                minWidth: 0,
+              }}
+            >
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={selectedTemplateId ?? ''}
+                disabled={favoritesDisabled || templateListLoading}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === '') {
+                    setSelectedTemplateId(null);
+                    return;
+                  }
+                  const templateId = Number(value);
+                  if (!Number.isSafeInteger(templateId) || templateId <= 0) {
+                    return;
+                  }
+                  setSelectedTemplateId(templateId);
+                  setTemplateError('');
+                  void loadTemplate(templateId);
+                }}
+                slotProps={{
+                  select: {
+                    'aria-label': '자주 쓰는 결재선',
+                    displayEmpty: true,
+                  },
+                }}
+                sx={{ flex: '1 1 auto', minWidth: 0 }}
               >
-                자주 쓰는 결재선 저장
-              </Button>
+                <MenuItem value="">등록된 자주 쓰는 결재선</MenuItem>
+                {favoriteTemplates.map((template) => (
+                  <MenuItem
+                    key={template.templateId}
+                    value={template.templateId}
+                  >
+                    {template.name}
+                  </MenuItem>
+                ))}
+              </TextField>
               <Button
                 variant="outlined"
                 disabled={favoritesDisabled}
-                aria-label="자주 쓰는 결재선 불러오기"
+                aria-label="설정"
                 onClick={() => void openTemplateManager()}
               >
-                자주 쓰는 결재선 불러오기
+                설정
               </Button>
             </Box>
+            {templateListLoading && (
+              <Typography role="status">
+                자주 쓰는 결재선 목록을 불러오는 중...
+              </Typography>
+            )}
+            {favoriteOperation === 'load' && (
+              <Typography role="status">결재선을 불러오는 중...</Typography>
+            )}
+            {templateListError && (
+              <Alert
+                severity="error"
+                action={
+                  <Button
+                    size="small"
+                    onClick={() => void refreshTemplateList()}
+                    disabled={templateListLoading}
+                    aria-label="결재선 목록 다시 시도"
+                  >
+                    다시 시도
+                  </Button>
+                }
+              >
+                {templateListError}
+              </Alert>
+            )}
+            {templateError && !managerOpen && !saveDialogOpen && (
+              <Alert severity="error">{templateError}</Alert>
+            )}
           </Box>
         </Box>
       </CommonDialog>
@@ -1131,6 +1271,9 @@ export function DocumentApprovalSettingsDialog({
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {templateError && <Alert severity="error">{templateError}</Alert>}
+          {templateListError && (
+            <Alert severity="error">{templateListError}</Alert>
+          )}
           <TextField
             autoFocus
             fullWidth
@@ -1146,6 +1289,7 @@ export function DocumentApprovalSettingsDialog({
       </CommonDialog>
       <CommonDialog
         open={managerOpen}
+        size="xs"
         onClose={() => requestManagerAction({ type: 'close' })}
         title="자주 쓰는 결재선 불러오기"
         description="결재선을 불러오거나 결재선명을 관리합니다."
@@ -1184,12 +1328,30 @@ export function DocumentApprovalSettingsDialog({
           }}
         >
           {templateError && <Alert severity="error">{templateError}</Alert>}
+          {templateListError && (
+            <Alert
+              severity="error"
+              action={
+                <Button
+                  size="small"
+                  onClick={() => void refreshTemplateList()}
+                  disabled={templateListLoading}
+                  aria-label="결재선 목록 다시 시도"
+                >
+                  다시 시도
+                </Button>
+              }
+            >
+              {templateListError}
+            </Alert>
+          )}
           {favoriteOperation === 'list' && (
             <Typography role="status">결재선 목록을 불러오는 중...</Typography>
           )}
           {favoriteOperation !== 'list' &&
             templates.length === 0 &&
-            !templateError && (
+            !templateError &&
+            !templateListError && (
               <Typography color="text.secondary">
                 저장된 자주 쓰는 결재선이 없습니다.
               </Typography>

@@ -33,7 +33,10 @@ import { DocumentApprovalSettingsDialog } from '../src/pages/groupware/documents
 import type { DocumentApprovalStage } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import type { F1GridUserOption } from '../src/shared/components/f1-grid/types/grid.types';
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  templateApi.list.mockResolvedValue([]);
+});
 
 const users: F1GridUserOption[] = [
   { value: 'drafter', label: '기안자' },
@@ -123,21 +126,35 @@ function getTemplateGrid() {
 }
 
 async function openTemplateManagerGrid() {
-  fireEvent.click(
-    screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
+  await waitFor(() =>
+    expect(
+      screen.getByRole('combobox', { name: '자주 쓰는 결재선' }),
+    ).toBeEnabled(),
   );
+  fireEvent.click(screen.getByRole('button', { name: '설정' }));
   await screen.findByRole('grid', {
     name: '자주 쓰는 결재선 목록',
   });
   await waitFor(() =>
     expect(within(getTemplateGrid()).getAllByRole('gridcell').length).toBeGreaterThan(0),
   );
+  await waitFor(() => expect(getTemplateManagerCloseButton()).toBeEnabled());
 }
 
 function getTemplateManager() {
   return screen.getByRole('dialog', {
     name: '자주 쓰는 결재선 불러오기',
   });
+}
+
+async function selectFavorite(name: string) {
+  const select = await screen.findByRole('combobox', {
+    name: '자주 쓰는 결재선',
+  });
+  fireEvent.mouseDown(select);
+  fireEvent.click(await screen.findByRole('option', { name }));
+  await waitFor(() => expect(select).toBeEnabled());
+  return select;
 }
 
 function getTemplateManagerCloseButton() {
@@ -169,9 +186,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(
       screen.getByRole('button', { name: '자주 쓰는 결재선 저장' }),
     ).toBeEnabled();
-    expect(
-      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
-    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: '설정' })).toBeEnabled();
   });
 
   it('saves the current draft stages and references under a required name', async () => {
@@ -226,6 +241,339 @@ describe('DocumentApprovalSettingsDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('loads favorites on open and applies a selected template to the draft', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.get.mockResolvedValue({
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+      approvalLines: [
+        {
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-2',
+        },
+        {
+          stageOrder: 3,
+          participantOrder: 1,
+          participantType: 'REFERENCE',
+          participantUserId: 'reference-2',
+        },
+      ],
+    });
+    const { onApply } = renderSettings();
+    await selectFavorite('기본 결재선');
+
+    expect(templateApi.list).toHaveBeenCalledWith('001');
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    await screen.findByRole('group', { name: '결재 2 새 결재자' });
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
+        'button',
+        { name: '적용' },
+      ),
+    );
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ isFixed: true }),
+        expect.objectContaining({
+          kind: 'approval',
+          users: [expect.objectContaining({ value: 'approver-2' })],
+        }),
+      ]),
+      ['reference-2'],
+    );
+  });
+
+  it('shows the registration prompt when no favorites are registered', async () => {
+    templateApi.list.mockResolvedValue([]);
+    renderSettings();
+
+    const select = await screen.findByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    await waitFor(() => expect(select).toBeEnabled());
+    expect(select).toHaveTextContent('등록된 자주 쓰는 결재선');
+  });
+
+  it('retries a failed favorite list request', async () => {
+    templateApi.list
+      .mockRejectedValueOnce(new Error('목록 조회 실패'))
+      .mockResolvedValueOnce([
+        { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+      ]);
+    renderSettings();
+
+    expect(await screen.findByText('목록 조회 실패')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: '결재선 목록 다시 시도' }),
+    );
+    await waitFor(() => expect(templateApi.list).toHaveBeenCalledTimes(2));
+    fireEvent.mouseDown(
+      await screen.findByRole('combobox', { name: '자주 쓰는 결재선' }),
+    );
+    expect(
+      await screen.findByRole('option', { name: '기본 결재선' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the current draft when selected favorite loading fails', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    templateApi.get.mockRejectedValue(new Error('상세 조회 실패'));
+    const { onApply } = renderSettings();
+    const select = await selectFavorite('기본 결재선');
+
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    expect(await screen.findByText('상세 조회 실패')).toBeInTheDocument();
+    expect(select).toHaveTextContent('기본 결재선');
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
+        'button',
+        { name: '적용' },
+      ),
+    );
+
+    expect(onApply).toHaveBeenCalledWith(approvalStages, ['reference-1']);
+  });
+
+  it('refreshes the selector after closing the manager and preserves selection by ID', async () => {
+    const beforeRename = {
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+    };
+    const afterRename = { ...beforeRename, name: '변경된 이름' };
+    templateApi.list
+      .mockResolvedValueOnce([beforeRename])
+      .mockResolvedValueOnce([beforeRename])
+      .mockResolvedValueOnce([afterRename]);
+    templateApi.get.mockResolvedValue({
+      ...beforeRename,
+      approvalLines: [
+        {
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-2',
+        },
+      ],
+    });
+    templateApi.rename.mockResolvedValue(afterRename);
+    const { onApply } = renderSettings();
+    await selectFavorite('기본 결재선');
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    await screen.findByRole('group', { name: '결재 2 새 결재자' });
+
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
+        'button',
+        { name: '설정' },
+      ),
+    );
+    await screen.findByRole('grid', { name: '자주 쓰는 결재선 목록' });
+    editTemplateName('기본 결재선', '변경된 이름');
+    fireEvent.click(
+      within(getTemplateManager()).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+    await waitFor(() =>
+      expect(templateApi.rename).toHaveBeenCalledWith(9, '변경된 이름'),
+    );
+    await waitFor(() =>
+      expect(getTemplateManagerCloseButton()).toBeEnabled(),
+    );
+    fireEvent.click(getTemplateManagerCloseButton());
+
+    await waitFor(() => expect(templateApi.list).toHaveBeenCalledTimes(3));
+    const select = await screen.findByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    await waitFor(() => expect(select).toBeEnabled());
+    expect(select).toHaveTextContent('변경된 이름');
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
+        'button',
+        { name: '적용' },
+      ),
+    );
+    expect(onApply).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'approval',
+          users: [expect.objectContaining({ value: 'approver-2' })],
+        }),
+      ]),
+      [],
+    );
+  });
+
+  it('resets selection after deleting its favorite while preserving the draft', async () => {
+    const template = {
+      templateId: 9,
+      name: '기본 결재선',
+      eabusNo: '001',
+    };
+    templateApi.list
+      .mockResolvedValueOnce([template])
+      .mockResolvedValueOnce([template])
+      .mockResolvedValueOnce([]);
+    templateApi.get.mockResolvedValue({
+      ...template,
+      approvalLines: [
+        {
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'approver-2',
+        },
+      ],
+    });
+    templateApi.delete.mockResolvedValue(undefined);
+    const { onApply } = renderSettings();
+    await selectFavorite('기본 결재선');
+    await waitFor(() => expect(templateApi.get).toHaveBeenCalledWith(9));
+    await screen.findByRole('group', { name: '결재 2 새 결재자' });
+    await openTemplateManagerGrid();
+    fireEvent.click(
+      within(getTemplateGrid()).getByRole('button', {
+        name: '결재선 삭제 기본 결재선',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '삭제 확인' }));
+    await waitFor(() => expect(templateApi.delete).toHaveBeenCalledWith(9));
+    fireEvent.click(getTemplateManagerCloseButton());
+
+    await waitFor(() => expect(templateApi.list).toHaveBeenCalledTimes(3));
+    const select = await screen.findByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    expect(select).toHaveTextContent('등록된 자주 쓰는 결재선');
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
+        'button',
+        { name: '적용' },
+      ),
+    );
+    expect(onApply).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'approval',
+          users: [expect.objectContaining({ value: 'approver-2' })],
+        }),
+      ]),
+      [],
+    );
+  });
+
+  it('places favorite save in the footer and selects the created favorite', async () => {
+    const created = {
+      templateId: 12,
+      name: '새 결재선',
+      eabusNo: '001',
+    };
+    templateApi.list
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([created]);
+    templateApi.create.mockResolvedValue(created);
+    renderSettings();
+
+    const settingsDialog = screen.getByRole('dialog', {
+      name: '결재선 설정',
+    });
+    const footer = within(settingsDialog).getByTestId(
+      'common-dialog-footer-start',
+    );
+    const saveStart = within(footer).getByRole('button', {
+      name: '자주 쓰는 결재선 저장',
+    });
+    expect(
+      within(settingsDialog).getAllByRole('button', {
+        name: '자주 쓰는 결재선 저장',
+      }),
+    ).toHaveLength(1);
+    fireEvent.click(saveStart);
+
+    const saveDialog = screen.getByRole('dialog', {
+      name: '결재선 템플릿 저장',
+    });
+    fireEvent.change(
+      within(saveDialog).getByRole('textbox', { name: '결재선 이름' }),
+      { target: { value: '새 결재선' } },
+    );
+    fireEvent.click(
+      within(saveDialog).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(templateApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: '새 결재선', eabusNo: '001' }),
+      ),
+    );
+    const select = await screen.findByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    await waitFor(() => expect(select).toHaveTextContent('새 결재선'));
+    await waitFor(() => expect(select).toBeEnabled());
+  });
+
+  it('keeps a created favorite selected when list refresh fails', async () => {
+    const created = {
+      templateId: 12,
+      name: '새 결재선',
+      eabusNo: '001',
+    };
+    templateApi.list
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('목록 갱신 실패'));
+    templateApi.create.mockResolvedValue(created);
+    renderSettings();
+
+    const settingsDialog = screen.getByRole('dialog', {
+      name: '결재선 설정',
+    });
+    fireEvent.click(
+      within(
+        within(settingsDialog).getByTestId('common-dialog-footer-start'),
+      ).getByRole('button', { name: '자주 쓰는 결재선 저장' }),
+    );
+    const saveDialog = screen.getByRole('dialog', {
+      name: '결재선 템플릿 저장',
+    });
+    fireEvent.change(
+      within(saveDialog).getByRole('textbox', { name: '결재선 이름' }),
+      { target: { value: '새 결재선' } },
+    );
+    fireEvent.click(
+      within(saveDialog).getByRole('button', {
+        name: '저장',
+        exact: true,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/결재선 저장은 완료했지만 목록 갱신에 실패했습니다/),
+    ).toBeInTheDocument();
+    const select = screen.getByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    expect(select).toHaveTextContent('새 결재선');
+    await waitFor(() => expect(select).toBeEnabled());
+  });
+
   it('shows templates in F1-Grid and loads a row into temporary state until Apply', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },
@@ -263,9 +611,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     });
     const { onApply } = renderSettings();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: '자주 쓰는 결재선 불러오기' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
     const grid = await screen.findByRole('grid', {
       name: '자주 쓰는 결재선 목록',
     });
