@@ -402,7 +402,9 @@
             UNION ALL
             SELECT owner_id, comment_id, created_at, 'SYSTEM' AS comment_type
             FROM system_roots
-        ), cursor_item AS (
+        )
+        <if test="beforeCommentId != null">
+        , cursor_item AS (
             SELECT c.owner_id, c.created_at, c.comment_id
             FROM tb_common_comment c
             WHERE c.tenant_id = #{tenantId}
@@ -412,16 +414,15 @@
                   #{ownerId}
               </foreach>
               AND c.comment_id = #{beforeCommentId}
-        ), eligible_roots AS (
+        )
+        </if>
+        , eligible_roots AS (
             SELECT root.owner_id, root.comment_id, root.created_at, root.comment_type
             FROM stream_roots root
             <if test="beforeCommentId != null">
                 JOIN cursor_item cursor
                   ON cursor.owner_id = root.owner_id
-                 AND (root.created_at, root.comment_id) &lt; (cursor.created_at, cursor.comment_id)
-            </if>
-            <if test="beforeCommentId == null">
-                WHERE NOT EXISTS (SELECT 1 FROM cursor_item)
+                  AND (root.created_at, root.comment_id) &lt; (cursor.created_at, cursor.comment_id)
             </if>
         ), ranked_roots AS (
             SELECT owner_id, comment_id, created_at,
@@ -537,7 +538,7 @@
             UNION ALL
             SELECT owner_id, comment_id FROM system_roots
         )
-        SELECT owner_id AS ownerId, COUNT(*) AS totalCount
+        SELECT owner_id AS "ownerId", COUNT(*) AS "totalCount"
         FROM stream_roots
         GROUP BY owner_id
     </select>

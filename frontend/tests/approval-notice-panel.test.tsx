@@ -15,6 +15,39 @@ const item: DocumentWriteItem = {
 };
 
 describe('ApprovalNoticePanel', () => {
+  it('shows the drafter, full document kind, status badge and actual submitted date', () => {
+    render(
+      <ApprovalNoticePanel
+        items={[{
+          ...item,
+          submittedDate: '2026.10.14',
+          statusColor: 'info',
+          statusVariant: 'filled',
+        }]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('기안자')).toBeInTheDocument();
+    expect(screen.getByText(item.author)).toBeInTheDocument();
+    expect(screen.getByText('업무구분')).toBeInTheDocument();
+    expect(screen.getByText('기안서')).toBeInTheDocument();
+    expect(screen.getByText('상신일')).toBeInTheDocument();
+    expect(screen.getByText('2026.10.14')).toBeInTheDocument();
+    expect(screen.getByText(item.status).closest('.MuiChip-root')).toHaveClass(
+      'MuiChip-colorInfo',
+      'MuiChip-filled',
+    );
+    expect(screen.queryByText(item.date)).not.toBeInTheDocument();
+  });
+
+  it('does not substitute the list date when the submitted date is missing', () => {
+    render(<ApprovalNoticePanel items={[item]} onSelect={() => undefined} />);
+
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText(item.date)).not.toBeInTheDocument();
+  });
+
   it('left-aligns the full-width notice and constrains long titles', () => {
     render(<ApprovalNoticePanel items={[item]} onSelect={() => undefined} />);
 

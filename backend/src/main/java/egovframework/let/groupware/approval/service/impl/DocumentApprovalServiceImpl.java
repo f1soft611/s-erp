@@ -1,6 +1,8 @@
 package egovframework.let.groupware.approval.service.impl;
 
 import java.net.URI;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.Locale;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpStatus;
@@ -41,6 +44,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedIte
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
@@ -59,6 +65,13 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             "DRAFTING", "BUSINESS_CONTACT", "EXPENSE_RESOLUTION", "ATTENDANCE_APPLICATION")));
     private static final Set<String> PARTICIPANT_TYPES = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("APPROVAL", "AGREEMENT", "REFERENCE")));
+    private static final Set<String> DOCUMENT_STATUSES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "DRAFT", "PENDING", "IN_PROGRESS", "REVISION_REQUESTED", "COMPLETED", "REJECTED")));
+    private static final Set<String> DOCUMENT_SCOPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED")));
+    private static final Set<String> DOCUMENT_SORT_FIELDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "eabusNo", "title", "documentType", "documentStatus", "submittedAt",
+            "drafterName", "drafterDepartmentName", "updatedAt")));
 
     private final DocumentApprovalDAO documentApprovalDAO;
     private final CommonCommentDAO commonCommentDAO;
@@ -389,6 +402,83 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("electronicApprovalId", electronicApprovalId);
         List<DocumentApprovalListItemVO> documents = documentApprovalDAO.selectRelatedDocumentList(params);
         return documents == null ? Collections.<DocumentApprovalListItemVO>emptyList() : documents;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentApprovalListPageVO searchDocuments(LoginVO user, String scope,
+            DocumentApprovalListQueryVO query) throws Exception {
+        validateAuthenticatedUser(user);
+        if (scope == null) {
+            scope = "ALL";
+        }
+        if (!DOCUMENT_SCOPES.contains(scope) || query == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+
+        String documentType = normalizeText(query.getDocumentType());
+        String documentStatus = normalizeText(query.getDocumentStatus());
+        if ((documentType != null && !DOCUMENT_TYPES.contains(documentType))
+                || (documentStatus != null && !DOCUMENT_STATUSES.contains(documentStatus))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+
+        int offset = query.getOffset() == null ? 0 : query.getOffset();
+        int limit = query.getLimit() == null ? 200 : query.getLimit();
+        if (offset < 0 || limit < 1 || limit > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 범위가 올바르지 않습니다.");
+        }
+
+        String sortField = normalizeText(query.getSortField());
+        if (sortField == null) {
+            sortField = "updatedAt";
+        } else if (!DOCUMENT_SORT_FIELDS.contains(sortField)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 정렬 조건이 올바르지 않습니다.");
+        }
+        String sortDirection = normalizeText(query.getSortDirection());
+        if (sortDirection == null) {
+            sortDirection = "DESC";
+        } else {
+            sortDirection = sortDirection.toUpperCase(Locale.ROOT);
+            if (!"ASC".equals(sortDirection) && !"DESC".equals(sortDirection)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 정렬 조건이 올바르지 않습니다.");
+            }
+        }
+
+        LocalDate submittedAtFrom = parseOptionalDate(query.getSubmittedAtFrom());
+        LocalDate submittedAtTo = parseOptionalDate(query.getSubmittedAtTo());
+        LocalDate updatedAtFrom = parseOptionalDate(query.getUpdatedAtFrom());
+        LocalDate updatedAtTo = parseOptionalDate(query.getUpdatedAtTo());
+        validateDateRange(submittedAtFrom, submittedAtTo);
+        validateDateRange(updatedAtFrom, updatedAtTo);
+
+        Map<String, Object> params = actorParams(user);
+        params.put("scope", scope);
+        params.put("documentType", documentType);
+        params.put("documentStatus", documentStatus);
+        params.put("keyword", normalizeText(query.getKeyword()));
+        params.put("drafterNameFilter", normalizeText(query.getDrafterName()));
+        params.put("drafterDepartmentName", normalizeText(query.getDrafterDepartmentName()));
+        params.put("participantName", normalizeText(query.getParticipantName()));
+        params.put("submittedAtFrom", submittedAtFrom == null ? null : submittedAtFrom.toString());
+        params.put("submittedAtTo", submittedAtTo == null ? null : submittedAtTo.toString());
+        params.put("updatedAtFrom", updatedAtFrom == null ? null : updatedAtFrom.toString());
+        params.put("updatedAtTo", updatedAtTo == null ? null : updatedAtTo.toString());
+        params.put("offset", offset);
+        params.put("limit", limit);
+        params.put("sortField", sortField);
+        params.put("sortDirection", sortDirection);
+
+        List<DocumentApprovalStatusListItemVO> resultList = documentApprovalDAO.selectRelatedDocumentPage(params);
+        Long totalRowCount = documentApprovalDAO.countRelatedDocuments(params);
+        if (resultList == null || totalRowCount == null) {
+            throw new IllegalStateException("전자결재 문서 검색 결과를 확인할 수 없습니다.");
+        }
+
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(resultList);
+        page.setTotalRowCount(totalRowCount);
+        return page;
     }
 
     @Override
@@ -1403,6 +1493,31 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("drafterName", user.getName());
         params.put("documentStatus", "DRAFT");
         return params;
+    }
+
+    private String normalizeText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        String normalizedValue = normalizeText(value);
+        if (normalizedValue == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(normalizedValue);
+        } catch (DateTimeParseException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 날짜 조건이 올바르지 않습니다.");
+        }
+    }
+
+    private void validateDateRange(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 날짜 범위가 올바르지 않습니다.");
+        }
     }
 
     private DocumentApprovalDraftVO draftResponse(Long approvalId) {

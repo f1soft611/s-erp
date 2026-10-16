@@ -47,6 +47,7 @@ function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
     documentStatus: record.documentStatus,
     author: record.drafterName,
     date: formatDate(record.submittedAt ?? record.updatedAt ?? record.createdAt),
+    submittedDate: formatDate(record.submittedAt),
     summary: record.summary,
   };
 }

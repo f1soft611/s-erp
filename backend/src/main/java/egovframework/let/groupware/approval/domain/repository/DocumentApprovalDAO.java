@@ -12,6 +12,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailV
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 
@@ -121,6 +122,15 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public List<DocumentApprovalListItemVO> selectRelatedDocumentList(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectRelatedDocumentList", params);
+    }
+
+    public List<DocumentApprovalStatusListItemVO> selectRelatedDocumentPage(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectRelatedDocumentPage", params);
+    }
+
+    public Long countRelatedDocuments(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.countRelatedDocuments", params);
     }
 
     public DocumentApprovalSummaryVO selectDocumentApprovalSummary(Map<String, Object> params) throws Exception {

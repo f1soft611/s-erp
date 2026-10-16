@@ -73,6 +73,7 @@ export type DocumentWriteItem = {
   badgeBorderRadius?: string;
   author: string;
   date: string;
+  submittedDate?: string;
   summary: string;
   isPinned?: boolean;
   documentStatus?: ApprovalDocumentStatus;

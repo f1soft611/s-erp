@@ -62,6 +62,14 @@
         <result property="noticeType" column="notice_type"/>
     </resultMap>
 
+    <resultMap id="statusListItem"
+            type="egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO"
+            extends="listItem">
+        <result property="drafterDepartmentName" column="drafter_department_name"/>
+        <result property="participantName" column="participant_name"/>
+        <result property="approvalProgress" column="approval_progress"/>
+    </resultMap>
+
     <resultMap id="summary"
             type="egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO">
         <result property="actionRequiredCount" column="action_required_count"/>
@@ -382,6 +390,131 @@
           AND participant_type IN ('APPROVAL', 'AGREEMENT')
           AND action_status = 'WAITING'
     </update>
+
+    <sql id="relatedDocumentStatusFilters">
+        WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
+          AND (
+              m.drafter_id = #{drafterId}
+              OR EXISTS (
+                  SELECT 1
+                  FROM public.tb_electronic_approval_line_info actor_line
+                  WHERE actor_line.tenant_id = m.tenant_id
+                    AND actor_line.electronic_approval_id = m.electronic_approval_id
+                    AND actor_line.participant_user_id = #{participantUserId}
+              )
+          )
+        <if test="scope == 'MY_PENDING'">
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info pending_line
+                WHERE pending_line.tenant_id = m.tenant_id
+                  AND pending_line.electronic_approval_id = m.electronic_approval_id
+                  AND pending_line.participant_user_id = #{participantUserId}
+                  AND pending_line.action_status = 'PENDING'
+            )
+        </if>
+        <if test="scope == 'IN_PROGRESS'">
+            AND m.document_status IN ('PENDING', 'IN_PROGRESS')
+        </if>
+        <if test="scope == 'DRAFT'">
+            AND m.drafter_id = #{drafterId}
+            AND m.document_status = 'DRAFT'
+        </if>
+        <if test="scope == 'COMPLETED' or scope == 'REVISION_REQUESTED' or scope == 'REJECTED'">
+            AND m.document_status = #{scope}
+        </if>
+        <if test="documentType != null and documentType != ''">
+            AND m.document_type = #{documentType}
+        </if>
+        <if test="electronicApprovalId != null">
+            AND m.electronic_approval_id = #{electronicApprovalId}
+        </if>
+        <if test="documentStatus != null and documentStatus != ''">
+            AND m.document_status = #{documentStatus}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                m.eabus_no ILIKE '%' || #{keyword} || '%'
+                OR m.title ILIKE '%' || #{keyword} || '%'
+                OR m.drafter_name ILIKE '%' || #{keyword} || '%'
+            )
+        </if>
+        <if test="drafterNameFilter != null and drafterNameFilter != ''">
+            AND m.drafter_name ILIKE '%' || #{drafterNameFilter} || '%'
+        </if>
+        <if test="drafterDepartmentName != null and drafterDepartmentName != ''">
+            AND m.drafter_department_name ILIKE '%' || #{drafterDepartmentName} || '%'
+        </if>
+        <if test="participantName != null and participantName != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info participant_line
+                WHERE participant_line.tenant_id = m.tenant_id
+                  AND participant_line.electronic_approval_id = m.electronic_approval_id
+                  AND participant_line.participant_name ILIKE '%' || #{participantName} || '%'
+            )
+        </if>
+        <if test="submittedAtFrom != null and submittedAtFrom != ''">
+            AND m.submitted_at &gt;= CAST(#{submittedAtFrom} AS date)
+        </if>
+        <if test="submittedAtTo != null and submittedAtTo != ''">
+            AND m.submitted_at &lt; CAST(#{submittedAtTo} AS date) + INTERVAL '1 day'
+        </if>
+        <if test="updatedAtFrom != null and updatedAtFrom != ''">
+            AND m.updated_at &gt;= CAST(#{updatedAtFrom} AS date)
+        </if>
+        <if test="updatedAtTo != null and updatedAtTo != ''">
+            AND m.updated_at &lt; CAST(#{updatedAtTo} AS date) + INTERVAL '1 day'
+        </if>
+    </sql>
+
+    <select id="selectRelatedDocumentPage" parameterType="map" resultMap="statusListItem">
+        SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,
+               m.title, m.drafter_name, m.drafter_department_name,
+               m.created_at, m.updated_at, m.submitted_at,
+               NULL::varchar AS notice_type,
+               COALESCE((
+                   SELECT string_agg(line.participant_name, ', ' ORDER BY line.stage_order, line.participant_order)
+                   FROM public.tb_electronic_approval_line_info line
+                   WHERE line.tenant_id = m.tenant_id
+                     AND line.electronic_approval_id = m.electronic_approval_id
+               ), '') AS participant_name,
+               COALESCE((
+                   SELECT COUNT(*) FILTER (WHERE line.action_status = 'APPROVED')::varchar
+                          || '/' || COUNT(*)::varchar
+                   FROM public.tb_electronic_approval_line_info line
+                   WHERE line.tenant_id = m.tenant_id
+                     AND line.electronic_approval_id = m.electronic_approval_id
+                     AND line.participant_type IN ('APPROVAL', 'AGREEMENT')
+                   HAVING COUNT(*) &gt; 0
+               ), '') AS approval_progress
+        FROM public.tb_electronic_approval_main m
+        <include refid="relatedDocumentStatusFilters"/>
+        ORDER BY
+        <choose>
+            <when test="sortField == 'eabusNo'">m.eabus_no</when>
+            <when test="sortField == 'title'">m.title</when>
+            <when test="sortField == 'documentType'">m.document_type</when>
+            <when test="sortField == 'documentStatus'">m.document_status</when>
+            <when test="sortField == 'submittedAt'">m.submitted_at</when>
+            <when test="sortField == 'drafterName'">m.drafter_name</when>
+            <when test="sortField == 'drafterDepartmentName'">m.drafter_department_name</when>
+            <otherwise>m.updated_at</otherwise>
+        </choose>
+        <choose>
+            <when test="sortDirection == 'ASC'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        m.electronic_approval_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRelatedDocuments" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM public.tb_electronic_approval_main m
+        <include refid="relatedDocumentStatusFilters"/>
+    </select>
 
     <select id="selectRelatedDocumentList" parameterType="map" resultMap="listItem">
         SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,

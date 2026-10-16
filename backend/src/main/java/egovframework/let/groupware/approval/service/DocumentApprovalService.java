@@ -17,6 +17,8 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalComment
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 
 public interface DocumentApprovalService {
@@ -32,6 +34,8 @@ public interface DocumentApprovalService {
     DocumentApprovalDraftVO cancelApproval(LoginVO user, Long electronicApprovalId) throws Exception;
     List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception;
+    DocumentApprovalListPageVO searchDocuments(LoginVO user, String scope,
+            DocumentApprovalListQueryVO query) throws Exception;
     List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception;
     DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception;

@@ -328,10 +328,10 @@ class DocumentApprovalMapperTest {
         params.put("limit", 4);
         params.put("beforeCommentId", null);
 
-        String pageSql = configuration
+        org.apache.ibatis.mapping.BoundSql initialPageBoundSql = configuration
                 .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
-                .getBoundSql(params)
-                .getSql();
+                .getBoundSql(params);
+        String pageSql = initialPageBoundSql.getSql();
         String threadSql = configuration
                 .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds")
                 .getBoundSql(params)
@@ -346,16 +346,20 @@ class DocumentApprovalMapperTest {
                 .getSql();
 
         params.put("beforeCommentId", 103L);
-        String olderPageSql = configuration
+        org.apache.ibatis.mapping.BoundSql olderPageBoundSql = configuration
                 .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
-                .getBoundSql(params)
-                .getSql();
+                .getBoundSql(params);
+        String olderPageSql = olderPageBoundSql.getSql();
 
         assertThat(pageSql)
                 .contains("comment_type = 'USER'")
                 .contains("comment_type = 'SYSTEM'")
                 .contains("PARTITION BY owner_id")
-                .contains("created_at DESC, comment_id DESC");
+                .contains("created_at DESC, comment_id DESC")
+                .doesNotContain("cursor_item");
+        assertThat(initialPageBoundSql.getParameterMappings())
+                .extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
+                .doesNotContain("beforeCommentId");
         assertThat(threadSql)
                 .contains("parent_comment_id")
                 .contains("comment_type = 'USER'")
@@ -363,7 +367,9 @@ class DocumentApprovalMapperTest {
         assertThat(countSql)
                 .contains("BOOL_OR(deleted_yn = 'N')")
                 .contains("comment_type = 'SYSTEM'")
-                .contains("comment_type = 'USER'");
+                .contains("comment_type = 'USER'")
+                .contains("owner_id AS \"ownerId\"")
+                .contains("COUNT(*) AS \"totalCount\"");
         assertThat(cursorSql)
                 .contains("tenant_id = ?")
                 .contains("owner_id = ?")
@@ -371,6 +377,9 @@ class DocumentApprovalMapperTest {
         assertThat(olderPageSql)
                 .contains("JOIN cursor_item cursor")
                 .contains("(root.created_at, root.comment_id) < (cursor.created_at, cursor.comment_id)");
+        assertThat(olderPageBoundSql.getParameterMappings())
+                .extracting(org.apache.ibatis.mapping.ParameterMapping::getProperty)
+                .contains("beforeCommentId");
     }
 
     @Test
@@ -490,6 +499,73 @@ class DocumentApprovalMapperTest {
                     .as("%s excludes soft-deleted documents", statementId)
                     .contains("deleted_yn = 'N'");
         }
+    }
+
+    @Test
+    void documentStatusPageUsesActorScopedBoundFiltersAndMatchingCount() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentPage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.countRelatedDocuments")).isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("documentType", "GENERAL");
+        params.put("documentStatus", "COMPLETED");
+        params.put("keyword", "annual");
+        params.put("drafterNameFilter", "Alex");
+        params.put("drafterDepartmentName", "Finance");
+        params.put("participantName", "Sam");
+        params.put("submittedAtFrom", "2026-09-16");
+        params.put("submittedAtTo", "2026-10-16");
+        params.put("updatedAtFrom", "2026-10-01");
+        params.put("updatedAtTo", "2026-10-16");
+        params.put("offset", 0);
+        params.put("limit", 200);
+        params.put("sortField", "submittedAt");
+        params.put("sortDirection", "DESC");
+
+        BoundSql pageSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params);
+        BoundSql countSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.countRelatedDocuments")
+                .getBoundSql(params);
+        String normalizedPageSql = pageSql.getSql().replaceAll("\\s+", " ");
+        String normalizedCountSql = countSql.getSql().replaceAll("\\s+", " ");
+
+        assertThat(normalizedPageSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.drafter_id = ?")
+                .contains("actor_line.participant_user_id = ?")
+                .contains("m.eabus_no ILIKE")
+                .contains("m.title ILIKE")
+                .contains("m.drafter_name ILIKE")
+                .contains("m.drafter_department_name ILIKE")
+                .contains("participant_line.participant_name ILIKE")
+                .contains("m.submitted_at >= CAST(? AS date)")
+                .contains("m.submitted_at < CAST(? AS date) + INTERVAL '1 day'")
+                .contains("m.updated_at >= CAST(? AS date)")
+                .contains("m.updated_at < CAST(? AS date) + INTERVAL '1 day'")
+                .contains("ORDER BY m.submitted_at DESC")
+                .contains("LIMIT ? OFFSET ?");
+        assertThat(normalizedCountSql)
+                .contains("m.tenant_id = ?")
+                .contains("m.drafter_id = ?")
+                .contains("actor_line.participant_user_id = ?")
+                .contains("m.eabus_no ILIKE")
+                .contains("m.submitted_at >= CAST(? AS date)")
+                .contains("m.updated_at < CAST(? AS date) + INTERVAL '1 day'");
+        assertThat(pageSql.getParameterMappings())
+                .extracting(ParameterMapping::getProperty)
+                .contains("tenantId", "drafterId", "participantUserId", "keyword",
+                        "documentType", "documentStatus", "drafterNameFilter",
+                        "drafterDepartmentName", "participantName",
+                        "submittedAtFrom", "submittedAtTo",
+                        "updatedAtFrom", "updatedAtTo", "limit", "offset");
     }
 
     @Test

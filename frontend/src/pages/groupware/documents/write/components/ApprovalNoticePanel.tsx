@@ -1,4 +1,5 @@
-import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Fragment } from 'react';
 import type { DocumentWriteItem } from '../types/documentWrite.types';
 
 type ApprovalNoticePanelProps = {
@@ -32,7 +33,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                 justifyContent: 'flex-start',
                 width: '100%',
                 minWidth: 0,
-                gap: 0.5,
+                gap: 1,
                 p: 1.5,
                 border: '1px solid',
                 borderColor: 'divider',
@@ -43,21 +44,79 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                 textTransform: 'none',
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {item.status === '보완요청' ? '보완 요청 문서' : '결재 요청 도착'}
-              </Typography>
+              <Stack
+                component="span"
+                direction="row"
+                sx={{
+                  width: '100%',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 0.75,
+                }}
+              >
+                <Typography component="span" variant="caption" color="text.secondary">
+                  {item.status === '보완요청' ? '보완 요청 문서' : '결재 요청 도착'}
+                </Typography>
+                <Chip
+                  component="span"
+                  label={item.status}
+                  size="small"
+                  color={item.statusColor ?? 'default'}
+                  variant={item.statusVariant ?? 'outlined'}
+                  sx={{
+                    height: 22,
+                    fontWeight: 700,
+                    borderRadius: item.badgeBorderRadius ?? '8px',
+                  }}
+                />
+              </Stack>
               <Typography
-                variant="caption"
-                color="text.secondary"
+                component="span"
+                variant="body2"
                 sx={{
                   width: '100%',
                   minWidth: 0,
                   overflowWrap: 'anywhere',
                   lineHeight: 1.5,
+                  fontWeight: 700,
                 }}
               >
                 {item.title}
               </Typography>
+              <Box
+                component="span"
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto minmax(0, 1fr)',
+                  columnGap: 1.5,
+                  rowGap: 0.5,
+                  width: '100%',
+                  minWidth: 0,
+                  pt: 1,
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                {[
+                  ['업무구분', item.kind],
+                  ['기안자', item.author],
+                  ['상신일', item.submittedDate || '—'],
+                ].map(([label, value]) => (
+                  <Fragment key={label}>
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {label}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      sx={{ minWidth: 0, overflowWrap: 'anywhere' }}
+                    >
+                      {value}
+                    </Typography>
+                  </Fragment>
+                ))}
+              </Box>
             </Button>
           ))}
           {items.length === 0 && (

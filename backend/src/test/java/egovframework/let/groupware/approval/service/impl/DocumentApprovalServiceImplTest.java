@@ -46,6 +46,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedIte
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
@@ -218,6 +221,58 @@ class DocumentApprovalServiceImplTest {
         verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
         verify(approvalDAO, never()).selectApprovalLines(anyMap());
         verifyNoInteractions(commentDAO, fileService);
+    }
+
+    @Test
+    void statusPageForwardsFiltersAndKeepsAuthenticatedActorScope() throws Exception {
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setKeyword("annual");
+        query.setDocumentType("DRAFTING");
+        query.setDocumentStatus("COMPLETED");
+        query.setSubmittedAtFrom("2026-09-16");
+        query.setSubmittedAtTo("2026-10-16");
+        query.setDrafterName("Morgan");
+        query.setDrafterDepartmentName("Finance");
+        query.setParticipantName("Sam");
+        query.setOffset(25);
+        query.setLimit(100);
+        query.setSortField("submittedAt");
+        query.setSortDirection("ASC");
+
+        DocumentApprovalStatusListItemVO item = new DocumentApprovalStatusListItemVO();
+        item.setElectronicApprovalId(77L);
+        when(approvalDAO.selectRelatedDocumentPage(anyMap())).thenReturn(Collections.singletonList(item));
+        when(approvalDAO.countRelatedDocuments(anyMap())).thenReturn(321L);
+
+        DocumentApprovalListPageVO page = (DocumentApprovalListPageVO) invokeApprovalMethod(
+                "searchDocuments",
+                new Class<?>[] { LoginVO.class, String.class, DocumentApprovalListQueryVO.class },
+                author, "ALL", query);
+
+        assertThat(page.getResultList()).containsExactly(item);
+        assertThat(page.getTotalRowCount()).isEqualTo(321L);
+        verify(approvalDAO).selectRelatedDocumentPage(argThat(params ->
+            "annual".equals(params.get("keyword"))
+                && "DRAFTING".equals(params.get("documentType"))
+                && "COMPLETED".equals(params.get("documentStatus"))
+                && "2026-09-16".equals(params.get("submittedAtFrom"))
+                && "2026-10-16".equals(params.get("submittedAtTo"))
+                && "Morgan".equals(params.get("drafterNameFilter"))
+                && "작성자".equals(params.get("drafterName"))
+                && "Finance".equals(params.get("drafterDepartmentName"))
+                && "Sam".equals(params.get("participantName"))
+                && Integer.valueOf(25).equals(params.get("offset"))
+                && Integer.valueOf(100).equals(params.get("limit"))
+                && "submittedAt".equals(params.get("sortField"))
+                && "ASC".equals(params.get("sortDirection"))
+                && Long.valueOf(4L).equals(params.get("tenantId"))
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))));
+        verify(approvalDAO).countRelatedDocuments(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))
+                && "COMPLETED".equals(params.get("documentStatus"))));
     }
 
     @Test
