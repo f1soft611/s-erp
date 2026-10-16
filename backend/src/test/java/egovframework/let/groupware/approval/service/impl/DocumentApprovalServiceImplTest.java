@@ -46,6 +46,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedIte
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineBatchVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
@@ -202,6 +203,26 @@ class DocumentApprovalServiceImplTest {
         verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
         verify(approvalDAO, never()).selectApprovalLines(anyMap());
         verifyNoInteractions(commentDAO, fileService);
+    }
+
+    @Test
+    void relatedDocumentListAndSummaryUseAuthenticatedParticipantId() throws Exception {
+        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.<DocumentApprovalListItemVO>emptyList());
+
+        service().listDocuments(author, "ALL", null, null);
+
+        verify(approvalDAO).selectRelatedDocumentList(argThat(params ->
+            "101".equals(params.get("participantUserId"))));
+
+        when(approvalDAO.selectDocumentApprovalSummary(anyMap())).thenReturn(new DocumentApprovalSummaryVO());
+        when(approvalDAO.selectApprovalNotices(anyMap())).thenReturn(Collections.<DocumentApprovalListItemVO>emptyList());
+
+        service().getSummary(author);
+
+        verify(approvalDAO).selectDocumentApprovalSummary(argThat(params ->
+            "101".equals(params.get("participantUserId"))));
+        verify(approvalDAO).selectApprovalNotices(argThat(params ->
+            "101".equals(params.get("participantUserId"))));
     }
 
     @Test
@@ -577,26 +598,33 @@ class DocumentApprovalServiceImplTest {
     }
 
     @Test
-    void listApprovalCommentsUsesUserOnlyPageAndRootCount() throws Exception {
+    void listApprovalCommentsIncludesSystemMessagesInThePagedResponse() throws Exception {
         when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
         CommonCommentVO comment = approvalComment(55L, "login-author", "USER");
+        CommonCommentVO systemEvent = approvalComment(56L, "login-author", "SYSTEM");
+        systemEvent.setEventType("SUBMITTED");
+        systemEvent.setContent("문서가 결재신청되었습니다.");
+        systemEvent.setCreatedAt(new java.util.Date(1_792_119_600_000L));
         when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
+        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.singletonList(systemEvent));
         when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
         when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.<CommonFileVO>emptyList());
 
-        CommonCommentPageVO page = (CommonCommentPageVO) invokeApprovalMethod(
+        Object page = invokeApprovalMethod(
                 "listApprovalComments",
                 new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
                 author, 77L, 3, null);
+        com.fasterxml.jackson.databind.JsonNode json = new ObjectMapper().valueToTree(page);
 
-        assertThat(page.getComments()).containsExactly(comment);
-        assertThat(page.getResultCnt()).isEqualTo(1L);
+        assertThat(json.path("comments").size()).isEqualTo(1);
+        assertThat(json.path("systemEvents").path(0).path("commentId").asLong()).isEqualTo(56L);
+        assertThat(json.path("resultCnt").asLong()).isEqualTo(2L);
+        verify(commentDAO).selectApprovalSystemEvents(argThat(params ->
+            params.get("tenantId").equals(4L) && params.get("ownerId").equals(77L)));
         verify(commentDAO).selectApprovalUserCommentPage(argThat(params ->
             params.get("tenantId").equals(4L)
                 && params.get("ownerId").equals(77L)
                 && params.get("limit").equals(4)));
-        verify(commentDAO).countApprovalUserComments(argThat(params ->
-            params.get("tenantId").equals(4L) && params.get("ownerId").equals(77L)));
     }
 
     @Test

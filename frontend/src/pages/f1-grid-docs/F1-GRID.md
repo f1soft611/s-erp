@@ -86,7 +86,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.
-- 우클릭 컨텍스트 메뉴에서 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 조합해 각 화면에서 필요한 액션만 노출할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
+- 우클릭 컨텍스트 메뉴에서 `disableContextMenu`로 전체 메뉴를 끄거나 `canExportExcel`, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`로 항목별 노출을 제어할 수 있다. `createDuplicate`를 제공하면 행 복사 액션이 동작한다.
 - 선택형 `rowFormPlugin`으로 컬럼 정의 기반의 신규·수정 행 폼 모달과 우측 고정 `상세` 액션 열을 활성화할 수 있다. 플러그인이 없거나 `enabled: false`이면 기존 인라인 편집과 즉시 행 추가 동작을 유지한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
@@ -1512,7 +1512,7 @@ interface GridDataState<T> {
 
 # 25. Grid Context Menu
 
-F1-Grid 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)를 그대로 사용한다.
+기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 우클릭 대상 셀/행 선택은 유지한다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
 
 일반 F1Grid의 메뉴 구성:
 
@@ -1538,6 +1538,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 관련 Props:
 
+- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
 - `canExportExcel?: boolean` — 엑셀 내보내기 메뉴 노출 여부. 기본값 `false`(미표시). 페이지별 엑셀 권한과 연동해서 사용한다(예: 메뉴관리 화면).
 - `excelFileName?: string` — 내보낼 파일명(확장자 `.xlsx`는 자동 부여). 기본값은 `${ariaLabel}-export`.
 - `allowAddRowInContextMenu?: boolean` — 우클릭 메뉴에 `행 추가` 및 일반 F1Grid의 `위에 행 삽입`/`아래에 행 삽입`을 노출할지 여부. 기본값 `true`.

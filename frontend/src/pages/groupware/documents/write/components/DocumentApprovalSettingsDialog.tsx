@@ -1154,7 +1154,7 @@ export function DocumentApprovalSettingsDialog({
             </Typography>
             <Box
               sx={{
-                alignItems: 'flex-start',
+                alignItems: 'stretch',
                 display: 'flex',
                 gap: 1,
                 minWidth: 0,
@@ -1164,6 +1164,7 @@ export function DocumentApprovalSettingsDialog({
                 select
                 fullWidth
                 size="small"
+                margin="none"
                 value={selectedTemplateId ?? ''}
                 disabled={favoritesDisabled || templateListLoading}
                 onChange={(event) => {
@@ -1186,9 +1187,29 @@ export function DocumentApprovalSettingsDialog({
                     displayEmpty: true,
                   },
                 }}
-                sx={{ flex: '1 1 auto', minWidth: 0 }}
+                sx={{
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  '& .MuiOutlinedInput-root': {
+                    minHeight: 38,
+                    py: 0,
+                  },
+                  '& .MuiSelect-select': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    minHeight: 'unset',
+                    py: 0,
+                  },
+                }}
               >
-                <MenuItem value="">등록된 자주 쓰는 결재선</MenuItem>
+                <MenuItem value="">
+                  <Typography
+                    component="span"
+                    sx={{ fontSize: '0.82rem', fontWeight: 600 }}
+                  >
+                    자주 쓰는 결재선 선택
+                  </Typography>
+                </MenuItem>
                 {favoriteTemplates.map((template) => (
                   <MenuItem
                     key={template.templateId}
@@ -1368,6 +1389,7 @@ export function DocumentApprovalSettingsDialog({
             loading={favoriteOperation === 'list'}
             disableSorting
             disableFiltering
+            disableContextMenu
             allowAddRowInContextMenu={false}
             allowDuplicateRowInContextMenu={false}
             allowDeleteRowInContextMenu={false}

@@ -1426,6 +1426,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("tenantId", user.getTenantId());
         params.put("drafterId", user.getId());
         params.put("drafterUserId", user.getUniqId());
+        params.put("participantUserId", user.getUniqId());
         params.put("drafterName", user.getName());
         params.put("documentStatus", "DRAFT");
         return params;

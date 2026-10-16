@@ -25,6 +25,9 @@ top-level stream item. Select items by descending creation time, using the
 persisted comment ID as a stable tie-breaker. Render each selected page in
 chronological order. Keep replies attached to their parent user comment and
 include them in the response with that root; replies do not consume page slots.
+A deleted user-comment root with at least one non-deleted descendant remains a
+visible tombstone thread and counts as one USER stream item. A thread whose root
+and every descendant are deleted is excluded.
 
 The initial page has a limit of three stream items. Each previous-page request
 has a limit of 20. Both limits and the cursor operate over the combined stream,
@@ -39,6 +42,9 @@ persisted comment ID so they can participate in the unified cursor and stable
 ordering. `commentCount` represents the total number of top-level stream items
 (user-comment roots plus system messages); replies are not additional stream
 items. The UI must not add the displayed system-message count a second time.
+USER roots use the existing thread-visibility rule: include a root when its
+tree contains at least one non-deleted comment, even if the root itself is a
+deleted-comment tombstone. Count that visible thread once.
 
 The same paging contract applies to preloaded feed details and to the existing
 document-detail comment endpoint. Older pages append to the currently loaded
@@ -84,11 +90,13 @@ the cursor. Invalid or missing page metadata remains an API contract error.
 
 - The initial page contains at most three top-level items across user comments
   and system messages, ordered by creation time; all replies of selected user
-  comment roots remain attached.
+  comment roots remain attached. A deleted root with a live reply is counted
+  once as its visible tombstone thread; a fully deleted thread is excluded.
 - Previous-page requests return at most 20 older combined items, advance the
   cursor across either item type, and stop when none remain.
 - Total and remaining counts include system messages exactly once and exclude
-  replies as separate page items.
+  replies as separate page items while counting every visible USER thread,
+  including a deleted root with live replies, exactly once.
 - Feed preloaded data and list-detail comment paging use the same mixed-page
   contract.
 - Existing user-comment mutations, attachments, error/retry behavior, and

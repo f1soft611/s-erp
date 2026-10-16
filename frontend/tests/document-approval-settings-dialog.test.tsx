@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
 import '@testing-library/jest-dom/vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,6 +31,7 @@ vi.mock(
 );
 
 import { DocumentApprovalSettingsDialog } from '../src/pages/groupware/documents/write/components/DocumentApprovalSettingsDialog';
+import { createAppTheme } from '../src/theme/theme';
 import type { DocumentApprovalStage } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import type { F1GridUserOption } from '../src/shared/components/f1-grid/types/grid.types';
 
@@ -78,10 +80,11 @@ function renderSettings(
       referenceIds: string[],
     ) => void;
   }> = {},
+  withAppTheme = false,
 ) {
   const onClose = overrides.onClose ?? vi.fn();
   const onApply = overrides.onApply ?? vi.fn();
-  render(
+  const dialog = (
     <DocumentApprovalSettingsDialog
       open
       documentCode="001"
@@ -90,7 +93,14 @@ function renderSettings(
       referenceUserIds={overrides.referenceUserIds ?? ['reference-1']}
       onClose={onClose}
       onApply={onApply}
-    />,
+    />
+  );
+  render(
+    withAppTheme ? (
+      <ThemeProvider theme={createAppTheme()}>{dialog}</ThemeProvider>
+    ) : (
+      dialog
+    ),
   );
   return { onClose, onApply };
 }
@@ -165,6 +175,16 @@ function getTemplateManagerCloseButton() {
 }
 
 describe('DocumentApprovalSettingsDialog', () => {
+  it('stretches the favorite selector and settings button to the same row height', () => {
+    renderSettings();
+
+    const settingsButton = screen.getByRole('button', { name: '설정' });
+    const controlsRow = settingsButton.parentElement;
+
+    expect(controlsRow).not.toBeNull();
+    expect(controlsRow).toHaveStyle({ alignItems: 'stretch' });
+  });
+
   it('loads the current approval line and references while keeping the drafter fixed', () => {
     renderSettings();
 
@@ -292,13 +312,25 @@ describe('DocumentApprovalSettingsDialog', () => {
 
   it('shows the registration prompt when no favorites are registered', async () => {
     templateApi.list.mockResolvedValue([]);
-    renderSettings();
+    renderSettings({}, true);
 
     const select = await screen.findByRole('combobox', {
       name: '자주 쓰는 결재선',
     });
     await waitFor(() => expect(select).toBeEnabled());
-    expect(select).toHaveTextContent('등록된 자주 쓰는 결재선');
+    const selectInput = select.closest('.MuiOutlinedInput-root');
+    const selectField = select.closest('.MuiFormControl-root');
+    const settingsButton = screen.getByRole('button', { name: '설정' });
+    const approvalButton = screen.getByRole('button', { name: '결재 추가' });
+    const agreementButton = screen.getByRole('button', { name: '합의 추가' });
+    const prompt = screen.getByText('자주 쓰는 결재선 선택');
+
+    expect(selectInput).toHaveStyle({ minHeight: '38px' });
+    expect(selectField).not.toHaveClass('MuiFormControl-marginNormal');
+    expect(prompt).toHaveStyle({ fontSize: '0.82rem', fontWeight: '600' });
+    expect(settingsButton).toHaveClass('MuiButton-sizeMedium');
+    expect(approvalButton).toHaveClass('MuiButton-sizeMedium');
+    expect(agreementButton).toHaveClass('MuiButton-sizeMedium');
   });
 
   it('retries a failed favorite list request', async () => {
@@ -456,7 +488,7 @@ describe('DocumentApprovalSettingsDialog', () => {
     const select = await screen.findByRole('combobox', {
       name: '자주 쓰는 결재선',
     });
-    expect(select).toHaveTextContent('등록된 자주 쓰는 결재선');
+    expect(select).toHaveTextContent('자주 쓰는 결재선 선택');
     fireEvent.click(
       within(screen.getByRole('dialog', { name: '결재선 설정' })).getByRole(
         'button',

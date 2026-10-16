@@ -166,6 +166,12 @@ const sections: DocSection[] = [
       ),
       api('disableSorting', 'boolean', '그리드 정렬 UI와 동작을 비활성화.', 'false'),
       api('disableFiltering', 'boolean', '그리드 필터 UI와 동작을 비활성화.', 'false'),
+      api(
+        'disableContextMenu',
+        'boolean',
+        'F1Grid/F1Tree 바디 우클릭 메뉴와 브라우저 기본 메뉴를 비활성화하며 대상 선택은 유지.',
+        'false',
+      ),
       api('canExportExcel', 'boolean', '컨텍스트 메뉴의 Excel 내보내기를 허용.', 'false'),
       api(
         'excelFileName',

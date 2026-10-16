@@ -15,6 +15,7 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  Popover,
   Stack,
   TextField,
   Typography,
@@ -33,6 +34,7 @@ import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerD
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import MessageOutlinedIcon from '@mui/icons-material/MessageOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { getStoredAuth } from '../../../../../shared/services/authService';
 import { fetchMyProfile } from '../../../../dashboard/services/profileSettings.service';
@@ -283,6 +285,10 @@ export function DocumentApprovalDetailFeed(
     Record<string, string>
   >({});
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [rejectionReasonPopover, setRejectionReasonPopover] = useState<{
+    anchorEl: HTMLElement;
+    reason: string;
+  } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [cancelDialogType, setCancelDialogType] = useState<
@@ -1179,6 +1185,10 @@ export function DocumentApprovalDetailFeed(
                             }}
                           >
                             {approvalLineGroups.approval.map((line, index) => {
+                              const rejectionReason =
+                                line.actionStatus === 'REJECTED'
+                                  ? line.actionComment
+                                  : null;
                               const statusTone =
                                 approvalLineStatusTones[line.actionStatus] ??
                                 'neutral';
@@ -1238,6 +1248,7 @@ export function DocumentApprovalDetailFeed(
                                         display: 'grid',
                                         alignContent: 'center',
                                         justifyItems: 'center',
+                                        position: 'relative',
                                         gap: 0.25,
                                         px: 0.5,
                                         borderBlock: '1px solid',
@@ -1288,17 +1299,48 @@ export function DocumentApprovalDetailFeed(
                                           line.actionStatus,
                                         )}
                                       </Avatar>
-                                      {line.actionComment && (
-                                        <Typography
-                                          variant="caption"
-                                          color="text.secondary"
-                                          title={line.actionComment}
-                                          noWrap
-                                          sx={{ maxWidth: '100%' }}
-                                        >
-                                          {line.actionComment}
-                                        </Typography>
-                                      )}
+                                      {rejectionReason &&
+                                        rejectionReason.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            aria-label={`${line.participantName} 반려 사유 보기`}
+                                            aria-haspopup="dialog"
+                                            onClick={(event) =>
+                                              setRejectionReasonPopover({
+                                                anchorEl: event.currentTarget,
+                                                reason: rejectionReason,
+                                              })
+                                            }
+                                            sx={{
+                                              position: 'absolute',
+                                              top: 4,
+                                              right: 8,
+                                              width: 24,
+                                              height: 24,
+                                              bgcolor: 'background.paper',
+                                              color: 'error.main',
+                                              '&:hover': {
+                                                bgcolor: 'background.default',
+                                              },
+                                            }}
+                                          >
+                                            <MessageOutlinedIcon
+                                              sx={{ fontSize: 16 }}
+                                            />
+                                          </IconButton>
+                                        )}
+                                      {line.actionStatus !== 'REJECTED' &&
+                                        line.actionComment && (
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            title={line.actionComment}
+                                            noWrap
+                                            sx={{ maxWidth: '100%' }}
+                                          >
+                                            {line.actionComment}
+                                          </Typography>
+                                        )}
                                     </Box>
                                     <Box
                                       data-testid={`approval-line-sequence-${line.electronicApprovalLineId}`}
@@ -1849,6 +1891,33 @@ export function DocumentApprovalDetailFeed(
           {detailCard}
         </PostDetailPanel>
       )}
+      <Popover
+        open={rejectionReasonPopover !== null}
+        anchorEl={rejectionReasonPopover?.anchorEl}
+        onClose={() => setRejectionReasonPopover(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            role: 'dialog',
+            'aria-label': '반려 사유',
+            sx: {
+              p: 1.5,
+              width: 320,
+              maxWidth: 'calc(100vw - 32px)',
+              maxHeight: 'calc(100dvh - 32px)',
+              overflowY: 'auto',
+            },
+          },
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          반려 사유
+        </Typography>
+        <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+          {rejectionReasonPopover?.reason}
+        </Typography>
+      </Popover>
       <Dialog
         open={isFeedPresentation && feedReasonAction !== null}
         onClose={() => {

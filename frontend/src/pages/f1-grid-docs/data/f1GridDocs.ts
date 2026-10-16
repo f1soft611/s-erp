@@ -898,17 +898,22 @@ const detailValues = {
     category: 'feature',
     group: 'selection-actions',
     description:
-      '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행합니다.',
+      '바디 우클릭으로 엑셀 내보내기, 행 추가, 필터/정렬 초기화, 레이아웃 복원 등을 수행하며 전체 메뉴를 비활성화할 수도 있습니다.',
     sections: [
       {
         type: 'prose',
         heading: 'Fast actions at the cursor',
-        body: 'F1-Grid 바디 영역을 우클릭하면 커서 위치에 컨텍스트 메뉴가 열립니다. 헤더 영역은 기존 정렬/필터/고정/숨김 메뉴를 유지하고, 바디 메뉴는 행 추가, 복사, 삭제, 컬럼 자동 맞춤, 엑셀 내보내기처럼 작업 성격이 강한 액션을 한 곳에 모아줍니다.',
+        body: '기본적으로 F1Grid와 F1Tree의 바디 영역을 우클릭하면 커서 위치에 컨텍스트 메뉴가 열립니다. disableContextMenu를 켜면 그리드 메뉴와 브라우저 기본 메뉴를 모두 막되 우클릭 대상 셀/행 선택은 유지합니다. 헤더의 정렬/필터/고정/숨김 메뉴는 영향을 받지 않습니다.',
       },
       {
         type: 'api',
         heading: 'Context menu props',
         rows: [
+          [
+            'disableContextMenu',
+            'boolean',
+            'F1Grid/F1Tree 바디 우클릭 메뉴 전체 비활성화 여부',
+          ],
           ['canExportExcel', 'boolean', '엑셀 내보내기 메뉴 노출 여부'],
           ['excelFileName', 'string', '다운로드 파일명 기본값'],
           [
@@ -938,19 +943,14 @@ const detailValues = {
       },
       {
         type: 'code',
-        heading: 'Enable the export menu',
+        heading: 'Disable the body context menu',
         code: `const columns = [{ field: 'name', headerName: '메뉴명', width: 220, editable: true }];
 
 <F1Grid
   rows={rows}
   columns={columns}
   rowKey="id"
-  canExportExcel
-  excelFileName="menu-export"
-  allowAddRowInContextMenu
-  allowDuplicateRowInContextMenu
-  allowDeleteRowInContextMenu
-  createDuplicate={(row) => ({ ...row, id: crypto.randomUUID() })}
+  disableContextMenu
 />`,
       },
     ],

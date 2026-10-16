@@ -501,6 +501,7 @@ function ContextMenuPlayground() {
   const [showAddRow, setShowAddRow] = useState(true);
   const [showDuplicateRow, setShowDuplicateRow] = useState(true);
   const [showDeleteRow, setShowDeleteRow] = useState(true);
+  const [contextMenuDisabled, setContextMenuDisabled] = useState(false);
 
   function createDuplicate(row: DemoRow): DemoRow {
     return {
@@ -514,10 +515,18 @@ function ContextMenuPlayground() {
       <Box className="f1-doc-playground-controls">
         <Typography variant="subtitle1">Try it</Typography>
         <Typography variant="body2">
-          우클릭 메뉴는 엑셀 내보내기와 같은 자주 쓰는 액션을 한 번에
-          제공합니다.
+          바디 우클릭 메뉴를 끄면 브라우저 메뉴도 표시하지 않으며, 우클릭
+          대상 선택과 헤더 메뉴는 유지됩니다.
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+          <Button
+            size="small"
+            onClick={() => setContextMenuDisabled((value) => !value)}
+          >
+            {contextMenuDisabled
+              ? 'Enable context menu'
+              : 'Disable context menu'}
+          </Button>
           <Button
             size="small"
             onClick={() => setExportEnabled((value) => !value)}
@@ -551,6 +560,7 @@ function ContextMenuPlayground() {
           ariaLabel="F1-Grid context menu example"
           height={260}
           showCheckbox
+          disableContextMenu={contextMenuDisabled}
           canExportExcel={exportEnabled}
           excelFileName="f1-grid-context-menu-demo"
           allowAddRowInContextMenu={showAddRow}

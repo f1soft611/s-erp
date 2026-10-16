@@ -34,7 +34,7 @@
 
 ## Contract to Implement
 
-The initial page limit is 3 per document and each older-page limit is 20. A page slot is a non-deleted top-level USER comment thread or one SYSTEM message. Replies accompany their USER root and do not consume slots. Sort page selection by `created_at DESC, comment_id DESC`; render the selected page chronologically. The cursor is the oldest selected root's persisted comment ID and works for either item type. For a previous-page request, resolve the cursor row within the same tenant/approval scope and select rows strictly older by `(created_at, comment_id)`, so equal timestamps and a cursor pointing to SYSTEM are handled deterministically. Batch feed queries must partition root ranking by `owner_id` so every document gets its own three-item initial page.
+The initial page limit is 3 per document and each older-page limit is 20. A page slot is a visible top-level USER thread or one SYSTEM message. A USER root qualifies when its tree contains at least one non-deleted comment; a deleted root with live replies remains a tombstone thread and counts once, while a fully deleted tree is excluded. Replies accompany their USER root and do not consume slots. Sort page selection by `created_at DESC, comment_id DESC`; render the selected page chronologically. The cursor is the oldest selected root's persisted comment ID and works for either item type. For a previous-page request, resolve the cursor row within the same tenant/approval scope and select rows strictly older by `(created_at, comment_id)`, so equal timestamps and a cursor pointing to SYSTEM are handled deterministically. Batch feed queries must partition root ranking by `owner_id` so every document gets its own three-item initial page.
 
 The approval-specific page response keeps the collections distinct:
 
@@ -48,7 +48,7 @@ The approval-specific page response keeps the collections distinct:
 }
 ```
 
-`resultCnt` counts USER roots plus SYSTEM messages, not replies. `systemEvents` carries each message's persisted `commentId`. The feed's `commentCount` has the same combined meaning. The frontend uses that count directly rather than adding the loaded system-message count again. Remaining count is total stream items minus loaded USER roots and SYSTEM messages; replies do not affect it.
+`resultCnt` counts visible USER threads plus SYSTEM messages, not replies. A deleted USER root with any live descendant is a visible thread and counts once. `systemEvents` carries each message's persisted `commentId`. The feed's `commentCount` has the same combined meaning. The frontend uses that count directly rather than adding the loaded system-message count again. Remaining count is total stream items minus loaded visible USER roots and SYSTEM messages; replies do not affect it.
 
 Example page selection: if the descending stream is `SYSTEM 105`, `USER 104`
 (with reply 110), `SYSTEM 103`, `USER 102`, then limit 3 returns USER root 104
@@ -86,6 +86,9 @@ system-event IDs equal `[103, 105]` in response order, and reply 110 remains
 under root 104. Assert `resultCnt` equals 4, `hasPrevious` is true, and
 `nextBeforeCommentId` equals 103. Run the feed case with at least two owners
 and assert each owner independently receives up to three mixed root items.
+Also arrange a deleted root with a live reply and a separate fully deleted
+thread. Assert the first is returned and counted once and the fully deleted
+thread is excluded from page results and `resultCnt`.
 
 - [ ] **Step 2: Run the focused tests and confirm they fail**
 
@@ -108,7 +111,7 @@ boundary. Assert no returned row duplicates the prior page.
 
 - [ ] **Step 4: Add mapper SQL assertions**
 
-Assert the mapped query scopes by tenant and approval owner, selects root USER and SYSTEM rows, filters the cursor boundary, orders deterministically by creation time and ID, and applies the per-owner page limit. Assert the matching count query counts only eligible top-level roots.
+Assert the mapped query scopes by tenant and approval owner, selects visible USER roots (including tombstone roots with live descendants) and SYSTEM rows, filters the cursor boundary, orders deterministically by creation time and ID, and applies the per-owner page limit. Assert the matching count query counts the same eligible USER thread roots plus SYSTEM roots.
 
 ## Task 3: Implement the Mixed Backend Page
 
@@ -126,7 +129,7 @@ Define `comments`, `systemEvents`, `hasPrevious`, `nextBeforeCommentId`, and `re
 
 - [ ] **Step 2: Select mixed root pages in MyBatis**
 
-Use the existing common-comment table and tenant/owner predicates. Select only eligible USER roots and SYSTEM messages into the same ordered page set. Apply `beforeCommentId` to either type, fetch one extra root to calculate `hasPrevious`, and return the selected root identity/type/time needed for mapping. Do not page reply rows as independent roots.
+Use the existing common-comment table and tenant/owner predicates. Select only visible USER roots (a thread is visible if any record in its tree is non-deleted) and SYSTEM messages into the same ordered page set. Apply `beforeCommentId` to either type, fetch one extra root to calculate `hasPrevious`, and return the selected root identity/type/time needed for mapping. Do not page reply rows as independent roots.
 
 - [ ] **Step 3: Attach USER replies and attachments**
 

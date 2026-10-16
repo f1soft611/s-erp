@@ -13,11 +13,13 @@ selector row to stretch its children so the 38px select and `설정` button have
 the same outer height, matching the adjacent approval-selection row. Keep the
 button's existing medium variant and limit the layout change to this row.
 
-Keep the select's 38px minimum height and vertically centered displayed value.
-Render the empty prompt `자주 쓰는 결재선 선택` with the same 0.82rem,
-600-weight typography as the `UserSelectEditor` input label. Leave selected
-template names at their existing typography. Keep the select's accessible name
-`자주 쓰는 결재선`, and retain all selection, loading, and manager behavior.
+Set the `TextField` margin to `none` to match `UserSelectEditor` and prevent
+default vertical margins from enlarging the row. Keep the select's 38px minimum
+height and vertically centered displayed value. Render the empty prompt
+`자주 쓰는 결재선 선택` with the same 0.82rem, 600-weight typography as the
+`UserSelectEditor` input label. Leave selected template names at their existing
+typography. Keep the select's accessible name `자주 쓰는 결재선`, and retain
+all selection, loading, and manager behavior.
 
 ## Verification
 

@@ -308,6 +308,63 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void approvalCommentStreamQueriesPageMixedRootsAndCountVisibleThreads() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalCommentStreamCursor"))
+                .isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("ownerIds", Arrays.asList(77L, 78L));
+        params.put("rootIds", Arrays.asList(103L, 104L));
+        params.put("limit", 4);
+        params.put("beforeCommentId", null);
+
+        String pageSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
+                .getBoundSql(params)
+                .getSql();
+        String threadSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalUserCommentThreadsByRootIds")
+                .getBoundSql(params)
+                .getSql();
+        String countSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds")
+                .getBoundSql(params)
+                .getSql();
+        String cursorSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamCursor")
+                .getBoundSql(params)
+                .getSql();
+
+        assertThat(pageSql)
+                .contains("comment_type = 'USER'")
+                .contains("comment_type = 'SYSTEM'")
+                .contains("PARTITION BY owner_id")
+                .contains("created_at DESC, comment_id DESC");
+        assertThat(threadSql)
+                .contains("parent_comment_id")
+                .contains("comment_type = 'USER'")
+                .contains("tenant_id = ?");
+        assertThat(countSql)
+                .contains("BOOL_OR(deleted_yn = 'N')")
+                .contains("comment_type = 'SYSTEM'")
+                .contains("comment_type = 'USER'");
+        assertThat(cursorSql)
+                .contains("tenant_id = ?")
+                .contains("owner_id = ?")
+                .contains("comment_id = ?");
+    }
+
+    @Test
     void detailViewCountAndViewerHistoryStatementsAreMappedWithTenantGuards() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");

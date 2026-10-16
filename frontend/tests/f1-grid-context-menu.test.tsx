@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import {
   act,
+  createEvent,
   fireEvent,
   render,
   screen,
@@ -86,6 +87,65 @@ describe('F1-Grid context menu', () => {
 
     fireEvent.contextMenu(getGridBody('테스트 그리드'));
     expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+  });
+
+  it('suppresses the F1Grid context menu while preserving right-click selection', () => {
+    render(
+      <F1Grid
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        ariaLabel="메뉴 비활성 그리드"
+        disableContextMenu
+      />,
+    );
+
+    const cell = screen.getByRole('gridcell', { name: 'Beta' });
+    const event = createEvent.contextMenu(cell, { button: 2 });
+    fireEvent(cell, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('suppresses the F1Tree context menu while preserving right-click selection', () => {
+    render(
+      <F1Tree
+        rows={treeRows}
+        columns={treeColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="메뉴 비활성 트리"
+        disableContextMenu
+      />,
+    );
+
+    const cell = screen.getByRole('gridcell', { name: 'Alpha' });
+    const event = createEvent.contextMenu(cell, { button: 2 });
+    fireEvent(cell, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+  });
+
+  it('closes an open context menu when context menus are disabled', async () => {
+    const props = {
+      rows: flatRows,
+      columns: flatColumns,
+      rowKey: 'id' as const,
+      ariaLabel: '동적 메뉴 비활성 그리드',
+    };
+    const view = render(<F1Grid {...props} />);
+
+    fireEvent.contextMenu(getGridBody(props.ariaLabel));
+    expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
+
+    view.rerender(<F1Grid {...props} disableContextMenu />);
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   });
 
   it.each([

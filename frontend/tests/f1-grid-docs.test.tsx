@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getF1GridDoc } from '../src/pages/f1-grid-docs/data/f1GridDocs';
 import { F1GridDocsPage } from '../src/pages/f1-grid-docs/F1GridDocsPage';
@@ -12,8 +18,8 @@ const expectedPublicApiByContract: Record<string, string[]> = {
     fixedRowHeightThreshold queryWorkerThreshold disableQueryWorker showCheckbox
     createRow createDuplicate editorPlugins editors onBeforeEdit beforeEdit
     onAfterEdit afterEdit onChangesChange onSelectionChange initialSelectedRowIds
-    rowProjection cellAdornment disableSorting disableFiltering canExportExcel
-    excelFileName allowAddRootInContextMenu allowAddRowInContextMenu
+    rowProjection cellAdornment disableSorting disableFiltering
+    disableContextMenu canExportExcel excelFileName allowAddRootInContextMenu allowAddRowInContextMenu
     allowDuplicateRowInContextMenu allowDeleteRowInContextMenu deleteMenuDisabled
     loading treeContextMenu
   `
@@ -244,6 +250,30 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('ERP 시스템')).toBeInTheDocument();
     expect(screen.getByText('기준정보')).toBeInTheDocument();
     expect(screen.getByText('공통코드')).toBeInTheDocument();
+  });
+
+  it('demonstrates disabling and re-enabling the context menu in the playground', () => {
+    render(<F1GridDocsPage initialDocumentId="context-menu" />);
+
+    const grid = screen.getByRole('grid', {
+      name: 'F1-Grid context menu example',
+    });
+    const cell = within(grid).getAllByRole('gridcell')[0];
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Disable context menu' }),
+    );
+    fireEvent.contextMenu(cell);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('data-grid-selected', 'true');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Enable context menu' }),
+    );
+    fireEvent.contextMenu(cell);
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
   it('opens an inline editor on the cell editing playground', () => {

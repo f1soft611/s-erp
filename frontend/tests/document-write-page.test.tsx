@@ -1167,6 +1167,95 @@ describe('Document write page', () => {
     );
   });
 
+  it('shows each rejection reason only in a dismissible message popover', async () => {
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
+      electronicApprovalId: 1,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'REJECTED',
+      title: '문서 A',
+      drafterName: '김민수',
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: '<p>본문 내용</p>',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 81,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'reviewer-1',
+          participantName: '결재자',
+          actionStatus: 'REJECTED',
+          actionComment: '결재 내용을 확인해 주세요',
+        },
+        {
+          electronicApprovalLineId: 82,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'reviewer-2',
+          participantName: '다른 결재자',
+          actionStatus: 'REJECTED',
+          actionComment: '첨부 내역을 확인해 주세요',
+        },
+        ...[null, '', '   '].map((actionComment, index) => ({
+          electronicApprovalLineId: 83 + index,
+          stageOrder: 3 + index,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: `empty-reviewer-${index}`,
+          participantName: `사유 없는 결재자 ${index}`,
+          actionStatus: 'REJECTED',
+          actionComment,
+        })),
+        {
+          electronicApprovalLineId: 86,
+          stageOrder: 6,
+          participantOrder: 1,
+          participantType: 'APPROVAL',
+          participantUserId: 'reviewer-3',
+          participantName: '보완 결재자',
+          actionStatus: 'RETURNED',
+          actionComment: '보완 의견 유지',
+        },
+      ],
+      attachments: [],
+      systemEvents: [],
+    });
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
+    const group = await screen.findByTestId('approval-line-group-approval');
+    const message = within(group).getByRole('button', {
+      name: '결재자 반려 사유 보기', exact: true,
+    });
+    expect(within(group).getAllByRole('button')).toHaveLength(2);
+    expect(screen.queryByText('결재 내용을 확인해 주세요')).not.toBeInTheDocument();
+    expect(group).toHaveTextContent('보완 의견 유지');
+
+    fireEvent.click(message);
+    let popover = await screen.findByRole('dialog', { name: '반려 사유' });
+    expect(popover).toHaveTextContent('결재 내용을 확인해 주세요');
+    expect(popover).not.toHaveTextContent('첨부 내역을 확인해 주세요');
+    fireEvent.keyDown(popover, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '반려 사유' }))
+      .not.toBeInTheDocument());
+    expect(screen.getByTestId('post-detail-panel')).toBeInTheDocument();
+
+    fireEvent.click(within(group).getByRole('button', {
+      name: '다른 결재자 반려 사유 보기',
+    }));
+    popover = await screen.findByRole('dialog', { name: '반려 사유' });
+    expect(popover).toHaveTextContent('첨부 내역을 확인해 주세요');
+    const backdrop = popover.closest('.MuiPopover-root')?.querySelector('.MuiBackdrop-root');
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '반려 사유' }))
+      .not.toBeInTheDocument());
+  });
+
   it('matches a pending approval seal to its participant border color', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,

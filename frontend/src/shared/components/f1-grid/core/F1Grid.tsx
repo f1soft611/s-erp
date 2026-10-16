@@ -165,6 +165,7 @@ function F1GridInner<T extends object>(
     cellAdornment,
     disableSorting = false,
     disableFiltering = false,
+    disableContextMenu = false,
     canExportExcel = false,
     excelFileName,
     allowAddRootInContextMenu = true,
@@ -2287,6 +2288,12 @@ function F1GridInner<T extends object>(
       contextMenuReopenTimeoutRef.current = undefined;
     }
 
+    if (disableContextMenu) {
+      applySelection();
+      closeContextMenu();
+      return;
+    }
+
     if (contextMenu) {
       setContextMenu(undefined);
       applySelection();
@@ -2308,6 +2315,12 @@ function F1GridInner<T extends object>(
     }
     setContextMenu(undefined);
   }
+
+  useEffect(() => {
+    if (disableContextMenu) {
+      closeContextMenu();
+    }
+  }, [disableContextMenu]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -2889,7 +2902,7 @@ function F1GridInner<T extends object>(
         </Box>
       ) : null}
       <Menu
-        open={Boolean(contextMenu)}
+        open={Boolean(contextMenu) && !disableContextMenu}
         onClose={closeContextMenu}
         anchorReference="anchorPosition"
         anchorPosition={

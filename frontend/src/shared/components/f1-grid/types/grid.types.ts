@@ -267,6 +267,7 @@ export type F1GridProps<T extends object> = {
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
   disableSorting?: boolean;
   disableFiltering?: boolean;
+  disableContextMenu?: boolean;
   canExportExcel?: boolean;
   excelFileName?: string;
   allowAddRootInContextMenu?: boolean;
