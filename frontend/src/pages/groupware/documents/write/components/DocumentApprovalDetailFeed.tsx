@@ -56,6 +56,7 @@ import {
 } from '../services/documentApproval.service';
 import {
   getApprovalStatusPresentation,
+  getApprovalSystemEventPresentation,
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
 import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
@@ -67,6 +68,7 @@ import type {
   DocumentApprovalComment,
   DocumentApprovalDetail,
   DocumentApprovalLine,
+  DocumentApprovalSystemEvent,
 } from '../types/documentWrite.types';
 
 type DocumentApprovalDetailFeedSharedProps = {
@@ -169,15 +171,18 @@ type FeedReasonAction = Extract<
 
 function toApprovalCommentTree(
   records: DocumentApprovalComment[],
-  systemEvents: DocumentApprovalDetail['systemEvents'],
+  systemEvents: DocumentApprovalSystemEvent[],
   commentImageUrls: Record<string, string>,
 ): FeedCommentItem[] {
   const comments = new Map<string, FeedCommentItem>();
   const createdAtById = new Map<string, string | null | undefined>();
+  const sortIdById = new Map<string, number>();
   const roots: FeedCommentItem[] = [];
   records.forEach((record) => {
-    createdAtById.set(String(record.commentId), record.createdAt);
-    comments.set(String(record.commentId), {
+    const commentKey = String(record.commentId);
+    createdAtById.set(commentKey, record.createdAt);
+    sortIdById.set(commentKey, record.commentId);
+    comments.set(commentKey, {
       id: record.commentId,
       author: record.deletedYn === 'Y' ? '삭제된 댓글' : record.writerName,
       time: formatCommentTime(record.createdAt),
@@ -210,14 +215,20 @@ function toApprovalCommentTree(
     }
   });
   systemEvents.forEach((event, index) => {
-    const eventId = `system-${event.eventType}-${event.createdAt ?? index}`;
-    createdAtById.set(eventId, event.createdAt);
+    const eventId =
+      event.commentId ?? `system-${event.eventType}-${event.createdAt ?? index}`;
+    const eventKey = String(eventId);
+    createdAtById.set(eventKey, event.createdAt);
+    if (typeof event.commentId === 'number') {
+      sortIdById.set(eventKey, event.commentId);
+    }
     roots.push({
       id: eventId,
       author: event.writerName || '시스템',
       time: formatCommentTime(event.createdAt),
       content: event.content,
       isSystemEvent: true,
+      systemEventBadge: getApprovalSystemEventPresentation(event.eventType),
     });
   });
   roots.sort((left, right) => {
@@ -227,9 +238,22 @@ function toApprovalCommentTree(
     const rightTime = new Date(
       createdAtById.get(String(right.id)) ?? '',
     ).getTime();
-    if (Number.isNaN(leftTime)) return Number.isNaN(rightTime) ? 0 : -1;
-    if (Number.isNaN(rightTime)) return 1;
-    return leftTime - rightTime;
+    if (
+      !Number.isNaN(leftTime) &&
+      !Number.isNaN(rightTime) &&
+      leftTime !== rightTime
+    ) {
+      return leftTime - rightTime;
+    }
+    if (Number.isNaN(leftTime) !== Number.isNaN(rightTime)) {
+      return Number.isNaN(leftTime) ? -1 : 1;
+    }
+    const leftId = sortIdById.get(String(left.id));
+    const rightId = sortIdById.get(String(right.id));
+    if (leftId !== undefined && rightId !== undefined && leftId !== rightId) {
+      return leftId - rightId;
+    }
+    return 0;
   });
   return roots;
 }
@@ -270,6 +294,9 @@ export function DocumentApprovalDetailFeed(
   const [commentRecords, setCommentRecords] = useState<
     DocumentApprovalComment[]
   >(preloadedFeedData?.comments ?? []);
+  const [commentSystemEvents, setCommentSystemEvents] = useState<
+    DocumentApprovalDetail['systemEvents']
+  >(preloadedFeedData?.systemEvents ?? []);
   const [commentCount, setCommentCount] = useState(
     preloadedFeedData?.commentCount ?? 0,
   );
@@ -281,6 +308,10 @@ export function DocumentApprovalDetailFeed(
   );
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [commentRetryRequest, setCommentRetryRequest] = useState<{
+    beforeCommentId?: number;
+    append: boolean;
+  } | null>(null);
   const [commentImageUrls, setCommentImageUrls] = useState<
     Record<string, string>
   >({});
@@ -311,6 +342,7 @@ export function DocumentApprovalDetailFeed(
       if (electronicApprovalId === null) return;
       setIsLoadingComments(true);
       setCommentError('');
+      setCommentRetryRequest(null);
       try {
         const page = await listApprovalComments(electronicApprovalId, {
           limit: append ? 20 : 3,
@@ -319,10 +351,14 @@ export function DocumentApprovalDetailFeed(
         setCommentRecords((current) =>
           append ? [...page.comments, ...current] : page.comments,
         );
+        setCommentSystemEvents((current) =>
+          append ? [...page.systemEvents, ...current] : page.systemEvents,
+        );
         setCommentCount(page.resultCnt);
         setHasPreviousComments(page.hasPrevious);
         setNextBeforeCommentId(page.nextBeforeCommentId);
       } catch (error: unknown) {
+        setCommentRetryRequest({ beforeCommentId, append });
         setCommentError(
           error instanceof Error
             ? error.message
@@ -346,6 +382,7 @@ export function DocumentApprovalDetailFeed(
     }
     setDetail(preloadedFeedData);
     setCommentRecords(preloadedFeedData.comments);
+    setCommentSystemEvents(preloadedFeedData.systemEvents);
     setCommentCount(preloadedFeedData.commentCount);
     setHasPreviousComments(preloadedFeedData.hasPreviousComments);
     setNextBeforeCommentId(preloadedFeedData.nextBeforeCommentId);
@@ -431,9 +468,11 @@ export function DocumentApprovalDetailFeed(
   useEffect(() => {
     if (!open || electronicApprovalId === null || isFeedPresentation) return;
     setCommentRecords([]);
+    setCommentSystemEvents([]);
     setCommentCount(0);
     setHasPreviousComments(false);
     setNextBeforeCommentId(null);
+    setCommentRetryRequest(null);
     void loadComments();
   }, [electronicApprovalId, isFeedPresentation, loadComments, open]);
 
@@ -706,7 +745,9 @@ export function DocumentApprovalDetailFeed(
           ? current
           : [...current, createdWithAttachments],
       );
-      setCommentCount((current) => current + 1);
+      if (parentCommentId == null) {
+        setCommentCount((current) => current + 1);
+      }
       const uploadedAttachments = await uploadCommentFiles(
         electronicApprovalId,
         created.commentId,
@@ -780,6 +821,17 @@ export function DocumentApprovalDetailFeed(
   const handleLoadPreviousComments = async () => {
     if (nextBeforeCommentId === null) return;
     await loadComments(nextBeforeCommentId, true);
+  };
+
+  const handleRetryComments = () => {
+    if (commentRetryRequest) {
+      void loadComments(
+        commentRetryRequest.beforeCommentId,
+        commentRetryRequest.append,
+      );
+      return;
+    }
+    void loadComments();
   };
 
   const handleDownloadCommentAttachment = async (
@@ -1769,7 +1821,7 @@ export function DocumentApprovalDetailFeed(
               liked={isLiked}
               likeCount={0}
               bookmarked={isBookmarked}
-              commentCount={commentCount + detail.systemEvents.length}
+              commentCount={commentCount}
               onToggleLike={() => setIsLiked((value) => !value)}
               onToggleBookmark={() => setIsBookmarked((value) => !value)}
             />
@@ -1778,7 +1830,14 @@ export function DocumentApprovalDetailFeed(
               isLoadingPrevious={isLoadingComments}
               remainingPreviousCount={
                 Number.isFinite(commentCount)
-                  ? Math.max(0, commentCount - commentRecords.length)
+                  ? Math.max(
+                      0,
+                      commentCount -
+                        commentRecords.filter(
+                          (comment) => comment.parentCommentId == null,
+                        ).length -
+                        commentSystemEvents.length,
+                    )
                   : undefined
               }
               onLoadPrevious={() => void handleLoadPreviousComments()}
@@ -1792,7 +1851,7 @@ export function DocumentApprovalDetailFeed(
                       <Button
                         color="inherit"
                         size="small"
-                        onClick={() => void loadComments()}
+                        onClick={handleRetryComments}
                         disabled={isLoadingComments}
                       >
                         다시 시도
@@ -1811,7 +1870,7 @@ export function DocumentApprovalDetailFeed(
                     <CircularProgress size={20} />
                   </Box>
                 ) : commentRecords.length === 0 &&
-                  detail.systemEvents.length === 0 ? (
+                  commentSystemEvents.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
                     등록된 댓글이 없습니다.
                   </Typography>
@@ -1819,7 +1878,7 @@ export function DocumentApprovalDetailFeed(
                 <CommentThread
                   comments={toApprovalCommentTree(
                     commentRecords,
-                    detail.systemEvents,
+                    commentSystemEvents,
                     commentImageUrls,
                   )}
                   onSubmitComment={(content, files) =>

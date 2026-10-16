@@ -7,13 +7,13 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import egovframework.com.cmm.LoginVO;
-import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
@@ -37,7 +37,7 @@ public interface DocumentApprovalService {
     DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception;
     DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception;
     void deleteDocumentApproval(LoginVO user, Long electronicApprovalId) throws Exception;
-    CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
+    DocumentApprovalCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
             Integer limit, Long beforeCommentId) throws Exception;
     CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
             String content, Long parentCommentId) throws Exception;

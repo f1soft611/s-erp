@@ -1205,7 +1205,11 @@ export function DocumentApprovalSettingsDialog({
                 <MenuItem value="">
                   <Typography
                     component="span"
-                    sx={{ fontSize: '0.82rem', fontWeight: 600 }}
+                    sx={{
+                      color: 'text.secondary',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                    }}
                   >
                     자주 쓰는 결재선 선택
                   </Typography>
@@ -1261,6 +1265,7 @@ export function DocumentApprovalSettingsDialog({
       </CommonDialog>
       <CommonDialog
         open={saveDialogOpen}
+        size="xs"
         onClose={() => setSaveDialogOpen(false)}
         title="결재선 템플릿 저장"
         description="현재 결재선과 참조자를 자주 쓰는 결재선으로 저장합니다."

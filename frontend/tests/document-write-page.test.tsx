@@ -452,6 +452,7 @@ beforeEach(() => {
   });
   composerApi.listApprovalComments.mockResolvedValue({
     comments: [],
+    systemEvents: [],
     hasPrevious: false,
     nextBeforeCommentId: null,
     resultCnt: 0,
@@ -1422,9 +1423,18 @@ describe('Document write page', () => {
         createdAt: '2026-10-12T10:00:00Z',
         attachments: [],
       }],
+      systemEvents: [{
+        commentId: 30,
+        ownerId: 1,
+        commentType: 'SYSTEM',
+        eventType: 'SUBMITTED',
+        content: '문서가 결재신청되었습니다.',
+        writerName: '김민수',
+        createdAt: '2026-10-12T09:00:00Z',
+      }],
       hasPrevious: false,
       nextBeforeCommentId: null,
-      resultCnt: 1,
+      resultCnt: 2,
     });
     const imagePreloaders: HTMLImageElement[] = [];
     const imagePreloaderSpy = vi.spyOn(window, 'Image').mockImplementation(function MockImage(
@@ -1448,9 +1458,9 @@ describe('Document write page', () => {
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('검토 의견입니다.');
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('문서가 결재신청되었습니다.');
     });
-    expect(
-      screen.getByRole('img', { name: '시스템 메시지' }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('system-event-badge')).toHaveTextContent('결재신청');
+    expect(screen.getByTestId('system-event-badge')).toHaveClass('MuiChip-colorInfo');
+    expect(screen.queryByRole('img', { name: '시스템 메시지' })).not.toBeInTheDocument();
     const approvalLine = screen.getByTestId('approval-line-readonly');
     const authorRow = screen.getByTestId('approval-author-row');
     expect(authorRow).toBeInTheDocument();
@@ -2094,18 +2104,38 @@ describe('Document write page', () => {
       createdAt: '2026-10-12T10:00:00Z',
       attachments: [],
     });
+    const createSystemEvent = (
+      commentId: number,
+      content: string,
+      createdAt: string,
+    ) => ({
+      commentId,
+      ownerId: 1,
+      commentType: 'SYSTEM',
+      eventType: 'SUBMITTED',
+      content,
+      writerName: '시스템',
+      createdAt,
+    });
     composerApi.listApprovalComments
       .mockResolvedValueOnce({
         comments: [createComment(30, '최근 댓글')],
+        systemEvents: [
+          createSystemEvent(31, '최신 페이지 시스템 메시지', '2026-10-12T09:00:00Z'),
+        ],
         hasPrevious: true,
-        nextBeforeCommentId: 30,
-        resultCnt: 2,
+        nextBeforeCommentId: 31,
+        resultCnt: 4,
       })
+      .mockRejectedValueOnce(new Error('이전 페이지를 불러오지 못했습니다.'))
       .mockResolvedValueOnce({
         comments: [createComment(20, '이전 댓글')],
+        systemEvents: [
+          createSystemEvent(19, '이전 페이지 시스템 메시지', '2026-10-12T08:00:00Z'),
+        ],
         hasPrevious: false,
         nextBeforeCommentId: null,
-        resultCnt: 2,
+        resultCnt: 4,
       });
     render(<DashboardContent {...pageProps} />);
     const listRegion = await screen.findByRole('region', {
@@ -2116,17 +2146,35 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('최근 댓글'),
     );
+    expect(screen.getByText('최신 페이지 시스템 메시지')).toBeInTheDocument();
+    expect(screen.getByText('댓글 4')).toBeInTheDocument();
     expect(composerApi.listApprovalComments).toHaveBeenNthCalledWith(1, 1, {
       limit: 3,
       beforeCommentId: undefined,
     });
-    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기 (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: '이전 댓글 보기 (2)' }));
+    expect(
+      await screen.findByText('이전 페이지를 불러오지 못했습니다.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('최신 페이지 시스템 메시지')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이전 댓글 보기 (2)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     await waitFor(() =>
       expect(screen.getByTestId('post-detail-panel')).toHaveTextContent('이전 댓글'),
     );
+    expect(screen.getByText('이전 페이지 시스템 메시지')).toBeInTheDocument();
+    expect(screen.getByText('최신 페이지 시스템 메시지')).toBeInTheDocument();
+    expect(screen.getByText('댓글 4')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /이전 댓글 보기/ }),
+    ).not.toBeInTheDocument();
+    expect(composerApi.listApprovalComments).toHaveBeenNthCalledWith(2, 1, {
+      limit: 20,
+      beforeCommentId: 31,
+    });
     expect(composerApi.listApprovalComments).toHaveBeenLastCalledWith(1, {
       limit: 20,
-      beforeCommentId: 30,
+      beforeCommentId: 31,
     });
   });
 
@@ -2149,12 +2197,14 @@ describe('Document write page', () => {
     composerApi.listApprovalComments
       .mockResolvedValueOnce({
         comments: latestComments,
+        systemEvents: [],
         hasPrevious: true,
         nextBeforeCommentId: 23,
         resultCnt: 5,
       })
       .mockResolvedValueOnce({
         comments: previousComments,
+        systemEvents: [],
         hasPrevious: true,
         nextBeforeCommentId: 22,
         resultCnt: 5,
@@ -2616,6 +2666,54 @@ describe('Document write page', () => {
     ).toBeInTheDocument();
   }, 30000);
 
+  it('renders type-specific system badges in document feed cards', async () => {
+    const events = [
+      ['DRAFT_SAVED', '임시저장', 'Default'],
+      ['SUBMITTED', '결재신청', 'Info'],
+      ['REJECTED', '반려', 'Error'],
+      ['APPROVED', '승인', 'Success'],
+      ['RETURNED', '보완요청', 'Warning'],
+      ['COMPLETED', '완료', 'Success'],
+      ['UNKNOWN', null, null],
+    ] as const;
+    composerApi.listDocumentApprovals.mockImplementation(
+      (_scope, _documentType, _documentId, includeDetails) =>
+        Promise.resolve(includeDetails
+          ? [...defaultDocumentRecords, { ...defaultDocumentRecords[0], electronicApprovalId: 7 }].map((record, index) => {
+              const [eventType] = events[index];
+              return toFeedRecord(record, {
+                systemEvents: [{
+                  eventType,
+                  writerName: '시스템',
+                  content: `시스템 처리 ${eventType}`,
+                  createdAt: '2026-10-16T09:00:00Z',
+                }],
+              });
+            })
+          : defaultDocumentRecords),
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+
+    const feed = await screen.findByTestId('document-feed');
+    await waitFor(() => {
+      expect(within(feed).getAllByTestId('system-event-badge')).toHaveLength(6);
+    });
+    const cards = within(feed).getAllByTestId('document-write-item');
+    events.forEach(([eventType, label, color], index) => {
+      const card = within(cards[index]);
+      expect(card.getByText(`시스템 처리 ${eventType}`)).toBeInTheDocument();
+      if (label) {
+        expect(card.getByTestId('system-event-badge')).toHaveTextContent(label);
+        expect(card.getByTestId('system-event-badge')).toHaveClass(`MuiChip-color${color}`);
+        expect(card.queryByTestId('system-event-icon')).not.toBeInTheDocument();
+      } else {
+        expect(card.queryByTestId('system-event-badge')).not.toBeInTheDocument();
+        expect(card.getByTestId('system-event-icon')).toBeInTheDocument();
+      }
+    });
+  });
+
   it('renders every filtered document as a complete feed card with comments and reactions', async () => {
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) =>
@@ -2703,6 +2801,7 @@ describe('Document write page', () => {
           attachments: [],
         },
       ],
+      systemEvents: [],
       hasPrevious: false,
       nextBeforeCommentId: null,
       resultCnt: 4,

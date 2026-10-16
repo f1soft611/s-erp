@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   IconButton,
   Menu,
   MenuItem,
   Stack,
   Typography,
 } from '@mui/material';
+import type { ChipProps } from '@mui/material';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -54,6 +56,11 @@ export type FeedCommentItem = {
   content: string;
   isDeleted?: boolean;
   isSystemEvent?: boolean;
+  systemEventBadge?: {
+    label: string;
+    color: ChipProps['color'];
+    variant: ChipProps['variant'];
+  };
   isEditable?: boolean;
   attachments?: FeedCommentAttachment[];
   replies?: FeedCommentItem[];
@@ -407,7 +414,15 @@ function CommentItem({
           {comment.author.slice(0, 2)}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" sx={{ mb: 0.5, alignItems: 'center', gap: 1 }}>
+          <Stack
+            direction="row"
+            sx={{
+              mb: 0.5,
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: isSystemEvent ? 'wrap' : 'nowrap',
+            }}
+          >
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {comment.author}
             </Typography>
@@ -415,12 +430,23 @@ function CommentItem({
               {comment.time}
             </Typography>
             {isSystemEvent && (
-              <InfoOutlinedIcon
-                aria-label="시스템 메시지"
-                titleAccess="시스템 메시지"
-                data-testid="system-event-icon"
-                fontSize="small"
-              />
+              comment.systemEventBadge ? (
+                <Chip
+                  data-testid="system-event-badge"
+                  size="small"
+                  label={comment.systemEventBadge.label}
+                  color={comment.systemEventBadge.color}
+                  variant={comment.systemEventBadge.variant}
+                  sx={{ borderRadius: '8px' }}
+                />
+              ) : (
+                <InfoOutlinedIcon
+                  aria-label="시스템 메시지"
+                  titleAccess="시스템 메시지"
+                  data-testid="system-event-icon"
+                  fontSize="small"
+                />
+              )
             )}
             <Box sx={{ ml: 'auto' }}>
               {!isDeleted && !isSystemEvent && (

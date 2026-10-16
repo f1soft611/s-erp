@@ -24,7 +24,6 @@ import org.jsoup.Jsoup;
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
-import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.repository.CommonCommentDAO;
 import egovframework.com.common.service.EmbeddedImageDocumentProcessor;
@@ -35,6 +34,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSa
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO.ApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
@@ -450,10 +450,8 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
 
         Map<Long, List<CommonFileVO>> attachmentsByApprovalId =
                 commonFileService.listFilesByOwnerIds(user.getTenantId(), OWNER_TYPE, approvalIds);
-        Map<Long, List<CommonCommentVO>> systemEventsByApprovalId =
-                listSystemEventsByApprovalIds(user, approvalIds);
-        Map<Long, CommonCommentPageVO> commentPagesByApprovalId =
-            listApprovalUserCommentPagesByOwnerIds(user, approvalIds, 3);
+        Map<Long, DocumentApprovalCommentPageVO> commentPagesByApprovalId =
+            listApprovalCommentStreamPagesByOwnerIds(user, approvalIds, 3, null);
 
         List<DocumentApprovalFeedItemVO> feedItems = new ArrayList<>();
         for (DocumentApprovalListItemVO listItem : documents) {
@@ -465,9 +463,9 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             if (detail == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다.");
             }
-            CommonCommentPageVO commentPage = commentPagesByApprovalId.get(approvalId);
+            DocumentApprovalCommentPageVO commentPage = commentPagesByApprovalId.get(approvalId);
             if (commentPage == null) {
-                commentPage = new CommonCommentPageVO();
+                throw new IllegalStateException("전자결재 댓글 페이지 조회 결과가 없습니다.");
             }
 
             DocumentApprovalFeedItemVO feedItem = new DocumentApprovalFeedItemVO();
@@ -491,7 +489,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             feedItem.setApprovalLines(approvalLinesByApprovalId.getOrDefault(
                 approvalId, Collections.emptyList()));
             feedItem.setAttachments(attachmentsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
-            feedItem.setSystemEvents(systemEventsByApprovalId.getOrDefault(approvalId, Collections.emptyList()));
+            feedItem.setSystemEvents(commentPage.getSystemEvents());
             feedItem.setComments(commentPage.getComments());
             feedItem.setCommentCount(commentPage.getResultCnt());
             feedItem.setHasPreviousComments(commentPage.isHasPrevious());
@@ -501,82 +499,109 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         return feedItems;
     }
 
-    private Map<Long, CommonCommentPageVO> listApprovalUserCommentPagesByOwnerIds(
-            LoginVO user, List<Long> approvalIds, int limit) throws Exception {
-        Map<String, Object> params = approvalCommentParams(user, null, null);
+    private Map<Long, DocumentApprovalCommentPageVO> listApprovalCommentStreamPagesByOwnerIds(
+            LoginVO user, List<Long> approvalIds, int limit, Long beforeCommentId) throws Exception {
+        if (approvalIds == null || approvalIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> params = approvalCommentParams(user, null, beforeCommentId);
         params.put("ownerIds", approvalIds);
         params.put("limit", limit + 1);
-        List<CommonCommentVO> fetched =
-            commonCommentDAO.selectApprovalUserCommentPagesByOwnerIds(params);
-
-        Map<Long, List<List<CommonCommentVO>>> rootGroupsByOwnerId = new HashMap<>();
-        for (Long approvalId : approvalIds) {
-            rootGroupsByOwnerId.put(approvalId, new ArrayList<>());
+        params.put("beforeCommentId", beforeCommentId);
+        List<CommonCommentVO> fetchedRoots =
+            commonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds(params);
+        if (fetchedRoots == null) {
+            throw new IllegalStateException("전자결재 댓글 페이지 조회 결과가 없습니다.");
         }
-        if (fetched != null) {
-            for (CommonCommentVO comment : fetched) {
-                if (comment == null || comment.getOwnerId() == null) {
-                    continue;
-                }
-                List<List<CommonCommentVO>> rootGroups =
-                    rootGroupsByOwnerId.computeIfAbsent(comment.getOwnerId(), key -> new ArrayList<>());
-                if (comment.getParentCommentId() == null || rootGroups.isEmpty()) {
-                    rootGroups.add(new ArrayList<>());
-                }
-                rootGroups.get(rootGroups.size() - 1).add(comment);
+
+        Map<Long, List<CommonCommentVO>> rootsByOwnerId = new HashMap<>();
+        for (Long approvalId : approvalIds) {
+            rootsByOwnerId.put(approvalId, new ArrayList<>());
+        }
+        for (CommonCommentVO root : fetchedRoots) {
+            if (root == null || root.getOwnerId() == null || root.getCommentId() == null) {
+                throw new IllegalStateException("전자결재 댓글 페이지 항목이 올바르지 않습니다.");
             }
+            List<CommonCommentVO> ownerRoots = rootsByOwnerId.get(root.getOwnerId());
+            if (ownerRoots == null ||
+                    !("USER".equals(root.getCommentType()) || "SYSTEM".equals(root.getCommentType()))) {
+                throw new IllegalStateException("전자결재 댓글 페이지 항목이 올바르지 않습니다.");
+            }
+            ownerRoots.add(root);
         }
 
         List<Map<String, Object>> countRows =
-            commonCommentDAO.selectApprovalUserCommentCountsByOwnerIds(params);
+            commonCommentDAO.selectApprovalCommentStreamCountsByOwnerIds(params);
+        if (countRows == null) {
+            throw new IllegalStateException("전자결재 댓글 건수 조회 결과가 없습니다.");
+        }
         Map<Long, Long> countsByOwnerId = new HashMap<>();
-        if (countRows != null) {
-            for (Map<String, Object> row : countRows) {
-                if (row == null || !(row.get("ownerId") instanceof Number)
-                        || !(row.get("totalCount") instanceof Number)) {
-                    continue;
+        for (Map<String, Object> row : countRows) {
+            if (row == null || !(row.get("ownerId") instanceof Number)
+                    || !(row.get("totalCount") instanceof Number)) {
+                throw new IllegalStateException("전자결재 댓글 건수 조회 결과가 올바르지 않습니다.");
+            }
+            countsByOwnerId.put(
+                ((Number) row.get("ownerId")).longValue(),
+                ((Number) row.get("totalCount")).longValue());
+        }
+
+        Map<Long, List<CommonCommentVO>> rootsInPageByOwnerId = new HashMap<>();
+        List<Long> userRootIds = new ArrayList<>();
+        for (Long approvalId : approvalIds) {
+            List<CommonCommentVO> roots = rootsByOwnerId.get(approvalId);
+            int selectedCount = Math.min(limit, roots.size());
+            List<CommonCommentVO> selectedRoots = new ArrayList<>(roots.subList(0, selectedCount));
+            Collections.reverse(selectedRoots);
+            rootsInPageByOwnerId.put(approvalId, selectedRoots);
+            for (CommonCommentVO root : selectedRoots) {
+                if ("USER".equals(root.getCommentType())) {
+                    userRootIds.add(root.getCommentId());
                 }
-                countsByOwnerId.put(
-                    ((Number) row.get("ownerId")).longValue(),
-                    ((Number) row.get("totalCount")).longValue());
             }
         }
 
-        Map<Long, CommonCommentPageVO> pagesByOwnerId = new HashMap<>();
-        Set<Long> commentIds = new LinkedHashSet<>();
-        for (Long approvalId : approvalIds) {
-            List<List<CommonCommentVO>> rootGroups =
-                rootGroupsByOwnerId.getOrDefault(approvalId, Collections.emptyList());
-            boolean hasPrevious = rootGroups.size() > limit;
-            List<CommonCommentVO> comments = new ArrayList<>();
-            int selectedRootCount = Math.min(limit, rootGroups.size());
-            for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
-                comments.addAll(rootGroups.get(groupIndex));
+        List<CommonCommentVO> userThreads = Collections.emptyList();
+        if (!userRootIds.isEmpty()) {
+            Map<String, Object> threadParams = new HashMap<>();
+            threadParams.put("tenantId", user.getTenantId());
+            threadParams.put("ownerIds", approvalIds);
+            threadParams.put("rootIds", userRootIds);
+            userThreads = commonCommentDAO.selectApprovalUserCommentThreadsByRootIds(threadParams);
+            if (userThreads == null) {
+                throw new IllegalStateException("전자결재 댓글 답글 조회 결과가 없습니다.");
             }
-            for (CommonCommentVO comment : comments) {
-                if (comment.getCommentId() != null && !"Y".equalsIgnoreCase(comment.getDeletedYn())) {
-                    commentIds.add(comment.getCommentId());
-                }
-            }
+        }
 
-            CommonCommentPageVO page = new CommonCommentPageVO();
-            page.setComments(comments);
-            page.setHasPrevious(hasPrevious);
-            page.setNextBeforeCommentId(
-                hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
-            page.setResultCnt(countsByOwnerId.getOrDefault(approvalId, 0L));
-            pagesByOwnerId.put(approvalId, page);
+        Set<Long> commentIds = new LinkedHashSet<>();
+        Map<Long, List<CommonCommentVO>> commentsByOwnerId = new HashMap<>();
+        for (Long approvalId : approvalIds) {
+            commentsByOwnerId.put(approvalId, new ArrayList<>());
+        }
+        for (CommonCommentVO comment : userThreads) {
+            if (comment == null || comment.getOwnerId() == null || comment.getCommentId() == null) {
+                throw new IllegalStateException("전자결재 댓글 답글 항목이 올바르지 않습니다.");
+            }
+            List<CommonCommentVO> ownerComments = commentsByOwnerId.get(comment.getOwnerId());
+            if (ownerComments == null) {
+                throw new IllegalStateException("전자결재 댓글 답글 항목이 올바르지 않습니다.");
+            }
+            ownerComments.add(comment);
+            if (!"Y".equalsIgnoreCase(comment.getDeletedYn())) {
+                commentIds.add(comment.getCommentId());
+            }
         }
 
         Map<Long, List<CommonFileVO>> filesByCommentId = commentIds.isEmpty()
-            ? Collections.emptyMap()
+            ? Collections.<Long, List<CommonFileVO>>emptyMap()
             : commonFileService.listFilesByOwnerIds(
                 user.getTenantId(), COMMENT_FILE_OWNER_TYPE, new ArrayList<>(commentIds));
         if (filesByCommentId == null) {
             throw new IllegalStateException("전자결재 댓글 첨부파일 조회 결과가 없습니다.");
         }
-        for (CommonCommentPageVO page : pagesByOwnerId.values()) {
-            for (CommonCommentVO comment : page.getComments()) {
+        for (List<CommonCommentVO> comments : commentsByOwnerId.values()) {
+            for (CommonCommentVO comment : comments) {
                 if ("Y".equalsIgnoreCase(comment.getDeletedYn())) {
                     comment.setContent("[삭제된 댓글입니다.]");
                     comment.setWriterName("삭제된 댓글");
@@ -589,6 +614,29 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
                         attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
                 }
             }
+        }
+
+        Map<Long, DocumentApprovalCommentPageVO> pagesByOwnerId = new HashMap<>();
+        for (Long approvalId : approvalIds) {
+            List<CommonCommentVO> roots = rootsByOwnerId.get(approvalId);
+            int selectedCount = Math.min(limit, roots.size());
+            boolean hasPrevious = roots.size() > limit;
+            List<CommonCommentVO> selectedRoots = rootsInPageByOwnerId.get(approvalId);
+            List<CommonCommentVO> systemEvents = new ArrayList<>();
+            for (CommonCommentVO root : selectedRoots) {
+                if ("SYSTEM".equals(root.getCommentType())) {
+                    systemEvents.add(root);
+                }
+            }
+
+            DocumentApprovalCommentPageVO page = new DocumentApprovalCommentPageVO();
+            page.setComments(commentsByOwnerId.get(approvalId));
+            page.setSystemEvents(systemEvents);
+            page.setHasPrevious(hasPrevious);
+            page.setNextBeforeCommentId(
+                hasPrevious && selectedCount > 0 ? roots.get(selectedCount - 1).getCommentId() : null);
+            page.setResultCnt(countsByOwnerId.getOrDefault(approvalId, 0L));
+            pagesByOwnerId.put(approvalId, page);
         }
         return pagesByOwnerId;
     }
@@ -609,41 +657,6 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         line.setActionAt(batchLine.getActionAt());
         line.setActionComment(batchLine.getActionComment());
         return line;
-    }
-
-    private Map<Long, List<CommonCommentVO>> listSystemEventsByApprovalIds(LoginVO user, List<Long> approvalIds) throws Exception {
-        if (approvalIds == null || approvalIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        Set<Long> distinctIds = new HashSet<>();
-        for (Long approvalId : approvalIds) {
-            if (approvalId != null) {
-                distinctIds.add(approvalId);
-            }
-        }
-        if (distinctIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("tenantId", user.getTenantId());
-        params.put("ownerType", OWNER_TYPE);
-        params.put("ownerIds", new ArrayList<>(distinctIds));
-        List<CommonCommentVO> events = commonCommentDAO.selectApprovalSystemEventsByOwnerIds(params);
-
-        Map<Long, List<CommonCommentVO>> grouped = new HashMap<>();
-        for (Long approvalId : distinctIds) {
-            grouped.put(approvalId, new ArrayList<>());
-        }
-        if (events != null) {
-            for (CommonCommentVO event : events) {
-                if (event == null || event.getOwnerId() == null) {
-                    continue;
-                }
-                grouped.computeIfAbsent(event.getOwnerId(), key -> new ArrayList<>()).add(event);
-            }
-        }
-        return grouped;
     }
 
     @Override
@@ -737,7 +750,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
 
     @Override
     @Transactional(readOnly = true)
-    public CommonCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
+    public DocumentApprovalCommentPageVO listApprovalComments(LoginVO user, Long electronicApprovalId,
             Integer limit, Long beforeCommentId) throws Exception {
         requireRelatedDocument(user, electronicApprovalId);
         int safeLimit = limit == null ? 3 : limit;
@@ -745,60 +758,20 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 조회 조건이 올바르지 않습니다.");
         }
 
-        Map<String, Object> params = approvalCommentParams(user, electronicApprovalId, null);
-        params.put("beforeCommentId", beforeCommentId);
-        params.put("limit", safeLimit + 1);
-        List<CommonCommentVO> fetched = commonCommentDAO.selectApprovalUserCommentPage(params);
-        if (fetched == null) {
-            fetched = Collections.emptyList();
-        }
-
-        List<List<CommonCommentVO>> rootGroups = new ArrayList<>();
-        for (CommonCommentVO comment : fetched) {
-            if (comment.getParentCommentId() == null || rootGroups.isEmpty()) {
-                rootGroups.add(new ArrayList<>());
-            }
-            rootGroups.get(rootGroups.size() - 1).add(comment);
-        }
-
-        boolean hasPrevious = rootGroups.size() > safeLimit;
-        List<CommonCommentVO> comments = new ArrayList<>();
-        int selectedRootCount = Math.min(safeLimit, rootGroups.size());
-        for (int groupIndex = selectedRootCount - 1; groupIndex >= 0; groupIndex--) {
-            comments.addAll(rootGroups.get(groupIndex));
-        }
-        List<Long> commentIds = new ArrayList<>();
-        for (CommonCommentVO comment : comments) {
-            if (comment != null && comment.getCommentId() != null) {
-                commentIds.add(comment.getCommentId());
-            }
-        }
-        Map<Long, List<CommonFileVO>> attachmentsByCommentId = commonFileService.listFilesByOwnerIds(
-                user.getTenantId(), COMMENT_FILE_OWNER_TYPE, commentIds);
-
-        for (CommonCommentVO comment : comments) {
-            if (comment == null) {
-                continue;
-            }
-            if ("Y".equalsIgnoreCase(comment.getDeletedYn())) {
-                comment.setContent("[삭제된 댓글입니다.]");
-                comment.setWriterName("삭제된 댓글");
-                comment.setWriterId(null);
-                comment.setAttachments(new ArrayList<>());
-            } else {
-                List<CommonFileVO> attachments = attachmentsByCommentId.getOrDefault(
-                        comment.getCommentId(), Collections.emptyList());
-                comment.setAttachments(attachments == null ? Collections.<CommonFileVO>emptyList() : attachments);
+        if (beforeCommentId != null) {
+            Map<String, Object> cursorParams =
+                approvalCommentParams(user, electronicApprovalId, beforeCommentId);
+            if (commonCommentDAO.selectApprovalCommentStreamCursor(cursorParams) == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글 조회 cursor가 올바르지 않습니다.");
             }
         }
 
-        CommonCommentPageVO page = new CommonCommentPageVO();
-        page.setComments(comments);
-        page.setHasPrevious(hasPrevious);
-        page.setNextBeforeCommentId(hasPrevious && !comments.isEmpty() ? comments.get(0).getCommentId() : null);
-        Long count = commonCommentDAO.countApprovalUserComments(
-                approvalCommentParams(user, electronicApprovalId, null));
-        page.setResultCnt(count == null ? 0L : count);
+        DocumentApprovalCommentPageVO page = listApprovalCommentStreamPagesByOwnerIds(
+            user, Collections.singletonList(electronicApprovalId), safeLimit, beforeCommentId)
+            .get(electronicApprovalId);
+        if (page == null) {
+            throw new IllegalStateException("전자결재 댓글 페이지 조회 결과가 없습니다.");
+        }
         return page;
     }
 

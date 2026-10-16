@@ -418,13 +418,22 @@ describe('document approval service', () => {
       writerId: 'writer-1',
       writerName: '홍길동',
     };
+    const systemEvent = {
+      commentId: 32,
+      ownerId: 41,
+      commentType: 'SYSTEM',
+      eventType: 'SUBMITTED',
+      content: '문서가 결재신청되었습니다.',
+      writerName: '시스템',
+      createdAt: '2026-10-12T09:00:00Z',
+    };
     api.get
       .mockResolvedValueOnce({
-        resultList: [comment],
         comments: [comment],
+        systemEvents: [systemEvent],
         hasPrevious: false,
         nextBeforeCommentId: null,
-        resultCnt: 1,
+        resultCnt: 2,
       })
       .mockResolvedValueOnce({
         resultList: [{ fileId: 51, fileName: 'evidence.png', fileSize: 10 }],
@@ -439,8 +448,9 @@ describe('document approval service', () => {
 
     await expect(listApprovalComments(41, { limit: 10 })).resolves.toMatchObject({
       comments: [comment],
+      systemEvents: [systemEvent],
       hasPrevious: false,
-      resultCnt: 1,
+      resultCnt: 2,
     });
     await expect(createApprovalComment(41, '의견', 30)).resolves.toEqual(comment);
     await expect(updateApprovalComment(41, 31, '수정 의견')).resolves.toEqual(comment);
@@ -448,6 +458,16 @@ describe('document approval service', () => {
     await expect(listApprovalCommentAttachments(41, 31)).resolves.toEqual([
       { fileId: 51, fileName: 'evidence.png', fileSize: 10 },
     ]);
+    api.get.mockResolvedValueOnce({
+      comments: [comment],
+      systemEvents: [{ ...systemEvent, commentId: undefined }],
+      hasPrevious: false,
+      nextBeforeCommentId: null,
+      resultCnt: 2,
+    });
+    await expect(listApprovalComments(41)).rejects.toThrow(
+      '전자결재 댓글 응답을 확인할 수 없습니다.',
+    );
     await expect(uploadApprovalCommentAttachment(41, 31, file)).resolves.toEqual({
       fileId: 51,
       fileName: 'evidence.png',
@@ -509,6 +529,7 @@ describe('document approval service', () => {
     api.get.mockResolvedValueOnce({
       resultList: [deletedComment],
       comments: [deletedComment],
+      systemEvents: [],
       hasPrevious: true,
       nextBeforeCommentId: 52,
       resultCnt: 22,

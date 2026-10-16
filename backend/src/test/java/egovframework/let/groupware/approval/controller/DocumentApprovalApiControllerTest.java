@@ -29,11 +29,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import egovframework.com.cmm.LoginVO;
+import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
@@ -71,6 +73,33 @@ class DocumentApprovalApiControllerTest {
 
         assertThat(response.getResult().get("resultList")).isSameAs(feed);
         verify(approvalService).listFeedDocuments(user, "ALL", null, null);
+    }
+
+    @Test
+    void listApprovalCommentsReturnsTheUnifiedPageContract() throws Exception {
+        LoginVO user = authenticatedUser();
+        CommonCommentVO comment = new CommonCommentVO();
+        comment.setCommentId(104L);
+        CommonCommentVO systemEvent = new CommonCommentVO();
+        systemEvent.setCommentId(103L);
+        DocumentApprovalCommentPageVO page = new DocumentApprovalCommentPageVO();
+        page.setComments(Collections.singletonList(comment));
+        page.setSystemEvents(Collections.singletonList(systemEvent));
+        page.setResultCnt(4L);
+        page.setHasPrevious(true);
+        page.setNextBeforeCommentId(103L);
+        when(approvalService.listApprovalComments(user, 77L, 3, 103L)).thenReturn(page);
+
+        ResultVO response = controller.listApprovalComments(77L, 3, 103L, user);
+
+        assertThat(response.getResult())
+            .containsEntry("resultList", page.getComments())
+            .containsEntry("comments", page.getComments())
+            .containsEntry("systemEvents", page.getSystemEvents())
+            .containsEntry("resultCnt", 4L)
+            .containsEntry("hasPrevious", true)
+            .containsEntry("nextBeforeCommentId", 103L);
+        verify(approvalService).listApprovalComments(user, 77L, 3, 103L);
     }
 
     @Test

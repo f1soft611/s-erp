@@ -26,10 +26,16 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
               variant="text"
               onClick={() => onSelect(item.id)}
               sx={{
-                display: 'grid',
-                justifyItems: 'start',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'flex-start',
+                width: '100%',
+                minWidth: 0,
                 gap: 0.5,
-                p: 1.2,
+                p: 1.5,
+                border: '1px solid',
+                borderColor: 'divider',
                 borderRadius: 2,
                 bgcolor: 'action.hover',
                 color: 'text.primary',
@@ -40,7 +46,16 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {item.status === '보완요청' ? '보완 요청 문서' : '결재 요청 도착'}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  width: '100%',
+                  minWidth: 0,
+                  overflowWrap: 'anywhere',
+                  lineHeight: 1.5,
+                }}
+              >
                 {item.title}
               </Typography>
             </Button>

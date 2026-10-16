@@ -16,15 +16,16 @@ button's existing medium variant and limit the layout change to this row.
 Set the `TextField` margin to `none` to match `UserSelectEditor` and prevent
 default vertical margins from enlarging the row. Keep the select's 38px minimum
 height and vertically centered displayed value. Render the empty prompt
-`자주 쓰는 결재선 선택` with the same 0.82rem, 600-weight typography as the
-`UserSelectEditor` input label. Leave selected template names at their existing
-typography. Keep the select's accessible name `자주 쓰는 결재선`, and retain
-all selection, loading, and manager behavior.
+`자주 쓰는 결재선 선택` with the same 0.82rem, 600-weight typography and
+`text.secondary` color as the `UserSelectEditor` input label. Leave selected
+template names at their existing typography. Keep the select's accessible name
+`자주 쓰는 결재선`, and retain all selection, loading, and manager behavior.
 
 ## Verification
 
 - Add or update approval-settings tests to verify the selector row stretch
-  alignment, 38px selector height, and empty-prompt typography.
+  alignment, 38px selector height, and equality of the empty-prompt and
+  user-picker label font size, weight, and color.
 - Run the approval-settings tests and frontend build.
 - Check the dialog in the available browser session if it can reach the
   authenticated screen; otherwise document that limitation without claiming

@@ -58,6 +58,27 @@ export function getApprovalStatusPresentation(
   return approvalStatusPresentation[status];
 }
 
+export function getApprovalSystemEventPresentation(
+  eventType: string,
+): Omit<ApprovalStatusPresentation, 'label'> & { label: string } | undefined {
+  switch (eventType) {
+    case 'DRAFT_SAVED':
+      return getApprovalStatusPresentation('DRAFT');
+    case 'SUBMITTED':
+      return { ...getApprovalStatusPresentation('PENDING'), label: '결재신청' };
+    case 'REJECTED':
+      return getApprovalStatusPresentation('REJECTED');
+    case 'APPROVED':
+      return getApprovalStatusPresentation('COMPLETED');
+    case 'COMPLETED':
+      return { ...getApprovalStatusPresentation('COMPLETED'), label: '완료' };
+    case 'RETURNED':
+      return getApprovalStatusPresentation('REVISION_REQUESTED');
+    default:
+      return undefined;
+  }
+}
+
 export function getDocumentKindFromType(
   documentType: DocumentApprovalRecord['documentType'],
 ): DocumentKind {

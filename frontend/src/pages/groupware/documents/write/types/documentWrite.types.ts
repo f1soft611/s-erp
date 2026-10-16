@@ -180,10 +180,19 @@ export type DocumentApprovalLine = {
 };
 
 export type DocumentApprovalSystemEvent = {
+  commentId?: number;
+  commentType?: 'SYSTEM';
+  ownerId?: number;
   eventType: string;
   content: string;
   writerName: string;
   createdAt?: string | null;
+};
+
+export type DocumentApprovalPageSystemEvent = DocumentApprovalSystemEvent & {
+  commentId: number;
+  commentType: 'SYSTEM';
+  ownerId: number;
 };
 
 export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
@@ -201,6 +210,7 @@ export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
 export type DocumentApprovalFeedRecord = DocumentApprovalRecord &
   Omit<DocumentApprovalDetail, keyof DocumentApprovalRecord> & {
     contentsText: string;
+    systemEvents: DocumentApprovalPageSystemEvent[];
     comments: DocumentApprovalComment[];
     commentCount: number;
     hasPreviousComments: boolean;
@@ -257,6 +267,7 @@ export type DocumentApprovalComment = {
 
 export type DocumentApprovalCommentPage = {
   comments: DocumentApprovalComment[];
+  systemEvents: DocumentApprovalPageSystemEvent[];
   hasPrevious: boolean;
   nextBeforeCommentId: number | null;
   resultCnt: number;

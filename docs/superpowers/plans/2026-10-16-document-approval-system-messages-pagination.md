@@ -15,8 +15,8 @@
 - `docs/directions/20261016/20261016_006_전자결재_시스템메시지_통합댓글페이지_작업지시서.md`: approved behavior and scope.
 - `docs/plan/20261016/20261016_006_전자결재_시스템메시지_통합댓글페이지_계획서.md`: dated project plan index and checkpoints.
 - `docs/spec/20261016/20261016_006_전자결재_시스템메시지_통합댓글페이지_상세사양서.md`: API, data, UI, and verification contract.
-- `backend/src/main/java/egovframework/com/common/domain/repository/CommonCommentDAO.java`: mapper access for mixed roots and user-comment reply trees.
-- `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`: select mixed top-level approval stream items and count them.
+- `backend/src/main/java/egovframework/com/common/domain/repository/CommonCommentDAO.java`: mapper access for mixed roots, scoped cursor validation, visible USER thread trees, and counts.
+- `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`: select mixed top-level approval stream items, validate cursors, load selected user threads, and count visible items.
 - `backend/src/main/java/egovframework/let/groupware/approval/domain/model/DocumentApprovalCommentPageVO.java`: approval-specific paged response, keeping common comment responses unchanged.
 - `backend/src/main/java/egovframework/let/groupware/approval/domain/model/DocumentApprovalFeedItemVO.java`: feed page system messages, combined count, and cursor metadata.
 - `backend/src/main/java/egovframework/let/groupware/approval/service/DocumentApprovalService.java`: typed return contract for approval comment pages.
@@ -60,15 +60,15 @@ and SYSTEM events 103 and 105, with cursor 103 and `hasPrevious=true`. The reply
 **Files:**
 - Create: `docs/spec/20261016/20261016_006_전자결재_시스템메시지_통합댓글페이지_상세사양서.md`
 
-- [ ] **Step 1: Record the approved API and UI contract**
+- [x] **Step 1: Record the approved API and UI contract**
 
 Include the mixed root-item definition, 3/20 page sizes, stable sort, ID cursor semantics, response fields, combined count semantics, reply/attachment handling, errors, and explicit no-schema-change boundary. Link the work direction and approved design.
 
-- [ ] **Step 2: Check current DB metadata before backend/API edits**
+- [x] **Step 2: Check current DB metadata before backend/API edits**
 
 Call the workspace `s-erp-postgresql-readonly` MCP `list_tables`, then `describe_table` for the common-comment table identified from the approved schema. Do not query tenant rows or sensitive data. Record the table/column metadata needed to validate existing mapper fields in the result report. If MCP is unavailable, report the failure and use the existing mapper/schema history only as explicitly identified fallback evidence.
 
-- [ ] **Step 3: Self-review the detailed spec**
+- [x] **Step 3: Self-review the detailed spec**
 
 Verify the direction, design, and detailed spec all agree on page sizes, whether replies consume slots, combined counts, cursor behavior, and scope. Resolve ambiguity before coding.
 
@@ -78,7 +78,7 @@ Verify the direction, design, and detailed spec all agree on page sizes, whether
 - Modify: `backend/src/test/java/egovframework/let/groupware/approval/service/impl/DocumentApprovalServiceImplTest.java`
 - Modify: `backend/src/test/java/egovframework/let/groupware/approval/domain/repository/DocumentApprovalMapperTest.java`
 
-- [ ] **Step 1: Add a service test for a mixed initial page**
+- [x] **Step 1: Add a service test for a mixed initial page**
 
 Arrange roots in descending order `SYSTEM 105`, `USER 104`, `SYSTEM 103`,
 `USER 102`; give USER root 104 a reply 110. Assert USER roots equal `[104]`,
@@ -90,7 +90,7 @@ Also arrange a deleted root with a live reply and a separate fully deleted
 thread. Assert the first is returned and counted once and the fully deleted
 thread is excluded from page results and `resultCnt`.
 
-- [ ] **Step 2: Run the focused tests and confirm they fail**
+- [x] **Step 2: Run the focused tests and confirm they fail**
 
 Run from `backend`:
 
@@ -100,16 +100,23 @@ mvn "-Dtest=DocumentApprovalServiceImplTest,DocumentApprovalMapperTest" test
 
 Expected: the current user-only page/count behavior does not satisfy the mixed page and combined-cursor assertions.
 
-- [ ] **Step 3: Add a previous-page boundary test**
+- [x] **Step 3: Add a previous-page boundary test**
 
-Use `beforeCommentId=103` where ID 103 is a SYSTEM root. Arrange `USER 102`
-and `SYSTEM 101` as older entries and assert both are selected in descending
-page order then serialized chronologically, cursor 101, and
-`hasPrevious=false`. Add another row with the same timestamp as ID 103 and a
-larger ID; assert it is excluded because it is not strictly older by the tuple
-boundary. Assert no returned row duplicates the prior page.
+Use `beforeCommentId=103` where ID 103 is a SYSTEM root. The service regression
+test verifies the SYSTEM cursor is accepted and that older USER 102 and SYSTEM
+101 entries are returned in the mixed page. The mapper test renders the cursor
+branch and asserts the strict `(created_at, comment_id)` tuple comparison.
+Actual PostgreSQL row-level duplicate-boundary execution remains unverified.
 
-- [ ] **Step 4: Add mapper SQL assertions**
+- [x] **Step 4: Add invalid-cursor and deleted-thread tests**
+
+Assert an unknown cursor is rejected without running the page query. Tenant and
+owner scope are asserted in the cursor mapper SQL. A deleted USER root with an
+active reply is included and counted once. Mapper SQL assertions cover the
+`BOOL_OR(deleted_yn = 'N')` visibility predicate; all-deleted tree behavior was
+not executed against PostgreSQL rows.
+
+- [x] **Step 5: Add mapper SQL assertions**
 
 Assert the mapped query scopes by tenant and approval owner, selects visible USER roots (including tombstone roots with live descendants) and SYSTEM rows, filters the cursor boundary, orders deterministically by creation time and ID, and applies the per-owner page limit. Assert the matching count query counts the same eligible USER thread roots plus SYSTEM roots.
 
@@ -123,23 +130,31 @@ Assert the mapped query scopes by tenant and approval owner, selects visible USE
 - Modify: `backend/src/main/java/egovframework/let/groupware/approval/service/DocumentApprovalService.java`
 - Modify: `backend/src/main/java/egovframework/let/groupware/approval/service/impl/DocumentApprovalServiceImpl.java`
 
-- [ ] **Step 1: Add approval-specific page response**
+- [x] **Step 1: Add approval-specific page response**
 
 Define `comments`, `systemEvents`, `hasPrevious`, `nextBeforeCommentId`, and `resultCnt`. Keep `CommonCommentPageVO` unchanged so other common-comment APIs do not gain unrelated response fields.
 
-- [ ] **Step 2: Select mixed root pages in MyBatis**
+- [x] **Step 2: Validate the cursor within the same owner scope**
+
+When `beforeCommentId` is present, query the candidate root by tenant,
+`owner_type='APPROVAL'`, the requested approval ID, top-level parent, and
+eligible USER/SYSTEM visibility. Reject an invalid or out-of-scope cursor
+before reading a page. Use the cursor's persisted `created_at` and `comment_id`
+as the strict tuple boundary.
+
+- [x] **Step 3: Select mixed root pages in MyBatis**
 
 Use the existing common-comment table and tenant/owner predicates. Select only visible USER roots (a thread is visible if any record in its tree is non-deleted) and SYSTEM messages into the same ordered page set. Apply `beforeCommentId` to either type, fetch one extra root to calculate `hasPrevious`, and return the selected root identity/type/time needed for mapping. Do not page reply rows as independent roots.
 
-- [ ] **Step 3: Attach USER replies and attachments**
+- [x] **Step 4: Attach USER replies and attachments**
 
 For only the selected USER root IDs, load their USER reply trees and attachments using existing data-access helpers or a narrowly scoped recursive query. Leave SYSTEM messages as standalone read-only items. Preserve deleted-comment masking and current attachment error handling. Keep reply and attachment lookups tenant- and approval-scoped.
 
-- [ ] **Step 4: Populate detail endpoint and feed preload from the shared mixed-page result**
+- [x] **Step 5: Populate detail endpoint and feed preload from the shared mixed-page result**
 
 Make `listApprovalComments` return the specialized page. In `listFeedDocuments`, set `comments`, page-scoped `systemEvents`, combined root `commentCount`, `hasPreviousComments`, and the mixed `nextBeforeCommentId` from the same page calculation. Do not independently attach every system message to the initial feed page.
 
-- [ ] **Step 5: Run focused backend tests**
+- [x] **Step 6: Run focused backend tests**
 
 Run:
 
@@ -158,19 +173,19 @@ Expected: all selected backend tests pass, including mixed-page and existing aut
 - Modify: `frontend/src/pages/groupware/documents/write/services/documentApproval.service.ts`
 - Modify: `frontend/tests/document-approval-service.test.ts`
 
-- [ ] **Step 1: Add failing controller response assertions**
+- [x] **Step 1: Add controller response assertions**
 
 Assert the existing `/{electronicApprovalId}/comments` route still returns USER `comments` and additionally returns page-scoped `systemEvents`, combined `resultCnt`, `hasPrevious`, and the shared cursor.
 
-- [ ] **Step 2: Add typed client validation**
+- [x] **Step 2: Add typed client validation**
 
 Require each system event's positive safe-integer `commentId`, string `eventType`, `content`, and `writerName`, with nullable/optional `createdAt` matching the existing backend model. Preserve USER-comment validation and do not cast the whole response to an unchecked type.
 
-- [ ] **Step 3: Test valid and invalid page responses**
+- [x] **Step 3: Test valid and invalid page responses**
 
 Verify a response containing both item types parses, and a malformed SYSTEM item or missing page metadata rejects with the existing explicit API-contract error path.
 
-- [ ] **Step 4: Run focused controller and frontend service tests**
+- [x] **Step 4: Run focused controller and frontend service tests**
 
 Run:
 
@@ -192,27 +207,27 @@ Expected: both selected test runs pass.
 - Modify: `frontend/src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed.tsx`
 - Modify: `frontend/tests/document-write-page.test.tsx`
 
-- [ ] **Step 1: Add failing component tests for mixed initial pages**
+- [x] **Step 1: Add failing component tests for mixed initial pages**
 
 Test list detail and preloaded feed cases with SYSTEM/USER/SYSTEM as the newest three top-level items, one USER reply, and an older remaining item. Assert only the three roots are shown, the reply is under its parent, the count includes all roots including systems exactly once, and the previous button shows the correct remaining count.
 
-- [ ] **Step 2: Add failing tests for mixed older pages**
+- [x] **Step 2: Add failing tests for mixed older pages**
 
 Click “이전 댓글 보기” when the cursor belongs to a SYSTEM item, then when it belongs to a USER item. Assert each page appends older SYSTEM and USER roots chronologically, no item is duplicated, page size is 20, and the button disappears once `hasPrevious` is false.
 
-- [ ] **Step 3: Add a failing test for a failed older-page request**
+- [x] **Step 3: Add a failing test for a failed older-page request**
 
 Make the previous-page request reject. Assert existing user comments and system messages remain visible, the cursor/remaining count do not advance, the explicit error and retry action appear, and retry uses the same `beforeCommentId`.
 
-- [ ] **Step 4: Update component state and merge**
+- [x] **Step 4: Update component state and merge**
 
 Keep the currently loaded system page alongside `commentRecords`. On a replacement page, replace both collections; on an older page, prepend the older `systemEvents` and USER comment records to the loaded chronological data. Map SYSTEM items with persisted IDs and preserve system styling; do not pass them to user-comment mutation handlers.
 
-- [ ] **Step 5: Correct totals and remaining count**
+- [x] **Step 5: Correct totals and remaining count**
 
 Use `commentCount` as the unified top-level total. Compute loaded top-level count as loaded USER roots plus loaded SYSTEM messages, not `commentRecords.length`, so replies do not distort the remaining number. Remove the extra `+ systemEvents.length` from the reaction-bar count.
 
-- [ ] **Step 6: Run the focused frontend regression test**
+- [x] **Step 6: Run the focused frontend regression test**
 
 Run:
 
@@ -228,7 +243,7 @@ Expected: mixed pagination tests and existing comment, system-message, and detai
 - Create: `docs/result/20261016/document-approval-system-message-pagination/20261016_006_전자결재_시스템메시지_통합댓글페이지_결과보고서.md`
 - Create: screenshots under `docs/result/20261016/document-approval-system-message-pagination/screenshots/`
 
-- [ ] **Step 1: Run backend focused suite**
+- [x] **Step 1: Run backend focused suite**
 
 Run from `backend`:
 
@@ -238,7 +253,7 @@ mvn "-Dtest=DocumentApprovalServiceImplTest,DocumentApprovalApiControllerTest,Do
 
 Expected: `BUILD SUCCESS`.
 
-- [ ] **Step 2: Run frontend focused tests and production build**
+- [x] **Step 2: Run frontend focused tests and production build**
 
 Run from `frontend`:
 
@@ -249,15 +264,15 @@ npm run build
 
 Expected: focused Vitest tests pass and Vite production build completes successfully.
 
-- [ ] **Step 3: Verify the real browser layout**
+- [x] **Step 3: Verify the real browser layout**
 
-Open `/groupware/doc/write` using the existing S-ERP browser at port 4173. Confirm a mixed page, the older-page control, and the system-message style at 375px, 768px, and 1280px. Save screenshots using English lowercase directory/file names. Do not stop or replace an existing shared development server.
+Open `/groupware/doc/write` using the existing S-ERP browser at port 4173. Verify the detail shell and comment composer at 375px, 768px, and 1280px and save privacy-masked screenshots. The existing server returned HTTP 500 for the detail comment API, so live mixed-page data and styling could not be confirmed; targeted UI tests cover that behavior. Do not stop or replace an existing shared development server.
 
-- [ ] **Step 4: Record evidence and scope**
+- [x] **Step 4: Record evidence and scope**
 
 Write the result report with the reproduction, cause, API/UI changes, DB MCP result or explicit failure and fallback evidence, exact test/build results, and screenshot links. Confirm there was no schema change and no notice-feed change.
 
-- [ ] **Step 5: Check patch hygiene**
+- [x] **Step 5: Check patch hygiene**
 
 Run:
 

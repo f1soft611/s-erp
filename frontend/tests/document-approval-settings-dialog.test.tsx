@@ -324,10 +324,33 @@ describe('DocumentApprovalSettingsDialog', () => {
     const approvalButton = screen.getByRole('button', { name: '결재 추가' });
     const agreementButton = screen.getByRole('button', { name: '합의 추가' });
     const prompt = screen.getByText('자주 쓰는 결재선 선택');
+    const promptStyle = getComputedStyle(prompt);
+    const userPickerStyles = ['결재선 사용자 선택', '참조자 선택'].map(
+      (label) => {
+        const picker = screen.getByRole('combobox', { name: label });
+        const pickerLabel = picker
+          .closest('.MuiFormControl-root')
+          ?.querySelector('.MuiInputLabel-root');
+        if (!pickerLabel) {
+          throw new Error(`${label} 라벨을 찾지 못했습니다.`);
+        }
+        return getComputedStyle(pickerLabel);
+      },
+    );
 
     expect(selectInput).toHaveStyle({ minHeight: '38px' });
     expect(selectField).not.toHaveClass('MuiFormControl-marginNormal');
-    expect(prompt).toHaveStyle({ fontSize: '0.82rem', fontWeight: '600' });
+    for (const userPickerStyle of userPickerStyles) {
+      expect({
+        fontSize: promptStyle.fontSize,
+        fontWeight: promptStyle.fontWeight,
+        color: promptStyle.color,
+      }).toEqual({
+        fontSize: userPickerStyle.fontSize,
+        fontWeight: userPickerStyle.fontWeight,
+        color: userPickerStyle.color,
+      });
+    }
     expect(settingsButton).toHaveClass('MuiButton-sizeMedium');
     expect(approvalButton).toHaveClass('MuiButton-sizeMedium');
     expect(agreementButton).toHaveClass('MuiButton-sizeMedium');

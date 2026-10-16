@@ -23,6 +23,7 @@ import type {
   DocumentApprovalComment,
   DocumentApprovalCommentAttachment,
   DocumentApprovalCommentPage,
+  DocumentApprovalPageSystemEvent,
 } from '../types/documentWrite.types';
 
 const APPROVAL_API = '/api/v1/groupware/approvals';
@@ -71,6 +72,25 @@ function isApprovalComment(value: unknown, electronicApprovalId: number): value 
   );
 }
 
+function isApprovalPageSystemEvent(
+  value: unknown,
+  electronicApprovalId: number,
+): value is DocumentApprovalPageSystemEvent {
+  return (
+    isObject(value) &&
+    Number.isSafeInteger(value.commentId) &&
+    Number(value.commentId) > 0 &&
+    value.ownerId === electronicApprovalId &&
+    value.commentType === 'SYSTEM' &&
+    typeof value.eventType === 'string' &&
+    typeof value.content === 'string' &&
+    typeof value.writerName === 'string' &&
+    (value.createdAt === undefined ||
+      value.createdAt === null ||
+      typeof value.createdAt === 'string')
+  );
+}
+
 function validateCommentAttachment(value: unknown): value is DocumentDraftAttachmentResponse {
   return (
     isObject(value) &&
@@ -96,6 +116,9 @@ function isDocumentApprovalFeedRecord(value: unknown): value is DocumentApproval
     Array.isArray(value.approvalLines) &&
     Array.isArray(value.attachments) &&
     Array.isArray(value.systemEvents) &&
+    value.systemEvents.every((event) =>
+      isApprovalPageSystemEvent(event, Number(value.electronicApprovalId)),
+    ) &&
     Array.isArray(value.comments) &&
     value.comments.every((comment) =>
       isApprovalComment(comment, Number(value.electronicApprovalId)),
@@ -267,24 +290,32 @@ export async function listApprovalComments(
   const response = await apiGet<{
     resultList?: DocumentApprovalComment[];
     comments?: DocumentApprovalComment[];
+    systemEvents?: DocumentApprovalPageSystemEvent[];
     hasPrevious?: boolean;
     nextBeforeCommentId: number | null;
     resultCnt?: number;
   }>(`${APPROVAL_API}/${electronicApprovalId}/comments?${query.toString()}`);
   const comments = response.comments ?? response.resultList;
+  const systemEvents = response.systemEvents;
   if (
     !Array.isArray(comments) ||
     !comments.every((comment) => isApprovalComment(comment, electronicApprovalId)) ||
+    !Array.isArray(systemEvents) ||
+    !systemEvents.every((event) =>
+      isApprovalPageSystemEvent(event, electronicApprovalId),
+    ) ||
     typeof response.hasPrevious !== 'boolean' ||
     !(response.nextBeforeCommentId === null ||
       (Number.isSafeInteger(response.nextBeforeCommentId) && Number(response.nextBeforeCommentId) > 0)) ||
     typeof response.resultCnt !== 'number' ||
-    !Number.isFinite(response.resultCnt)
+    !Number.isSafeInteger(response.resultCnt) ||
+    Number(response.resultCnt) < 0
   ) {
     throw new Error('전자결재 댓글 응답을 확인할 수 없습니다.');
   }
   return {
     comments,
+    systemEvents,
     hasPrevious: response.hasPrevious,
     nextBeforeCommentId: response.nextBeforeCommentId,
     resultCnt: response.resultCnt,

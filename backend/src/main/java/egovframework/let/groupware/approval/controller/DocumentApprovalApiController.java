@@ -24,13 +24,13 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonFileVO;
-import egovframework.com.common.domain.model.CommonCommentPageVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
@@ -165,12 +165,13 @@ public class DocumentApprovalApiController {
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Long beforeCommentId,
             @AuthenticationPrincipal LoginVO user) throws Exception {
-        CommonCommentPageVO page = documentApprovalService.listApprovalComments(
+        DocumentApprovalCommentPageVO page = documentApprovalService.listApprovalComments(
                 user, electronicApprovalId, limit, beforeCommentId);
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("resultList", page.getComments());
         resultMap.put("comments", page.getComments());
         resultMap.put("resultCnt", page.getResultCnt());
+        resultMap.put("systemEvents", page.getSystemEvents());
         resultMap.put("hasPrevious", page.isHasPrevious());
         resultMap.put("nextBeforeCommentId", page.getNextBeforeCommentId());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);

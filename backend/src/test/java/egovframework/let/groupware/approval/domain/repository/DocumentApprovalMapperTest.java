@@ -345,6 +345,12 @@ class DocumentApprovalMapperTest {
                 .getBoundSql(params)
                 .getSql();
 
+        params.put("beforeCommentId", 103L);
+        String olderPageSql = configuration
+                .getMappedStatement("CommonCommentDAO.selectApprovalCommentStreamPagesByOwnerIds")
+                .getBoundSql(params)
+                .getSql();
+
         assertThat(pageSql)
                 .contains("comment_type = 'USER'")
                 .contains("comment_type = 'SYSTEM'")
@@ -362,6 +368,9 @@ class DocumentApprovalMapperTest {
                 .contains("tenant_id = ?")
                 .contains("owner_id = ?")
                 .contains("comment_id = ?");
+        assertThat(olderPageSql)
+                .contains("JOIN cursor_item cursor")
+                .contains("(root.created_at, root.comment_id) < (cursor.created_at, cursor.comment_id)");
     }
 
     @Test

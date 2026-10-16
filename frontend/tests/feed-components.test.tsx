@@ -292,6 +292,39 @@ describe('shared feed components', () => {
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['임시저장', 'default', 'outlined'],
+    ['결재신청', 'info', 'filled'],
+    ['반려', 'error', 'filled'],
+    ['승인', 'success', 'filled'],
+    ['완료', 'success', 'filled'],
+    ['보완요청', 'warning', 'filled'],
+  ] as const)('replaces the system icon with the %s badge without mutation controls', (label, color, variant) => {
+    render(
+      <CommentThread
+        comments={[{
+          id: 'system-event',
+          author: '시스템',
+          time: '2026-10-16 10:00',
+          content: '시스템 처리 내용',
+          isSystemEvent: true,
+          systemEventBadge: { label, color, variant },
+        }]}
+        showComposer={false}
+      />,
+    );
+
+    const badge = screen.getByTestId('system-event-badge');
+    expect(badge).toHaveTextContent(label);
+    expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
+    expect(badge).toHaveClass(`MuiChip-${variant}`);
+    expect(badge).toHaveStyle({ borderRadius: '8px' });
+    expect(screen.queryByRole('img', { name: '시스템 메시지' })).not.toBeInTheDocument();
+    expect(screen.getByText('시스템 처리 내용')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
+  });
+
   it('renders a file-type icon for spreadsheet attachments', () => {
     render(
       <AttachmentList

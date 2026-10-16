@@ -104,31 +104,41 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectApprovalLinesByOwnerIds(anyMap()))
             .thenReturn(Arrays.asList(firstLine, secondLine));
 
+        CommonCommentVO newestSystemEvent = approvalComment(57L, "login-author", "SYSTEM");
+        newestSystemEvent.setEventType("SUBMITTED");
+        newestSystemEvent.setCreatedAt(new java.util.Date(6_000L));
         CommonCommentVO newestRoot = approvalComment(55L, "login-author", "USER");
+        newestRoot.setCreatedAt(new java.util.Date(5_000L));
         CommonCommentVO newestReply = approvalComment(56L, "login-author", "USER");
         newestReply.setParentCommentId(55L);
-        CommonCommentVO secondRoot = approvalComment(54L, "login-author", "USER");
+        newestReply.setCreatedAt(new java.util.Date(5_500L));
+        CommonCommentVO secondSystemEvent = approvalComment(54L, "login-author", "SYSTEM");
+        secondSystemEvent.setEventType("APPROVED");
+        secondSystemEvent.setCreatedAt(new java.util.Date(4_000L));
         CommonCommentVO thirdRoot = approvalComment(53L, "login-author", "USER");
-        CommonCommentVO olderRoot = approvalComment(52L, "login-author", "USER");
         CommonCommentVO otherDocumentRoot = approvalComment(81L, "login-author", "USER");
-        for (CommonCommentVO comment : Arrays.asList(newestRoot, newestReply, secondRoot, thirdRoot, olderRoot)) {
-            comment.setOwnerId(77L);
-        }
+        newestSystemEvent.setOwnerId(77L);
+        newestRoot.setOwnerId(77L);
+        newestReply.setOwnerId(77L);
+        secondSystemEvent.setOwnerId(77L);
+        thirdRoot.setOwnerId(77L);
         otherDocumentRoot.setOwnerId(78L);
-        when(commentDAO.selectApprovalUserCommentPagesByOwnerIds(anyMap()))
-            .thenReturn(Arrays.asList(newestRoot, newestReply, secondRoot, thirdRoot, olderRoot, otherDocumentRoot));
+        when(commentDAO.selectApprovalCommentStreamPagesByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(
+                newestSystemEvent, newestRoot, secondSystemEvent, thirdRoot, otherDocumentRoot));
         Map<String, Object> firstOwnerCount = new HashMap<>();
         firstOwnerCount.put("ownerId", 77L);
-        firstOwnerCount.put("totalCount", 4L);
+        firstOwnerCount.put("totalCount", 5L);
         Map<String, Object> secondOwnerCount = new HashMap<>();
         secondOwnerCount.put("ownerId", 78L);
         secondOwnerCount.put("totalCount", 1L);
-        when(commentDAO.selectApprovalUserCommentCountsByOwnerIds(anyMap()))
+        when(commentDAO.selectApprovalCommentStreamCountsByOwnerIds(anyMap()))
             .thenReturn(Arrays.asList(firstOwnerCount, secondOwnerCount));
+        when(commentDAO.selectApprovalUserCommentThreadsByRootIds(anyMap()))
+            .thenReturn(Arrays.asList(newestRoot, newestReply, otherDocumentRoot));
         CommonFileVO commentAttachment = approvalCommentFile(601L, 55L);
-        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(53L, 54L, 55L, 56L, 81L)))
+        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(55L, 56L, 81L)))
             .thenReturn(Collections.singletonMap(55L, Collections.singletonList(commentAttachment)));
-        when(commentDAO.selectApprovalSystemEventsByOwnerIds(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
         List<DocumentApprovalFeedItemVO> result = service().listFeedDocuments(author, "ALL", null, null);
 
@@ -142,27 +152,32 @@ class DocumentApprovalServiceImplTest {
             .isExactlyInstanceOf(DocumentApprovalLineVO.class);
         assertThat(result.get(0).getAttachments()).containsExactly(attachment);
         assertThat(result.get(0).getComments())
-            .extracting(CommonCommentVO::getCommentId).containsExactly(53L, 54L, 55L, 56L);
-        assertThat(result.get(0).getComments().get(2).getAttachments())
+            .extracting(CommonCommentVO::getCommentId).containsExactly(55L, 56L);
+        assertThat(result.get(0).getComments().get(0).getAttachments())
             .containsExactly(commentAttachment);
-        assertThat(result.get(0).getCommentCount()).isEqualTo(4L);
+        assertThat(result.get(0).getSystemEvents())
+            .extracting(CommonCommentVO::getCommentId).containsExactly(54L, 57L);
+        assertThat(result.get(0).getCommentCount()).isEqualTo(5L);
         assertThat(result.get(0).isHasPreviousComments()).isTrue();
-        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(53L);
+        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(54L);
         assertThat(result.get(1).getElectronicApprovalId()).isEqualTo(78L);
         assertThat(result.get(1).getContentsHtml()).isEqualTo("<p>둘째 본문</p>");
         assertThat(result.get(1).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
             .containsExactly(502L);
         assertThat(result.get(1).getComments()).containsExactly(otherDocumentRoot);
+        assertThat(result.get(1).getSystemEvents()).isEmpty();
         assertThat(result.get(1).getCommentCount()).isEqualTo(1L);
         assertThat(result.get(1).isHasPreviousComments()).isFalse();
         verify(approvalDAO).selectDocumentApprovalDetailsByIds(anyMap());
         verify(approvalDAO).selectApprovalLinesByOwnerIds(anyMap());
-        verify(commentDAO).selectApprovalUserCommentPagesByOwnerIds(argThat(params ->
+        verify(commentDAO).selectApprovalCommentStreamPagesByOwnerIds(argThat(params ->
             params.get("ownerIds") != null && ((List<?>) params.get("ownerIds")).containsAll(Arrays.asList(77L, 78L))
                 && params.get("limit").equals(4)));
-        verify(commentDAO).selectApprovalUserCommentCountsByOwnerIds(anyMap());
+        verify(commentDAO).selectApprovalCommentStreamCountsByOwnerIds(anyMap());
+        verify(commentDAO).selectApprovalUserCommentThreadsByRootIds(argThat(params ->
+            ((List<?>) params.get("rootIds")).containsAll(Arrays.asList(55L, 81L))));
         verify(fileService).listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L));
-        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(53L, 54L, 55L, 56L, 81L));
+        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(55L, 56L, 81L));
         verify(approvalDAO, never()).selectLoginIdByLoginCode(anyMap());
         verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
         verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
@@ -605,10 +620,17 @@ class DocumentApprovalServiceImplTest {
         systemEvent.setEventType("SUBMITTED");
         systemEvent.setContent("문서가 결재신청되었습니다.");
         systemEvent.setCreatedAt(new java.util.Date(1_792_119_600_000L));
-        when(commentDAO.selectApprovalUserCommentPage(anyMap())).thenReturn(Collections.singletonList(comment));
-        when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.singletonList(systemEvent));
-        when(commentDAO.countApprovalUserComments(anyMap())).thenReturn(1L);
-        when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.<CommonFileVO>emptyList());
+        when(commentDAO.selectApprovalCommentStreamPagesByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(systemEvent, comment));
+        Map<String, Object> count = new HashMap<>();
+        count.put("ownerId", 77L);
+        count.put("totalCount", 2L);
+        when(commentDAO.selectApprovalCommentStreamCountsByOwnerIds(anyMap()))
+            .thenReturn(Collections.singletonList(count));
+        when(commentDAO.selectApprovalUserCommentThreadsByRootIds(anyMap()))
+            .thenReturn(Collections.singletonList(comment));
+        when(fileService.listFilesByOwnerIds(eq(4L), eq("APPROVAL_COMMENT"), org.mockito.ArgumentMatchers.anyList()))
+            .thenReturn(Collections.<Long, List<CommonFileVO>>emptyMap());
 
         Object page = invokeApprovalMethod(
                 "listApprovalComments",
@@ -619,12 +641,92 @@ class DocumentApprovalServiceImplTest {
         assertThat(json.path("comments").size()).isEqualTo(1);
         assertThat(json.path("systemEvents").path(0).path("commentId").asLong()).isEqualTo(56L);
         assertThat(json.path("resultCnt").asLong()).isEqualTo(2L);
-        verify(commentDAO).selectApprovalSystemEvents(argThat(params ->
-            params.get("tenantId").equals(4L) && params.get("ownerId").equals(77L)));
-        verify(commentDAO).selectApprovalUserCommentPage(argThat(params ->
+        verify(commentDAO).selectApprovalCommentStreamPagesByOwnerIds(argThat(params ->
+            params.get("tenantId").equals(4L)
+                && ((List<?>) params.get("ownerIds")).contains(77L)
+                && params.get("limit").equals(4)));
+        verify(commentDAO).selectApprovalCommentStreamCountsByOwnerIds(anyMap());
+    }
+
+    @Test
+    void listApprovalCommentsCountsDeletedRootWhenAVisibleReplyRemains() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        CommonCommentVO deletedRoot = approvalComment(55L, "login-author", "USER");
+        deletedRoot.setDeletedYn("Y");
+        CommonCommentVO visibleReply = approvalComment(56L, "other-writer", "USER");
+        visibleReply.setParentCommentId(55L);
+        when(commentDAO.selectApprovalCommentStreamPagesByOwnerIds(anyMap()))
+            .thenReturn(Collections.singletonList(deletedRoot));
+        Map<String, Object> count = new HashMap<>();
+        count.put("ownerId", 77L);
+        count.put("totalCount", 1L);
+        when(commentDAO.selectApprovalCommentStreamCountsByOwnerIds(anyMap()))
+            .thenReturn(Collections.singletonList(count));
+        when(commentDAO.selectApprovalUserCommentThreadsByRootIds(anyMap()))
+            .thenReturn(Arrays.asList(deletedRoot, visibleReply));
+        when(fileService.listFilesByOwnerIds(eq(4L), eq("APPROVAL_COMMENT"), org.mockito.ArgumentMatchers.anyList()))
+            .thenReturn(Collections.<Long, List<CommonFileVO>>emptyMap());
+
+        Object page = invokeApprovalMethod(
+                "listApprovalComments",
+                new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
+                author, 77L, 3, null);
+        com.fasterxml.jackson.databind.JsonNode json = new ObjectMapper().valueToTree(page);
+
+        assertThat(json.path("comments").size()).isEqualTo(2);
+        assertThat(json.path("resultCnt").asLong()).isEqualTo(1L);
+    }
+
+    @Test
+    void listApprovalCommentsAcceptsSystemCursorForAnOlderMixedPage() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+        CommonCommentVO cursor = approvalComment(103L, "system", "SYSTEM");
+        when(commentDAO.selectApprovalCommentStreamCursor(anyMap())).thenReturn(cursor);
+        CommonCommentVO olderUserRoot = approvalComment(102L, "other-writer", "USER");
+        CommonCommentVO olderSystemEvent = approvalComment(101L, "system", "SYSTEM");
+        olderSystemEvent.setEventType("APPROVED");
+        when(commentDAO.selectApprovalCommentStreamPagesByOwnerIds(anyMap()))
+            .thenReturn(Arrays.asList(olderUserRoot, olderSystemEvent));
+        Map<String, Object> count = new HashMap<>();
+        count.put("ownerId", 77L);
+        count.put("totalCount", 4L);
+        when(commentDAO.selectApprovalCommentStreamCountsByOwnerIds(anyMap()))
+            .thenReturn(Collections.singletonList(count));
+        when(commentDAO.selectApprovalUserCommentThreadsByRootIds(anyMap()))
+            .thenReturn(Collections.singletonList(olderUserRoot));
+        when(fileService.listFilesByOwnerIds(eq(4L), eq("APPROVAL_COMMENT"), org.mockito.ArgumentMatchers.anyList()))
+            .thenReturn(Collections.<Long, List<CommonFileVO>>emptyMap());
+
+        Object page = invokeApprovalMethod(
+                "listApprovalComments",
+                new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
+                author, 77L, 20, 103L);
+        com.fasterxml.jackson.databind.JsonNode json = new ObjectMapper().valueToTree(page);
+
+        assertThat(json.path("comments").get(0).path("commentId").asLong()).isEqualTo(102L);
+        assertThat(json.path("systemEvents").get(0).path("commentId").asLong()).isEqualTo(101L);
+        assertThat(json.path("resultCnt").asLong()).isEqualTo(4L);
+        assertThat(json.path("hasPrevious").asBoolean()).isFalse();
+        assertThat(json.path("nextBeforeCommentId").isNull()).isTrue();
+        verify(commentDAO).selectApprovalCommentStreamCursor(argThat(params ->
             params.get("tenantId").equals(4L)
                 && params.get("ownerId").equals(77L)
-                && params.get("limit").equals(4)));
+                && params.get("commentId").equals(103L)));
+        verify(commentDAO).selectApprovalCommentStreamPagesByOwnerIds(argThat(params ->
+            params.get("beforeCommentId").equals(103L)
+                && params.get("limit").equals(21)));
+    }
+
+    @Test
+    void listApprovalCommentsRejectsCursorOutsideVisibleApprovalStream() throws Exception {
+        when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
+
+        assertThatThrownBy(() -> invokeApprovalMethod(
+                "listApprovalComments",
+                new Class<?>[] {LoginVO.class, Long.class, Integer.class, Long.class},
+                author, 77L, 20, 999L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
