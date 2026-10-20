@@ -24,6 +24,14 @@ public class ArchiveBoardDAO extends EgovAbstractMapper {
         return selectOne("ArchiveBoardDAO.selectArchiveFileItemById", params);
     }
 
+    public int updateArchiveFileNameAndCategory(Map<String, Object> params) throws Exception {
+        return update("ArchiveBoardDAO.updateArchiveFileNameAndCategory", params);
+    }
+
+    public int updateArchivePostCategoryAndTitle(Map<String, Object> params) throws Exception {
+        return update("ArchiveBoardDAO.updateArchivePostCategoryAndTitle", params);
+    }
+
     public List<ArchiveBoardPostVO> selectArchivePostList(Map<String, Object> params) throws Exception {
         return selectList("ArchiveBoardDAO.selectArchivePostList", params);
     }

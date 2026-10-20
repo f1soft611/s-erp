@@ -29,6 +29,7 @@ import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.common.dto.ListResult;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileSearchVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileUpdateRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSearchVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO;
@@ -81,6 +82,14 @@ public class ArchiveBoardApiController {
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(item(archiveBoardService.uploadFile(file, folderCode, user)));
+    }
+
+    @PutMapping("/files/{boardFileId}")
+    public ResponseEntity<ResultVO> updateFile(@PathVariable Long boardFileId,
+            @RequestBody ArchiveBoardFileUpdateRequestVO payload,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        return ResponseEntity.ok(item(archiveBoardService.updateFile(boardFileId, payload, user)));
     }
 
     @PutMapping("/posts/{postId}")

@@ -112,6 +112,21 @@ class ArchiveBoardApiControllerTest {
     }
 
     @Test
+    void fileUpdateRouteRenamesAndMovesFile() throws Exception {
+        ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
+        item.setBoardFileId(31L);
+        item.setFileName("renamed.txt");
+        when(service.updateFile(eq(31L), any(), eq(user))).thenReturn(item);
+
+        mvc.perform(put(ROOT + "/files/31")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"postId\":13,\"fileName\":\"renamed.txt\",\"folderCode\":\"GENERAL\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.item.boardFileId").value(31))
+                .andExpect(jsonPath("$.result.item.fileName").value("renamed.txt"));
+    }
+
+    @Test
     void attachmentRoutesRequirePostOwnershipParameterAndMultipartFile() throws Exception {
         ArchiveBoardFileVO attachment = new ArchiveBoardFileVO();
         attachment.setBoardFileId(31L);

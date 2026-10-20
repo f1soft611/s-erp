@@ -148,6 +148,29 @@
         WHERE tenant_id = #{tenantId} AND board_type_code = 'ARCHIVE'
           AND post_id = #{postId} AND is_deleted = 'N'
     </update>
+    <update id="updateArchiveFileNameAndCategory" parameterType="map">
+        UPDATE tb_common_file
+        SET file_name = #{fileName},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND owner_type = 'ARCHIVE'
+          AND owner_id = #{postId}
+          AND file_id = #{boardFileId}
+          AND file_usage_type = 'ATTACHMENT'
+          AND deleted_yn = 'N'
+    </update>
+    <update id="updateArchivePostCategoryAndTitle" parameterType="map">
+        UPDATE tb_board_post
+        SET category_code = #{categoryCode},
+            title = #{fileName},
+            last_modified_by = #{lastModifiedBy},
+            last_modified_by_name = #{lastModifiedByName},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND board_type_code = 'ARCHIVE'
+          AND post_id = #{postId}
+          AND is_deleted = 'N'
+    </update>
     <update id="softDeleteArchivePost" parameterType="map">
         UPDATE tb_board_post SET is_deleted = 'Y', updated_at = CURRENT_TIMESTAMP,
             last_modified_by = #{lastModifiedBy}, last_modified_by_name = #{lastModifiedByName}

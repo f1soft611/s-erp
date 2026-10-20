@@ -27,6 +27,7 @@ import egovframework.let.common.pagination.EgovPaginationSupport;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileSearchVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileUpdateRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSearchVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO;
@@ -130,6 +131,42 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ArchiveBoardFileItemVO updateFile(Long boardFileId, ArchiveBoardFileUpdateRequestVO payload, LoginVO user)
+            throws Exception {
+        requireMutation(user, false);
+        if (boardFileId == null || payload == null || payload.getPostId() == null || !StringUtils.hasText(payload.getFileName())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 정보를 확인해 주세요.");
+        }
+
+        String fileName = payload.getFileName().trim();
+        if (fileName.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일명을 확인해 주세요.");
+        }
+
+        ArchiveBoardFileVO file = requireAttachment(payload.getPostId(), boardFileId, user);
+        String categoryCode = StringUtils.hasText(payload.getFolderCode()) ? payload.getFolderCode().trim() : null;
+        if (categoryCode != null) {
+            categoryValidator.validate(user.getTenantId(), ARCHIVE, categoryCode);
+        }
+
+        Map<String, Object> params = postParams(user, payload.getPostId());
+        params.put("boardFileId", boardFileId);
+        params.put("fileName", fileName);
+        params.put("categoryCode", categoryCode);
+        archiveBoardDAO.updateArchiveFileNameAndCategory(params);
+        archiveBoardDAO.updateArchivePostCategoryAndTitle(params);
+
+        Map<String, Object> lookup = postParams(user, file.getPostId());
+        lookup.put("boardFileId", boardFileId);
+        ArchiveBoardFileItemVO item = archiveBoardDAO.selectArchiveFileItemById(lookup);
+        if (item == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다.");
+        }
+        return item;
+    }
+
+    @Override
     public ListResult<ArchiveBoardPostVO> listPosts(ArchiveBoardPostSearchVO search, LoginVO user) throws Exception {
         requireAuthenticated(user);
         requireBoard();
@@ -227,6 +264,10 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         requireMutation(user, false);
         requireAttachment(postId, boardFileId, user);
         commonFileService.deleteFile(user.getTenantId(), ARCHIVE, postId, boardFileId);
+        List<CommonFileVO> remaining = ownedFiles(postId, user);
+        if (remaining.isEmpty()) {
+            archiveBoardDAO.softDeleteArchivePost(postParams(user, postId));
+        }
     }
 
     @Override
@@ -283,7 +324,7 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         return post;
     }
 
-    private void requireAttachment(Long postId, Long boardFileId, LoginVO user) throws Exception {
+    private ArchiveBoardFileVO requireAttachment(Long postId, Long boardFileId, LoginVO user) throws Exception {
         requirePost(postId, user);
         requireId(boardFileId);
         Map<String, Object> params = postParams(user, postId);
@@ -295,6 +336,7 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
                 || !"N".equals(file.getDeletedYn())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일을 찾을 수 없습니다.");
         }
+        return file;
     }
 
     private List<CommonFileVO> ownedFiles(Long postId, LoginVO user) throws Exception {

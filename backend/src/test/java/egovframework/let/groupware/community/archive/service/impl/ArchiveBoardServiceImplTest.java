@@ -132,6 +132,38 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
+    void updateFileRenamesAndMovesOwnedArchiveFile() throws Exception {
+        ArchiveBoardFileVO attachment = new ArchiveBoardFileVO();
+        attachment.setBoardFileId(31L);
+        attachment.setTenantId(71L);
+        attachment.setPostId(13L);
+        attachment.setOwnerType("ARCHIVE");
+        attachment.setFileUsageType("ATTACHMENT");
+        attachment.setDeletedYn("N");
+        when(dao.selectArchiveAttachmentById(anyMap())).thenReturn(attachment);
+        when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.singletonList(ownedFile(31L)));
+        ArchiveBoardFileItemVO updated = new ArchiveBoardFileItemVO();
+        updated.setBoardFileId(31L);
+        updated.setFileName("renamed.txt");
+        when(dao.selectArchiveFileItemById(anyMap())).thenReturn(updated);
+
+        ArchiveBoardFileUpdateRequestVO request = new ArchiveBoardFileUpdateRequestVO();
+        request.setPostId(13L);
+        request.setFileName("renamed.txt");
+        request.setFolderCode("GENERAL");
+
+        ArchiveBoardFileItemVO result = service.updateFile(31L, request, user);
+
+        assertThat(result.getFileName()).isEqualTo("renamed.txt");
+        verify(categories).validate(71L, "ARCHIVE", "GENERAL");
+        verify(dao).updateArchiveFileNameAndCategory(argThat((Map<String, Object> params) ->
+                Long.valueOf(13L).equals(params.get("postId"))
+                        && Long.valueOf(31L).equals(params.get("boardFileId"))
+                        && "renamed.txt".equals(params.get("fileName"))
+                        && "GENERAL".equals(params.get("categoryCode"))));
+    }
+
+    @Test
     void createAndUpdateKeepPlainTextAndAuthenticatedWriter() throws Exception {
         when(dao.insertArchivePost(anyMap())).thenReturn(13L);
         service.createPost(payload, user);
@@ -358,6 +390,25 @@ class ArchiveBoardServiceImplTest {
         verify(dao, times(2)).selectArchiveAttachmentById(argThat(map ->
                 Long.valueOf(71).equals(map.get("tenantId")) && Long.valueOf(13).equals(map.get("postId"))
                 && Long.valueOf(31).equals(map.get("boardFileId")) && "ARCHIVE".equals(map.get("boardTypeCode"))));
+    }
+
+    @Test
+    void deletingLastAttachmentAlsoSoftDeletesPost() throws Exception {
+        ArchiveBoardFileVO file = new ArchiveBoardFileVO();
+        file.setBoardFileId(31L);
+        file.setTenantId(71L);
+        file.setPostId(13L);
+        file.setOwnerType("ARCHIVE");
+        file.setFileUsageType("ATTACHMENT");
+        file.setDeletedYn("N");
+        when(dao.selectArchiveAttachmentById(anyMap())).thenReturn(file);
+        when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.emptyList());
+
+        service.deleteAttachment(13L, 31L, user);
+
+        verify(dao).softDeleteArchivePost(argThat(params ->
+                Long.valueOf(13L).equals(params.get("postId"))
+                        && Long.valueOf(71L).equals(params.get("tenantId"))));
     }
 
     @Test
