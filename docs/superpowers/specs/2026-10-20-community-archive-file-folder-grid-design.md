@@ -2,7 +2,7 @@
 
 ## Status
 
-The design direction was approved by the user on 2026-10-20. The user requested a file-centric archive grid while keeping the existing database tables. This document is awaiting the user's review before implementation planning.
+The design direction was approved by the user on 2026-10-20. The user requested a file-centric archive grid while keeping the existing database tables. The user additionally specified that selecting `새 자료 등록` must open the file picker immediately and upload selected files without an information-entry form. This updated document is awaiting the user's review before implementation planning.
 
 ## Goal
 
@@ -24,6 +24,7 @@ Redesign `/groupware/community/archive` as a lightweight file browser. Archive c
 - A file remains in `tb_common_file`; its owning `tb_board_post` continues to hold its tenant, board type, folder code, writer, and title. No folder or file table is added.
 - Each newly uploaded file creates its own archive post and attachment. `tb_board_post.title` is populated from the original file name automatically; `contents` may be empty. The post's `category_code` is the selected folder code, or `NULL` for a direct upload to the root.
 - The original file name remains the displayed name in `tb_common_file.file_name`. If it exceeds the current 200-character post-title validation limit, reject the upload with an actionable error rather than silently truncating the generated title.
+- Clicking `새 자료 등록` immediately opens the native file picker. Selecting one or more files starts upload directly; there is no composer or additional information form.
 - A multi-file selection creates one post and one visible file row per selected file. Each file result is reported independently so partial failures are explicit.
 - Existing posts with multiple attachments remain intact. Their attachments are flattened into separate grid rows using `tb_common_file.file_name`, while the existing post remains the owner and supplies its folder and writer metadata.
 - An upload without an actual file is rejected. If the final active attachment is deleted, its now-empty post is also soft-deleted.
@@ -31,7 +32,8 @@ Redesign `/groupware/community/archive` as a lightweight file browser. Archive c
 ### Folder and file navigation
 
 - The root view displays folder rows followed by uncategorized file rows.
-- Selecting a folder opens that folder and displays its files with a breadcrumb/back navigation to the root. Uploading from the root leaves `category_code` empty; uploading inside a folder assigns its code.
+- Selecting a folder opens that folder and displays its files with a breadcrumb/back navigation to the root. `새 자료 등록` uses the current location: uploading from the root leaves `category_code` empty; uploading inside a folder assigns its code.
+- Upload state and per-file success/failure are displayed in the page; a failed upload is not reported as successful and can be retried.
 - A `분류 추가` action opens the existing common-code item dialog for the `WF_ARCHIVE_CATEGORY` group. The dialog must present an archive-appropriate title while preserving its current draft-form title and behavior for existing callers.
 - Folder-item editing follows the existing tenant-admin and page create/update permission pattern.
 - Inactive folders remain visible and browsable as read-only locations so their existing files remain accessible. Uploads into inactive folders are blocked.
@@ -65,7 +67,7 @@ Included:
 
 - Archive page file/folder navigation and file-oriented grid.
 - Common-code folder management through the existing item dialog.
-- Per-file upload, list, download, and delete behavior using the current tables.
+- Direct-to-file-picker, per-file upload, list, download, and delete behavior using the current tables.
 - Archive API/service changes to support file-row responses, root uploads, and required-file validation.
 - Soft deletion of existing archive posts with no active attachment.
 - Focused frontend/backend tests, responsive browser verification, and dated result documentation.
