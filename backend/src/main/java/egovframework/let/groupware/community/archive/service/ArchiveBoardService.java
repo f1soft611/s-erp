@@ -15,6 +15,7 @@ import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPo
 
 public interface ArchiveBoardService {
     ListResult<ArchiveBoardFileItemVO> listFiles(ArchiveBoardFileSearchVO search, LoginVO user) throws Exception;
+    ArchiveBoardFileItemVO uploadFile(MultipartFile file, String folderCode, LoginVO user) throws Exception;
     ListResult<ArchiveBoardPostVO> listPosts(ArchiveBoardPostSearchVO search, LoginVO user) throws Exception;
     ArchiveBoardPostVO getPost(Long postId, LoginVO user) throws Exception;
     ArchiveBoardPostVO createPost(ArchiveBoardPostSaveRequestVO payload, LoginVO user) throws Exception;

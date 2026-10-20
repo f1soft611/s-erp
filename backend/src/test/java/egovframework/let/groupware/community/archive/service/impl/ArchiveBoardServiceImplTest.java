@@ -113,6 +113,25 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
+    void directUploadCreatesArchivePostWithFileNameTitle() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "manual.txt", "text/plain", new byte[] {1, 2});
+        when(dao.insertArchivePost(anyMap())).thenReturn(44L);
+        CommonFileVO uploaded = ownedFile(77L);
+        uploaded.setOwnerId(44L);
+        uploaded.setFileName("manual.txt");
+        when(files.uploadFile(eq(71L), eq("ARCHIVE"), eq(44L), any(), eq("test-admin"))).thenReturn(uploaded);
+        ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
+        item.setBoardFileId(77L);
+        when(dao.selectArchiveFileItemById(anyMap())).thenReturn(item);
+
+        ArchiveBoardFileItemVO result = service.uploadFile(file, null, user);
+
+        assertThat(result.getBoardFileId()).isEqualTo(77L);
+        verify(dao).insertArchivePost(argThat((Map<String, Object> params) ->
+                "manual.txt".equals(params.get("title")) && params.get("categoryCode") == null));
+    }
+
+    @Test
     void createAndUpdateKeepPlainTextAndAuthenticatedWriter() throws Exception {
         when(dao.insertArchivePost(anyMap())).thenReturn(13L);
         service.createPost(payload, user);

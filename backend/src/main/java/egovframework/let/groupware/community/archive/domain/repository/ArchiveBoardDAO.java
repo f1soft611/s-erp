@@ -20,6 +20,10 @@ public class ArchiveBoardDAO extends EgovAbstractMapper {
         return selectOne("ArchiveBoardDAO.selectArchiveFileCount", params);
     }
 
+    public ArchiveBoardFileItemVO selectArchiveFileItemById(Map<String, Object> params) throws Exception {
+        return selectOne("ArchiveBoardDAO.selectArchiveFileItemById", params);
+    }
+
     public List<ArchiveBoardPostVO> selectArchivePostList(Map<String, Object> params) throws Exception {
         return selectList("ArchiveBoardDAO.selectArchivePostList", params);
     }

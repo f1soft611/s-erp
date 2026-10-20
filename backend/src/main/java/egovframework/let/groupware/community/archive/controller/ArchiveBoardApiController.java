@@ -75,11 +75,12 @@ public class ArchiveBoardApiController {
         return item(archiveBoardService.getPost(postId, user));
     }
 
-    @PostMapping("/posts")
-    public ResponseEntity<ResultVO> createPost(@RequestBody ArchiveBoardPostSaveRequestVO payload,
+    @PostMapping("/files")
+    public ResponseEntity<ResultVO> uploadFile(@RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String folderCode,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(item(archiveBoardService.createPost(payload, user)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(item(archiveBoardService.uploadFile(file, folderCode, user)));
     }
 
     @PutMapping("/posts/{postId}")

@@ -82,6 +82,54 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ArchiveBoardFileItemVO uploadFile(MultipartFile file, String folderCode, LoginVO user) throws Exception {
+        requireMutation(user, true);
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 파일이 없습니다.");
+        }
+
+        String rawName = file.getOriginalFilename();
+        String title = StringUtils.cleanPath(Objects.toString(rawName, "")).trim();
+        if (!StringUtils.hasText(title) || title.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일명을 확인해 주세요.");
+        }
+
+        String normalizedFolderCode = StringUtils.hasText(folderCode) ? folderCode.trim() : null;
+        if (normalizedFolderCode != null) {
+            categoryValidator.validate(user.getTenantId(), ARCHIVE, normalizedFolderCode);
+        }
+
+        Map<String, Object> insertParams = postParams(user, null);
+        insertParams.put("title", title);
+        insertParams.put("categoryCode", normalizedFolderCode);
+        insertParams.put("contents", null);
+        insertParams.put("contentsText", null);
+
+        Long postId = archiveBoardDAO.insertArchivePost(insertParams);
+        if (postId == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "자료를 저장하지 못했습니다.");
+        }
+
+        try {
+            CommonFileVO uploaded = commonFileService.uploadFile(user.getTenantId(), ARCHIVE, postId, file, user.getId());
+            if (uploaded == null || uploaded.getFileId() == null) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일을 저장하지 못했습니다.");
+            }
+            Map<String, Object> lookup = postParams(user, postId);
+            lookup.put("boardFileId", uploaded.getFileId());
+            ArchiveBoardFileItemVO item = archiveBoardDAO.selectArchiveFileItemById(lookup);
+            if (item == null) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "업로드 결과를 조회하지 못했습니다.");
+            }
+            return item;
+        } catch (Exception ex) {
+            archiveBoardDAO.softDeleteArchivePost(postParams(user, postId));
+            throw ex;
+        }
+    }
+
+    @Override
     public ListResult<ArchiveBoardPostVO> listPosts(ArchiveBoardPostSearchVO search, LoginVO user) throws Exception {
         requireAuthenticated(user);
         requireBoard();

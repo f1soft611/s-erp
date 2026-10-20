@@ -53,12 +53,11 @@ class ArchiveBoardApiControllerTest {
     }
 
     @Test
-    void listDetailAndSaveUseApprovedPathsStatusAndEnvelopes() throws Exception {
+    void listDetailAndUpdateUseApprovedPathsStatusAndEnvelopes() throws Exception {
         ArchiveBoardPostVO post = new ArchiveBoardPostVO();
         post.setPostId(13L);
         when(service.listPosts(any(), eq(user))).thenReturn(new ListResult<>(Collections.singletonList(post), 1L));
         when(service.getPost(13L, user)).thenReturn(post);
-        when(service.createPost(any(), eq(user))).thenReturn(post);
         when(service.updatePost(eq(13L), any(), eq(user))).thenReturn(post);
         mvc.perform(get(ROOT + "/posts").param("pageIndex", "2").param("pageUnit", "5")
                 .param("keyword", "manual").param("categoryCode", "GENERAL").param("tenantId", "999"))
@@ -69,8 +68,6 @@ class ArchiveBoardApiControllerTest {
                 && Long.valueOf(71).equals(search.getTenantId())), eq(user));
         mvc.perform(get(ROOT + "/posts/13")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.item.postId").value(13));
-        mvc.perform(post(ROOT + "/posts").contentType(MediaType.APPLICATION_JSON).content(payload()))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.result.item.postId").value(13));
         mvc.perform(put(ROOT + "/posts/13").contentType(MediaType.APPLICATION_JSON).content(payload()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.result.item.postId").value(13));
         mvc.perform(delete(ROOT + "/posts/13")).andExpect(status().isOk())
@@ -97,6 +94,24 @@ class ArchiveBoardApiControllerTest {
     }
 
     @Test
+    void directFileUploadRouteSupportsMultipartAndPostCreateRouteIsNotAvailable() throws Exception {
+        ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
+        item.setBoardFileId(55L);
+        when(service.uploadFile(any(), any(), eq(user))).thenReturn(item);
+
+        mvc.perform(multipart(ROOT + "/files").file(
+                        new MockMultipartFile("file", "manual.txt", "text/plain", new byte[] {1}))
+                        .param("folderCode", "GENERAL"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.result.item.boardFileId").value(55));
+
+        verify(service).uploadFile(any(), eq("GENERAL"), eq(user));
+
+        mvc.perform(post(ROOT + "/posts").contentType(MediaType.APPLICATION_JSON).content(payload()))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
     void attachmentRoutesRequirePostOwnershipParameterAndMultipartFile() throws Exception {
         ArchiveBoardFileVO attachment = new ArchiveBoardFileVO();
         attachment.setBoardFileId(31L);
@@ -118,7 +133,8 @@ class ArchiveBoardApiControllerTest {
         user = null;
         mvc.perform(get(ROOT + "/posts")).andExpect(status().isUnauthorized());
         mvc.perform(get(ROOT + "/posts/13")).andExpect(status().isUnauthorized());
-        mvc.perform(post(ROOT + "/posts").contentType(MediaType.APPLICATION_JSON).content(payload()))
+        mvc.perform(multipart(ROOT + "/files").file(
+                new MockMultipartFile("file", "manual.txt", "text/plain", new byte[] {1})))
                 .andExpect(status().isUnauthorized());
         mvc.perform(put(ROOT + "/posts/13").contentType(MediaType.APPLICATION_JSON).content(payload()))
                 .andExpect(status().isUnauthorized());
@@ -132,12 +148,13 @@ class ArchiveBoardApiControllerTest {
 
     @Test
     void serviceErrorsRemainErrorsInsteadOfSuccessEnvelopes() throws Exception {
-        when(service.createPost(any(), eq(user))).thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
+        when(service.uploadFile(any(), any(), eq(user))).thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
         when(service.getPost(13L, user)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
-        mvc.perform(post(ROOT + "/posts").contentType(MediaType.APPLICATION_JSON).content(payload()))
+        mvc.perform(multipart(ROOT + "/files").file(
+                new MockMultipartFile("file", "manual.txt", "text/plain", new byte[] {1})))
                 .andExpect(status().isForbidden());
         mvc.perform(get(ROOT + "/posts/13")).andExpect(status().isNotFound());
-        mvc.perform(post(ROOT + "/posts").contentType(MediaType.APPLICATION_JSON).content("{"))
+        mvc.perform(multipart(ROOT + "/files"))
                 .andExpect(status().isBadRequest());
     }
 
