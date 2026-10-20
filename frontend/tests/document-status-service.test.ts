@@ -14,7 +14,6 @@ import type { DocumentStatusRow } from '../src/pages/groupware/documents/status/
 
 const row: DocumentStatusRow = {
   electronicApprovalId: 41,
-  eabusNo: '001',
   title: 'Annual plan',
   documentType: 'DRAFTING',
   documentStatus: 'COMPLETED',
@@ -22,6 +21,9 @@ const row: DocumentStatusRow = {
   drafterName: 'Morgan',
   drafterDepartmentName: 'Finance',
   participantName: 'Sam',
+  myParticipantType: 'APPROVAL',
+  myActionStatus: 'PENDING',
+  currentApprovalStep: '1단계 · Sam',
   approvalProgress: '2/2',
   updatedAt: '2026-10-11T10:00:00',
 };
@@ -48,7 +50,7 @@ describe('document status service', () => {
     const controller = new AbortController();
     const dataSource = createDocumentStatusDataSource({
       keyword: 'annual plan',
-      eabusNo: '001',
+      electronicApprovalId: '41',
       title: 'Annual',
       documentType: 'DRAFTING',
       documentStatus: 'COMPLETED',
@@ -57,6 +59,9 @@ describe('document status service', () => {
       drafterName: 'Morgan',
       drafterDepartmentName: 'Finance',
       participantName: 'Sam',
+      myParticipantType: 'APPROVAL',
+      myActionStatus: 'PENDING',
+      currentApproverName: 'Sam',
       updatedAtFrom: '2026-10-01',
       updatedAtTo: '2026-10-16',
     });
@@ -74,7 +79,7 @@ describe('document status service', () => {
       offset: '20',
       limit: '40',
       keyword: 'annual plan',
-      eabusNo: '001',
+      electronicApprovalId: '41',
       title: 'Annual',
       documentType: 'DRAFTING',
       documentStatus: 'COMPLETED',
@@ -83,12 +88,29 @@ describe('document status service', () => {
       drafterName: 'Morgan',
       drafterDepartmentName: 'Finance',
       participantName: 'Sam',
+      myParticipantType: 'APPROVAL',
+      myActionStatus: 'PENDING',
+      currentApproverName: 'Sam',
       updatedAtFrom: '2026-10-01',
       updatedAtTo: '2026-10-16',
       sortField: 'submittedAt',
       sortDirection: 'DESC',
     });
     expect(signal).toBe(controller.signal);
+  });
+
+  it('sorts document numbers by the electronic approval ID', async () => {
+    api.get.mockResolvedValue({ resultList: [row], totalRowCount: 1 });
+    const dataSource = createDocumentStatusDataSource({});
+    const request = query(new AbortController().signal);
+    request.sorts = [{ field: 'electronicApprovalId', direction: 'asc' }];
+
+    await dataSource.load(request);
+
+    const [path] = api.get.mock.calls[0] as [string];
+    const params = new URL(path, 'http://localhost').searchParams;
+    expect(params.get('sortField')).toBe('electronicApprovalId');
+    expect(params.get('sortDirection')).toBe('ASC');
   });
 
   it('rejects malformed page responses instead of returning success-shaped empty rows', async () => {

@@ -106,6 +106,8 @@ export function useDocumentComposer(
   const fieldSurfaceBackground = isDark ? '#1e293b' : '#ffffff';
   const [activeDocumentKind, setActiveDocumentKind] =
     useState<DocumentKind>('기안서');
+  const [pendingDocumentKind, setPendingDocumentKind] = useState<DocumentKind | null>(null);
+  const [drafterUser, setDrafterUser] = useState<F1GridUserOption | null>(null);
   const [composerTitle, setComposerTitle] = useState('');
   const [attachments, setAttachments] = useState<DocumentDraftAttachment[]>([]);
   const [electronicApprovalId, setElectronicApprovalId] = useState<number | null>(null);
@@ -288,6 +290,7 @@ export function useDocumentComposer(
             positionName: profile.levelName,
             departmentName: profile.departmentName,
           };
+        setDrafterUser(signedInUser);
         setApprovalStages([
           {
             id: nextStageId.current++,
@@ -303,7 +306,8 @@ export function useDocumentComposer(
               line.participantType === 'APPROVAL' &&
               line.participantUserId === signedInEmployeeId,
           );
-          if (!authorLine) {
+          const isBusinessContact = initialDocument.documentType === 'BUSINESS_CONTACT';
+          if (!isBusinessContact && !authorLine) {
             setLoadError('저장된 결재선에서 기안자를 확인할 수 없습니다.');
             return;
           }
@@ -345,7 +349,7 @@ export function useDocumentComposer(
               references.push(line.participantUserId);
               continue;
             }
-            if (line.electronicApprovalLineId === authorLine.electronicApprovalLineId) {
+            if (isBusinessContact || line.electronicApprovalLineId === authorLine?.electronicApprovalLineId) {
               continue;
             }
             let stage = lineStages.get(line.stageOrder);
@@ -367,7 +371,7 @@ export function useDocumentComposer(
               };
             stage.users.push(participant);
           }
-          setApprovalStages([
+          setApprovalStages(isBusinessContact ? [] : [
             {
               id: nextStageId.current++,
               kind: 'approval',
@@ -401,6 +405,36 @@ export function useDocumentComposer(
             String(form.categoryItemId) === selectedCategoryId),
       ),
     [draftForms, selectedCategoryId],
+  );
+
+  const applyDocumentKind = (kind: DocumentKind) => {
+    setActiveDocumentKind(kind);
+    setApprovalStages(kind === '기안서' && drafterUser ? [{
+      id: nextStageId.current++,
+      kind: 'approval',
+      users: [drafterUser],
+      isFixed: true,
+    }] : []);
+    setSelectedApprovalUserIds([]);
+    setReferenceUserIds([]);
+    setPendingDocumentKind(null);
+  };
+
+  const requestDocumentKindChange = (kind: DocumentKind) => {
+    if (
+      kind === activeDocumentKind || (kind !== '기안서' && kind !== '업무연락') ||
+      isLoading || templateLoading || isSaving || imageSaveLifecycle.uploadingCount > 0
+    ) return;
+    setPendingDocumentKind(kind);
+  };
+
+  const confirmDocumentKindChange = () => {
+    if (pendingDocumentKind !== null) applyDocumentKind(pendingDocumentKind);
+  };
+
+  const cancelDocumentKindChange = () => setPendingDocumentKind(null);
+  const referenceUserOptions = userOptions.filter(
+    (user) => String(user.value) !== String(drafterUser?.value),
   );
 
   const handleEditorReady = useCallback((nextEditor: Editor | null) => {
@@ -612,7 +646,8 @@ export function useDocumentComposer(
     const selectedApprovalIds = new Set(selectedApprovalUserIds);
     setReferenceUserIds(
       toUserIds(value).filter(
-        (id) => !assignedUserIds.has(id) && !selectedApprovalIds.has(id),
+        (id) => !assignedUserIds.has(id) && !selectedApprovalIds.has(id)
+          && (activeDocumentKind !== '업무연락' || id !== String(drafterUser?.value)),
       ),
     );
   };
@@ -704,6 +739,9 @@ export function useDocumentComposer(
     setApprovalStages([]);
     setSelectedApprovalUserIds([]);
     setReferenceUserIds([]);
+    setActiveDocumentKind('기안서');
+    setPendingDocumentKind(null);
+    setDrafterUser(null);
     nextStageId.current = 1;
     setLoadError('');
     setInitialLookupsComplete(false);
@@ -718,9 +756,10 @@ export function useDocumentComposer(
   }, [editor, imageSaveLifecycle, onClose]);
 
   const buildDraftRequest = useCallback((): DocumentApprovalDraftRequest | null => {
-    if (!editor || !composerTitle.trim() || approvalStages.length === 0) return null;
+    if (!editor || !composerTitle.trim()
+      || (activeDocumentKind !== '업무연락' && approvalStages.length === 0)) return null;
     const approvalLines: DocumentApprovalDraftRequest['approvalLines'] =
-      approvalStages.flatMap((stage, stageIndex) =>
+      (activeDocumentKind === '업무연락' ? [] : approvalStages).flatMap((stage, stageIndex) =>
         stage.users.map((user, participantIndex) => ({
           stageOrder: stageIndex + 1,
           participantOrder: participantIndex + 1,
@@ -732,7 +771,7 @@ export function useDocumentComposer(
     if (referenceUserIds.length > 0) {
       approvalLines.push(
         ...referenceUserIds.map((participantUserId, participantIndex) => ({
-          stageOrder: approvalStages.length + 1,
+          stageOrder: activeDocumentKind === '업무연락' ? 1 : approvalStages.length + 1,
           participantOrder: participantIndex + 1,
           participantType: 'REFERENCE' as const,
           participantUserId,
@@ -776,8 +815,12 @@ export function useDocumentComposer(
       savingRef.current ||
       !editor ||
       !composerTitle.trim() ||
-      approvalStages.length === 0
+      (activeDocumentKind !== '업무연락' && approvalStages.length === 0)
     ) {
+      return;
+    }
+    if (submit && activeDocumentKind === '업무연락' && referenceUserIds.length === 0) {
+      setSaveError('발송할 참조자를 선택해 주세요.');
       return;
     }
     if (imageSaveLifecycle.uploadingCount > 0) {
@@ -818,7 +861,8 @@ export function useDocumentComposer(
           return;
         }
         await submitDocumentApproval(saved.electronicApprovalId, latestRequest);
-        showSuccess('문서가 결재신청되었습니다.');
+        showSuccess(activeDocumentKind === '업무연락'
+          ? '업무연락이 발송되었습니다.' : '문서가 결재신청되었습니다.');
         savingRef.current = false;
         setIsSaving(false);
         closeComposer();
@@ -835,10 +879,14 @@ export function useDocumentComposer(
     }
   }, [
     attachments,
+    activeDocumentKind,
+    approvalStages.length,
     buildDraftRequest,
     closeComposer,
+    composerTitle,
     editor,
     imageSaveLifecycle,
+    referenceUserIds.length,
     showSuccess,
     uploadAttachment,
   ]);
@@ -1030,7 +1078,11 @@ export function useDocumentComposer(
 
   return {
     activeDocumentKind,
-    setActiveDocumentKind,
+    requestDocumentKindChange,
+    confirmDocumentKindChange,
+    cancelDocumentKindChange,
+    documentKindConfirmOpen: pendingDocumentKind !== null,
+    referenceUserOptions,
     composerTitle,
     setComposerTitle,
     draftDate,
@@ -1079,7 +1131,8 @@ export function useDocumentComposer(
       imageSaveLifecycle.uploadingCount === 0 &&
       Boolean(composerTitle.trim()) &&
       Boolean(editor) &&
-      approvalStages.length > 0,
+      !loadError &&
+      (activeDocumentKind === '업무연락' || approvalStages.length > 0),
     canSubmitDraft:
       !isLoading &&
       !templateLoading &&
@@ -1087,7 +1140,10 @@ export function useDocumentComposer(
       imageSaveLifecycle.uploadingCount === 0 &&
       Boolean(composerTitle.trim()) &&
       Boolean(editor) &&
-      approvalStages.some((stage, index) => index > 0 && stage.users.length > 0),
+      !loadError &&
+      (activeDocumentKind === '업무연락'
+        ? referenceUserIds.length > 0
+        : approvalStages.some((stage, index) => index > 0 && stage.users.length > 0)),
     attachmentInputRef,
     editor,
     handleEditorReady,

@@ -47,12 +47,30 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPag
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
 class DocumentApprovalApiControllerTest {
 
     private final DocumentApprovalService approvalService = mock(DocumentApprovalService.class);
     private final DocumentApprovalApiController controller =
             new DocumentApprovalApiController(new ResultVoHelper(), approvalService);
+
+    @Test
+    void filePageUsesAuthenticatedUserAndExistingResultEnvelope() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalFilePageVO page = new DocumentApprovalFilePageVO();
+        page.setResultList(Collections.emptyList());
+        when(approvalService.listFiles(user, "ALL", null, null, 55L)).thenReturn(page);
+        ResultVO response = controller.listFiles("ALL", null, null, 55L, user);
+        assertThat(response.getResult())
+                .containsEntry("resultList", page.getResultList())
+                .containsEntry("hasNext", false)
+                .containsEntry("nextBeforeFileId", null);
+        Method method = DocumentApprovalApiController.class.getMethod("listFiles",
+                String.class, String.class, Long.class, Long.class, LoginVO.class);
+        assertThat(method.getAnnotation(GetMapping.class).value()).containsExactly("/files");
+        verify(approvalService).listFiles(user, "ALL", null, null, 55L);
+    }
 
     @Test
     void listDocumentsKeepsLightweightResponseByDefault() throws Exception {

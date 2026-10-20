@@ -6,7 +6,6 @@ import type {
 export type DocumentStatusRow = Pick<
   DocumentApprovalRecord,
   | 'electronicApprovalId'
-  | 'eabusNo'
   | 'title'
   | 'documentType'
   | 'documentStatus'
@@ -17,12 +16,27 @@ export type DocumentStatusRow = Pick<
   rowNumber?: number;
   drafterDepartmentName: string | null;
   participantName: string;
+  myParticipantType: string;
+  myActionStatus: string;
+  currentApprovalStep: string;
   approvalProgress: string;
 };
 
+export type DocumentStatusParticipantType =
+  | 'APPROVAL'
+  | 'AGREEMENT'
+  | 'REFERENCE';
+
+export type DocumentStatusActionStatus =
+  | 'WAITING'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'RETURNED';
+
 export type DocumentStatusFilters = {
   keyword?: string;
-  eabusNo?: string;
+  electronicApprovalId?: string;
   title?: string;
   documentType?: DocumentApprovalRecord['documentType'];
   documentStatus?: ApprovalDocumentStatus;
@@ -31,6 +45,9 @@ export type DocumentStatusFilters = {
   drafterName?: string;
   drafterDepartmentName?: string;
   participantName?: string;
+  myParticipantType?: DocumentStatusParticipantType;
+  myActionStatus?: DocumentStatusActionStatus;
+  currentApproverName?: string;
   updatedAtFrom?: string;
   updatedAtTo?: string;
 };

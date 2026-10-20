@@ -1,0 +1,115 @@
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+import SlideshowOutlinedIcon from '@mui/icons-material/SlideshowOutlined';
+import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
+import { Alert, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { useEffect, useRef } from 'react';
+import type { CommonFileViewItem } from './commonViewTypes';
+
+type FileViewProps<T extends CommonFileViewItem> = {
+  items: T[];
+  isLoading: boolean;
+  hasNext: boolean;
+  error: string;
+  onLoadMore: () => void;
+  onRetry: () => void;
+  onRefresh?: () => void;
+  onDownload: (item: T) => void;
+  onOpenSource?: (item: T) => void;
+  scrollRoot?: HTMLElement | null;
+};
+
+function FileIcon({ name }: { name: string }) {
+  const extension = name.split('.').pop()?.toLowerCase();
+  if (extension === 'pdf') return <PictureAsPdfOutlinedIcon color="error" />;
+  if (['xlsx', 'xls', 'csv'].includes(extension ?? '')) return <TableChartOutlinedIcon color="success" />;
+  if (['pptx', 'ppt'].includes(extension ?? '')) return <SlideshowOutlinedIcon color="warning" />;
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension ?? '')) return <ImageOutlinedIcon color="info" />;
+  return <DescriptionOutlinedIcon color="primary" />;
+}
+
+export function FileView<T extends CommonFileViewItem>({
+  items, isLoading, hasNext, error, onLoadMore, onRetry, onRefresh,
+  onDownload, onOpenSource, scrollRoot,
+}: FileViewProps<T>) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hasNext || isLoading || error || !sentinel.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
+    }, { root: scrollRoot ?? null, rootMargin: '160px' });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [hasNext, isLoading, error, onLoadMore, scrollRoot, items.length]);
+
+  const columns = { xs: 'minmax(0, 1fr) 36px', md: 'minmax(0, 1fr) 110px 150px 80px 36px' };
+  return (
+    <Box aria-label="파일형 첨부파일 목록">
+      <Box sx={{
+        display: { xs: 'none', md: 'grid' }, gridTemplateColumns: columns,
+        gap: 1.5, px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider',
+      }}>
+        {['이름', '소유자', '올린 날짜', '크기'].map((label) =>
+          <Typography key={label} variant="caption" fontWeight={700}>{label}</Typography>)}
+      </Box>
+      {items.map((item) => (
+        <Box key={item.id} data-testid="file-view-row" sx={{
+          display: 'grid', gridTemplateColumns: columns, alignItems: 'center',
+          columnGap: 1.5, rowGap: 0.5, px: 1.5, py: 1.25,
+          borderBottom: 1, borderColor: 'divider', minWidth: 0,
+          '&:hover': { bgcolor: 'action.hover' },
+        }}>
+          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+            <FileIcon name={item.name} />
+            <Box sx={{ minWidth: 0 }}>
+              <Button variant="text" aria-label={`${item.name} 다운로드`}
+                onClick={() => onDownload(item)}
+                sx={{ p: 0, minWidth: 0, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none',
+                  overflowWrap: 'anywhere', fontWeight: 400 }}>
+                {item.name}
+              </Button>
+              {item.description && <Typography variant="caption" color="text.secondary"
+                sx={{ display: 'block', overflowWrap: 'anywhere' }}>{item.description}</Typography>}
+              <Typography variant="caption" color="text.secondary"
+                sx={{ display: { xs: 'block', md: 'none' }, overflowWrap: 'anywhere' }}>
+                {item.ownerLabel} · {item.dateLabel} · {item.sizeLabel}
+              </Typography>
+            </Box>
+          </Stack>
+          {[item.ownerLabel, item.dateLabel, item.sizeLabel].map((label, index) =>
+            <Typography key={index} variant="body2" color="text.secondary"
+              sx={{ display: { xs: 'none', md: 'block' }, overflowWrap: 'anywhere' }}>{label}</Typography>)}
+          {onOpenSource && (
+            <Tooltip title="원문 보기">
+              <IconButton size="small" aria-label={`${item.name} 원문 보기`} onClick={() => onOpenSource(item)}>
+                <OpenInNewOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      ))}
+      {error && <Alert severity="error" sx={{ my: 1.5 }} action={
+        <Stack direction="row">
+          <Button color="inherit" size="small" onClick={onRetry}>다시 시도</Button>
+          {onRefresh && <Button color="inherit" size="small" onClick={onRefresh}>목록 새로고침</Button>}
+        </Stack>
+      }>{error}</Alert>}
+      {isLoading && <Stack role="status" direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+        <CircularProgress size={20} /><Typography variant="body2">파일 불러오는 중</Typography>
+      </Stack>}
+      {!isLoading && !error && items.length === 0 &&
+        <Typography color="text.secondary" sx={{ py: 5, textAlign: 'center' }}>첨부파일이 없습니다.</Typography>}
+      {hasNext && !error && (
+        <Box ref={sentinel} data-testid="file-view-sentinel" sx={{ textAlign: 'center', py: 1 }}>
+          <Button onClick={onLoadMore} disabled={isLoading} size="small">더 불러오기</Button>
+        </Box>
+      )}
+      {!hasNext && !isLoading && !error && items.length > 0 &&
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', py: 2 }}>
+          모든 파일을 불러왔습니다.
+        </Typography>}
+    </Box>
+  );
+}

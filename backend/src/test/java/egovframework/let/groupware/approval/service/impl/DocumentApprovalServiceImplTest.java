@@ -54,6 +54,8 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflo
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalEmbeddedImageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFileItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
 class DocumentApprovalServiceImplTest {
 
@@ -63,6 +65,40 @@ class DocumentApprovalServiceImplTest {
     private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
     private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
     private final LoginVO author = author();
+
+    @Test
+    void filePageReturnsTwentyItemsAndUsesLastVisibleFileAsCursor() throws Exception {
+        List<DocumentApprovalFileItemVO> files = new ArrayList<>();
+        for (long id = 45; id >= 25; id--) {
+            DocumentApprovalFileItemVO file = new DocumentApprovalFileItemVO();
+            file.setFileId(id);
+            files.add(file);
+        }
+        when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(files);
+        DocumentApprovalFilePageVO page = service().listFiles(author, "ALL", null, null, null);
+        assertThat(page.getResultList()).hasSize(20);
+        assertThat(page.isHasNext()).isTrue();
+        assertThat(page.getNextBeforeFileId()).isEqualTo(26L);
+        verify(approvalDAO).selectRelatedFilePage(argThat(params ->
+                author.getTenantId().equals(params.get("tenantId"))
+                && author.getId().equals(params.get("drafterId"))
+                && author.getUniqId().equals(params.get("participantUserId"))));
+    }
+
+    @Test
+    void filePageStopsAtLastPageAndRejectsInvalidOrInaccessibleCursor() throws Exception {
+        when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(Collections.emptyList());
+        when(approvalDAO.selectRelatedFileCursor(anyMap())).thenReturn(null);
+        DocumentApprovalFilePageVO page = service().listFiles(author, "ALL", null, null, null);
+        assertThat(page.isHasNext()).isFalse();
+        assertThat(page.getNextBeforeFileId()).isNull();
+        assertThatThrownBy(() -> service().listFiles(author, "INVALID", null, null, null))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+        assertThatThrownBy(() -> service().listFiles(author, "ALL", null, null, -1L))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+        assertThatThrownBy(() -> service().listFiles(author, "ALL", null, null, 55L))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+    }
 
     @Test
     void businessContactDraftAllowsNoReferences() throws Exception {
@@ -124,6 +160,24 @@ class DocumentApprovalServiceImplTest {
         request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "101")));
         assertThatThrownBy(() -> service().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("작성자");
+        verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
+    }
+
+    @Test
+    void businessContactRejectsDuplicateUnorderedAndUnavailableReferences() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setDocumentType("BUSINESS_CONTACT");
+        request.setApprovalLines(Arrays.asList(
+            line(1, 1, "REFERENCE", "202"), line(1, 2, "REFERENCE", "202")));
+        assertThatThrownBy(() -> service().saveDraft(author, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("중복");
+        request.setApprovalLines(Collections.singletonList(line(2, 1, "REFERENCE", "202")));
+        assertThatThrownBy(() -> service().saveDraft(author, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조");
+        request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "202")));
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Collections.emptyList());
+        assertThatThrownBy(() -> service().saveDraft(author, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("사용할 수 없는");
         verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
     }
 
@@ -290,6 +344,7 @@ class DocumentApprovalServiceImplTest {
     void statusPageForwardsFiltersAndKeepsAuthenticatedActorScope() throws Exception {
         DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
         query.setKeyword("annual");
+        query.setElectronicApprovalId(77L);
         query.setEabusNo("001");
         query.setTitle("budget");
         query.setDocumentType("DRAFTING");
@@ -299,6 +354,9 @@ class DocumentApprovalServiceImplTest {
         query.setDrafterName("Morgan");
         query.setDrafterDepartmentName("Finance");
         query.setParticipantName("Sam");
+        query.setMyParticipantType("APPROVAL");
+        query.setMyActionStatus("PENDING");
+        query.setCurrentApproverName("Alex");
         query.setOffset(25);
         query.setLimit(100);
         query.setSortField("approvalProgress");
@@ -318,6 +376,7 @@ class DocumentApprovalServiceImplTest {
         assertThat(page.getTotalRowCount()).isEqualTo(321L);
         verify(approvalDAO).selectRelatedDocumentPage(argThat(params ->
             "annual".equals(params.get("keyword"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalIdFilter"))
                 && "001".equals(params.get("eabusNoFilter"))
                 && "budget".equals(params.get("titleFilter"))
                 && "DRAFTING".equals(params.get("documentType"))
@@ -328,6 +387,9 @@ class DocumentApprovalServiceImplTest {
                 && "작성자".equals(params.get("drafterName"))
                 && "Finance".equals(params.get("drafterDepartmentName"))
                 && "Sam".equals(params.get("participantName"))
+                && "APPROVAL".equals(params.get("myParticipantType"))
+                && "PENDING".equals(params.get("myActionStatus"))
+                && "Alex".equals(params.get("currentApproverName"))
                 && Integer.valueOf(25).equals(params.get("offset"))
                 && Integer.valueOf(100).equals(params.get("limit"))
                 && "approvalProgress".equals(params.get("sortField"))
@@ -366,6 +428,24 @@ class DocumentApprovalServiceImplTest {
         reversedDateRange.setSubmittedAtFrom("2026-10-17");
         reversedDateRange.setSubmittedAtTo("2026-10-16");
         assertThatThrownBy(() -> service().searchDocuments(author, "ALL", reversedDateRange))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO invalidDocumentId = new DocumentApprovalListQueryVO();
+        invalidDocumentId.setElectronicApprovalId(0L);
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidDocumentId))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO invalidParticipantType = new DocumentApprovalListQueryVO();
+        invalidParticipantType.setMyParticipantType("UNSAFE");
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidParticipantType))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        DocumentApprovalListQueryVO invalidActionStatus = new DocumentApprovalListQueryVO();
+        invalidActionStatus.setMyActionStatus("UNSAFE");
+        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidActionStatus))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 

@@ -23,6 +23,74 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 class DocumentApprovalMapperTest {
 
     @Test
+    void filePagesUseRelatedDocumentAccessAndStableFileCursor() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("scope", "ALL");
+        params.put("beforeFileId", 55L);
+        String sql = configuration.getMappedStatement("DocumentApprovalDAO.selectRelatedFilePage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(sql)
+                .contains("m.tenant_id = ?", "m.deleted_yn = 'N'", "m.drafter_id = ?",
+                        "m.document_status != 'DRAFT'", "l.participant_user_id = ?")
+                .contains("f.owner_type = 'APPROVAL'", "f.owner_type = 'APPROVAL_COMMENT'",
+                        "c.owner_type = 'APPROVAL'", "c.deleted_yn = 'N'",
+                        "f.deleted_yn = 'N'", "f.file_usage_type = 'ATTACHMENT'")
+                .contains("(f.created_at, f.file_id) <", "ORDER BY f.created_at DESC, f.file_id DESC",
+                        "LIMIT 21");
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedFileCursor")).isTrue();
+    }
+
+    @Test
+    void statusPageFiltersByDocumentIdAndCurrentUsersApprovalState() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("electronicApprovalIdFilter", 77L);
+        params.put("myParticipantType", "APPROVAL");
+        params.put("myActionStatus", "PENDING");
+        params.put("currentApproverName", "Sam");
+        params.put("scope", "ALL");
+        params.put("sortField", "electronicApprovalId");
+        params.put("sortDirection", "ASC");
+        params.put("offset", 0);
+        params.put("limit", 50);
+
+        for (String statementId : Arrays.asList("selectRelatedDocumentPage", "countRelatedDocuments")) {
+            BoundSql boundSql = configuration.getMappedStatement("DocumentApprovalDAO." + statementId)
+                    .getBoundSql(params);
+            String sql = boundSql.getSql().replaceAll("\\s+", " ");
+            assertThat(sql)
+                    .contains("m.electronic_approval_id = ?")
+                    .contains("my_line.participant_user_id = ?")
+                    .contains("my_line.participant_type = ?")
+                    .contains("my_line.action_status = ?")
+                    .contains("pending_line.participant_name ILIKE '%' || ? || '%'")
+                    .contains("pending_line.stage_order = (")
+                    .contains("m.tenant_id = ?");
+            assertThat(boundSql.getParameterMappings())
+                    .extracting(ParameterMapping::getProperty)
+                    .contains("electronicApprovalIdFilter", "participantUserId", "myParticipantType",
+                            "myActionStatus", "currentApproverName");
+        }
+
+        String pageSql = configuration.getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(pageSql)
+                .contains("AS my_participant_type")
+                .contains("AS my_action_status")
+                .contains("AS current_approval_step");
+    }
+
+    @Test
     void documentReadsAllowOwnDraftsButRequireNonDraftStatusForOtherParticipants() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");

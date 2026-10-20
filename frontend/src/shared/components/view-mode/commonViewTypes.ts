@@ -1,4 +1,13 @@
-export type CommonViewMode = 'feed' | 'list';
+export type CommonViewMode = 'feed' | 'list' | 'file';
+
+export type CommonFileViewItem = {
+  id: string | number;
+  name: string;
+  ownerLabel: string;
+  dateLabel: string;
+  sizeLabel: string;
+  description?: string;
+};
 export type CommonViewCategoryColor = 'primary' | 'info' | 'warning' | 'secondary';
 
 export type CommonViewItem = {

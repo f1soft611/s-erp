@@ -2,6 +2,7 @@ package egovframework.let.groupware.approval.domain.repository;
 
 import java.util.List;
 import java.util.Map;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFileItemVO;
 
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
@@ -18,6 +19,14 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflo
 
 @Repository("documentApprovalDAO")
 public class DocumentApprovalDAO extends EgovAbstractMapper {
+
+    public List<DocumentApprovalFileItemVO> selectRelatedFilePage(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectRelatedFilePage", params);
+    }
+
+    public Long selectRelatedFileCursor(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectRelatedFileCursor", params);
+    }
 
     public Boolean selectActiveDraftingCategory(Map<String, Object> params) throws Exception {
         return (Boolean) selectOne("DocumentApprovalDAO.selectActiveDraftingCategory", params);

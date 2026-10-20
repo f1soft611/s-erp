@@ -122,6 +122,7 @@ vi.mock(
 
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { DocumentApprovalDetailFeed } from '../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed';
+import { DocumentComposerDialog } from '../src/pages/groupware/documents/write/components/DocumentComposerDialog';
 import { calculateApprovalSlotCapacity } from '../src/pages/groupware/documents/write/components/DocumentApprovalFields';
 import type {
   DocumentApprovalDetail,
@@ -583,12 +584,36 @@ function installApprovalResizeObserverMock() {
 }
 
 describe('Document write page', () => {
+  it('business contact always confirms unchanged tab switches in both directions', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    const confirmation = await screen.findByRole('dialog', { name: '문서 유형 변경' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(confirmation);
+    expect(screen.getByRole('tab', { name: '기안서' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByTestId('document-approval-person')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    expect(screen.getByRole('tab', { name: '업무연락' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    expect(await screen.findByRole('dialog', { name: '문서 유형 변경' })).toBeInTheDocument();
+  }, 20000);
+
   it('business contact shares metadata and sends references without approvers', async () => {
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await waitForComposerReady();
     fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
-    expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: '기안자' })).toHaveValue('기안자');
     expect(screen.getByRole('combobox', { name: '기안양식' })).toBeInTheDocument();
     expect(screen.queryByText('결재선')).not.toBeInTheDocument();
@@ -620,7 +645,7 @@ describe('Document write page', () => {
       }),
     ));
     expect(composerNotifications.showSuccess).toHaveBeenCalledWith('업무연락이 발송되었습니다.');
-  }, 20000);
+  }, 60000);
 
   it('business contact tab confirmation preserves content and resets all participants only after moving', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -635,16 +660,28 @@ describe('Document write page', () => {
     const picker = screen.getByRole('combobox', { name: '참조자 선택' });
     fireEvent.change(picker, { target: { value: '김민수' } });
     fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    const approvalPicker = screen.getByRole('combobox', { name: '결재선 2 사용자 선택' });
+    fireEvent.change(approvalPicker, { target: { value: '박서준' } });
+    fireEvent.click(within(getPickerListbox(approvalPicker)).getByRole('option', { name: /박서준/ }));
+    fireEvent.click(screen.getByRole('button', { name: '합의 추가' }));
+    const nextApprovalPicker = screen.getByRole('combobox', { name: '결재선 3 사용자 선택' });
+    fireEvent.change(nextApprovalPicker, {
+      target: { value: '이수진' },
+    });
+    fireEvent.click(within(getPickerListbox(nextApprovalPicker)).getByRole('option', { name: /이수진/ }));
     fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
     expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
     const confirm = await screen.findByRole('dialog', { name: '문서 유형 변경' });
     fireEvent.click(within(confirm).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(confirm);
     expect(screen.getByRole('tab', { name: '기안서' })).toHaveAttribute('aria-selected', 'true');
     expect(picker.closest('.MuiAutocomplete-root')).toHaveTextContent('김민수');
     fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
     fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
       .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' }))
+      .not.toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('탭 이동 제목');
     expect(screen.getByRole('textbox', { name: '본문' })).toHaveTextContent('양식 본문');
     expect(screen.getByRole('combobox', { name: '기안양식' })).toHaveTextContent('정기점검');
@@ -652,9 +689,113 @@ describe('Document write page', () => {
       .not.toHaveTextContent('김민수');
     expect(screen.queryByTestId('document-approval-fields')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
-    expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
     expect(screen.getAllByTestId('document-approval-person')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
+    expect(screen.queryByTestId('document-agreement-person')).not.toBeInTheDocument();
     expect(composerApi.fetchDraftFormTemplate).toHaveBeenCalledTimes(1);
+  }, 60000);
+
+  it('business contact restores a draft with no drafter approval line', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} initialDocument={{
+      electronicApprovalId: 77,
+      documentType: 'BUSINESS_CONTACT',
+      documentStatus: 'DRAFT',
+      title: '저장한 업무연락',
+      drafterName: '기안자',
+      isDrafter: true,
+      viewCount: 0,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc"}',
+      contentsHtml: '<p>보존한 본문</p>',
+      approvalLines: [{
+        electronicApprovalLineId: 1, stageOrder: 1, participantOrder: 1,
+        participantType: 'REFERENCE', participantUserId: anotherComposerUser.userId,
+        participantName: anotherComposerUser.userNm, actionStatus: '',
+      }],
+      attachments: [],
+      systemEvents: [],
+    }} />);
+    await waitForComposerReady();
+    expect(screen.getByRole('tab', { name: '업무연락' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('저장된 결재선에서 기안자를 확인할 수 없습니다.')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '본문' })).toHaveTextContent('보존한 본문');
+    expect(screen.getByRole('combobox', { name: '참조자 선택' }).closest('.MuiAutocomplete-root'))
+      .toHaveTextContent(anotherComposerUser.userNm);
+    expect(screen.getByRole('button', { name: '발송' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    const confirmation = await screen.findByRole('dialog', { name: '문서 유형 변경' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(confirmation);
+    expect(screen.getByRole('tab', { name: '업무연락' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('combobox', { name: '참조자 선택' }).closest('.MuiAutocomplete-root'))
+      .toHaveTextContent(anotherComposerUser.userNm);
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    expect(screen.getAllByTestId('document-approval-person')).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('저장한 업무연락');
+    expect(screen.getByRole('textbox', { name: '본문' })).toHaveTextContent('보존한 본문');
+    expect(screen.getByRole('combobox', { name: '참조자 선택' }).closest('.MuiAutocomplete-root'))
+      .not.toHaveTextContent(anotherComposerUser.userNm);
+  });
+
+  it('business contact detects body-only edits and keeps attachments through tab changes', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+    const body = screen.getByRole('textbox', { name: '본문' });
+    fireEvent.paste(body, { clipboardData: {
+      getData: (type: string) => type === 'text/plain' ? '직접 작성한 본문' : '',
+      files: [],
+      items: [],
+    } });
+    await waitFor(() => expect(body).toHaveTextContent('직접 작성한 본문'));
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('첨부 파일 선택'), {
+      target: { files: [new File(['test'], 'contact.txt', { type: 'text/plain' })] },
+    });
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: '본문' })).toHaveTextContent('직접 작성한 본문');
+    expect(screen.getByText('contact.txt')).toBeInTheDocument();
+  });
+
+  it('business contact reports dispatch failures and always confirms tab changes after saving', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '발송 실패 검증' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: '참조자 선택' }), {
+      target: { value: '김민수' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /김민수/ }));
+    composerApi.submitDocumentApproval.mockRejectedValueOnce(new Error('발송 실패'));
+    fireEvent.click(screen.getByRole('button', { name: '발송' }));
+    expect(await screen.findByText('발송 실패')).toBeInTheDocument();
+    expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(composerNotifications.showSuccess).toHaveBeenCalledWith('문서가 임시저장되었습니다.'));
+    await waitFor(() => expect(screen.getByRole('tab', { name: '기안서' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    const confirmation = await screen.findByRole('dialog', { name: '문서 유형 변경' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(confirmation);
+    expect(screen.getByRole('tab', { name: '업무연락' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('combobox', { name: '참조자 선택' }).closest('.MuiAutocomplete-root'))
+      .toHaveTextContent('김민수');
   }, 20000);
 
   it('does not emit an SSR-unsafe first-child selector warning', async () => {
@@ -1122,6 +1263,30 @@ describe('Document write page', () => {
     expect(
       screen.queryByRole('button', { name: '전체 조회' }),
     ).not.toBeInTheDocument();
+  }, 20000);
+
+  it('business contact confirms tab changes after edits made during a pending save', async () => {
+    let finishSave: ((value: { electronicApprovalId: number; documentStatus: string }) => void) | undefined;
+    composerApi.saveDocumentDraft.mockImplementationOnce(() => new Promise((resolve) => {
+      finishSave = resolve;
+    }));
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '문서 유형 변경' }))
+      .getByRole('button', { name: '이동' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument());
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '저장 요청 제목' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(screen.getByRole('tab', { name: '기안서' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
+      target: { value: '아직 저장되지 않은 제목' },
+    });
+    await act(async () => finishSave?.({ electronicApprovalId: 77, documentStatus: 'DRAFT' }));
+    fireEvent.click(screen.getByRole('tab', { name: '기안서' }));
+    expect(await screen.findByRole('dialog', { name: '문서 유형 변경' })).toBeInTheDocument();
   }, 20000);
 
   it('removes a scope filter chip without leaving feed mode', async () => {

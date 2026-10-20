@@ -128,6 +128,28 @@ describe('document approval service', () => {
     );
   });
 
+  it('accepts only a completed response when sending a business contact', async () => {
+    const request = {
+      documentType: 'BUSINESS_CONTACT' as const,
+      draftingWorkCategoryId: null,
+      title: '업무연락',
+      contentsJson: { type: 'doc' },
+      contentsHtml: '<p>내용</p>',
+      contentsText: '내용',
+      approvalLines: [],
+      embeddedImages: [],
+      temporaryImages: [],
+    };
+    const sent = {
+      electronicApprovalId: 41, eabusNo: '008', documentStatus: 'COMPLETED',
+      submittedAt: '2026-10-20T09:00:00Z',
+    };
+    api.post.mockResolvedValueOnce({ item: sent });
+    await expect(submitDocumentApproval(41, request)).resolves.toEqual(sent);
+    api.post.mockResolvedValueOnce({ item: { ...sent, documentStatus: 'PENDING' } });
+    await expect(submitDocumentApproval(41, request)).rejects.toThrow('업무연락 발송 응답을 확인할 수 없습니다.');
+  });
+
   it('uses the scoped list, summary, detail, and action ResultVO contracts', async () => {
     const document = {
       electronicApprovalId: 41,

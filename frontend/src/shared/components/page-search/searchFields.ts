@@ -48,7 +48,8 @@ export function toPageSearchFields<T extends object>(
   return columns
     .filter(
       (column) =>
-        column.hidden !== true && column.search?.hidden !== true,
+        column.search?.hidden !== true &&
+        (column.hidden !== true || column.search !== undefined),
     )
     .sort((left, right) => {
       const leftOrder = left.search?.order;

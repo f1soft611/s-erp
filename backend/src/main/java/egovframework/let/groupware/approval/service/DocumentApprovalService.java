@@ -1,6 +1,7 @@
 package egovframework.let.groupware.approval.service;
 
 import java.util.List;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -22,6 +23,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQue
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 
 public interface DocumentApprovalService {
+
+    DocumentApprovalFilePageVO listFiles(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId, Long beforeFileId) throws Exception;
 
     DocumentApprovalDraftVO saveDraft(LoginVO user, DocumentApprovalDraftSaveRequestVO request) throws Exception;
     DocumentApprovalDraftVO saveDraft(LoginVO user, Long electronicApprovalId,

@@ -24,6 +24,14 @@ const DOCUMENT_STATUSES = new Set([
   'COMPLETED',
   'REJECTED',
 ]);
+const PARTICIPANT_TYPES = new Set(['APPROVAL', 'AGREEMENT', 'REFERENCE']);
+const ACTION_STATUSES = new Set([
+  'WAITING',
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'RETURNED',
+]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -52,7 +60,6 @@ function isDocumentStatusRow(value: unknown): value is DocumentStatusRow {
   return (
     Number.isSafeInteger(value.electronicApprovalId) &&
     Number(value.electronicApprovalId) > 0 &&
-    typeof value.eabusNo === 'string' &&
     typeof value.title === 'string' &&
     typeof value.documentType === 'string' &&
     DOCUMENT_TYPES.has(value.documentType) &&
@@ -64,7 +71,19 @@ function isDocumentStatusRow(value: unknown): value is DocumentStatusRow {
     isDateValue(value.submittedAt) &&
     isDateValue(value.updatedAt) &&
     typeof value.participantName === 'string' &&
+    typeof value.myParticipantType === 'string' &&
+    isTokenSet(value.myParticipantType, PARTICIPANT_TYPES) &&
+    typeof value.myActionStatus === 'string' &&
+    isTokenSet(value.myActionStatus, ACTION_STATUSES) &&
+    typeof value.currentApprovalStep === 'string' &&
     typeof value.approvalProgress === 'string'
+  );
+}
+
+function isTokenSet(value: string, allowedTokens: Set<string>): boolean {
+  return (
+    value === '' ||
+    value.split(', ').every((token) => allowedTokens.has(token))
   );
 }
 

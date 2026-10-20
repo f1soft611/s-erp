@@ -1,6 +1,7 @@
 package egovframework.let.groupware.approval.controller;
 
 import java.util.HashMap;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -128,6 +129,22 @@ public class DocumentApprovalApiController {
         documentApprovalService.deleteDocumentApproval(user, electronicApprovalId);
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("message", "문서가 삭제되었습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "내 관련 문서 첨부파일 목록", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/files")
+    public ResultVO listFiles(@RequestParam(defaultValue = "ALL") String scope,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) Long electronicApprovalId,
+            @RequestParam(required = false) Long beforeFileId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        DocumentApprovalFilePageVO page = documentApprovalService.listFiles(
+                user, scope, documentType, electronicApprovalId, beforeFileId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList", page.getResultList());
+        resultMap.put("hasNext", page.isHasNext());
+        resultMap.put("nextBeforeFileId", page.getNextBeforeFileId());
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

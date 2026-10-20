@@ -40,7 +40,6 @@ import { toPageSearchFields } from '../src/shared/components/page-search/searchF
 
 const row: DocumentStatusRow = {
   electronicApprovalId: 41,
-  eabusNo: '001',
   title: 'Annual plan',
   documentType: 'DRAFTING',
   documentStatus: 'COMPLETED',
@@ -48,6 +47,9 @@ const row: DocumentStatusRow = {
   drafterName: 'Morgan',
   drafterDepartmentName: 'Finance',
   participantName: 'Sam',
+  myParticipantType: 'APPROVAL',
+  myActionStatus: 'PENDING',
+  currentApprovalStep: '1단계 · Sam',
   approvalProgress: '2/2',
   updatedAt: '2026-10-11T10:00:00',
 };
@@ -148,7 +150,7 @@ describe('document status page', () => {
 
     expect(columns.map((column) => String(column.field))).toEqual([
       'rowNumber',
-      'eabusNo',
+      'electronicApprovalId',
       'title',
       'documentType',
       'documentStatus',
@@ -156,6 +158,9 @@ describe('document status page', () => {
       'drafterName',
       'drafterDepartmentName',
       'participantName',
+      'myParticipantType',
+      'myActionStatus',
+      'currentApprovalStep',
       'approvalProgress',
       'updatedAt',
     ]);
@@ -163,33 +168,49 @@ describe('document status page', () => {
       'submittedAt',
       'documentStatus',
       'documentType',
+      'electronicApprovalId',
       'title',
       'drafterName',
       'drafterDepartmentName',
       'participantName',
+      'myParticipantType',
+      'myActionStatus',
+      'currentApprovalStep',
+      'updatedAt',
     ]);
     expect(fields.find((field) => field.field === 'submittedAt')?.type).toBe(
       'date',
     );
-    expect(fields.map((field) => field.group)).toEqual([
-      '결재신청일',
-      '결재상태',
-      '결재상태',
-      '제목',
-      '기안정보',
-      '기안정보',
-      '기안정보',
-    ]);
+    expect(fields.find((field) => field.field === 'electronicApprovalId')?.type)
+      .toBe('number');
+    expect(fields.find((field) => field.field === 'myParticipantType')?.type)
+      .toBe('select');
+    expect(fields.find((field) => field.field === 'myActionStatus')?.type)
+      .toBe('select');
+    expect(columns.find((column) => column.field === 'electronicApprovalId')?.headerName)
+      .toBe('문서번호');
+    expect(columns.some((column) => column.field === 'eabusNo')).toBe(false);
+    expect(
+      columns.find((column) => column.field === 'participantName')?.hidden,
+    ).toBe(true);
+    expect(
+      fields.find((field) => field.field === 'participantName')?.label,
+    ).toBe('결재 참여자');
     expect(
       fields.map((field) => [field.field, field.searchSpan]),
     ).toEqual([
       ['submittedAt', 4],
       ['documentStatus', 2],
       ['documentType', 2],
+      ['electronicApprovalId', 1],
       ['title', 4],
       ['drafterName', 1],
       ['drafterDepartmentName', 1],
       ['participantName', 1],
+      ['myParticipantType', 1],
+      ['myActionStatus', 1],
+      ['currentApprovalStep', 4],
+      ['updatedAt', 2],
     ]);
   });
 
@@ -210,7 +231,7 @@ describe('document status page', () => {
   it('opens the documents menu with a one-month submitted date range', async () => {
     renderDocumentStatusPage();
 
-    expect(await screen.findByText('001')).toBeInTheDocument();
+    expect(await screen.findByText('41')).toBeInTheDocument();
     const request = getListRequest();
     const expectedRange = expectedRecentMonthRange(new Date());
     expect(request.get('scope')).toBe('ALL');
@@ -223,7 +244,7 @@ describe('document status page', () => {
 
   it('opens the existing approval detail overlay for the selected document and closes it', async () => {
     renderDocumentStatusPage();
-    await screen.findByText('001');
+    await screen.findByText('41');
 
     const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
     fireEvent.click(within(selectedRow).getByRole('checkbox'));
@@ -238,7 +259,7 @@ describe('document status page', () => {
 
   it('forwards detail actions to the existing composer and refreshes the list', async () => {
     renderDocumentStatusPage();
-    await screen.findByText('001');
+    await screen.findByText('41');
     const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
     fireEvent.click(within(selectedRow).getByRole('checkbox'));
     await screen.findByTestId('page-area-overlay');
@@ -263,7 +284,7 @@ describe('document status page', () => {
 
   it('applies the detailed title filter to the next remote query', async () => {
     renderDocumentStatusPage();
-    await screen.findByText('001');
+    await screen.findByText('41');
 
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
     fireEvent.change(screen.getByRole('textbox', { name: '제목' }), {
@@ -275,6 +296,38 @@ describe('document status page', () => {
       expect(getListRequest().get('title')).toBe('Budget');
     });
   });
+
+  it('applies document ID and personal approval filters from detailed search', async () => {
+    renderDocumentStatusPage();
+    await screen.findByText('41');
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: '문서번호' }), {
+      target: { value: '41' },
+    });
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '내 결재 역할' }));
+    fireEvent.click(await screen.findByRole('option', { name: '결재' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '내 처리상태' }));
+    fireEvent.click(await screen.findByRole('option', { name: '처리 중' }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '현재 결재담당자' }),
+      { target: { value: 'Sam' } },
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '결재 참여자' }),
+      { target: { value: 'Sam' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => {
+      const request = getListRequest();
+      expect(request.get('electronicApprovalId')).toBe('41');
+      expect(request.get('myParticipantType')).toBe('APPROVAL');
+      expect(request.get('myActionStatus')).toBe('PENDING');
+      expect(request.get('currentApproverName')).toBe('Sam');
+      expect(request.get('participantName')).toBe('Sam');
+    });
+  }, 20000);
 
   it('shows an explicit empty state when no historical documents match', async () => {
     api.get.mockResolvedValue({ resultList: [], totalRowCount: 0 });

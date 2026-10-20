@@ -43,7 +43,7 @@ function formatDate(value?: string | null): string {
 }
 
 function mapDocument(record: DocumentApprovalRecord): DocumentWriteItem {
-  const status = getApprovalStatusPresentation(record.documentStatus);
+  const status = getApprovalStatusPresentation(record.documentStatus, record.documentType);
   const displayDate = getDocumentDisplayDate(record);
   return {
     id: record.electronicApprovalId,

@@ -65,7 +65,11 @@ function isDocumentType(
 
 export function getApprovalStatusPresentation(
   status: ApprovalDocumentStatus,
+  documentType?: DocumentApprovalRecord['documentType'],
 ): ApprovalStatusPresentation {
+  if (status === 'COMPLETED' && documentType === 'BUSINESS_CONTACT') {
+    return { label: '발송완료', color: 'success', variant: 'filled' };
+  }
   return approvalStatusPresentation[status];
 }
 

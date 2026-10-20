@@ -8,7 +8,7 @@ import type { RichTextEditorImage } from '../../../../../shared/components/rich-
 import type { DocumentDateSourceLabel } from '../data/documentDate';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
-export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청';
+export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청' | '발송완료';
 export type ApprovalStatusColor = 'default' | 'info' | 'success' | 'error' | 'warning';
 export type ApprovalDocumentStatus =
   | 'DRAFT'
@@ -250,6 +250,31 @@ export type DocumentDraftAttachmentResponse = {
 };
 
 export type DocumentApprovalCommentAttachment = DocumentDraftAttachmentResponse;
+
+export type DocumentFileItem = {
+  fileId: number;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+  uploadedByName: string;
+  createdAt: string;
+  electronicApprovalId: number;
+  documentTitle: string;
+  commentId: number | null;
+};
+
+export type DocumentFileQuery = {
+  scope: DocumentApprovalScope;
+  documentType?: DocumentApprovalRecord['documentType'];
+  electronicApprovalId?: number;
+  beforeFileId?: number;
+};
+
+export type DocumentFilePage = {
+  resultList: DocumentFileItem[];
+  hasNext: boolean;
+  nextBeforeFileId: number | null;
+};
 
 export type DocumentApprovalComment = {
   commentId: number;

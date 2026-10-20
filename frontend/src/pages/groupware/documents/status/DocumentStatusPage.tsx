@@ -42,6 +42,18 @@ const DOCUMENT_STATUSES = new Set<string>([
   'COMPLETED',
   'REJECTED',
 ]);
+const PARTICIPANT_TYPES = new Set<string>([
+  'APPROVAL',
+  'AGREEMENT',
+  'REFERENCE',
+]);
+const ACTION_STATUSES = new Set<string>([
+  'WAITING',
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'RETURNED',
+]);
 
 type DocumentStatusPageProps = {
   selectedModule: ModuleItem;
@@ -105,6 +117,18 @@ function isDocumentStatus(
   return DOCUMENT_STATUSES.has(value);
 }
 
+function isParticipantType(
+  value: string,
+): value is NonNullable<DocumentStatusFilters['myParticipantType']> {
+  return PARTICIPANT_TYPES.has(value);
+}
+
+function isActionStatus(
+  value: string,
+): value is NonNullable<DocumentStatusFilters['myActionStatus']> {
+  return ACTION_STATUSES.has(value);
+}
+
 function toDocumentStatusFilters(
   keyword: string,
   values: Record<string, PageSearchFieldValue>,
@@ -113,17 +137,20 @@ function toDocumentStatusFilters(
   const normalizedKeyword = keyword.trim();
   if (normalizedKeyword) filters.keyword = normalizedKeyword;
 
-  const eabusNo = readTextValue(values, 'eabusNo');
+  const electronicApprovalId = readTextValue(values, 'electronicApprovalId');
   const title = readTextValue(values, 'title');
   const documentType = readTextValue(values, 'documentType');
   const documentStatus = readTextValue(values, 'documentStatus');
   const drafterName = readTextValue(values, 'drafterName');
   const drafterDepartmentName = readTextValue(values, 'drafterDepartmentName');
   const participantName = readTextValue(values, 'participantName');
+  const myParticipantType = readTextValue(values, 'myParticipantType');
+  const myActionStatus = readTextValue(values, 'myActionStatus');
+  const currentApproverName = readTextValue(values, 'currentApprovalStep');
   const submittedAt = readDateRange(values, 'submittedAt');
   const updatedAt = readDateRange(values, 'updatedAt');
 
-  if (eabusNo) filters.eabusNo = eabusNo;
+  if (electronicApprovalId) filters.electronicApprovalId = electronicApprovalId;
   if (title) filters.title = title;
   if (documentType && isDocumentType(documentType)) {
     filters.documentType = documentType;
@@ -136,6 +163,13 @@ function toDocumentStatusFilters(
     filters.drafterDepartmentName = drafterDepartmentName;
   }
   if (participantName) filters.participantName = participantName;
+  if (myParticipantType && isParticipantType(myParticipantType)) {
+    filters.myParticipantType = myParticipantType;
+  }
+  if (myActionStatus && isActionStatus(myActionStatus)) {
+    filters.myActionStatus = myActionStatus;
+  }
+  if (currentApproverName) filters.currentApproverName = currentApproverName;
   if (submittedAt.from) filters.submittedAtFrom = submittedAt.from;
   if (submittedAt.to) filters.submittedAtTo = submittedAt.to;
   if (updatedAt.from) filters.updatedAtFrom = updatedAt.from;

@@ -3,6 +3,7 @@ package egovframework.let.groupware.approval.domain.model;
 public class DocumentApprovalListQueryVO {
 
     private String keyword;
+    private Long electronicApprovalId;
     private String eabusNo;
     private String title;
     private String documentType;
@@ -12,6 +13,9 @@ public class DocumentApprovalListQueryVO {
     private String drafterName;
     private String drafterDepartmentName;
     private String participantName;
+    private String myParticipantType;
+    private String myActionStatus;
+    private String currentApproverName;
     private String updatedAtFrom;
     private String updatedAtTo;
     private Integer offset;
@@ -21,6 +25,10 @@ public class DocumentApprovalListQueryVO {
 
     public String getKeyword() { return keyword; }
     public void setKeyword(String keyword) { this.keyword = keyword; }
+    public Long getElectronicApprovalId() { return electronicApprovalId; }
+    public void setElectronicApprovalId(Long electronicApprovalId) {
+        this.electronicApprovalId = electronicApprovalId;
+    }
     public String getEabusNo() { return eabusNo; }
     public void setEabusNo(String eabusNo) { this.eabusNo = eabusNo; }
     public String getTitle() { return title; }
@@ -41,6 +49,14 @@ public class DocumentApprovalListQueryVO {
     }
     public String getParticipantName() { return participantName; }
     public void setParticipantName(String participantName) { this.participantName = participantName; }
+    public String getMyParticipantType() { return myParticipantType; }
+    public void setMyParticipantType(String myParticipantType) { this.myParticipantType = myParticipantType; }
+    public String getMyActionStatus() { return myActionStatus; }
+    public void setMyActionStatus(String myActionStatus) { this.myActionStatus = myActionStatus; }
+    public String getCurrentApproverName() { return currentApproverName; }
+    public void setCurrentApproverName(String currentApproverName) {
+        this.currentApproverName = currentApproverName;
+    }
     public String getUpdatedAtFrom() { return updatedAtFrom; }
     public void setUpdatedAtFrom(String updatedAtFrom) { this.updatedAtFrom = updatedAtFrom; }
     public String getUpdatedAtTo() { return updatedAtTo; }
@@ -56,10 +72,12 @@ public class DocumentApprovalListQueryVO {
 
     public boolean isPageRequest() {
         return offset != null || limit != null || sortField != null || sortDirection != null
-                || hasText(keyword) || hasText(eabusNo) || hasText(title)
+                || hasText(keyword) || electronicApprovalId != null || hasText(eabusNo) || hasText(title)
+                || hasText(documentType)
                 || hasText(documentStatus) || hasText(submittedAtFrom) || hasText(submittedAtTo)
                 || hasText(drafterName) || hasText(drafterDepartmentName)
-                || hasText(participantName) || hasText(updatedAtFrom) || hasText(updatedAtTo);
+                || hasText(participantName) || hasText(myParticipantType) || hasText(myActionStatus)
+                || hasText(currentApproverName) || hasText(updatedAtFrom) || hasText(updatedAtTo);
     }
 
     private boolean hasText(String value) {

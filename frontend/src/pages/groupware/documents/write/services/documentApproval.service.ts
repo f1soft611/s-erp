@@ -24,9 +24,53 @@ import type {
   DocumentApprovalCommentAttachment,
   DocumentApprovalCommentPage,
   DocumentApprovalPageSystemEvent,
+  DocumentFileItem,
+  DocumentFilePage,
+  DocumentFileQuery,
 } from '../types/documentWrite.types';
 
 const APPROVAL_API = '/api/v1/groupware/approvals';
+
+function isDocumentFileItem(value: unknown): value is DocumentFileItem {
+  return isObject(value)
+    && Number.isSafeInteger(value.fileId) && Number(value.fileId) > 0
+    && typeof value.fileName === 'string' && value.fileName.trim().length > 0
+    && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0
+    && (value.mimeType === null || typeof value.mimeType === 'string')
+    && typeof value.uploadedByName === 'string'
+    && typeof value.createdAt === 'string' && Number.isFinite(Date.parse(value.createdAt))
+    && Number.isSafeInteger(value.electronicApprovalId) && Number(value.electronicApprovalId) > 0
+    && typeof value.documentTitle === 'string'
+    && (value.commentId === null || (Number.isSafeInteger(value.commentId) && Number(value.commentId) > 0));
+}
+
+export async function listDocumentFiles(query: DocumentFileQuery): Promise<DocumentFilePage> {
+  const params = new URLSearchParams({ scope: query.scope });
+  if (query.documentType) params.set('documentType', query.documentType);
+  if (query.electronicApprovalId !== undefined) {
+    requireApprovalId(query.electronicApprovalId, '문서 ID');
+    params.set('electronicApprovalId', String(query.electronicApprovalId));
+  }
+  if (query.beforeFileId !== undefined) {
+    requireApprovalId(query.beforeFileId, '파일 커서');
+    params.set('beforeFileId', String(query.beforeFileId));
+  }
+  const response = await apiGet<unknown>(`${APPROVAL_API}/files?${params}`);
+  if (!isObject(response) || !Array.isArray(response.resultList)
+    || !response.resultList.every(isDocumentFileItem) || response.resultList.length > 20
+    || new Set(response.resultList.map((item) => item.fileId)).size !== response.resultList.length
+    || typeof response.hasNext !== 'boolean'
+    || (response.hasNext
+      ? response.resultList.length !== 20 || response.nextBeforeFileId !== response.resultList[19].fileId
+      : response.nextBeforeFileId !== null)) {
+    throw new Error('파일 목록 응답을 확인할 수 없습니다.');
+  }
+  return {
+    resultList: response.resultList,
+    hasNext: response.hasNext,
+    nextBeforeFileId: response.hasNext ? response.resultList[19].fileId : null,
+  };
+}
 
 export class UnknownAttachmentUploadOutcomeError extends Error {
   constructor() {
@@ -162,6 +206,7 @@ export async function submitDocumentApproval(
   electronicApprovalId: number,
   request: DocumentApprovalDraftRequest,
 ): Promise<DocumentApprovalDraftResponse> {
+  const isBusinessContact = request.documentType === 'BUSINESS_CONTACT';
   const response = await apiPost<{ item?: DocumentApprovalDraftResponse }>(
     `${APPROVAL_API}/${electronicApprovalId}/submit`,
     request,
@@ -170,11 +215,13 @@ export async function submitDocumentApproval(
   if (
     !item ||
     item.electronicApprovalId !== electronicApprovalId ||
-    item.documentStatus !== 'PENDING' ||
+    item.documentStatus !== (isBusinessContact ? 'COMPLETED' : 'PENDING') ||
     !item.eabusNo?.trim() ||
     !item.submittedAt?.trim()
   ) {
-    throw new Error('결재신청 응답을 확인할 수 없습니다.');
+    throw new Error(isBusinessContact
+      ? '업무연락 발송 응답을 확인할 수 없습니다.'
+      : '결재신청 응답을 확인할 수 없습니다.');
   }
   return item;
 }

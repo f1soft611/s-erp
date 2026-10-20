@@ -962,7 +962,7 @@ export function DocumentApprovalDetailFeed(
   const displayDocumentType =
     detail?.documentType ?? feedItem?.feedData.documentType;
   const statusPresentation = displayDocumentStatus
-    ? getApprovalStatusPresentation(displayDocumentStatus)
+    ? getApprovalStatusPresentation(displayDocumentStatus, displayDocumentType)
     : null;
   const kindPresentation = displayDocumentType
     ? getDocumentKindPresentation(displayDocumentType)
@@ -1207,7 +1207,7 @@ export function DocumentApprovalDetailFeed(
                       variant="body1"
                       sx={{ fontWeight: 700 }}
                     >
-                      결재선
+                      {displayDocumentType === 'BUSINESS_CONTACT' ? '참조자' : '결재선'}
                     </Typography>
                     <Typography
                       data-testid="approval-line-drafter-meta"
@@ -1223,7 +1223,7 @@ export function DocumentApprovalDetailFeed(
                 approvalLineGroups.agreement.length === 0 &&
                 approvalLineGroups.reference.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    결재선 정보가 없습니다.
+                    {displayDocumentType === 'BUSINESS_CONTACT' ? '참조자 정보가 없습니다.' : '결재선 정보가 없습니다.'}
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
