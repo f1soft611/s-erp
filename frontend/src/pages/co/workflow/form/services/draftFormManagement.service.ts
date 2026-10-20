@@ -4,8 +4,11 @@ import {
   apiPut,
 } from '../../../../../shared/services/apiClient';
 import {
+  createCommonCodeItem,
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
+  updateCommonCodeItem,
+  type CommonCodeItemSavePayload,
 } from '../../../master/common-code/services/commonCodeManagement.service';
 import type {
   CommonCodeGroupRow,
@@ -129,19 +132,11 @@ export async function updateDraftForm(
   return normalizeDraftFormRow(result.item ?? {});
 }
 
-export type CommonCodeItemSavePayload = Pick<
-  CommonCodeItemRow,
-  'itemCode' | 'itemNm' | 'itemDc' | 'sortOrder' | 'useAt'
->;
-
 export function createDraftFormCategoryItem(
   groupId: string,
   payload: CommonCodeItemSavePayload,
 ) {
-  return apiPost(
-    `/api/v1/co/master/common-code/groups/${groupId}/items`,
-    payload,
-  );
+  return createCommonCodeItem(groupId, payload);
 }
 
 export function updateDraftFormCategoryItem(
@@ -149,8 +144,5 @@ export function updateDraftFormCategoryItem(
   itemId: string,
   payload: CommonCodeItemSavePayload,
 ) {
-  return apiPut(
-    `/api/v1/co/master/common-code/groups/${groupId}/items/${itemId}`,
-    payload,
-  );
+  return updateCommonCodeItem(groupId, itemId, payload);
 }
