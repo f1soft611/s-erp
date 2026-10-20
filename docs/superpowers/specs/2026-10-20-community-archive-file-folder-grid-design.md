@@ -46,7 +46,9 @@ Redesign `/groupware/community/archive` as a lightweight file browser. Archive c
 
 ### API and authorization
 
-- Replace or adapt the current post-oriented list response with a file-oriented result containing one row per active archive attachment, including the post ID and file ID needed for folder scope, downloads, and deletion.
+- Replace the post-oriented list with a file-oriented endpoint that returns one row per active archive attachment, including the post ID and file ID needed for folder scope, downloads, and deletion. An omitted folder code means root files (`category_code IS NULL`); a supplied code means files in that folder.
+- Create files through a multipart file-upload endpoint that accepts one file and an optional folder code. The browser calls it once per selected file, allowing each result to succeed or fail independently. Retire the old post-only create route so clients cannot create new fileless archive records.
+- Rename/move uses a file-specific update request containing the current post ID, file name, and optional destination folder code. The existing attachment download and delete routes remain available with the file's current owner post ID.
 - Every list, upload, delete, and download operation remains tenant-scoped and restricted to `board_type_code='ARCHIVE'` and archive attachment ownership.
 - Category values are validated against the tenant's `WF_ARCHIVE_CATEGORY` group. Root uploads accept a null category; inactive categories cannot receive new files.
 - File creation and post metadata creation use a single workflow that does not leave an empty visible post when an upload fails. Errors are surfaced, and successful files in a multi-file batch remain distinguishable from failed files.
@@ -73,8 +75,8 @@ Included:
 - Archive page file/folder navigation and file-oriented grid.
 - Common-code folder management through the existing item dialog.
 - Direct-to-file-picker, per-file upload, list, download, and delete behavior using the current tables.
+- File rename and folder move, including safe reassignment of one attachment from a legacy multi-attachment post.
 - Archive API/service changes to support file-row responses, root uploads, and required-file validation.
-- Per-file rename and folder move using existing file/post metadata.
 - Soft deletion of existing archive posts with no active attachment.
 - Focused frontend/backend tests, responsive browser verification, and dated result documentation.
 
