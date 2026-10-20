@@ -1,30 +1,16 @@
 import { useState } from 'react';
 import {
-  createArchivePost,
   deleteArchiveAttachment,
-  deleteArchivePost,
-  uploadArchiveAttachment,
-  updateArchivePost,
+  updateArchiveFile,
+  uploadArchiveFile,
 } from '../services/archiveBoardService';
 import type {
-  ArchiveAttachment,
-  ArchiveId,
-  ArchivePost,
-  ArchivePostSavePayload,
+  ArchiveFileRow,
+  ArchiveFileUpdatePayload,
 } from '../types/archive.types';
-
-export type ArchiveSaveResult = {
-  success: boolean;
-  postId?: ArchiveId;
-  failedUploads: File[];
-  failedRemovals: ArchiveAttachment[];
-  error?: string;
-};
 
 type UseArchiveMutationsOptions = {
   reloadList: () => Promise<void>;
-  reloadDetail: (postId: ArchiveId) => Promise<void>;
-  onPostDeleted: () => void;
   showError: (message: string) => void;
   showSuccess: (message: string) => void;
 };
@@ -35,107 +21,78 @@ function messageOf(error: unknown): string {
 
 export function useArchiveMutations({
   reloadList,
-  reloadDetail,
-  onPostDeleted,
   showError,
   showSuccess,
 }: UseArchiveMutationsOptions) {
-  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const savePost = async (
-    postId: ArchiveId | null,
-    payload: ArchivePostSavePayload,
-    files: File[],
-    removedAttachments: ArchiveAttachment[],
-  ): Promise<ArchiveSaveResult> => {
-    setIsSaving(true);
-    let savedPost: ArchivePost;
+  const uploadFiles = async (files: File[], folderCode?: string | null) => {
+    if (files.length === 0) return { successCount: 0, failures: [] as string[] };
+    setIsUploading(true);
+    const failures: string[] = [];
+    let successCount = 0;
     try {
-      savedPost = postId
-        ? await updateArchivePost(postId, payload)
-        : await createArchivePost(payload);
-    } catch (error) {
-      const message = `자료 저장에 실패했습니다: ${messageOf(error)}`;
-      showError(message);
-      setIsSaving(false);
-      return {
-        success: false,
-        postId: postId ?? undefined,
-        failedUploads: files,
-        failedRemovals: removedAttachments,
-        error: message,
-      };
-    }
-
-    const failedUploads: File[] = [];
-    const failedRemovals: ArchiveAttachment[] = [];
-    const failureDescriptions: string[] = [];
-    for (const file of files) {
-      try {
-        await uploadArchiveAttachment(savedPost.postId, file);
-      } catch (error) {
-        failedUploads.push(file);
-        failureDescriptions.push(
-          `${file.name} 업로드 실패: ${messageOf(error)}`,
-        );
+      for (const file of files) {
+        try {
+          await uploadArchiveFile(file, folderCode ?? undefined);
+          successCount += 1;
+        } catch (error) {
+          failures.push(`${file.name}: ${messageOf(error)}`);
+        }
       }
-    }
-    for (const attachment of removedAttachments) {
-      try {
-        await deleteArchiveAttachment(
-          attachment.boardFileId,
-          savedPost.postId,
-        );
-      } catch (error) {
-        failedRemovals.push(attachment);
-        failureDescriptions.push(
-          `${attachment.fileName} 제거 실패: ${messageOf(error)}`,
-        );
+      await reloadList();
+      if (failures.length > 0) {
+        showError(`일부 파일 업로드에 실패했습니다. ${failures.join('; ')}`);
+      } else {
+        showSuccess('파일을 업로드했습니다.');
       }
+      return { successCount, failures };
+    } finally {
+      setIsUploading(false);
     }
-
-    await reloadList();
-    if (postId) await reloadDetail(savedPost.postId);
-
-    if (failedUploads.length || failedRemovals.length) {
-      const message = `게시글은 저장됐지만 일부 파일 작업에 실패했습니다: ${failureDescriptions.join('; ')}`;
-      showError(message);
-      setIsSaving(false);
-      return {
-        success: false,
-        postId: savedPost.postId,
-        failedUploads,
-        failedRemovals,
-        error: message,
-      };
-    }
-
-    showSuccess(postId ? '자료를 수정했습니다.' : '자료를 등록했습니다.');
-    setIsSaving(false);
-    return {
-      success: true,
-      postId: savedPost.postId,
-      failedUploads,
-      failedRemovals,
-    };
   };
 
-  const deletePost = async (postId: ArchiveId) => {
+  const updateFile = async (
+    row: ArchiveFileRow,
+    payload: ArchiveFileUpdatePayload,
+  ) => {
+    setIsUpdating(true);
+    try {
+      const updated = await updateArchiveFile(row.boardFileId, payload);
+      await reloadList();
+      showSuccess('파일 정보를 수정했습니다.');
+      return updated;
+    } catch (error) {
+      showError(`파일 수정에 실패했습니다: ${messageOf(error)}`);
+      return null;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const deleteFile = async (row: ArchiveFileRow) => {
     setIsDeleting(true);
     try {
-      await deleteArchivePost(postId);
-      onPostDeleted();
+      await deleteArchiveAttachment(row.boardFileId, row.postId);
       await reloadList();
-      showSuccess('자료를 삭제했습니다.');
+      showSuccess('파일을 삭제했습니다.');
       return true;
     } catch (error) {
-      showError(`자료 삭제에 실패했습니다: ${messageOf(error)}`);
+      showError(`파일 삭제에 실패했습니다: ${messageOf(error)}`);
       return false;
     } finally {
       setIsDeleting(false);
     }
   };
 
-  return { savePost, deletePost, isSaving, isDeleting };
+  return {
+    uploadFiles,
+    updateFile,
+    deleteFile,
+    isUploading,
+    isUpdating,
+    isDeleting,
+  };
 }

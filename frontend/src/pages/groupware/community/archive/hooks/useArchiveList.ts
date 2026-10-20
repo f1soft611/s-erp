@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
-import { fetchArchivePosts } from '../services/archiveBoardService';
+import { fetchArchiveFiles } from '../services/archiveBoardService';
 import type { F1GridDataSource } from '../../../../../shared/components/f1-grid';
-import type { ArchivePost } from '../types/archive.types';
+import type { ArchiveFileRow } from '../types/archive.types';
 
 type UseArchiveListOptions = {
   pageUnit?: number;
@@ -10,7 +10,7 @@ type UseArchiveListOptions = {
 
 type ArchiveListFilters = {
   keyword: string;
-  categoryCode: string;
+  folderCode: string;
 };
 
 export function useArchiveList({
@@ -19,17 +19,17 @@ export function useArchiveList({
 }: UseArchiveListOptions = {}) {
   const [filters, setFilters] = useState<ArchiveListFilters>({
     keyword: '',
-    categoryCode: '',
+    folderCode: '',
   });
-  const dataSource = useMemo<F1GridDataSource<ArchivePost>>(
+  const dataSource = useMemo<F1GridDataSource<ArchiveFileRow>>(
     () => ({
       pageSize: pageUnit,
       async load({ offset, limit, signal }) {
-        const result = await fetchArchivePosts(
-          Math.floor(offset / limit) + 1,
+        const result = await fetchArchiveFiles(
+          offset,
           limit,
           filters.keyword,
-          filters.categoryCode,
+          filters.folderCode,
           signal,
         );
         return {
@@ -48,7 +48,7 @@ export function useArchiveList({
   }, []);
   const setCategoryCode = useCallback((categoryCode: string) => {
     setFilters((current) =>
-      current.categoryCode === categoryCode ? current : { ...current, categoryCode },
+      current.folderCode === categoryCode ? current : { ...current, folderCode: categoryCode },
     );
   }, []);
 
@@ -56,7 +56,7 @@ export function useArchiveList({
     dataSource,
     pageUnit,
     keyword: filters.keyword,
-    categoryCode: filters.categoryCode,
+    categoryCode: filters.folderCode,
     setKeyword,
     setCategoryCode,
   };

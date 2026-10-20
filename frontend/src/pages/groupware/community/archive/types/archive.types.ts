@@ -1,5 +1,33 @@
 export type ArchiveId = number | string;
 
+export type ArchiveFileRow = {
+  boardFileId: ArchiveId;
+  postId: ArchiveId;
+  fileName: string;
+  fileSize?: number | string | null;
+  mimeType?: string | null;
+  uploadedAt?: string | Date | null;
+  writerName?: string | null;
+  categoryCode?: string | null;
+};
+
+export type ArchiveFileUpdatePayload = {
+  postId: ArchiveId;
+  fileName: string;
+  folderCode?: string | null;
+};
+
+export type ArchivePageResult = {
+  resultList: ArchiveFileRow[];
+  resultCnt: number;
+};
+
+export type ArchiveCategory = {
+  code: string;
+  name: string;
+};
+
+// Legacy compatibility types kept temporarily for incremental migration.
 export type ArchiveAttachment = {
   boardFileId: ArchiveId;
   postId: ArchiveId;
@@ -28,14 +56,4 @@ export type ArchivePostSavePayload = {
   title: string;
   contents: string;
   categoryCode: string;
-};
-
-export type ArchivePageResult = {
-  resultList: ArchivePost[];
-  resultCnt: number;
-};
-
-export type ArchiveCategory = {
-  code: string;
-  name: string;
 };
