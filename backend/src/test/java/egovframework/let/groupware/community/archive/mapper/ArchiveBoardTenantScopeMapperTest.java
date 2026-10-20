@@ -80,6 +80,14 @@ class ArchiveBoardTenantScopeMapperTest {
                 .contains("board_type_code = 'ARCHIVE'", "write_auth_level", "file_upload_yn", "use_yn");
     }
 
+    @Test
+    void fileListMapperScopesTenantArchiveAndAttachmentStates() throws Exception {
+        BoundSql list = sql(parse(), "selectArchiveFileList");
+        assertThat(list.getSql()).contains("f.tenant_id = ?", "p.tenant_id = ?", "p.board_type_code = 'ARCHIVE'",
+                "f.owner_type = 'ARCHIVE'", "f.file_usage_type = 'ATTACHMENT'", "f.deleted_yn = 'N'");
+        assertThat(properties(list)).contains("tenantId", "offset", "limit");
+    }
+
     private Configuration parse() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
@@ -95,6 +103,8 @@ class ArchiveBoardTenantScopeMapperTest {
         params.put("boardFileId", 31L);
         params.put("keyword", "manual");
         params.put("categoryCode", "GENERAL");
+        params.put("offset", 0);
+        params.put("limit", 20);
         return configuration.getMappedStatement("ArchiveBoardDAO." + id).getBoundSql(params);
     }
 

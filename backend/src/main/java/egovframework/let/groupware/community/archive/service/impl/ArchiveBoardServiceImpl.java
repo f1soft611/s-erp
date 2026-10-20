@@ -25,6 +25,8 @@ import egovframework.com.common.service.CommonFileService;
 import egovframework.let.common.dto.ListResult;
 import egovframework.let.common.pagination.EgovPaginationSupport;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileSearchVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSearchVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO;
@@ -47,6 +49,36 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         this.archiveBoardDAO = archiveBoardDAO;
         this.commonFileService = commonFileService;
         this.categoryValidator = categoryValidator;
+    }
+
+    @Override
+    public ListResult<ArchiveBoardFileItemVO> listFiles(ArchiveBoardFileSearchVO search, LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        requireBoard();
+        ArchiveBoardFileSearchVO actual = search == null ? new ArchiveBoardFileSearchVO() : search;
+        int offset = actual.getOffset() == null ? 0 : actual.getOffset();
+        int limit = actual.getLimit() == null ? 20 : actual.getLimit();
+        if (offset < 0 || limit < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "페이지 정보가 올바르지 않습니다.");
+        }
+
+        String keyword = StringUtils.hasText(actual.getKeyword()) ? actual.getKeyword().trim() : null;
+        String folderCode = StringUtils.hasText(actual.getFolderCode()) ? actual.getFolderCode().trim() : null;
+        if (folderCode != null) {
+            categoryValidator.validate(user.getTenantId(), ARCHIVE, folderCode);
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", user.getTenantId());
+        params.put("keyword", keyword);
+        params.put("folderCode", folderCode);
+        params.put("rootOnly", folderCode == null);
+        params.put("offset", offset);
+        params.put("limit", limit);
+
+        List<ArchiveBoardFileItemVO> files = archiveBoardDAO.selectArchiveFileList(params);
+        Long count = archiveBoardDAO.selectArchiveFileCount(params);
+        return new ListResult<>(files == null ? new ArrayList<>() : files, count == null ? 0L : count);
     }
 
     @Override

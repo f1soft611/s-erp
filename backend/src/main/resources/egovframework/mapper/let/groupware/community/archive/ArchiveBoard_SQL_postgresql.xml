@@ -28,6 +28,55 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
+    <resultMap id="archiveFileItemMap" type="egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO">
+        <id property="boardFileId" column="board_file_id"/>
+        <result property="postId" column="post_id"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="mimeType" column="mime_type"/>
+        <result property="uploadedAt" column="uploaded_at"/>
+        <result property="writerName" column="writer_name"/>
+        <result property="categoryCode" column="category_code"/>
+    </resultMap>
+
+    <sql id="archiveFileScope">
+        f.tenant_id = #{tenantId}
+        AND p.tenant_id = #{tenantId}
+        AND p.board_type_code = 'ARCHIVE'
+        AND p.is_deleted = 'N'
+        AND f.owner_type = 'ARCHIVE'
+        AND f.file_usage_type = 'ATTACHMENT'
+        AND f.deleted_yn = 'N'
+    </sql>
+    <sql id="archiveFileFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (f.file_name ILIKE '%' || #{keyword} || '%'
+                OR p.writer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="folderCode != null and folderCode != ''">
+            AND p.category_code = #{folderCode}
+        </if>
+        <if test="rootOnly != null and rootOnly">
+            AND p.category_code IS NULL
+        </if>
+    </sql>
+    <select id="selectArchiveFileList" parameterType="map" resultMap="archiveFileItemMap">
+        SELECT f.file_id AS board_file_id, p.post_id, f.file_name, f.file_size, f.mime_type,
+               f.created_at AS uploaded_at, p.writer_name, p.category_code
+        FROM tb_common_file f
+        JOIN tb_board_post p ON p.post_id = f.owner_id
+        WHERE <include refid="archiveFileScope"/>
+        <include refid="archiveFileFilter"/>
+        ORDER BY f.created_at DESC, f.file_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="selectArchiveFileCount" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_common_file f
+        JOIN tb_board_post p ON p.post_id = f.owner_id
+        WHERE <include refid="archiveFileScope"/>
+        <include refid="archiveFileFilter"/>
+    </select>
 
     <sql id="postColumns">
         p.post_id, p.board_type_code, p.title, p.contents, p.contents_text, p.category_code,

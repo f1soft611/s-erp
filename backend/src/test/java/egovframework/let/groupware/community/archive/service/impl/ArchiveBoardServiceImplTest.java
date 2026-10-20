@@ -93,6 +93,26 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
+    void listFilesUsesOffsetLimitKeywordAndRootScope() throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setTenantId(999L);
+        search.setOffset(0);
+        search.setLimit(20);
+        search.setKeyword(" manual ");
+        when(dao.selectArchiveFileList(anyMap())).thenReturn(Collections.emptyList());
+        when(dao.selectArchiveFileCount(anyMap())).thenReturn(0L);
+
+        assertThat(service.listFiles(search, user).getResultCnt()).isZero();
+
+        verify(dao).selectArchiveFileList(argThat((Map<String, Object> params) ->
+                Long.valueOf(71L).equals(params.get("tenantId"))
+                        && Integer.valueOf(0).equals(params.get("offset"))
+                        && Integer.valueOf(20).equals(params.get("limit"))
+                        && "manual".equals(params.get("keyword"))
+                        && Boolean.TRUE.equals(params.get("rootOnly"))));
+    }
+
+    @Test
     void createAndUpdateKeepPlainTextAndAuthenticatedWriter() throws Exception {
         when(dao.insertArchivePost(anyMap())).thenReturn(13L);
         service.createPost(payload, user);

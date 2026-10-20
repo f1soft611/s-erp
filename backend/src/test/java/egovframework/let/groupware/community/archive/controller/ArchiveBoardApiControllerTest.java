@@ -79,6 +79,24 @@ class ArchiveBoardApiControllerTest {
     }
 
     @Test
+    void fileListRouteUsesOffsetLimitAndFolderCode() throws Exception {
+        ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
+        item.setBoardFileId(31L);
+        when(service.listFiles(any(), eq(user))).thenReturn(new ListResult<>(Collections.singletonList(item), 1L));
+
+        mvc.perform(get(ROOT + "/files").param("offset", "0").param("limit", "20")
+                        .param("keyword", "manual").param("folderCode", "GENERAL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.resultCnt").value(1))
+                .andExpect(jsonPath("$.result.resultList[0].boardFileId").value(31));
+
+        verify(service).listFiles(argThat(search -> search.getOffset() == 0
+                && search.getLimit() == 20
+                && "manual".equals(search.getKeyword())
+                && "GENERAL".equals(search.getFolderCode())), eq(user));
+    }
+
+    @Test
     void attachmentRoutesRequirePostOwnershipParameterAndMultipartFile() throws Exception {
         ArchiveBoardFileVO attachment = new ArchiveBoardFileVO();
         attachment.setBoardFileId(31L);
