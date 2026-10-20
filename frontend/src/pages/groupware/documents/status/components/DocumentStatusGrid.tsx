@@ -81,7 +81,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       field: 'electronicApprovalId',
       headerName: '문서번호',
       type: 'number',
-      width: 120,
+      width: 80,
       align: 'center',
       editable: false,
       search: {
@@ -121,9 +121,12 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
         <Chip
           size="small"
           color={STATUS_COLORS[row.documentStatus]}
-          label={row.documentType === 'BUSINESS_CONTACT' && row.documentStatus === 'COMPLETED'
-            ? '발송완료'
-            : STATUS_LABELS[row.documentStatus] ?? row.documentStatus}
+          label={
+            row.documentType === 'BUSINESS_CONTACT' &&
+            row.documentStatus === 'COMPLETED'
+              ? '발송완료'
+              : (STATUS_LABELS[row.documentStatus] ?? row.documentStatus)
+          }
         />
       ),
     },
@@ -139,14 +142,16 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
     {
       field: 'drafterName',
       headerName: '기안자',
-      width: 120,
+      width: 100,
+      align: 'center',
       editable: false,
       search: { label: '기안자', order: 6, group: '기안정보' },
     },
     {
       field: 'drafterDepartmentName',
       headerName: '기안부서',
-      width: 160,
+      width: 100,
+      align: 'center',
       editable: false,
       search: { label: '기안부서', order: 7, group: '기안정보' },
     },
@@ -166,7 +171,8 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       field: 'myParticipantType',
       headerName: '내 결재 역할',
       type: 'select',
-      width: 110,
+      width: 80,
+      align: 'center',
       editable: false,
       options: PARTICIPANT_TYPE_OPTIONS,
       search: {
@@ -181,7 +187,8 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       field: 'myActionStatus',
       headerName: '내 처리상태',
       type: 'select',
-      width: 120,
+      width: 80,
+      align: 'center',
       editable: false,
       options: ACTION_STATUS_OPTIONS,
       search: {
@@ -195,8 +202,9 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
     {
       field: 'currentApprovalStep',
       headerName: '현재 결재단계·담당자',
-      width: 220,
+      width: 150,
       editable: false,
+      align: 'center',
       search: {
         label: '현재 결재담당자',
         order: 11,
@@ -219,12 +227,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       width: 100,
       align: 'center',
       editable: false,
-      search: {
-        label: '최종 변경일',
-        order: 12,
-        span: 2,
-        group: '최종 변경일',
-      },
+      search: { hidden: true },
     },
   ];
 }

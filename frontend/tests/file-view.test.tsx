@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileView } from '../src/shared/components/view-mode/FileView';
 import { ViewModeToggle } from '../src/shared/components/view-mode/ViewModeToggle';
+import { createAppTheme } from '../src/theme/theme';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -72,7 +74,57 @@ describe('shared file view', () => {
     const { rerender } = render(<FileView {...props} />);
     expect(screen.getByText('첨부파일이 없습니다.')).toBeInTheDocument();
     rerender(<FileView {...props} isLoading />);
-    expect(screen.getByRole('status')).toHaveTextContent('파일 불러오는 중');
+    expect(screen.getByRole('status', { name: '파일 불러오는 중' })).toBeInTheDocument();
+    expect(screen.getByTestId('file-view-skeleton')
+      .querySelectorAll('[data-testid="file-view-skeleton-row"]')).toHaveLength(8);
     expect(screen.queryByText('첨부파일이 없습니다.')).not.toBeInTheDocument();
+  });
+
+  it('keeps loaded file rows while showing the incremental loading indicator', () => {
+    const item = {
+      id: 1, name: 'sample.pdf', ownerLabel: 'Sample User',
+      dateLabel: '2026-10-20 09:00', sizeLabel: '1 KB',
+    };
+    render(<FileView items={[item]} hasNext isLoading error=""
+      onLoadMore={vi.fn()} onRetry={vi.fn()} onDownload={vi.fn()} />);
+
+    expect(screen.getByTestId('file-view-row')).toHaveTextContent('sample.pdf');
+    expect(screen.getByRole('status', { name: '파일 페이지 불러오는 중' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText('파일 불러오는 중')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('file-view-skeleton')).not.toBeInTheDocument();
+  });
+
+  it('keeps the list surface white in light mode', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <FileView items={[]} hasNext={false} isLoading={false} error=""
+          onLoadMore={vi.fn()} onRetry={vi.fn()} onDownload={vi.fn()} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('파일형 첨부파일 목록')).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
+  });
+
+  it('uses readable theme surfaces and spinner colors in dark mode', () => {
+    render(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <FileView items={[{
+          id: 1, name: 'sample.pdf', ownerLabel: 'Sample User',
+          dateLabel: '2026-10-20 09:00', sizeLabel: '1 KB',
+        }]} hasNext isLoading error="" onLoadMore={vi.fn()} onRetry={vi.fn()}
+          onDownload={vi.fn()} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText('파일형 첨부파일 목록')).toHaveStyle({
+      backgroundColor: 'rgb(17, 24, 39)',
+    });
+    expect(screen.getByRole('progressbar')).toHaveStyle({
+      color: 'rgb(96, 165, 250)',
+    });
+    expect(screen.getByTestId('file-view-row')).toHaveTextContent('Sample User');
   });
 });

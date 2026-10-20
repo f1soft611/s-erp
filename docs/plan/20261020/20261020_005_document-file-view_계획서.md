@@ -114,3 +114,19 @@
 2. `frontend/src/shared/components/view-mode/FileView.tsx`의 목록 루트에 `bgcolor: 'common.white'`를 지정하고 마지막 페이지 안내 Typography만 제거한다.
 3. `npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx tests/document-files-hook.test.tsx` 및 `npm run build`로 회귀를 확인한다.
 4. 합성 데이터로 375px·768px·1280px 실제 렌더링, 흰색 배경, 종료 문구 부재를 검증하고 결과/스크린샷을 갱신한다.
+
+## 파일형 스켈레톤 로딩 계획
+
+1. `frontend/tests/file-view.test.tsx`에서 초기 로딩 중 status와 스켈레톤 행 8개를 검증하고, 기존 파일 행이 있는 다음 페이지 로딩 중 파일 행 유지와 하단 진행 표시를 검증한다.
+2. 신규 초기 스켈레톤 단언이 현재 구현에서 실패하는지 확인한다.
+3. `frontend/src/shared/components/view-mode/FileView.tsx`에서 파일이 아직 없는 초기 로딩에만 스켈레톤 행을 표시하고, 추가 페이지 로딩은 기존 진행 표시를 유지한다.
+4. `npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx` 및 `npm run build`를 실행한다.
+5. 합성 데이터로 375px·768px·1280px 실제 렌더링과 페이지 가로 넘침 여부를 확인하고 결과서 및 스크린샷을 갱신한다.
+
+## 파일 페이지 스피너 및 다크테마 계획
+
+1. `frontend/tests/file-view.test.tsx`에서 다음 페이지 로딩 중 파일 행 유지, 안내 텍스트 부재, 접근성 status와 progressbar를 검증하고 라이트/다크 테마 배경 및 다크 스피너 색상을 확인한다.
+2. 해당 테스트를 현재 구현에서 실행해 페이징 안내 텍스트와 고정 흰 배경으로 실패하는지 확인한다.
+3. `frontend/src/shared/components/view-mode/FileView.tsx`에서 라이트는 흰 배경을 유지하고 다크는 `background.paper`를 사용하며, 다음 페이지 로딩은 안내 문구 없이 theme primary 색 스피너만 렌더한다.
+4. `npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx`와 `npm run build`를 실행한다.
+5. 합성 데이터로 라이트/다크 테마에서 375px·768px·1280px 화면의 대비, 스피너, 페이지 가로 넘침을 브라우저에서 확인하고 결과서와 대표 스크린샷을 갱신한다.

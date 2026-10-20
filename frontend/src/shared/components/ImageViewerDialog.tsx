@@ -7,6 +7,7 @@ import {
   IconButton,
   Typography,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 
 export type ImageViewerDialogProps = {
   open: boolean;
@@ -24,6 +25,11 @@ export function ImageViewerDialog({
   title = '이미지 보기',
 }: ImageViewerDialogProps) {
   const [displaySrc, setDisplaySrc] = useState(src);
+  const theme = useTheme();
+  const checkerColor = alpha(
+    theme.palette.text.primary,
+    theme.palette.mode === 'dark' ? 0.12 : 0.08,
+  );
 
   useEffect(() => {
     setDisplaySrc(src);
@@ -46,8 +52,10 @@ export function ImageViewerDialog({
           sx: {
             borderRadius: 2,
             overflow: 'hidden',
-            bgcolor: '#0f172a',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            border: '1px solid',
+            borderColor: 'divider',
           },
         },
       }}
@@ -59,21 +67,22 @@ export function ImageViewerDialog({
           justifyContent: 'space-between',
           px: 2,
           py: 1.25,
-          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-          backgroundColor: '#111827',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
         }}
       >
         <Typography
           id="image-viewer-dialog-title"
           variant="subtitle1"
-          sx={{ fontWeight: 700, color: '#e2e8f0' }}
+          sx={{ fontWeight: 700, color: 'text.primary' }}
         >
           {title}
         </Typography>
         <IconButton
           aria-label="이미지 뷰어 닫기"
           onClick={onClose}
-          sx={{ color: '#e2e8f0' }}
+          sx={{ color: 'text.primary' }}
         >
           <CloseIcon />
         </IconButton>
@@ -84,28 +93,43 @@ export function ImageViewerDialog({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          p: 2,
-          backgroundColor: '#0f172a',
+          p: 1.5,
+          backgroundColor: 'background.default',
           overflow: 'auto',
         }}
       >
         <Box
-          component="img"
-          src={displaySrc}
-          alt={alt}
-          role="img"
-          aria-label={alt}
+          data-testid="image-viewer-canvas"
           sx={{
-            display: 'block',
-            maxWidth: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            minHeight: 'min(30vh, 200px)',
             maxHeight: '72vh',
-            width: 'auto',
-            height: 'auto',
-            objectFit: 'contain',
-            borderRadius: 1,
-            bgcolor: '#020617',
+            overflow: 'auto',
+            backgroundColor: 'background.default',
+            backgroundImage: `repeating-conic-gradient(${checkerColor} 0% 25%, transparent 0% 50%)`,
+            backgroundSize: '16px 16px',
           }}
-        />
+        >
+          <Box
+            component="img"
+            src={displaySrc}
+            alt={alt}
+            role="img"
+            aria-label={alt}
+            sx={{
+              display: 'block',
+              maxWidth: '100%',
+              maxHeight: '72vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              borderRadius: 1,
+            }}
+          />
+        </Box>
       </DialogContent>
     </Dialog>
   );

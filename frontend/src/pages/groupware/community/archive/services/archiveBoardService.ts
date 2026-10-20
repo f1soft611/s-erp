@@ -7,6 +7,7 @@ import {
 } from '../../../../../shared/services/apiClient';
 import type {
   ArchiveFileRow,
+  ArchiveFileSearchFilters,
   ArchiveFileUpdatePayload,
   ArchiveId,
   ArchivePageResult,
@@ -29,21 +30,20 @@ function requireItem<T>(response: ArchiveItemApiResponse<T>, label: string): T {
 }
 
 export async function fetchArchiveFiles(
-  offset: number,
-  limit: number,
-  keyword?: string,
-  folderCode?: string,
+  filters: ArchiveFileSearchFilters,
   signal?: AbortSignal,
 ): Promise<ArchivePageResult> {
-  const query = new URLSearchParams({
-    offset: String(offset),
-    limit: String(limit),
-  });
-  const normalizedKeyword = keyword?.trim();
+  const query = new URLSearchParams();
+  const normalizedKeyword = filters.keyword.trim();
   if (normalizedKeyword) query.set('keyword', normalizedKeyword);
-  if (folderCode?.trim()) query.set('folderCode', folderCode.trim());
+  const normalizedFolderCode = filters.folderCode.trim();
+  if (normalizedFolderCode) query.set('folderCode', normalizedFolderCode);
+  if (filters.uploadedFrom) query.set('uploadedFrom', filters.uploadedFrom);
+  if (filters.uploadedTo) query.set('uploadedTo', filters.uploadedTo);
+  if (filters.fileType !== 'ALL') query.set('fileType', filters.fileType);
 
-  const url = `/api/v1/groupware/boards/archive/files?${query.toString()}`;
+  const queryString = query.toString();
+  const url = `/api/v1/groupware/boards/archive/files${queryString ? `?${queryString}` : ''}`;
   const response =
     signal === undefined
       ? await apiGet<ArchiveListApiResponse>(url)

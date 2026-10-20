@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import dayjs from 'dayjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMocks = vi.hoisted(() => ({
@@ -35,40 +36,63 @@ describe('archive board service', () => {
     vi.clearAllMocks();
   });
 
-  it('serializes file-list pagination and optional search and folder filters', async () => {
+  it('serializes all archive filters without pagination', async () => {
     apiMocks.apiGet.mockResolvedValue({
       resultList: [{ boardFileId: 7, fileName: 'Travel policy.pdf' }],
       resultCnt: 21,
     });
     await expect(
-      fetchArchiveFiles(20, 10, 'travel policy', 'GUIDE'),
+      fetchArchiveFiles({
+        keyword: 'travel policy',
+        folderCode: 'GUIDE',
+        uploadedFrom: '2025-10-20',
+        uploadedTo: '2026-10-20',
+        fileType: 'PDF',
+      }),
     ).resolves.toEqual({
       resultList: [{ boardFileId: 7, fileName: 'Travel policy.pdf' }],
       resultCnt: 21,
     });
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
-      '/api/v1/groupware/boards/archive/files?offset=20&limit=10&keyword=travel+policy&folderCode=GUIDE',
+      '/api/v1/groupware/boards/archive/files?keyword=travel+policy&folderCode=GUIDE&uploadedFrom=2025-10-20&uploadedTo=2026-10-20&fileType=PDF',
     );
   });
 
   it('omits empty optional list filters and normalizes missing ResultVO fields', async () => {
     apiMocks.apiGet.mockResolvedValue({});
 
-    await expect(fetchArchiveFiles(0, 20, '  ', '')).resolves.toEqual({
+    await expect(
+      fetchArchiveFiles({
+        keyword: '  ',
+        folderCode: '',
+        uploadedFrom: '',
+        uploadedTo: '',
+        fileType: 'ALL',
+      }),
+    ).resolves.toEqual({
       resultList: [],
       resultCnt: 0,
     });
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
-      '/api/v1/groupware/boards/archive/files?offset=0&limit=20',
+      '/api/v1/groupware/boards/archive/files',
     );
   });
 
   it('passes the list request signal to the API', async () => {
     const signal = new AbortController().signal;
     apiMocks.apiGet.mockResolvedValue({ resultList: [], resultCnt: 0 });
-    await fetchArchiveFiles(0, 10, ' policy ', 'GUIDE', signal);
+    await fetchArchiveFiles(
+      {
+        keyword: ' policy ',
+        folderCode: 'GUIDE',
+        uploadedFrom: '',
+        uploadedTo: '',
+        fileType: 'ALL',
+      },
+      signal,
+    );
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
-      '/api/v1/groupware/boards/archive/files?offset=0&limit=10&keyword=policy&folderCode=GUIDE',
+      '/api/v1/groupware/boards/archive/files?keyword=policy&folderCode=GUIDE',
       signal,
     );
   });
@@ -136,37 +160,71 @@ describe('archive hooks', () => {
     vi.clearAllMocks();
   });
 
-  it('maps grid offset/limit directly to file-list API', async () => {
-    apiMocks.apiGet.mockResolvedValue({ resultList: [], resultCnt: 0 });
-    const { result } = renderHook(() => useArchiveList({ pageUnit: 20 }));
-    await act(async () => {
-      await result.current.dataSource.load({
-        offset: 40,
-        limit: 20,
-        signal: undefined,
-      });
+  it('loads all files with the recent-year default filters', async () => {
+    apiMocks.apiGet.mockResolvedValue({
+      resultList: [{ boardFileId: 7, fileName: 'guide.pdf' }],
+      resultCnt: 1,
     });
+    const { result } = renderHook(() => useArchiveList());
+    const today = dayjs().format('YYYY-MM-DD');
+    const uploadedFrom = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.filters).toEqual({
+      keyword: '',
+      folderCode: '',
+      uploadedFrom,
+      uploadedTo: today,
+      fileType: 'ALL',
+    });
+    expect(result.current.rows).toEqual([
+      { boardFileId: 7, fileName: 'guide.pdf' },
+    ]);
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
-      '/api/v1/groupware/boards/archive/files?offset=40&limit=20',
+      `/api/v1/groupware/boards/archive/files?uploadedFrom=${uploadedFrom}&uploadedTo=${today}`,
+      expect.any(AbortSignal),
     );
   });
 
-  it('loads active categories in API order from the archive category group', async () => {
+  it('exposes request errors and retries without a success-shaped fallback', async () => {
+    apiMocks.apiGet
+      .mockRejectedValueOnce(new Error('network unavailable'))
+      .mockResolvedValueOnce({ resultList: [], resultCnt: 0 });
+    const { result } = renderHook(() => useArchiveList());
+
+    await waitFor(() =>
+      expect(result.current.error?.message).toBe('network unavailable'),
+    );
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(apiMocks.apiGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads active and inactive categories from the editable archive category group', async () => {
     commonCodeMocks.fetchCommonCodeGroups.mockResolvedValue([
       { id: '5', groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
     ]);
     commonCodeMocks.fetchCommonCodeItems.mockResolvedValue([
       {
+        id: '1',
+        groupId: '5',
         itemCode: 'POLICY',
         itemNm: 'Policies',
         useAt: 'Y',
       },
       {
+        id: '2',
+        groupId: '5',
         itemCode: 'OLD',
         itemNm: 'Retired',
         useAt: 'N',
       },
       {
+        id: '3',
+        groupId: '5',
         itemCode: 'GUIDE',
         itemNm: 'Guides',
         useAt: 'Y',
@@ -181,8 +239,11 @@ describe('archive hooks', () => {
     });
     expect(commonCodeMocks.fetchCommonCodeItems).toHaveBeenCalledWith('5');
     expect(result.current.categories).toEqual([
-      { code: 'POLICY', name: 'Policies' },
-      { code: 'GUIDE', name: 'Guides' },
+      { code: 'POLICY', name: 'Policies', active: true },
+      { code: 'OLD', name: 'Retired', active: false },
+      { code: 'GUIDE', name: 'Guides', active: true },
     ]);
+    expect(result.current.groupId).toBe('5');
+    expect(result.current.items).toHaveLength(3);
   });
 });

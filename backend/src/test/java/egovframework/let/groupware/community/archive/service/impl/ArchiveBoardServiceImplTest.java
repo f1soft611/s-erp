@@ -93,12 +93,14 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
-    void listFilesUsesOffsetLimitKeywordAndRootScope() throws Exception {
+    void listFilesAppliesSearchFiltersAndAllowsReadingInactiveFolders() throws Exception {
         ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
         search.setTenantId(999L);
-        search.setOffset(0);
-        search.setLimit(20);
         search.setKeyword(" manual ");
+        search.setFolderCode(" INACTIVE ");
+        search.setUploadedFrom("2025-10-20");
+        search.setUploadedTo("2026-10-20");
+        search.setFileType("PDF");
         when(dao.selectArchiveFileList(anyMap())).thenReturn(Collections.emptyList());
         when(dao.selectArchiveFileCount(anyMap())).thenReturn(0L);
 
@@ -106,10 +108,57 @@ class ArchiveBoardServiceImplTest {
 
         verify(dao).selectArchiveFileList(argThat((Map<String, Object> params) ->
                 Long.valueOf(71L).equals(params.get("tenantId"))
-                        && Integer.valueOf(0).equals(params.get("offset"))
-                        && Integer.valueOf(20).equals(params.get("limit"))
                         && "manual".equals(params.get("keyword"))
-                        && Boolean.TRUE.equals(params.get("rootOnly"))));
+                        && "INACTIVE".equals(params.get("folderCode"))
+                        && "2025-10-20".equals(params.get("uploadedFrom"))
+                        && "2026-10-20".equals(params.get("uploadedTo"))
+                        && "PDF".equals(params.get("fileType"))
+                        && Boolean.FALSE.equals(params.get("rootOnly"))
+                        && !params.containsKey("offset")
+                        && !params.containsKey("limit")));
+        verify(dao).selectArchiveFileCount(anyMap());
+        verifyNoInteractions(categories);
+    }
+
+    @Test
+    void listFilesAllowsAnOpenDateBoundAndOmitsAllTypeFilter() throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setUploadedFrom("2026-01-01");
+        search.setUploadedTo(" ");
+        search.setFileType("ALL");
+        when(dao.selectArchiveFileList(anyMap())).thenReturn(Collections.emptyList());
+        when(dao.selectArchiveFileCount(anyMap())).thenReturn(0L);
+
+        service.listFiles(search, user);
+
+        verify(dao).selectArchiveFileList(argThat((Map<String, Object> params) ->
+                Long.valueOf(71L).equals(params.get("tenantId"))
+                        && Boolean.TRUE.equals(params.get("rootOnly"))
+                        && "2026-01-01".equals(params.get("uploadedFrom"))
+                        && !params.containsKey("uploadedTo")
+                        && !params.containsKey("fileType")
+                        && !params.containsKey("offset")
+                        && !params.containsKey("limit")));
+    }
+
+    @Test
+    void listFilesRejectsInvalidDatesReversedRangeAndUnknownType() throws Exception {
+        assertInvalidListSearch("2025-02-30", "", "ALL");
+        assertInvalidListSearch("2026-10-21", "2026-10-20", "ALL");
+        assertInvalidListSearch("", "", "AUDIO");
+        verify(dao, never()).selectArchiveFileList(anyMap());
+        verify(dao, never()).selectArchiveFileCount(anyMap());
+    }
+
+    private void assertInvalidListSearch(String from, String to, String fileType) throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setUploadedFrom(from);
+        search.setUploadedTo(to);
+        search.setFileType(fileType);
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class, () -> service.listFiles(search, user));
+        assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

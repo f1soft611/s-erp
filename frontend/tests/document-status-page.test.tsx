@@ -137,6 +137,7 @@ function expectedRecentMonthRange(today: Date) {
 describe('document status page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     api.get.mockImplementation((path: string) =>
       path.includes('/documents?')
         ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
@@ -243,6 +244,116 @@ describe('document status page', () => {
     expect(request.get('submittedAtFrom')).toBe(expectedRange.from);
     expect(request.get('submittedAtTo')).toBe(expectedRange.to);
 
+  });
+
+  it('restores the last applied quick and detailed search when returning to the page', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:document-status',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: 'budget',
+          detailValues: {
+            title: 'Quarterly',
+            submittedAt: { from: '2026-10-01', to: '2026-10-20' },
+          },
+        },
+      }),
+    );
+    renderDocumentStatusPage();
+
+    expect(await screen.findByText('41')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '문서현황 빠른 검색' }))
+      .toHaveValue('budget');
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(screen.getByRole('textbox', { name: '제목' }))
+      .toHaveValue('Quarterly');
+
+    const request = getListRequest();
+    expect(request.get('keyword')).toBe('budget');
+    expect(request.get('title')).toBe('Quarterly');
+    expect(request.get('submittedAtFrom')).toBe('2026-10-01');
+    expect(request.get('submittedAtTo')).toBe('2026-10-20');
+  });
+
+  it('keeps the last applied search when later inputs are not submitted', async () => {
+    const firstRender = renderDocumentStatusPage();
+    expect(await screen.findByText('41')).toBeInTheDocument();
+    const searchInput = screen.getByRole('textbox', {
+      name: '문서현황 빠른 검색',
+    });
+    fireEvent.change(searchInput, { target: { value: 'applied' } });
+    fireEvent.keyDown(searchInput, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(getListRequest().get('keyword')).toBe('applied');
+    });
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '문서현황 빠른 검색' }),
+      { target: { value: 'unapplied' } },
+    );
+    firstRender.unmount();
+
+    api.get.mockClear();
+    renderDocumentStatusPage();
+    expect(await screen.findByText('41')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '문서현황 빠른 검색' }))
+      .toHaveValue('applied');
+    expect(getListRequest().get('keyword')).toBe('applied');
+  });
+
+  it('restores the default submitted date after resetting conditions', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:document-status',
+      JSON.stringify({
+        version: 1,
+        value: { keyword: 'old', detailValues: { title: 'Old title' } },
+      }),
+    );
+    api.get.mockResolvedValue({ resultList: [], totalRowCount: 0 });
+    const firstRender = renderDocumentStatusPage();
+    expect(await screen.findByText(/조회 결과가 없습니다/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
+
+    const expectedRange = expectedRecentMonthRange(new Date());
+    await waitFor(() => {
+      expect(getListRequest().get('submittedAtFrom')).toBe(expectedRange.from);
+      expect(getListRequest().get('submittedAtTo')).toBe(expectedRange.to);
+    });
+    expect(getListRequest().has('title')).toBe(false);
+    expect(getListRequest().has('keyword')).toBe(false);
+    await waitFor(() => {
+      expect(JSON.parse(
+        window.sessionStorage.getItem('s-erp:page:document-status') ?? '{}',
+      )).toEqual({
+        version: 1,
+        value: {
+          keyword: '',
+          detailValues: { submittedAt: expectedRange },
+        },
+      });
+    });
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(screen.getByLabelText('결재신청일 시작일'))
+      .toHaveValue(expectedRange.from);
+    expect(screen.getByLabelText('결재신청일 종료일'))
+      .toHaveValue(expectedRange.to);
+    firstRender.unmount();
+
+    api.get.mockClear();
+    renderDocumentStatusPage();
+    expect(await screen.findByText(/조회 결과가 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '문서현황 빠른 검색' }))
+      .toHaveValue('');
+    expect(getListRequest().get('submittedAtFrom')).toBe(expectedRange.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(expectedRange.to);
+    expect(getListRequest().has('title')).toBe(false);
+    expect(getListRequest().has('keyword')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(screen.getByLabelText('결재신청일 시작일'))
+      .toHaveValue(expectedRange.from);
+    expect(screen.getByLabelText('결재신청일 종료일'))
+      .toHaveValue(expectedRange.to);
   });
 
   it('opens the existing approval detail overlay for the selected document and closes it', async () => {

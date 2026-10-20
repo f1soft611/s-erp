@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ClearIcon from '@mui/icons-material/Clear';
-import SearchIcon from '@mui/icons-material/Search';
 import { Box, Button, IconButton, TextField, Typography } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -11,6 +10,7 @@ import {
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import type {
   ModuleItem,
   PageContent,
@@ -55,12 +55,62 @@ const ACTION_STATUSES = new Set<string>([
   'REJECTED',
   'RETURNED',
 ]);
+const DOCUMENT_STATUS_SESSION_KEY = 's-erp:page:document-status';
+const DOCUMENT_STATUS_SESSION_VERSION = 1;
+
+type DocumentStatusSearchSession = {
+  keyword: string;
+  detailValues: Record<string, PageSearchFieldValue>;
+};
 
 type DocumentStatusPageProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPageSearchFieldValue(value: unknown): value is PageSearchFieldValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return true;
+  }
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (!isRecord(value)) return false;
+  return (
+    Object.keys(value).every((key) => key === 'from' || key === 'to') &&
+    (value.from === undefined || typeof value.from === 'string') &&
+    (value.to === undefined || typeof value.to === 'string')
+  );
+}
+
+function isDocumentStatusSearchSession(
+  value: unknown,
+): value is DocumentStatusSearchSession {
+  return (
+    isRecord(value) &&
+    typeof value.keyword === 'string' &&
+    isRecord(value.detailValues) &&
+    Object.values(value.detailValues).every(isPageSearchFieldValue)
+  );
+}
+
+function cloneDetailValues(
+  values: Record<string, PageSearchFieldValue>,
+): Record<string, PageSearchFieldValue> {
+  return Object.fromEntries(
+    Object.entries(values).map(([field, value]) => [
+      field,
+      value !== null && typeof value === 'object' ? { ...value } : value,
+    ]),
+  );
+}
 
 function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -189,17 +239,28 @@ export function DocumentStatusPage({
     () => getDefaultSubmittedAtRange(),
     [],
   );
-  const [keyword, setKeyword] = useState('');
+  const initialSession = useMemo<DocumentStatusSearchSession>(
+    () => ({
+      keyword: '',
+      detailValues: { submittedAt: defaultSubmittedAtRange },
+    }),
+    [defaultSubmittedAtRange],
+  );
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState(DOCUMENT_STATUS_SESSION_KEY, initialSession, {
+      version: DOCUMENT_STATUS_SESSION_VERSION,
+      validate: isDocumentStatusSearchSession,
+    });
+  const [keyword, setKeyword] = useState(searchSession.keyword);
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >(() => ({
-    submittedAt: defaultSubmittedAtRange,
-  }));
+  >(() => cloneDetailValues(searchSession.detailValues));
   const [appliedFilters, setAppliedFilters] = useState<DocumentStatusFilters>(
-    () => ({
-      submittedAtFrom: defaultSubmittedAtRange.from,
-      submittedAtTo: defaultSubmittedAtRange.to,
-    }),
+    () =>
+      toDocumentStatusFilters(
+        searchSession.keyword,
+        searchSession.detailValues,
+      ),
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(
     null,
@@ -239,18 +300,28 @@ export function DocumentStatusPage({
 
   const applySearch = useCallback(
     (values: Record<string, PageSearchFieldValue> = detailValues) => {
-      setAppliedFilters(toDocumentStatusFilters(keyword, values));
+      const snapshot = {
+        keyword,
+        detailValues: cloneDetailValues(values),
+      };
+      setSearchSession(snapshot);
+      setAppliedFilters(
+        toDocumentStatusFilters(snapshot.keyword, snapshot.detailValues),
+      );
     },
-    [detailValues, keyword],
+    [detailValues, keyword, setSearchSession],
   );
 
-  const handleSelectionChange = useCallback((rowIds: Array<string | number>) => {
-    const rowId = rowIds[rowIds.length - 1];
-    const parsedId = rowId === undefined ? NaN : Number(rowId);
-    setSelectedDocumentId(
-      Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : null,
-    );
-  }, []);
+  const handleSelectionChange = useCallback(
+    (rowIds: Array<string | number>) => {
+      const rowId = rowIds[rowIds.length - 1];
+      const parsedId = rowId === undefined ? NaN : Number(rowId);
+      setSelectedDocumentId(
+        Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : null,
+      );
+    },
+    [],
+  );
 
   const closeDetail = useCallback(() => {
     setSelectedDocumentId(null);
@@ -263,13 +334,10 @@ export function DocumentStatusPage({
     setDetailRefreshToken((current) => current + 1);
   }, []);
 
-  const handleEditDocument = useCallback(
-    (document: DocumentApprovalDetail) => {
-      setEditingDocument(document);
-      setIsComposerOpen(true);
-    },
-    [],
-  );
+  const handleEditDocument = useCallback((document: DocumentApprovalDetail) => {
+    setEditingDocument(document);
+    setIsComposerOpen(true);
+  }, []);
 
   const handleDataSourceError = useCallback((loadError: Error) => {
     setError(loadError.message);
@@ -286,10 +354,21 @@ export function DocumentStatusPage({
   }, []);
 
   const resetSearch = useCallback(() => {
+    const resetDetailValues = { submittedAt: getDefaultSubmittedAtRange() };
+    const resetSnapshot = {
+      keyword: '',
+      detailValues: resetDetailValues,
+    };
     setKeyword('');
-    setDetailValues({});
-    setAppliedFilters({});
-  }, []);
+    setDetailValues(resetDetailValues);
+    setSearchSession(resetSnapshot);
+    setAppliedFilters(
+      toDocumentStatusFilters(
+        resetSnapshot.keyword,
+        resetSnapshot.detailValues,
+      ),
+    );
+  }, [setSearchSession]);
 
   return (
     <Box
@@ -342,7 +421,7 @@ export function DocumentStatusPage({
         onDetailSearch={applySearch}
         detailLoading={false}
       >
-        <Button
+        {/* <Button
           type="button"
           variant="contained"
           size="small"
@@ -351,7 +430,7 @@ export function DocumentStatusPage({
           sx={{ minHeight: 40, whiteSpace: 'nowrap' }}
         >
           검색
-        </Button>
+        </Button> */}
       </PageSearchArea>
       <PageMessageArea message={error} onClose={handleErrorClose} />
       {error ? (

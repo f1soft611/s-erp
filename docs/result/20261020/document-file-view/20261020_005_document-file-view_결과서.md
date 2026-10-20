@@ -110,3 +110,57 @@ npm run build
 - 파일형 목록 루트 배경을 `common.white`로 지정해 머리글/행 영역이 흰색으로 표시되도록 조정했다.
 - 자동 페이지 종료, hover, 빈 목록/오류/로딩 동작은 유지했다.
 - 검증: `npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx` (6개 통과)
+
+## 후속 초기 로딩 스켈레톤
+
+- 파일형 첫 페이지 조회 중에는 머리글을 유지하고 파일 행 형태의 스켈레톤 8개를 표시한다.
+- 다음 페이지 조회 중에는 이미 표시된 파일 행을 유지하고 기존 하단 진행 표시를 사용한다.
+- 오류, 빈 결과, 마지막 페이지, 재시도, 새로고침, 자동 페이지 로딩 및 흰색 배경 동작은 변경하지 않았다.
+- 테스트 우선 확인: 초기 로딩 스켈레톤 검증은 수정 전 구현에서 실패했고, 추가 페이지 로딩 중 기존 행 유지 검증은 통과했다.
+
+### 검증
+
+```powershell
+npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx
+npm run build
+```
+
+- `file-view.test.tsx` 5개와 `document-file-page.test.tsx` 2개, 총 7개 테스트 통과.
+- 첫 병렬 검증에서는 production build와 동시 실행 중 문서 페이지 테스트 1개가 5초 제한으로 타임아웃됐다. 해당 파일을 단독 재실행해 2개 모두 통과했고, 두 파일의 대상 테스트를 다시 실행해 종료 코드 0을 확인했다.
+- `npm run build`의 TypeScript 및 Vite production build 통과. 기존 대용량 청크 경고는 표시되었다.
+- 실제 FileView를 합성 데이터로 375px·768px·1280px에서 확인했다. 각 너비에서 스켈레톤 8개, 페이지 전체 가로 넘침 없음, 흰색 목록 배경, 추가 조회 중 기존 파일 행과 진행 표시를 확인했다.
+- 375px·768px에서는 기존 모바일 레이아웃에 맞춰 파일명/행 형태를 표시했고, 1280px에서는 머리글과 이름·소유자·올린 날짜·크기 열 정렬을 확인했다.
+- 검증용 미리보기 파일은 삭제했다. 실제 사용자·테넌트 파일 데이터는 사용하지 않았다.
+
+![375px 파일형 초기 스켈레톤](screenshots/file-view-loading-375.png)
+
+![768px 파일형 초기 스켈레톤](screenshots/file-view-loading-768.png)
+
+![1280px 파일형 초기 스켈레톤](screenshots/file-view-loading-1280.png)
+
+## 후속 페이징 스피너 및 다크테마 가독성
+
+- 다음 파일 페이지 조회 중에는 이미 표시된 파일 행을 유지하고, `파일 불러오는 중` 안내 텍스트 대신 primary 색상의 로딩 스피너만 표시한다.
+- 진행 상태는 `role="status"`와 `파일 페이지 불러오는 중` 접근성 이름을 제공하고 스피너는 progressbar로 노출한다.
+- 라이트 테마의 파일 목록 배경은 기존 흰색을 유지하며, 다크 테마는 앱의 `background.paper` 표면색을 사용한다.
+- 앱 테마 팔레트의 본문/보조 텍스트와 primary 링크·스피너 색상을 사용해 다크 표면에서 파일 정보와 진행 상태가 보이도록 했다.
+- 초기 8행 스켈레톤, 오류/빈 상태, 재시도, 자동 페이징 및 백엔드 계약은 변경하지 않았다.
+
+### 검증
+
+```powershell
+npm run test -- tests/file-view.test.tsx tests/document-file-page.test.tsx
+npm run build
+```
+
+- 추가 전 회귀 테스트 2개가 실패해 기존 문제(페이징 진행 텍스트 및 다크 모드의 고정 흰 배경)를 재현했다.
+- `file-view.test.tsx` 7개와 `document-file-page.test.tsx` 2개, 총 9개 테스트가 통과했다.
+- `npm run build`에서 TypeScript와 Vite production build가 통과했다. 기존 1000 kB 초과 청크 경고가 표시되었다.
+- 합성 FileView 화면을 라이트/다크 각각 375px·768px·1280px에서 확인했다. 모든 조합에서 페이지 가로 넘침이 없고, 파일 행과 스피너가 표시되며 페이징 중 로딩 텍스트는 보이지 않는다.
+- 라이트 배경 `rgb(255, 255, 255)`, 라이트 스피너 `rgb(29, 78, 216)`, 다크 표면 `rgb(17, 24, 39)`, 다크 스피너 `rgb(96, 165, 250)`를 확인했다.
+- 스크린샷은 합성 파일 정보만 포함한다. 캡처의 원형 진행 표시만 정지 프레임으로 고정했으며 실제 UI 스피너 애니메이션은 변경하지 않았다.
+- 검증용 임시 미리보기 파일을 삭제했고 공유 4173 개발 서버는 종료하지 않았다.
+
+![라이트 테마 페이징 스피너](screenshots/file-view-pagination-light.png)
+
+![다크 테마 페이징 스피너](screenshots/file-view-pagination-dark.png)

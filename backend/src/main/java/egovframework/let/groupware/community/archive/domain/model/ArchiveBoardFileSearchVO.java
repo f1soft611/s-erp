@@ -7,8 +7,9 @@ import lombok.Setter;
 @Setter
 public class ArchiveBoardFileSearchVO {
     private Long tenantId;
-    private Integer offset = 0;
-    private Integer limit = 20;
     private String keyword;
     private String folderCode;
+    private String uploadedFrom;
+    private String uploadedTo;
+    private String fileType;
 }

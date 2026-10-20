@@ -59,6 +59,151 @@
         <if test="rootOnly != null and rootOnly">
             AND p.category_code IS NULL
         </if>
+        <if test="uploadedFrom != null and uploadedFrom != ''">
+            AND f.created_at >= CAST(#{uploadedFrom} AS date)
+        </if>
+        <if test="uploadedTo != null and uploadedTo != ''">
+            AND f.created_at &lt; CAST(#{uploadedTo} AS date) + INTERVAL '1 day'
+        </if>
+        <choose>
+            <when test="fileType == 'DOCUMENT'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) IN (
+                        'application/msword',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/haansofthwp',
+                        'application/vnd.hancom.hwp',
+                        'application/vnd.hancom.hwpx',
+                        'application/vnd.oasis.opendocument.text',
+                        'application/rtf',
+                        'text/plain',
+                        'text/markdown',
+                        'text/html',
+                        'application/xml',
+                        'text/xml',
+                        'application/json',
+                        'application/sql'
+                    )
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.doc' OR LOWER(f.file_name) LIKE '%.docx'
+                            OR LOWER(f.file_name) LIKE '%.hwp' OR LOWER(f.file_name) LIKE '%.hwpx'
+                            OR LOWER(f.file_name) LIKE '%.odt' OR LOWER(f.file_name) LIKE '%.rtf'
+                            OR LOWER(f.file_name) LIKE '%.txt' OR LOWER(f.file_name) LIKE '%.md'
+                            OR LOWER(f.file_name) LIKE '%.htm' OR LOWER(f.file_name) LIKE '%.html'
+                            OR LOWER(f.file_name) LIKE '%.xml' OR LOWER(f.file_name) LIKE '%.json'
+                            OR LOWER(f.file_name) LIKE '%.sql'
+                        )
+                    )
+                )
+            </when>
+            <when test="fileType == 'SPREADSHEET'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) IN (
+                        'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-excel.sheet.macroenabled.12',
+                        'application/vnd.oasis.opendocument.spreadsheet',
+                        'text/csv',
+                        'application/csv'
+                    )
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.xls' OR LOWER(f.file_name) LIKE '%.xlsx'
+                            OR LOWER(f.file_name) LIKE '%.xlsm' OR LOWER(f.file_name) LIKE '%.ods'
+                            OR LOWER(f.file_name) LIKE '%.csv'
+                        )
+                    )
+                )
+            </when>
+            <when test="fileType == 'PRESENTATION'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) IN (
+                        'application/vnd.ms-powerpoint',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'application/vnd.oasis.opendocument.presentation'
+                    )
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.ppt' OR LOWER(f.file_name) LIKE '%.pptx'
+                            OR LOWER(f.file_name) LIKE '%.odp'
+                        )
+                    )
+                )
+            </when>
+            <when test="fileType == 'PDF'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) = 'application/pdf'
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND LOWER(f.file_name) LIKE '%.pdf'
+                    )
+                )
+            </when>
+            <when test="fileType == 'IMAGE'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) LIKE 'image/%'
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.png' OR LOWER(f.file_name) LIKE '%.jpg'
+                            OR LOWER(f.file_name) LIKE '%.jpeg' OR LOWER(f.file_name) LIKE '%.gif'
+                            OR LOWER(f.file_name) LIKE '%.webp' OR LOWER(f.file_name) LIKE '%.svg'
+                            OR LOWER(f.file_name) LIKE '%.bmp' OR LOWER(f.file_name) LIKE '%.tif'
+                            OR LOWER(f.file_name) LIKE '%.tiff'
+                        )
+                    )
+                )
+            </when>
+            <when test="fileType == 'VIDEO'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) LIKE 'video/%'
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.mp4' OR LOWER(f.file_name) LIKE '%.mov'
+                            OR LOWER(f.file_name) LIKE '%.avi' OR LOWER(f.file_name) LIKE '%.mkv'
+                            OR LOWER(f.file_name) LIKE '%.webm' OR LOWER(f.file_name) LIKE '%.m4v'
+                            OR LOWER(f.file_name) LIKE '%.wmv'
+                        )
+                    )
+                )
+            </when>
+            <when test="fileType == 'ARCHIVE'">
+                AND (
+                    LOWER(COALESCE(f.mime_type, '')) IN (
+                        'application/zip',
+                        'application/x-zip-compressed',
+                        'application/vnd.rar',
+                        'application/x-rar-compressed',
+                        'application/x-7z-compressed',
+                        'application/x-tar',
+                        'application/gzip',
+                        'application/x-bzip2',
+                        'application/x-xz'
+                    )
+                    OR (
+                        (f.mime_type IS NULL OR BTRIM(f.mime_type) = ''
+                            OR LOWER(BTRIM(f.mime_type)) = 'application/octet-stream')
+                        AND (
+                            LOWER(f.file_name) LIKE '%.zip' OR LOWER(f.file_name) LIKE '%.rar'
+                            OR LOWER(f.file_name) LIKE '%.7z' OR LOWER(f.file_name) LIKE '%.tar'
+                            OR LOWER(f.file_name) LIKE '%.gz' OR LOWER(f.file_name) LIKE '%.bz2'
+                            OR LOWER(f.file_name) LIKE '%.xz'
+                        )
+                    )
+                )
+            </when>
+        </choose>
     </sql>
     <select id="selectArchiveFileList" parameterType="map" resultMap="archiveFileItemMap">
         SELECT f.file_id AS board_file_id, p.post_id, f.file_name, f.file_size, f.mime_type,
@@ -68,7 +213,6 @@
         WHERE <include refid="archiveFileScope"/>
         <include refid="archiveFileFilter"/>
         ORDER BY f.created_at DESC, f.file_id DESC
-        LIMIT #{limit} OFFSET #{offset}
     </select>
     <select id="selectArchiveFileCount" parameterType="map" resultType="long">
         SELECT COUNT(*)

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.util.Collections;
+import java.util.Objects;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,8 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
@@ -76,21 +79,33 @@ class ArchiveBoardApiControllerTest {
     }
 
     @Test
-    void fileListRouteUsesOffsetLimitAndFolderCode() throws Exception {
+    void fileListRouteBindsFiltersWithoutPagination() throws Exception {
         ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
         item.setBoardFileId(31L);
         when(service.listFiles(any(), eq(user))).thenReturn(new ListResult<>(Collections.singletonList(item), 1L));
 
-        mvc.perform(get(ROOT + "/files").param("offset", "0").param("limit", "20")
-                        .param("keyword", "manual").param("folderCode", "GENERAL"))
+        mvc.perform(get(ROOT + "/files").param("keyword", "manual").param("folderCode", "GENERAL")
+                        .param("uploadedFrom", "2025-10-20").param("uploadedTo", "2026-10-20")
+                        .param("fileType", "PDF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.resultCnt").value(1))
                 .andExpect(jsonPath("$.result.resultList[0].boardFileId").value(31));
 
-        verify(service).listFiles(argThat(search -> search.getOffset() == 0
-                && search.getLimit() == 20
-                && "manual".equals(search.getKeyword())
-                && "GENERAL".equals(search.getFolderCode())), eq(user));
+        verify(service).listFiles(argThat(search ->
+                "manual".equals(search.getKeyword())
+                        && "GENERAL".equals(search.getFolderCode())
+                        && Objects.equals("2025-10-20",
+                                property(search, "uploadedFrom"))
+                        && Objects.equals("2026-10-20",
+                                property(search, "uploadedTo"))
+                        && Objects.equals("PDF", property(search, "fileType"))
+                        && property(search, "offset") == null
+                        && property(search, "limit") == null), eq(user));
+    }
+
+    private Object property(ArchiveBoardFileSearchVO search, String name) {
+        BeanWrapper bean = new BeanWrapperImpl(search);
+        return bean.isReadableProperty(name) ? bean.getPropertyValue(name) : null;
     }
 
     @Test

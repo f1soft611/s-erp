@@ -4,7 +4,7 @@ import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import SlideshowOutlinedIcon from '@mui/icons-material/SlideshowOutlined';
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
-import { Alert, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, IconButton, Skeleton, Stack, Tooltip, Typography } from '@mui/material';
 import { useEffect, useRef } from 'react';
 import type { CommonFileViewItem } from './commonViewTypes';
 
@@ -46,7 +46,9 @@ export function FileView<T extends CommonFileViewItem>({
 
   const columns = { xs: 'minmax(0, 1fr) 36px', md: 'minmax(0, 1fr) 110px 150px 80px 36px' };
   return (
-    <Box aria-label="파일형 첨부파일 목록" sx={{ bgcolor: 'common.white' }}>
+    <Box aria-label="파일형 첨부파일 목록" sx={{
+      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'background.paper' : 'common.white',
+    }}>
       <Box sx={{
         display: { xs: 'none', md: 'grid' }, gridTemplateColumns: columns,
         gap: 1.5, px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider',
@@ -96,9 +98,39 @@ export function FileView<T extends CommonFileViewItem>({
           {onRefresh && <Button color="inherit" size="small" onClick={onRefresh}>목록 새로고침</Button>}
         </Stack>
       }>{error}</Alert>}
-      {isLoading && <Stack role="status" direction="row" spacing={1} sx={{ py: 3, alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress size={20} /><Typography variant="body2">파일 불러오는 중</Typography>
-      </Stack>}
+      {isLoading && items.length === 0 ? (
+        <Stack role="status" aria-label="파일 불러오는 중" data-testid="file-view-skeleton">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Box key={index} data-testid="file-view-skeleton-row" sx={{
+              display: 'grid', gridTemplateColumns: columns, alignItems: 'center',
+              columnGap: 1.5, rowGap: 0.5, px: 1.5, py: 1.25,
+              borderBottom: 1, borderColor: 'divider', minWidth: 0,
+            }}>
+              <Stack direction="row" spacing={1.25} sx={{ minWidth: 0, alignItems: 'center' }}>
+                <Skeleton variant="rounded" width={22} height={26} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Skeleton variant="text" width={`${55 + (index % 4) * 10}%`} height={24} />
+                  <Skeleton variant="text" width="70%" height={18}
+                    sx={{ display: { xs: 'block', md: 'none' } }} />
+                </Box>
+              </Stack>
+              <Skeleton variant="text" width="72px" height={22}
+                sx={{ display: { xs: 'none', md: 'block' } }} />
+              <Skeleton variant="text" width="104px" height={22}
+                sx={{ display: { xs: 'none', md: 'block' } }} />
+              <Skeleton variant="text" width="42px" height={22}
+                sx={{ display: { xs: 'none', md: 'block' } }} />
+              {onOpenSource && <Skeleton variant="circular" width={32} height={32} />}
+            </Box>
+          ))}
+        </Stack>
+      ) : isLoading ? (
+        <Stack role="status" aria-label="파일 페이지 불러오는 중" direction="row" sx={{
+          py: 3, alignItems: 'center', justifyContent: 'center',
+        }}>
+          <CircularProgress size={24} color="primary" aria-label="로딩 중" />
+        </Stack>
+      ) : null}
       {!isLoading && !error && items.length === 0 &&
         <Typography color="text.secondary" sx={{ py: 5, textAlign: 'center' }}>첨부파일이 없습니다.</Typography>}
       {hasNext && !error && (

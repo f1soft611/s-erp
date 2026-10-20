@@ -1,8 +1,12 @@
 package egovframework.let.groupware.community.archive.service.impl;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,6 +42,8 @@ import egovframework.let.groupware.community.common.CommunityCategoryValidator;
 @Service("archiveBoardService")
 public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements ArchiveBoardService {
     private static final String ARCHIVE = "ARCHIVE";
+    private static final List<String> ARCHIVE_FILE_TYPES = Arrays.asList(
+            "DOCUMENT", "SPREADSHEET", "PRESENTATION", "PDF", "IMAGE", "VIDEO", "ARCHIVE");
     private final ArchiveBoardDAO archiveBoardDAO;
     private final CommonFileService commonFileService;
     private final CommunityCategoryValidator categoryValidator;
@@ -57,29 +63,67 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         requireAuthenticated(user);
         requireBoard();
         ArchiveBoardFileSearchVO actual = search == null ? new ArchiveBoardFileSearchVO() : search;
-        int offset = actual.getOffset() == null ? 0 : actual.getOffset();
-        int limit = actual.getLimit() == null ? 20 : actual.getLimit();
-        if (offset < 0 || limit < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "페이지 정보가 올바르지 않습니다.");
-        }
-
         String keyword = StringUtils.hasText(actual.getKeyword()) ? actual.getKeyword().trim() : null;
         String folderCode = StringUtils.hasText(actual.getFolderCode()) ? actual.getFolderCode().trim() : null;
-        if (folderCode != null) {
-            categoryValidator.validate(user.getTenantId(), ARCHIVE, folderCode);
-        }
+        String uploadedFrom = normalizeDate(actual.getUploadedFrom());
+        String uploadedTo = normalizeDate(actual.getUploadedTo());
+        validateDateRange(uploadedFrom, uploadedTo);
+        String fileType = normalizeFileType(actual.getFileType());
 
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", user.getTenantId());
         params.put("keyword", keyword);
         params.put("folderCode", folderCode);
         params.put("rootOnly", folderCode == null);
-        params.put("offset", offset);
-        params.put("limit", limit);
+        if (uploadedFrom != null) {
+            params.put("uploadedFrom", uploadedFrom);
+        }
+        if (uploadedTo != null) {
+            params.put("uploadedTo", uploadedTo);
+        }
+        if (fileType != null) {
+            params.put("fileType", fileType);
+        }
 
         List<ArchiveBoardFileItemVO> files = archiveBoardDAO.selectArchiveFileList(params);
         Long count = archiveBoardDAO.selectArchiveFileCount(params);
         return new ListResult<>(files == null ? new ArrayList<>() : files, count == null ? 0L : count);
+    }
+
+    private String normalizeDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim();
+        try {
+            LocalDate.parse(normalized);
+        } catch (DateTimeParseException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드 날짜를 확인해 주세요.");
+        }
+        return normalized;
+    }
+
+    private void validateDateRange(String uploadedFrom, String uploadedTo) {
+        if (uploadedFrom == null || uploadedTo == null) {
+            return;
+        }
+        if (LocalDate.parse(uploadedFrom).isAfter(LocalDate.parse(uploadedTo))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작일은 종료일보다 늦을 수 없습니다.");
+        }
+    }
+
+    private String normalizeFileType(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if ("ALL".equals(normalized)) {
+            return null;
+        }
+        if (!ARCHIVE_FILE_TYPES.contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 유형을 확인해 주세요.");
+        }
+        return normalized;
     }
 
     @Override

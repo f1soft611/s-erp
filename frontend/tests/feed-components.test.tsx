@@ -6,6 +6,8 @@ import {
   within,
 } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ThemeProvider } from '@mui/material/styles';
+import { createAppTheme } from '../src/theme/theme';
 import { FeedCard } from '../src/shared/components/feed/FeedCard';
 import { FeedCommentsSection } from '../src/shared/components/feed/FeedCommentsSection';
 import { FeedBodyContent } from '../src/shared/components/feed/FeedBodyContent';
@@ -20,6 +22,99 @@ import { PostDetailPanel } from '../src/shared/components/feed/PostDetailPanel';
 import { getApprovalSystemEventPresentation } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('shared feed components', () => {
+  it.each([
+    { mode: 'dark', isDark: undefined, dark: true },
+    { mode: 'light', isDark: undefined, dark: false },
+    { mode: 'dark', isDark: false, dark: false },
+    { mode: 'light', isDark: true, dark: true },
+  ] as const)(
+    'resolves comment surfaces from $mode theme with isDark=$isDark',
+    async ({ mode, isDark, dark }) => {
+      render(
+        <ThemeProvider theme={createAppTheme(mode)}>
+          <CommentThread
+            isDark={isDark}
+            expandReplies
+            comments={[{
+              id: 'theme-comment',
+              author: '작성자',
+              time: '2026-10-20',
+              content: '<p>테마 확인</p>',
+              attachments: [{ id: 'file', name: 'parent.pdf' }],
+              replies: [{
+                id: 'theme-reply',
+                author: '답글작성자',
+                time: '2026-10-20',
+                content: '<p>답글 테마 확인</p>',
+                attachments: [{ id: 'reply-file', name: 'reply.pdf' }],
+              }],
+            }]}
+          />
+        </ThemeProvider>,
+      );
+
+      const fileSurface = dark ? 'rgba(30,41,59,0.8)' : '#ffffff';
+      const editorSurface = dark ? 'rgba(15,23,42,0.76)' : '#ffffff';
+      for (const name of ['parent.pdf', 'reply.pdf']) {
+        const fileName = screen.getByText(name);
+        expect(fileName.parentElement?.parentElement).toHaveStyle({
+          backgroundColor: fileSurface,
+        });
+        expect(fileName).toHaveStyle({ color: dark ? '#e2e8f0' : '#0f172a' });
+      }
+      for (const button of screen.getAllByRole('button', { name: '첨부 파일 다운로드' })) {
+        expect(button).toHaveStyle({
+          backgroundColor: dark ? 'rgba(15,23,42,0.7)' : '#f8fafc',
+          color: dark ? '#e2e8f0' : '#475569',
+        });
+      }
+      await screen.findByRole('textbox', { name: '댓글 입력' });
+      expect(screen.getByLabelText('댓글 첨부파일 선택').parentElement?.parentElement)
+        .toHaveStyle({ backgroundColor: editorSurface });
+      fireEvent.change(screen.getByLabelText('댓글 첨부파일 선택'), {
+        target: { files: [new File(['test'], 'selected.pdf', { type: 'application/pdf' })] },
+      });
+      expect(screen.getByText('selected.pdf').parentElement?.parentElement)
+        .toHaveStyle({ backgroundColor: fileSurface });
+
+      fireEvent.click(screen.getAllByRole('button', { name: '답글', exact: true })[0]);
+      await screen.findByRole('textbox', { name: '답글 입력' });
+      expect(screen.getByLabelText('답글 첨부파일 선택').parentElement?.parentElement)
+        .toHaveStyle({ backgroundColor: editorSurface });
+
+      fireEvent.click(screen.getByRole('button', { name: '댓글 메뉴 작성자' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+      await screen.findByRole('textbox', { name: '댓글 수정 입력' });
+      expect(screen.getByLabelText('댓글 수정 첨부파일 선택').parentElement?.parentElement)
+        .toHaveStyle({ backgroundColor: editorSurface });
+      expect(screen.getByText('parent.pdf').parentElement?.parentElement)
+        .toHaveStyle({ backgroundColor: fileSurface });
+    },
+  );
+
+  it('updates comment surfaces when the app theme changes without an isDark prop', () => {
+    const comments = [{
+      id: 'switch-theme',
+      author: '작성자',
+      time: '2026-10-20',
+      content: '<p>테마 전환</p>',
+      attachments: [{ id: 'file', name: 'switch.pdf' }],
+    }];
+    const { rerender } = render(
+      <ThemeProvider theme={createAppTheme('light')}>
+        <CommentThread comments={comments} />
+      </ThemeProvider>,
+    );
+    const fileRow = screen.getByText('switch.pdf').parentElement?.parentElement;
+    expect(fileRow).toHaveStyle({ backgroundColor: '#ffffff' });
+    rerender(
+      <ThemeProvider theme={createAppTheme('dark')}>
+        <CommentThread comments={comments} />
+      </ThemeProvider>,
+    );
+    expect(fileRow).toHaveStyle({ backgroundColor: 'rgba(30,41,59,0.8)' });
+  });
+
   it('centers detail loading in the shared panel content area', () => {
     render(
       <PostDetailPanel
@@ -386,7 +481,7 @@ describe('shared feed components', () => {
     );
   });
 
-  it('shows comment image previews below file attachments and opens the selected image', () => {
+  it('shows comment image previews before file attachments and opens the selected image', () => {
     const onOpenAttachmentImage = vi.fn();
 
     render(
@@ -421,6 +516,12 @@ describe('shared feed components', () => {
     expect(within(attachmentList).getByText('receipt.png')).toBeInTheDocument();
     expect(within(attachmentList).getByText('guide.pdf')).toBeInTheDocument();
     expect(within(attachmentList).queryByRole('img')).not.toBeInTheDocument();
+
+    const imagePreviews = screen.getByTestId('comment-image-previews-31');
+    expect(
+      imagePreviews.compareDocumentPosition(attachmentList) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     const previewButton = screen.getByRole('button', {
       name: '댓글 이미지 미리보기 1: receipt.png',

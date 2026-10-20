@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { ChipProps } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -576,32 +577,6 @@ function CommentItem({
                   __html: sanitizeCommentHtml(comment.content),
                 }}
               />
-              {comment.attachments && comment.attachments.length > 0 && (
-                <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
-                  <AttachmentList
-                    files={comment.attachments}
-                    showImagePreview={false}
-                    isDark={isDark}
-                    mode={canEditAttachments ? 'edit' : 'view'}
-                    showActions
-                    onDownload={(attachmentId) => {
-                      const attachment = comment.attachments?.find(
-                        (item) => String(item.id) === String(attachmentId),
-                      );
-                      void props.onDownloadAttachment?.(
-                        comment.id,
-                        attachmentId,
-                        attachment?.name,
-                      );
-                    }}
-                    onRemove={(attachmentId) => {
-                      void Promise.resolve(
-                        props.onDeleteAttachment?.(comment.id, attachmentId),
-                      ).catch(() => undefined);
-                    }}
-                  />
-                </Box>
-              )}
               {imageAttachments.length > 0 && (
                 <Box
                   data-testid={`comment-image-previews-${comment.id}`}
@@ -683,6 +658,32 @@ function CommentItem({
                       </Typography>
                     ) : null,
                   )}
+                </Box>
+              )}
+              {comment.attachments && comment.attachments.length > 0 && (
+                <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
+                  <AttachmentList
+                    files={comment.attachments}
+                    showImagePreview={false}
+                    isDark={isDark}
+                    mode={canEditAttachments ? 'edit' : 'view'}
+                    showActions
+                    onDownload={(attachmentId) => {
+                      const attachment = comment.attachments?.find(
+                        (item) => String(item.id) === String(attachmentId),
+                      );
+                      void props.onDownloadAttachment?.(
+                        comment.id,
+                        attachmentId,
+                        attachment?.name,
+                      );
+                    }}
+                    onRemove={(attachmentId) => {
+                      void Promise.resolve(
+                        props.onDeleteAttachment?.(comment.id, attachmentId),
+                      ).catch(() => undefined);
+                    }}
+                  />
                 </Box>
               )}
               <Button
@@ -873,13 +874,15 @@ export function TiptapCommentThread({
   onDownloadAttachment,
   onDeleteAttachment,
   onOpenAttachmentImage,
-  isDark = false,
+  isDark: isDarkProp,
   showComposer = true,
   placeholder = '줄바꿈 Shift+Enter, 입력 Enter',
   composerLabel = '댓글 입력',
   submitLabel = '등록',
   expandReplies = false,
 }: CommentThreadProps) {
+  const theme = useTheme();
+  const isDark = isDarkProp ?? theme.palette.mode === 'dark';
   const [replyTargetId, setReplyTargetId] = useState<string | number | null>(
     null,
   );
