@@ -25,12 +25,32 @@ describe('notice post data adapter', () => {
           { boardFileId: 2, fileName: '본문.png', fileUsageType: 'EMBEDDED' },
         ],
         comments: [
-          { commentId: 100, writerName: '사용자', content: '확인했습니다.' },
+          {
+            commentId: 100,
+            writerName: '사용자',
+            content: '확인했습니다.',
+            attachments: [
+              {
+                fileId: 10,
+                fileName: '확인.png',
+                fileSize: 456,
+                mimeType: 'image/png',
+              },
+            ],
+          },
           {
             commentId: 101,
             parentCommentId: 100,
             writerName: '운영팀',
             content: '감사합니다.',
+            attachments: [
+              {
+                fileId: 11,
+                fileName: '답글.jpg',
+                fileSize: 789,
+                contentType: 'image/jpeg',
+              },
+            ],
           },
         ],
       },
@@ -43,5 +63,17 @@ describe('notice post data adapter', () => {
     expect(item.attachments).toEqual(['안내.pdf']);
     expect(item.comments).toHaveLength(1);
     expect(item.comments?.[0].replies?.[0].content).toBe('감사합니다.');
+    expect(item.comments?.[0].attachments?.[0]).toMatchObject({
+      id: '10',
+      name: '확인.png',
+      size: 456,
+      mimeType: 'image/png',
+    });
+    expect(item.comments?.[0].replies?.[0].attachments?.[0]).toMatchObject({
+      id: '11',
+      name: '답글.jpg',
+      size: 789,
+      mimeType: 'image/jpeg',
+    });
   });
 });

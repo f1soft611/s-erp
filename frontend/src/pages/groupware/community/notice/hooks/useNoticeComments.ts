@@ -167,6 +167,7 @@ export function useNoticeComments({
           id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
           name: file.fileName ?? '첨부파일',
           size: Number(file.fileSize ?? 0) || undefined,
+          mimeType: file.mimeType ?? file.contentType ?? undefined,
         }));
         const nextContent = updated.content ?? content;
         setNoticeItems((current) =>

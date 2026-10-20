@@ -135,6 +135,9 @@ export type NoticeCommentItem = {
     id: string;
     name: string;
     size?: number;
+    mimeType?: string;
+    previewUrl?: string;
+    previewError?: string;
   }>;
   replies?: NoticeCommentItem[];
 };

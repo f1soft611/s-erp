@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getNoticeCategoryPresentation } from '../data/noticeCategoryPresentation';
 import {
   Box,
@@ -29,6 +29,7 @@ import type {
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
+import { fetchCommonFileBlob } from '../../../../../shared/services/commonContentApi';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -93,8 +94,40 @@ type NoticeFeedListProps = {
   serverItemRevision?: number;
 };
 
+type NoticeCommentImagePreview = {
+  previewUrl?: string;
+  previewError?: string;
+};
+
+function getNoticeCommentImageKey(
+  noticeId: number,
+  commentId: number | string,
+  attachmentId: string,
+): string {
+  return `${noticeId}:${commentId}:${attachmentId}`;
+}
+
+function getNoticeCommentImageAttachments(
+  comments: NoticeCommentItem[],
+): Array<{
+  commentId: number;
+  attachmentId: string;
+}> {
+  return comments.flatMap((comment) => [
+    ...(comment.attachments ?? [])
+      .filter((attachment) => attachment.mimeType?.startsWith('image/'))
+      .map((attachment) => ({
+        commentId: comment.id,
+        attachmentId: attachment.id,
+      })),
+    ...getNoticeCommentImageAttachments(comment.replies ?? []),
+  ]);
+}
+
 function normalizeCommentTree(
   comments: NoticeCommentItem[] = [],
+  noticeId: number,
+  imagePreviews: Record<string, NoticeCommentImagePreview>,
 ): FeedCommentItem[] {
   const normalizedById = new Map<string, FeedCommentItem>();
 
@@ -106,8 +139,17 @@ function normalizeCommentTree(
       content: comment.content,
       isEditable: comment.isEditable,
       isDeleted: comment.isDeleted,
-      attachments: comment.attachments,
-      replies: normalizeCommentTree(comment.replies ?? []),
+      attachments: (comment.attachments ?? []).map((attachment) => ({
+        ...attachment,
+        ...imagePreviews[
+          getNoticeCommentImageKey(noticeId, comment.id, attachment.id)
+        ],
+      })),
+      replies: normalizeCommentTree(
+        comment.replies ?? [],
+        noticeId,
+        imagePreviews,
+      ),
     });
   });
 
@@ -555,6 +597,99 @@ export function NoticeFeedList({
   const serverCommentSnapshots = useRef<Record<number, string>>({});
   const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
   const serverItemRevisionRef = useRef<number | undefined>(undefined);
+  const expandedCommentItems = useMemo(
+    () =>
+      expandedNotice
+        ? localCommentsByNoticeId[expandedNotice.id] ??
+          expandedNotice.comments ??
+          []
+        : [],
+    [expandedNotice, localCommentsByNoticeId],
+  );
+  const visibleExpandedComments = useMemo(
+    () =>
+      expandedNotice &&
+      !loadedPreviousByNoticeId[expandedNotice.id] &&
+      expandedCommentItems.length > 3
+        ? expandedCommentItems.slice(-3)
+        : expandedCommentItems,
+    [expandedCommentItems, expandedNotice, loadedPreviousByNoticeId],
+  );
+  const expandedCommentImages = useMemo(
+    () => getNoticeCommentImageAttachments(visibleExpandedComments),
+    [visibleExpandedComments],
+  );
+  const commentImageRequestKey = JSON.stringify(
+    expandedCommentImages.map(({ commentId, attachmentId }) => [
+      expandedNotice?.id,
+      commentId,
+      attachmentId,
+    ]),
+  );
+  const [commentImagePreviews, setCommentImagePreviews] = useState<
+    Record<string, NoticeCommentImagePreview>
+  >({});
+
+  useEffect(() => {
+    let active = true;
+    const objectUrls: string[] = [];
+    setCommentImagePreviews({});
+
+    if (expandedNoticeId == null || expandedCommentImages.length === 0) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.allSettled(
+      expandedCommentImages.map(async ({ commentId, attachmentId }) => ({
+        commentId,
+        attachmentId,
+        blob: await fetchCommonFileBlob(
+          'NOTICE_COMMENT',
+          commentId,
+          attachmentId,
+        ),
+      })),
+    ).then((results) => {
+      if (!active) return;
+
+      const previews: Record<string, NoticeCommentImagePreview> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const { commentId, attachmentId, blob } = result.value;
+          const previewUrl = URL.createObjectURL(blob);
+          objectUrls.push(previewUrl);
+          previews[
+            getNoticeCommentImageKey(
+              expandedNoticeId,
+              commentId,
+              attachmentId,
+            )
+          ] = { previewUrl };
+          return;
+        }
+
+        const attachment = expandedCommentImages[index];
+        if (!attachment) return;
+        previews[
+          getNoticeCommentImageKey(
+            expandedNoticeId,
+            attachment.commentId,
+            attachment.attachmentId,
+          )
+        ] = {
+          previewError: '이미지 미리보기를 불러오지 못했습니다.',
+        };
+      });
+      setCommentImagePreviews(previews);
+    });
+
+    return () => {
+      active = false;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [commentImageRequestKey, expandedNoticeId]);
 
   useEffect(() => {
     if (
@@ -1341,7 +1476,11 @@ export function NoticeFeedList({
                     }}
                   >
                     <CommentThread
-                      comments={normalizeCommentTree(visibleComments)}
+                      comments={normalizeCommentTree(
+                        visibleComments,
+                        item.id,
+                        commentImagePreviews,
+                      )}
                       expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
                       onSubmitComment={async (content, files) => {
                         await handleLocalCommentAdd(
@@ -1390,6 +1529,7 @@ export function NoticeFeedList({
                           attachmentId,
                         )
                       }
+                      onOpenAttachmentImage={setViewerImage}
                       isDark={isDark}
                       showComposer
                       placeholder="줄바꿈 Shift+Enter, 입력 Enter"

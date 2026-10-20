@@ -2,6 +2,7 @@ import {
   apiDelete,
   apiDownload,
   apiGet,
+  apiGetBlob,
   apiPost,
   apiPostFormData,
   apiPut,
@@ -76,6 +77,17 @@ export async function fetchCommonFiles(
     `/api/v1/common/files?ownerType=${encodeURIComponent(ownerType)}&ownerId=${encodeURIComponent(String(ownerId))}`,
   );
   return result.resultList ?? [];
+}
+
+export function fetchCommonFileBlob(
+  ownerType: CommonOwnerType | string,
+  ownerId: number | string,
+  fileId: number | string,
+): Promise<Blob> {
+  const query = buildCommonFileOwnerQuery(ownerType, ownerId);
+  return apiGetBlob(
+    `/api/v1/common/files/${encodeURIComponent(String(fileId))}/download?${query}`,
+  );
 }
 
 export async function uploadCommonFile(
