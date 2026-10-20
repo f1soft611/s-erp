@@ -91,6 +91,8 @@ export function getApprovalSystemEventPresentation(
       return getApprovalStatusPresentation('DRAFT');
     case 'SUBMITTED':
       return { ...getApprovalStatusPresentation('PENDING'), label: '결재신청' };
+    case 'RESUBMITTED':
+      return { ...getApprovalStatusPresentation('PENDING'), label: '재상신' };
     case 'SUBMISSION_CANCELED':
       return { ...getApprovalStatusPresentation('REJECTED'), label: '결재신청 취소', variant: 'outlined' };
     case 'APPROVAL_CANCELED':

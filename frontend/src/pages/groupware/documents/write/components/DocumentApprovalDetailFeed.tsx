@@ -664,7 +664,8 @@ export function DocumentApprovalDetailFeed(
         setActionComment('');
       }
       onActionComplete();
-      onClose?.();
+      setDetailRetryToken((token) => token + 1);
+      await loadComments();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
@@ -703,6 +704,7 @@ export function DocumentApprovalDetailFeed(
       setCancelDialogType(null);
       onActionComplete();
       setDetailRetryToken((token) => token + 1);
+      await loadComments();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 취소에 실패했습니다.',

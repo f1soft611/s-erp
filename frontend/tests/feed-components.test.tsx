@@ -308,6 +308,7 @@ describe('shared feed components', () => {
   it.each([
     ['임시저장', 'default', 'outlined'],
     ['결재신청', 'info', 'filled'],
+    ['재상신', 'info', 'filled'],
     ['결재신청 취소', 'error', 'outlined'],
     ['결재 승인 취소', 'error', 'outlined'],
     ['반려', 'error', 'filled'],

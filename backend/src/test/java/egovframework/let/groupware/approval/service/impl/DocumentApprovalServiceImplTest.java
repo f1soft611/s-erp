@@ -65,6 +65,69 @@ class DocumentApprovalServiceImplTest {
     private final LoginVO author = author();
 
     @Test
+    void businessContactDraftAllowsNoReferences() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setDocumentType("BUSINESS_CONTACT");
+        request.setApprovalLines(Collections.emptyList());
+        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+
+        assertThat(service().saveDraft(author, request).getDocumentStatus()).isEqualTo("DRAFT");
+        verify(approvalDAO, never()).selectActiveParticipants(anyMap());
+        verify(approvalDAO, never()).insertDocumentApprovalLine(anyMap());
+    }
+
+    @Test
+    void businessContactSendCompletesImmediatelyWithOnlyReferenceLines() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setDocumentType("BUSINESS_CONTACT");
+        request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "202")));
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("DRAFT"));
+        when(approvalDAO.selectActiveParticipants(anyMap()))
+            .thenReturn(Collections.singletonList(participant("202", "참조자", "기획팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("COMPLETED"));
+
+        assertThat(service().submit(author, 77L, request).getDocumentStatus()).isEqualTo("COMPLETED");
+        verify(approvalDAO).insertDocumentApprovalLine(argThat(params ->
+            "REFERENCE".equals(params.get("participantType"))
+                && params.get("actionStatus") == null && params.get("pendingAt") == null
+                && params.get("actionAt") == null && params.get("actionComment") == null));
+        verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
+            "COMPLETED".equals(params.get("nextDocumentStatus"))));
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "COMPLETED".equals(params.get("eventType"))
+                && "업무연락이 발송되었습니다.".equals(params.get("content"))));
+    }
+
+    @Test
+    void businessContactSendRequiresAReference() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setDocumentType("BUSINESS_CONTACT");
+        request.setApprovalLines(Collections.emptyList());
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("DRAFT"));
+        assertThatThrownBy(() -> service().submit(author, 77L, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조자");
+        verify(approvalDAO, never()).updateDocumentApprovalMain(anyMap());
+    }
+
+    @Test
+    void businessContactRejectsApprovalLinesAndSelfReferences() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setDocumentType("BUSINESS_CONTACT");
+        assertThatThrownBy(() -> service().saveDraft(author, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조");
+        request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "101")));
+        assertThatThrownBy(() -> service().saveDraft(author, request))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("작성자");
+        verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
+    }
+
+    @Test
     void feedListHydratesDocumentWithoutRecordingView() throws Exception {
         DocumentApprovalListItemVO firstItem = new DocumentApprovalListItemVO();
         firstItem.setElectronicApprovalId(77L);

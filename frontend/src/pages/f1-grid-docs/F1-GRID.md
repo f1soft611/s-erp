@@ -460,6 +460,21 @@ const columns: F1GridColumn<Item>[] = [
 
 > ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
 
+## date 컬럼 표시 형식
+
+`type: 'date'`는 `format`으로 표시 형식을 지정한다. 미지정 또는 빈 문자열이면 기본값은 `yyyy-mm-dd`다. 문서현황의 결재신청일/최종 변경일처럼 ISO timestamp를 받는 컬럼도 기본적으로 날짜만 표시한다.
+
+```typescript
+{ field: 'submittedAt', headerName: '결재신청일', type: 'date' }
+// 2026-10-20T09:21:00 -> 2026-10-20
+{ field: 'updatedAt', headerName: '최종 변경일', type: 'date', format: 'yyyy/mm/dd' }
+// 2026-10-20T09:21:00 -> 2026/10/20
+```
+
+지원 토큰은 `yyyy`/`YYYY`(4자리 연도), `yy`/`YY`(2자리 연도), `mm`/`MM`(2자리 월), `m`/`M`(월), `dd`/`DD`(2자리 일), `d`/`D`(일)이다. 구분자와 한글을 조합할 수 있으며, `[문자열]`은 토큰 치환 없이 표시한다. ISO 날짜/timestamp, 8자리 `yyyymmdd`, 유효한 `Date` 객체를 지원한다. Timestamp 문자열은 시간대 변환 없이 명시된 날짜를 사용한다.
+
+빈 값은 빈 셀, 잘못된 날짜는 원문으로 표시한다. 표시 포맷은 원본 데이터, 날짜 편집기의 `YYYY-MM-DD` 값, 검색/정렬/필터 값을 변경하지 않는다. 사용자 `renderCell`이 있으면 기존처럼 우선 적용된다. 공통 표시 함수를 사용하는 자동 너비 계산과 Excel 텍스트 출력에도 같은 형식이 적용된다. 기존 숫자 `format`과 `datetime`/`time` 동작은 유지한다.
+
 ## PageSearchArea 상세 검색 연결
 
 Grid 헤더 필터와 페이지의 상세검색은 서로 다른 기능이다. 헤더 필터는 그리드에 표시된 행을 필터링하고, `PageSearchArea` 상세검색은 컬럼의 검색 설정을 페이지 조회조건에 연결한다. 흐름은 `F1GridColumn.search` → `toPageSearchFields(columns)` → `PageSearchArea` → 페이지 필터 → 목록 API 순서다. F1-Grid는 검색 필드 설정을 제공하며 업무 API를 직접 호출하지 않는다.

@@ -129,7 +129,7 @@ export type F1GridColumn<T extends object> = {
   maxWidth?: number;
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
-  format?: F1GridNumberFormat;
+  format?: string;
   decimalPlaces?: number;
   options?: F1GridOption[];
   userOptions?: F1GridUserOption[];

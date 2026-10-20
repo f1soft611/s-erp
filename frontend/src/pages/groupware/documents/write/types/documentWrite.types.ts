@@ -50,7 +50,7 @@ export type ApprovalLineTemplateSummary = {
   templateId: number;
   name: string;
   eabusNo: ApprovalLineTemplateEabusNo;
-  updatedAt?: string;
+  updatedAt?: string | number | null;
 };
 
 export type ApprovalLineTemplate = ApprovalLineTemplateSummary & {

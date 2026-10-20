@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import type {
   F1GridColumn,
   F1GridPinSide,
@@ -212,10 +213,52 @@ function formatNumericValue(
   }).format(numericValue);
 }
 
+function formatDateValue(value: unknown, format = 'yyyy-mm-dd'): string {
+  const rawValue = String(value ?? '');
+  if (rawValue === '') return '';
+
+  let dateValue: string | Date;
+  if (value instanceof Date) {
+    dateValue = value;
+  } else if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:$|[T ])/);
+    if (!match) return rawValue;
+    dateValue = `${match[1]}-${match[2]}-${match[3]}`;
+  } else {
+    return rawValue;
+  }
+
+  const parsed = dayjs(dateValue);
+  if (
+    !parsed.isValid() ||
+    (typeof dateValue === 'string' && parsed.format('YYYY-MM-DD') !== dateValue)
+  ) {
+    return rawValue;
+  }
+
+  const tokens: Record<string, string> = {
+    yyyy: parsed.format('YYYY'),
+    yy: parsed.format('YY'),
+    mm: parsed.format('MM'),
+    m: parsed.format('M'),
+    dd: parsed.format('DD'),
+    d: parsed.format('D'),
+  };
+  return (format || 'yyyy-mm-dd').replace(
+    /\[([^\]]*)\]|yyyy|YYYY|yy|YY|mm|MM|dd|DD|m|M|d|D/g,
+    (token: string, literal: string | undefined) =>
+      literal ?? tokens[token.toLowerCase()],
+  );
+}
+
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
   value: T[keyof T],
 ): string {
+  if (column.type === 'date') {
+    return formatDateValue(value, column.format);
+  }
+
   if (column.type === 'user') {
     const selectedValues = Array.isArray(value) ? value : [value];
     return selectedValues
