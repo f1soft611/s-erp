@@ -176,6 +176,7 @@ function toApprovalCommentTree(
   records: DocumentApprovalComment[],
   systemEvents: DocumentApprovalSystemEvent[],
   commentImageUrls: Record<string, string>,
+  commentImageErrors: Record<string, string>,
 ): FeedCommentItem[] {
   const comments = new Map<string, FeedCommentItem>();
   const createdAtById = new Map<string, string | null | undefined>();
@@ -200,6 +201,8 @@ function toApprovalCommentTree(
         size: file.fileSize,
         mimeType: file.mimeType,
         previewUrl: commentImageUrls[`${record.commentId}:${file.fileId}`],
+        previewError:
+          commentImageErrors[`${record.commentId}:${file.fileId}`],
       })),
       replies: [],
     });
@@ -316,6 +319,9 @@ export function DocumentApprovalDetailFeed(
     append: boolean;
   } | null>(null);
   const [commentImageUrls, setCommentImageUrls] = useState<
+    Record<string, string>
+  >({});
+  const [commentImageErrors, setCommentImageErrors] = useState<
     Record<string, string>
   >({});
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
@@ -492,6 +498,7 @@ export function DocumentApprovalDetailFeed(
         .map((file) => ({ commentId: comment.commentId, file })),
     );
     setCommentImageUrls({});
+    setCommentImageErrors({});
     if (electronicApprovalId === null || imageAttachments.length === 0) {
       return () => {
         active = false;
@@ -510,13 +517,21 @@ export function DocumentApprovalDetailFeed(
     ).then((results) => {
       if (!active) return;
       const urls: Record<string, string> = {};
-      results.forEach((result) => {
-        if (result.status !== 'fulfilled') return;
-        const url = URL.createObjectURL(result.value.blob);
-        objectUrls.push(url);
-        urls[result.value.key] = url;
+      const errors: Record<string, string> = {};
+      results.forEach((result, index) => {
+        const attachment = imageAttachments[index];
+        if (!attachment) return;
+        const key = `${attachment.commentId}:${attachment.file.fileId}`;
+        if (result.status === 'fulfilled') {
+          const url = URL.createObjectURL(result.value.blob);
+          objectUrls.push(url);
+          urls[key] = url;
+          return;
+        }
+        errors[key] = '이미지 미리보기를 불러오지 못했습니다.';
       });
       setCommentImageUrls(urls);
+      setCommentImageErrors(errors);
     });
     return () => {
       active = false;
@@ -1895,6 +1910,7 @@ export function DocumentApprovalDetailFeed(
                     commentRecords,
                     commentSystemEvents,
                     commentImageUrls,
+                    commentImageErrors,
                   )}
                   onSubmitComment={(content, files) =>
                     handleAddComment(content, files)
@@ -1906,6 +1922,7 @@ export function DocumentApprovalDetailFeed(
                   onDeleteComment={handleDeleteComment}
                   onDownloadAttachment={handleDownloadCommentAttachment}
                   onDeleteAttachment={handleDeleteCommentAttachment}
+                  onOpenAttachmentImage={setSelectedBodyImage}
                   expandReplies
                 />
               </>

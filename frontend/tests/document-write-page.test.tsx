@@ -26,6 +26,7 @@ const composerApi = vi.hoisted(() => ({
   getDocumentApprovalDetail: vi.fn(),
   listApprovalComments: vi.fn(),
   fetchApprovalEmbeddedImageBlob: vi.fn(),
+  fetchApprovalCommentAttachmentBlob: vi.fn(),
   createApprovalComment: vi.fn(),
   updateApprovalComment: vi.fn(),
   deleteApprovalComment: vi.fn(),
@@ -101,6 +102,8 @@ vi.mock(
     getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
     listApprovalComments: composerApi.listApprovalComments,
     fetchApprovalEmbeddedImageBlob: composerApi.fetchApprovalEmbeddedImageBlob,
+    fetchApprovalCommentAttachmentBlob:
+      composerApi.fetchApprovalCommentAttachmentBlob,
     createApprovalComment: composerApi.createApprovalComment,
     updateApprovalComment: composerApi.updateApprovalComment,
     deleteApprovalComment: composerApi.deleteApprovalComment,
@@ -460,6 +463,9 @@ beforeEach(() => {
     resultCnt: 0,
   });
   composerApi.fetchApprovalEmbeddedImageBlob.mockResolvedValue(
+    new Blob(['image'], { type: 'image/png' }),
+  );
+  composerApi.fetchApprovalCommentAttachmentBlob.mockResolvedValue(
     new Blob(['image'], { type: 'image/png' }),
   );
   composerApi.createApprovalComment.mockResolvedValue({});
@@ -1559,6 +1565,126 @@ describe('Document write page', () => {
       expect(message).toHaveStyle({ whiteSpace: 'pre-wrap' });
     }
   }, 20000);
+
+  it('opens approval comment image previews in the existing image viewer', async () => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    const imageUrl = 'blob:approval-comment-image';
+    vi.mocked(URL.createObjectURL).mockReturnValue(imageUrl);
+    const detail = toFeedRecord(record, {
+      comments: [
+        {
+          commentId: 1101,
+          ownerId: 1,
+          content: '<p>댓글 이미지</p>',
+          commentType: 'USER',
+          writerId: 'commenter',
+          writerName: '댓글 작성자',
+          attachments: [
+            {
+              fileId: 91,
+              fileName: 'photo.png',
+              fileSize: 123,
+              mimeType: 'image/png',
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <DocumentApprovalDetailFeed
+        open
+        electronicApprovalId={1}
+        detailRefreshToken={0}
+        onActionComplete={vi.fn()}
+        onEditDocument={vi.fn()}
+        presentation="feed"
+        employeeId="emp-1"
+        feedItem={{
+          id: 1,
+          title: detail.title,
+          author: detail.drafterName,
+          kind: '기안서',
+          status: '결재진행중',
+          summary: '',
+          date: '',
+          feedData: detail,
+        }}
+      />,
+    );
+
+    const preview = await screen.findByRole('button', {
+      name: '댓글 이미지 미리보기 1: photo.png',
+    });
+    fireEvent.click(preview);
+
+    const viewer = screen.getByRole('dialog');
+    expect(within(viewer).getByRole('img', { name: 'photo.png' })).toHaveAttribute(
+      'src',
+      imageUrl,
+    );
+    expect(composerApi.fetchApprovalCommentAttachmentBlob).toHaveBeenCalledWith(
+      1,
+      1101,
+      91,
+    );
+  });
+
+  it('reports approval comment image preview failures without hiding the file', async () => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    composerApi.fetchApprovalCommentAttachmentBlob.mockRejectedValueOnce(
+      new Error('image request failed'),
+    );
+    const detail = toFeedRecord(record, {
+      comments: [
+        {
+          commentId: 1102,
+          ownerId: 1,
+          content: '<p>댓글 이미지</p>',
+          commentType: 'USER',
+          writerId: 'commenter',
+          writerName: '댓글 작성자',
+          attachments: [
+            {
+              fileId: 92,
+              fileName: 'failed.png',
+              fileSize: 123,
+              mimeType: 'image/png',
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <DocumentApprovalDetailFeed
+        open
+        electronicApprovalId={1}
+        detailRefreshToken={0}
+        onActionComplete={vi.fn()}
+        onEditDocument={vi.fn()}
+        presentation="feed"
+        employeeId="emp-1"
+        feedItem={{
+          id: 1,
+          title: detail.title,
+          author: detail.drafterName,
+          kind: '기안서',
+          status: '결재진행중',
+          summary: '',
+          date: '',
+          feedData: detail,
+        }}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '이미지 미리보기를 불러오지 못했습니다.',
+    );
+    expect(screen.getByText('failed.png')).toBeInTheDocument();
+  });
 
   it('shows rejection and revision reasons only in dismissible message popovers', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
