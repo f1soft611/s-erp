@@ -7,7 +7,7 @@ vi.mock('../src/shared/services/apiClient', () => ({
 }));
 import { listDocumentFiles } from '../src/pages/groupware/documents/write/services/documentApproval.service';
 
-export const fileItem = {
+const fileItem = {
   fileId: 101, fileName: 'sample.pdf', fileSize: 1024, mimeType: 'application/pdf',
   uploadedByName: 'Sample User', createdAt: '2026-10-20T09:00:00Z',
   electronicApprovalId: 10, documentTitle: 'Sample Document', commentId: null,

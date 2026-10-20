@@ -5,7 +5,7 @@
 - [작업지시서](../../directions/20261020/20261020_005_document-file-view_작업지시서.md)
 - [계획서](../../plan/20261020/20261020_005_document-file-view_계획서.md)
 - 사용자는 문서 직접 첨부와 댓글 첨부 모두 포함 및 서버 파일 전용 페이지/공통 UI 설계를 승인했다.
-- 이 문서는 승인 설계를 구체화한 구현 전 검토본이다.
+- 사용자는 이 상세 사양서를 검토·승인하고 현재 작업 폴더에서 직접 구현·검증을 진행하도록 확인했다.
 
 ## 1. 조회 대상
 
@@ -17,6 +17,7 @@
 - 본문 삽입 이미지는 제외한다. 댓글 본문 이미지와 일반 첨부의 구분도 같은 파일 용도 조건을 따른다.
 - 문서 유형·scope·선택 문서 조건은 기존 문서작성 필터와 같은 의미로 적용한다.
 - 로그인 tenant·작성자·참여자 식별값은 인증 사용자에서만 가져온다.
+- `actorParams`의 쓰기 경로 기본값인 `documentStatus=DRAFT`는 파일 조회 파라미터에서 제거한다. ALL에서 암묵적인 문서 상태 필터를 적용하지 않으며, DRAFT/COMPLETED 등 명시적인 scope만 기존 의미로 적용한다. 다음 페이지 커서 권한 확인에도 같은 조건을 사용한다.
 
 ## 2. 정렬과 페이지
 
@@ -81,6 +82,8 @@
 - 표 머리글은 소유자, 올린 날짜, 크기를 사용한다. 크기는 기존 형식 유틸을 우선 재사용한다.
 - 폴더 구분, 즐겨찾기, 파일 삭제, 일괄 다운로드, 업로드 기능은 추가하지 않는다.
 - 모바일은 이름과 메타정보를 줄바꿈하여 페이지 전체의 가로 스크롤을 방지한다.
+- 사용자 승인 표시 보완: 파일 목록 루트 배경은 `common.white`로 지정하여 머리글과 행 기본 배경을 흰색으로 표시한다. 페이지 배경과 행 hover는 변경하지 않는다.
+- 마지막 페이지에 `모든 파일을 불러왔습니다.` 문구나 이를 위한 하단 여백을 표시하지 않는다. hasNext=false에 따른 추가 요청 종료는 유지한다.
 - 로딩은 status, 오류는 alert, 동작은 키보드 접근 가능한 버튼/링크로 제공한다.
 
 ## 5. 문서작성 연결과 상태
@@ -106,8 +109,9 @@
 - `tb_common_comment`: tenant/owner 관계, writer, deleted_yn, comment_type.
 - `tb_electronic_approval_main`: tenant, drafter_id, document_status, deleted_yn, document_type.
 - `tb_electronic_approval_line_info`: tenant, electronic_approval_id, participant_user_id, participant_type.
+- 업로더 이름 관계 추가 확인: `tb_user`의 tenant_id, login_id, user_nm과 `tb_login_account`의 tenant_id, login_id, login_code.
 
-기존 코드는 직접 첨부에 APPROVAL, 댓글 첨부에 APPROVAL_COMMENT를 사용하며 업로드 시 사용자 로그인 ID를 저장한다. 구현 시 업로더 이름 조회의 기존 조인 패턴과 사용자 메타데이터를 추가 확인한다.
+기존 코드는 직접 첨부에 APPROVAL, 댓글 첨부에 APPROVAL_COMMENT를 사용하며 업로드 시 사용자 로그인 코드를 저장한다. 기존 계정·사용자 조인 패턴과 위 메타데이터를 확인하여 같은 tenant에서 업로더 표시 이름만 조회한다.
 
 현재 설계에는 DDL·마이그레이션이 필요하지 않다. 성능상 인덱스 변경이 필요한 것으로 확인되면 별도 SQL·변경 이력·롤백과 누적 스키마 문서를 함께 갱신한다.
 

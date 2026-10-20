@@ -24,7 +24,12 @@ const DOCUMENT_STATUSES = new Set([
   'COMPLETED',
   'REJECTED',
 ]);
-const PARTICIPANT_TYPES = new Set(['APPROVAL', 'AGREEMENT', 'REFERENCE']);
+const PARTICIPANT_TYPES = new Set([
+  'DRAFTER',
+  'APPROVAL',
+  'AGREEMENT',
+  'REFERENCE',
+]);
 const ACTION_STATUSES = new Set([
   'WAITING',
   'PENDING',

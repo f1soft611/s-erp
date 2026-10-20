@@ -12,6 +12,7 @@ import {
   getDocumentKindPresentation,
 } from '../data/documentPresentation';
 import { getDocumentDisplayDate } from '../data/documentDate';
+import { useDocumentFiles } from './useDocumentFiles';
 import type {
   DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
@@ -97,6 +98,11 @@ export function useDocumentWritePage() {
       quiet,
     }));
   }, []);
+  const files = useDocumentFiles(viewMode === 'file', {
+    scope,
+    documentType: selectedKind ? documentTypeByKind[selectedKind] : undefined,
+    electronicApprovalId: selectedDocumentId,
+  }, reloadRequest.version);
 
   useEffect(() => {
     let active = true;
@@ -109,7 +115,9 @@ export function useDocumentWritePage() {
       ? documentTypeByKind[selectedKind]
       : undefined;
     const listRequest =
-      viewMode === 'feed'
+      viewMode === 'file'
+        ? Promise.resolve({ documents: [], feedDocuments: [] })
+        : viewMode === 'feed'
         ? listDocumentApprovals(
             scope,
             documentType,
@@ -308,6 +316,7 @@ export function useDocumentWritePage() {
   ]);
 
   return {
+    files,
     viewMode,
     setViewMode,
     selectedKind,

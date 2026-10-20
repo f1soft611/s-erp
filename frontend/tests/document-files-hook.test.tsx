@@ -75,4 +75,29 @@ describe('document file paging state', () => {
     await waitFor(() => expect(result.current.items).toHaveLength(21));
     expect(api.list).toHaveBeenLastCalledWith({ scope: 'ALL', beforeFileId: 26 });
   });
+
+  it('retries an initial failure and resets the cursor for filters and refresh', async () => {
+    api.list.mockRejectedValueOnce(new Error('첫 조회 실패'));
+    const { result, rerender } = renderHook(
+      ({ documentType, electronicApprovalId, version }: {
+        documentType?: 'DRAFTING' | 'BUSINESS_CONTACT'; electronicApprovalId?: number; version: number;
+      }) => useDocumentFiles(true, { scope: 'ALL', documentType, electronicApprovalId }, version),
+      { initialProps: { documentType: 'DRAFTING', electronicApprovalId: 10, version: 0 } },
+    );
+    await waitFor(() => expect(result.current.error).toBe('첫 조회 실패'));
+    api.list.mockResolvedValueOnce({ resultList: first, hasNext: true, nextBeforeFileId: 26 });
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.items).toHaveLength(20));
+    api.list.mockResolvedValue({ resultList: [], hasNext: false, nextBeforeFileId: null });
+    rerender({ documentType: 'BUSINESS_CONTACT', electronicApprovalId: 11, version: 0 });
+    await waitFor(() => expect(result.current.items).toHaveLength(0));
+    expect(api.list).toHaveBeenLastCalledWith({
+      scope: 'ALL', documentType: 'BUSINESS_CONTACT', electronicApprovalId: 11, beforeFileId: undefined,
+    });
+    rerender({ documentType: 'BUSINESS_CONTACT', electronicApprovalId: 11, version: 1 });
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(4));
+    expect(api.list).toHaveBeenLastCalledWith({
+      scope: 'ALL', documentType: 'BUSINESS_CONTACT', electronicApprovalId: 11, beforeFileId: undefined,
+    });
+  });
 });

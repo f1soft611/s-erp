@@ -530,7 +530,10 @@
                   AND participant_line.participant_name ILIKE '%' || #{participantName} || '%'
             )
         </if>
-        <if test="(myParticipantType != null and myParticipantType != '')
+        <if test="myParticipantType == 'DRAFTER'">
+            AND m.drafter_id = #{drafterId}
+        </if>
+        <if test="(myParticipantType != null and myParticipantType != '' and myParticipantType != 'DRAFTER')
                   or (myActionStatus != null and myActionStatus != '')">
             AND EXISTS (
                 SELECT 1
@@ -538,7 +541,7 @@
                 WHERE my_line.tenant_id = m.tenant_id
                   AND my_line.electronic_approval_id = m.electronic_approval_id
                   AND my_line.participant_user_id = #{participantUserId}
-                <if test="myParticipantType != null and myParticipantType != ''">
+                <if test="myParticipantType != null and myParticipantType != '' and myParticipantType != 'DRAFTER'">
                     AND my_line.participant_type = #{myParticipantType}
                 </if>
                 <if test="myActionStatus != null and myActionStatus != ''">
@@ -566,10 +569,18 @@
             )
         </if>
         <if test="submittedAtFrom != null and submittedAtFrom != ''">
-            AND m.submitted_at &gt;= CAST(#{submittedAtFrom} AS date)
+            AND (
+                (m.document_status = 'DRAFT' AND m.created_at &gt;= CAST(#{submittedAtFrom} AS date))
+                OR (m.document_status != 'DRAFT' AND m.submitted_at &gt;= CAST(#{submittedAtFrom} AS date))
+            )
         </if>
         <if test="submittedAtTo != null and submittedAtTo != ''">
-            AND m.submitted_at &lt; CAST(#{submittedAtTo} AS date) + INTERVAL '1 day'
+            AND (
+                (m.document_status = 'DRAFT'
+                    AND m.created_at &lt; CAST(#{submittedAtTo} AS date) + INTERVAL '1 day')
+                OR (m.document_status != 'DRAFT'
+                    AND m.submitted_at &lt; CAST(#{submittedAtTo} AS date) + INTERVAL '1 day')
+            )
         </if>
         <if test="updatedAtFrom != null and updatedAtFrom != ''">
             AND m.updated_at &gt;= CAST(#{updatedAtFrom} AS date)
@@ -590,13 +601,16 @@
                    WHERE line.tenant_id = m.tenant_id
                      AND line.electronic_approval_id = m.electronic_approval_id
                ), '') AS participant_name,
-               COALESCE((
+               CASE
+                   WHEN m.drafter_id = #{drafterId} THEN 'DRAFTER'
+                   ELSE COALESCE((
                    SELECT string_agg(DISTINCT my_line.participant_type, ', ' ORDER BY my_line.participant_type)
                    FROM public.tb_electronic_approval_line_info my_line
                    WHERE my_line.tenant_id = m.tenant_id
                      AND my_line.electronic_approval_id = m.electronic_approval_id
                      AND my_line.participant_user_id = #{participantUserId}
-               ), '') AS my_participant_type,
+                   ), '')
+               END AS my_participant_type,
                COALESCE((
                    SELECT string_agg(DISTINCT my_line.action_status, ', ' ORDER BY my_line.action_status)
                    FROM public.tb_electronic_approval_line_info my_line

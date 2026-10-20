@@ -91,6 +91,41 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void statusPageShowsDrafterRoleAndFiltersOwnDraftsByCreationDate() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("scope", "ALL");
+        params.put("myParticipantType", "DRAFTER");
+        params.put("submittedAtFrom", "2026-10-01");
+        params.put("submittedAtTo", "2026-10-20");
+        params.put("offset", 0);
+        params.put("limit", 50);
+
+        String pageSql = configuration.getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        String countSql = configuration.getMappedStatement("DocumentApprovalDAO.countRelatedDocuments")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        for (String sql : Arrays.asList(pageSql, countSql)) {
+            assertThat(sql)
+                    .contains("m.drafter_id = ?")
+                    .contains("m.document_status = 'DRAFT' AND m.created_at >= CAST(? AS date)")
+                    .contains("m.document_status = 'DRAFT' AND m.created_at < CAST(? AS date) + INTERVAL '1 day'")
+                    .contains("m.submitted_at >= CAST(? AS date)")
+                    .contains("m.submitted_at < CAST(? AS date) + INTERVAL '1 day'")
+                    .doesNotContain("my_line.participant_type = ?");
+        }
+        assertThat(pageSql)
+                .contains("CASE WHEN m.drafter_id = ? THEN 'DRAFTER'")
+                .contains("AS my_participant_type");
+    }
+
+    @Test
     void documentReadsAllowOwnDraftsButRequireNonDraftStatusForOtherParticipants() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");

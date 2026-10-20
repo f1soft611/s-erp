@@ -185,6 +185,9 @@ describe('document status page', () => {
       .toBe('number');
     expect(fields.find((field) => field.field === 'myParticipantType')?.type)
       .toBe('select');
+    expect(
+      columns.find((column) => column.field === 'myParticipantType')?.options,
+    ).toContainEqual({ value: 'DRAFTER', label: '기안' });
     expect(fields.find((field) => field.field === 'myActionStatus')?.type)
       .toBe('select');
     expect(columns.find((column) => column.field === 'electronicApprovalId')?.headerName)

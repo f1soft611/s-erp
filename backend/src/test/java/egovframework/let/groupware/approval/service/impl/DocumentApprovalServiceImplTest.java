@@ -80,7 +80,8 @@ class DocumentApprovalServiceImplTest {
         assertThat(page.isHasNext()).isTrue();
         assertThat(page.getNextBeforeFileId()).isEqualTo(26L);
         verify(approvalDAO).selectRelatedFilePage(argThat(params ->
-                author.getTenantId().equals(params.get("tenantId"))
+                !params.containsKey("documentStatus")
+                && author.getTenantId().equals(params.get("tenantId"))
                 && author.getId().equals(params.get("drafterId"))
                 && author.getUniqId().equals(params.get("participantUserId"))));
     }
@@ -98,6 +99,29 @@ class DocumentApprovalServiceImplTest {
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
         assertThatThrownBy(() -> service().listFiles(author, "ALL", null, null, 55L))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+    }
+
+    @Test
+    void filePageWithExactlyTwentyFilesEndsAndPassesTheValidatedCursor() throws Exception {
+        List<DocumentApprovalFileItemVO> files = new ArrayList<>();
+        for (long id = 25; id >= 6; id--) {
+            DocumentApprovalFileItemVO file = new DocumentApprovalFileItemVO();
+            file.setFileId(id);
+            files.add(file);
+        }
+        when(approvalDAO.selectRelatedFileCursor(anyMap())).thenReturn(26L);
+        when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(files);
+        DocumentApprovalFilePageVO page = service().listFiles(author, "DRAFT", "DRAFTING", 77L, 26L);
+        assertThat(page.getResultList()).hasSize(20);
+        assertThat(page.isHasNext()).isFalse();
+        assertThat(page.getNextBeforeFileId()).isNull();
+        verify(approvalDAO).selectRelatedFilePage(argThat(params ->
+                !params.containsKey("documentStatus")
+                && "DRAFT".equals(params.get("scope"))
+                && "DRAFTING".equals(params.get("documentType"))
+                && Long.valueOf(77).equals(params.get("electronicApprovalId"))
+                && Long.valueOf(26).equals(params.get("beforeFileId"))));
+        verify(approvalDAO).selectRelatedFileCursor(argThat(params -> !params.containsKey("documentStatus")));
     }
 
     @Test
@@ -354,7 +378,7 @@ class DocumentApprovalServiceImplTest {
         query.setDrafterName("Morgan");
         query.setDrafterDepartmentName("Finance");
         query.setParticipantName("Sam");
-        query.setMyParticipantType("APPROVAL");
+        query.setMyParticipantType("DRAFTER");
         query.setMyActionStatus("PENDING");
         query.setCurrentApproverName("Alex");
         query.setOffset(25);
@@ -387,7 +411,7 @@ class DocumentApprovalServiceImplTest {
                 && "작성자".equals(params.get("drafterName"))
                 && "Finance".equals(params.get("drafterDepartmentName"))
                 && "Sam".equals(params.get("participantName"))
-                && "APPROVAL".equals(params.get("myParticipantType"))
+                && "DRAFTER".equals(params.get("myParticipantType"))
                 && "PENDING".equals(params.get("myActionStatus"))
                 && "Alex".equals(params.get("currentApproverName"))
                 && Integer.valueOf(25).equals(params.get("offset"))

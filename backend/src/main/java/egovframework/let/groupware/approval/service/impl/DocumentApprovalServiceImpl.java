@@ -68,6 +68,8 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             "DRAFTING", "BUSINESS_CONTACT", "EXPENSE_RESOLUTION", "ATTENDANCE_APPLICATION")));
     private static final Set<String> PARTICIPANT_TYPES = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("APPROVAL", "AGREEMENT", "REFERENCE")));
+    private static final Set<String> STATUS_ROLE_TYPES = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList("DRAFTER", "APPROVAL", "AGREEMENT", "REFERENCE")));
     private static final Set<String> DOCUMENT_STATUSES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "DRAFT", "PENDING", "IN_PROGRESS", "REVISION_REQUESTED", "COMPLETED", "REJECTED")));
     private static final Set<String> DOCUMENT_SCOPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
@@ -412,6 +414,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 조회 조건이 올바르지 않습니다.");
         }
         Map<String, Object> params = actorParams(user);
+        params.remove("documentStatus");
         params.put("scope", effectiveScope);
         params.put("documentType", documentType);
         params.put("electronicApprovalId", electronicApprovalId);
@@ -474,7 +477,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         Long electronicApprovalId = query.getElectronicApprovalId();
         if ((documentType != null && !DOCUMENT_TYPES.contains(documentType))
                 || (documentStatus != null && !DOCUMENT_STATUSES.contains(documentStatus))
-                || (myParticipantType != null && !PARTICIPANT_TYPES.contains(myParticipantType))
+                || (myParticipantType != null && !STATUS_ROLE_TYPES.contains(myParticipantType))
                 || (myActionStatus != null && !APPROVAL_LINE_ACTION_STATUSES.contains(myActionStatus))
                 || (electronicApprovalId != null && electronicApprovalId <= 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");

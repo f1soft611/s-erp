@@ -1,0 +1,35 @@
+[
+  {
+    "width": 1280,
+    "dimensions": {
+      "width": 1280,
+      "scrollWidth": 1280
+    },
+    "initialRows": 20,
+    "secondPageRows": 40,
+    "lastPageRows": 45,
+    "requests": [
+      "?scope=ALL",
+      "?scope=ALL&beforeFileId=26",
+      "?scope=ALL&beforeFileId=26",
+      "?scope=ALL&beforeFileId=6"
+    ],
+    "errorRetryPassed": true
+  },
+  {
+    "width": 768,
+    "dimensions": {
+      "width": 768,
+      "scrollWidth": 768
+    },
+    "initialRows": 20
+  },
+  {
+    "width": 375,
+    "dimensions": {
+      "width": 375,
+      "scrollWidth": 375
+    },
+    "initialRows": 20
+  }
+]

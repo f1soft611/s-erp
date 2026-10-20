@@ -1,0 +1,75 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const api = vi.hoisted(() => ({
+  listDocumentApprovals: vi.fn(), getDocumentApprovalSummary: vi.fn(), listDocumentFiles: vi.fn(),
+  downloadDocumentApprovalAttachment: vi.fn(), downloadApprovalCommentAttachment: vi.fn(),
+  showError: vi.fn(),
+}));
+vi.mock('../src/pages/groupware/documents/write/services/documentApproval.service', () => api);
+vi.mock('../src/shared/context/NotificationContext', () => ({ useNotification: () => ({ showError: api.showError }) }));
+vi.mock('../src/pages/groupware/documents/write/components/DocumentComposerDialog', () => ({
+  DocumentComposerDialog: () => null,
+}));
+vi.mock('../src/pages/groupware/documents/write/components/DocumentFeedItem', () => ({
+  DocumentFeedItem: () => null,
+}));
+vi.mock('../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed', () => ({
+  DocumentApprovalDetailFeed: ({ electronicApprovalId }: { electronicApprovalId: number }) =>
+    <div>상세 {electronicApprovalId}</div>,
+}));
+import { DocumentWritePage } from '../src/pages/groupware/documents/write/DocumentWritePage';
+
+const props = {
+  selectedModule: { id: 'groupware', name: '그룹웨어', icon: <span>G</span>, tree: [], menus: [], path: '/groupware' },
+  currentMenuName: '문서작성',
+  content: { title: '문서작성', description: '문서작성', cards: [], items: [] },
+};
+const directFile = {
+  fileId: 100, fileName: 'direct.pdf', fileSize: 1024, mimeType: 'application/pdf',
+  uploadedByName: 'Sample User', createdAt: '2026-10-20T09:00:00Z',
+  electronicApprovalId: 10, documentTitle: 'Sample Document', commentId: null,
+};
+const commentFile = { ...directFile, fileId: 99, fileName: 'comment.xlsx', commentId: 5 };
+
+describe('document write file mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.listDocumentApprovals.mockResolvedValue([]);
+    api.downloadDocumentApprovalAttachment.mockResolvedValue(undefined);
+    api.downloadApprovalCommentAttachment.mockResolvedValue(undefined);
+    api.getDocumentApprovalSummary.mockResolvedValue({
+      actionRequiredCount: 0, inProgressCount: 0, draftCount: 0, completedCount: 0,
+      revisionRequestedCount: 0, rejectedCount: 0, notices: [],
+    });
+    api.listDocumentFiles.mockResolvedValue({
+      resultList: [directFile, commentFile], hasNext: false, nextBeforeFileId: null,
+    });
+  });
+
+  it('uses file queries instead of document queries and reuses source-specific downloads', async () => {
+    render(<DocumentWritePage {...props} />);
+    await waitFor(() => expect(api.listDocumentApprovals).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: '파일형 보기' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'direct.pdf 다운로드' }));
+    await waitFor(() => expect(api.downloadDocumentApprovalAttachment).toHaveBeenCalledWith(10, 100, 'direct.pdf'));
+    fireEvent.click(screen.getByRole('button', { name: 'comment.xlsx 다운로드' }));
+    await waitFor(() => expect(api.downloadApprovalCommentAttachment).toHaveBeenCalledWith(10, 5, 99, 'comment.xlsx'));
+    expect(api.listDocumentApprovals).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/상단고정/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'comment.xlsx 원문 보기' }));
+    expect(await screen.findByText('상세 10')).toBeInTheDocument();
+  });
+
+  it('retains file mode when applying summary filters and reports download errors', async () => {
+    api.downloadDocumentApprovalAttachment.mockRejectedValueOnce(new Error('다운로드 실패'));
+    render(<DocumentWritePage {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: '파일형 보기' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'direct.pdf 다운로드' }));
+    await waitFor(() => expect(api.showError).toHaveBeenCalledWith('다운로드 실패'));
+    fireEvent.click(screen.getByRole('button', { name: /작성 중 문서/ }));
+    await waitFor(() => expect(api.listDocumentFiles).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scope: 'DRAFT', beforeFileId: undefined }),
+    ));
+    expect(screen.getByRole('button', { name: '파일형 보기' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});

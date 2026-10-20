@@ -26,6 +26,10 @@ describe('shared file view', () => {
       onLoadMore={vi.fn()} onRetry={vi.fn()} onDownload={onDownload} onOpenSource={onOpenSource} />);
     expect(screen.getByText('Sample User')).toBeInTheDocument();
     expect(screen.getByText('1 KB')).toBeInTheDocument();
+    expect(screen.queryByText('모든 파일을 불러왔습니다.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('파일형 첨부파일 목록')).toHaveStyle({
+      backgroundColor: 'rgb(255, 255, 255)',
+    });
     fireEvent.click(screen.getByRole('button', { name: 'sample.pdf 다운로드' }));
     expect(onDownload).toHaveBeenCalledWith(item);
     fireEvent.click(screen.getByRole('button', { name: 'sample.pdf 원문 보기' }));

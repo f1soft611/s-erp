@@ -113,6 +113,20 @@ describe('document status service', () => {
     expect(params.get('sortDirection')).toBe('ASC');
   });
 
+  it('accepts the drafter role returned for the current user', async () => {
+    api.get.mockResolvedValue({
+      resultList: [{ ...row, myParticipantType: 'DRAFTER' }],
+      totalRowCount: 1,
+    });
+    const dataSource = createDocumentStatusDataSource({});
+
+    await expect(dataSource.load(query(new AbortController().signal))).resolves
+      .toMatchObject({
+        rows: [{ myParticipantType: 'DRAFTER' }],
+        totalRowCount: 1,
+      });
+  });
+
   it('rejects malformed page responses instead of returning success-shaped empty rows', async () => {
     const dataSource = createDocumentStatusDataSource({});
     const request = query(new AbortController().signal);

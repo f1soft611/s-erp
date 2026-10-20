@@ -20,6 +20,7 @@ import { DocumentApprovalDetailFeed } from './components/DocumentApprovalDetailF
 import { DocumentFeedItem } from './components/DocumentFeedItem';
 import { DocumentStatusPanel } from './components/DocumentStatusPanel';
 import { EmptyDocumentList } from './components/EmptyDocumentList';
+import { DocumentFileList } from './components/DocumentFileList';
 import { documentKinds } from './data/documentWriteData';
 import { useDocumentWritePage } from './hooks/useDocumentWritePage';
 import type {
@@ -36,7 +37,9 @@ export function DocumentWritePage({
   const [editingDocument, setEditingDocument] =
     useState<DocumentApprovalDetail | null>(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const {
+    files,
     viewMode,
     setViewMode,
     selectedKind,
@@ -103,7 +106,7 @@ export function DocumentWritePage({
         actionGroups={pageActionGroups}
       />
 
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <Box ref={setScrollRoot} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <Container
           maxWidth="xl"
           sx={{
@@ -116,6 +119,7 @@ export function DocumentWritePage({
             left={
               <>
                 <PinnedViewToolbar
+                  enableFileView
                   pinnedCount={pinnedDocuments.length}
                   mode={viewMode}
                   onChange={setViewMode}
@@ -201,7 +205,14 @@ export function DocumentWritePage({
                     {feedEmployeeError}
                   </Alert>
                 )}
-                {isLoading ? (
+                {viewMode === 'file' ? (
+                  <DocumentFileList
+                    files={files}
+                    scrollRoot={scrollRoot}
+                    onRefresh={retry}
+                    onOpenDocument={openDetail}
+                  />
+                ) : isLoading ? (
                   <Box
                     role="status"
                     aria-label="문서 목록 불러오는 중"

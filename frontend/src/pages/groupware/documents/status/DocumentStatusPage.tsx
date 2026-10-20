@@ -43,6 +43,7 @@ const DOCUMENT_STATUSES = new Set<string>([
   'REJECTED',
 ]);
 const PARTICIPANT_TYPES = new Set<string>([
+  'DRAFTER',
   'APPROVAL',
   'AGREEMENT',
   'REFERENCE',

@@ -46,13 +46,13 @@ export function FileView<T extends CommonFileViewItem>({
 
   const columns = { xs: 'minmax(0, 1fr) 36px', md: 'minmax(0, 1fr) 110px 150px 80px 36px' };
   return (
-    <Box aria-label="파일형 첨부파일 목록">
+    <Box aria-label="파일형 첨부파일 목록" sx={{ bgcolor: 'common.white' }}>
       <Box sx={{
         display: { xs: 'none', md: 'grid' }, gridTemplateColumns: columns,
         gap: 1.5, px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider',
       }}>
         {['이름', '소유자', '올린 날짜', '크기'].map((label) =>
-          <Typography key={label} variant="caption" fontWeight={700}>{label}</Typography>)}
+          <Typography key={label} variant="caption" sx={{ fontWeight: 700 }}>{label}</Typography>)}
       </Box>
       {items.map((item) => (
         <Box key={item.id} data-testid="file-view-row" sx={{
@@ -61,7 +61,7 @@ export function FileView<T extends CommonFileViewItem>({
           borderBottom: 1, borderColor: 'divider', minWidth: 0,
           '&:hover': { bgcolor: 'action.hover' },
         }}>
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={1.25} sx={{ minWidth: 0, alignItems: 'center' }}>
             <FileIcon name={item.name} />
             <Box sx={{ minWidth: 0 }}>
               <Button variant="text" aria-label={`${item.name} 다운로드`}
@@ -96,7 +96,7 @@ export function FileView<T extends CommonFileViewItem>({
           {onRefresh && <Button color="inherit" size="small" onClick={onRefresh}>목록 새로고침</Button>}
         </Stack>
       }>{error}</Alert>}
-      {isLoading && <Stack role="status" direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+      {isLoading && <Stack role="status" direction="row" spacing={1} sx={{ py: 3, alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress size={20} /><Typography variant="body2">파일 불러오는 중</Typography>
       </Stack>}
       {!isLoading && !error && items.length === 0 &&
@@ -106,10 +106,6 @@ export function FileView<T extends CommonFileViewItem>({
           <Button onClick={onLoadMore} disabled={isLoading} size="small">더 불러오기</Button>
         </Box>
       )}
-      {!hasNext && !isLoading && !error && items.length > 0 &&
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', py: 2 }}>
-          모든 파일을 불러왔습니다.
-        </Typography>}
     </Box>
   );
 }

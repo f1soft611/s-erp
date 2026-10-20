@@ -23,6 +23,7 @@ export type DocumentStatusRow = Pick<
 };
 
 export type DocumentStatusParticipantType =
+  | 'DRAFTER'
   | 'APPROVAL'
   | 'AGREEMENT'
   | 'REFERENCE';

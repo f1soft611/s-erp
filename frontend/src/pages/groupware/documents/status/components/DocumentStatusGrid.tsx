@@ -23,6 +23,7 @@ const DOCUMENT_STATUS_OPTIONS = [
 ];
 
 const PARTICIPANT_TYPE_OPTIONS = [
+  { value: 'DRAFTER', label: '기안' },
   { value: 'APPROVAL', label: '결재' },
   { value: 'AGREEMENT', label: '합의' },
   { value: 'REFERENCE', label: '참조' },
