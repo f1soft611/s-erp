@@ -50,6 +50,9 @@ views, matching the existing file view's 20-item automatic loading behavior.
   while the next page is loading.
 - Retain pinned-item separation and current filter semantics. Do not introduce
   a pin-management feature or a database schema change.
+- The existing approval list response and current database metadata do not
+  expose a persisted pin field. Preserve the current client-side panel contract;
+  do not invent a backend pin source as part of pagination.
 
 ## Failure and loading behavior
 
@@ -74,3 +77,7 @@ views, matching the existing file view's 20-item automatic loading behavior.
 - Confirm no database schema change; inspect the current DB contract through
   the registered read-only MCP before implementation because the API data
   contract is changing.
+- Read-only MCP metadata confirms `tb_electronic_approval_main` and
+  `tb_electronic_approval_line_info` have no pin column. The current API also
+  does not return a pin flag, so this change preserves the panel structure but
+  does not create or claim a server-side all-pins data source.
