@@ -21,6 +21,7 @@ export type AttachmentListProps = {
   isDark?: boolean;
   mode?: 'view' | 'edit';
   showActions?: boolean;
+  showImagePreview?: boolean;
   onDownload?: (id: string) => void;
   onRemove?: (id: string) => void;
   statusBadge?: ReactNode;
@@ -32,6 +33,7 @@ export function AttachmentList({
   isDark = false,
   mode = 'view',
   showActions = true,
+  showImagePreview = true,
   onDownload,
   onRemove,
   statusBadge,
@@ -63,7 +65,8 @@ export function AttachmentList({
               overflow: 'hidden',
             }}
           >
-            {file.mimeType?.startsWith('image/') &&
+            {showImagePreview &&
+              file.mimeType?.startsWith('image/') &&
               file.previewUrl?.startsWith('blob:') && (
                 <Box
                   component="img"

@@ -386,6 +386,58 @@ describe('shared feed components', () => {
     );
   });
 
+  it('shows comment image previews below file attachments and opens the selected image', () => {
+    const onOpenAttachmentImage = vi.fn();
+
+    render(
+      <CommentThread
+        comments={[
+          {
+            id: 31,
+            author: '작성자',
+            time: '2026-10-20 10:00',
+            content: '확인 바랍니다.',
+            attachments: [
+              {
+                id: 'image-1',
+                name: 'receipt.png',
+                mimeType: 'image/png',
+                previewUrl: 'blob:comment-image',
+              },
+              {
+                id: 'file-1',
+                name: 'guide.pdf',
+                mimeType: 'application/pdf',
+              },
+            ],
+          },
+        ]}
+        onOpenAttachmentImage={onOpenAttachmentImage}
+        showComposer={false}
+      />,
+    );
+
+    const attachmentList = screen.getByTestId('notice-attachment-list');
+    expect(within(attachmentList).getByText('receipt.png')).toBeInTheDocument();
+    expect(within(attachmentList).getByText('guide.pdf')).toBeInTheDocument();
+    expect(within(attachmentList).queryByRole('img')).not.toBeInTheDocument();
+
+    const previewButton = screen.getByRole('button', {
+      name: '댓글 이미지 미리보기 1: receipt.png',
+    });
+    fireEvent.click(previewButton);
+
+    expect(onOpenAttachmentImage).toHaveBeenCalledWith({
+      src: 'blob:comment-image',
+      alt: 'receipt.png',
+    });
+    expect(
+      screen.queryByRole('button', {
+        name: '댓글 이미지 미리보기 2: guide.pdf',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it('maps known and unknown file extensions to icon metadata', () => {
     expect(getAttachmentIconMeta('guide.pdf').label).toBe('PDF');
     expect(getAttachmentIconMeta('archive.unknown').label).toBe('FILE');

@@ -48,6 +48,7 @@ export type FeedCommentAttachment = {
   size?: number;
   mimeType?: string;
   previewUrl?: string;
+  previewError?: string;
 };
 export type FeedCommentItem = {
   id: string | number;
@@ -90,6 +91,7 @@ export type CommentThreadProps = {
     commentId: string | number,
     attachmentId: string,
   ) => Promise<void> | void;
+  onOpenAttachmentImage?: (image: { src: string; alt: string }) => void;
   isDark?: boolean;
   showComposer?: boolean;
   placeholder?: string;
@@ -385,6 +387,9 @@ function CommentItem({
   const isSystemEvent = comment.isSystemEvent === true;
   const canEditAttachments = isEditing;
   const replyCount = comment.replies?.length ?? 0;
+  const imageAttachments = (comment.attachments ?? []).filter((attachment) =>
+    attachment.mimeType?.startsWith('image/'),
+  );
   return (
     <Box
       sx={{
@@ -575,6 +580,7 @@ function CommentItem({
                 <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
                   <AttachmentList
                     files={comment.attachments}
+                    showImagePreview={false}
                     isDark={isDark}
                     mode={canEditAttachments ? 'edit' : 'view'}
                     showActions
@@ -594,6 +600,89 @@ function CommentItem({
                       ).catch(() => undefined);
                     }}
                   />
+                </Box>
+              )}
+              {imageAttachments.length > 0 && (
+                <Box
+                  data-testid={`comment-image-previews-${comment.id}`}
+                  sx={{ mt: 0.75, maxWidth: '100%' }}
+                >
+                  {imageAttachments.some((attachment) => attachment.previewUrl) && (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: 76,
+                        overflow: 'hidden',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          height: '100%',
+                          width: '100%',
+                          overflow: 'hidden',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {imageAttachments.map((attachment, index) =>
+                          attachment.previewUrl ? (
+                            <Box
+                              key={attachment.id}
+                              component="button"
+                              type="button"
+                              aria-label={`댓글 이미지 미리보기 ${index + 1}: ${attachment.name}`}
+                              onClick={() =>
+                                props.onOpenAttachmentImage?.({
+                                  src: attachment.previewUrl ?? '',
+                                  alt: attachment.name,
+                                })
+                              }
+                              sx={{
+                                display: 'block',
+                                flexShrink: 0,
+                                width: 112,
+                                height: 76,
+                                p: 0,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                overflow: 'hidden',
+                                bgcolor: 'background.paper',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={attachment.previewUrl}
+                                alt={attachment.name}
+                                sx={{
+                                  display: 'block',
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            </Box>
+                          ) : null,
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
+                  {imageAttachments.map((attachment) =>
+                    attachment.previewError ? (
+                      <Typography
+                        key={`${attachment.id}-preview-error`}
+                        role="alert"
+                        color="error"
+                        variant="body2"
+                        sx={{ mt: 0.5 }}
+                      >
+                        {attachment.previewError}
+                      </Typography>
+                    ) : null,
+                  )}
                 </Box>
               )}
               <Button
@@ -783,6 +872,7 @@ export function TiptapCommentThread({
   onDeleteComment,
   onDownloadAttachment,
   onDeleteAttachment,
+  onOpenAttachmentImage,
   isDark = false,
   showComposer = true,
   placeholder = '줄바꿈 Shift+Enter, 입력 Enter',
@@ -805,6 +895,7 @@ export function TiptapCommentThread({
     onDeleteComment,
     onDownloadAttachment,
     onDeleteAttachment,
+    onOpenAttachmentImage,
     isDark,
     showComposer,
     placeholder,
