@@ -34,7 +34,9 @@ Update `/groupware/community/archive` to present folders and files in a file-bro
 - Replace the folder chips with a common search row containing an integrated keyword field for file name/owner and a `상세검색` toggle.
 - Detailed search contains an uploaded-date range and file type selection: `전체`, `문서`, `스프레드시트`, `프레젠테이션`, `PDF`, `이미지`, `비디오`, and `압축`.
 - Keep detailed search collapsed initially, but show its active date summary (`최근 1년`) so the default constraint is visible. Apply the most recent one-year date range automatically on initial entry. The user can change the start and end dates in detailed search and apply them with the search action.
+- Either date boundary may be cleared to make that side of the range open-ended. Clearing both boundaries removes the date constraint; when both are present, reject a start date later than the end date.
 - Search applies within the current location. At the root, keyword search may filter folder names; date and file-type filters apply only to files, so folders remain navigable regardless of those filters.
+- Listing an inactive folder is allowed for reading existing files. The query remains tenant/archive scoped, and invalid or foreign folder codes return no rows. Upload and file-update operations continue to validate that destination folders are active.
 - File type classification uses stored MIME type first and the file extension as a fallback. Unknown types remain available under `전체` and are not assigned to a named type without evidence.
 - Use these extension groups as the fallback when MIME type is missing or generic: documents (`doc`, `docx`, `hwp`, `hwpx`, `odt`, `rtf`, `txt`, `md`, `htm`, `html`, `xml`, `json`, `sql`); spreadsheets (`xls`, `xlsx`, `xlsm`, `ods`, `csv`); presentations (`ppt`, `pptx`, `odp`); PDF (`pdf`); images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`, `tif`, `tiff`); videos (`mp4`, `mov`, `avi`, `mkv`, `webm`, `m4v`, `wmv`); archives (`zip`, `rar`, `7z`, `tar`, `gz`, `bz2`, `xz`). A known non-generic MIME type takes precedence over the filename extension.
 - Do not show page numbers or incremental loading. Return all matching files for the current folder and search criteria in one response, ordered by most recently uploaded first.
@@ -46,7 +48,7 @@ Update `/groupware/community/archive` to present folders and files in a file-bro
 - Keep upload permission-gated and immediately open the file picker. For multiple selected files, upload each separately and show each file's success or failure; do not imply a failed upload succeeded.
 - Expose rename/move only to users with update permission and delete only to users with delete permission. Download remains subject to the existing read access and tenant/ownership checks.
 - Reuse existing confirmation for deletion and prevent duplicate requests while a row operation is active.
-- Files in inactive folders remain readable/downloadable, but upload, rename, move, delete, and folder editing remain unavailable until the folder is active again.
+- Files in inactive folders remain readable/downloadable, but file upload, rename, move, and delete are unavailable while the folder is inactive. Users with category-management permission can still manage the common-code item and reactivate the folder.
 - Show explicit loading, error, empty-result, and mutation states. Search or loading failures must not fall back to an unfiltered or success-shaped result.
 
 ## API and data changes
