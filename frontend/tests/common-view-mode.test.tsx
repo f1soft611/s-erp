@@ -137,6 +137,29 @@ describe('common notice view mode components', () => {
     expect(onItemClick).not.toHaveBeenCalled();
   });
 
+  it('keeps a custom list toolbar outside selection and replaces default badges', () => {
+    const onItemClick = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ListView
+        items={[items[0]]}
+        onItemClick={onItemClick}
+        renderItemToolbar={() => (
+          <button type="button" onClick={onAction}>Toolbar action</button>
+        )}
+      />,
+    );
+
+    const action = screen.getByRole('button', { name: 'Toolbar action' });
+    expect(action.parentElement?.closest('button')).toBeNull();
+    expect(screen.queryByText('시스템')).not.toBeInTheDocument();
+    fireEvent.click(action);
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /고정 공지/ }));
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
+  });
+
   it('keeps feed and list item rendering separate', () => {
     render(
       <>
