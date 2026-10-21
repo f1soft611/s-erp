@@ -1,7 +1,10 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
+import {
+  Alert, Box, Button, Chip, Container, Stack,
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+} from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import { useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -25,6 +28,9 @@ import { DocumentFeedItem } from './components/DocumentFeedItem';
 import { DocumentStatusPanel } from './components/DocumentStatusPanel';
 import { EmptyDocumentList } from './components/EmptyDocumentList';
 import { DocumentFileList } from './components/DocumentFileList';
+import { DocumentApprovalToolbar } from './components/DocumentApprovalToolbar';
+import { DocumentActionsMenu } from './components/DocumentActionsMenu';
+import { deleteDocumentApproval, getDocumentApprovalDetail } from './services/documentApproval.service';
 import { documentKinds } from './data/documentWriteData';
 import { useDocumentWritePage } from './hooks/useDocumentWritePage';
 import type {
@@ -50,7 +56,11 @@ export function DocumentWritePage({
     useState<PendingDocumentPinAction | null>(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
-  const { showError } = useNotification();
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const { showError, showSuccess } = useNotification();
   const {
     files,
     viewMode,
@@ -88,6 +98,34 @@ export function DocumentWritePage({
     loadMore,
     retryLoadMore,
   } = useDocumentWritePage();
+  const editListDocument = async (documentId: number) => {
+    if (editingDocumentId !== null) return;
+    setEditingDocumentId(documentId);
+    try {
+      const document = await getDocumentApprovalDetail(documentId);
+      setEditingDocument(document);
+      openComposer();
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : '문서 상세를 불러오지 못했습니다.');
+    } finally {
+      setEditingDocumentId(null);
+    }
+  };
+  const deleteListDocument = async () => {
+    if (deletingDocumentId === null || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteDocumentApproval(deletingDocumentId);
+      setDeletingDocumentId(null);
+      showSuccess('문서가 삭제되었습니다.');
+      refresh({ quiet: true });
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : '문서 삭제에 실패했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   const requestPinToggle = (
     electronicApprovalId: number,
     isPinned: boolean,
@@ -328,22 +366,56 @@ export function DocumentWritePage({
                           onRetry: retryLoadMore,
                         }}
                         onItemClick={(item) => openDetail(Number(item.id))}
-                        renderItemHeaderAction={(item) => (
-                          <IconButton
-                            size="small"
-                            aria-label={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
-                            title={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
-                            disabled={isPinPending(Number(item.id))}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              requestPinToggle(Number(item.id), Boolean(item.isPinned), item.title);
-                            }}
-                          >
-                            <PushPinOutlinedIcon
-                              fontSize="small"
-                              color={item.isPinned ? 'primary' : 'inherit'}
-                            />
-                          </IconButton>
+                        renderItemToolbar={(item) => (
+                          <DocumentApprovalToolbar
+                            status={
+                              <Chip
+                                label={item.statusLabel}
+                                size="small"
+                                color={item.statusColor}
+                                variant={item.statusVariant}
+                                sx={{ height: 22, fontWeight: 700, borderRadius: item.badgeBorderRadius }}
+                              />
+                            }
+                            documentKind={
+                              <Chip
+                                data-testid="list-category-chip"
+                                label={item.categoryLabel}
+                                size="small"
+                                color={item.categoryColor}
+                                sx={{ height: 22, fontWeight: 700, borderRadius: item.badgeBorderRadius }}
+                              />
+                            }
+                            pinControl={
+                              <IconButton
+                                size="small"
+                                aria-label={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
+                                title={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
+                                disabled={isPinPending(Number(item.id))}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  requestPinToggle(Number(item.id), Boolean(item.isPinned), item.title);
+                                }}
+                              >
+                                <PushPinOutlinedIcon
+                                  fontSize="small"
+                                  color={item.isPinned ? 'primary' : 'inherit'}
+                                />
+                              </IconButton>
+                            }
+                            moreMenu={
+                              <DocumentActionsMenu
+                                isDrafter={item.isDrafter}
+                                documentStatus={item.documentStatus}
+                                disabled={editingDocumentId !== null || isDeleting}
+                                onEdit={() => { void editListDocument(Number(item.id)); }}
+                                onDelete={() => {
+                                  setDeleteError('');
+                                  setDeletingDocumentId(Number(item.id));
+                                }}
+                              />
+                            }
+                          />
                         )}
                       />
                     ) : (
@@ -418,6 +490,24 @@ export function DocumentWritePage({
           void confirmPinToggle();
         }}
       />
+      <Dialog
+        open={deletingDocumentId !== null}
+        onClose={() => { if (!isDeleting) setDeletingDocumentId(null); }}
+        aria-labelledby="list-document-delete-title"
+      >
+        <DialogTitle id="list-document-delete-title">문서를 삭제하시겠습니까?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다.</DialogContentText>
+          {deleteError && <Alert severity="error" sx={{ mt: 1 }}>{deleteError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" variant="contained" disabled={isDeleting}
+            onClick={() => { void deleteListDocument(); }}>
+            {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+          <Button disabled={isDeleting} onClick={() => setDeletingDocumentId(null)}>취소</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

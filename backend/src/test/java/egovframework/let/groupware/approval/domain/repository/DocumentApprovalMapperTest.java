@@ -18,9 +18,40 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 
 class DocumentApprovalMapperTest {
+
+    @Test
+    void ordinaryDocumentListsExposeCurrentActorOwnershipWithoutDrafterId() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("drafterId", "login-author");
+        params.put("scope", "ALL");
+        params.put("offset", 0);
+        params.put("limit", 20);
+        for (String statement : Arrays.asList("selectRelatedDocumentList", "selectRelatedDocumentWritePage")) {
+            String sql = configuration.getMappedStatement("DocumentApprovalDAO." + statement)
+                    .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+            assertThat(sql).contains("(m.drafter_id = ?) AS is_drafter");
+        }
+        assertThat(configuration.getResultMap("DocumentApprovalDAO.listItem").getResultMappings())
+                .anySatisfy(mapping -> {
+                    assertThat(mapping.getProperty()).isEqualTo("drafter");
+                    assertThat(mapping.getColumn()).isEqualTo("is_drafter");
+                });
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode json = mapper.readTree("{\"isDrafter\":true}");
+        DocumentApprovalListItemVO item = mapper.treeToValue(json, DocumentApprovalListItemVO.class);
+        assertThat(mapper.valueToTree(item).path("isDrafter").asBoolean()).isTrue();
+        DocumentApprovalFeedItemVO feed = mapper.treeToValue(json, DocumentApprovalFeedItemVO.class);
+        assertThat(feed.isDrafter()).isTrue();
+        assertThat(mapper.valueToTree(feed).path("isDrafter").asBoolean()).isTrue();
+    }
 
     @Test
     void filePagesUseRelatedDocumentAccessAndStableFileCursor() throws Exception {
@@ -46,7 +77,7 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
-    void writeDocumentPagesExcludeCurrentUsersPinsAndUseStableOffsetOrdering() throws Exception {
+    void writeDocumentPagesIncludePinsInPageAndCountWithStableOffsetOrdering() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentWritePage")).isTrue();
@@ -74,8 +105,8 @@ class DocumentApprovalMapperTest {
             assertThat(sql)
                     .contains("m.tenant_id = ?", "m.deleted_yn = 'N'", "m.drafter_id = ?",
                             "l.participant_user_id = ?", "m.document_type = ?",
-                            "m.electronic_approval_id = ?", "p.tenant_id = m.tenant_id",
-                            "p.user_id = ?", "p.electronic_approval_id = m.electronic_approval_id");
+                            "m.electronic_approval_id = ?")
+                    .doesNotContain("tb_electronic_approval_pin", "p.user_id");
         }
         assertThat(pageSql)
                 .contains("ORDER BY m.updated_at DESC, m.electronic_approval_id DESC")

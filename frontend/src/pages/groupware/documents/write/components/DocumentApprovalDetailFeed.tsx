@@ -13,8 +13,6 @@ import {
   DialogTitle,
   Divider,
   IconButton,
-  Menu,
-  MenuItem,
   Popover,
   Stack,
   TextField,
@@ -33,7 +31,7 @@ import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetai
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { DocumentActionsMenu } from './DocumentActionsMenu';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MessageOutlinedIcon from '@mui/icons-material/MessageOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -332,7 +330,6 @@ export function DocumentApprovalDetailFeed(
   const [commentImageErrors, setCommentImageErrors] = useState<
     Record<string, string>
   >({});
-  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [reasonPopover, setReasonPopover] = useState<{
     anchorEl: HTMLElement;
     reason: string;
@@ -626,19 +623,6 @@ export function DocumentApprovalDetailFeed(
       bodyHtml.includes('data-approval-embedded-image-file-id')),
   );
   const shouldShowApprovalLine = !hasMoreBody || isBodyExpanded;
-  const canEditDraft = useMemo(
-    () =>
-      Boolean(
-        detail &&
-        detail.isDrafter &&
-        (detail.documentStatus === 'DRAFT' ||
-          detail.documentStatus === 'REVISION_REQUESTED'),
-      ),
-    [detail],
-  );
-  const canDeleteDocument = useMemo(() => {
-    return Boolean(detail?.isDrafter && detail.documentStatus === 'DRAFT');
-  }, [detail]);
 
   const handleDeleteDocument = async () => {
     if (electronicApprovalId === null || isDeleting) return;
@@ -938,46 +922,14 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
-  const documentMenu =
-    detail?.isDrafter && (canEditDraft || canDeleteDocument) ? (
-      <>
-        <IconButton
-          aria-label="문서 더보기"
-          size="small"
-          onClick={(event) => setMenuAnchor(event.currentTarget)}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-        <Menu
-          anchorEl={menuAnchor}
-          open={Boolean(menuAnchor)}
-          onClose={() => setMenuAnchor(null)}
-        >
-          {canEditDraft && (
-            <MenuItem
-              onClick={() => {
-                setMenuAnchor(null);
-                onEditDocument(detail);
-              }}
-            >
-              {detail.documentStatus === 'REVISION_REQUESTED'
-                ? '수정 후 재상신'
-                : '문서 수정'}
-            </MenuItem>
-          )}
-          {canDeleteDocument && (
-            <MenuItem
-              onClick={() => {
-                setMenuAnchor(null);
-                setIsDeleteDialogOpen(true);
-              }}
-            >
-              삭제
-            </MenuItem>
-          )}
-        </Menu>
-      </>
-    ) : null;
+  const documentMenu = detail ? (
+    <DocumentActionsMenu
+      isDrafter={detail.isDrafter}
+      documentStatus={detail.documentStatus}
+      onEdit={() => onEditDocument(detail)}
+      onDelete={() => setIsDeleteDialogOpen(true)}
+    />
+  ) : null;
 
   const feedItem = props.presentation === 'feed' ? props.feedItem : null;
   const isPinned = feedItem
@@ -2114,6 +2066,8 @@ export function DocumentApprovalDetailFeed(
         </DialogContent>
         <DialogActions>
           <Button
+            variant="outlined"
+            color="error"
             onClick={() => void handleCancelDocumentAction()}
             disabled={isActing}
           >

@@ -1,6 +1,7 @@
 package egovframework.let.groupware.approval.domain.model;
 
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class DocumentApprovalListItemVO {
 
@@ -15,6 +16,7 @@ public class DocumentApprovalListItemVO {
     private Date submittedAt;
     private String summary;
     private String noticeType;
+    private boolean drafter;
 
     public Long getElectronicApprovalId() { return electronicApprovalId; }
     public void setElectronicApprovalId(Long electronicApprovalId) { this.electronicApprovalId = electronicApprovalId; }
@@ -38,4 +40,8 @@ public class DocumentApprovalListItemVO {
     public void setSummary(String summary) { this.summary = summary; }
     public String getNoticeType() { return noticeType; }
     public void setNoticeType(String noticeType) { this.noticeType = noticeType; }
+    @JsonProperty("isDrafter")
+    public boolean isDrafter() { return drafter; }
+    @JsonProperty("isDrafter")
+    public void setDrafter(boolean drafter) { this.drafter = drafter; }
 }

@@ -8,6 +8,7 @@ type ListViewProps<T extends CommonViewItem> = {
   items: T[];
   onItemClick?: (item: T) => void;
   renderItemHeaderAction?: (item: T) => ReactNode;
+  renderItemToolbar?: (item: T) => ReactNode;
   renderItemAction?: (item: T) => ReactNode;
   ariaLabel?: string;
   badgeOrder?: 'category-status' | 'status-category';
@@ -25,6 +26,7 @@ export function ListView<T extends CommonViewItem>({
   items,
   onItemClick,
   renderItemHeaderAction,
+  renderItemToolbar,
   renderItemAction,
   ariaLabel = '리스트형 목록',
   badgeOrder = 'category-status',
@@ -88,7 +90,9 @@ export function ListView<T extends CommonViewItem>({
             key={item.id}
             sx={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              gridTemplateColumns: renderItemToolbar
+                ? { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' }
+                : 'minmax(0, 1fr) auto',
               gridTemplateRows: 'auto auto',
               columnGap: 0.5,
               alignItems: 'center',
@@ -111,7 +115,7 @@ export function ListView<T extends CommonViewItem>({
               onClick={() => onItemClick?.(item)}
               sx={{
                 gridColumn: 1,
-                gridRow: '1 / 3',
+                gridRow: renderItemToolbar ? { xs: '1', sm: '1 / 3' } : '1 / 3',
                 display: 'grid',
                 gridTemplateColumns: '24px minmax(0, 1fr)',
                 gap: 1.5,
@@ -152,7 +156,7 @@ export function ListView<T extends CommonViewItem>({
                   >
                     {item.title}
                   </Typography>
-                  {badgeOrder === 'status-category' ? (
+                  {renderItemToolbar ? null : badgeOrder === 'status-category' ? (
                     <>
                       {statusChip}
                       {categoryChip}
@@ -176,25 +180,28 @@ export function ListView<T extends CommonViewItem>({
             </Box>
             <Box
               sx={{
-                gridColumn: 2,
-                gridRow: 1,
+                gridColumn: renderItemToolbar ? { xs: 1, sm: 2 } : 2,
+                gridRow: renderItemToolbar ? { xs: 2, sm: '1 / 3' } : 1,
                 display: 'flex',
                 alignItems: 'center',
+                ...(renderItemToolbar ? { minWidth: 0, justifyContent: 'flex-end', mt: { xs: 0.5, sm: 0 } } : {}),
               }}
             >
-              {renderItemHeaderAction?.(item)}
+              {renderItemToolbar ? renderItemToolbar(item) : renderItemHeaderAction?.(item)}
             </Box>
-            <Box
-              sx={{
-                gridColumn: 2,
-                gridRow: 2,
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-              }}
-            >
-              {renderItemAction?.(item)}
-            </Box>
+            {renderItemAction && (
+              <Box
+                sx={{
+                  gridColumn: 2,
+                  gridRow: 2,
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                }}
+              >
+                {renderItemAction(item)}
+              </Box>
+            )}
           </Box>
         );
       })}

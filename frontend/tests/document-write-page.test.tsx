@@ -43,6 +43,7 @@ const composerApi = vi.hoisted(() => ({
   deleteDocumentDraftEmbeddedImage: vi.fn(),
   listDocumentDraftAttachments: vi.fn(),
   deleteDocumentDraftAttachment: vi.fn(),
+  deleteDocumentApproval: vi.fn(),
 }));
 
 const composerNotifications = vi.hoisted(() => ({
@@ -123,6 +124,7 @@ vi.mock(
     deleteDocumentDraftEmbeddedImage: composerApi.deleteDocumentDraftEmbeddedImage,
     listDocumentDraftAttachments: composerApi.listDocumentDraftAttachments,
     deleteDocumentDraftAttachment: composerApi.deleteDocumentDraftAttachment,
+    deleteDocumentApproval: composerApi.deleteDocumentApproval,
     isDefiniteAttachmentUploadFailure: (error: unknown) =>
       error instanceof Error && error.message === 'definite failure',
     UnknownAttachmentUploadOutcomeError: class extends Error {},
@@ -440,10 +442,10 @@ beforeEach(() => {
       ),
   );
   composerApi.listPinnedDocumentApprovals.mockResolvedValue([]);
-  composerApi.pinDocumentApproval.mockImplementation((electronicApprovalId: number) =>
+  composerApi.pinDocumentApproval.mockReset().mockImplementation((electronicApprovalId: number) =>
     Promise.resolve({ electronicApprovalId, pinned: true }),
   );
-  composerApi.unpinDocumentApproval.mockImplementation((electronicApprovalId: number) =>
+  composerApi.unpinDocumentApproval.mockReset().mockImplementation((electronicApprovalId: number) =>
     Promise.resolve({ electronicApprovalId, pinned: false }),
   );
   composerApi.getDocumentApprovalSummary.mockResolvedValue({
@@ -512,6 +514,7 @@ beforeEach(() => {
   composerApi.createApprovalComment.mockResolvedValue({});
   composerApi.updateApprovalComment.mockResolvedValue({});
   composerApi.deleteApprovalComment.mockResolvedValue(undefined);
+  composerApi.deleteDocumentApproval.mockResolvedValue(undefined);
   composerApi.uploadApprovalCommentAttachment.mockResolvedValue({});
   composerApi.downloadApprovalCommentAttachment.mockResolvedValue(undefined);
   composerApi.deleteApprovalCommentAttachment.mockResolvedValue(undefined);
@@ -1235,12 +1238,13 @@ describe('Document write page', () => {
   });
 
   it('defaults to list mode and displays approval status and all document kinds', async () => {
+    mockPaginatedDocumentLists();
     render(<DashboardContent {...pageProps} />);
     const listRegion = await screen.findByRole('region', {
       name: '리스트형 문서 목록',
     });
     await waitFor(() =>
-      expect(within(listRegion).getByRole('button', { name: /문서 A/ })).toBeInTheDocument(),
+      expect(within(listRegion).getByRole('button', { name: /^문서 A/ })).toBeInTheDocument(),
     );
 
     expect(
@@ -1250,13 +1254,13 @@ describe('Document write page', () => {
     expect(
       screen.queryByRole('textbox', { name: '문서 제목 검색' }),
     ).not.toBeInTheDocument();
-    expect(listRegion.querySelectorAll('button')).toHaveLength(6);
+    expect(within(listRegion).getAllByTestId('list-item-row')).toHaveLength(6);
     expect(listRegion).toHaveTextContent('문서 A');
     const firstDocumentRow = within(listRegion).getByRole('button', {
-      name: /문서 A/,
+      name: /^문서 A/,
     });
     const badgeLabels = Array.from(
-      firstDocumentRow.querySelectorAll('.MuiChip-root'),
+      firstDocumentRow.closest('[data-testid="list-item-row"]')!.querySelectorAll('.MuiChip-root'),
       (chip) => chip.textContent,
     );
     expect(badgeLabels).toEqual(['결재진행중', '기안']);
@@ -1279,7 +1283,7 @@ describe('Document write page', () => {
     });
     const row = itemButton.closest('[data-testid="list-item-row"]');
     if (!row) throw new Error('Expected a ListView row for the document.');
-    const category = within(itemButton).getByTestId('list-category-chip');
+    const category = within(row).getByTestId('list-category-chip');
     const pin = within(row).getByRole('button', {
       name: '상단 고정 문서 A',
     });
@@ -1304,6 +1308,96 @@ describe('Document write page', () => {
       expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1),
     );
     expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1);
+  });
+
+  it('uses the shared list toolbar order and author-only edit menu', async () => {
+    composerApi.listDocumentApprovals.mockResolvedValue({
+      resultList: defaultDocumentRecords.map((record) => ({ ...record, isDrafter: true })),
+      totalRowCount: 6,
+    });
+    render(<DashboardContent {...pageProps} />);
+    const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
+    const rows = within(list).getAllByTestId('list-item-row');
+    const draftRow = rows[2];
+    if (!draftRow) throw new Error('Missing draft row.');
+    const toolbar = within(draftRow).getByTestId('document-approval-toolbar');
+    const elements = [
+      within(toolbar).getByText('임시저장'),
+      within(toolbar).getByText('기안'),
+      within(toolbar).getByRole('separator'),
+      within(toolbar).getByRole('button', { name: '상단 고정 문서 C' }),
+      within(toolbar).getByRole('button', { name: '문서 더보기' }),
+    ];
+    for (let index = 0; index < elements.length - 1; index += 1) {
+      expect(elements[index]!.compareDocumentPosition(elements[index + 1]!)
+        & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    }
+    expect(elements[4]!.parentElement?.closest('button')).toBeNull();
+    expect(within(rows[0]!).queryByRole('button', { name: '문서 더보기' })).toBeNull();
+    fireEvent.click(elements[4]!);
+    expect(await screen.findByRole('menuitem', { name: '문서 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '삭제' })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    expect(composerApi.getDocumentApprovalDetail).not.toHaveBeenCalled();
+  });
+
+  it('hides list more menus for non-authors and unknown ownership', async () => {
+    composerApi.listDocumentApprovals.mockResolvedValue({
+      resultList: [
+        { ...defaultDocumentRecords[2], isDrafter: false },
+        { ...defaultDocumentRecords[3], isDrafter: true },
+        { ...defaultDocumentRecords[2], electronicApprovalId: 99 },
+      ],
+      totalRowCount: 3,
+    });
+    render(<DashboardContent {...pageProps} />);
+    const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
+    expect(within(list).getAllByRole('button', { name: '문서 더보기' })).toHaveLength(1);
+    fireEvent.click(within(list).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menuitem', { name: '수정 후 재상신' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '삭제' })).toBeNull();
+  });
+
+  it('opens the composer from list edit and reports detail fetch failures', async () => {
+    composerApi.listDocumentApprovals.mockResolvedValue({
+      resultList: [{ ...defaultDocumentRecords[0], documentStatus: 'DRAFT', isDrafter: true }],
+      totalRowCount: 1,
+    });
+    composerApi.getDocumentApprovalDetail.mockRejectedValueOnce(new Error('상세 조회 실패'));
+    render(<DashboardContent {...pageProps} />);
+    const more = await screen.findByRole('button', { name: '문서 더보기' });
+    fireEvent.click(more);
+    fireEvent.click(await screen.findByRole('menuitem', { name: '문서 수정' }));
+    await waitFor(() => expect(composerNotifications.showError).toHaveBeenCalledWith('상세 조회 실패'));
+    expect(screen.queryByRole('dialog', { name: '문서 작성' })).toBeNull();
+    fireEvent.click(more);
+    fireEvent.click(await screen.findByRole('menuitem', { name: '문서 수정' }));
+    expect(await screen.findByRole('dialog', { name: '문서 작성' })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+  });
+
+  it('confirms list deletion and keeps errors visible for retry', async () => {
+    composerApi.listDocumentApprovals.mockResolvedValue({
+      resultList: [{ ...defaultDocumentRecords[2], isDrafter: true }],
+      totalRowCount: 1,
+    });
+    composerApi.deleteDocumentApproval.mockRejectedValueOnce(new Error('삭제 실패'));
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '삭제' }));
+    const dialog = await screen.findByRole('dialog', { name: '문서를 삭제하시겠습니까?' });
+    expect(composerApi.deleteDocumentApproval).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(dialog);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '삭제' }));
+    const retryDialog = await screen.findByRole('dialog', { name: '문서를 삭제하시겠습니까?' });
+    fireEvent.click(within(retryDialog).getByRole('button', { name: '삭제' }));
+    expect(await within(retryDialog).findByText('삭제 실패')).toBeInTheDocument();
+    expect(composerApi.deleteDocumentApproval).toHaveBeenCalledWith(3);
+    fireEvent.click(within(retryDialog).getByRole('button', { name: '삭제' }));
+    await waitFor(() => expect(composerApi.deleteDocumentApproval).toHaveBeenCalledTimes(2));
+    await waitForElementToBeRemoved(retryDialog);
   });
 
   it('reports pin mutation failures after confirmation', async () => {
@@ -1386,14 +1480,15 @@ describe('Document write page', () => {
     fireEvent.click(within(list).getByRole('button', { name: '상단 고정 문서 A' }));
     let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
     fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    const unpin = await within(list).findByRole('button', { name: '상단 고정 해제 문서 A' });
+    await waitFor(() => expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1));
+    const unpin = await screen.findByRole('button', { name: '상단 고정 해제 문서 A' }, { timeout: 5000 });
     expect(within(unpin).getByTestId('PushPinOutlinedIcon'))
       .toHaveClass('MuiSvgIcon-colorPrimary');
-    expect(within(list).getAllByTestId('list-item-row')).toHaveLength(6);
+    expect(within(screen.getByRole('region', { name: '리스트형 문서 목록' })).getAllByTestId('list-item-row')).toHaveLength(6);
     fireEvent.click(unpin);
     dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
     fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    const pin = await within(list).findByRole('button', { name: '상단 고정 문서 A' });
+    const pin = await screen.findByRole('button', { name: '상단 고정 문서 A' });
     expect(within(pin).getByTestId('PushPinOutlinedIcon'))
       .not.toHaveClass('MuiSvgIcon-colorPrimary');
     expect(composerApi.unpinDocumentApproval).toHaveBeenCalledWith(1);
@@ -3148,6 +3243,7 @@ describe('Document write page', () => {
   }, 15000);
 
   it('shows and preserves existing attachments when editing a revision-requested document', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 4,
       eabusNo: '001',
@@ -3182,7 +3278,7 @@ describe('Document write page', () => {
       name: '리스트형 문서 목록',
     });
     fireEvent.click(
-      await within(listRegion).findByRole('button', { name: /문서 D/ }),
+      await within(listRegion).findByRole('button', { name: /^문서 D/ }),
     );
     await screen.findByTestId('post-detail-panel');
     fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
@@ -4106,6 +4202,7 @@ describe('Document write page', () => {
   );
 
   it('does not offer deletion for a pending drafter document', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -4148,7 +4245,7 @@ describe('Document write page', () => {
       name: '리스트형 문서 목록',
     });
     fireEvent.click(
-      await within(listRegion).findByRole('button', { name: /문서 A/ }),
+      await within(listRegion).findByRole('button', { name: /^문서 A/ }),
     );
 
     await screen.findByTestId('approval-detail-card');
@@ -4158,15 +4255,16 @@ describe('Document write page', () => {
   });
 
   it('keeps the document deletion menu available for a draft', async () => {
+    mockPaginatedDocumentLists();
     const draftRecord = defaultDocumentRecords[2];
     if (!draftRecord) throw new Error('Missing draft document fixture.');
-    composerApi.listDocumentApprovals.mockResolvedValueOnce([
+    composerApi.listDocumentApprovals.mockResolvedValueOnce({ resultList: [
       {
         ...draftRecord,
         title: '임시저장 문서',
         documentStatus: 'DRAFT',
       },
-    ]);
+    ], totalRowCount: 1 });
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 3,
       eabusNo: '001',
@@ -4189,7 +4287,7 @@ describe('Document write page', () => {
       name: '리스트형 문서 목록',
     });
     fireEvent.click(
-      await within(listRegion).findByRole('button', { name: /임시저장 문서/ }),
+      await within(listRegion).findByRole('button', { name: /^임시저장 문서/ }),
     );
 
     fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
@@ -4200,7 +4298,7 @@ describe('Document write page', () => {
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) =>
         Promise.resolve(
-          includeDetails
+          { resultList: includeDetails
             ? defaultDocumentRecords.map((record) =>
                 toFeedRecord(record, {
                   isDrafter: true,
@@ -4209,6 +4307,8 @@ describe('Document write page', () => {
                 }),
               )
             : defaultDocumentRecords,
+            totalRowCount: defaultDocumentRecords.length,
+          },
         ),
     );
     composerApi.createApprovalComment.mockResolvedValueOnce({
@@ -4265,7 +4365,11 @@ describe('Document write page', () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    const closeButton = within(screen.getByRole('dialog', { name: '문서 작성' }))
+      .getAllByRole('button', { name: '닫기' })
+      .find((button) => button.textContent === '닫기');
+    if (!closeButton) throw new Error('Missing composer close action.');
+    fireEvent.click(closeButton);
     await waitFor(() => {
       expect(composerApi.listDocumentApprovals).toHaveBeenCalledTimes(3);
       expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
@@ -4273,6 +4377,7 @@ describe('Document write page', () => {
         undefined,
         undefined,
         true,
+        { offset: 0, limit: 20 },
       );
       expect(composerApi.getDocumentApprovalDetail).not.toHaveBeenCalled();
     });

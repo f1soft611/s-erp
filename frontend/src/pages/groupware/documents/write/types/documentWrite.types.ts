@@ -78,6 +78,7 @@ export type DocumentWriteItem = {
   submittedDate?: string;
   summary: string;
   isPinned?: boolean;
+  isDrafter?: boolean;
   documentStatus?: ApprovalDocumentStatus;
   feedData?: DocumentApprovalFeedRecord;
 };
@@ -149,6 +150,7 @@ export type DocumentApprovalRecord = {
   documentStatus: ApprovalDocumentStatus;
   title: string;
   drafterName: string;
+  isDrafter?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
   submittedAt?: string | null;
@@ -227,6 +229,7 @@ export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
 
 export type DocumentApprovalFeedRecord = DocumentApprovalRecord &
   Omit<DocumentApprovalDetail, keyof DocumentApprovalRecord> & {
+    isDrafter: boolean;
     contentsText: string;
     systemEvents: DocumentApprovalPageSystemEvent[];
     comments: DocumentApprovalComment[];

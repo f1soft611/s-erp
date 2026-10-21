@@ -116,6 +116,7 @@
         <result property="submittedAt" column="submitted_at"/>
         <result property="summary" column="summary"/>
         <result property="noticeType" column="notice_type"/>
+        <result property="drafter" column="is_drafter"/>
     </resultMap>
 
     <resultMap id="statusListItem"
@@ -683,7 +684,8 @@
         SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,
                m.title, m.drafter_name, m.created_at, m.updated_at, m.submitted_at,
                LEFT(COALESCE(m.contents_text, ''), 240) AS summary,
-               NULL::varchar AS notice_type
+               NULL::varchar AS notice_type,
+               (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
@@ -721,13 +723,6 @@
         WHERE m.tenant_id = #{tenantId}
           AND m.deleted_yn = 'N'
         <include refid="documentReadAccess"/>
-        AND NOT EXISTS (
-            SELECT 1
-            FROM public.tb_electronic_approval_pin p
-            WHERE p.tenant_id = m.tenant_id
-              AND p.user_id = #{userId}
-              AND p.electronic_approval_id = m.electronic_approval_id
-        )
         <if test="documentType != null and documentType != ''">
             AND m.document_type = #{documentType}
         </if>
@@ -760,7 +755,8 @@
         SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,
                m.title, m.drafter_name, m.created_at, m.updated_at, m.submitted_at,
                LEFT(COALESCE(m.contents_text, ''), 240) AS summary,
-               NULL::varchar AS notice_type
+               NULL::varchar AS notice_type,
+               (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
         <include refid="relatedWriteDocumentFilters"/>
         ORDER BY m.updated_at DESC, m.electronic_approval_id DESC

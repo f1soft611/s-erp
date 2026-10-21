@@ -34,7 +34,12 @@ export function DocumentApprovalToolbar({
       {approvalActions}
       {status}
       {documentKind}
-      {pinControl ? <Divider orientation="vertical" flexItem /> : null}
+      {pinControl ? (
+        <Divider
+          orientation="vertical"
+          sx={{ height: 20, alignSelf: 'center', flexShrink: 0 }}
+        />
+      ) : null}
       {pinControl}
       {moreMenu}
     </Stack>

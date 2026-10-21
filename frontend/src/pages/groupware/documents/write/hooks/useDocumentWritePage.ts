@@ -70,6 +70,7 @@ function mapDocument(
     submittedDate: formatDate(record.submittedAt),
     summary: record.summary,
     isPinned,
+    isDrafter: record.isDrafter,
   };
 }
 
@@ -379,6 +380,8 @@ export function useDocumentWritePage() {
           badgeBorderRadius: item.badgeBorderRadius,
           summary: item.summary,
           isPinned: item.isPinned,
+          isDrafter: item.isDrafter,
+          documentStatus: item.documentStatus,
         };
       }),
     [documents],

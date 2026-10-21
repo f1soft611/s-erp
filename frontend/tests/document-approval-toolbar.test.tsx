@@ -34,6 +34,8 @@ describe('DocumentApprovalToolbar', () => {
     ];
 
     expect(getComputedStyle(toolbar).columnGap).toBe('4px');
+    expect(getComputedStyle(divider).height).toBe('20px');
+    expect(getComputedStyle(divider).alignSelf).toBe('center');
     expect(getComputedStyle(status).marginRight).toBe('4px');
     expect(getComputedStyle(pin).marginLeft).toBe('4px');
     expect(pin.nextElementSibling).toBe(more);
