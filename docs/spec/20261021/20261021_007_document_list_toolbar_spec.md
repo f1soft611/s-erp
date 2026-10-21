@@ -1,5 +1,7 @@
 # 문서 리스트 도구막대 상세 사양서
 
+> 리스트형의 액션 구성은 후속 승인된 [008 사양](20261021_008_document_list_badges_spec.md)으로 대체됐다. 리스트에는 결재상태·업무구분만 표시하며, 아래 피드/상세 동작은 유지한다.
+
 - [작업지시서](../../directions/20261021/20261021_007_document_list_toolbar_work_instruction.md)
 - [계획서](../../plan/20261021/20261021_007_document_list_toolbar_plan.md)
 

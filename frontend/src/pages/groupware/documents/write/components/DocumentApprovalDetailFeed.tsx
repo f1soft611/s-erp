@@ -992,7 +992,7 @@ export function DocumentApprovalDetailFeed(
                 </Button>
               </>
             )}
-            {!isFeedPresentation && canCancelSubmission && (
+            {canCancelSubmission && (
               <Button
                 size="small"
                 variant="outlined"
@@ -1007,7 +1007,7 @@ export function DocumentApprovalDetailFeed(
                 상신 취소
               </Button>
             )}
-            {!isFeedPresentation && canCancelApproval && (
+            {canCancelApproval && (
               <Button
                 size="small"
                 variant="contained"

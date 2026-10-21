@@ -1272,45 +1272,7 @@ describe('Document write page', () => {
     expect(screen.getAllByText('보완요청').length).toBeGreaterThan(0);
   });
 
-  it('requires confirmation before pinning a list document', async () => {
-    mockPaginatedDocumentLists();
-    render(<DashboardContent {...pageProps} />);
-    const listRegion = await screen.findByRole('region', {
-      name: '리스트형 문서 목록',
-    });
-    const itemButton = within(listRegion).getByRole('button', {
-      name: /^문서 A/,
-    });
-    const row = itemButton.closest('[data-testid="list-item-row"]');
-    if (!row) throw new Error('Expected a ListView row for the document.');
-    const category = within(row).getByTestId('list-category-chip');
-    const pin = within(row).getByRole('button', {
-      name: '상단 고정 문서 A',
-    });
-    expect(category.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .not.toBe(0);
-    expect(pin.parentElement?.closest('button')).toBeNull();
-
-    fireEvent.click(pin);
-    let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
-    expect(
-      within(dialog).getByText('이 문서를 상단에 고정하시겠습니까?'),
-    ).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
-    expect(composerApi.pinDocumentApproval).not.toHaveBeenCalled();
-    expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
-    await waitForElementToBeRemoved(dialog);
-
-    fireEvent.click(screen.getByRole('button', { name: '상단 고정 문서 A' }));
-    dialog = await screen.findByRole('dialog', { name: '상단 고정' });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    await waitFor(() =>
-      expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1),
-    );
-    expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1);
-  });
-
-  it('uses the shared list toolbar order and author-only edit menu', async () => {
+  it('shows only approval status and business category badges in list rows', async () => {
     composerApi.listDocumentApprovals.mockResolvedValue({
       resultList: defaultDocumentRecords.map((record) => ({ ...record, isDrafter: true })),
       totalRowCount: 6,
@@ -1318,30 +1280,21 @@ describe('Document write page', () => {
     render(<DashboardContent {...pageProps} />);
     const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
     const rows = within(list).getAllByTestId('list-item-row');
-    const draftRow = rows[2];
-    if (!draftRow) throw new Error('Missing draft row.');
-    const toolbar = within(draftRow).getByTestId('document-approval-toolbar');
-    const elements = [
-      within(toolbar).getByText('임시저장'),
-      within(toolbar).getByText('기안'),
-      within(toolbar).getByRole('separator'),
-      within(toolbar).getByRole('button', { name: '상단 고정 문서 C' }),
-      within(toolbar).getByRole('button', { name: '문서 더보기' }),
-    ];
-    for (let index = 0; index < elements.length - 1; index += 1) {
-      expect(elements[index]!.compareDocumentPosition(elements[index + 1]!)
-        & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(rows).toHaveLength(6);
+    for (const row of rows) {
+      expect(row.querySelectorAll('.MuiChip-root')).toHaveLength(2);
+      expect(within(row).queryByRole('separator')).not.toBeInTheDocument();
+      expect(within(row).queryByRole('button', { name: /상단 고정|문서 더보기/ }))
+        .not.toBeInTheDocument();
+      expect(within(row).getAllByRole('button')).toHaveLength(1);
     }
-    expect(elements[4]!.parentElement?.closest('button')).toBeNull();
-    expect(within(rows[0]!).queryByRole('button', { name: '문서 더보기' })).toBeNull();
-    fireEvent.click(elements[4]!);
-    expect(await screen.findByRole('menuitem', { name: '문서 수정' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '삭제' })).toBeInTheDocument();
+    expect(Array.from(rows[2]!.querySelectorAll('.MuiChip-root'), (chip) => chip.textContent))
+      .toEqual(['임시저장', '기안']);
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
     expect(composerApi.getDocumentApprovalDetail).not.toHaveBeenCalled();
   });
 
-  it('hides list more menus for non-authors and unknown ownership', async () => {
+  it('hides list actions regardless of authorship and opens details on selection', async () => {
     composerApi.listDocumentApprovals.mockResolvedValue({
       resultList: [
         { ...defaultDocumentRecords[2], isDrafter: false },
@@ -1352,52 +1305,10 @@ describe('Document write page', () => {
     });
     render(<DashboardContent {...pageProps} />);
     const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
-    expect(within(list).getAllByRole('button', { name: '문서 더보기' })).toHaveLength(1);
-    fireEvent.click(within(list).getByRole('button', { name: '문서 더보기' }));
-    expect(await screen.findByRole('menuitem', { name: '수정 후 재상신' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: '삭제' })).toBeNull();
-  });
-
-  it('opens the composer from list edit and reports detail fetch failures', async () => {
-    composerApi.listDocumentApprovals.mockResolvedValue({
-      resultList: [{ ...defaultDocumentRecords[0], documentStatus: 'DRAFT', isDrafter: true }],
-      totalRowCount: 1,
-    });
-    composerApi.getDocumentApprovalDetail.mockRejectedValueOnce(new Error('상세 조회 실패'));
-    render(<DashboardContent {...pageProps} />);
-    const more = await screen.findByRole('button', { name: '문서 더보기' });
-    fireEvent.click(more);
-    fireEvent.click(await screen.findByRole('menuitem', { name: '문서 수정' }));
-    await waitFor(() => expect(composerNotifications.showError).toHaveBeenCalledWith('상세 조회 실패'));
-    expect(screen.queryByRole('dialog', { name: '문서 작성' })).toBeNull();
-    fireEvent.click(more);
-    fireEvent.click(await screen.findByRole('menuitem', { name: '문서 수정' }));
-    expect(await screen.findByRole('dialog', { name: '문서 작성' })).toBeInTheDocument();
-    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
-  });
-
-  it('confirms list deletion and keeps errors visible for retry', async () => {
-    composerApi.listDocumentApprovals.mockResolvedValue({
-      resultList: [{ ...defaultDocumentRecords[2], isDrafter: true }],
-      totalRowCount: 1,
-    });
-    composerApi.deleteDocumentApproval.mockRejectedValueOnce(new Error('삭제 실패'));
-    render(<DashboardContent {...pageProps} />);
-    fireEvent.click(await screen.findByRole('button', { name: '문서 더보기' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: '삭제' }));
-    const dialog = await screen.findByRole('dialog', { name: '문서를 삭제하시겠습니까?' });
-    expect(composerApi.deleteDocumentApproval).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
-    await waitForElementToBeRemoved(dialog);
-    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: '삭제' }));
-    const retryDialog = await screen.findByRole('dialog', { name: '문서를 삭제하시겠습니까?' });
-    fireEvent.click(within(retryDialog).getByRole('button', { name: '삭제' }));
-    expect(await within(retryDialog).findByText('삭제 실패')).toBeInTheDocument();
-    expect(composerApi.deleteDocumentApproval).toHaveBeenCalledWith(3);
-    fireEvent.click(within(retryDialog).getByRole('button', { name: '삭제' }));
-    await waitFor(() => expect(composerApi.deleteDocumentApproval).toHaveBeenCalledTimes(2));
-    await waitForElementToBeRemoved(retryDialog);
+    expect(within(list).queryByRole('button', { name: /문서 더보기|상단 고정/ })).toBeNull();
+    fireEvent.click(within(list).getByRole('button', { name: /^문서 D/ }));
+    await screen.findByTestId('approval-detail-card');
+    expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledWith(4);
   });
 
   it('reports pin mutation failures after confirmation', async () => {
@@ -1406,6 +1317,7 @@ describe('Document write page', () => {
       new Error('고정 실패'),
     );
     render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
     const pin = await screen.findByRole('button', {
       name: '상단 고정 문서 A',
     });
@@ -1463,35 +1375,20 @@ describe('Document write page', () => {
       .not.toHaveClass('MuiSvgIcon-colorPrimary');
   });
 
-  it('keeps the list row after pinning and updates its colored unpin action', async () => {
+  it('keeps pinned documents in ordinary list rows without pin actions', async () => {
     mockPaginatedDocumentLists();
     const documentA = defaultDocumentRecords[0];
     if (!documentA) throw new Error('Missing pinned document fixture.');
-    composerApi.pinDocumentApproval.mockImplementationOnce(async () => {
-      composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
-      return { electronicApprovalId: 1, pinned: true };
-    });
-    composerApi.unpinDocumentApproval.mockImplementationOnce(async () => {
-      composerApi.listPinnedDocumentApprovals.mockResolvedValue([]);
-      return { electronicApprovalId: 1, pinned: false };
-    });
+    composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
     render(<DashboardContent {...pageProps} />);
     const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
-    fireEvent.click(within(list).getByRole('button', { name: '상단 고정 문서 A' }));
-    let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    await waitFor(() => expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1));
-    const unpin = await screen.findByRole('button', { name: '상단 고정 해제 문서 A' }, { timeout: 5000 });
-    expect(within(unpin).getByTestId('PushPinOutlinedIcon'))
-      .toHaveClass('MuiSvgIcon-colorPrimary');
-    expect(within(screen.getByRole('region', { name: '리스트형 문서 목록' })).getAllByTestId('list-item-row')).toHaveLength(6);
-    fireEvent.click(unpin);
-    dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    const pin = await screen.findByRole('button', { name: '상단 고정 문서 A' });
-    expect(within(pin).getByTestId('PushPinOutlinedIcon'))
-      .not.toHaveClass('MuiSvgIcon-colorPrimary');
-    expect(composerApi.unpinDocumentApproval).toHaveBeenCalledWith(1);
+    expect(within(list).getAllByTestId('list-item-row')).toHaveLength(6);
+    expect(within(list).getByRole('button', { name: /^문서 A/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '상단 고정 문서' }))
+      .getByRole('button', { name: '문서 A' })).toBeInTheDocument();
+    expect(within(list).queryByRole('button', { name: /상단 고정/ })).toBeNull();
+    expect(composerApi.pinDocumentApproval).not.toHaveBeenCalled();
+    expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
   }, 20000);
 
   it('requires confirmation before pinning a feed document', async () => {
@@ -4101,6 +3998,94 @@ describe('Document write page', () => {
     expect(cancelApi).toHaveBeenCalledWith(1);
     expect(onClose).not.toHaveBeenCalled();
   }, 15000);
+
+  it.each([
+    ['submission', '상신 취소', '결재신청 취소'],
+    ['approval', '승인 취소', '승인 취소'],
+  ] as const)('confirms and retries feed %s cancellation with a list refresh', async (
+    kind, buttonLabel, dialogTitle,
+  ) => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    const feedRecord = toFeedRecord(record, {
+      isDrafter: kind === 'submission',
+      approvalLines: kind === 'approval' ? [{
+        electronicApprovalLineId: 93,
+        stageOrder: 2,
+        participantOrder: 1,
+        participantType: 'APPROVAL',
+        participantUserId: 'emp-1',
+        participantName: '결재자',
+        actionStatus: 'APPROVED',
+      }] : [],
+    });
+    const onActionComplete = vi.fn();
+    const cancelApi = kind === 'submission'
+      ? composerApi.cancelDocumentSubmission : composerApi.cancelDocumentApproval;
+    cancelApi.mockRejectedValueOnce(new Error('취소 처리 실패'));
+    render(<DocumentApprovalDetailFeed
+      open presentation="feed" electronicApprovalId={1} detailRefreshToken={0}
+      feedItem={{
+        id: 1, title: record.title, author: record.drafterName,
+        kind: '기안서', status: '결재진행중', date: '', summary: record.summary, feedData: feedRecord,
+      }}
+      employeeId="emp-1"
+      onActionComplete={onActionComplete} onEditDocument={vi.fn()}
+    />);
+    fireEvent.click(await screen.findByRole('button', { name: buttonLabel, exact: true }));
+    let dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    expect(cancelApi).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    await waitForElementToBeRemoved(dialog);
+    expect(cancelApi).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: buttonLabel, exact: true }));
+    dialog = await screen.findByRole('dialog', { name: dialogTitle });
+    fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel, exact: true }));
+    expect(await within(dialog).findByText('취소 처리 실패')).toBeInTheDocument();
+    expect(onActionComplete).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel, exact: true }));
+    await waitFor(() => expect(onActionComplete).toHaveBeenCalledOnce());
+    expect(cancelApi).toHaveBeenCalledTimes(2);
+    expect(cancelApi).toHaveBeenLastCalledWith(1);
+    expect(composerApi.getDocumentApprovalDetail).not.toHaveBeenCalled();
+    expect(composerApi.listApprovalComments).toHaveBeenCalledWith(1, {
+      beforeCommentId: undefined, limit: 3,
+    });
+  }, 20000);
+
+  it.each([
+    ['not the drafter', 'PENDING', false, 'WAITING', false],
+    ['already in progress', 'IN_PROGRESS', true, 'WAITING', false],
+    ['completed', 'COMPLETED', true, 'APPROVED', false],
+    ['a later stage acted', 'IN_PROGRESS', false, 'APPROVED', true],
+  ] as const)('hides ineligible feed cancellation when %s', async (
+    _reason, documentStatus, isDrafter, ownStatus, laterActed,
+  ) => {
+    const record = defaultDocumentRecords[0];
+    if (!record) throw new Error('Missing document fixture.');
+    const feedRecord = toFeedRecord(record, {
+      documentStatus, isDrafter,
+      approvalLines: [{
+        electronicApprovalLineId: 93, stageOrder: 2, participantOrder: 1,
+        participantType: 'APPROVAL', participantUserId: 'emp-1',
+        participantName: '결재자', actionStatus: ownStatus,
+      }, ...(laterActed ? [{
+        electronicApprovalLineId: 94, stageOrder: 3, participantOrder: 1,
+        participantType: 'APPROVAL' as const, participantUserId: 'emp-2',
+        participantName: '후속 결재자', actionStatus: 'APPROVED' as const,
+      }] : [])],
+    });
+    render(<DocumentApprovalDetailFeed
+      open presentation="feed" electronicApprovalId={1} detailRefreshToken={0}
+      feedItem={{
+        id: 1, title: record.title, author: record.drafterName,
+        kind: '기안서', status: '결재진행중', date: '', summary: record.summary, feedData: feedRecord,
+      }}
+      employeeId="emp-1" onActionComplete={vi.fn()} onEditDocument={vi.fn()}
+    />);
+    await screen.findByTestId('document-approval-toolbar');
+    expect(screen.queryByRole('button', { name: /상신 취소|승인 취소/ })).toBeNull();
+  });
 
   it('shows a feed approval error when the direct approval request fails', async () => {
     mockPendingFeedForCurrentApprover();
