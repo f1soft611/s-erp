@@ -22,6 +22,9 @@ const composerApi = vi.hoisted(() => ({
   cancelDocumentSubmission: vi.fn(),
   cancelDocumentApproval: vi.fn(),
   listDocumentApprovals: vi.fn(),
+  listPinnedDocumentApprovals: vi.fn(),
+  pinDocumentApproval: vi.fn(),
+  unpinDocumentApproval: vi.fn(),
   getDocumentApprovalSummary: vi.fn(),
   getDocumentApprovalDetail: vi.fn(),
   listApprovalComments: vi.fn(),
@@ -98,6 +101,9 @@ vi.mock(
     cancelDocumentSubmission: composerApi.cancelDocumentSubmission,
     cancelDocumentApproval: composerApi.cancelDocumentApproval,
     listDocumentApprovals: composerApi.listDocumentApprovals,
+    listPinnedDocumentApprovals: composerApi.listPinnedDocumentApprovals,
+    pinDocumentApproval: composerApi.pinDocumentApproval,
+    unpinDocumentApproval: composerApi.unpinDocumentApproval,
     getDocumentApprovalSummary: composerApi.getDocumentApprovalSummary,
     getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
     listApprovalComments: composerApi.listApprovalComments,
@@ -227,35 +233,63 @@ function toFeedRecord(
   };
 }
 
+function mockPaginatedDocumentLists() {
+  composerApi.listDocumentApprovals.mockImplementation(
+    (
+      _scope: unknown,
+      _documentType: unknown,
+      _electronicApprovalId: unknown,
+      includeDetails: boolean,
+      page?: { offset: number; limit: number },
+    ) => {
+      const records = includeDetails
+        ? defaultDocumentRecords.map((record) => toFeedRecord(record))
+        : defaultDocumentRecords;
+      if (!page) return Promise.resolve(records);
+      return Promise.resolve({
+        resultList: records.slice(page.offset, page.offset + page.limit),
+        totalRowCount: records.length,
+      });
+    },
+  );
+}
+
 function mockPendingFeedForCurrentApprover() {
   const record = defaultDocumentRecords[0];
   if (!record) throw new Error('Missing pending document fixture.');
   const pendingRecord = { ...record, documentStatus: 'PENDING' as const };
+  const pendingFeedRecord = toFeedRecord(pendingRecord, {
+    isDrafter: false,
+    summary: '진행 문서',
+    contentsHtml: '<p>진행 문서</p>',
+    contentsText: '진행 문서',
+    approvalLines: [
+      {
+        electronicApprovalLineId: 90,
+        stageOrder: 2,
+        participantOrder: 1,
+        participantType: 'APPROVAL',
+        participantUserId: 'emp-1',
+        participantName: '홍길동',
+        actionStatus: 'PENDING',
+      },
+    ],
+  });
   composerApi.listDocumentApprovals.mockImplementation(
-    (_scope, _documentType, _documentId, includeDetails) =>
-      Promise.resolve(
-        includeDetails
-          ? [
-              toFeedRecord(pendingRecord, {
-                isDrafter: false,
-                summary: '진행 문서',
-                contentsHtml: '<p>진행 문서</p>',
-                contentsText: '진행 문서',
-                approvalLines: [
-                  {
-                    electronicApprovalLineId: 90,
-                    stageOrder: 2,
-                    participantOrder: 1,
-                    participantType: 'APPROVAL',
-                    participantUserId: 'emp-1',
-                    participantName: '홍길동',
-                    actionStatus: 'PENDING',
-                  },
-                ],
-              }),
-            ]
-          : [pendingRecord],
-      ),
+    (
+      _scope: unknown,
+      _documentType: unknown,
+      _documentId: unknown,
+      includeDetails: boolean,
+      page?: { offset: number; limit: number },
+    ) => {
+      const records = includeDetails ? [pendingFeedRecord] : [pendingRecord];
+      if (!page) return Promise.resolve(records);
+      return Promise.resolve({
+        resultList: records.slice(page.offset, page.offset + page.limit),
+        totalRowCount: records.length,
+      });
+    },
   );
 }
 
@@ -404,6 +438,13 @@ beforeEach(() => {
           ? defaultDocumentRecords.map((record) => toFeedRecord(record))
           : defaultDocumentRecords,
       ),
+  );
+  composerApi.listPinnedDocumentApprovals.mockResolvedValue([]);
+  composerApi.pinDocumentApproval.mockImplementation((electronicApprovalId: number) =>
+    Promise.resolve({ electronicApprovalId, pinned: true }),
+  );
+  composerApi.unpinDocumentApproval.mockImplementation((electronicApprovalId: number) =>
+    Promise.resolve({ electronicApprovalId, pinned: false }),
   );
   composerApi.getDocumentApprovalSummary.mockResolvedValue({
     actionRequiredCount: 1,
@@ -1226,6 +1267,153 @@ describe('Document write page', () => {
     expect(within(listRegion).getByText('승인')).toBeInTheDocument();
     expect(screen.getAllByText('보완요청').length).toBeGreaterThan(0);
   });
+
+  it('requires confirmation before pinning a list document', async () => {
+    mockPaginatedDocumentLists();
+    render(<DashboardContent {...pageProps} />);
+    const listRegion = await screen.findByRole('region', {
+      name: '리스트형 문서 목록',
+    });
+    const itemButton = within(listRegion).getByRole('button', {
+      name: /^문서 A/,
+    });
+    const row = itemButton.closest('[data-testid="list-item-row"]');
+    if (!row) throw new Error('Expected a ListView row for the document.');
+    const category = within(itemButton).getByTestId('list-category-chip');
+    const pin = within(row).getByRole('button', {
+      name: '상단 고정 문서 A',
+    });
+    expect(category.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
+    expect(pin.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(pin);
+    let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    expect(
+      within(dialog).getByText('이 문서를 상단에 고정하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(composerApi.pinDocumentApproval).not.toHaveBeenCalled();
+    expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
+    await waitForElementToBeRemoved(dialog);
+
+    fireEvent.click(screen.getByRole('button', { name: '상단 고정 문서 A' }));
+    dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    await waitFor(() =>
+      expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1),
+    );
+    expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1);
+  });
+
+  it('reports pin mutation failures after confirmation', async () => {
+    mockPaginatedDocumentLists();
+    composerApi.pinDocumentApproval.mockRejectedValueOnce(
+      new Error('고정 실패'),
+    );
+    render(<DashboardContent {...pageProps} />);
+    const pin = await screen.findByRole('button', {
+      name: '상단 고정 문서 A',
+    });
+
+    fireEvent.click(pin);
+    const dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    await waitFor(() =>
+      expect(composerNotifications.showError).toHaveBeenCalledWith('고정 실패'),
+    );
+    expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1);
+  }, 20000);
+
+  it('requires confirmation before unpinning a pinned-panel document', async () => {
+    mockPaginatedDocumentLists();
+    const documentA = defaultDocumentRecords[0];
+    if (!documentA) throw new Error('Missing pinned document fixture.');
+    composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
+    render(<DashboardContent {...pageProps} />);
+    await screen.findByRole('region', { name: '상단 고정 문서' });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '상단 고정 해제 문서 A' }),
+    );
+    let dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    expect(
+      within(dialog).getByText('이 문서의 상단 고정을 해제하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
+    await waitForElementToBeRemoved(dialog);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '상단 고정 해제 문서 A' }),
+    );
+    dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    await waitFor(() =>
+      expect(composerApi.unpinDocumentApproval).toHaveBeenCalledTimes(1),
+    );
+    expect(composerApi.unpinDocumentApproval).toHaveBeenCalledWith(1);
+  });
+
+  it('requires confirmation before pinning a feed document', async () => {
+    mockPaginatedDocumentLists();
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    const pin = await screen.findByRole('button', {
+      name: '상단 고정 문서 A',
+    });
+
+    fireEvent.click(pin);
+    let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    expect(
+      within(dialog).getByText('이 문서를 상단에 고정하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(composerApi.pinDocumentApproval).not.toHaveBeenCalled();
+    await waitForElementToBeRemoved(dialog);
+
+    fireEvent.click(pin);
+    dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    await waitFor(() =>
+      expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1),
+    );
+    expect(composerApi.pinDocumentApproval).toHaveBeenCalledWith(1);
+  }, 20000);
+
+  it('reflects pinned state and confirms unpinning from its detail overlay', async () => {
+    mockPaginatedDocumentLists();
+    const documentA = defaultDocumentRecords[0];
+    if (!documentA) throw new Error('Missing pinned document fixture.');
+    composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
+    render(<DashboardContent {...pageProps} />);
+    const pinnedRegion = await screen.findByRole('region', {
+      name: '상단 고정 문서',
+    });
+    fireEvent.click(within(pinnedRegion).getByText('문서 A'));
+    const overlay = await screen.findByTestId('page-area-overlay');
+    const pin = await within(overlay).findByRole('button', {
+      name: '상단 고정 해제 문서 A',
+    });
+
+    fireEvent.click(pin);
+    let dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    expect(
+      within(dialog).getByText('이 문서의 상단 고정을 해제하시겠습니까?'),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
+    await waitForElementToBeRemoved(dialog);
+
+    fireEvent.click(pin);
+    dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    await waitFor(() =>
+      expect(composerApi.unpinDocumentApproval).toHaveBeenCalledTimes(1),
+    );
+    expect(composerApi.unpinDocumentApproval).toHaveBeenCalledWith(1);
+  }, 20000);
 
   it('shows a removable scope filter chip without leaving list mode', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -3425,7 +3613,9 @@ describe('Document write page', () => {
     const kindChip = within(toolbar).getByText('기안').closest('.MuiChip-root');
     if (!statusChip || !kindChip) throw new Error('Missing document badges.');
     const divider = within(toolbar).getByRole('separator');
-    const pin = within(toolbar).getByRole('button', { name: '고정된 문서' });
+    const pin = within(toolbar).getByRole('button', {
+      name: '상단 고정 문서 A',
+    });
     const commentSubmitButton = within(card).getByRole('button', {
       name: '등록',
     });
@@ -3434,9 +3624,9 @@ describe('Document write page', () => {
       reject,
       returnForRevision,
       statusChip,
+      kindChip,
       divider,
       pin,
-      kindChip,
     ];
     const actionButtonStyles = [approve, reject, returnForRevision].map(
       (button) => getComputedStyle(button),
@@ -3445,8 +3635,8 @@ describe('Document write page', () => {
     expect(getComputedStyle(statusChip).height).toBe('28px');
     expect(getComputedStyle(kindChip).height).toBe('28px');
     expect(getComputedStyle(toolbar).columnGap).toBe('4px');
-    expect(getComputedStyle(statusChip).marginRight).toBe('4px');
-    expect(getComputedStyle(pin).marginLeft).toBe('4px');
+    expect(parseFloat(getComputedStyle(statusChip).marginRight)).toBe(0);
+    expect(parseFloat(getComputedStyle(pin).marginLeft)).toBe(0);
     expect(parseFloat(getComputedStyle(kindChip).marginRight)).toBe(0);
     expect(actionButtonStyles.map((style) => style.minHeight)).toEqual([
       getComputedStyle(commentSubmitButton).minHeight,

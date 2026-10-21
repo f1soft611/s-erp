@@ -10,7 +10,11 @@ type DocumentFeedItemProps = {
   employeeId: string;
   pinPending: boolean;
   detailRefreshToken: number;
-  onTogglePin: (electronicApprovalId: number, pinned: boolean) => Promise<void>;
+  onTogglePin: (
+    electronicApprovalId: number,
+    pinned: boolean,
+    title: string,
+  ) => void;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
 };

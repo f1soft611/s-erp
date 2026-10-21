@@ -113,6 +113,30 @@ describe('common notice view mode components', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps pinned panel actions outside the selectable item button', () => {
+    const onItemClick = vi.fn();
+    const onAction = vi.fn();
+
+    render(
+      <PinnedItemsPanel
+        items={[items[0]]}
+        onItemClick={onItemClick}
+        renderItemAction={() => (
+          <button type="button" onClick={onAction}>고정 해제</button>
+        )}
+      />,
+    );
+
+    const action = screen.getByRole('button', { name: '고정 해제' });
+
+    expect(action.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(action);
+
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
+  });
+
   it('keeps feed and list item rendering separate', () => {
     render(
       <>
@@ -249,6 +273,49 @@ describe('common notice view mode components', () => {
     );
 
     expect(screen.getByTestId('list-category-chip')).toHaveClass('MuiChip-colorInfo');
+  });
+
+  it('keeps header and metadata actions outside the clickable list row', () => {
+    const onItemClick = vi.fn();
+    const onHeaderAction = vi.fn();
+    const onMetadataAction = vi.fn();
+
+    render(
+      <ListView
+        items={[
+          {
+            id: 22,
+            title: '고정 대상 문서',
+            authorLabel: '작성자',
+            dateLabel: '2026-10-21',
+            categoryLabel: '업무연락',
+          },
+        ]}
+        onItemClick={onItemClick}
+        renderItemHeaderAction={() => (
+          <button type="button" onClick={onHeaderAction}>문서 고정</button>
+        )}
+        renderItemAction={() => (
+          <button type="button" onClick={onMetadataAction}>기존 액션</button>
+        )}
+      />,
+    );
+
+    const category = screen.getByTestId('list-category-chip');
+    const pin = screen.getByRole('button', { name: '문서 고정' });
+    const metadataAction = screen.getByRole('button', { name: '기존 액션' });
+
+    expect(category.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
+    expect(pin.parentElement?.closest('button')).toBeNull();
+    expect(metadataAction.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(pin);
+    fireEvent.click(metadataAction);
+
+    expect(onHeaderAction).toHaveBeenCalledOnce();
+    expect(onMetadataAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
   });
 
   it('provides mode-specific skeletons', () => {

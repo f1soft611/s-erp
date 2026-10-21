@@ -418,7 +418,8 @@ class DocumentApprovalServiceImplTest {
                 && "101".equals(params.get("participantUserId"))
                 && "MY_PENDING".equals(params.get("scope"))
                 && "DRAFTING".equals(params.get("documentType"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && !params.containsKey("documentStatus")));
     }
 
     @Test

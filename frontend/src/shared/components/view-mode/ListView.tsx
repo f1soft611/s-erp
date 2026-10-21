@@ -7,6 +7,7 @@ import { ViewModePagination } from './ViewModePagination';
 type ListViewProps<T extends CommonViewItem> = {
   items: T[];
   onItemClick?: (item: T) => void;
+  renderItemHeaderAction?: (item: T) => ReactNode;
   renderItemAction?: (item: T) => ReactNode;
   ariaLabel?: string;
   badgeOrder?: 'category-status' | 'status-category';
@@ -23,6 +24,7 @@ type ListViewProps<T extends CommonViewItem> = {
 export function ListView<T extends CommonViewItem>({
   items,
   onItemClick,
+  renderItemHeaderAction,
   renderItemAction,
   ariaLabel = '리스트형 목록',
   badgeOrder = 'category-status',
@@ -82,14 +84,13 @@ export function ListView<T extends CommonViewItem>({
 
         return (
           <Box
-            component="button"
-            type="button"
+            data-testid="list-item-row"
             key={item.id}
-            onClick={() => onItemClick?.(item)}
             sx={{
               display: 'grid',
-              gridTemplateColumns: '24px minmax(0, 1fr)',
-              gap: 1.5,
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              gridTemplateRows: 'auto auto',
+              columnGap: 0.5,
               alignItems: 'center',
               width: '100%',
               minHeight: 68,
@@ -101,60 +102,98 @@ export function ListView<T extends CommonViewItem>({
               borderColor: 'divider',
               bgcolor: 'background.paper',
               color: 'inherit',
-              cursor: onItemClick ? 'pointer' : 'default',
               '&:hover': onItemClick ? { bgcolor: 'action.hover' } : undefined,
             }}
           >
-            <DescriptionOutlinedIcon
-              fontSize="small"
-              sx={{ color: item.isPinned ? 'primary.main' : 'text.secondary' }}
-            />
-            <Box sx={{ minWidth: 0 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                  minWidth: 0,
-                }}
-              >
-                <Typography
-                  variant="body2"
+            <Box
+              component="button"
+              type="button"
+              onClick={() => onItemClick?.(item)}
+              sx={{
+                gridColumn: 1,
+                gridRow: '1 / 3',
+                display: 'grid',
+                gridTemplateColumns: '24px minmax(0, 1fr)',
+                gap: 1.5,
+                alignItems: 'center',
+                width: '100%',
+                p: 0,
+                textAlign: 'left',
+                border: 0,
+                bgcolor: 'transparent',
+                color: 'inherit',
+                cursor: onItemClick ? 'pointer' : 'default',
+              }}
+            >
+              <DescriptionOutlinedIcon
+                fontSize="small"
+                sx={{ color: item.isPinned ? 'primary.main' : 'text.secondary' }}
+              />
+              <Box sx={{ minWidth: 0 }}>
+                <Box
                   sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
                     minWidth: 0,
-                    flex: 1,
-                    fontWeight: 700,
-                    color: item.isPinned ? 'primary.main' : 'text.primary',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {item.title}
-                </Typography>
-                {badgeOrder === 'status-category' ? (
-                  <>
-                    {statusChip}
-                    {categoryChip}
-                  </>
-                ) : (
-                  <>
-                    {categoryChip}
-                    {statusChip}
-                  </>
-                )}
-              </Box>
-              <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0, alignItems: 'center' }}>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {item.authorLabel}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {item.dateLabel}
-                </Typography>
-                <Box sx={{ ml: 'auto', flexShrink: 0 }}>
-                  {renderItemAction?.(item)}
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      minWidth: 0,
+                      flex: 1,
+                      fontWeight: 700,
+                      color: item.isPinned ? 'primary.main' : 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.title}
+                  </Typography>
+                  {badgeOrder === 'status-category' ? (
+                    <>
+                      {statusChip}
+                      {categoryChip}
+                    </>
+                  ) : (
+                    <>
+                      {categoryChip}
+                      {statusChip}
+                    </>
+                  )}
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0, alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {item.authorLabel}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {item.dateLabel}
+                  </Typography>
                 </Box>
               </Box>
+            </Box>
+            <Box
+              sx={{
+                gridColumn: 2,
+                gridRow: 1,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {renderItemHeaderAction?.(item)}
+            </Box>
+            <Box
+              sx={{
+                gridColumn: 2,
+                gridRow: 2,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+              }}
+            >
+              {renderItemAction?.(item)}
             </Box>
           </Box>
         );

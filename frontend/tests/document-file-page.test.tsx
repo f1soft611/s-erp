@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   listDocumentApprovals: vi.fn(), listPinnedDocumentApprovals: vi.fn(), getDocumentApprovalSummary: vi.fn(), listDocumentFiles: vi.fn(),
+  pinDocumentApproval: vi.fn(), unpinDocumentApproval: vi.fn(),
   downloadDocumentApprovalAttachment: vi.fn(), downloadApprovalCommentAttachment: vi.fn(),
   showError: vi.fn(),
 }));
@@ -14,8 +15,26 @@ vi.mock('../src/pages/groupware/documents/write/components/DocumentFeedItem', ()
   DocumentFeedItem: () => null,
 }));
 vi.mock('../src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed', () => ({
-  DocumentApprovalDetailFeed: ({ electronicApprovalId }: { electronicApprovalId: number }) =>
-    <div>상세 {electronicApprovalId}</div>,
+  DocumentApprovalDetailFeed: ({
+    electronicApprovalId,
+    isPinned,
+    onTogglePin,
+  }: {
+    electronicApprovalId: number;
+    isPinned: boolean;
+    onTogglePin: (id: number, isPinned: boolean, title: string) => void;
+  }) => (
+    <>
+      <div>상세 {electronicApprovalId}</div>
+      <button
+        type="button"
+        aria-label={`${isPinned ? '상단 고정 해제' : '상단 고정'} Sample Document`}
+        onClick={() => onTogglePin(electronicApprovalId, isPinned, 'Sample Document')}
+      >
+        고정 상태 액션
+      </button>
+    </>
+  ),
 }));
 import { DocumentWritePage } from '../src/pages/groupware/documents/write/DocumentWritePage';
 
@@ -36,6 +55,8 @@ describe('document write file mode', () => {
     vi.clearAllMocks();
     api.listDocumentApprovals.mockResolvedValue({ resultList: [], totalRowCount: 0 });
     api.listPinnedDocumentApprovals.mockResolvedValue([]);
+    api.pinDocumentApproval.mockResolvedValue(undefined);
+    api.unpinDocumentApproval.mockResolvedValue(undefined);
     api.downloadDocumentApprovalAttachment.mockResolvedValue(undefined);
     api.downloadApprovalCommentAttachment.mockResolvedValue(undefined);
     api.getDocumentApprovalSummary.mockResolvedValue({
@@ -72,5 +93,75 @@ describe('document write file mode', () => {
       expect.objectContaining({ scope: 'DRAFT', beforeFileId: undefined }),
     ));
     expect(screen.getByRole('button', { name: '파일형 보기' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('preserves pinned status when opening a file source document', async () => {
+    api.listPinnedDocumentApprovals.mockResolvedValue([{
+      electronicApprovalId: 10,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: 'Sample Document',
+      drafterName: 'Sample User',
+      summary: 'Sample summary',
+      createdAt: '2026-10-20T09:00:00Z',
+    }]);
+    render(<DocumentWritePage {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: '파일형 보기' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'direct.pdf 원문 보기' }));
+    expect(await screen.findByRole('button', {
+      name: '상단 고정 해제 Sample Document',
+    })).toBeInTheDocument();
+    expect(api.listPinnedDocumentApprovals).toHaveBeenLastCalledWith(
+      'ALL',
+      undefined,
+      undefined,
+    );
+
+    fireEvent.click(screen.getByRole('button', {
+      name: '상단 고정 해제 Sample Document',
+    }));
+    await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    expect(api.unpinDocumentApproval).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  });
+
+  it('uses current scope and document kind when loading pinned state in file mode', async () => {
+    api.getDocumentApprovalSummary.mockResolvedValue({
+      actionRequiredCount: 1, inProgressCount: 0, draftCount: 0, completedCount: 0,
+      revisionRequestedCount: 0, rejectedCount: 0,
+      notices: [{
+        electronicApprovalId: 10,
+        eabusNo: '001',
+        documentType: 'DRAFTING',
+        documentStatus: 'PENDING',
+        title: 'Sample Document',
+        drafterName: 'Sample User',
+        summary: 'Sample summary',
+        noticeType: 'ACTION_REQUIRED',
+      }],
+    });
+    render(<DocumentWritePage {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: '파일형 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: /작성 중 문서/ }));
+    await waitFor(() => expect(api.listPinnedDocumentApprovals).toHaveBeenLastCalledWith(
+      'DRAFT',
+      undefined,
+      undefined,
+    ));
+    fireEvent.click(screen.getByRole('button', { name: '문서 업무구분 필터' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '기안서' }));
+    await waitFor(() => expect(api.listPinnedDocumentApprovals).toHaveBeenLastCalledWith(
+      'DRAFT',
+      'DRAFTING',
+      undefined,
+    ));
+    fireEvent.click(await screen.findByRole('button', { name: /결재 요청 도착/ }));
+    await waitFor(() => expect(api.listPinnedDocumentApprovals).toHaveBeenLastCalledWith(
+      'ALL',
+      undefined,
+      10,
+    ));
   });
 });

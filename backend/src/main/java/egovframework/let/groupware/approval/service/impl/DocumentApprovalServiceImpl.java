@@ -496,6 +496,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
         }
         Map<String, Object> params = actorParams(user);
+        params.remove("documentStatus");
         params.put("userId", authenticatedUserId(user));
         params.put("scope", effectiveScope);
         params.put("documentType", documentType);

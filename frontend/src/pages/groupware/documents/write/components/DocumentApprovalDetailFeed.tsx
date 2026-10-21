@@ -79,7 +79,12 @@ type DocumentApprovalDetailFeedSharedProps = {
   electronicApprovalId: number | null;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
-  onTogglePin?: (electronicApprovalId: number, pinned: boolean) => Promise<void>;
+  onTogglePin?: (
+    electronicApprovalId: number,
+    pinned: boolean,
+    title: string,
+  ) => void;
+  isPinned?: boolean;
   pinPending?: boolean;
   detailRefreshToken: number;
 };
@@ -203,8 +208,7 @@ function toApprovalCommentTree(
         size: file.fileSize,
         mimeType: file.mimeType,
         previewUrl: commentImageUrls[`${record.commentId}:${file.fileId}`],
-        previewError:
-          commentImageErrors[`${record.commentId}:${file.fileId}`],
+        previewError: commentImageErrors[`${record.commentId}:${file.fileId}`],
       })),
       replies: [],
     });
@@ -976,7 +980,9 @@ export function DocumentApprovalDetailFeed(
     ) : null;
 
   const feedItem = props.presentation === 'feed' ? props.feedItem : null;
-  const isPinned = Boolean(feedItem?.isPinned);
+  const isPinned = feedItem
+    ? Boolean(feedItem.isPinned)
+    : Boolean(props.isPinned);
   const pinTitle = detail?.title ?? feedItem?.title ?? '';
   const pinAriaLabel = isPinned
     ? `상단 고정 해제 ${pinTitle}`
@@ -1083,17 +1089,13 @@ export function DocumentApprovalDetailFeed(
           <IconButton
             aria-label={pinAriaLabel}
             title={pinAriaLabel}
-            disabled={!isFeedPresentation || pinPending || !onTogglePin}
+            disabled={
+              pinPending || !onTogglePin || electronicApprovalId === null
+            }
             size="small"
             onClick={() => {
-              if (!isFeedPresentation || !onTogglePin || electronicApprovalId === null) return;
-              void onTogglePin(electronicApprovalId, isPinned).catch((error: unknown) => {
-                showError(
-                  error instanceof Error
-                    ? error.message
-                    : '문서 고정 상태를 변경하지 못했습니다.',
-                );
-              });
+              if (!onTogglePin || electronicApprovalId === null) return;
+              onTogglePin(electronicApprovalId, isPinned, pinTitle);
             }}
           >
             <PushPinOutlinedIcon fontSize="small" />
@@ -1194,8 +1196,7 @@ export function DocumentApprovalDetailFeed(
                     variant="caption"
                     color="text.secondary"
                   >
-                    기안자 · {displayDate} · 조회{' '}
-                    {detail.viewCount}
+                    기안자 · {displayDate} · 조회 {detail.viewCount}
                   </Typography>
                 </Box>
               </Stack>
@@ -1246,7 +1247,9 @@ export function DocumentApprovalDetailFeed(
                       variant="body1"
                       sx={{ fontWeight: 700 }}
                     >
-                      {displayDocumentType === 'BUSINESS_CONTACT' ? '참조자' : '결재선'}
+                      {displayDocumentType === 'BUSINESS_CONTACT'
+                        ? '참조자'
+                        : '결재선'}
                     </Typography>
                     <Typography
                       data-testid="approval-line-drafter-meta"
@@ -1262,7 +1265,9 @@ export function DocumentApprovalDetailFeed(
                 approvalLineGroups.agreement.length === 0 &&
                 approvalLineGroups.reference.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    {displayDocumentType === 'BUSINESS_CONTACT' ? '참조자 정보가 없습니다.' : '결재선 정보가 없습니다.'}
+                    {displayDocumentType === 'BUSINESS_CONTACT'
+                      ? '참조자 정보가 없습니다.'
+                      : '결재선 정보가 없습니다.'}
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
@@ -1284,10 +1289,9 @@ export function DocumentApprovalDetailFeed(
                               const hasReasonPopover =
                                 line.actionStatus === 'REJECTED' ||
                                 line.actionStatus === 'RETURNED';
-                              const actionReason =
-                                hasReasonPopover
-                                  ? line.actionComment
-                                  : null;
+                              const actionReason = hasReasonPopover
+                                ? line.actionComment
+                                : null;
                               const reasonTitle =
                                 line.actionStatus === 'RETURNED'
                                   ? '보완요청 사유'
@@ -1395,7 +1399,8 @@ export function DocumentApprovalDetailFeed(
                                             ],
                                           fontSize: '1rem',
                                           fontWeight: 700,
-                                          ...(line.actionStatus === 'RETURNED' && {
+                                          ...(line.actionStatus ===
+                                            'RETURNED' && {
                                             whiteSpace: 'pre-line',
                                             textAlign: 'center',
                                             lineHeight: 1.05,
@@ -1409,37 +1414,39 @@ export function DocumentApprovalDetailFeed(
                                               line.actionStatus,
                                             )}
                                       </Avatar>
-                                      {actionReason &&
-                                        actionReason.trim() && (
-                                          <IconButton
-                                            size="small"
-                                            aria-label={`${line.participantName} ${reasonTitle} 보기`}
-                                            aria-haspopup="dialog"
-                                            onClick={(event) =>
-                                              setReasonPopover({
-                                                anchorEl: event.currentTarget,
-                                                reason: actionReason,
-                                                title: reasonTitle,
-                                              })
-                                            }
-                                            sx={{
-                                              position: 'absolute',
-                                              top: 4,
-                                              right: 8,
-                                              width: 24,
-                                              height: 24,
-                                              bgcolor: 'background.paper',
-                                              color: approvalLineStatusColors[statusTone],
-                                              '&:hover': {
-                                                bgcolor: 'background.default',
-                                              },
-                                            }}
-                                          >
-                                            <MessageOutlinedIcon
-                                              sx={{ fontSize: 16 }}
-                                            />
-                                          </IconButton>
-                                        )}
+                                      {actionReason && actionReason.trim() && (
+                                        <IconButton
+                                          size="small"
+                                          aria-label={`${line.participantName} ${reasonTitle} 보기`}
+                                          aria-haspopup="dialog"
+                                          onClick={(event) =>
+                                            setReasonPopover({
+                                              anchorEl: event.currentTarget,
+                                              reason: actionReason,
+                                              title: reasonTitle,
+                                            })
+                                          }
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 4,
+                                            right: 8,
+                                            width: 24,
+                                            height: 24,
+                                            bgcolor: 'background.paper',
+                                            color:
+                                              approvalLineStatusColors[
+                                                statusTone
+                                              ],
+                                            '&:hover': {
+                                              bgcolor: 'background.default',
+                                            },
+                                          }}
+                                        >
+                                          <MessageOutlinedIcon
+                                            sx={{ fontSize: 16 }}
+                                          />
+                                        </IconButton>
+                                      )}
                                       {!hasReasonPopover &&
                                         line.actionComment && (
                                           <Typography
@@ -2138,17 +2145,18 @@ export function DocumentApprovalDetailFeed(
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => setIsDeleteDialogOpen(false)}
-            disabled={isDeleting}
-          >
-            취소
-          </Button>
-          <Button
             color="error"
+            variant="contained"
             onClick={() => void handleDeleteDocument()}
             disabled={isDeleting}
           >
             {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+          <Button
+            onClick={() => setIsDeleteDialogOpen(false)}
+            disabled={isDeleting}
+          >
+            취소
           </Button>
         </DialogActions>
       </Dialog>

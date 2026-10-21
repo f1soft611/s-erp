@@ -1586,7 +1586,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 동작 요약:
 
-- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`/`datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식과 date 컬럼의 지원 `format`은 Excel number format으로 반영하며 셀 값의 계산 가능한 타입은 유지한다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
 - **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
 - **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
 - **행 추가**: 일반 F1Grid에서는 데이터 순서의 맨 아래에 새 행을 추가한다. F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가) 기존 트리 동작을 유지한다.
@@ -2307,7 +2307,7 @@ F1-Grid에 전달하는 모든 행은 `rowKey` 값이 안정적이고 서로 달
 - 2026-10-21부터 목록은 F1Grid 대신 `F1Tree`(`parentKey="parentId"`, `treeColumn="name"`, `defaultExpandAll`)로 표시하며 `F1GridDataSource` 대신 로컬 `rows`를 전달한다. `rowKey`/`parentId`는 `section:folders`(부모 `null`), `section:files`(부모 `null`), `folder:<itemCode>`(부모 `section:folders`), `file:<boardFileId>`(부모 `section:files`)이다. 파일을 분류 아래로 중첩하지 않으며, 분류 이름 클릭은 기존처럼 현재 폴더 필터를 바꾼다.
 - 파일 업로드(`POST` 직접 업로드)는 게시글 INSERT 시 인증 사용자의 `writerId`/`writerName`을 함께 전달한다(`tb_board_post.writer_id` NOT NULL). 누락 시 공통 DB 오류 메시지가 표시되던 문제의 수정이다.
 - 루트에는 분류 폴더와 파일 섹션을 함께 표시한다. 폴더를 선택하면 경로와 해당 폴더의 파일만 표시하고, 루트 이동으로 돌아올 수 있다. 파일 날짜/유형 검색 중에도 루트의 폴더 탐색은 유지한다.
-- 컬럼은 `이름`, `소유자`, `올린 날짜`, `크기`, `작업` 순서이며, 정렬/필터/엑셀 내보내기는 비활성화한다.
+- 컬럼은 `이름`, `소유자`, `올린 날짜`, `크기`, `작업` 순서이며, 정렬/필터는 비활성화한다. 우클릭 메뉴의 엑셀 내보내기는 활성화하고 루트 추가, 행 추가, 행 삭제, 행 복제 메뉴는 비활성화한다. 컨텍스트 메뉴 구분선은 비어 있지 않은 액션 그룹 사이에만 표시되므로, 자료실에서는 일반 메뉴와 기본 설정 복원 사이에 하나만 표시된다.
 - 폴더 생성은 기존 `WF_ARCHIVE_CATEGORY` 공통코드 도움창을 사용한다. 새 항목의 코드가 비어 있으면 공통코드 서비스가 코드를 자동 생성한다.
 - 업로드/폴더 생성/파일 수정/삭제 작업은 tenant 관리자 및 메뉴 권한으로 제어한다. 비활성 폴더는 탐색·다운로드할 수 있지만 업로드, 이름 변경, 이동, 삭제는 허용하지 않는다.
 - `새 자료 등록`은 메타데이터 입력 폼 없이 hidden `input[type=file][multiple]`을 즉시 열고, 선택 파일을 개별 업로드 요청으로 처리한다.

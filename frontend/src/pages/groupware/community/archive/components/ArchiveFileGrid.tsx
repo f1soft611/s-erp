@@ -213,7 +213,7 @@ export function ArchiveFileGrid({
     result.push({
       field: 'rowKey',
       headerName: '작업',
-      width: isNarrow ? 112 : 150,
+      width: isNarrow ? 112 : 120,
       align: 'center',
       editable: false,
       search: { hidden: true },
@@ -290,7 +290,8 @@ export function ArchiveFileGrid({
         disableSorting
         disableFiltering
         stripeRows
-        canExportExcel={false}
+        canExportExcel
+        allowAddRootInContextMenu={false}
         allowAddRowInContextMenu={false}
         allowDeleteRowInContextMenu={false}
         allowDuplicateRowInContextMenu={false}

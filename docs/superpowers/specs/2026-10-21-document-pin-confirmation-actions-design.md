@@ -16,10 +16,10 @@ request, and place pin actions consistently in list, feed, and detail views.
 - After success, retain the current quiet refresh of the pinned and ordinary
   document lists. Existing error notifications remain in place.
 - List view: place the pin icon immediately beside the document-kind chip.
-- Feed view: place the pin icon beside the `더보기` control in the document
-  toolbar.
-- Document detail overlay: place the pin icon beside `더보기` and reflect the
-  selected document's current pin state.
+- Feed view: order the document toolbar as status, document kind, divider, pin,
+  and `더보기`; place the pin icon immediately before the `더보기` control.
+- Document detail overlay: use the same toolbar order and reflect the selected
+  document's current pin state.
 - The unpin action in the pinned-items panel also uses the same confirmation.
 
 ## Current implementation findings
@@ -44,8 +44,10 @@ canceling clears the pending action. The handler catches and reports mutation
 errors with the existing notification context.
 
 Add an optional header-action render prop to `ListView`, rendered adjacent to
-the category chip. Use it for the document list pin button and remove the
-document pin button from the author/date row. Render `pinControl` in
+the category chip. Keep this action and metadata actions outside the row's
+content button so the DOM contains no nested interactive buttons. Use the
+header slot for the document list pin button and remove the document pin button
+from the author/date row. Render `pinControl` in
 `DocumentApprovalToolbar` immediately next to `moreMenu`. Extend the detail
 component's shared props with the selected document's pin state and use the
 same control in panel and feed presentations. The page resolves panel pin state

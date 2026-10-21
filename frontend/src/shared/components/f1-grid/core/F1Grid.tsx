@@ -2511,6 +2511,12 @@ function F1GridInner<T extends object>(
     sortState.length > 0 || filterState.length > 0;
   const showDuplicateRowInContextMenu = allowDuplicateRowInContextMenu ?? true;
   const showDeleteRowInContextMenu = allowDeleteRowInContextMenu ?? true;
+  const hasRowContextMenuActions =
+    (treeContextMenu !== undefined && showAddRootInContextMenu) ||
+    showAddRowInContextMenu ||
+    showDuplicateRowInContextMenu ||
+    showDeleteRowInContextMenu;
+  const hasClearContextMenuActions = !disableFiltering || !disableSorting;
 
   const resolvedHeight =
     typeof height === 'number' ? `${height}px` : (height ?? 'auto');
@@ -2969,7 +2975,9 @@ function F1GridInner<T extends object>(
             행 삭제
           </MenuItem>
         ) : null}
-        {!disableFiltering || !disableSorting ? <Divider /> : null}
+        {hasRowContextMenuActions && hasClearContextMenuActions ? (
+          <Divider />
+        ) : null}
         {!disableFiltering ? (
           <MenuItem
             disabled={filterState.length === 0}
@@ -2986,7 +2994,9 @@ function F1GridInner<T extends object>(
             정렬 해제
           </MenuItem>
         ) : null}
-        <Divider />
+        {hasRowContextMenuActions || hasClearContextMenuActions ? (
+          <Divider />
+        ) : null}
         <MenuItem onClick={handleResetColumnSettingsClick}>
           설정을 기본값으로 복원
         </MenuItem>

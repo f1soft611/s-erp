@@ -8,6 +8,7 @@ import {
   type F1GridRef,
 } from '../src/shared/components/f1-grid';
 import { createDocumentStatusColumns } from '../src/pages/groupware/documents/status/components/DocumentStatusGrid';
+import { getGridDateValue } from '../src/shared/components/f1-grid/utils/grid.utils';
 
 type Row = { id: string; date: string | Date | null | undefined };
 
@@ -18,6 +19,27 @@ const column: F1GridColumn<Row> = {
 };
 
 describe('F1-GRID date formatting', () => {
+  it.each([
+    ['2026-10-20', 2026, 9, 20],
+    ['2026-10-20T00:30:00+14:00', 2026, 9, 20],
+    ['20261020', 2026, 9, 20],
+    [new Date(2026, 9, 20, 15, 30), 2026, 9, 20],
+  ])('parses %s as a timezone-stable date-only value', (value, year, month, day) => {
+    const parsed = getGridDateValue(value);
+    expect(parsed).toBeInstanceOf(Date);
+    expect(parsed?.getFullYear()).toBe(year);
+    expect(parsed?.getMonth()).toBe(month);
+    expect(parsed?.getDate()).toBe(day);
+    expect(parsed?.getHours()).toBe(0);
+  });
+
+  it.each([null, undefined, '', '2026-02-29', 'not-a-date'])(
+    'does not parse empty or invalid date value %s',
+    (value) => {
+      expect(getGridDateValue(value)).toBeUndefined();
+    },
+  );
+
   it.each([
     ['2026-10-20', '2026-10-20'],
     ['2026-10-20T09:21:00', '2026-10-20'],

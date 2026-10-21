@@ -482,6 +482,28 @@ describe('F1-Grid context menu', () => {
     );
   });
 
+  it('renders one separator when a tree context menu has no row actions', () => {
+    render(
+      <F1Tree
+        rows={treeRows}
+        columns={treeColumns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="자료실 트리"
+        canExportExcel
+        allowAddRootInContextMenu={false}
+        allowAddRowInContextMenu={false}
+        allowDuplicateRowInContextMenu={false}
+        allowDeleteRowInContextMenu={false}
+      />,
+    );
+
+    fireEvent.contextMenu(getGridBody('자료실 트리'));
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1);
+  });
+
   it('does not show the root add item for a plain F1Grid', () => {
     render(
       <F1Grid

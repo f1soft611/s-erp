@@ -140,14 +140,16 @@ export function useDocumentWritePage() {
       : undefined;
     const listRequest =
       viewMode === 'file'
-        ? Promise.resolve({
-            pinnedDocuments: [] as DocumentWriteItem[],
-            unpinnedDocuments: [] as DocumentWriteItem[],
-            pinnedFeedDocuments: [] as DocumentFeedWriteItem[],
-            unpinnedFeedDocuments: [] as DocumentFeedWriteItem[],
-            totalRowCount: 0,
-            nextOffset: 0,
-          })
+        ? listPinnedDocumentApprovals(scope, documentType, selectedDocumentId).then(
+            (pinnedRecords) => ({
+              pinnedDocuments: pinnedRecords.map((record) => mapDocument(record, true)),
+              unpinnedDocuments: [] as DocumentWriteItem[],
+              pinnedFeedDocuments: [] as DocumentFeedWriteItem[],
+              unpinnedFeedDocuments: [] as DocumentFeedWriteItem[],
+              totalRowCount: 0,
+              nextOffset: 0,
+            }),
+          )
         : viewMode === 'feed'
         ? Promise.all([
             listPinnedDocumentApprovals(scope, documentType, selectedDocumentId, true),

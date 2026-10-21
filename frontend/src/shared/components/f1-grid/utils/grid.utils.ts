@@ -213,28 +213,30 @@ function formatNumericValue(
   }).format(numericValue);
 }
 
+export function getGridDateValue(value: unknown): Date | undefined {
+  if (value instanceof Date) {
+    if (!dayjs(value).isValid()) return undefined;
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value !== 'string') return undefined;
+
+  const match = value.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:$|[T ])/);
+  if (!match) return undefined;
+  const dateText = `${match[1]}-${match[2]}-${match[3]}`;
+  const parsed = dayjs(dateText);
+  if (!parsed.isValid() || parsed.format('YYYY-MM-DD') !== dateText) {
+    return undefined;
+  }
+  return new Date(parsed.year(), parsed.month(), parsed.date());
+}
+
 function formatDateValue(value: unknown, format = 'yyyy-mm-dd'): string {
   const rawValue = String(value ?? '');
   if (rawValue === '') return '';
 
-  let dateValue: string | Date;
-  if (value instanceof Date) {
-    dateValue = value;
-  } else if (typeof value === 'string') {
-    const match = value.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:$|[T ])/);
-    if (!match) return rawValue;
-    dateValue = `${match[1]}-${match[2]}-${match[3]}`;
-  } else {
-    return rawValue;
-  }
-
+  const dateValue = getGridDateValue(value);
+  if (!dateValue) return rawValue;
   const parsed = dayjs(dateValue);
-  if (
-    !parsed.isValid() ||
-    (typeof dateValue === 'string' && parsed.format('YYYY-MM-DD') !== dateValue)
-  ) {
-    return rawValue;
-  }
 
   const tokens: Record<string, string> = {
     yyyy: parsed.format('YYYY'),
@@ -253,7 +255,7 @@ function formatDateValue(value: unknown, format = 'yyyy-mm-dd'): string {
 
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
-  value: T[keyof T],
+  value: unknown,
 ): string {
   if (column.type === 'date') {
     return formatDateValue(value, column.format);

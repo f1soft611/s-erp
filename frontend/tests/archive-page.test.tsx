@@ -169,6 +169,20 @@ describe('Archive dashboard page', () => {
     );
   }, 15000);
 
+  it('shows Excel export without root-add in the archive tree context menu', async () => {
+    renderArchive();
+    const grid = await screen.findByRole('grid', { name: '자료실' });
+
+    fireEvent.contextMenu(grid);
+
+    expect(
+      screen.queryByRole('menuitem', { name: '루트 추가' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
+  });
+
   it('sends keyword search to file-list API', async () => {
     renderArchive();
     const search = await screen.findByRole('textbox', { name: '자료 검색' });
