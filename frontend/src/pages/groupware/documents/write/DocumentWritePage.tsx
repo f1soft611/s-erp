@@ -62,10 +62,10 @@ export function DocumentWritePage({
     openComposer,
     closeComposer,
     pinnedDocuments,
-    unpinnedDocuments,
+    listDocuments,
     feedDocuments,
     pinnedViewItems,
-    unpinnedViewItems,
+    listViewItems,
     summary,
     notices,
     isLoading,
@@ -113,7 +113,7 @@ export function DocumentWritePage({
   const hasVisibleDocuments =
     viewMode === 'feed'
       ? feedDocuments.length > 0
-      : pinnedDocuments.length + unpinnedDocuments.length > 0;
+      : pinnedDocuments.length + listDocuments.length > 0;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'document-write',
@@ -270,26 +270,12 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <>
-                {viewMode === 'list' && pinnedDocuments.length > 0 && (
+                {pinnedDocuments.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
                     <PinnedItemsPanel
                       items={pinnedViewItems}
                       ariaLabel="상단 고정 문서"
                       onItemClick={(item) => openDetail(Number(item.id))}
-                      renderItemAction={(item) => (
-                        <IconButton
-                          size="small"
-                          aria-label={`상단 고정 해제 ${item.title}`}
-                          title={`상단 고정 해제 ${item.title}`}
-                          disabled={isPinPending(Number(item.id))}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            requestPinToggle(Number(item.id), true, item.title);
-                          }}
-                        >
-                          <PushPinOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      )}
                     />
                   </Box>
                 )}
@@ -328,9 +314,9 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <Box data-testid="document-list">
-                    {unpinnedViewItems.length > 0 ? (
+                    {listViewItems.length > 0 ? (
                       <ListView
-                        items={unpinnedViewItems}
+                        items={listViewItems}
                         ariaLabel="리스트형 문서 목록"
                         badgeOrder="status-category"
                         pagination={{
@@ -345,15 +331,18 @@ export function DocumentWritePage({
                         renderItemHeaderAction={(item) => (
                           <IconButton
                             size="small"
-                            aria-label={`상단 고정 ${item.title}`}
-                            title={`상단 고정 ${item.title}`}
+                            aria-label={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
+                            title={`${item.isPinned ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
                             disabled={isPinPending(Number(item.id))}
                             onClick={(event) => {
                               event.stopPropagation();
-                              requestPinToggle(Number(item.id), false, item.title);
+                              requestPinToggle(Number(item.id), Boolean(item.isPinned), item.title);
                             }}
                           >
-                            <PushPinOutlinedIcon fontSize="small" />
+                            <PushPinOutlinedIcon
+                              fontSize="small"
+                              color={item.isPinned ? 'primary' : 'inherit'}
+                            />
                           </IconButton>
                         )}
                       />

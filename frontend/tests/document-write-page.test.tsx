@@ -1326,35 +1326,78 @@ describe('Document write page', () => {
     expect(composerApi.pinDocumentApproval).toHaveBeenCalledTimes(1);
   }, 20000);
 
-  it('requires confirmation before unpinning a pinned-panel document', async () => {
+  it('does not offer direct unpinning in the pinned panel', async () => {
     mockPaginatedDocumentLists();
     const documentA = defaultDocumentRecords[0];
     if (!documentA) throw new Error('Missing pinned document fixture.');
     composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
     render(<DashboardContent {...pageProps} />);
-    await screen.findByRole('region', { name: '상단 고정 문서' });
-
-    fireEvent.click(
-      screen.getByRole('button', { name: '상단 고정 해제 문서 A' }),
-    );
-    let dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
+    const panel = await screen.findByRole('region', { name: '상단 고정 문서' });
+    expect(within(panel).getByRole('button', { name: '문서 A' })).toBeInTheDocument();
     expect(
-      within(dialog).getByText('이 문서의 상단 고정을 해제하시겠습니까?'),
-    ).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+      within(panel).queryByRole('button', { name: '상단 고정 해제 문서 A' }),
+    ).not.toBeInTheDocument();
     expect(composerApi.unpinDocumentApproval).not.toHaveBeenCalled();
-    await waitForElementToBeRemoved(dialog);
+  });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: '상단 고정 해제 문서 A' }),
+  it('shows the pinned panel in feed mode and highlights the pinned card icon', async () => {
+    mockPaginatedDocumentLists();
+    const documentA = defaultDocumentRecords[0];
+    if (!documentA) throw new Error('Missing pinned document fixture.');
+    composerApi.listPinnedDocumentApprovals.mockImplementation(
+      (_scope, _documentType, _documentId, includeDetails) =>
+        Promise.resolve([includeDetails ? toFeedRecord(documentA) : documentA]),
     );
+    render(<DashboardContent {...pageProps} />);
+    await screen.findByRole('region', { name: '상단 고정 문서' });
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    const feed = await screen.findByTestId('document-feed');
+    const panel = screen.getByRole('region', { name: '상단 고정 문서' });
+    expect(within(panel).getByRole('button', { name: '문서 A' })).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole('button', { name: '상단 고정 해제 문서 A' }),
+    ).not.toBeInTheDocument();
+    const pinnedButton = within(feed).getByRole('button', {
+      name: '상단 고정 해제 문서 A',
+    });
+    expect(within(pinnedButton).getByTestId('PushPinOutlinedIcon'))
+      .toHaveClass('MuiSvgIcon-colorPrimary');
+    const ordinaryButton = within(feed).getByRole('button', {
+      name: '상단 고정 문서 B',
+    });
+    expect(within(ordinaryButton).getByTestId('PushPinOutlinedIcon'))
+      .not.toHaveClass('MuiSvgIcon-colorPrimary');
+  });
+
+  it('keeps the list row after pinning and updates its colored unpin action', async () => {
+    mockPaginatedDocumentLists();
+    const documentA = defaultDocumentRecords[0];
+    if (!documentA) throw new Error('Missing pinned document fixture.');
+    composerApi.pinDocumentApproval.mockImplementationOnce(async () => {
+      composerApi.listPinnedDocumentApprovals.mockResolvedValue([documentA]);
+      return { electronicApprovalId: 1, pinned: true };
+    });
+    composerApi.unpinDocumentApproval.mockImplementationOnce(async () => {
+      composerApi.listPinnedDocumentApprovals.mockResolvedValue([]);
+      return { electronicApprovalId: 1, pinned: false };
+    });
+    render(<DashboardContent {...pageProps} />);
+    const list = await screen.findByRole('region', { name: '리스트형 문서 목록' });
+    fireEvent.click(within(list).getByRole('button', { name: '상단 고정 문서 A' }));
+    let dialog = await screen.findByRole('dialog', { name: '상단 고정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    const unpin = await within(list).findByRole('button', { name: '상단 고정 해제 문서 A' });
+    expect(within(unpin).getByTestId('PushPinOutlinedIcon'))
+      .toHaveClass('MuiSvgIcon-colorPrimary');
+    expect(within(list).getAllByTestId('list-item-row')).toHaveLength(6);
+    fireEvent.click(unpin);
     dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });
     fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-    await waitFor(() =>
-      expect(composerApi.unpinDocumentApproval).toHaveBeenCalledTimes(1),
-    );
+    const pin = await within(list).findByRole('button', { name: '상단 고정 문서 A' });
+    expect(within(pin).getByTestId('PushPinOutlinedIcon'))
+      .not.toHaveClass('MuiSvgIcon-colorPrimary');
     expect(composerApi.unpinDocumentApproval).toHaveBeenCalledWith(1);
-  });
+  }, 20000);
 
   it('requires confirmation before pinning a feed document', async () => {
     mockPaginatedDocumentLists();
@@ -1396,6 +1439,8 @@ describe('Document write page', () => {
     const pin = await within(overlay).findByRole('button', {
       name: '상단 고정 해제 문서 A',
     });
+    expect(within(pin).getByTestId('PushPinOutlinedIcon'))
+      .toHaveClass('MuiSvgIcon-colorPrimary');
 
     fireEvent.click(pin);
     let dialog = await screen.findByRole('dialog', { name: '상단 고정 해제' });

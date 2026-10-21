@@ -58,7 +58,7 @@ describe('useDocumentWritePage pagination', () => {
       result.current.loadMore();
     });
 
-    await waitFor(() => expect(result.current.unpinnedDocuments).toHaveLength(25));
+    await waitFor(() => expect(result.current.listDocuments).toHaveLength(25));
     expect(listDocumentApprovals).toHaveBeenCalledTimes(2);
     expect(listDocumentApprovals).toHaveBeenLastCalledWith('ALL', undefined, undefined, false, {
       offset: 20,
@@ -79,12 +79,12 @@ describe('useDocumentWritePage pagination', () => {
       result.current.loadMore();
     });
     await waitFor(() => expect(result.current.pageError).toBeTruthy());
-    expect(result.current.unpinnedDocuments).toHaveLength(20);
+    expect(result.current.listDocuments).toHaveLength(20);
 
     await act(async () => {
       result.current.retryLoadMore();
     });
-    await waitFor(() => expect(result.current.unpinnedDocuments).toHaveLength(40));
+    await waitFor(() => expect(result.current.listDocuments).toHaveLength(40));
     expect(listDocumentApprovals).toHaveBeenLastCalledWith('ALL', undefined, undefined, false, {
       offset: 20,
       limit: 20,
@@ -103,6 +103,6 @@ describe('useDocumentWritePage pagination', () => {
       false,
       { offset: 0, limit: 20 },
     );
-    expect(result.current.unpinnedDocuments).toHaveLength(0);
+    expect(result.current.listDocuments).toHaveLength(0);
   });
 });

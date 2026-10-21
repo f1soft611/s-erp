@@ -1098,7 +1098,10 @@ export function DocumentApprovalDetailFeed(
               onTogglePin(electronicApprovalId, isPinned, pinTitle);
             }}
           >
-            <PushPinOutlinedIcon fontSize="small" />
+            <PushPinOutlinedIcon
+              fontSize="small"
+              color={isPinned ? 'primary' : 'inherit'}
+            />
           </IconButton>
         }
         moreMenu={documentMenu}

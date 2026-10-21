@@ -90,7 +90,12 @@ export function useDocumentWritePage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWriteItem[]>([]);
+  const [pinnedDocuments, setPinnedDocuments] = useState<DocumentWriteItem[]>([]);
   const [feedDocuments, setFeedDocuments] = useState<DocumentFeedWriteItem[]>([]);
+  const pinnedIds = useMemo(
+    () => new Set(pinnedDocuments.map((item) => item.id)),
+    [pinnedDocuments],
+  );
   const [summary, setSummary] = useState<DocumentApprovalSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -143,9 +148,8 @@ export function useDocumentWritePage() {
         ? listPinnedDocumentApprovals(scope, documentType, selectedDocumentId).then(
             (pinnedRecords) => ({
               pinnedDocuments: pinnedRecords.map((record) => mapDocument(record, true)),
-              unpinnedDocuments: [] as DocumentWriteItem[],
-              pinnedFeedDocuments: [] as DocumentFeedWriteItem[],
-              unpinnedFeedDocuments: [] as DocumentFeedWriteItem[],
+              listDocuments: [] as DocumentWriteItem[],
+              feedDocuments: [] as DocumentFeedWriteItem[],
               totalRowCount: 0,
               nextOffset: 0,
             }),
@@ -159,14 +163,12 @@ export function useDocumentWritePage() {
             }),
           ]).then(([pinnedRecords, page]) => {
             const pinnedIds = new Set(pinnedRecords.map((item) => item.electronicApprovalId));
-            const filteredRecords = page.resultList.filter(
-              (item) => !pinnedIds.has(item.electronicApprovalId),
-            );
             return {
               pinnedDocuments: pinnedRecords.map((record) => mapDocument(record, true)),
-              unpinnedDocuments: filteredRecords.map((record) => mapDocument(record, false)),
-              pinnedFeedDocuments: pinnedRecords.map((record) => mapFeedDocument(record, true)),
-              unpinnedFeedDocuments: filteredRecords.map((record) => mapFeedDocument(record, false)),
+              listDocuments: page.resultList.map((record) =>
+                mapDocument(record, pinnedIds.has(record.electronicApprovalId))),
+              feedDocuments: page.resultList.map((record) =>
+                mapFeedDocument(record, pinnedIds.has(record.electronicApprovalId))),
               totalRowCount: page.totalRowCount,
               nextOffset: page.resultList.length,
             };
@@ -179,14 +181,11 @@ export function useDocumentWritePage() {
             }),
           ]).then(([pinnedRecords, page]) => {
             const pinnedIds = new Set(pinnedRecords.map((item) => item.electronicApprovalId));
-            const filteredRecords = page.resultList.filter(
-              (item) => !pinnedIds.has(item.electronicApprovalId),
-            );
             return {
               pinnedDocuments: pinnedRecords.map((record) => mapDocument(record, true)),
-              unpinnedDocuments: filteredRecords.map((record) => mapDocument(record, false)),
-              pinnedFeedDocuments: [] as DocumentFeedWriteItem[],
-              unpinnedFeedDocuments: [] as DocumentFeedWriteItem[],
+              listDocuments: page.resultList.map((record) =>
+                mapDocument(record, pinnedIds.has(record.electronicApprovalId))),
+              feedDocuments: [] as DocumentFeedWriteItem[],
               totalRowCount: page.totalRowCount,
               nextOffset: page.resultList.length,
             };
@@ -197,14 +196,9 @@ export function useDocumentWritePage() {
     ])
       .then(([nextDocuments, nextSummary]) => {
         if (!active) return;
-        setDocuments([
-          ...nextDocuments.pinnedDocuments,
-          ...nextDocuments.unpinnedDocuments,
-        ]);
-        setFeedDocuments([
-          ...nextDocuments.pinnedFeedDocuments,
-          ...nextDocuments.unpinnedFeedDocuments,
-        ]);
+        setPinnedDocuments(nextDocuments.pinnedDocuments);
+        setDocuments(nextDocuments.listDocuments);
+        setFeedDocuments(nextDocuments.feedDocuments);
         nextOffset.current = nextDocuments.nextOffset;
         setHasNextPage(nextDocuments.nextOffset < nextDocuments.totalRowCount);
         setSummary(nextSummary);
@@ -214,6 +208,7 @@ export function useDocumentWritePage() {
           setHasNextPage(false);
           if (!isQuietReload) {
             setDocuments([]);
+            setPinnedDocuments([]);
             setFeedDocuments([]);
           }
           setLoadError(
@@ -267,7 +262,8 @@ export function useDocumentWritePage() {
             ...current,
             ...page.resultList
               .filter((record) => !existingIds.has(record.electronicApprovalId))
-              .map((record) => mapFeedDocument(record, false)),
+              .map((record) =>
+                mapFeedDocument(record, pinnedIds.has(record.electronicApprovalId))),
           ];
         });
         nextOffset.current = offset + page.resultList.length;
@@ -287,7 +283,8 @@ export function useDocumentWritePage() {
             ...current,
             ...page.resultList
               .filter((record) => !existingIds.has(record.electronicApprovalId))
-              .map((record) => mapDocument(record, false)),
+              .map((record) =>
+                mapDocument(record, pinnedIds.has(record.electronicApprovalId))),
           ];
         });
         nextOffset.current = offset + page.resultList.length;
@@ -313,6 +310,7 @@ export function useDocumentWritePage() {
   }, [
     hasNextPage,
     pageError,
+    pinnedIds,
     scope,
     selectedDocumentId,
     selectedKind,
@@ -353,21 +351,6 @@ export function useDocumentWritePage() {
     };
   }, [feedEmployeeRetryToken, viewMode]);
 
-  const pinnedDocuments = useMemo(
-    () => documents.filter((item) => item.isPinned),
-    [documents],
-  );
-  const unpinnedDocuments = useMemo(
-    () => documents.filter((item) => !item.isPinned),
-    [documents],
-  );
-  const orderedFeedDocuments = useMemo(
-    () => [
-      ...feedDocuments.filter((item) => item.isPinned),
-      ...feedDocuments.filter((item) => !item.isPinned),
-    ],
-    [feedDocuments],
-  );
   const pinnedViewItems = useMemo(
     () =>
       pinnedDocuments.map((item) => ({
@@ -379,9 +362,9 @@ export function useDocumentWritePage() {
       })),
     [pinnedDocuments],
   );
-  const unpinnedViewItems = useMemo(
+  const listViewItems = useMemo(
     () =>
-      unpinnedDocuments.map((item) => {
+      documents.map((item) => {
         const kind = getDocumentKindPresentation(item.kind);
         return {
           id: item.id,
@@ -395,9 +378,10 @@ export function useDocumentWritePage() {
           statusVariant: item.statusVariant,
           badgeBorderRadius: item.badgeBorderRadius,
           summary: item.summary,
+          isPinned: item.isPinned,
         };
       }),
-    [unpinnedDocuments],
+    [documents],
   );
 
   const selectScope = useCallback((nextScope: DocumentApprovalScope) => {
@@ -506,10 +490,10 @@ export function useDocumentWritePage() {
     openComposer,
     closeComposer,
     pinnedDocuments,
-    unpinnedDocuments,
-    feedDocuments: orderedFeedDocuments,
+    listDocuments: documents,
+    feedDocuments,
     pinnedViewItems,
-    unpinnedViewItems,
+    listViewItems,
     summary,
     notices: (summary?.notices ?? []).map((notice) => mapDocument(notice, false)),
     isLoading,

@@ -107,11 +107,11 @@ describe('useDocumentWritePage date metadata', () => {
       const { result } = renderHook(() => useDocumentWritePage());
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-      expect(result.current.unpinnedDocuments[0]).toMatchObject({
+      expect(result.current.listDocuments[0]).toMatchObject({
         date: expectedDate,
         dateSourceLabel: expectedLabel,
       });
-      expect(result.current.unpinnedViewItems[0]?.dateLabel).toBe(expectedDate);
+      expect(result.current.listViewItems[0]?.dateLabel).toBe(expectedDate);
       expect(result.current.notices[0]).toMatchObject({
         author: record.drafterName,
         kind: '기안서',

@@ -1,6 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDocumentWritePage } from '../src/pages/groupware/documents/write/hooks/useDocumentWritePage';
+import { fetchMyProfile } from '../src/pages/dashboard/services/profileSettings.service';
+import type { DocumentApprovalFeedRecord } from '../src/pages/groupware/documents/write/types/documentWrite.types';
 import {
   getDocumentApprovalSummary,
   listDocumentApprovals,
@@ -15,6 +17,9 @@ vi.mock('../src/pages/groupware/documents/write/services/documentApproval.servic
   listPinnedDocumentApprovals: vi.fn(),
   pinDocumentApproval: vi.fn(),
   unpinDocumentApproval: vi.fn(),
+}));
+vi.mock('../src/pages/dashboard/services/profileSettings.service', () => ({
+  fetchMyProfile: vi.fn(),
 }));
 
 const documentA = {
@@ -39,6 +44,7 @@ const documentB = {
 describe('useDocumentWritePage pins', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(fetchMyProfile).mockResolvedValue({ employeeId: 'test-employee' } as Awaited<ReturnType<typeof fetchMyProfile>>);
     vi.mocked(getDocumentApprovalSummary).mockResolvedValue({
       actionRequiredCount: 0,
       inProgressCount: 0,
@@ -63,16 +69,71 @@ describe('useDocumentWritePage pins', () => {
     });
   });
 
-  it('keeps pinned documents separate from ordinary documents without duplication', async () => {
+  it('keeps pinned documents in the ordinary list in API order', async () => {
+    vi.mocked(listDocumentApprovals).mockResolvedValue({
+      resultList: [documentB, documentA],
+      totalRowCount: 2,
+    } as never);
     const { result } = renderHook(() => useDocumentWritePage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.pinnedDocuments).toHaveLength(1);
     expect(result.current.pinnedDocuments[0]?.id).toBe(41);
-    expect(result.current.unpinnedDocuments).toHaveLength(1);
-    expect(result.current.unpinnedDocuments[0]?.id).toBe(42);
+    expect(result.current.listDocuments.map((item) => item.id)).toEqual([42, 41]);
+    expect(result.current.listViewItems.map((item) => item.isPinned)).toEqual([false, true]);
   });
 
+  it('does not inject separately fetched pins into ordinary pages and preserves pin state on later pages', async () => {
+    vi.mocked(listDocumentApprovals)
+      .mockResolvedValueOnce({ resultList: [documentB], totalRowCount: 2 } as never)
+      .mockResolvedValueOnce({ resultList: [documentA], totalRowCount: 2 } as never);
+    const { result } = renderHook(() => useDocumentWritePage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.listDocuments.map((item) => item.id)).toEqual([42]);
+    expect(result.current.pinnedDocuments.map((item) => item.id)).toEqual([41]);
+    await act(async () => { await result.current.loadMore(); });
+    expect(result.current.listDocuments.map((item) => item.id)).toEqual([42, 41]);
+    expect(result.current.listViewItems[1]?.isPinned).toBe(true);
+  });
+
+  it('keeps ordinary feed order without promoting or injecting pinned documents', async () => {
+    const toFeed = (record: typeof documentA): DocumentApprovalFeedRecord => ({
+      ...record,
+      viewCount: 0,
+      isDrafter: false,
+      draftingWorkCategoryId: null,
+      contentsJson: '{"type":"doc","content":[]}',
+      contentsHtml: '<p>test</p>',
+      contentsText: 'test',
+      approvalLines: [],
+      attachments: [],
+      systemEvents: [],
+      comments: [],
+      commentCount: 0,
+      hasPreviousComments: false,
+      nextBeforeCommentId: null,
+    });
+    const outsidePage = { ...documentA, electronicApprovalId: 43 };
+    vi.mocked(listPinnedDocumentApprovals).mockResolvedValue(
+      [toFeed(documentA), toFeed(outsidePage)],
+    );
+    vi.mocked(listDocumentApprovals)
+      .mockResolvedValueOnce({ resultList: [], totalRowCount: 0 } as never)
+      .mockResolvedValueOnce({
+        resultList: [toFeed(documentB), toFeed(documentA)],
+        totalRowCount: 3,
+      } as never)
+      .mockResolvedValueOnce({ resultList: [toFeed(outsidePage)], totalRowCount: 3 } as never);
+    const { result } = renderHook(() => useDocumentWritePage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.setViewMode('feed'));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.feedDocuments.map((item) => item.id)).toEqual([42, 41]);
+    expect(result.current.feedDocuments.map((item) => item.isPinned)).toEqual([false, true]);
+    await act(async () => { await result.current.loadMore(); });
+    expect(result.current.feedDocuments.map((item) => item.id)).toEqual([42, 41, 43]);
+    expect(result.current.feedDocuments[2]?.isPinned).toBe(true);
+  });
   it('toggles pin state through authenticated pin APIs and clears pending state', async () => {
     const { result } = renderHook(() => useDocumentWritePage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
