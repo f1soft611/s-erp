@@ -1,5 +1,7 @@
 # F1-Grid Excel Export Cell Types Design
 
+> Follow-up amendment: `type: 'date'` is now exported as Grid-formatted text, and Excel header/body alignment follows the Grid column alignment settings. See the [date text export design](./2026-10-21-f1-grid-date-export-text-design.md) for the current contract.
+
 ## Context
 
 F1-Grid already creates `.xlsx` files with ExcelJS and exports the visible columns and rows. The current exporter sends every cell through `getCellDisplayValue`, so typed values such as numbers and dates become text. The goal is to retain the existing export scope and download flow while writing type-aware Excel cells.
