@@ -315,8 +315,10 @@ const GridRowInner = <T extends object>({
     ) => {
       if (event.button === 2) {
         onSetFocusedCell(cell);
-        onSelectRow(rowId, event as unknown as MouseEvent<HTMLElement>);
+        onSelectRow(rowId, event);
       }
+      if (event.button !== 0) return;
+
       const previousCell = previousDragCellRef.current;
       const isSameDragCell =
         previousCell?.rowId === cell.rowId &&

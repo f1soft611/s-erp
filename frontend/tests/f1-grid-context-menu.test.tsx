@@ -89,6 +89,47 @@ describe('F1-Grid context menu', () => {
     expect(screen.getByRole('menuitem', { name: '행 추가' })).toBeVisible();
   });
 
+  it('preserves the existing row selection when context-menu row selection is disabled', async () => {
+    const gridRef = createRef<F1GridRef<FlatRow>>();
+    const onSelectionChange = vi.fn();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={flatRows}
+        columns={flatColumns}
+        rowKey="id"
+        initialSelectedRowIds={['1']}
+        selectRowOnContextMenu={false}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+    await waitFor(() => expect(gridRef.current?.getSelectedRowIds()).toEqual(['1']));
+    onSelectionChange.mockClear();
+
+    const cell = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(cell, { button: 2 });
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['1']);
+    fireEvent.contextMenu(cell, { button: 2 });
+    fireEvent.mouseUp(cell, { button: 2 });
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['1']);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(cell).toHaveAttribute('tabindex', '0');
+  });
+
+  it('keeps right-click row selection enabled by default', () => {
+    const gridRef = createRef<F1GridRef<FlatRow>>();
+    render(
+      <F1Grid ref={gridRef} rows={flatRows} columns={flatColumns} rowKey="id" />,
+    );
+    const cell = screen.getByRole('gridcell', { name: 'Beta' });
+    fireEvent.mouseDown(cell, { button: 2 });
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['2']);
+    fireEvent.contextMenu(cell, { button: 2 });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
   it('suppresses the F1Grid context menu while preserving right-click selection', () => {
     render(
       <F1Grid

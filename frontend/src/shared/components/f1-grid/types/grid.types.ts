@@ -281,6 +281,7 @@ export type F1GridProps<T extends object> = {
   disableSorting?: boolean;
   disableFiltering?: boolean;
   disableContextMenu?: boolean;
+  selectRowOnContextMenu?: boolean;
   canExportExcel?: boolean;
   excelFileName?: string;
   allowAddRootInContextMenu?: boolean;

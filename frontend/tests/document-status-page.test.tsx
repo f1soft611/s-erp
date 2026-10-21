@@ -435,6 +435,45 @@ describe('document status page', () => {
       .toHaveValue(SYSTEM_DATE_RANGE.to);
   });
 
+  it('opens only the read-only context menu on right-click and still opens detail on left-click', async () => {
+    renderDocumentStatusPage();
+    const cell = await screen.findByRole('gridcell', { name: row.title });
+
+    fireEvent.mouseDown(cell, { button: 2 });
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    fireEvent.contextMenu(cell, { button: 2 });
+    fireEvent.mouseUp(cell, { button: 2 });
+
+    const menu = await screen.findByRole('menu');
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    for (const name of [
+      '엑셀 내보내기',
+      '컬럼 길이 자동 조정',
+      '정렬 해제',
+      '설정을 기본값으로 복원',
+    ]) {
+      expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
+    }
+    expect(within(menu).getByRole('menuitem', { name: '엑셀 내보내기' }))
+      .not.toHaveAttribute('aria-disabled', 'true');
+    for (const name of [
+      '행 추가',
+      '위에 행 삽입',
+      '아래에 행 삽입',
+      '행 복사',
+      '행 삭제',
+      '필터 해제',
+    ]) {
+      expect(within(menu).queryByRole('menuitem', { name }))
+        .not.toBeInTheDocument();
+    }
+
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    fireEvent.click(cell);
+    expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
+  });
+
   it('opens the existing approval detail overlay for the selected document and closes it', async () => {
     renderDocumentStatusPage();
     await screen.findByText('41');

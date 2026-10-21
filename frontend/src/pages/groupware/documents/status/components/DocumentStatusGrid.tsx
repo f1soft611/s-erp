@@ -80,7 +80,7 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
     {
       field: 'electronicApprovalId',
       headerName: '문서번호',
-      type: 'number',
+      // type: 'number',
       width: 80,
       align: 'center',
       editable: false,
@@ -264,8 +264,11 @@ export function DocumentStatusGrid({
       onSelectionChange={onSelectionChange}
       showCheckbox
       disableFiltering
-      disableContextMenu
-      canExportExcel={false}
+      selectRowOnContextMenu={false}
+      allowAddRowInContextMenu={false}
+      allowDuplicateRowInContextMenu={false}
+      allowDeleteRowInContextMenu={false}
+      canExportExcel
       height="100%"
       minHeight={320}
     />

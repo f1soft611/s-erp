@@ -166,6 +166,7 @@ function F1GridInner<T extends object>(
     disableSorting = false,
     disableFiltering = false,
     disableContextMenu = false,
+    selectRowOnContextMenu = true,
     canExportExcel = false,
     excelFileName,
     allowAddRootInContextMenu = true,
@@ -1404,6 +1405,8 @@ function F1GridInner<T extends object>(
   }
 
   function selectRow(rowId: F1GridRowId, event?: MouseEvent<HTMLElement>) {
+    if (event?.button === 2 && !selectRowOnContextMenu) return;
+
     const rowIndex = visibleRows.findIndex(
       (row) => getGridRowId(row, rowKey) === rowId,
     );
@@ -2261,7 +2264,7 @@ function F1GridInner<T extends object>(
     };
 
     const applySelection = () => {
-      if (targetRowId !== undefined) {
+      if (selectRowOnContextMenu && targetRowId !== undefined) {
         setRowSelection({
           allSelected: false,
           includedIds: new Set([targetRowId]),
@@ -2271,15 +2274,17 @@ function F1GridInner<T extends object>(
       if (clickedCell) {
         setFocusedCell(clickedCell);
         setCellSelectionRange(clickedCell, clickedCell);
-        setRowSelection(
-          targetRowId !== undefined
-            ? {
-                allSelected: false,
-                includedIds: new Set([targetRowId]),
-                excludedIds: new Set(),
-              }
-            : createGridRowSelection(),
-        );
+        if (selectRowOnContextMenu) {
+          setRowSelection(
+            targetRowId !== undefined
+              ? {
+                  allSelected: false,
+                  includedIds: new Set([targetRowId]),
+                  excludedIds: new Set(),
+                }
+              : createGridRowSelection(),
+          );
+        }
       }
     };
 

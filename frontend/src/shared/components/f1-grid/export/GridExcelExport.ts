@@ -6,6 +6,7 @@ type ExportCellValue = string | number | boolean | Date | null;
 type ExportCell = {
   value: ExportCellValue;
   numFmt?: string;
+  alignment?: { horizontal: 'left' | 'center' | 'right' };
 };
 
 const DECIMAL_VALUE_PATTERN =
@@ -84,68 +85,62 @@ function getNumericFormat<T extends object>(
     : numberFormat;
 }
 
-function getExcelDateFormat(format?: string): string {
-  const source = format || 'yyyy-mm-dd';
-  const tokens = source.match(/\[[^\]]*\]|yyyy|yy|mm|m|dd|d/gi) ?? [];
-  let result = '';
-  let cursor = 0;
-
-  for (const token of tokens) {
-    const index = source.indexOf(token, cursor);
-    const literal = source.slice(cursor, index);
-    if (literal) result += `"${literal.replace(/"/g, '""')}"`;
-    result += token.startsWith('[')
-      ? `"${token.slice(1, -1).replace(/"/g, '""')}"`
-      : token.toLowerCase();
-    cursor = index + token.length;
-  }
-
-  const trailingLiteral = source.slice(cursor);
-  if (trailingLiteral) {
-    result += `"${trailingLiteral.replace(/"/g, '""')}"`;
-  }
-  return result || 'yyyy-mm-dd';
+function getGridCellAlignment<T extends object>(
+  column: F1GridColumn<T>,
+): NonNullable<ExportCell['alignment']> {
+  return {
+    horizontal:
+      column.align ??
+      (column.type === 'number' || column.type === 'rownumber'
+        ? 'right'
+        : 'left'),
+  };
 }
 
 function getTypedExcelCell<T extends object>(
   column: F1GridColumn<T>,
   rawValue: unknown,
 ): ExportCell {
+  const alignment = getGridCellAlignment(column);
   if (rawValue === null || rawValue === undefined || rawValue === '') {
-    return { value: null };
+    return { value: null, alignment };
   }
 
+  let cell: ExportCell;
   switch (column.type) {
     case 'number':
     case 'decimal':
     case 'currency':
-      return {
+      cell = {
         value: getNumberOrText(rawValue),
         numFmt: getNumericFormat(column),
       };
-    case 'date': {
-      const date = getGridDateValue(rawValue);
-      return date
-        ? { value: date, numFmt: getExcelDateFormat(column.format) }
-        : { value: String(rawValue) };
-    }
+      break;
+    case 'date':
+      cell = { value: getCellDisplayValue(column, rawValue) };
+      break;
     case 'datetime': {
       const date = getDateTimeValue(rawValue);
-      return date
+      cell = date
         ? { value: date, numFmt: 'yyyy-mm-dd hh:mm:ss' }
         : { value: String(rawValue) };
+      break;
     }
     case 'time': {
       const time = getTimeValue(rawValue);
-      return time ?? { value: String(rawValue) };
+      cell = time ?? { value: String(rawValue) };
+      break;
     }
     case 'checkbox':
-      return { value: getBooleanOrText(rawValue) };
+      cell = { value: getBooleanOrText(rawValue) };
+      break;
     case 'rownumber':
-      return { value: getNumberOrText(rawValue), numFmt: '0' };
+      cell = { value: getNumberOrText(rawValue), numFmt: '0' };
+      break;
     default:
-      return { value: getCellDisplayValue(column, rawValue) };
+      cell = { value: getCellDisplayValue(column, rawValue) };
   }
+  return { ...cell, alignment };
 }
 
 /** 화면에 보이는 컬럼/행 기준으로 .xlsx 파일을 생성해 즉시 다운로드한다. */
@@ -162,6 +157,12 @@ export async function exportGridRowsToExcel<T extends object>(
     header: column.headerName,
     key: String(column.field),
   }));
+  const headerRow = worksheet.getRow(1);
+  columns.forEach((column, index) => {
+    headerRow.getCell(index + 1).alignment = {
+      horizontal: column.headerAlign ?? 'center',
+    };
+  });
   rows.forEach((row) => {
     const cells = columns.map((column) => {
       const rawValue = column.getValue?.(row) ?? row[column.field];
@@ -169,7 +170,9 @@ export async function exportGridRowsToExcel<T extends object>(
     });
     const excelRow = worksheet.addRow(cells.map((cell) => cell.value));
     cells.forEach((cell, index) => {
-      if (cell.numFmt) excelRow.getCell(index + 1).numFmt = cell.numFmt;
+      const excelCell = excelRow.getCell(index + 1);
+      if (cell.numFmt) excelCell.numFmt = cell.numFmt;
+      if (cell.alignment) excelCell.alignment = cell.alignment;
     });
   });
 

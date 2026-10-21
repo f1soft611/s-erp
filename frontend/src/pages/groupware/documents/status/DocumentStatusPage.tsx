@@ -222,19 +222,17 @@ export function DocumentStatusPage({
     error: defaultsError,
     retry: retryDefaults,
   } = usePageSearchDefaults(detailFields);
-  const {
-    state: searchSession,
-    setState: setSearchSession,
-  } = usePageSessionState<DocumentStatusSearchSession | null>(
-    DOCUMENT_STATUS_SESSION_KEY,
-    null,
-    {
-      version: DOCUMENT_STATUS_SESSION_VERSION,
-      validate: (value): value is DocumentStatusSearchSession | null =>
-        value === null || isDocumentStatusSearchSession(value),
-      persistWhen: (value) => value !== null,
-    },
-  );
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<DocumentStatusSearchSession | null>(
+      DOCUMENT_STATUS_SESSION_KEY,
+      null,
+      {
+        version: DOCUMENT_STATUS_SESSION_VERSION,
+        validate: (value): value is DocumentStatusSearchSession | null =>
+          value === null || isDocumentStatusSearchSession(value),
+        persistWhen: (value) => value !== null,
+      },
+    );
   const [defaultsInitialized, setDefaultsInitialized] = useState(false);
   const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<
@@ -437,18 +435,7 @@ export function DocumentStatusPage({
           resetSearch();
         }}
         detailLoading={defaultsLoading || !defaultsInitialized}
-      >
-        {/* <Button
-          type="button"
-          variant="contained"
-          size="small"
-          startIcon={<SearchIcon fontSize="small" />}
-          onClick={() => applySearch()}
-          sx={{ minHeight: 40, whiteSpace: 'nowrap' }}
-        >
-          검색
-        </Button> */}
-      </PageSearchArea>
+      ></PageSearchArea>
       <PageMessageArea
         message={defaultsError ?? error}
         onClose={handleErrorClose}
@@ -479,7 +466,9 @@ export function DocumentStatusPage({
         }}
       >
         {defaultsInitialized ? (
-          <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
+          <Box
+            sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}
+          >
             <DocumentStatusGrid
               dataSource={dataSource}
               onSelectionChange={handleSelectionChange}

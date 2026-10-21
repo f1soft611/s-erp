@@ -1550,7 +1550,7 @@ interface GridDataState<T> {
 
 # 25. Grid Context Menu
 
-기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 우클릭 대상 셀/행 선택은 유지한다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
+기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 기본 설정에서는 우클릭 대상 셀/행 선택은 유지한다. `selectRowOnContextMenu={false}`이면 메뉴 활성화 여부와 무관하게 행 선택은 변경하지 않는다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
 
 일반 F1Grid의 메뉴 구성:
 
@@ -1576,7 +1576,8 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 관련 Props:
 
-- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
+- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 기본 설정에서는 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
+- `selectRowOnContextMenu?: boolean` — 우클릭 시 대상 행 선택 여부. 기본값 `true`로 기존 선택 동작을 유지한다. `false`이면 기존 행 선택을 변경하거나 `onSelectionChange`를 발생시키지 않고 대상 셀 포커스/범위 및 메뉴만 갱신한다. `disableContextMenu`와 독립적으로 적용되며, 우클릭은 좌클릭 드래그 선택을 시작하지 않는다.
 - `canExportExcel?: boolean` — 엑셀 내보내기 메뉴 노출 여부. 기본값 `false`(미표시). 페이지별 엑셀 권한과 연동해서 사용한다(예: 메뉴관리 화면).
 - `excelFileName?: string` — 내보낼 파일명(확장자 `.xlsx`는 자동 부여). 기본값은 `${ariaLabel}-export`.
 - `allowAddRowInContextMenu?: boolean` — 우클릭 메뉴에 `행 추가` 및 일반 F1Grid의 `위에 행 삽입`/`아래에 행 삽입`을 노출할지 여부. 기본값 `true`.
@@ -1586,7 +1587,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 동작 요약:
 
-- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`/`datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식과 date 컬럼의 지원 `format`은 Excel number format으로 반영하며 셀 값의 계산 가능한 타입은 유지한다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식은 Excel number format으로 반영한다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
 - **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
 - **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
 - **행 추가**: 일반 F1Grid에서는 데이터 순서의 맨 아래에 새 행을 추가한다. F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가) 기존 트리 동작을 유지한다.
@@ -1598,10 +1599,12 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 화면별 Custom Menu 확장은 아직 지원하지 않는다(⚠️ 아직 미구현).
 
+문서현황은 행 선택 시 상세를 여는 화면이므로 `selectRowOnContextMenu={false}`로 우클릭 상세 열기를 막는다. 메뉴는 활성화하고 `canExportExcel`로 엑셀 내보내기를 제공하며, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 모두 false로 지정해 행 추가·삽입·복사·삭제 메뉴를 숨긴다. 왼쪽 클릭 및 체크박스 선택의 상세 열기는 유지한다.
+
 컨텍스트 메뉴 닫힘/재오픈 규칙:
 
 - 메뉴가 열린 상태에서 그리드 바깥(다른 카드, 검색 영역, 브레드크럼 등)을 좌클릭하거나 우클릭하면 메뉴는 그 자리에서 다시 열리지 않고 즉시 닫힌다.
-- 메뉴가 열린 상태에서 같은 그리드 또는 다른 그리드 영역(바디 여백 또는 셀)을 다시 우클릭하면, 기존 메뉴는 닫히고 새로 클릭한 셀/행이 먼저 선택된 뒤 그 위치에 메뉴가 다시 열린다.
+- 메뉴가 열린 상태에서 같은 그리드 또는 다른 그리드 영역(바디 여백 또는 셀)을 다시 우클릭하면, 기존 메뉴는 닫히고 새로 클릭한 셀/행이 먼저 선택된 뒤 그 위치에 메뉴가 다시 열린다. `selectRowOnContextMenu={false}`인 그리드는 기존 행 선택을 유지하고 셀 포커스/범위만 이동한다.
 - 내부적으로 그리드 컨테이너의 `getBoundingClientRect()` 좌표와 클릭 좌표를 비교해 "그리드 영역 안인지"를 판정하며, DOM 트리 상 조상 관계만으로 판단하지 않는다. MUI `Menu`가 열려 있는 동안에는 전체 화면을 덮는 투명 백드롭이 렌더링되고, 이 백드롭은 React 컴포넌트 트리 상 그리드의 자식으로 포탈되어 실제 DOM 위치와 무관하게 그리드의 `onContextMenu` 핸들러로 이벤트가 버블링될 수 있다. 이 문제를 막기 위해 백드롭의 `pointerEvents`를 `none`으로 비활성화해, 클릭이 항상 실제 화면상의 요소(그리드 내부 셀 또는 그리드 바깥 요소)에 도달하도록 한다. 추가로 `document.elementsFromPoint()`를 우선 사용해 포털/백드롭 같은 비그리드 래퍼가 맨 위에 있어도 실제 그리드 셀을 우선 복원해 선택한다.
 
 ---

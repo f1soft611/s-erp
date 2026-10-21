@@ -20,6 +20,7 @@ type ExportRow = {
   invalidTime: string;
   invalidCheckbox: string;
   invalidCreatedAt: string;
+  emptyDate: string | null;
 };
 
 const columns: F1GridColumn<ExportRow>[] = [
@@ -41,6 +42,8 @@ const columns: F1GridColumn<ExportRow>[] = [
     headerName: 'Date',
     type: 'date',
     format: 'yyyy년 m월 d일',
+    align: 'center',
+    headerAlign: 'right',
   },
   { field: 'createdAt', headerName: 'Created at', type: 'datetime' },
   { field: 'time', headerName: 'Time', type: 'time' },
@@ -67,6 +70,7 @@ const columns: F1GridColumn<ExportRow>[] = [
     headerName: 'Invalid created at',
     type: 'datetime',
   },
+  { field: 'emptyDate', headerName: 'Empty date', type: 'date' },
 ];
 
 async function readExportedWorkbook(
@@ -122,7 +126,7 @@ describe('F1-Grid Excel export cell types', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports typed values with Excel formats and preserves invalid values', async () => {
+  it('exports typed values, Grid-aligned date text and invalid-value fallbacks', async () => {
     const row: ExportRow = {
       id: 1,
       amount: '1234.5',
@@ -140,6 +144,7 @@ describe('F1-Grid Excel export cell types', () => {
       invalidTime: '25:75',
       invalidCheckbox: 'unknown',
       invalidCreatedAt: '2026-02-29T09:21:00',
+      emptyDate: null,
     };
     const workbook = await readExportedWorkbook([row]);
     const sheet = workbook.getWorksheet('Sheet1');
@@ -150,14 +155,13 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('B2').value).toBe(12345.6);
     expect(sheet?.getCell('B2').numFmt).toBe('"₩"#,##0');
 
-    const exportedDate = sheet?.getCell('C2').value;
-    if (!(exportedDate instanceof Date)) {
-      throw new Error('Expected the exported date cell to contain a Date.');
-    }
-    expect(exportedDate.getFullYear()).toBe(2026);
-    expect(exportedDate.getMonth()).toBe(9);
-    expect(exportedDate.getDate()).toBe(20);
-    expect(sheet?.getCell('C2').numFmt).toBe('yyyy"년 "m"월 "d"일"');
+    expect(sheet?.getCell('C2').value).toBe('2026년 10월 20일');
+    expect(sheet?.getCell('C2').type).toBe(ExcelJS.ValueType.String);
+    expect(sheet?.getCell('C2').numFmt).toBeUndefined();
+    expect(sheet?.getCell('A1').alignment?.horizontal).toBe('center');
+    expect(sheet?.getCell('A2').alignment?.horizontal).toBe('right');
+    expect(sheet?.getCell('C1').alignment?.horizontal).toBe('right');
+    expect(sheet?.getCell('C2').alignment?.horizontal).toBe('center');
 
     expect(sheet?.getCell('D2').value).toBeInstanceOf(Date);
     expect(sheet?.getCell('D2').numFmt).toBe('yyyy-mm-dd hh:mm:ss');
@@ -174,6 +178,7 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('H2').value).toBeNull();
     expect(sheet?.getCell('I2').value).toBe('not-a-number');
     expect(sheet?.getCell('J2').value).toBe('2026-02-29');
+    expect(sheet?.getCell('J2').alignment?.horizontal).toBe('left');
     expect(sheet?.getCell('K2').value).toBe(7);
     const exportedTimeWithSeconds = sheet?.getCell('L2').value;
     if (!(exportedTimeWithSeconds instanceof Date)) {
@@ -186,6 +191,8 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('M2').value).toBe('25:75');
     expect(sheet?.getCell('N2').value).toBe('unknown');
     expect(sheet?.getCell('O2').value).toBe('2026-02-29T09:21:00');
+    expect(sheet?.getCell('P2').value).toBeNull();
+    expect(sheet?.getCell('P2').alignment?.horizontal).toBe('left');
     expect(row.date).toBe('2026-10-20T00:30:00+14:00');
   });
 });
