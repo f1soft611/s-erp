@@ -251,7 +251,7 @@ Run `npx vitest run tests/page-session-state.test.tsx`. Expected: the test fails
 
 - [ ] **Step 3: Add opt-in persistence gating**
 
-Add optional `persistWhen?: boolean` to `PageSessionStateOptions<T>`, defaulting to `true`. Skip only the persistence effect while false; do not change session loading, validation, reset, or storage-error behavior. Include `persistWhen` in the effect dependencies.
+Add optional `persistWhen?: boolean | ((value: T) => boolean)` to `PageSessionStateOptions<T>`, defaulting to `true`. Skip only the persistence effect when the boolean is false or the predicate returns false; do not change session loading, validation, reset, or storage-error behavior. Include `persistWhen` in the effect dependencies.
 
 - [ ] **Step 4: Run the focused session hook test**
 
@@ -295,7 +295,7 @@ defaultValue: {
 
 - [ ] **Step 5: Initialize filters and session from resolved metadata**
 
-Remove `getDefaultSubmittedAtRange` and all browser `Date` usage for the submitted-date default. Initialize the page session hook with `null`, a validator that accepts `null` or a valid `DocumentStatusSearchSession`, and `persistWhen: searchSession !== null`; this preserves an existing valid session but does not write a placeholder while the server date is loading. Make state initializers null-safe (`searchSession?.keyword ?? ''` and empty detail values when it is null). When the resolver succeeds and no session was restored, set keyword/detail values and applied filters from the resolved default snapshot, then persist that snapshot. When a valid session was restored, keep its values as the applied filters. Do not mount the grid until defaults resolve; on failure, show an explicit error with a button wired to the defaults hook's `retry` function and keep the grid from making a request with missing default filters.
+Remove `getDefaultSubmittedAtRange` and all browser `Date` usage for the submitted-date default. Initialize the page session hook with `null`, a validator that accepts `null` or a valid `DocumentStatusSearchSession`, and `persistWhen: (value) => value !== null`; this preserves an existing valid session but does not write a placeholder while the server date is loading. Make state initializers null-safe (`searchSession?.keyword ?? ''` and empty detail values when it is null). When the resolver succeeds and no session was restored, set keyword/detail values and applied filters from the resolved default snapshot, then persist that snapshot. When a valid session was restored, keep its values as the applied filters. Do not mount the grid until defaults resolve; on failure, show an explicit error with a button wired to the defaults hook's `retry` function and keep the grid from making a request with missing default filters.
 
 - [ ] **Step 6: Apply the resolved default snapshot on page reset**
 

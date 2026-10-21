@@ -23,6 +23,8 @@ type SearchRenderBlock =
   | { group: string; fields: PageSearchField[] }
   | { field: PageSearchField };
 
+const EMPTY_SEARCH_VALUES: Record<string, PageSearchFieldValue> = {};
+
 function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
   const blocks: SearchRenderBlock[] = [];
 
@@ -50,8 +52,10 @@ export type PageSearchAreaProps = {
   onDefaultSearch?: () => void;
   detailFields?: PageSearchField[];
   detailValues?: Record<string, PageSearchFieldValue>;
+  defaultValues?: Record<string, PageSearchFieldValue>;
   onDetailValuesChange?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailSearch?: (values: Record<string, PageSearchFieldValue>) => void;
+  onDetailReset?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailClose?: () => void;
   detailLoading?: boolean;
 };
@@ -59,9 +63,20 @@ export type PageSearchAreaProps = {
 function getFieldValue(
   values: Record<string, PageSearchFieldValue>,
   field: PageSearchField,
+  defaultValues: Record<string, PageSearchFieldValue>,
 ): PageSearchFieldValue {
   if (values[field.field] !== undefined) return values[field.field];
+  if (defaultValues[field.field] !== undefined) {
+    return defaultValues[field.field];
+  }
   return field.type === 'date' ? { from: '', to: '' } : '';
+}
+
+function mergeSearchValues(
+  defaults: Record<string, PageSearchFieldValue>,
+  values: Record<string, PageSearchFieldValue>,
+): Record<string, PageSearchFieldValue> {
+  return { ...defaults, ...values };
 }
 
 function getDateValue(value: PageSearchFieldValue, key: 'from' | 'to'): string {
@@ -99,19 +114,24 @@ export function PageSearchArea({
   onDefaultSearch,
   detailFields = [],
   detailValues = {},
+  defaultValues = EMPTY_SEARCH_VALUES,
   onDetailValuesChange,
   onDetailSearch,
+  onDetailReset,
   onDetailClose,
   detailLoading = false,
 }: PageSearchAreaProps) {
   const [detailOpen, setDetailOpen] = useState(false);
-  const [draftValues, setDraftValues] = useState(detailValues);
+  const [draftValues, setDraftValues] = useState(() =>
+    mergeSearchValues(defaultValues, detailValues),
+  );
 
   useEffect(() => {
+    const resolvedValues = mergeSearchValues(defaultValues, detailValues);
     setDraftValues((current) =>
-      areSearchValuesEqual(current, detailValues) ? current : detailValues,
+      areSearchValuesEqual(current, resolvedValues) ? current : resolvedValues,
     );
-  }, [detailValues]);
+  }, [defaultValues, detailValues]);
 
   const updateValue = (field: string, value: PageSearchFieldValue) => {
     const next = { ...draftValues, [field]: value };
@@ -125,7 +145,7 @@ export function PageSearchArea({
   };
 
   const renderSearchField = (field: PageSearchField) => {
-    const value = getFieldValue(draftValues, field);
+    const value = getFieldValue(draftValues, field, defaultValues);
     const span = field.searchSpan ?? 1;
     const gridColumn = {
       xs: 'span 1',
@@ -490,8 +510,9 @@ export function PageSearchArea({
               type="button"
               variant="outlined"
               onClick={() => {
-                setDraftValues({});
-                onDetailValuesChange?.({});
+                setDraftValues(defaultValues);
+                onDetailValuesChange?.(defaultValues);
+                onDetailReset?.(defaultValues);
               }}
               disabled={detailLoading}
             >

@@ -45,7 +45,7 @@ describe('document status service', () => {
     vi.clearAllMocks();
   });
 
-  it('serializes status filters and remote paging into the existing documents API', async () => {
+  it('serializes status filters and remote paging into the dedicated search API', async () => {
     api.get.mockResolvedValue({ resultList: [row], totalRowCount: 201 });
     const controller = new AbortController();
     const dataSource = createDocumentStatusDataSource({
@@ -73,7 +73,7 @@ describe('document status service', () => {
 
     const [path, signal] = api.get.mock.calls[0] as [string, AbortSignal];
     const request = new URL(path, 'http://localhost');
-    expect(request.pathname).toBe('/api/v1/groupware/approvals/documents');
+    expect(request.pathname).toBe('/api/v1/groupware/approvals/documents/search');
     expect(Object.fromEntries(request.searchParams)).toEqual({
       scope: 'ALL',
       offset: '20',

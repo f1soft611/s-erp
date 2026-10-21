@@ -48,6 +48,7 @@ export type ArchiveCategory = {
 
 type ArchiveBrowserRowBase = {
   rowKey: string;
+  parentId: string | null;
   name: string;
   ownerName?: string | null;
   uploadedAt?: string | Date | null;

@@ -9,7 +9,7 @@ import type {
   DocumentStatusRow,
 } from '../types/documentStatus.types';
 
-const DOCUMENTS_API = '/api/v1/groupware/approvals/documents';
+const DOCUMENTS_API = '/api/v1/groupware/approvals/documents/search';
 const DOCUMENT_TYPES = new Set([
   'DRAFTING',
   'BUSINESS_CONTACT',

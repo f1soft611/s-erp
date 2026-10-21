@@ -717,6 +717,105 @@
         ORDER BY m.updated_at DESC, m.electronic_approval_id DESC
     </select>
 
+    <sql id="relatedWriteDocumentFilters">
+        WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
+        <include refid="documentReadAccess"/>
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.tb_electronic_approval_pin p
+            WHERE p.tenant_id = m.tenant_id
+              AND p.user_id = #{userId}
+              AND p.electronic_approval_id = m.electronic_approval_id
+        )
+        <if test="documentType != null and documentType != ''">
+            AND m.document_type = #{documentType}
+        </if>
+        <if test="electronicApprovalId != null">
+            AND m.electronic_approval_id = #{electronicApprovalId}
+        </if>
+        <if test="scope == 'MY_PENDING'">
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info l
+                WHERE l.tenant_id = m.tenant_id
+                  AND l.electronic_approval_id = m.electronic_approval_id
+                  AND l.participant_user_id = #{participantUserId}
+                  AND l.action_status = 'PENDING'
+            )
+        </if>
+        <if test="scope == 'IN_PROGRESS'">
+            AND m.document_status IN ('PENDING', 'IN_PROGRESS')
+        </if>
+        <if test="scope == 'DRAFT'">
+            AND m.drafter_id = #{drafterId}
+            AND m.document_status = 'DRAFT'
+        </if>
+        <if test="scope == 'COMPLETED' or scope == 'REVISION_REQUESTED' or scope == 'REJECTED'">
+            AND m.document_status = #{scope}
+        </if>
+    </sql>
+
+    <select id="selectRelatedDocumentWritePage" parameterType="map" resultMap="listItem">
+        SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,
+               m.title, m.drafter_name, m.created_at, m.updated_at, m.submitted_at,
+               LEFT(COALESCE(m.contents_text, ''), 240) AS summary,
+               NULL::varchar AS notice_type
+        FROM public.tb_electronic_approval_main m
+        <include refid="relatedWriteDocumentFilters"/>
+        ORDER BY m.updated_at DESC, m.electronic_approval_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRelatedWriteDocuments" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM public.tb_electronic_approval_main m
+        <include refid="relatedWriteDocumentFilters"/>
+    </select>
+
+    <insert id="insertDocumentApprovalPin" parameterType="map">
+        INSERT INTO public.tb_electronic_approval_pin (
+            tenant_id, user_id, electronic_approval_id
+        )
+        SELECT m.tenant_id, #{userId}, m.electronic_approval_id
+        FROM public.tb_electronic_approval_main m
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
+        <include refid="documentReadAccess"/>
+        ON CONFLICT (tenant_id, user_id, electronic_approval_id) DO NOTHING
+    </insert>
+
+    <delete id="deleteDocumentApprovalPin" parameterType="map">
+        DELETE FROM public.tb_electronic_approval_pin p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.user_id = #{userId}
+          AND p.electronic_approval_id = #{electronicApprovalId}
+          AND EXISTS (
+              SELECT 1
+              FROM public.tb_electronic_approval_main m
+              WHERE m.tenant_id = p.tenant_id
+                AND m.electronic_approval_id = p.electronic_approval_id
+                AND m.deleted_yn = 'N'
+            <include refid="documentReadAccess"/>
+          )
+    </delete>
+
+    <select id="selectPinnedRelatedDocumentList" parameterType="map" resultMap="listItem">
+        SELECT m.electronic_approval_id, m.eabus_no, m.document_type, m.document_status,
+               m.title, m.drafter_name, m.created_at, m.updated_at, m.submitted_at,
+               LEFT(COALESCE(m.contents_text, ''), 240) AS summary,
+               NULL::varchar AS notice_type
+        FROM public.tb_electronic_approval_main m
+        JOIN public.tb_electronic_approval_pin p
+          ON p.tenant_id = m.tenant_id
+         AND p.electronic_approval_id = m.electronic_approval_id
+         AND p.tenant_id = #{tenantId}
+         AND p.user_id = #{userId}
+        <include refid="relatedDocumentStatusFilters"/>
+        ORDER BY m.updated_at DESC, m.electronic_approval_id DESC
+    </select>
+
     <select id="selectDocumentApprovalSummary" parameterType="map" resultMap="summary">
         SELECT
             COUNT(DISTINCT CASE WHEN EXISTS (

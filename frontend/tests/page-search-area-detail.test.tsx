@@ -216,4 +216,46 @@ describe('PageSearchArea 상세 검색', () => {
     expect(screen.getByRole('dialog', { name: '상세 검색' })).toBeVisible();
     expect(onDetailValuesChange).toHaveBeenLastCalledWith({});
   });
+
+  it('resolved 기본값을 초기화에 적용하고 선택적 초기화 callback을 호출한다', () => {
+    const onDetailValuesChange = vi.fn();
+    const onDetailReset = vi.fn();
+    const onDetailSearch = vi.fn();
+    const defaultValues = {
+      createdAt: { from: '2026-09-20', to: '2026-10-20' },
+    };
+
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{}}
+        defaultValues={defaultValues}
+        onDetailValuesChange={onDetailValuesChange}
+        onDetailReset={onDetailReset}
+        onDetailSearch={onDetailSearch}
+      >
+        <button type="button">기본 검색</button>
+      </PageSearchArea>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-09-20');
+    expect(screen.getByLabelText('생성일 종료일')).toHaveValue('2026-10-20');
+
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), {
+      target: { value: '변경 조건' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+
+    expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('');
+    expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-09-20');
+    expect(screen.getByLabelText('생성일 종료일')).toHaveValue('2026-10-20');
+    expect(onDetailValuesChange).toHaveBeenLastCalledWith(defaultValues);
+    expect(onDetailReset).toHaveBeenCalledWith(defaultValues);
+    expect(onDetailSearch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    expect(onDetailSearch).toHaveBeenCalledWith(defaultValues);
+  });
 });

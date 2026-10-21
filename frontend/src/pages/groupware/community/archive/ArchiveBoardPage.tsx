@@ -100,6 +100,9 @@ function getFileType(value: PageSearchFieldValue | undefined): ArchiveFileType {
   return FILE_TYPE_VALUES.find((fileType) => fileType === value) ?? 'ALL';
 }
 
+const FOLDERS_SECTION_ID = 'section:folders';
+const FILES_SECTION_ID = 'section:files';
+
 function buildBrowserRows(
   categories: ReturnType<typeof useArchiveCategories>['categories'],
   files: ArchiveFileRow[],
@@ -110,6 +113,7 @@ function buildBrowserRows(
     const category = categories.find((item) => item.code === file.categoryCode);
     return {
       rowKey: `file:${file.boardFileId}`,
+      parentId: FILES_SECTION_ID,
       rowType: 'file',
       name: file.fileName,
       ownerName: file.writerName,
@@ -124,7 +128,8 @@ function buildBrowserRows(
   if (folderCode) {
     return [
       {
-        rowKey: 'section:files',
+        rowKey: FILES_SECTION_ID,
+        parentId: null,
         rowType: 'section',
         name: '파일',
         label: '파일',
@@ -142,6 +147,7 @@ function buildBrowserRows(
     )
     .map((category) => ({
       rowKey: `folder:${category.code}`,
+      parentId: FOLDERS_SECTION_ID,
       rowType: 'folder',
       name: category.name,
       folderCode: category.code,
@@ -151,14 +157,16 @@ function buildBrowserRows(
 
   return [
     {
-      rowKey: 'section:folders',
+      rowKey: FOLDERS_SECTION_ID,
+      parentId: null,
       rowType: 'section',
       name: '폴더',
       label: '폴더',
     },
     ...folderRows,
     {
-      rowKey: 'section:files',
+      rowKey: FILES_SECTION_ID,
+      parentId: null,
       rowType: 'section',
       name: '파일',
       label: '파일',

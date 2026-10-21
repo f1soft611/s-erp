@@ -8,7 +8,9 @@ import type {
 type DocumentFeedItemProps = {
   item: DocumentFeedWriteItem;
   employeeId: string;
+  pinPending: boolean;
   detailRefreshToken: number;
+  onTogglePin: (electronicApprovalId: number, pinned: boolean) => Promise<void>;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
 };
@@ -16,7 +18,9 @@ type DocumentFeedItemProps = {
 export function DocumentFeedItem({
   item,
   employeeId,
+  pinPending,
   detailRefreshToken,
+  onTogglePin,
   onActionComplete,
   onEditDocument,
 }: DocumentFeedItemProps) {
@@ -32,6 +36,8 @@ export function DocumentFeedItem({
         onActionComplete={onActionComplete}
         onEditDocument={onEditDocument}
         detailRefreshToken={detailRefreshToken}
+        pinPending={pinPending}
+        onTogglePin={onTogglePin}
       />
     </Stack>
   );

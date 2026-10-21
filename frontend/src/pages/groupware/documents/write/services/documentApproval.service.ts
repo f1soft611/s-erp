@@ -16,6 +16,9 @@ import type {
   DocumentApprovalDetail,
   DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
+  DocumentApprovalPinState,
+  DocumentApprovalPage,
+  DocumentApprovalPageRequest,
   DocumentApprovalScope,
   DocumentApprovalSummary,
   DocumentDraftEmbeddedImageUpload,
@@ -86,6 +89,12 @@ const DOCUMENT_STATUSES = new Set([
   'REVISION_REQUESTED',
   'COMPLETED',
   'REJECTED',
+]);
+const DOCUMENT_TYPES = new Set([
+  'DRAFTING',
+  'BUSINESS_CONTACT',
+  'EXPENSE_RESOLUTION',
+  'ATTENDANCE_APPLICATION',
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -176,6 +185,20 @@ function isDocumentApprovalFeedRecord(value: unknown): value is DocumentApproval
   );
 }
 
+function isDocumentApprovalRecord(value: unknown): value is DocumentApprovalRecord {
+  return isObject(value)
+    && Number.isSafeInteger(value.electronicApprovalId)
+    && Number(value.electronicApprovalId) > 0
+    && typeof value.eabusNo === 'string'
+    && typeof value.documentType === 'string'
+    && DOCUMENT_TYPES.has(value.documentType)
+    && typeof value.documentStatus === 'string'
+    && isWorkflowStatus(value.documentStatus)
+    && typeof value.title === 'string'
+    && typeof value.drafterName === 'string'
+    && typeof value.summary === 'string';
+}
+
 export function isDefiniteAttachmentUploadFailure(error: unknown): boolean {
   return error instanceof ApiResponseError && error.status >= 400 && error.status < 500;
 }
@@ -231,7 +254,21 @@ export function listDocumentApprovals(
   documentType: DocumentApprovalRecord['documentType'] | undefined,
   electronicApprovalId: number | undefined,
   includeDetails: true,
+  page: DocumentApprovalPageRequest,
+): Promise<DocumentApprovalPage<DocumentApprovalFeedRecord>>;
+export function listDocumentApprovals(
+  scope: DocumentApprovalScope | undefined,
+  documentType: DocumentApprovalRecord['documentType'] | undefined,
+  electronicApprovalId: number | undefined,
+  includeDetails: true,
 ): Promise<DocumentApprovalFeedRecord[]>;
+export function listDocumentApprovals(
+  scope: DocumentApprovalScope | undefined,
+  documentType: DocumentApprovalRecord['documentType'] | undefined,
+  electronicApprovalId: number | undefined,
+  includeDetails: false,
+  page: DocumentApprovalPageRequest,
+): Promise<DocumentApprovalPage<DocumentApprovalRecord>>;
 export function listDocumentApprovals(
   scope?: DocumentApprovalScope,
   documentType?: DocumentApprovalRecord['documentType'],
@@ -239,6 +276,90 @@ export function listDocumentApprovals(
   includeDetails?: false,
 ): Promise<DocumentApprovalRecord[]>;
 export async function listDocumentApprovals(
+  scope: DocumentApprovalScope = 'ALL',
+  documentType?: DocumentApprovalRecord['documentType'],
+  electronicApprovalId?: number,
+  includeDetails = false,
+  page?: DocumentApprovalPageRequest,
+): Promise<
+  | DocumentApprovalRecord[]
+  | DocumentApprovalFeedRecord[]
+  | DocumentApprovalPage<DocumentApprovalRecord>
+  | DocumentApprovalPage<DocumentApprovalFeedRecord>
+> {
+  const query = new URLSearchParams({ scope });
+  if (documentType) query.set('documentType', documentType);
+  if (electronicApprovalId !== undefined) {
+    query.set('electronicApprovalId', String(electronicApprovalId));
+  }
+  if (includeDetails) query.set('includeDetails', 'true');
+  if (page) {
+    if (!Number.isSafeInteger(page.offset) || page.offset < 0
+      || !Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 20) {
+      throw new Error('문서 페이지 범위가 올바르지 않습니다.');
+    }
+    query.set('offset', String(page.offset));
+    query.set('limit', String(page.limit));
+  }
+  const response = await apiGet<{
+    resultList?: unknown[];
+    totalRowCount?: number;
+  }>(
+    `${APPROVAL_API}/documents?${query.toString()}`,
+  );
+  if (!Array.isArray(response.resultList)) {
+    throw new Error('전자결재 문서 목록 응답을 확인할 수 없습니다.');
+  }
+  if (includeDetails) {
+    const records = response.resultList.filter(isDocumentApprovalFeedRecord);
+    if (records.length !== response.resultList.length) {
+      throw new Error('전자결재 문서 피드 응답을 확인할 수 없습니다.');
+    }
+    if (page) {
+      if (!isValidDocumentApprovalPage(response.totalRowCount, records.length, page)) {
+        throw new Error('전자결재 문서 페이지 응답을 확인할 수 없습니다.');
+      }
+      return { resultList: records, totalRowCount: response.totalRowCount };
+    }
+    return records;
+  }
+  const records = response.resultList.filter(isDocumentApprovalRecord);
+  if (records.length !== response.resultList.length) {
+    throw new Error('전자결재 문서 목록 응답을 확인할 수 없습니다.');
+  }
+  if (page) {
+    if (!isValidDocumentApprovalPage(response.totalRowCount, records.length, page)) {
+      throw new Error('전자결재 문서 페이지 응답을 확인할 수 없습니다.');
+    }
+    return { resultList: records, totalRowCount: response.totalRowCount };
+  }
+  return records;
+}
+
+function isValidDocumentApprovalPage(
+  totalRowCount: unknown,
+  resultCount: number,
+  page: DocumentApprovalPageRequest,
+): totalRowCount is number {
+  return Number.isSafeInteger(totalRowCount)
+    && Number(totalRowCount) >= 0
+    && Number(totalRowCount) >= page.offset + resultCount
+    && !(resultCount === 0 && page.offset < Number(totalRowCount));
+}
+
+export function listPinnedDocumentApprovals(
+  scope: DocumentApprovalScope | undefined,
+  documentType: DocumentApprovalRecord['documentType'] | undefined,
+  electronicApprovalId: number | undefined,
+  includeDetails: true,
+): Promise<DocumentApprovalFeedRecord[]>;
+export function listPinnedDocumentApprovals(
+  scope?: DocumentApprovalScope,
+  documentType?: DocumentApprovalRecord['documentType'],
+  electronicApprovalId?: number,
+  includeDetails?: false,
+): Promise<DocumentApprovalRecord[]>;
+export async function listPinnedDocumentApprovals(
   scope: DocumentApprovalScope = 'ALL',
   documentType?: DocumentApprovalRecord['documentType'],
   electronicApprovalId?: number,
@@ -252,19 +373,62 @@ export async function listDocumentApprovals(
   if (includeDetails) query.set('includeDetails', 'true');
   const response = await apiGet<{
     resultList?: Array<DocumentApprovalRecord | DocumentApprovalFeedRecord>;
-  }>(
-    `${APPROVAL_API}/documents?${query.toString()}`,
-  );
-  if (!Array.isArray(response.resultList)) {
-    throw new Error('전자결재 문서 목록 응답을 확인할 수 없습니다.');
+    totalRowCount?: number;
+  }>(`${APPROVAL_API}/documents/pinned?${query.toString()}`);
+  const { resultList, totalRowCount } = response;
+  if (
+    !Array.isArray(resultList)
+    || typeof totalRowCount !== 'number'
+    || !Number.isSafeInteger(totalRowCount)
+    || totalRowCount < 0
+    || totalRowCount !== resultList.length
+  ) {
+    throw new Error('고정 문서 목록 응답을 확인할 수 없습니다.');
   }
   if (
     includeDetails &&
-    !response.resultList.every(isDocumentApprovalFeedRecord)
+    !resultList.every(isDocumentApprovalFeedRecord)
   ) {
-    throw new Error('전자결재 문서 피드 응답을 확인할 수 없습니다.');
+    throw new Error('고정 문서 피드 응답을 확인할 수 없습니다.');
   }
-  return response.resultList;
+  return resultList;
+}
+
+export async function pinDocumentApproval(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalPinState> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPut<{ item?: DocumentApprovalPinState }>(
+    `${APPROVAL_API}/documents/${electronicApprovalId}/pin`,
+    undefined,
+  );
+  const item = response.item;
+  if (
+    !item
+    || item.electronicApprovalId !== electronicApprovalId
+    || item.pinned !== true
+  ) {
+    throw new Error('문서 고정 응답을 확인할 수 없습니다.');
+  }
+  return item;
+}
+
+export async function unpinDocumentApproval(
+  electronicApprovalId: number,
+): Promise<DocumentApprovalPinState> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiDelete<{ item?: DocumentApprovalPinState }>(
+    `${APPROVAL_API}/documents/${electronicApprovalId}/pin`,
+  );
+  const item = response.item;
+  if (
+    !item
+    || item.electronicApprovalId !== electronicApprovalId
+    || item.pinned !== false
+  ) {
+    throw new Error('문서 고정 해제 응답을 확인할 수 없습니다.');
+  }
+  return item;
 }
 
 export async function getDocumentApprovalSummary(): Promise<DocumentApprovalSummary> {

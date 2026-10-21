@@ -488,15 +488,30 @@ const detailFields = useMemo(
 );
 ```
 
-`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`/`defaultValue`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
 
 페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
 
 날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
 
+날짜 검색 기본값은 `search.defaultValue`에 검색 필드 범위로 선언한다. 이 설정은 상세검색 값만 초기화하며 Grid 셀/행 편집 기본값과는 별개다. 각 끝점은 고정일 또는 서버 시스템 날짜 기준 상대일을 사용할 수 있고, 생략한 끝점은 빈 값으로 남는다.
+
+```typescript
+search: {
+  defaultValue: {
+    from: { type: 'systemDate', offset: { months: -1 } },
+    to: { type: 'systemDate' },
+  },
+}
+```
+
+고정일은 `{ type: 'fixed', year: 2026, month: 10, day: 20 }`처럼 지정한다. `systemDate`는 `GET /api/v1/common/system-date`의 `result.today` (`yyyy-MM-dd`)를 기준으로 하며 `years`, `months`, `days`의 정수 offset을 지정할 수 있다. 상대 계산은 연도 → 월 → 일 순서로 달력 연산을 적용하고, 대상 월에 해당 일이 없으면 월말로 보정한다. 예를 들어 3월 31일에서 한 달 전은 2월 말일이며 윤년은 2월 29일을 허용한다. API 실패나 잘못된 날짜 설정은 오류로 표시하고 프런트엔드 시계로 대체하지 않는다.
+
+기본값이 지정된 날짜 필드는 첫 조회와 상세검색 초기화에 해석된 기본값을 사용한다. 초기화 시 공통 검색 영역은 값을 갱신하지만 자동 조회 여부는 페이지가 선택한다. 문서현황은 서버 날짜 해석이 완료된 뒤 첫 목록을 조회하고, 저장된 탭 세션 조건이 있으면 이를 우선 복원한다. 사용자가 초기화하면 최근 1개월 범위를 서버 날짜 기준으로 다시 적용하고 같은 조건을 세션에 저장한다.
+
 문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `search.span`, `type`, `options`가 상세검색 폼에 반영되고, `hidden: true`인 컬럼도 명시적인 `search` metadata가 있으면 그리드에는 표시하지 않고 상세검색에는 제공할 수 있다. 검색 자체를 제외하려면 `search.hidden: true`를 지정한다.
 
-문서현황의 문서번호는 DB PK인 `electronicApprovalId`이며, `eabusNo`는 문서 유형별 구분 코드이므로 문서번호로 표시하지 않는다. 결재 참여자 전체 이름 요약은 기본 그리드에서 제거하고, 대신 현재 결재단계·담당자 및 내 결재 역할·처리상태를 표시한다. 현재 사용자가 기안자이면 결재선 참여유형보다 `기안` 역할을 우선 표시하고, 상세검색의 `기안` 조건은 현재 사용자가 기안한 문서만 조회한다. 숨김 `participantName` 컬럼의 검색 metadata로 참여자 이름 상세검색은 유지한다. 상세검색 순서는 결재신청일, 결재상태/문서종류, 문서번호, 제목, 기안자/부서, 결재 참여자, 내 역할/처리상태, 현재 결재담당자, 최종 변경일이다. 결재신청일 기간 검색은 일반 문서의 `submitted_at`, 임시저장 문서의 `created_at`을 사용하며 임시저장은 기안자 본인 문서만 표시한다. 날짜 범위 기본값과 시작일/종료일 라벨을 유지한다. 빠른 검색어는 문서번호 PK·제목·기안자 부분 검색에 사용한다. 검색 실행 시 빠른 검색어와 상세검색 조건은 현재 브라우저 탭 세션에 저장되며, 페이지 재진입 시 해당 값으로 즉시 다시 조회한다. 검색 실행 전 입력한 값은 저장되지 않는다. 검색 조건 초기화 시 검색어와 나머지 상세조건을 비우고 결재신청일은 최근 1개월 기본 범위로 되돌려 즉시 조회하며, 이 범위도 세션에 저장해 재진입 후 유지한다. 세션 저장 대상은 검색조건뿐이며 행 선택과 상세 패널 및 Grid 레이아웃은 저장하지 않는다.
+문서현황의 문서번호는 DB PK인 `electronicApprovalId`이며, `eabusNo`는 문서 유형별 구분 코드이므로 문서번호로 표시하지 않는다. 결재 참여자 전체 이름 요약은 기본 그리드에서 제거하고, 대신 현재 결재단계·담당자 및 내 결재 역할·처리상태를 표시한다. 현재 사용자가 기안자이면 결재선 참여유형보다 `기안` 역할을 우선 표시하고, 상세검색의 `기안` 조건은 현재 사용자가 기안한 문서만 조회한다. 숨김 `participantName` 컬럼의 검색 metadata로 참여자 이름 상세검색은 유지한다. 상세검색 순서는 결재신청일, 결재상태/문서종류, 문서번호, 제목, 기안자/부서, 결재 참여자, 내 역할/처리상태, 현재 결재담당자, 최종 변경일이다. 결재신청일 기간 검색은 일반 문서의 `submitted_at`, 임시저장 문서의 `created_at`을 사용하며 임시저장은 기안자 본인 문서만 표시한다. 결재신청일 기본 범위는 컬럼 metadata의 시스템 날짜 기준 최근 1개월이며, 백엔드 날짜 조회가 완료될 때까지 초기 목록 요청을 보류한다. 실패 시 재시도 가능한 오류를 표시하고 브라우저 날짜를 사용하지 않는다. 빠른 검색어는 문서번호 PK·제목·기안자 부분 검색에 사용한다. 검색 실행 시 빠른 검색어와 상세검색 조건은 현재 브라우저 탭 세션에 저장되며, 페이지 재진입 시 해당 값으로 조회한다. 검색 실행 전 입력한 값은 저장되지 않는다. 검색 조건 초기화 시 검색어와 나머지 상세조건을 비우고 결재신청일은 서버 날짜 기준 최근 1개월 범위로 되돌려 즉시 조회하며, 이 범위도 세션에 저장해 재진입 후 유지한다. 세션 저장 대상은 검색조건뿐이며 행 선택과 상세 패널 및 Grid 레이아웃은 저장하지 않는다.
 
 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
 
@@ -2289,7 +2304,8 @@ F1-Grid에 전달하는 모든 행은 `rowKey` 값이 안정적이고 서로 달
 
 - 목록 API는 `/api/v1/groupware/boards/archive/files`를 사용하며 `keyword`, `folderCode`, `uploadedFrom`, `uploadedTo`, `fileType`을 한 번에 전달해 전체 검색 결과를 한 응답으로 받는다. `offset`/`limit`, 페이지 이동, 더 보기 동작은 사용하지 않는다.
 - 날짜 검색은 최근 1년을 기본값으로 사용하고, 종료일을 포함해 검색한다. 유형 `ALL`은 API 조건에서 생략한다.
-- F1-Grid에는 `F1GridDataSource` 대신 로컬 `rows`를 전달한다. `rowKey`는 섹션에 `section:folders`/`section:files`, 폴더에 `folder:<itemCode>`, 파일에 `file:<boardFileId>`를 사용한다.
+- 2026-10-21부터 목록은 F1Grid 대신 `F1Tree`(`parentKey="parentId"`, `treeColumn="name"`, `defaultExpandAll`)로 표시하며 `F1GridDataSource` 대신 로컬 `rows`를 전달한다. `rowKey`/`parentId`는 `section:folders`(부모 `null`), `section:files`(부모 `null`), `folder:<itemCode>`(부모 `section:folders`), `file:<boardFileId>`(부모 `section:files`)이다. 파일을 분류 아래로 중첩하지 않으며, 분류 이름 클릭은 기존처럼 현재 폴더 필터를 바꾼다.
+- 파일 업로드(`POST` 직접 업로드)는 게시글 INSERT 시 인증 사용자의 `writerId`/`writerName`을 함께 전달한다(`tb_board_post.writer_id` NOT NULL). 누락 시 공통 DB 오류 메시지가 표시되던 문제의 수정이다.
 - 루트에는 분류 폴더와 파일 섹션을 함께 표시한다. 폴더를 선택하면 경로와 해당 폴더의 파일만 표시하고, 루트 이동으로 돌아올 수 있다. 파일 날짜/유형 검색 중에도 루트의 폴더 탐색은 유지한다.
 - 컬럼은 `이름`, `소유자`, `올린 날짜`, `크기`, `작업` 순서이며, 정렬/필터/엑셀 내보내기는 비활성화한다.
 - 폴더 생성은 기존 `WF_ARCHIVE_CATEGORY` 공통코드 도움창을 사용한다. 새 항목의 코드가 비어 있으면 공통코드 서비스가 코드를 자동 생성한다.

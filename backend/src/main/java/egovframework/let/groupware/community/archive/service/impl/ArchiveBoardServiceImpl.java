@@ -146,6 +146,8 @@ public class ArchiveBoardServiceImpl extends EgovAbstractServiceImpl implements 
         }
 
         Map<String, Object> insertParams = postParams(user, null);
+        insertParams.put("writerId", user.getId());
+        insertParams.put("writerName", user.getName());
         insertParams.put("title", title);
         insertParams.put("categoryCode", normalizedFolderCode);
         insertParams.put("contents", null);

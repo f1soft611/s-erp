@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeedView } from '../src/shared/components/view-mode/FeedView';
 import { FeedViewSkeleton } from '../src/shared/components/view-mode/FeedViewSkeleton';
 import { ListView } from '../src/shared/components/view-mode/ListView';
@@ -27,7 +27,67 @@ const items: CommonViewItem[] = [
   },
 ];
 
+class ImmediateIntersectionObserver {
+  constructor(private readonly callback: (entries: Array<{ isIntersecting: boolean }>) => void) {}
+
+  observe() {
+    this.callback([{ isIntersecting: true }]);
+  }
+
+  disconnect() {}
+}
+
 describe('common notice view mode components', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['feed', 'list'] as const)(
+    'supports opt-in pagination in %s mode',
+    (mode) => {
+      const onLoadMore = vi.fn();
+      const scrollRoot = document.createElement('div');
+      vi.stubGlobal('IntersectionObserver', ImmediateIntersectionObserver);
+
+      const pagination = {
+        scrollRoot,
+        hasNext: true,
+        isLoadingMore: false,
+        onLoadMore,
+      };
+      const view = mode === 'feed'
+        ? (
+            <FeedView
+              items={[]}
+              renderItem={() => <span>피드 항목</span>}
+              pagination={pagination}
+            />
+          )
+        : <ListView items={[]} pagination={pagination} />;
+
+      const { rerender } = render(view);
+
+      expect(onLoadMore).toHaveBeenCalledOnce();
+      expect(screen.queryByRole('status', { name: '다음 문서 불러오는 중' }))
+        .not.toBeInTheDocument();
+
+      const loadingView = mode === 'feed'
+        ? (
+            <FeedView
+              items={[]}
+              renderItem={() => <span>피드 항목</span>}
+              pagination={{ ...pagination, isLoadingMore: true }}
+            />
+          )
+        : <ListView items={[]} pagination={{ ...pagination, isLoadingMore: true }} />;
+      rerender(loadingView);
+
+      expect(onLoadMore).toHaveBeenCalledOnce();
+      expect(screen.getByRole('status', { name: '다음 문서 불러오는 중' }))
+        .toBeInTheDocument();
+    },
+  );
+
   it('switches between feed and list modes through a callback', () => {
     const onChange = vi.fn();
 

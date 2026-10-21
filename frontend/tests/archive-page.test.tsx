@@ -146,6 +146,10 @@ describe('Archive dashboard page', () => {
     expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
     expect(screen.getByText('폴더')).toBeInTheDocument();
     expect(screen.getByText('파일')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '폴더 접기' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '파일 접기' })).toBeInTheDocument();
     expect(await screen.findByText('업무양식')).toBeInTheDocument();
     expect(screen.getByText('매뉴얼')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '업무양식' }));

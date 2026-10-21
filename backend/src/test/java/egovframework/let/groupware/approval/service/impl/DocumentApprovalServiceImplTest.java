@@ -48,6 +48,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
@@ -365,6 +366,62 @@ class DocumentApprovalServiceImplTest {
     }
 
     @Test
+    void pinAndUnpinUseAuthenticatedActorScopeAndAllowIdempotentMutations() throws Exception {
+        when(approvalDAO.insertDocumentApprovalPin(anyMap())).thenReturn(0);
+        when(approvalDAO.deleteDocumentApprovalPin(anyMap())).thenReturn(0);
+
+        DocumentApprovalPinStateVO pinned = service().pinDocument(author, 77L);
+        DocumentApprovalPinStateVO unpinned = service().unpinDocument(author, 77L);
+
+        assertThat(pinned.getElectronicApprovalId()).isEqualTo(77L);
+        assertThat(pinned.isPinned()).isTrue();
+        assertThat(unpinned.getElectronicApprovalId()).isEqualTo(77L);
+        assertThat(unpinned.isPinned()).isFalse();
+
+        verify(approvalDAO).insertDocumentApprovalPin(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(101L).equals(params.get("userId"))
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+        verify(approvalDAO).deleteDocumentApprovalPin(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(101L).equals(params.get("userId"))
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+    }
+
+    @Test
+    void pinRejectsNonNumericAuthenticatedUserId() throws Exception {
+        LoginVO malformedActor = participantUser("login-author", "not-a-number", "작성자");
+
+        assertThatThrownBy(() -> service().pinDocument(malformedActor, 77L))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(approvalDAO, never()).insertDocumentApprovalPin(anyMap());
+    }
+
+    @Test
+    void pinnedListUsesScopeAndFilterWithCurrentAuthenticatedIdentityOnly() throws Exception {
+        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
+        listItem.setElectronicApprovalId(77L);
+        when(approvalDAO.selectPinnedRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
+
+        List<DocumentApprovalListItemVO> result = service().listPinnedDocuments(author, "MY_PENDING", "DRAFTING", 77L);
+
+        assertThat(result).containsExactly(listItem);
+        verify(approvalDAO).selectPinnedRelatedDocumentList(argThat(params ->
+            Long.valueOf(4L).equals(params.get("tenantId"))
+                && Long.valueOf(101L).equals(params.get("userId"))
+                && "login-author".equals(params.get("drafterId"))
+                && "101".equals(params.get("participantUserId"))
+                && "MY_PENDING".equals(params.get("scope"))
+                && "DRAFTING".equals(params.get("documentType"))
+                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
+    }
+
+    @Test
     void statusPageForwardsFiltersAndKeepsAuthenticatedActorScope() throws Exception {
         DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
         query.setKeyword("annual");
@@ -474,6 +531,19 @@ class DocumentApprovalServiceImplTest {
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 
         verifyNoInteractions(approvalDAO);
+    }
+
+    @Test
+    void writePageRejectsLimitsAboveTwenty() {
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setLimit(21);
+
+        assertThatThrownBy(() -> invokeApprovalMethod(
+                "searchWriteDocuments",
+                new Class<?>[] { LoginVO.class, String.class, DocumentApprovalListQueryVO.class },
+                author, "ALL", query))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test

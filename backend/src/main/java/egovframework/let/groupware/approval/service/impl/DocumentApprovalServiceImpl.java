@@ -49,7 +49,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
@@ -440,21 +442,65 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
     public List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception {
         validateAuthenticatedUser(user);
-        Set<String> scopes = new HashSet<>(Arrays.asList(
-                "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED"));
-        if (scope == null) {
-            scope = "ALL";
-        }
-        if (!scopes.contains(scope)
+        String effectiveScope = scope == null ? "ALL" : scope;
+        if (!DOCUMENT_SCOPES.contains(effectiveScope)
                 || (documentType != null && !DOCUMENT_TYPES.contains(documentType))
                 || (electronicApprovalId != null && electronicApprovalId <= 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
         }
         Map<String, Object> params = actorParams(user);
-        params.put("scope", scope);
+        params.put("scope", effectiveScope);
         params.put("documentType", documentType);
         params.put("electronicApprovalId", electronicApprovalId);
         List<DocumentApprovalListItemVO> documents = documentApprovalDAO.selectRelatedDocumentList(params);
+        return documents == null ? Collections.<DocumentApprovalListItemVO>emptyList() : documents;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalPinStateVO pinDocument(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("userId", authenticatedUserId(user));
+        params.put("electronicApprovalId", electronicApprovalId);
+        documentApprovalDAO.insertDocumentApprovalPin(params);
+        return pinState(electronicApprovalId, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalPinStateVO unpinDocument(LoginVO user, Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("userId", authenticatedUserId(user));
+        params.put("electronicApprovalId", electronicApprovalId);
+        documentApprovalDAO.deleteDocumentApprovalPin(params);
+        return pinState(electronicApprovalId, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentApprovalListItemVO> listPinnedDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception {
+        validateAuthenticatedUser(user);
+        String effectiveScope = scope == null ? "ALL" : scope;
+        if (!DOCUMENT_SCOPES.contains(effectiveScope)
+                || (documentType != null && !DOCUMENT_TYPES.contains(documentType))
+                || (electronicApprovalId != null && electronicApprovalId <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+        Map<String, Object> params = actorParams(user);
+        params.put("userId", authenticatedUserId(user));
+        params.put("scope", effectiveScope);
+        params.put("documentType", documentType);
+        params.put("electronicApprovalId", electronicApprovalId);
+        List<DocumentApprovalListItemVO> documents = documentApprovalDAO.selectPinnedRelatedDocumentList(params);
         return documents == null ? Collections.<DocumentApprovalListItemVO>emptyList() : documents;
     }
 
@@ -549,9 +595,83 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
 
     @Override
     @Transactional(readOnly = true)
+    public DocumentApprovalWritePageVO<DocumentApprovalListItemVO> searchWriteDocuments(
+            LoginVO user, String scope, DocumentApprovalListQueryVO query) throws Exception {
+        return loadWriteDocumentPage(user, scope, query);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentApprovalWritePageVO<DocumentApprovalFeedItemVO> searchWriteFeedDocuments(
+            LoginVO user, String scope, DocumentApprovalListQueryVO query) throws Exception {
+        DocumentApprovalWritePageVO<DocumentApprovalListItemVO> documentPage =
+                loadWriteDocumentPage(user, scope, query);
+        DocumentApprovalWritePageVO<DocumentApprovalFeedItemVO> feedPage = new DocumentApprovalWritePageVO<>();
+        feedPage.setResultList(buildFeedDocuments(user, documentPage.getResultList()));
+        feedPage.setTotalRowCount(documentPage.getTotalRowCount());
+        return feedPage;
+    }
+
+    private DocumentApprovalWritePageVO<DocumentApprovalListItemVO> loadWriteDocumentPage(
+            LoginVO user, String scope, DocumentApprovalListQueryVO query) throws Exception {
+        validateAuthenticatedUser(user);
+        String effectiveScope = scope == null ? "ALL" : scope;
+        if (!DOCUMENT_SCOPES.contains(effectiveScope) || query == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+
+        String documentType = normalizeText(query.getDocumentType());
+        Long electronicApprovalId = query.getElectronicApprovalId();
+        if ((documentType != null && !DOCUMENT_TYPES.contains(documentType))
+                || (electronicApprovalId != null && electronicApprovalId <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 조건이 올바르지 않습니다.");
+        }
+
+        int offset = query.getOffset() == null ? 0 : query.getOffset();
+        int limit = query.getLimit() == null ? 20 : query.getLimit();
+        if (offset < 0 || limit < 1 || limit > 20) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 조회 범위가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = actorParams(user);
+        params.put("userId", authenticatedUserId(user));
+        params.put("scope", effectiveScope);
+        params.put("documentType", documentType);
+        params.put("electronicApprovalId", electronicApprovalId);
+        params.put("offset", offset);
+        params.put("limit", limit);
+
+        List<DocumentApprovalListItemVO> resultList =
+                documentApprovalDAO.selectRelatedDocumentWritePage(params);
+        Long totalRowCount = documentApprovalDAO.countRelatedWriteDocuments(params);
+        if (resultList == null || totalRowCount == null) {
+            throw new IllegalStateException("전자결재 문서 페이지 조회 결과를 확인할 수 없습니다.");
+        }
+
+        DocumentApprovalWritePageVO<DocumentApprovalListItemVO> page = new DocumentApprovalWritePageVO<>();
+        page.setResultList(resultList);
+        page.setTotalRowCount(totalRowCount);
+        return page;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception {
         List<DocumentApprovalListItemVO> documents = listDocuments(user, scope, documentType, electronicApprovalId);
+        return buildFeedDocuments(user, documents);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentApprovalFeedItemVO> listPinnedFeedDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception {
+        List<DocumentApprovalListItemVO> documents = listPinnedDocuments(user, scope, documentType, electronicApprovalId);
+        return buildFeedDocuments(user, documents);
+    }
+
+    private List<DocumentApprovalFeedItemVO> buildFeedDocuments(LoginVO user, List<DocumentApprovalListItemVO> documents)
+            throws Exception {
         if (documents == null || documents.isEmpty()) {
             return Collections.emptyList();
         }
@@ -652,6 +772,7 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
             feedItem.setNextBeforeCommentId(commentPage.getNextBeforeCommentId());
             feedItems.add(feedItem);
         }
+
         return feedItems;
     }
 
@@ -1576,6 +1697,21 @@ public class DocumentApprovalServiceImpl implements DocumentApprovalService {
         params.put("drafterName", user.getName());
         params.put("documentStatus", "DRAFT");
         return params;
+    }
+
+    private Long authenticatedUserId(LoginVO user) {
+        try {
+            return Long.valueOf(user.getUniqId());
+        } catch (NumberFormatException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 사용자 ID가 올바르지 않습니다.", exception);
+        }
+    }
+
+    private DocumentApprovalPinStateVO pinState(Long electronicApprovalId, boolean pinned) {
+        DocumentApprovalPinStateVO state = new DocumentApprovalPinStateVO();
+        state.setElectronicApprovalId(electronicApprovalId);
+        state.setPinned(pinned);
+        return state;
     }
 
     private String normalizeText(String value) {

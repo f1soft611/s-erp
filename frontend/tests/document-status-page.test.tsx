@@ -84,6 +84,9 @@ const selectedModule = {
   menus: [],
 };
 
+const SYSTEM_TODAY = '2026-10-20';
+const SYSTEM_DATE_RANGE = { from: '2026-09-20', to: SYSTEM_TODAY };
+
 function renderDocumentStatusPage(currentPageKey = 'documents') {
   return render(
     <DashboardContent
@@ -103,7 +106,7 @@ function renderDocumentStatusPage(currentPageKey = 'documents') {
 
 function getListRequest(): URLSearchParams {
   const calls = api.get.mock.calls.filter(([path]) =>
-    String(path).includes('/api/v1/groupware/approvals/documents?'),
+    String(path).includes('/api/v1/groupware/approvals/documents/search?'),
   );
   const call = calls[calls.length - 1];
   if (!call) throw new Error('문서현황 목록 요청을 찾을 수 없습니다.');
@@ -112,37 +115,33 @@ function getListRequest(): URLSearchParams {
 
 function getListRequests(): number {
   return api.get.mock.calls.filter(([path]) =>
-    String(path).includes('/api/v1/groupware/approvals/documents?'),
+    String(path).includes('/api/v1/groupware/approvals/documents/search?'),
   ).length;
-}
-
-function expectedRecentMonthRange(today: Date) {
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const lastDayOfPreviousMonth = new Date(
-    previousMonth.getFullYear(),
-    previousMonth.getMonth() + 1,
-    0,
-  ).getDate();
-  const start = new Date(
-    previousMonth.getFullYear(),
-    previousMonth.getMonth(),
-    Math.min(today.getDate(), lastDayOfPreviousMonth),
-  );
-  const format = (date: Date) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return { from: format(start), to: format(end) };
 }
 
 describe('document status page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    api.get.mockImplementation((path: string) =>
-      path.includes('/documents?')
+    api.get.mockImplementation((path: string) => {
+      if (path.includes('/common/system-date')) {
+        return Promise.resolve({ today: SYSTEM_TODAY });
+      }
+      return path.includes('/documents/search?')
         ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
-        : Promise.resolve({}),
+        : Promise.resolve({});
+    });
+  });
+
+  it('declares the submitted date default using server date metadata', () => {
+    const field = toPageSearchFields(createDocumentStatusColumns()).find(
+      (searchField) => searchField.field === 'submittedAt',
     );
+
+    expect(field?.defaultValue).toEqual({
+      from: { type: 'systemDate', offset: { months: -1 } },
+      to: { type: 'systemDate' },
+    });
   });
 
   it('derives detailed search fields from the F1-Grid column metadata', () => {
@@ -182,6 +181,11 @@ describe('document status page', () => {
     expect(fields.find((field) => field.field === 'submittedAt')?.type).toBe(
       'date',
     );
+    expect(fields.find((field) => field.field === 'submittedAt')?.defaultValue)
+      .toEqual({
+        from: { type: 'systemDate', offset: { months: -1 } },
+        to: { type: 'systemDate' },
+      });
     expect(fields.find((field) => field.field === 'electronicApprovalId')?.type)
       .toBe('number');
     expect(fields.find((field) => field.field === 'myParticipantType')?.type)
@@ -232,18 +236,59 @@ describe('document status page', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the documents menu with a one-month submitted date range', async () => {
+  it('waits for the server date before sending the initial list request', async () => {
+    let resolveSystemDate: (value: { today: string }) => void = () => {};
+    const systemDateResponse = new Promise<{ today: string }>((resolve) => {
+      resolveSystemDate = resolve;
+    });
+    api.get.mockImplementation((path: string) => {
+      if (path.includes('/common/system-date')) return systemDateResponse;
+      return path.includes('/documents/search?')
+        ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
+        : Promise.resolve({});
+    });
+
     renderDocumentStatusPage();
 
+    expect(getListRequests()).toBe(0);
+    await act(async () => resolveSystemDate({ today: SYSTEM_TODAY }));
     expect(await screen.findByText('41')).toBeInTheDocument();
     const request = getListRequest();
-    const expectedRange = expectedRecentMonthRange(new Date());
     expect(request.get('scope')).toBe('ALL');
     expect(request.get('offset')).toBe('0');
     expect(request.get('limit')).toBe('200');
-    expect(request.get('submittedAtFrom')).toBe(expectedRange.from);
-    expect(request.get('submittedAtTo')).toBe(expectedRange.to);
+    expect(request.get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(request.get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
 
+  });
+
+  it('shows a retryable system date error without sending a defaultless list request', async () => {
+    let dateRequests = 0;
+    api.get.mockImplementation((path: string) => {
+      if (path.includes('/common/system-date')) {
+        dateRequests += 1;
+        return dateRequests === 1
+          ? Promise.reject(new Error('system date unavailable'))
+          : Promise.resolve({ today: SYSTEM_TODAY });
+      }
+      return path.includes('/documents/search?')
+        ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
+        : Promise.resolve({});
+    });
+
+    renderDocumentStatusPage();
+
+    expect(await screen.findByText('system date unavailable')).toBeVisible();
+    expect(getListRequests()).toBe(0);
+    expect(
+      window.sessionStorage.getItem('s-erp:page:document-status'),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '문서현황 다시 조회' }));
+
+    expect(await screen.findByText('41')).toBeInTheDocument();
+    expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
+    expect(dateRequests).toBe(2);
   });
 
   it('restores the last applied quick and detailed search when returning to the page', async () => {
@@ -274,6 +319,37 @@ describe('document status page', () => {
     expect(request.get('title')).toBe('Quarterly');
     expect(request.get('submittedAtFrom')).toBe('2026-10-01');
     expect(request.get('submittedAtTo')).toBe('2026-10-20');
+  });
+
+  it('keeps an omitted date empty when restoring an applied session', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:document-status',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: 'budget',
+          detailValues: { title: 'Quarterly' },
+        },
+      }),
+    );
+
+    renderDocumentStatusPage();
+
+    expect(await screen.findByText('41')).toBeInTheDocument();
+    expect(getListRequest().get('keyword')).toBe('budget');
+    expect(getListRequest().get('title')).toBe('Quarterly');
+    expect(getListRequest().has('submittedAtFrom')).toBe(false);
+    expect(getListRequest().has('submittedAtTo')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(screen.getByLabelText('결재신청일 시작일')).toHaveValue('');
+    expect(screen.getByLabelText('결재신청일 종료일')).toHaveValue('');
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => {
+      expect(getListRequest().has('submittedAtFrom')).toBe(false);
+      expect(getListRequest().has('submittedAtTo')).toBe(false);
+    });
   });
 
   it('keeps the last applied search when later inputs are not submitted', async () => {
@@ -310,15 +386,18 @@ describe('document status page', () => {
         value: { keyword: 'old', detailValues: { title: 'Old title' } },
       }),
     );
-    api.get.mockResolvedValue({ resultList: [], totalRowCount: 0 });
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : Promise.resolve({ resultList: [], totalRowCount: 0 }),
+    );
     const firstRender = renderDocumentStatusPage();
     expect(await screen.findByText(/조회 결과가 없습니다/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
 
-    const expectedRange = expectedRecentMonthRange(new Date());
     await waitFor(() => {
-      expect(getListRequest().get('submittedAtFrom')).toBe(expectedRange.from);
-      expect(getListRequest().get('submittedAtTo')).toBe(expectedRange.to);
+      expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+      expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
     });
     expect(getListRequest().has('title')).toBe(false);
     expect(getListRequest().has('keyword')).toBe(false);
@@ -329,15 +408,15 @@ describe('document status page', () => {
         version: 1,
         value: {
           keyword: '',
-          detailValues: { submittedAt: expectedRange },
+          detailValues: { submittedAt: SYSTEM_DATE_RANGE },
         },
       });
     });
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
     expect(screen.getByLabelText('결재신청일 시작일'))
-      .toHaveValue(expectedRange.from);
+      .toHaveValue(SYSTEM_DATE_RANGE.from);
     expect(screen.getByLabelText('결재신청일 종료일'))
-      .toHaveValue(expectedRange.to);
+      .toHaveValue(SYSTEM_DATE_RANGE.to);
     firstRender.unmount();
 
     api.get.mockClear();
@@ -345,15 +424,15 @@ describe('document status page', () => {
     expect(await screen.findByText(/조회 결과가 없습니다/)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '문서현황 빠른 검색' }))
       .toHaveValue('');
-    expect(getListRequest().get('submittedAtFrom')).toBe(expectedRange.from);
-    expect(getListRequest().get('submittedAtTo')).toBe(expectedRange.to);
+    expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
     expect(getListRequest().has('title')).toBe(false);
     expect(getListRequest().has('keyword')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
     expect(screen.getByLabelText('결재신청일 시작일'))
-      .toHaveValue(expectedRange.from);
+      .toHaveValue(SYSTEM_DATE_RANGE.from);
     expect(screen.getByLabelText('결재신청일 종료일'))
-      .toHaveValue(expectedRange.to);
+      .toHaveValue(SYSTEM_DATE_RANGE.to);
   });
 
   it('opens the existing approval detail overlay for the selected document and closes it', async () => {
@@ -444,7 +523,11 @@ describe('document status page', () => {
   }, 20000);
 
   it('shows an explicit empty state when no historical documents match', async () => {
-    api.get.mockResolvedValue({ resultList: [], totalRowCount: 0 });
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : Promise.resolve({ resultList: [], totalRowCount: 0 }),
+    );
     renderDocumentStatusPage();
 
     expect(

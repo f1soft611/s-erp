@@ -4,6 +4,9 @@ import { useDocumentWritePage } from '../src/pages/groupware/documents/write/hoo
 import {
   getDocumentApprovalSummary,
   listDocumentApprovals,
+  listPinnedDocumentApprovals,
+  pinDocumentApproval,
+  unpinDocumentApproval,
 } from '../src/pages/groupware/documents/write/services/documentApproval.service';
 import type {
   DocumentApprovalRecord,
@@ -13,6 +16,9 @@ import type {
 vi.mock('../src/pages/groupware/documents/write/services/documentApproval.service', () => ({
   getDocumentApprovalSummary: vi.fn(),
   listDocumentApprovals: vi.fn(),
+  listPinnedDocumentApprovals: vi.fn(),
+  pinDocumentApproval: vi.fn(),
+  unpinDocumentApproval: vi.fn(),
 }));
 
 const record: DocumentApprovalRecord = {
@@ -38,9 +44,15 @@ const emptySummary: DocumentApprovalSummary = {
   notices: [],
 };
 
+const emptyPage = { resultList: [], totalRowCount: 0 };
+const firstPage = { offset: 0, limit: 20 };
+
 describe('useDocumentWritePage date metadata', () => {
   beforeEach(() => {
-    vi.mocked(listDocumentApprovals).mockResolvedValue([]);
+    vi.mocked(listDocumentApprovals).mockResolvedValue(emptyPage as never);
+    vi.mocked(listPinnedDocumentApprovals).mockResolvedValue([]);
+    vi.mocked(pinDocumentApproval).mockResolvedValue({ electronicApprovalId: 42, pinned: true });
+    vi.mocked(unpinDocumentApproval).mockResolvedValue({ electronicApprovalId: 42, pinned: false });
   });
 
   it.each([
@@ -82,7 +94,7 @@ describe('useDocumentWritePage date metadata', () => {
       expectedLabel,
     }) => {
       const dateRecord = { ...record, submittedAt, updatedAt, createdAt };
-      vi.mocked(listDocumentApprovals).mockResolvedValue([dateRecord]);
+      vi.mocked(listDocumentApprovals).mockResolvedValue({ resultList: [dateRecord], totalRowCount: 1 } as never);
       vi.mocked(getDocumentApprovalSummary).mockResolvedValue({
         actionRequiredCount: 1,
         inProgressCount: 1,
@@ -112,7 +124,7 @@ describe('useDocumentWritePage date metadata', () => {
 
   describe('useDocumentWritePage active filter chips', () => {
     beforeEach(() => {
-      vi.mocked(listDocumentApprovals).mockResolvedValue([]);
+      vi.mocked(listDocumentApprovals).mockResolvedValue(emptyPage as never);
       vi.mocked(getDocumentApprovalSummary).mockResolvedValue(emptySummary);
     });
 
@@ -155,6 +167,8 @@ describe('useDocumentWritePage date metadata', () => {
           'IN_PROGRESS',
           'BUSINESS_CONTACT',
           undefined,
+          false,
+          firstPage,
         ),
       );
       expect(result.current.activeFilterChips).toEqual([
@@ -168,6 +182,8 @@ describe('useDocumentWritePage date metadata', () => {
           'ALL',
           'BUSINESS_CONTACT',
           undefined,
+          false,
+          firstPage,
         ),
       );
       expect(result.current.scope).toBe('ALL');
@@ -190,6 +206,8 @@ describe('useDocumentWritePage date metadata', () => {
           'IN_PROGRESS',
           'BUSINESS_CONTACT',
           undefined,
+          false,
+          firstPage,
         ),
       );
 
@@ -199,6 +217,8 @@ describe('useDocumentWritePage date metadata', () => {
           'IN_PROGRESS',
           undefined,
           undefined,
+          false,
+          firstPage,
         ),
       );
       expect(result.current.scope).toBe('IN_PROGRESS');
@@ -231,6 +251,8 @@ describe('useDocumentWritePage date metadata', () => {
           'ALL',
           'BUSINESS_CONTACT',
           42,
+          false,
+          firstPage,
         ),
       );
 
@@ -240,6 +262,8 @@ describe('useDocumentWritePage date metadata', () => {
           'ALL',
           'BUSINESS_CONTACT',
           undefined,
+          false,
+          firstPage,
         ),
       );
       expect(result.current.selectedKind).toBe('업무연락');

@@ -177,7 +177,12 @@ class ArchiveBoardServiceImplTest {
 
         assertThat(result.getBoardFileId()).isEqualTo(77L);
         verify(dao).insertArchivePost(argThat((Map<String, Object> params) ->
-                "manual.txt".equals(params.get("title")) && params.get("categoryCode") == null));
+                "manual.txt".equals(params.get("title"))
+                        && params.get("categoryCode") == null
+                        && "test-admin".equals(params.get("writerId"))
+                        && "Test administrator".equals(params.get("writerName"))
+                        && "test-admin".equals(params.get("lastModifiedBy"))
+                        && "Test administrator".equals(params.get("lastModifiedByName"))));
     }
 
     @Test

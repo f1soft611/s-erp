@@ -23,6 +23,8 @@
 | `npx vitest run tests/document-write-page.test.tsx tests/notice-page-local-updates.test.tsx -t "comment image" --reporter=verbose` | 통과: 4개 관련 테스트 |
 | `npm run build` | TypeScript 검사 및 Vite 빌드 통과. 기존 대형 번들 경고가 출력됨. |
 | 브라우저 확인 | 합성 댓글/이미지로 375px, 768px, 1280px에서 확인. 모든 너비에서 미리보기 DOM이 첨부 목록보다 앞섰고 가로 overflow가 없었다. 라이트/다크 모두 이미지 원본 크기 240×160, `filter: none`, 체크무늬 캔버스 및 테마 surface 색을 확인했다. |
+| 최종 관련 회귀 테스트 `npx vitest run tests/feed-components.test.tsx tests/image-viewer-dialog.test.tsx tests/document-write-page.test.tsx tests/notice-page-local-updates.test.tsx -t "comment image\|approval comment image\|notice comment image\|preserves the image" --reporter=dot` | 통과: 4개 테스트 파일, 관련 테스트 7개. |
+| 전체 `npm test` | 실패: Vitest가 177개 실패 테스트를 보고했고 unhandled errors 섹션도 출력됐다. 실패는 app-router, dashboard-sidebar, common-code 관리 등 이번 변경과 무관한 테스트를 포함한다. 전체 테스트 통과가 확인되지 않아 병합/PR 완료 단계는 진행하지 않았다. |
 
 ## 브라우저 스크린샷
 

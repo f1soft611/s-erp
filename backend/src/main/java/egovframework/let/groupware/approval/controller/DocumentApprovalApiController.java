@@ -1,6 +1,7 @@
 package egovframework.let.groupware.approval.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
 import javax.servlet.http.HttpServletResponse;
@@ -34,10 +35,13 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -156,16 +160,77 @@ public class DocumentApprovalApiController {
             @ModelAttribute DocumentApprovalListQueryVO query,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         HashMap<String, Object> resultMap = new HashMap<>();
-        if (includeDetails) {
-            resultMap.put("resultList", documentApprovalService.listFeedDocuments(
-                    user, scope, query.getDocumentType(), electronicApprovalId));
-        } else if (query.isPageRequest()) {
-            DocumentApprovalListPageVO page = documentApprovalService.searchDocuments(user, scope, query);
+        boolean pageRequest = query.getOffset() != null || query.getLimit() != null;
+        if (pageRequest && includeDetails) {
+            DocumentApprovalWritePageVO<DocumentApprovalFeedItemVO> page =
+                    documentApprovalService.searchWriteFeedDocuments(user, scope, query);
             resultMap.put("resultList", page.getResultList());
             resultMap.put("totalRowCount", page.getTotalRowCount());
+        } else if (pageRequest) {
+            DocumentApprovalWritePageVO<DocumentApprovalListItemVO> page =
+                    documentApprovalService.searchWriteDocuments(user, scope, query);
+            resultMap.put("resultList", page.getResultList());
+            resultMap.put("totalRowCount", page.getTotalRowCount());
+        } else if (includeDetails) {
+            resultMap.put("resultList", documentApprovalService.listFeedDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId));
         } else {
             resultMap.put("resultList", documentApprovalService.listDocuments(
                     user, scope, query.getDocumentType(), electronicApprovalId));
+        }
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 문서 현황 검색", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/documents/search")
+    public ResultVO searchDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
+            @ModelAttribute DocumentApprovalListQueryVO query,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        DocumentApprovalListPageVO page = documentApprovalService.searchDocuments(user, scope, query);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList", page.getResultList());
+        resultMap.put("totalRowCount", page.getTotalRowCount());
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 문서 개인별 고정", security = @SecurityRequirement(name = "Authorization"))
+    @PutMapping("/documents/{electronicApprovalId}/pin")
+    public ResultVO pinDocument(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        DocumentApprovalPinStateVO state = documentApprovalService.pinDocument(user, electronicApprovalId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", state);
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 문서 개인별 고정 해제", security = @SecurityRequirement(name = "Authorization"))
+    @DeleteMapping("/documents/{electronicApprovalId}/pin")
+    public ResultVO unpinDocument(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        DocumentApprovalPinStateVO state = documentApprovalService.unpinDocument(user, electronicApprovalId);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", state);
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "내 전자결재 고정 문서 목록", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/documents/pinned")
+    public ResultVO listPinnedDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
+            @RequestParam(required = false) Long electronicApprovalId,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
+            @ModelAttribute DocumentApprovalListQueryVO query,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        if (includeDetails) {
+            List<DocumentApprovalFeedItemVO> resultList = documentApprovalService.listPinnedFeedDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId);
+            resultMap.put("resultList", resultList);
+            resultMap.put("totalRowCount", Long.valueOf(resultList.size()));
+        } else {
+            List<DocumentApprovalListItemVO> resultList = documentApprovalService.listPinnedDocuments(
+                    user, scope, query.getDocumentType(), electronicApprovalId);
+            resultMap.put("resultList", resultList);
+            resultMap.put("totalRowCount", Long.valueOf(resultList.size()));
         }
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }

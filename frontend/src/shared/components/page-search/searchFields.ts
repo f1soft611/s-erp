@@ -1,4 +1,9 @@
-import type { F1GridColumn, F1GridEditorType, F1GridOption } from '../f1-grid';
+import type {
+  F1GridColumn,
+  F1GridDateRangeDefault,
+  F1GridEditorType,
+  F1GridOption,
+} from '../f1-grid';
 
 export type PageSearchFieldType =
   | 'text'
@@ -23,6 +28,7 @@ export type PageSearchField = {
   searchSpan: 1 | 2 | 3 | 4 | 5;
   group?: string;
   options?: F1GridOption[];
+  defaultValue?: F1GridDateRangeDefault;
 };
 
 const SEARCH_FIELD_TYPES = new Set<PageSearchFieldType>([
@@ -66,5 +72,8 @@ export function toPageSearchFields<T extends object>(
       searchSpan: column.search?.span ?? 1,
       ...(column.search?.group ? { group: column.search.group } : {}),
       ...(column.options ? { options: column.options } : {}),
+      ...(column.search?.defaultValue
+        ? { defaultValue: column.search.defaultValue }
+        : {}),
     }));
 }

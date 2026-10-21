@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -8,6 +9,7 @@ type PinnedItemsPanelProps<T extends CommonViewItem = CommonViewItem> = {
   ariaLabel?: string;
   selectedItemId?: string | number | null;
   onItemClick?: (item: T) => void;
+  renderItemAction?: (item: T) => ReactNode;
 };
 
 export function PinnedItemsPanel<T extends CommonViewItem>({
@@ -15,6 +17,7 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
   ariaLabel = '상단 고정 항목',
   selectedItemId,
   onItemClick,
+  renderItemAction,
 }: PinnedItemsPanelProps<T>) {
   const theme = useTheme();
   const pinnedItems = items.filter((item) => item.isPinned);
@@ -67,13 +70,16 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
             <Typography
               variant="body2"
               sx={{
-                fontWeight: 700,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
+              minWidth: 0,
+              flex: 1,
+              fontWeight: 700,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
             >
-              {item.title}
+            {item.title}
             </Typography>
+            {renderItemAction?.(item)}
           </Box>
         ))}
       </Stack>

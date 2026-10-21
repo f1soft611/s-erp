@@ -23,13 +23,10 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  F1Grid,
+  F1Tree,
   type F1GridColumn,
 } from '../../../../../shared/components/f1-grid';
-import type {
-  ArchiveBrowserRow,
-  ArchiveFileRow,
-} from '../types/archive.types';
+import type { ArchiveBrowserRow, ArchiveFileRow } from '../types/archive.types';
 
 type ArchiveFileGridProps = {
   rows: ArchiveBrowserRow[];
@@ -61,7 +58,8 @@ function formatDate(value?: string | Date | null) {
 function getFileIcon(file: ArchiveFileRow) {
   const mimeType = (file.mimeType ?? '').toLowerCase();
   const extension = file.fileName.split('.').pop()?.toLowerCase() ?? '';
-  if (mimeType === 'application/pdf' || extension === 'pdf') return PictureAsPdfOutlined;
+  if (mimeType === 'application/pdf' || extension === 'pdf')
+    return PictureAsPdfOutlined;
   if (mimeType.startsWith('image/')) return ImageOutlined;
   if (mimeType.startsWith('video/')) return VideoFileOutlined;
   if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(extension)) {
@@ -71,7 +69,11 @@ function getFileIcon(file: ArchiveFileRow) {
     return TableChartOutlined;
   }
   if (['ppt', 'pptx', 'odp'].includes(extension)) return SlideshowOutlined;
-  if (['doc', 'docx', 'hwp', 'hwpx', 'odt', 'rtf', 'txt', 'md'].includes(extension)) {
+  if (
+    ['doc', 'docx', 'hwp', 'hwpx', 'odt', 'rtf', 'txt', 'md'].includes(
+      extension,
+    )
+  ) {
     return DescriptionOutlined;
   }
   return InsertDriveFileOutlined;
@@ -159,7 +161,8 @@ export function ArchiveFileGrid({
                 </Button>
                 {isNarrow && (
                   <Typography variant="caption" color="text.secondary">
-                    {row.file.writerName ?? '—'} · {formatDate(row.file.uploadedAt)} ·{' '}
+                    {row.file.writerName ?? '—'} ·{' '}
+                    {formatDate(row.file.uploadedAt)} ·{' '}
                     {formatSize(row.file.fileSize)}
                   </Typography>
                 )}
@@ -182,7 +185,7 @@ export function ArchiveFileGrid({
           editable: false,
           search: { hidden: true },
           renderCell: ({ row }) =>
-            row.rowType === 'file' ? row.file.writerName ?? '—' : '—',
+            row.rowType === 'file' ? (row.file.writerName ?? '—') : '—',
         },
         {
           field: 'uploadedAt',
@@ -211,6 +214,7 @@ export function ArchiveFileGrid({
       field: 'rowKey',
       headerName: '작업',
       width: isNarrow ? 112 : 150,
+      align: 'center',
       editable: false,
       search: { hidden: true },
       renderCell: ({ row }) => {
@@ -258,16 +262,27 @@ export function ArchiveFileGrid({
     });
 
     return result;
-  }, [canDelete, canUpdate, isNarrow, onDelete, onDownload, onEdit, onFolderOpen]);
+  }, [
+    canDelete,
+    canUpdate,
+    isNarrow,
+    onDelete,
+    onDownload,
+    onEdit,
+    onFolderOpen,
+  ]);
 
   return (
     <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
-      <F1Grid
+      <F1Tree
         ariaLabel="자료실"
         rows={rows}
         columns={columns}
         rowKey="rowKey"
-        storageKey="groupware-community-archive-file-grid-v2"
+        parentKey="parentId"
+        treeColumn="name"
+        defaultExpandAll
+        storageKey="groupware-community-archive-file-tree-v1"
         height="100%"
         minHeight={320}
         loading={loading}

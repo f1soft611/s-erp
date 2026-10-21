@@ -40,6 +40,9 @@ import {
   downloadDocumentApprovalAttachment,
   getDocumentApprovalSummary,
   listDocumentApprovals,
+  listPinnedDocumentApprovals,
+  pinDocumentApproval,
+  unpinDocumentApproval,
   processDocumentApprovalAction,
   cancelDocumentSubmission,
   cancelDocumentApproval,
@@ -56,6 +59,33 @@ import { ApiResponseError } from '../src/shared/services/apiClient';
 describe('document approval service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('requests and validates an offset page of ordinary documents', async () => {
+    const listItem = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '페이지 문서',
+      drafterName: '작성자',
+      summary: '요약',
+    };
+    const page = { resultList: [listItem], totalRowCount: 41 };
+    api.get.mockResolvedValueOnce(page);
+
+    await expect(
+      listDocumentApprovals(
+        'ALL',
+        'DRAFTING',
+        undefined,
+        false,
+        { offset: 20, limit: 20 },
+      ),
+    ).resolves.toEqual(page);
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/documents?scope=ALL&documentType=DRAFTING&offset=20&limit=20',
+    );
   });
 
   it('uses create and update draft routes while preserving the document ID', async () => {
@@ -313,6 +343,44 @@ describe('document approval service', () => {
     await expect(
       listDocumentApprovals('ALL', undefined, undefined, true),
     ).rejects.toThrow('전자결재 문서 피드 응답을 확인할 수 없습니다.');
+  });
+
+  it('uses dedicated pinned routes and validates pin state responses', async () => {
+    const listItem = {
+      electronicApprovalId: 41,
+      eabusNo: '001',
+      documentType: 'DRAFTING',
+      documentStatus: 'PENDING',
+      title: '고정 문서',
+      drafterName: '홍길동',
+      summary: '요약',
+    };
+    api.get.mockResolvedValueOnce({ resultList: [listItem], totalRowCount: 1 });
+    await expect(
+      listPinnedDocumentApprovals('MY_PENDING', 'DRAFTING', 41),
+    ).resolves.toEqual([listItem]);
+    expect(api.get).toHaveBeenLastCalledWith(
+      '/api/v1/groupware/approvals/documents/pinned?scope=MY_PENDING&documentType=DRAFTING&electronicApprovalId=41',
+    );
+
+    api.put.mockResolvedValueOnce({ item: { electronicApprovalId: 41, pinned: true } });
+    await expect(pinDocumentApproval(41)).resolves.toEqual({
+      electronicApprovalId: 41,
+      pinned: true,
+    });
+    expect(api.put).toHaveBeenCalledWith('/api/v1/groupware/approvals/documents/41/pin', undefined);
+
+    api.delete.mockResolvedValueOnce({ item: { electronicApprovalId: 41, pinned: false } });
+    await expect(unpinDocumentApproval(41)).resolves.toEqual({
+      electronicApprovalId: 41,
+      pinned: false,
+    });
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/groupware/approvals/documents/41/pin');
+
+    api.get.mockResolvedValueOnce({ resultList: [listItem], totalRowCount: 2 });
+    await expect(listPinnedDocumentApprovals('ALL')).rejects.toThrow(
+      '고정 문서 목록 응답을 확인할 수 없습니다.',
+    );
   });
 
   it('requires a non-negative safe integer view count in document details', async () => {

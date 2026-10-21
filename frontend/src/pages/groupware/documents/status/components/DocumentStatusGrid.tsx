@@ -137,7 +137,16 @@ export function createDocumentStatusColumns(): F1GridColumn<DocumentStatusRow>[]
       width: 100,
       align: 'center',
       editable: false,
-      search: { label: '결재신청일', order: 1, span: 4, group: '결재신청일' },
+      search: {
+        label: '결재신청일',
+        order: 1,
+        span: 4,
+        group: '결재신청일',
+        defaultValue: {
+          from: { type: 'systemDate', offset: { months: -1 } },
+          to: { type: 'systemDate' },
+        },
+      },
     },
     {
       field: 'drafterName',

@@ -6,7 +6,7 @@
 
 ## 아키텍처
 
-승인된 [통합 설계 문서](../../superpowers/specs/2026-10-20-document-pin-and-feed-list-pagination-design.md)와 [작업지시서](../../directions/20261020/20261020_012_document_feed_list_pagination_work_instruction.md)를 따른다. 선행 개인별 고정 기능이 제공하는 전체 고정 문서 결과는 별도 상태로 유지하고 일반 문서 API 페이지에서 제외한다. 기존 문서 조회 API의 offset/limit 페이지 응답을 활용하고, 프론트 훅이 scope·업무구분·문서 필터별 페이지 상태를 보유한다. 공통 피드·리스트 렌더러는 선택적으로 sentinel 자동 조회와 다음 페이지 스피너를 제공하며, 기본 사용처는 기존 동작을 유지한다.
+승인된 [통합 설계 문서](../../superpowers/specs/2026-10-20-document-pin-and-feed-list-pagination-design.md)와 [작업지시서](../../directions/20261020/20261020_012_document_feed_list_pagination_work_instruction.md)를 따른다. 선행 개인별 고정 기능이 제공하는 전체 고정 문서 결과는 별도 상태로 유지하고 일반 문서 API 페이지에서 제외한다. 문서작성 전용 `/documents`와 기간·필터 기반 문서 현황 `/documents/search`를 분리해 양쪽 API 계약을 보존한다. 문서작성 훅이 scope·업무구분·문서 필터별 페이지 상태를 보유하고, 공통 피드·리스트 렌더러는 선택적으로 sentinel 자동 조회와 다음 페이지 스피너를 제공한다.
 
 ## 기술 스택
 
@@ -18,11 +18,13 @@ React, TypeScript, MUI, Vitest, Spring Boot, MyBatis, PostgreSQL, JUnit.
 
 - `frontend/src/pages/groupware/documents/write/types/documentWrite.types.ts`: 페이지 요청/응답 타입을 정의한다.
 - `frontend/src/pages/groupware/documents/write/services/documentApproval.service.ts`: offset/limit 요청과 `resultList`/`totalRowCount` 응답 검증을 담당한다.
+- `frontend/src/pages/groupware/documents/status/services/documentStatus.service.ts`: 문서 현황 검색을 전용 `/documents/search` 경로로 호출한다.
 - `frontend/src/pages/groupware/documents/write/hooks/useDocumentWritePage.ts`: 첫 페이지/추가 페이지 로드, append, 필터 초기화, stale 응답 무시, 재시도 상태를 소유한다.
 - `frontend/src/pages/groupware/documents/write/DocumentWritePage.tsx`: 실제 스크롤 컨테이너와 피드·리스트 페이징 콜백을 연결한다.
 - `frontend/src/shared/components/view-mode/FeedView.tsx`: 옵션형 sentinel 및 추가 로딩 스피너를 제공한다.
 - `frontend/src/shared/components/view-mode/ListView.tsx`: 옵션형 sentinel 및 추가 로딩 스피너를 제공한다.
 - `frontend/tests/document-approval-service.test.ts`: 페이지 파라미터와 응답 검증을 검사한다.
+- `frontend/tests/document-status-service.test.ts`: 기존 기간·필터 검색이 분리된 API 경로를 사용하는지 검사한다.
 - `frontend/tests/use-document-write-page-pagination.test.tsx`: 첫/추가 페이지, 필터·새로고침 리셋, 오류·재시도, stale 응답 및 중복 요청을 검사한다.
 - `frontend/tests/view-mode-pagination.test.tsx`: 공통 피드·리스트의 sentinel, scroll root, 접근성 스피너와 기본 비페이징 회귀를 검사한다.
 - `frontend/tests/document-write-page.test.tsx`: 문서 화면 피드·리스트 모드와 초기 스켈레톤 회귀를 확인한다.
@@ -55,6 +57,8 @@ React, TypeScript, MUI, Vitest, Spring Boot, MyBatis, PostgreSQL, JUnit.
 
 ### 2. 백엔드 페이지 조회 테스트 및 구현
 
+- [ ] 문서 현황 검색 라우트 `/documents/search`를 추가하고 현행 검색 서비스·응답 envelope를 유지한다. `/documents`는 문서작성 목록 조회로 분리한다.
+- [ ] 컨트롤러 테스트에서 현황 검색과 문서작성 페이지가 서로 다른 라우트·서비스 흐름을 사용하는지 검증한다.
 - [ ] Mapper 테스트에 최신 수정일 및 문서 ID 보조 정렬, LIMIT/OFFSET, scope·문서 유형·선택 문서 조건, 접근권한 필터 유지 검증을 추가한다.
 - [ ] 서비스·컨트롤러 테스트에 20개 limit, 음수 offset·비정상 limit 거부, `totalRowCount`, 사용자 인증 전달, 기존 응답 envelope를 추가한다.
 - [ ] includeDetails 페이지 테스트에 현재 페이지 ID만 상세·결재선·첨부·최근 댓글 조회에 전달되는 것을 추가한다.
@@ -65,12 +69,14 @@ React, TypeScript, MUI, Vitest, Spring Boot, MyBatis, PostgreSQL, JUnit.
 
 ### 3. 프론트엔드 API와 페이지 상태 테스트 및 구현
 
+- [ ] 문서 현황 데이터소스 테스트에서 기존 검색 조건·응답 처리와 `/documents/search` 경로를 검증한다.
 - [ ] API 서비스 테스트에서 offset·limit·scope·업무구분·선택 문서 쿼리와 유효하지 않은 page 응답 거부를 확인한다.
 - [ ] 일반 페이지 조회 결과가 고정 문서 ID를 제외하고 정확히 20개를 채우며, pinned 결과는 별도 목록에 유지되는지 검증한다.
 - [ ] 페이지 훅 테스트에서 첫 20건, 다음 offset 20, append, `totalRowCount` 기반 종료, 필터/새로고침 초기화를 검증한다.
 - [ ] 훅 테스트에서 중복 loadMore 차단, 페이지 요청 오류 뒤 재시도, 필터 전환 후 이전 응답 무시를 추가한다.
 - [ ] 위 프론트엔드 테스트를 먼저 실행해 페이지 기능이 없어 실패함을 확인한다.
 - [ ] 서비스가 페이지 요청을 전달하고 타입 가드로 결과 목록과 건수를 확인하도록 구현한다.
+- [ ] 문서 현황 데이터소스의 기존 검색 파라미터·응답 검증을 보존하면서 전용 경로로 전환한다.
 - [ ] 문서작성 훅에 페이징 상태를 추가한다. 첫 페이지 교체, 다음 페이지 append, 실패 offset 재시도, 새 요청 generation 무효화, 인플라이트 중복 차단을 적용한다.
 - [ ] 피드와 리스트 전환은 해당 모드의 올바른 목록 데이터를 요청하며, pinned 문서는 일반 페이지와 분리한다. 파일형은 기존 `useDocumentFiles` 로직을 유지한다.
 - [ ] 신규 서비스·훅 테스트를 실행해 통과를 확인한다.

@@ -1,19 +1,32 @@
+import type { ReactNode } from 'react';
 import { Box, Chip, Stack, Typography } from '@mui/material';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import type { CommonViewItem } from './commonViewTypes';
+import { ViewModePagination } from './ViewModePagination';
 
 type ListViewProps<T extends CommonViewItem> = {
   items: T[];
   onItemClick?: (item: T) => void;
+  renderItemAction?: (item: T) => ReactNode;
   ariaLabel?: string;
   badgeOrder?: 'category-status' | 'status-category';
+  pagination?: {
+    scrollRoot: Element | null;
+    hasNext: boolean;
+    isLoadingMore: boolean;
+    error?: string;
+    onLoadMore: () => void;
+    onRetry?: () => void;
+  };
 };
 
 export function ListView<T extends CommonViewItem>({
   items,
   onItemClick,
+  renderItemAction,
   ariaLabel = '리스트형 목록',
   badgeOrder = 'category-status',
+  pagination,
 }: ListViewProps<T>) {
   return (
     <Stack
@@ -131,18 +144,24 @@ export function ListView<T extends CommonViewItem>({
                   </>
                 )}
               </Box>
-              <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', gap: 0.75, minWidth: 0, alignItems: 'center' }}>
                 <Typography variant="caption" color="text.secondary" noWrap>
                   {item.authorLabel}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" noWrap>
                   {item.dateLabel}
                 </Typography>
+                <Box sx={{ ml: 'auto', flexShrink: 0 }}>
+                  {renderItemAction?.(item)}
+                </Box>
               </Box>
             </Box>
           </Box>
         );
       })}
+      {pagination ? (
+        <ViewModePagination {...pagination} itemCount={items.length} />
+      ) : null}
     </Stack>
   );
 }

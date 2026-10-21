@@ -20,6 +20,8 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedIte
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 
 public interface DocumentApprovalService {
@@ -38,9 +40,19 @@ public interface DocumentApprovalService {
     DocumentApprovalDraftVO cancelApproval(LoginVO user, Long electronicApprovalId) throws Exception;
     List<DocumentApprovalListItemVO> listDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception;
+    DocumentApprovalPinStateVO pinDocument(LoginVO user, Long electronicApprovalId) throws Exception;
+    DocumentApprovalPinStateVO unpinDocument(LoginVO user, Long electronicApprovalId) throws Exception;
+    List<DocumentApprovalListItemVO> listPinnedDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception;
     DocumentApprovalListPageVO searchDocuments(LoginVO user, String scope,
             DocumentApprovalListQueryVO query) throws Exception;
+    DocumentApprovalWritePageVO<DocumentApprovalListItemVO> searchWriteDocuments(LoginVO user, String scope,
+            DocumentApprovalListQueryVO query) throws Exception;
+    DocumentApprovalWritePageVO<DocumentApprovalFeedItemVO> searchWriteFeedDocuments(LoginVO user, String scope,
+            DocumentApprovalListQueryVO query) throws Exception;
     List<DocumentApprovalFeedItemVO> listFeedDocuments(LoginVO user, String scope, String documentType,
+            Long electronicApprovalId) throws Exception;
+    List<DocumentApprovalFeedItemVO> listPinnedFeedDocuments(LoginVO user, String scope, String documentType,
             Long electronicApprovalId) throws Exception;
     DocumentApprovalSummaryVO getSummary(LoginVO user) throws Exception;
     DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception;

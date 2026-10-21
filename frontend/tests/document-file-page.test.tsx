@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
-  listDocumentApprovals: vi.fn(), getDocumentApprovalSummary: vi.fn(), listDocumentFiles: vi.fn(),
+  listDocumentApprovals: vi.fn(), listPinnedDocumentApprovals: vi.fn(), getDocumentApprovalSummary: vi.fn(), listDocumentFiles: vi.fn(),
   downloadDocumentApprovalAttachment: vi.fn(), downloadApprovalCommentAttachment: vi.fn(),
   showError: vi.fn(),
 }));
@@ -34,7 +34,8 @@ const commentFile = { ...directFile, fileId: 99, fileName: 'comment.xlsx', comme
 describe('document write file mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    api.listDocumentApprovals.mockResolvedValue([]);
+    api.listDocumentApprovals.mockResolvedValue({ resultList: [], totalRowCount: 0 });
+    api.listPinnedDocumentApprovals.mockResolvedValue([]);
     api.downloadDocumentApprovalAttachment.mockResolvedValue(undefined);
     api.downloadApprovalCommentAttachment.mockResolvedValue(undefined);
     api.getDocumentApprovalSummary.mockResolvedValue({

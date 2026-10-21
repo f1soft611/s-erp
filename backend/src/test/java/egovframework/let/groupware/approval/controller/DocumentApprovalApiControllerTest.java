@@ -45,7 +45,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedIte
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
 import egovframework.let.groupware.approval.service.DocumentApprovalService;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
 
@@ -107,22 +109,65 @@ class DocumentApprovalApiControllerTest {
     @Test
     void listDocumentsReturnsResultListAndTotalForRemoteQuery() throws Exception {
         LoginVO user = authenticatedUser();
-        DocumentApprovalStatusListItemVO row = new DocumentApprovalStatusListItemVO();
+        DocumentApprovalListItemVO row = new DocumentApprovalListItemVO();
         row.setElectronicApprovalId(77L);
-        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        DocumentApprovalWritePageVO<DocumentApprovalListItemVO> page = new DocumentApprovalWritePageVO<>();
         page.setResultList(Collections.singletonList(row));
         page.setTotalRowCount(42L);
         DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
         query.setOffset(0);
         query.setLimit(25);
-        when(approvalService.searchDocuments(user, "ALL", query)).thenReturn(page);
+        when(approvalService.searchWriteDocuments(user, "ALL", query)).thenReturn(page);
 
         ResultVO response = controller.listDocuments("ALL", null, false, query, user);
 
         assertThat(response.getResult())
                 .containsEntry("resultList", page.getResultList())
                 .containsEntry("totalRowCount", 42L);
-        verify(approvalService).searchDocuments(user, "ALL", query);
+        verify(approvalService).searchWriteDocuments(user, "ALL", query);
+    }
+
+    @Test
+    void pinAndUnpinRoutesDelegateAuthenticatedActorAndReturnStateItem() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalPinStateVO pinned = new DocumentApprovalPinStateVO();
+        pinned.setElectronicApprovalId(77L);
+        pinned.setPinned(true);
+        DocumentApprovalPinStateVO unpinned = new DocumentApprovalPinStateVO();
+        unpinned.setElectronicApprovalId(77L);
+        unpinned.setPinned(false);
+        when(approvalService.pinDocument(user, 77L)).thenReturn(pinned);
+        when(approvalService.unpinDocument(user, 77L)).thenReturn(unpinned);
+
+        assertRoute("pinDocument", PutMapping.class, "/documents/{electronicApprovalId}/pin");
+        assertRoute("unpinDocument", DeleteMapping.class, "/documents/{electronicApprovalId}/pin");
+
+        ResultVO pinResponse = controller.pinDocument(77L, user);
+        ResultVO unpinResponse = controller.unpinDocument(77L, user);
+
+        assertThat(pinResponse.getResult().get("item")).isSameAs(pinned);
+        assertThat(unpinResponse.getResult().get("item")).isSameAs(unpinned);
+        verify(approvalService).pinDocument(user, 77L);
+        verify(approvalService).unpinDocument(user, 77L);
+    }
+
+    @Test
+    void listPinnedDocumentsReturnsFilteredListAndTotalCount() throws Exception {
+        LoginVO user = authenticatedUser();
+        DocumentApprovalListItemVO pinned = new DocumentApprovalListItemVO();
+        pinned.setElectronicApprovalId(77L);
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setDocumentType("DRAFTING");
+        when(approvalService.listPinnedDocuments(user, "MY_PENDING", "DRAFTING", 77L))
+                .thenReturn(Collections.singletonList(pinned));
+
+        ResultVO response = controller.listPinnedDocuments("MY_PENDING", 77L, false, query, user);
+
+        assertRoute("listPinnedDocuments", GetMapping.class, "/documents/pinned");
+        assertThat(response.getResult())
+                .containsEntry("resultList", Collections.singletonList(pinned))
+                .containsEntry("totalRowCount", 1L);
+        verify(approvalService).listPinnedDocuments(user, "MY_PENDING", "DRAFTING", 77L);
     }
 
     @Test
@@ -136,7 +181,8 @@ class DocumentApprovalApiControllerTest {
                 .thenReturn(page);
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mockMvc.perform(get("/api/v1/groupware/approvals/documents")
+        assertRoute("searchDocuments", GetMapping.class, "/documents/search");
+        mockMvc.perform(get("/api/v1/groupware/approvals/documents/search")
                 .param("keyword", "annual")
                 .param("documentType", "DRAFTING")
                 .param("documentStatus", "COMPLETED")

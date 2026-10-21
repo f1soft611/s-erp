@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/components/page-search/searchFields';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
+import { usePageSearchDefaults } from '../../../../shared/hooks/usePageSearchDefaults';
 import type {
   ModuleItem,
   PageContent,
@@ -110,26 +111,6 @@ function cloneDetailValues(
       value !== null && typeof value === 'object' ? { ...value } : value,
     ]),
   );
-}
-
-function formatLocalDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function getDefaultSubmittedAtRange(now: Date = new Date()) {
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastDayOfPreviousMonth = new Date(
-    previousMonth.getFullYear(),
-    previousMonth.getMonth() + 1,
-    0,
-  ).getDate();
-  const start = new Date(
-    previousMonth.getFullYear(),
-    previousMonth.getMonth(),
-    Math.min(now.getDate(), lastDayOfPreviousMonth),
-  );
-  return { from: formatLocalDate(start), to: formatLocalDate(end) };
 }
 
 function readTextValue(
@@ -235,31 +216,35 @@ export function DocumentStatusPage({
 }: DocumentStatusPageProps) {
   const columns = useMemo(() => createDocumentStatusColumns(), []);
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
-  const defaultSubmittedAtRange = useMemo(
-    () => getDefaultSubmittedAtRange(),
-    [],
-  );
-  const initialSession = useMemo<DocumentStatusSearchSession>(
-    () => ({
-      keyword: '',
-      detailValues: { submittedAt: defaultSubmittedAtRange },
-    }),
-    [defaultSubmittedAtRange],
-  );
-  const { state: searchSession, setState: setSearchSession } =
-    usePageSessionState(DOCUMENT_STATUS_SESSION_KEY, initialSession, {
+  const {
+    values: defaultValues,
+    loading: defaultsLoading,
+    error: defaultsError,
+    retry: retryDefaults,
+  } = usePageSearchDefaults(detailFields);
+  const {
+    state: searchSession,
+    setState: setSearchSession,
+  } = usePageSessionState<DocumentStatusSearchSession | null>(
+    DOCUMENT_STATUS_SESSION_KEY,
+    null,
+    {
       version: DOCUMENT_STATUS_SESSION_VERSION,
-      validate: isDocumentStatusSearchSession,
-    });
-  const [keyword, setKeyword] = useState(searchSession.keyword);
+      validate: (value): value is DocumentStatusSearchSession | null =>
+        value === null || isDocumentStatusSearchSession(value),
+      persistWhen: (value) => value !== null,
+    },
+  );
+  const [defaultsInitialized, setDefaultsInitialized] = useState(false);
+  const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >(() => cloneDetailValues(searchSession.detailValues));
+  >(() => cloneDetailValues(searchSession?.detailValues ?? {}));
   const [appliedFilters, setAppliedFilters] = useState<DocumentStatusFilters>(
     () =>
       toDocumentStatusFilters(
-        searchSession.keyword,
-        searchSession.detailValues,
+        searchSession?.keyword ?? '',
+        searchSession?.detailValues ?? {},
       ),
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(
@@ -273,6 +258,27 @@ export function DocumentStatusPage({
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState('');
   const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    if (!defaultValues) return;
+
+    if (searchSession === null) {
+      const initialSnapshot: DocumentStatusSearchSession = {
+        keyword: '',
+        detailValues: cloneDetailValues(defaultValues),
+      };
+      setKeyword(initialSnapshot.keyword);
+      setDetailValues(initialSnapshot.detailValues);
+      setSearchSession(initialSnapshot);
+      setAppliedFilters(
+        toDocumentStatusFilters(
+          initialSnapshot.keyword,
+          initialSnapshot.detailValues,
+        ),
+      );
+    }
+    setDefaultsInitialized(true);
+  }, [defaultValues, searchSession, setSearchSession]);
 
   const baseDataSource = useMemo(
     () => createDocumentStatusDataSource(appliedFilters),
@@ -354,7 +360,8 @@ export function DocumentStatusPage({
   }, []);
 
   const resetSearch = useCallback(() => {
-    const resetDetailValues = { submittedAt: getDefaultSubmittedAtRange() };
+    if (!defaultValues) return;
+    const resetDetailValues = cloneDetailValues(defaultValues);
     const resetSnapshot = {
       keyword: '',
       detailValues: resetDetailValues,
@@ -368,7 +375,9 @@ export function DocumentStatusPage({
         resetSnapshot.detailValues,
       ),
     );
-  }, [setSearchSession]);
+  }, [defaultValues, setSearchSession]);
+  const searchAreaDefaultValues =
+    searchSession === null ? (defaultValues ?? {}) : {};
 
   return (
     <Box
@@ -393,6 +402,7 @@ export function DocumentStatusPage({
             margin="none"
             placeholder="문서번호/제목/기안자 검색"
             value={keyword}
+            disabled={!defaultsInitialized}
             onChange={(event) => setKeyword(event.target.value)}
             slotProps={{
               htmlInput: { 'aria-label': '문서현황 빠른 검색' },
@@ -414,12 +424,19 @@ export function DocumentStatusPage({
             sx={{ width: '100%', height: 40 }}
           />
         }
-        onDefaultSearch={() => applySearch()}
+        onDefaultSearch={() => {
+          if (defaultsInitialized) applySearch();
+        }}
         detailFields={detailFields}
         detailValues={detailValues}
+        defaultValues={searchAreaDefaultValues}
         onDetailValuesChange={setDetailValues}
         onDetailSearch={applySearch}
-        detailLoading={false}
+        onDetailReset={(values) => {
+          setDetailValues(values);
+          resetSearch();
+        }}
+        detailLoading={defaultsLoading || !defaultsInitialized}
       >
         {/* <Button
           type="button"
@@ -432,13 +449,16 @@ export function DocumentStatusPage({
           검색
         </Button> */}
       </PageSearchArea>
-      <PageMessageArea message={error} onClose={handleErrorClose} />
-      {error ? (
+      <PageMessageArea
+        message={defaultsError ?? error}
+        onClose={handleErrorClose}
+      />
+      {defaultsError || error ? (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
           <Button
             type="button"
             size="small"
-            onClick={handleRetry}
+            onClick={defaultsError ? retryDefaults : handleRetry}
             aria-label="문서현황 다시 조회"
           >
             다시 조회
@@ -458,13 +478,15 @@ export function DocumentStatusPage({
           minWidth: 0,
         }}
       >
-        <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
-          <DocumentStatusGrid
-            dataSource={dataSource}
-            onSelectionChange={handleSelectionChange}
-            onDataSourceError={handleDataSourceError}
-          />
-        </Box>
+        {defaultsInitialized ? (
+          <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
+            <DocumentStatusGrid
+              dataSource={dataSource}
+              onSelectionChange={handleSelectionChange}
+              onDataSourceError={handleDataSourceError}
+            />
+          </Box>
+        ) : null}
         {hasLoaded && totalRowCount === 0 && !error ? (
           <Box
             role="status"

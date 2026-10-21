@@ -50,6 +50,9 @@ then paginate only unpinned documents.
 - Exclude that user's pinned document IDs from ordinary offset/limit pages.
 - Extend the existing document-list request with fixed `offset` and `limit`
   parameters and return the requested page plus `totalRowCount`.
+- Keep document-status date/filter search on its own `/documents/search` route;
+  `/documents` remains the document-write list/feed route so the two contracts
+  cannot conflict.
 - Apply pagination to the authorized, filtered, latest-first document query.
 - In feed mode, load pinned feed items first, then page the remaining base
   document records and load details, approval lines, attachments, and the

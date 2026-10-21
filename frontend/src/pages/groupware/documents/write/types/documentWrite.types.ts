@@ -156,6 +156,21 @@ export type DocumentApprovalRecord = {
   noticeType?: 'ACTION_REQUIRED' | 'REVISION_REQUESTED' | null;
 };
 
+export type DocumentApprovalPageRequest = {
+  offset: number;
+  limit: number;
+};
+
+export type DocumentApprovalPage<T> = {
+  resultList: T[];
+  totalRowCount: number;
+};
+
+export type DocumentApprovalPinState = {
+  electronicApprovalId: number;
+  pinned: boolean;
+};
+
 export type DocumentApprovalSummary = {
   actionRequiredCount: number;
   inProgressCount: number;

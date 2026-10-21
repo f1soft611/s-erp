@@ -37,6 +37,27 @@ function VersionedSessionStateProbe() {
   return <output data-testid="versioned-state">{JSON.stringify(state)}</output>;
 }
 
+function DeferredPersistenceProbe({
+  persistWhen,
+}: {
+  persistWhen: boolean;
+}) {
+  const { state, setState } = usePageSessionState(
+    'deferred-page',
+    { keyword: '' },
+    { persistWhen },
+  );
+
+  return (
+    <>
+      <output data-testid="deferred-state">{JSON.stringify(state)}</output>
+      <button type="button" onClick={() => setState({ keyword: 'ready' })}>
+        update
+      </button>
+    </>
+  );
+}
+
 describe('page session state', () => {
   it('clears the persisted recent-menu state when reset', () => {
     window.sessionStorage.setItem(
@@ -70,6 +91,23 @@ describe('page session state', () => {
     );
     expect(window.sessionStorage.getItem('versioned-page')).toBe(
       JSON.stringify({ version: 2, value: { searchQuery: '' } }),
+    );
+  });
+
+  it('defers persistence until asynchronous defaults are ready', () => {
+    const { rerender } = render(
+      <DeferredPersistenceProbe persistWhen={false} />,
+    );
+
+    act(() => {
+      screen.getByRole('button', { name: 'update' }).click();
+    });
+    expect(window.sessionStorage.getItem('deferred-page')).toBeNull();
+
+    rerender(<DeferredPersistenceProbe persistWhen />);
+
+    expect(window.sessionStorage.getItem('deferred-page')).toBe(
+      JSON.stringify({ keyword: 'ready' }),
     );
   });
 });

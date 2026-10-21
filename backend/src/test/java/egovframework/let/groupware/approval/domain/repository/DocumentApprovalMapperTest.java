@@ -46,6 +46,97 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void writeDocumentPagesExcludeCurrentUsersPinsAndUseStableOffsetOrdering() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectRelatedDocumentWritePage")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.countRelatedWriteDocuments")).isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("userId", 101L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("scope", "MY_PENDING");
+        params.put("documentType", "DRAFTING");
+        params.put("electronicApprovalId", 77L);
+        params.put("offset", 20);
+        params.put("limit", 20);
+
+        String pageSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentWritePage")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        String countSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.countRelatedWriteDocuments")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+
+        for (String sql : Arrays.asList(pageSql, countSql)) {
+            assertThat(sql)
+                    .contains("m.tenant_id = ?", "m.deleted_yn = 'N'", "m.drafter_id = ?",
+                            "l.participant_user_id = ?", "m.document_type = ?",
+                            "m.electronic_approval_id = ?", "p.tenant_id = m.tenant_id",
+                            "p.user_id = ?", "p.electronic_approval_id = m.electronic_approval_id");
+        }
+        assertThat(pageSql)
+                .contains("ORDER BY m.updated_at DESC, m.electronic_approval_id DESC")
+                .contains("LIMIT ? OFFSET ?");
+    }
+
+    @Test
+    void personalPinsAreScopedToCurrentUserAndReadableDocuments() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.insertDocumentApprovalPin")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.deleteDocumentApprovalPin")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectPinnedRelatedDocumentList")).isTrue();
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("userId", 101L);
+        params.put("drafterId", "login-author");
+        params.put("participantUserId", "101");
+        params.put("electronicApprovalId", 77L);
+        params.put("documentType", "GENERAL");
+        params.put("scope", "MY_PENDING");
+
+        String selectSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectPinnedRelatedDocumentList")
+                .getBoundSql(params)
+                .getSql()
+                .replaceAll("\\s+", " ");
+        assertThat(selectSql)
+                .contains("p.tenant_id = ?", "p.user_id = ?")
+                .contains("m.tenant_id = ?", "m.deleted_yn = 'N'")
+                .contains("m.drafter_id = ?", "l.participant_user_id = ?")
+                .contains("pending_line.action_status = 'PENDING'")
+                .contains("m.document_type = ?", "m.electronic_approval_id = ?")
+                .contains("ORDER BY m.updated_at DESC, m.electronic_approval_id DESC");
+
+        String insertSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.insertDocumentApprovalPin")
+                .getBoundSql(params)
+                .getSql()
+                .replaceAll("\\s+", " ");
+        assertThat(insertSql)
+                .contains("tenant_id", "user_id", "electronic_approval_id")
+                .contains("m.tenant_id = ?", "m.electronic_approval_id = ?", "m.deleted_yn = 'N'")
+                .contains("m.drafter_id = ?", "l.participant_user_id = ?")
+                .contains("ON CONFLICT (tenant_id, user_id, electronic_approval_id) DO NOTHING");
+
+        String deleteSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.deleteDocumentApprovalPin")
+                .getBoundSql(params)
+                .getSql()
+                .replaceAll("\\s+", " ");
+        assertThat(deleteSql)
+                .contains("tenant_id = ?", "user_id = ?", "electronic_approval_id = ?")
+                .contains("EXISTS ( SELECT 1 FROM public.tb_electronic_approval_main m")
+                .contains("m.tenant_id = p.tenant_id", "m.deleted_yn = 'N'")
+                .contains("m.drafter_id = ?", "l.participant_user_id = ?");
+    }
+
+    @Test
     void statusPageFiltersByDocumentIdAndCurrentUsersApprovalState() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");

@@ -1,8 +1,11 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
 import { useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { useNotification } from '../../../../shared/context/NotificationContext';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { FeedView } from '../../../../shared/components/view-mode/FeedView';
@@ -38,6 +41,7 @@ export function DocumentWritePage({
     useState<DocumentApprovalDetail | null>(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const { showError } = useNotification();
   const {
     files,
     viewMode,
@@ -67,6 +71,13 @@ export function DocumentWritePage({
     closeDetail,
     detailDocumentId,
     refresh,
+    togglePin,
+    isPinPending,
+    hasNextPage,
+    isLoadingMore,
+    pageError,
+    loadMore,
+    retryLoadMore,
   } = useDocumentWritePage();
   const hasVisibleDocuments =
     viewMode === 'feed'
@@ -233,6 +244,27 @@ export function DocumentWritePage({
                     <PinnedItemsPanel
                       items={pinnedViewItems}
                       ariaLabel="상단 고정 문서"
+                      onItemClick={(item) => openDetail(Number(item.id))}
+                      renderItemAction={(item) => (
+                        <IconButton
+                          size="small"
+                          aria-label={`상단 고정 해제 ${item.title}`}
+                          title={`상단 고정 해제 ${item.title}`}
+                          disabled={isPinPending(Number(item.id))}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void togglePin(Number(item.id), true).catch((error: unknown) => {
+                              showError(
+                                error instanceof Error
+                                  ? error.message
+                                  : '문서 고정 상태를 변경하지 못했습니다.',
+                              );
+                            });
+                          }}
+                        >
+                          <PushPinOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     />
                   </Box>
                 )}
@@ -241,12 +273,22 @@ export function DocumentWritePage({
                   {feedDocuments.length > 0 ? (
                       <FeedView
                         items={feedDocuments}
+                        pagination={{
+                          scrollRoot,
+                          hasNext: hasNextPage,
+                          isLoadingMore,
+                          error: pageError || undefined,
+                          onLoadMore: loadMore,
+                          onRetry: retryLoadMore,
+                        }}
                         renderItem={(item) => (
                           <DocumentFeedItem
                             key={item.id}
                             item={item}
                             employeeId={feedEmployeeId}
+                            pinPending={isPinPending(item.id)}
                             detailRefreshToken={detailRefreshToken}
+                            onTogglePin={togglePin}
                             onActionComplete={refresh}
                             onEditDocument={(document) => {
                               setEditingDocument(document);
@@ -266,7 +308,35 @@ export function DocumentWritePage({
                         items={unpinnedViewItems}
                         ariaLabel="리스트형 문서 목록"
                         badgeOrder="status-category"
+                        pagination={{
+                          scrollRoot,
+                          hasNext: hasNextPage,
+                          isLoadingMore,
+                          error: pageError || undefined,
+                          onLoadMore: loadMore,
+                          onRetry: retryLoadMore,
+                        }}
                         onItemClick={(item) => openDetail(Number(item.id))}
+                        renderItemAction={(item) => (
+                          <IconButton
+                            size="small"
+                            aria-label={`상단 고정 ${item.title}`}
+                            title={`상단 고정 ${item.title}`}
+                            disabled={isPinPending(Number(item.id))}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void togglePin(Number(item.id), false).catch((error: unknown) => {
+                                showError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : '문서 고정 상태를 변경하지 못했습니다.',
+                                );
+                              });
+                            }}
+                          >
+                            <PushPinOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        )}
                       />
                     ) : (
                       <EmptyDocumentList onCreate={openComposer} />

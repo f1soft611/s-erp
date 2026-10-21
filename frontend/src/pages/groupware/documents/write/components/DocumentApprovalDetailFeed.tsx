@@ -79,6 +79,8 @@ type DocumentApprovalDetailFeedSharedProps = {
   electronicApprovalId: number | null;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
+  onTogglePin?: (electronicApprovalId: number, pinned: boolean) => Promise<void>;
+  pinPending?: boolean;
   detailRefreshToken: number;
 };
 
@@ -273,6 +275,8 @@ export function DocumentApprovalDetailFeed(
     electronicApprovalId,
     onActionComplete,
     onEditDocument,
+    onTogglePin,
+    pinPending = false,
     detailRefreshToken,
   } = props;
   const theme = useTheme();
@@ -972,6 +976,11 @@ export function DocumentApprovalDetailFeed(
     ) : null;
 
   const feedItem = props.presentation === 'feed' ? props.feedItem : null;
+  const isPinned = Boolean(feedItem?.isPinned);
+  const pinTitle = detail?.title ?? feedItem?.title ?? '';
+  const pinAriaLabel = isPinned
+    ? `상단 고정 해제 ${pinTitle}`
+    : `상단 고정 ${pinTitle}`;
   const displayDocumentStatus =
     detail?.documentStatus ?? feedItem?.feedData.documentStatus;
   const displayDocumentType =
@@ -1071,7 +1080,22 @@ export function DocumentApprovalDetailFeed(
           />
         }
         pinControl={
-          <IconButton aria-label="고정된 문서" disabled size="small">
+          <IconButton
+            aria-label={pinAriaLabel}
+            title={pinAriaLabel}
+            disabled={!isFeedPresentation || pinPending || !onTogglePin}
+            size="small"
+            onClick={() => {
+              if (!isFeedPresentation || !onTogglePin || electronicApprovalId === null) return;
+              void onTogglePin(electronicApprovalId, isPinned).catch((error: unknown) => {
+                showError(
+                  error instanceof Error
+                    ? error.message
+                    : '문서 고정 상태를 변경하지 못했습니다.',
+                );
+              });
+            }}
+          >
             <PushPinOutlinedIcon fontSize="small" />
           </IconButton>
         }
