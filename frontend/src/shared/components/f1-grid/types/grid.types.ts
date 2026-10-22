@@ -37,8 +37,14 @@ export type F1GridDraftValue = string | number | null | Array<string | number>;
 export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
 export type F1GridInputFormat =
-  | { type: 'digits'; groupSizes?: number[]; separator?: string }
-  | { type: 'korean-phone' };
+  | {
+      type: 'digits';
+      groupSizes?: number[];
+      separator?: string;
+      maxDigits?: number;
+      validDigitCounts?: number[];
+    }
+  | { type: 'korean-phone'; maxDigits?: number };
 
 export type F1GridFormMode = 'create' | 'edit';
 

@@ -28,6 +28,21 @@ describe('formatF1GridInput', () => {
     ['021234567', { type: 'korean-phone' }, '02-123-4567'],
     ['123-45-67890', { type: 'digits', groupSizes: [3, 2] }, '123-45-67890'],
     ['123456789012345', { type: 'digits', groupSizes: [3, 2] }, '123-45-6789012345'],
+    [
+      '123456789012345',
+      { type: 'digits', groupSizes: [3, 2], maxDigits: 10 },
+      '123-45-67890',
+    ],
+    [
+      '021234567890',
+      { type: 'korean-phone', maxDigits: 11 },
+      '02-1234-5678',
+    ],
+    [
+      '010123456789',
+      { type: 'korean-phone', maxDigits: 11 },
+      '010-1234-5678',
+    ],
   ] as const)(
     'formats %j using %j as %j',
     (value, inputFormat, expected) => {
@@ -38,6 +53,16 @@ describe('formatF1GridInput', () => {
   it('formats partial grouped values without dropping digits', () => {
     expect(
       formatF1GridInput('1234', { type: 'digits', groupSizes: [3, 2] }),
+    ).toBe('123-4');
+  });
+
+  it('keeps partial values under max digits without padding', () => {
+    expect(
+      formatF1GridInput('1234', {
+        type: 'digits',
+        groupSizes: [3, 2],
+        maxDigits: 10,
+      }),
     ).toBe('123-4');
   });
 

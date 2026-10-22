@@ -80,6 +80,39 @@ describe('PageSearchArea 상세 검색', () => {
     });
   });
 
+  it('caps detailed search values by max digits but keeps partial input', () => {
+    const onValuesChange = vi.fn();
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'businessNo',
+            label: '사업자번호',
+            type: 'text',
+            searchSpan: 1,
+            inputFormat: { type: 'digits', groupSizes: [3, 2], maxDigits: 10 },
+          },
+        ]}
+        onDetailValuesChange={onValuesChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const businessNo = screen.getByRole('textbox', { name: '사업자번호' });
+
+    fireEvent.change(businessNo, { target: { value: '123456789012' } });
+    expect(businessNo).toHaveValue('123-45-67890');
+    expect(onValuesChange).toHaveBeenLastCalledWith({
+      businessNo: '123-45-67890',
+    });
+
+    fireEvent.change(businessNo, { target: { value: '1234' } });
+    expect(businessNo).toHaveValue('123-4');
+    expect(onValuesChange).toHaveBeenLastCalledWith({
+      businessNo: '123-4',
+    });
+  });
+
   it.each([
     ['20261022', '2026-10-22'],
     ['261022', '2026-10-22'],

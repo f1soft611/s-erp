@@ -96,11 +96,21 @@ describe('customer management page', () => {
     );
 
     expect(formats).toMatchObject({
-      businessNo: { type: 'digits', groupSizes: [3, 2] },
-      juridNo: { type: 'digits', groupSizes: [6] },
-      postCode: { type: 'digits' },
-      telephoneNo: { type: 'korean-phone' },
-      facsimileNo: { type: 'korean-phone' },
+      businessNo: {
+        type: 'digits',
+        groupSizes: [3, 2],
+        maxDigits: 10,
+        validDigitCounts: [10],
+      },
+      juridNo: {
+        type: 'digits',
+        groupSizes: [6],
+        maxDigits: 13,
+        validDigitCounts: [13],
+      },
+      postCode: { type: 'digits', maxDigits: 5, validDigitCounts: [5] },
+      telephoneNo: { type: 'korean-phone', maxDigits: 11 },
+      facsimileNo: { type: 'korean-phone', maxDigits: 11 },
     });
   });
 

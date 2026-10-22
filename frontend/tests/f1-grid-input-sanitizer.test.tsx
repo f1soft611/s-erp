@@ -41,6 +41,33 @@ describe('F1-Grid customer input sanitizer hook', () => {
     expect(onChange).toHaveBeenCalledWith('123-45-67890');
   });
 
+  it('caps inline text editor digits when maxDigits is configured', () => {
+    const onChange = vi.fn();
+    render(
+      <CellEditor
+        column={{
+          field: 'value',
+          headerName: '사업자번호',
+          inputFormat: { type: 'digits', groupSizes: [3, 2], maxDigits: 10 },
+        }}
+        value=""
+        onChange={onChange}
+        onKeyDown={vi.fn()}
+        onSelectChange={vi.fn()}
+        userValue=""
+        onUserChange={vi.fn()}
+        onCommitEdit={vi.fn()}
+        onCodePick={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '123456789012' },
+    });
+
+    expect(onChange).toHaveBeenCalledWith('123-45-67890');
+  });
+
   it('keeps the caret after the same digit when a separator is inserted', () => {
     function ControlledCellEditor() {
       const [value, setValue] = useState('12345');
@@ -152,6 +179,31 @@ describe('F1-Grid customer input sanitizer hook', () => {
     expect(onPatch).toHaveBeenCalledWith({ value: '123-45-67890' });
   });
 
+  it('caps row-form digits when maxDigits is configured', () => {
+    const onPatch = vi.fn();
+    const column: F1GridColumn<InputRow> = {
+      field: 'value',
+      headerName: '사업자번호',
+      inputFormat: { type: 'digits', groupSizes: [3, 2], maxDigits: 10 },
+    };
+    render(
+      <GridFormField
+        column={column}
+        row={{ value: '' }}
+        mode="edit"
+        value=""
+        readOnly={false}
+        onPatch={onPatch}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: '사업자번호' }), {
+      target: { value: '123456789012' },
+    });
+
+    expect(onPatch).toHaveBeenCalledWith({ value: '123-45-67890' });
+  });
+
   it('keeps unsanitized text columns unchanged', () => {
     const onChange = vi.fn();
     render(
@@ -234,6 +286,41 @@ describe('F1-Grid customer input sanitizer hook', () => {
     fireEvent.click(cell);
     fireEvent.paste(cell, {
       clipboardData: { getData: () => '1234567890\tAcme X' },
+    });
+
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({
+        id: 'row-1',
+        value: '123-45-67890',
+        notes: 'Acme X',
+      }),
+    ]);
+  });
+
+  it('caps TSV paste digits using maxDigits in target column format', () => {
+    type PasteRow = InputRow & { id: string; notes: string };
+    const gridRef = createRef<F1GridRef<PasteRow>>();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'row-1', value: 'old-value', notes: '' }]}
+        columns={[
+          {
+            field: 'value',
+            headerName: '사업자번호',
+            editable: true,
+            inputFormat: { type: 'digits', groupSizes: [3, 2], maxDigits: 10 },
+          },
+          { field: 'notes', headerName: '메모', editable: true },
+        ]}
+        rowKey="id"
+      />
+    );
+
+    const cell = screen.getByRole('gridcell', { name: 'old-value' });
+    fireEvent.click(cell);
+    fireEvent.paste(cell, {
+      clipboardData: { getData: () => '123456789012\tAcme X' },
     });
 
     expect(gridRef.current?.getChanges().updatedRows).toEqual([

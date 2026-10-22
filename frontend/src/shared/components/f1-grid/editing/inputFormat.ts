@@ -25,19 +25,27 @@ export function formatF1GridInput(
   const digits = value.replace(/\D/g, '');
 
   if (inputFormat.type === 'digits') {
+    const cappedDigits =
+      inputFormat.maxDigits === undefined
+        ? digits
+        : digits.slice(0, inputFormat.maxDigits);
     return formatDigitGroups(
-      digits,
+      cappedDigits,
       inputFormat.groupSizes ?? [],
       inputFormat.separator ?? '-',
     );
   }
 
+  const maxDigits = digits.startsWith('02')
+    ? Math.min(inputFormat.maxDigits ?? 10, 10)
+    : Math.min(inputFormat.maxDigits ?? 11, 11);
+  const cappedDigits = digits.slice(0, maxDigits);
   const groupSizes =
-    digits.startsWith('02')
-      ? [2, digits.length >= 10 ? 4 : 3]
-      : [3, digits.length >= 11 ? 4 : 3];
+    cappedDigits.startsWith('02')
+      ? [2, cappedDigits.length >= 10 ? 4 : 3]
+      : [3, cappedDigits.length >= 11 ? 4 : 3];
 
-  return formatDigitGroups(digits, groupSizes, '-');
+  return formatDigitGroups(cappedDigits, groupSizes, '-');
 }
 
 export function normalizeF1GridInput(
@@ -66,4 +74,25 @@ export function mapF1GridInputSelection(
   }
 
   return formattedValue.length;
+}
+
+function hasDigits(value: string): boolean {
+  return value.replace(/\D/g, '').length > 0;
+}
+
+export function isF1GridInputDigitCountValid(
+  value: string,
+  inputFormat: F1GridInputFormat,
+): boolean {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return true;
+
+  if (inputFormat.type === 'digits') {
+    if (!inputFormat.validDigitCounts?.length) return true;
+    return inputFormat.validDigitCounts.includes(digits.length);
+  }
+
+  if (!hasDigits(value)) return true;
+  if (digits.startsWith('02')) return digits.length === 9 || digits.length === 10;
+  return digits.length === 10 || digits.length === 11;
 }
