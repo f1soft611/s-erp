@@ -1,4 +1,4 @@
-package egovframework.let.groupware.approval.controller;
+package egovframework.let.groupware.approval.shared.controller;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,61 +28,28 @@ import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
-import egovframework.com.common.domain.model.EmbeddedImageUploadVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalFeedItemVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalListPageVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalListQueryVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalPinStateVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
-import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
-import egovframework.let.groupware.approval.service.DocumentApprovalService;
+import egovframework.let.groupware.approval.shared.service.DocumentApprovalInteractionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/groupware/approvals")
-@Tag(name = "DocumentApprovalApiController", description = "전자결재 임시저장 API")
-public class DocumentApprovalApiController {
+@Tag(name = "DocumentApprovalInteractionApiController", description = "전자결재 공통 업무 API")
+public class DocumentApprovalInteractionApiController {
 
     private final ResultVoHelper resultVoHelper;
-    private final DocumentApprovalService documentApprovalService;
+    private final DocumentApprovalInteractionService documentApprovalService;
 
-    public DocumentApprovalApiController(ResultVoHelper resultVoHelper,
-            DocumentApprovalService documentApprovalService) {
+    public DocumentApprovalInteractionApiController(ResultVoHelper resultVoHelper,
+            DocumentApprovalInteractionService documentApprovalService) {
         this.resultVoHelper = resultVoHelper;
         this.documentApprovalService = documentApprovalService;
-    }
-
-    @Operation(summary = "전자결재 문서 임시저장", security = @SecurityRequirement(name = "Authorization"))
-    @PostMapping("/drafts")
-    public ResponseEntity<ResultVO> createDraft(@RequestBody DocumentApprovalDraftSaveRequestVO request,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        DocumentApprovalDraftVO saved = documentApprovalService.saveDraft(user, request);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", saved);
-        resultMap.put("message", "문서가 임시저장되었습니다.");
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
-    }
-
-    @Operation(summary = "전자결재 임시저장 문서 수정", security = @SecurityRequirement(name = "Authorization"))
-    @PutMapping("/drafts/{electronicApprovalId}")
-    public ResultVO updateDraft(@PathVariable Long electronicApprovalId,
-            @RequestBody DocumentApprovalDraftSaveRequestVO request,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        DocumentApprovalDraftVO saved = documentApprovalService.saveDraft(user, electronicApprovalId, request);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", saved);
-        resultMap.put("message", "문서가 임시저장되었습니다.");
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
     @Operation(summary = "전자결재 문서 결재신청", security = @SecurityRequirement(name = "Authorization"))
@@ -149,97 +116,6 @@ public class DocumentApprovalApiController {
         resultMap.put("resultList", page.getResultList());
         resultMap.put("hasNext", page.isHasNext());
         resultMap.put("nextBeforeFileId", page.getNextBeforeFileId());
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "내 관련 전자결재 문서 목록", security = @SecurityRequirement(name = "Authorization"))
-    @GetMapping("/documents")
-    public ResultVO listDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
-            @RequestParam(required = false) Long electronicApprovalId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
-            @ModelAttribute DocumentApprovalListQueryVO query,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        HashMap<String, Object> resultMap = new HashMap<>();
-        boolean pageRequest = query.getOffset() != null || query.getLimit() != null;
-        if (pageRequest && includeDetails) {
-            DocumentApprovalWritePageVO<DocumentApprovalFeedItemVO> page =
-                    documentApprovalService.searchWriteFeedDocuments(user, scope, query);
-            resultMap.put("resultList", page.getResultList());
-            resultMap.put("totalRowCount", page.getTotalRowCount());
-        } else if (pageRequest) {
-            DocumentApprovalWritePageVO<DocumentApprovalListItemVO> page =
-                    documentApprovalService.searchWriteDocuments(user, scope, query);
-            resultMap.put("resultList", page.getResultList());
-            resultMap.put("totalRowCount", page.getTotalRowCount());
-        } else if (includeDetails) {
-            resultMap.put("resultList", documentApprovalService.listFeedDocuments(
-                    user, scope, query.getDocumentType(), electronicApprovalId));
-        } else {
-            resultMap.put("resultList", documentApprovalService.listDocuments(
-                    user, scope, query.getDocumentType(), electronicApprovalId));
-        }
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "전자결재 문서 현황 검색", security = @SecurityRequirement(name = "Authorization"))
-    @GetMapping("/documents/search")
-    public ResultVO searchDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
-            @ModelAttribute DocumentApprovalListQueryVO query,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        DocumentApprovalListPageVO page = documentApprovalService.searchDocuments(user, scope, query);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("resultList", page.getResultList());
-        resultMap.put("totalRowCount", page.getTotalRowCount());
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "전자결재 문서 개인별 고정", security = @SecurityRequirement(name = "Authorization"))
-    @PutMapping("/documents/{electronicApprovalId}/pin")
-    public ResultVO pinDocument(@PathVariable Long electronicApprovalId,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        DocumentApprovalPinStateVO state = documentApprovalService.pinDocument(user, electronicApprovalId);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", state);
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "전자결재 문서 개인별 고정 해제", security = @SecurityRequirement(name = "Authorization"))
-    @DeleteMapping("/documents/{electronicApprovalId}/pin")
-    public ResultVO unpinDocument(@PathVariable Long electronicApprovalId,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        DocumentApprovalPinStateVO state = documentApprovalService.unpinDocument(user, electronicApprovalId);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", state);
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "내 전자결재 고정 문서 목록", security = @SecurityRequirement(name = "Authorization"))
-    @GetMapping("/documents/pinned")
-    public ResultVO listPinnedDocuments(@RequestParam(required = false, defaultValue = "ALL") String scope,
-            @RequestParam(required = false) Long electronicApprovalId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDetails,
-            @ModelAttribute DocumentApprovalListQueryVO query,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        HashMap<String, Object> resultMap = new HashMap<>();
-        if (includeDetails) {
-            List<DocumentApprovalFeedItemVO> resultList = documentApprovalService.listPinnedFeedDocuments(
-                    user, scope, query.getDocumentType(), electronicApprovalId);
-            resultMap.put("resultList", resultList);
-            resultMap.put("totalRowCount", Long.valueOf(resultList.size()));
-        } else {
-            List<DocumentApprovalListItemVO> resultList = documentApprovalService.listPinnedDocuments(
-                    user, scope, query.getDocumentType(), electronicApprovalId);
-            resultMap.put("resultList", resultList);
-            resultMap.put("totalRowCount", Long.valueOf(resultList.size()));
-        }
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
-    }
-
-    @Operation(summary = "내 전자결재 요약 조회", security = @SecurityRequirement(name = "Authorization"))
-    @GetMapping("/summary")
-    public ResultVO getSummary(@AuthenticationPrincipal LoginVO user) throws Exception {
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", documentApprovalService.getSummary(user));
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -390,29 +266,6 @@ public class DocumentApprovalApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일 ID가 없습니다.");
         }
         documentApprovalService.downloadAttachment(user, electronicApprovalId, fileId, response);
-    }
-
-    @Operation(summary = "전자결재 본문 이미지 임시 업로드", security = @SecurityRequirement(name = "Authorization"))
-    @PostMapping("/embedded-images/temp")
-    public ResponseEntity<ResultVO> uploadTemporaryEmbeddedImage(
-            @RequestParam("file") MultipartFile file,
-            @AuthenticationPrincipal LoginVO user) throws Exception {
-        EmbeddedImageUploadVO uploaded = documentApprovalService.uploadTemporaryEmbeddedImage(user, file);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("item", uploaded);
-        resultMap.put("message", "본문 이미지가 업로드되었습니다.");
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS));
-    }
-
-    @Operation(summary = "전자결재 임시 본문 이미지 삭제", security = @SecurityRequirement(name = "Authorization"))
-    @DeleteMapping("/embedded-images/temp/{uploadToken}")
-    public ResultVO deleteTemporaryEmbeddedImage(@PathVariable String uploadToken,
-            @RequestParam String fileName, @AuthenticationPrincipal LoginVO user) throws Exception {
-        documentApprovalService.deleteTemporaryEmbeddedImage(user, uploadToken, fileName);
-        HashMap<String, Object> resultMap = new HashMap<>();
-        resultMap.put("message", "임시 본문 이미지가 삭제되었습니다.");
-        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
     @Operation(summary = "전자결재 본문 이미지 조회", security = @SecurityRequirement(name = "Authorization"))

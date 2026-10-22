@@ -9,7 +9,10 @@ vi.mock('../src/shared/services/apiClient', () => ({
   apiGet: api.get,
 }));
 
-import { createDocumentStatusDataSource } from '../src/pages/groupware/documents/status/services/documentStatus.service';
+import {
+  createDocumentStatusDataSource,
+  searchDocumentStatus,
+} from '../src/pages/groupware/documents/status/services/documentStatus.service';
 import type { DocumentStatusRow } from '../src/pages/groupware/documents/status/types/documentStatus.types';
 
 const row: DocumentStatusRow = {
@@ -113,6 +116,28 @@ describe('document status service', () => {
     expect(params.get('sortDirection')).toBe('ASC');
   });
 
+  it('loads all matching status rows without paging parameters', async () => {
+    api.get.mockResolvedValue({ resultList: [row], totalRowCount: 1 });
+    const controller = new AbortController();
+
+    await expect(
+      searchDocumentStatus(
+        { documentStatus: 'COMPLETED', submittedAtFrom: '2026-09-20' },
+        controller.signal,
+      ),
+    ).resolves.toEqual({ rows: [row], totalRowCount: 1 });
+
+    const [path, signal] = api.get.mock.calls[0] as [string, AbortSignal];
+    const request = new URL(path, 'http://localhost');
+    expect(request.searchParams.get('documentStatus')).toBe('COMPLETED');
+    expect(request.searchParams.get('submittedAtFrom')).toBe('2026-09-20');
+    expect(request.searchParams.has('offset')).toBe(false);
+    expect(request.searchParams.has('limit')).toBe(false);
+    expect(request.searchParams.has('sortField')).toBe(false);
+    expect(request.searchParams.has('sortDirection')).toBe(false);
+    expect(signal).toBe(controller.signal);
+  });
+
   it('accepts the drafter role returned for the current user', async () => {
     api.get.mockResolvedValue({
       resultList: [{ ...row, myParticipantType: 'DRAFTER' }],
@@ -149,5 +174,41 @@ describe('document status service', () => {
     await expect(
       dataSource.load(query(new AbortController().signal)),
     ).rejects.toBe(failure);
+  });
+
+  it('normalizes numeric dates in both full and paged results', async () => {
+    const timestamp = Date.UTC(2026, 9, 20);
+    api.get.mockResolvedValue({
+      resultList: [{ ...row, submittedAt: timestamp, updatedAt: null }],
+      totalRowCount: 1,
+    });
+    const expected = {
+      rows: [{ ...row, submittedAt: '2026-10-20T00:00:00.000Z', updatedAt: null }],
+      totalRowCount: 1,
+    };
+    await expect(searchDocumentStatus({})).resolves.toEqual(expected);
+    await expect(
+      createDocumentStatusDataSource({}).load(query(new AbortController().signal)),
+    ).resolves.toEqual(expected);
+  });
+
+  it.each([
+    { documentType: 'INVALID' },
+    { documentStatus: 'INVALID' },
+    { myParticipantType: 'DRAFTER, INVALID' },
+    { myActionStatus: 'APPROVED, INVALID' },
+    { submittedAt: Number.NaN },
+    { electronicApprovalId: 1.5 },
+  ])('rejects malformed rows through both service entry points: %j', async (invalid) => {
+    api.get.mockResolvedValue({
+      resultList: [{ ...row, ...invalid }],
+      totalRowCount: 1,
+    });
+    await expect(searchDocumentStatus({})).rejects.toThrow(
+      '전자결재 문서 검색 응답을 확인할 수 없습니다.',
+    );
+    await expect(
+      createDocumentStatusDataSource({}).load(query(new AbortController().signal)),
+    ).rejects.toThrow('전자결재 문서 검색 응답을 확인할 수 없습니다.');
   });
 });

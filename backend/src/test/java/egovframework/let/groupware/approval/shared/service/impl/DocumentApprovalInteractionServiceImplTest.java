@@ -1,4 +1,4 @@
-package egovframework.let.groupware.approval.service.impl;
+package egovframework.let.groupware.approval.shared.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -19,16 +18,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 import egovframework.com.common.domain.model.CommonCommentPageVO;
@@ -57,15 +53,23 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalPartici
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFileItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
+import egovframework.let.groupware.approval.common.service.DocumentApprovalAccessService;
+import egovframework.let.groupware.approval.common.service.DocumentApprovalCommentSupportService;
+import egovframework.let.groupware.approval.common.service.DocumentApprovalDraftSupportService;
+import egovframework.let.groupware.approval.common.service.impl.DocumentApprovalAccessServiceImpl;
+import egovframework.let.groupware.approval.common.service.impl.DocumentApprovalCommentSupportServiceImpl;
+import egovframework.let.groupware.approval.common.service.impl.DocumentApprovalDraftSupportServiceImpl;
+import egovframework.let.groupware.approval.write.service.impl.DocumentApprovalWriteServiceImpl;
+import egovframework.let.groupware.approval.shared.service.impl.DocumentApprovalInteractionServiceImpl;
 
-class DocumentApprovalServiceImplTest {
+class DocumentApprovalInteractionServiceImplTest {
 
-    private final DocumentApprovalDAO approvalDAO = mock(DocumentApprovalDAO.class);
     private final CommonCommentDAO commentDAO = mock(CommonCommentDAO.class);
     private final CommonFileService fileService = mock(CommonFileService.class);
+    private final DocumentApprovalDAO approvalDAO = mock(DocumentApprovalDAO.class);
     private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
-    private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
     private final LoginVO author = author();
+    private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
 
     @Test
     void filePageReturnsTwentyItemsAndUsesLastVisibleFileAsCursor() throws Exception {
@@ -76,7 +80,7 @@ class DocumentApprovalServiceImplTest {
             files.add(file);
         }
         when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(files);
-        DocumentApprovalFilePageVO page = service().listFiles(author, "ALL", null, null, null);
+        DocumentApprovalFilePageVO page = sharedService().listFiles(author, "ALL", null, null, null);
         assertThat(page.getResultList()).hasSize(20);
         assertThat(page.isHasNext()).isTrue();
         assertThat(page.getNextBeforeFileId()).isEqualTo(26L);
@@ -91,14 +95,14 @@ class DocumentApprovalServiceImplTest {
     void filePageStopsAtLastPageAndRejectsInvalidOrInaccessibleCursor() throws Exception {
         when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(Collections.emptyList());
         when(approvalDAO.selectRelatedFileCursor(anyMap())).thenReturn(null);
-        DocumentApprovalFilePageVO page = service().listFiles(author, "ALL", null, null, null);
+        DocumentApprovalFilePageVO page = sharedService().listFiles(author, "ALL", null, null, null);
         assertThat(page.isHasNext()).isFalse();
         assertThat(page.getNextBeforeFileId()).isNull();
-        assertThatThrownBy(() -> service().listFiles(author, "INVALID", null, null, null))
+        assertThatThrownBy(() -> sharedService().listFiles(author, "INVALID", null, null, null))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
-        assertThatThrownBy(() -> service().listFiles(author, "ALL", null, null, -1L))
+        assertThatThrownBy(() -> sharedService().listFiles(author, "ALL", null, null, -1L))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
-        assertThatThrownBy(() -> service().listFiles(author, "ALL", null, null, 55L))
+        assertThatThrownBy(() -> sharedService().listFiles(author, "ALL", null, null, 55L))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
     }
 
@@ -112,7 +116,7 @@ class DocumentApprovalServiceImplTest {
         }
         when(approvalDAO.selectRelatedFileCursor(anyMap())).thenReturn(26L);
         when(approvalDAO.selectRelatedFilePage(anyMap())).thenReturn(files);
-        DocumentApprovalFilePageVO page = service().listFiles(author, "DRAFT", "DRAFTING", 77L, 26L);
+        DocumentApprovalFilePageVO page = sharedService().listFiles(author, "DRAFT", "DRAFTING", 77L, 26L);
         assertThat(page.getResultList()).hasSize(20);
         assertThat(page.isHasNext()).isFalse();
         assertThat(page.getNextBeforeFileId()).isNull();
@@ -123,20 +127,6 @@ class DocumentApprovalServiceImplTest {
                 && Long.valueOf(77).equals(params.get("electronicApprovalId"))
                 && Long.valueOf(26).equals(params.get("beforeFileId"))));
         verify(approvalDAO).selectRelatedFileCursor(argThat(params -> !params.containsKey("documentStatus")));
-    }
-
-    @Test
-    void businessContactDraftAllowsNoReferences() throws Exception {
-        DocumentApprovalDraftSaveRequestVO request = request();
-        request.setDocumentType("BUSINESS_CONTACT");
-        request.setApprovalLines(Collections.emptyList());
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
-
-        assertThat(service().saveDraft(author, request).getDocumentStatus()).isEqualTo("DRAFT");
-        verify(approvalDAO, never()).selectActiveParticipants(anyMap());
-        verify(approvalDAO, never()).insertDocumentApprovalLine(anyMap());
     }
 
     @Test
@@ -153,7 +143,7 @@ class DocumentApprovalServiceImplTest {
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
         when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("COMPLETED"));
 
-        assertThat(service().submit(author, 77L, request).getDocumentStatus()).isEqualTo("COMPLETED");
+        assertThat(sharedService().submit(author, 77L, request).getDocumentStatus()).isEqualTo("COMPLETED");
         verify(approvalDAO).insertDocumentApprovalLine(argThat(params ->
             "REFERENCE".equals(params.get("participantType"))
                 && params.get("actionStatus") == null && params.get("pendingAt") == null
@@ -171,7 +161,7 @@ class DocumentApprovalServiceImplTest {
         request.setDocumentType("BUSINESS_CONTACT");
         request.setApprovalLines(Collections.emptyList());
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("DRAFT"));
-        assertThatThrownBy(() -> service().submit(author, 77L, request))
+        assertThatThrownBy(() -> sharedService().submit(author, 77L, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조자");
         verify(approvalDAO, never()).updateDocumentApprovalMain(anyMap());
     }
@@ -180,10 +170,10 @@ class DocumentApprovalServiceImplTest {
     void businessContactRejectsApprovalLinesAndSelfReferences() throws Exception {
         DocumentApprovalDraftSaveRequestVO request = request();
         request.setDocumentType("BUSINESS_CONTACT");
-        assertThatThrownBy(() -> service().saveDraft(author, request))
+        assertThatThrownBy(() -> writeService().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조");
         request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "101")));
-        assertThatThrownBy(() -> service().saveDraft(author, request))
+        assertThatThrownBy(() -> writeService().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("작성자");
         verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
     }
@@ -194,377 +184,16 @@ class DocumentApprovalServiceImplTest {
         request.setDocumentType("BUSINESS_CONTACT");
         request.setApprovalLines(Arrays.asList(
             line(1, 1, "REFERENCE", "202"), line(1, 2, "REFERENCE", "202")));
-        assertThatThrownBy(() -> service().saveDraft(author, request))
+        assertThatThrownBy(() -> writeService().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("중복");
         request.setApprovalLines(Collections.singletonList(line(2, 1, "REFERENCE", "202")));
-        assertThatThrownBy(() -> service().saveDraft(author, request))
+        assertThatThrownBy(() -> writeService().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("참조");
         request.setApprovalLines(Collections.singletonList(line(1, 1, "REFERENCE", "202")));
         when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Collections.emptyList());
-        assertThatThrownBy(() -> service().saveDraft(author, request))
+        assertThatThrownBy(() -> writeService().saveDraft(author, request))
             .isInstanceOf(ResponseStatusException.class).hasMessageContaining("사용할 수 없는");
         verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
-    }
-
-    @Test
-    void feedListHydratesDocumentWithoutRecordingView() throws Exception {
-        DocumentApprovalListItemVO firstItem = new DocumentApprovalListItemVO();
-        firstItem.setElectronicApprovalId(77L);
-        firstItem.setTitle("첫 피드 문서");
-        firstItem.setSummary("첫 요약");
-        DocumentApprovalListItemVO secondItem = new DocumentApprovalListItemVO();
-        secondItem.setElectronicApprovalId(78L);
-        secondItem.setTitle("둘째 피드 문서");
-        secondItem.setSummary("둘째 요약");
-        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Arrays.asList(firstItem, secondItem));
-
-        DocumentApprovalDetailVO firstDetail = detail(8);
-        firstDetail.setContentsJson("{\"type\":\"doc\"}");
-        firstDetail.setContentsHtml("<p>첫 본문</p>");
-        firstDetail.setContentsText("첫 본문");
-        DocumentApprovalDetailVO secondDetail = detail(6);
-        secondDetail.setElectronicApprovalId(78L);
-        secondDetail.setContentsHtml("<p>둘째 본문</p>");
-        when(approvalDAO.selectDocumentApprovalDetailsByIds(argThat(params ->
-            Long.valueOf(4L).equals(params.get("tenantId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))
-                && ((List<?>) params.get("ownerIds")).containsAll(Arrays.asList(77L, 78L)))))
-            .thenReturn(Arrays.asList(firstDetail, secondDetail));
-
-        CommonFileVO attachment = new CommonFileVO();
-        attachment.setFileId(91L);
-        attachment.setOwnerId(77L);
-        Map<Long, List<CommonFileVO>> attachmentsByOwnerId = new HashMap<>();
-        attachmentsByOwnerId.put(77L, Collections.singletonList(attachment));
-        attachmentsByOwnerId.put(78L, Collections.<CommonFileVO>emptyList());
-        when(fileService.listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L)))
-            .thenReturn(attachmentsByOwnerId);
-        DocumentApprovalLineBatchVO firstLine = new DocumentApprovalLineBatchVO();
-        firstLine.setElectronicApprovalId(77L);
-        firstLine.setElectronicApprovalLineId(501L);
-        DocumentApprovalLineBatchVO secondLine = new DocumentApprovalLineBatchVO();
-        secondLine.setElectronicApprovalId(78L);
-        secondLine.setElectronicApprovalLineId(502L);
-        when(approvalDAO.selectApprovalLinesByOwnerIds(anyMap()))
-            .thenReturn(Arrays.asList(firstLine, secondLine));
-
-        CommonCommentVO newestSystemEvent = approvalComment(57L, "login-author", "SYSTEM");
-        newestSystemEvent.setEventType("SUBMITTED");
-        newestSystemEvent.setCreatedAt(new java.util.Date(6_000L));
-        CommonCommentVO newestRoot = approvalComment(55L, "login-author", "USER");
-        newestRoot.setCreatedAt(new java.util.Date(5_000L));
-        CommonCommentVO newestReply = approvalComment(56L, "login-author", "USER");
-        newestReply.setParentCommentId(55L);
-        newestReply.setCreatedAt(new java.util.Date(5_500L));
-        CommonCommentVO secondSystemEvent = approvalComment(54L, "login-author", "SYSTEM");
-        secondSystemEvent.setEventType("APPROVED");
-        secondSystemEvent.setCreatedAt(new java.util.Date(4_000L));
-        CommonCommentVO thirdRoot = approvalComment(53L, "login-author", "USER");
-        CommonCommentVO otherDocumentRoot = approvalComment(81L, "login-author", "USER");
-        newestSystemEvent.setOwnerId(77L);
-        newestRoot.setOwnerId(77L);
-        newestReply.setOwnerId(77L);
-        secondSystemEvent.setOwnerId(77L);
-        thirdRoot.setOwnerId(77L);
-        otherDocumentRoot.setOwnerId(78L);
-        when(commentDAO.selectApprovalCommentStreamPagesByOwnerIds(anyMap()))
-            .thenReturn(Arrays.asList(
-                newestSystemEvent, newestRoot, secondSystemEvent, thirdRoot, otherDocumentRoot));
-        Map<String, Object> firstOwnerCount = new HashMap<>();
-        firstOwnerCount.put("ownerId", 77L);
-        firstOwnerCount.put("totalCount", 5L);
-        Map<String, Object> secondOwnerCount = new HashMap<>();
-        secondOwnerCount.put("ownerId", 78L);
-        secondOwnerCount.put("totalCount", 1L);
-        when(commentDAO.selectApprovalCommentStreamCountsByOwnerIds(anyMap()))
-            .thenReturn(Arrays.asList(firstOwnerCount, secondOwnerCount));
-        when(commentDAO.selectApprovalUserCommentThreadsByRootIds(anyMap()))
-            .thenReturn(Arrays.asList(newestRoot, newestReply, otherDocumentRoot));
-        CommonFileVO commentAttachment = approvalCommentFile(601L, 55L);
-        when(fileService.listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(55L, 56L, 81L)))
-            .thenReturn(Collections.singletonMap(55L, Collections.singletonList(commentAttachment)));
-
-        List<DocumentApprovalFeedItemVO> result = service().listFeedDocuments(author, "ALL", null, null);
-
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).getElectronicApprovalId()).isEqualTo(77L);
-        assertThat(result.get(0).getSummary()).isEqualTo("첫 요약");
-        assertThat(result.get(0).getContentsHtml()).isEqualTo("<p>첫 본문</p>");
-        assertThat(result.get(0).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
-            .containsExactly(501L);
-        assertThat(result.get(0).getApprovalLines().get(0))
-            .isExactlyInstanceOf(DocumentApprovalLineVO.class);
-        assertThat(result.get(0).getAttachments()).containsExactly(attachment);
-        assertThat(result.get(0).getComments())
-            .extracting(CommonCommentVO::getCommentId).containsExactly(55L, 56L);
-        assertThat(result.get(0).getComments().get(0).getAttachments())
-            .containsExactly(commentAttachment);
-        assertThat(result.get(0).getSystemEvents())
-            .extracting(CommonCommentVO::getCommentId).containsExactly(54L, 57L);
-        assertThat(result.get(0).getCommentCount()).isEqualTo(5L);
-        assertThat(result.get(0).isHasPreviousComments()).isTrue();
-        assertThat(result.get(0).getNextBeforeCommentId()).isEqualTo(54L);
-        assertThat(result.get(1).getElectronicApprovalId()).isEqualTo(78L);
-        assertThat(result.get(1).getContentsHtml()).isEqualTo("<p>둘째 본문</p>");
-        assertThat(result.get(1).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
-            .containsExactly(502L);
-        assertThat(result.get(1).getComments()).containsExactly(otherDocumentRoot);
-        assertThat(result.get(1).getSystemEvents()).isEmpty();
-        assertThat(result.get(1).getCommentCount()).isEqualTo(1L);
-        assertThat(result.get(1).isHasPreviousComments()).isFalse();
-        verify(approvalDAO).selectDocumentApprovalDetailsByIds(anyMap());
-        verify(approvalDAO).selectApprovalLinesByOwnerIds(anyMap());
-        verify(commentDAO).selectApprovalCommentStreamPagesByOwnerIds(argThat(params ->
-            params.get("ownerIds") != null && ((List<?>) params.get("ownerIds")).containsAll(Arrays.asList(77L, 78L))
-                && params.get("limit").equals(4)));
-        verify(commentDAO).selectApprovalCommentStreamCountsByOwnerIds(anyMap());
-        verify(commentDAO).selectApprovalUserCommentThreadsByRootIds(argThat(params ->
-            ((List<?>) params.get("rootIds")).containsAll(Arrays.asList(55L, 81L))));
-        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL", Arrays.asList(77L, 78L));
-        verify(fileService).listFilesByOwnerIds(4L, "APPROVAL_COMMENT", Arrays.asList(55L, 56L, 81L));
-        verify(approvalDAO, never()).selectLoginIdByLoginCode(anyMap());
-        verify(approvalDAO, never()).insertElectronicApprovalViewHistory(anyMap());
-        verify(approvalDAO, never()).incrementElectronicApprovalViewCount(anyMap());
-        verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
-        verify(approvalDAO, never()).selectApprovalLines(anyMap());
-        verify(approvalDAO, never()).selectIsDocumentParticipant(anyMap());
-        verify(commentDAO, never()).selectApprovalUserCommentPage(anyMap());
-        verify(commentDAO, never()).countApprovalUserComments(anyMap());
-        verify(fileService, never()).listFiles(eq(4L), eq("APPROVAL"), eq(77L));
-        verify(fileService, never()).listFiles(eq(4L), eq("APPROVAL_COMMENT"), eq(55L));
-    }
-
-    @Test
-    void feedListStopsWhenBatchDetailDoesNotAuthorizeAListedDocument() throws Exception {
-        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
-        listItem.setElectronicApprovalId(77L);
-        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
-        when(approvalDAO.selectDocumentApprovalDetailsByIds(anyMap()))
-            .thenReturn(Collections.<DocumentApprovalDetailVO>emptyList());
-
-        assertThatThrownBy(() -> service().listFeedDocuments(author, "ALL", null, null))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
-
-        verify(approvalDAO, never()).selectApprovalLinesByOwnerIds(anyMap());
-        verifyNoInteractions(commentDAO, fileService);
-    }
-
-    @Test
-    void ordinaryListDoesNotHydrateDetails() throws Exception {
-        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
-        listItem.setElectronicApprovalId(77L);
-        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
-
-        List<DocumentApprovalListItemVO> result = service().listDocuments(author, "ALL", null, null);
-
-        assertThat(result).containsExactly(listItem);
-        verify(approvalDAO, never()).selectDocumentApprovalDetail(anyMap());
-        verify(approvalDAO, never()).selectApprovalLines(anyMap());
-        verifyNoInteractions(commentDAO, fileService);
-    }
-
-    @Test
-    void pinAndUnpinUseAuthenticatedActorScopeAndAllowIdempotentMutations() throws Exception {
-        when(approvalDAO.insertDocumentApprovalPin(anyMap())).thenReturn(0);
-        when(approvalDAO.deleteDocumentApprovalPin(anyMap())).thenReturn(0);
-
-        DocumentApprovalPinStateVO pinned = service().pinDocument(author, 77L);
-        DocumentApprovalPinStateVO unpinned = service().unpinDocument(author, 77L);
-
-        assertThat(pinned.getElectronicApprovalId()).isEqualTo(77L);
-        assertThat(pinned.isPinned()).isTrue();
-        assertThat(unpinned.getElectronicApprovalId()).isEqualTo(77L);
-        assertThat(unpinned.isPinned()).isFalse();
-
-        verify(approvalDAO).insertDocumentApprovalPin(argThat(params ->
-            Long.valueOf(4L).equals(params.get("tenantId"))
-                && Long.valueOf(101L).equals(params.get("userId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
-        verify(approvalDAO).deleteDocumentApprovalPin(argThat(params ->
-            Long.valueOf(4L).equals(params.get("tenantId"))
-                && Long.valueOf(101L).equals(params.get("userId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))));
-    }
-
-    @Test
-    void pinRejectsNonNumericAuthenticatedUserId() throws Exception {
-        LoginVO malformedActor = participantUser("login-author", "not-a-number", "작성자");
-
-        assertThatThrownBy(() -> service().pinDocument(malformedActor, 77L))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-        verify(approvalDAO, never()).insertDocumentApprovalPin(anyMap());
-    }
-
-    @Test
-    void pinnedListUsesScopeAndFilterWithCurrentAuthenticatedIdentityOnly() throws Exception {
-        DocumentApprovalListItemVO listItem = new DocumentApprovalListItemVO();
-        listItem.setElectronicApprovalId(77L);
-        when(approvalDAO.selectPinnedRelatedDocumentList(anyMap())).thenReturn(Collections.singletonList(listItem));
-
-        List<DocumentApprovalListItemVO> result = service().listPinnedDocuments(author, "MY_PENDING", "DRAFTING", 77L);
-
-        assertThat(result).containsExactly(listItem);
-        verify(approvalDAO).selectPinnedRelatedDocumentList(argThat(params ->
-            Long.valueOf(4L).equals(params.get("tenantId"))
-                && Long.valueOf(101L).equals(params.get("userId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))
-                && "MY_PENDING".equals(params.get("scope"))
-                && "DRAFTING".equals(params.get("documentType"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalId"))
-                && !params.containsKey("documentStatus")));
-    }
-
-    @Test
-    void statusPageForwardsFiltersAndKeepsAuthenticatedActorScope() throws Exception {
-        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
-        query.setKeyword("annual");
-        query.setElectronicApprovalId(77L);
-        query.setEabusNo("001");
-        query.setTitle("budget");
-        query.setDocumentType("DRAFTING");
-        query.setDocumentStatus("COMPLETED");
-        query.setSubmittedAtFrom("2026-09-16");
-        query.setSubmittedAtTo("2026-10-16");
-        query.setDrafterName("Morgan");
-        query.setDrafterDepartmentName("Finance");
-        query.setParticipantName("Sam");
-        query.setMyParticipantType("DRAFTER");
-        query.setMyActionStatus("PENDING");
-        query.setCurrentApproverName("Alex");
-        query.setOffset(25);
-        query.setLimit(100);
-        query.setSortField("approvalProgress");
-        query.setSortDirection("ASC");
-
-        DocumentApprovalStatusListItemVO item = new DocumentApprovalStatusListItemVO();
-        item.setElectronicApprovalId(77L);
-        when(approvalDAO.selectRelatedDocumentPage(anyMap())).thenReturn(Collections.singletonList(item));
-        when(approvalDAO.countRelatedDocuments(anyMap())).thenReturn(321L);
-
-        DocumentApprovalListPageVO page = (DocumentApprovalListPageVO) invokeApprovalMethod(
-                "searchDocuments",
-                new Class<?>[] { LoginVO.class, String.class, DocumentApprovalListQueryVO.class },
-                author, "ALL", query);
-
-        assertThat(page.getResultList()).containsExactly(item);
-        assertThat(page.getTotalRowCount()).isEqualTo(321L);
-        verify(approvalDAO).selectRelatedDocumentPage(argThat(params ->
-            "annual".equals(params.get("keyword"))
-                && Long.valueOf(77L).equals(params.get("electronicApprovalIdFilter"))
-                && "001".equals(params.get("eabusNoFilter"))
-                && "budget".equals(params.get("titleFilter"))
-                && "DRAFTING".equals(params.get("documentType"))
-                && "COMPLETED".equals(params.get("documentStatus"))
-                && "2026-09-16".equals(params.get("submittedAtFrom"))
-                && "2026-10-16".equals(params.get("submittedAtTo"))
-                && "Morgan".equals(params.get("drafterNameFilter"))
-                && "작성자".equals(params.get("drafterName"))
-                && "Finance".equals(params.get("drafterDepartmentName"))
-                && "Sam".equals(params.get("participantName"))
-                && "DRAFTER".equals(params.get("myParticipantType"))
-                && "PENDING".equals(params.get("myActionStatus"))
-                && "Alex".equals(params.get("currentApproverName"))
-                && Integer.valueOf(25).equals(params.get("offset"))
-                && Integer.valueOf(100).equals(params.get("limit"))
-                && "approvalProgress".equals(params.get("sortField"))
-                && "ASC".equals(params.get("sortDirection"))
-                && Long.valueOf(4L).equals(params.get("tenantId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))));
-        verify(approvalDAO).countRelatedDocuments(argThat(params ->
-            Long.valueOf(4L).equals(params.get("tenantId"))
-                && "login-author".equals(params.get("drafterId"))
-                && "101".equals(params.get("participantUserId"))
-                && "COMPLETED".equals(params.get("documentStatus"))));
-    }
-
-    @Test
-    void statusPageRejectsInvalidPagingSortingAndDateRanges() throws Exception {
-        DocumentApprovalListQueryVO negativeOffset = new DocumentApprovalListQueryVO();
-        negativeOffset.setOffset(-1);
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", negativeOffset))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO excessiveLimit = new DocumentApprovalListQueryVO();
-        excessiveLimit.setLimit(201);
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", excessiveLimit))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO unsafeSort = new DocumentApprovalListQueryVO();
-        unsafeSort.setSortField("submittedAt; DROP TABLE tb_user");
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", unsafeSort))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO reversedDateRange = new DocumentApprovalListQueryVO();
-        reversedDateRange.setSubmittedAtFrom("2026-10-17");
-        reversedDateRange.setSubmittedAtTo("2026-10-16");
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", reversedDateRange))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO invalidDocumentId = new DocumentApprovalListQueryVO();
-        invalidDocumentId.setElectronicApprovalId(0L);
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidDocumentId))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO invalidParticipantType = new DocumentApprovalListQueryVO();
-        invalidParticipantType.setMyParticipantType("UNSAFE");
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidParticipantType))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        DocumentApprovalListQueryVO invalidActionStatus = new DocumentApprovalListQueryVO();
-        invalidActionStatus.setMyActionStatus("UNSAFE");
-        assertThatThrownBy(() -> service().searchDocuments(author, "ALL", invalidActionStatus))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-
-        verifyNoInteractions(approvalDAO);
-    }
-
-    @Test
-    void writePageRejectsLimitsAboveTwenty() {
-        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
-        query.setLimit(21);
-
-        assertThatThrownBy(() -> invokeApprovalMethod(
-                "searchWriteDocuments",
-                new Class<?>[] { LoginVO.class, String.class, DocumentApprovalListQueryVO.class },
-                author, "ALL", query))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    void relatedDocumentListAndSummaryUseAuthenticatedParticipantId() throws Exception {
-        when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Collections.<DocumentApprovalListItemVO>emptyList());
-
-        service().listDocuments(author, "ALL", null, null);
-
-        verify(approvalDAO).selectRelatedDocumentList(argThat(params ->
-            "101".equals(params.get("participantUserId"))));
-
-        when(approvalDAO.selectDocumentApprovalSummary(anyMap())).thenReturn(new DocumentApprovalSummaryVO());
-        when(approvalDAO.selectApprovalNotices(anyMap())).thenReturn(Collections.<DocumentApprovalListItemVO>emptyList());
-
-        service().getSummary(author);
-
-        verify(approvalDAO).selectDocumentApprovalSummary(argThat(params ->
-            "101".equals(params.get("participantUserId"))));
-        verify(approvalDAO).selectApprovalNotices(argThat(params ->
-            "101".equals(params.get("participantUserId"))));
     }
 
     @Test
@@ -577,7 +206,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
         when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
-        DocumentApprovalDetailVO result = service().getDetail(author, 77L);
+        DocumentApprovalDetailVO result = sharedService().getDetail(author, 77L);
 
         assertThat(result.getViewCount()).isEqualTo(1);
         verify(approvalDAO, org.mockito.Mockito.times(2)).selectDocumentApprovalDetail(anyMap());
@@ -602,7 +231,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
         when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
-        DocumentApprovalDetailVO result = service().getDetail(author, 77L);
+        DocumentApprovalDetailVO result = sharedService().getDetail(author, 77L);
 
         assertThat(result.getViewCount()).isEqualTo(2);
         verify(approvalDAO, org.mockito.Mockito.times(2)).selectDocumentApprovalDetail(anyMap());
@@ -620,7 +249,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectApprovalLines(anyMap())).thenReturn(Collections.<DocumentApprovalLineVO>emptyList());
         when(commentDAO.selectApprovalSystemEvents(anyMap())).thenReturn(Collections.<CommonCommentVO>emptyList());
 
-        DocumentApprovalDetailVO result = service().getDetail(anotherUser, 77L);
+        DocumentApprovalDetailVO result = sharedService().getDetail(anotherUser, 77L);
 
         assertThat(result.getViewCount()).isEqualTo(4);
         verify(approvalDAO).selectLoginIdByLoginCode(argThat(params ->
@@ -634,7 +263,7 @@ class DocumentApprovalServiceImplTest {
     void detailDoesNotRecordViewWhenDocumentIsUnavailable() throws Exception {
         when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(null);
 
-        assertThatThrownBy(() -> service().getDetail(author, 77L))
+        assertThatThrownBy(() -> sharedService().getDetail(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
@@ -649,7 +278,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectDocumentApprovalDetail(anyMap())).thenReturn(detail(0));
         when(approvalDAO.selectLoginIdByLoginCode(anyMap())).thenReturn(null);
 
-        assertThatThrownBy(() -> service().getDetail(author, 77L))
+        assertThatThrownBy(() -> sharedService().getDetail(author, 77L))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("인증된 로그인 계정을 찾을 수 없습니다.");
 
@@ -665,7 +294,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.insertElectronicApprovalViewHistory(anyMap())).thenReturn(401L);
         when(approvalDAO.incrementElectronicApprovalViewCount(anyMap())).thenReturn(0);
 
-        assertThatThrownBy(() -> service().getDetail(author, 77L))
+        assertThatThrownBy(() -> sharedService().getDetail(author, 77L))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("전자결재 문서 조회수를 갱신할 수 없습니다.");
 
@@ -680,7 +309,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.softDeleteDocumentApproval(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
 
-        service().deleteDocumentApproval(author, 77L);
+        sharedService().deleteDocumentApproval(author, 77L);
 
         ArgumentCaptor<Map<String, Object>> deleteParams = mapCaptor();
         verify(approvalDAO).softDeleteDocumentApproval(deleteParams.capture());
@@ -700,7 +329,7 @@ class DocumentApprovalServiceImplTest {
             .thenReturn(workflowDocument("PENDING"));
         when(approvalDAO.selectCanDeletePendingDocumentApproval(anyMap())).thenReturn(false);
 
-        assertThatThrownBy(() -> service().deleteDocumentApproval(author, 77L))
+        assertThatThrownBy(() -> sharedService().deleteDocumentApproval(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
         verify(approvalDAO, never()).softDeleteDocumentApproval(anyMap());
@@ -715,7 +344,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.softDeleteDocumentApproval(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
 
-        service().deleteDocumentApproval(author, 77L);
+        sharedService().deleteDocumentApproval(author, 77L);
 
         verify(approvalDAO).selectCanDeletePendingDocumentApproval(argThat(params ->
             "101".equals(params.get("participantUserId"))));
@@ -729,7 +358,7 @@ class DocumentApprovalServiceImplTest {
         document.setDrafterId("another-author");
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(document);
 
-        assertThatThrownBy(() -> service().deleteDocumentApproval(author, 77L))
+        assertThatThrownBy(() -> sharedService().deleteDocumentApproval(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(approvalDAO, never()).softDeleteDocumentApproval(anyMap());
@@ -744,7 +373,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.resetSubmittedApprovalLines(anyMap())).thenReturn(3);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(93L);
 
-        DocumentApprovalDraftVO result = service().cancelSubmission(author, 77L);
+        DocumentApprovalDraftVO result = sharedService().cancelSubmission(author, 77L);
 
         assertThat(result.getDocumentStatus()).isEqualTo("DRAFT");
         verify(approvalDAO).resetSubmittedDocumentToDraft(argThat(params ->
@@ -764,7 +393,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
             .thenReturn(workflowDocument("IN_PROGRESS"));
 
-        assertThatThrownBy(() -> service().cancelSubmission(author, 77L))
+        assertThatThrownBy(() -> sharedService().cancelSubmission(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
 
@@ -779,7 +408,7 @@ class DocumentApprovalServiceImplTest {
         document.setDrafterId("another-author");
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(document);
 
-        assertThatThrownBy(() -> service().cancelSubmission(author, 77L))
+        assertThatThrownBy(() -> sharedService().cancelSubmission(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
@@ -801,7 +430,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(94L);
 
-        DocumentApprovalDraftVO result = service().cancelApproval(approver, 77L);
+        DocumentApprovalDraftVO result = sharedService().cancelApproval(approver, 77L);
 
         assertThat(result.getDocumentStatus()).isEqualTo("PENDING");
         verify(approvalDAO).selectUserApprovedApprovalLineForUpdate(argThat(params ->
@@ -828,7 +457,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap()))
             .thenReturn(approvedLine(21L, 1, "APPROVAL", "101"));
 
-        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+        assertThatThrownBy(() -> sharedService().cancelApproval(approver, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
 
@@ -845,7 +474,7 @@ class DocumentApprovalServiceImplTest {
             .thenReturn(approvedLine(22L, 2, "APPROVAL", "202"));
         when(approvalDAO.selectProcessedLaterApprovalStage(anyMap())).thenReturn(true);
 
-        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+        assertThatThrownBy(() -> sharedService().cancelApproval(approver, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
 
@@ -860,7 +489,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
             .thenReturn(workflowDocument("COMPLETED"));
 
-        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+        assertThatThrownBy(() -> sharedService().cancelApproval(approver, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
         verify(approvalDAO, never()).selectUserApprovedApprovalLineForUpdate(anyMap());
@@ -869,61 +498,11 @@ class DocumentApprovalServiceImplTest {
             .thenReturn(workflowDocument("IN_PROGRESS"));
         when(approvalDAO.selectUserApprovedApprovalLineForUpdate(anyMap())).thenReturn(null);
 
-        assertThatThrownBy(() -> service().cancelApproval(approver, 77L))
+        assertThatThrownBy(() -> sharedService().cancelApproval(approver, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
         verify(approvalDAO, never()).resetApprovalLineToPending(anyMap());
         verifyNoInteractions(commentDAO);
-    }
-
-    @Test
-    void saveDraftPersistsAuthenticatedAuthorOrderedLinesAndSystemEvent() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
-
-        DocumentApprovalDraftVO saved = service().saveDraft(author, request());
-
-        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
-        assertThat(saved.getDocumentStatus()).isEqualTo("DRAFT");
-
-        ArgumentCaptor<Map<String, Object>> documentParams = mapCaptor();
-        verify(approvalDAO).insertDocumentApprovalMain(documentParams.capture());
-        assertThat(documentParams.getValue())
-            .containsEntry("tenantId", 4L)
-            .containsEntry("drafterId", "login-author")
-            .containsEntry("drafterName", "작성자")
-            .containsEntry("drafterDepartmentName", "기획팀")
-            .containsEntry("documentStatus", "DRAFT")
-            .containsEntry("documentType", "DRAFTING")
-            .containsEntry("eabusNo", "001")
-            .containsEntry("title", "기안 요청")
-            .containsEntry("contentsHtml", "<p>본문</p>")
-            .containsEntry("contentsText", "본문");
-
-        ArgumentCaptor<Map<String, Object>> lineParams = mapCaptor();
-        verify(approvalDAO, org.mockito.Mockito.times(2)).insertDocumentApprovalLine(lineParams.capture());
-        assertThat(lineParams.getAllValues())
-            .extracting(params -> params.get("participantUserId"))
-            .containsExactly("101", "202");
-        assertThat(lineParams.getAllValues())
-            .extracting(params -> params.get("participantName"))
-            .containsExactly("작성자", "결재자");
-
-        ArgumentCaptor<Map<String, Object>> eventParams = mapCaptor();
-        verify(commentDAO).insertSystemComment(eventParams.capture());
-        assertThat(eventParams.getValue())
-            .containsEntry("tenantId", 4L)
-            .containsEntry("ownerType", "APPROVAL")
-            .containsEntry("ownerId", 77L)
-            .containsEntry("commentType", "SYSTEM")
-            .containsEntry("eventType", "DRAFT_SAVED")
-            .containsEntry("writerId", "login-author")
-            .containsEntry("writerName", "작성자");
     }
 
     @Test
@@ -1088,7 +667,7 @@ class DocumentApprovalServiceImplTest {
             .thenReturn(approvalComment(55L, "login-author", "USER"));
         MockMultipartFile file = new MockMultipartFile("file", "evidence.txt", "text/plain", new byte[] {1});
 
-        service().uploadApprovalCommentAttachment(author, 77L, 55L, file);
+        sharedService().uploadApprovalCommentAttachment(author, 77L, 55L, file);
 
         verify(fileService).uploadFile(4L, "APPROVAL_COMMENT", 55L, file, "login-author");
     }
@@ -1099,7 +678,7 @@ class DocumentApprovalServiceImplTest {
         when(commentDAO.selectApprovalUserCommentById(anyMap()))
             .thenReturn(approvalComment(55L, "someone-else", "USER"));
 
-        assertThatThrownBy(() -> service().uploadApprovalCommentAttachment(
+        assertThatThrownBy(() -> sharedService().uploadApprovalCommentAttachment(
                 author, 77L, 55L, new MockMultipartFile("file", "evidence.txt", "text/plain", new byte[] {1})))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
@@ -1114,7 +693,7 @@ class DocumentApprovalServiceImplTest {
         CommonFileVO file = approvalCommentFile(91L, 56L);
         when(fileService.listFiles(4L, "APPROVAL_COMMENT", 55L)).thenReturn(Collections.singletonList(file));
 
-        assertThatThrownBy(() -> service().downloadApprovalCommentAttachment(
+        assertThatThrownBy(() -> sharedService().downloadApprovalCommentAttachment(
                 author, 77L, 55L, 91L, mock(javax.servlet.http.HttpServletResponse.class)))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
@@ -1132,7 +711,7 @@ class DocumentApprovalServiceImplTest {
         when(commentDAO.selectApprovalUserCommentById(anyMap()))
             .thenReturn(approvalComment(55L, "someone-else", "USER"));
 
-        assertThatThrownBy(() -> service().deleteApprovalCommentAttachment(author, 77L, 55L, 91L))
+        assertThatThrownBy(() -> sharedService().deleteApprovalCommentAttachment(author, 77L, 55L, 91L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(fileService, never()).deleteFile(
@@ -1172,121 +751,6 @@ class DocumentApprovalServiceImplTest {
     }
 
     @Test
-    void saveDraftRejectsInvalidParticipantBeforeWritingAnything() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap()))
-            .thenReturn(Collections.singletonList(participant("101", "작성자", "기획팀")));
-        DocumentApprovalDraftSaveRequestVO request = request();
-        request.setApprovalLines(new ArrayList<>(request.getApprovalLines()));
-        request.getApprovalLines().add(line(2, 1, "APPROVAL", "999"));
-
-        assertThatThrownBy(() -> service().saveDraft(author, request))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-        verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
-        verifyNoInteractions(commentDAO);
-    }
-
-    @Test
-    void saveDraftUsesConditionalUpdateForExistingDraft() throws Exception {
-        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
-        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("DRAFT"));
-
-        DocumentApprovalDraftVO saved = service().saveDraft(author, 77L, request());
-
-        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
-        verify(approvalDAO, never()).insertDocumentApprovalMain(anyMap());
-        verify(approvalDAO).updateDocumentApprovalMain(org.mockito.ArgumentMatchers.argThat(
-            params -> params.get("tenantId").equals(4L)
-                && params.get("drafterId").equals("login-author")
-                && params.get("documentStatus").equals("DRAFT")
-                && params.get("electronicApprovalId").equals(77L)));
-        verify(commentDAO).insertSystemComment(org.mockito.ArgumentMatchers.argThat(
-            params -> params.get("ownerId").equals(77L)
-                && params.get("eventType").equals("DRAFT_SAVED")));
-    }
-
-    @Test
-    void saveDraftPreservesRevisionRequestedStatusAndReturnsPersistedDocumentMetadata() throws Exception {
-        java.util.Date submittedAt = new java.util.Date();
-        DocumentApprovalDraftVO persisted = new DocumentApprovalDraftVO();
-        persisted.setElectronicApprovalId(77L);
-        persisted.setEabusNo("001");
-        persisted.setDocumentStatus("REVISION_REQUESTED");
-        persisted.setSubmittedAt(submittedAt);
-        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
-        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(persisted);
-
-        DocumentApprovalDraftVO saved = service().saveDraft(author, 77L, request());
-
-        assertThat(saved.getDocumentStatus()).isEqualTo("REVISION_REQUESTED");
-        assertThat(saved.getEabusNo()).isEqualTo("001");
-        assertThat(saved.getSubmittedAt()).isEqualTo(submittedAt);
-    }
-
-    @Test
-    void saveDraftStopsWhenAnApprovalLineCannotBePersisted() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(0);
-
-        assertThatThrownBy(() -> service().saveDraft(author, request()))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("결재선 저장에 실패했습니다.");
-        verifyNoInteractions(commentDAO);
-    }
-
-    @Test
-    void saveDraftFailsWhenSystemEventPersistenceReturnsNoIdentity() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(null);
-
-        assertThatThrownBy(() -> service().saveDraft(author, request()))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("임시저장 시스템 이력 기록에 실패했습니다.");
-    }
-
-    @Test
-    void saveDraftRejectsUpdatingAnotherAuthorsDraft() throws Exception {
-        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("other-login");
-
-        assertThatThrownBy(() -> service().saveDraft(author, 77L, request()))
-            .isInstanceOfSatisfying(ResponseStatusException.class,
-                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
-        verify(approvalDAO, never()).deleteDocumentApprovalLines(anyMap());
-        verifyNoInteractions(commentDAO);
-    }
-
-    @Test
-    void saveDraftRequiresTransactionalBoundary() throws Exception {
-        Method method = DocumentApprovalServiceImpl.class.getMethod(
-            "saveDraft", LoginVO.class, Long.class, DocumentApprovalDraftSaveRequestVO.class);
-
-        assertThat(method.getAnnotation(Transactional.class)).isNotNull();
-    }
-
-    @Test
     void submitApprovesDrafterAndActivatesOnlyTheFirstRealApprovalStage() throws Exception {
         when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
             .thenReturn(workflowDocument("DRAFT"));
@@ -1306,7 +770,7 @@ class DocumentApprovalServiceImplTest {
         persisted.setSubmittedAt(submittedAt);
         when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(persisted);
 
-        DocumentApprovalDraftVO submitted = service().submit(author, 77L, request());
+        DocumentApprovalDraftVO submitted = sharedService().submit(author, 77L, request());
 
         assertThat(submitted.getDocumentStatus()).isEqualTo("PENDING");
         assertThat(submitted.getEabusNo()).isEqualTo("001");
@@ -1342,7 +806,7 @@ class DocumentApprovalServiceImplTest {
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
 
-        DocumentApprovalDraftVO result = service().processAction(approver, 77L, request);
+        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
 
         assertThat(result.getDocumentStatus()).isEqualTo("IN_PROGRESS");
         verify(approvalDAO).activateApprovalStage(argThat(params ->
@@ -1362,7 +826,7 @@ class DocumentApprovalServiceImplTest {
             .thenReturn(workflowDocument("PENDING"));
         when(approvalDAO.selectCurrentPendingApprovalLine(anyMap())).thenReturn(null);
 
-        assertThatThrownBy(() -> service().processAction(author, 77L, request))
+        assertThatThrownBy(() -> sharedService().processAction(author, 77L, request))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
         verifyNoInteractions(commentDAO);
@@ -1373,34 +837,17 @@ class DocumentApprovalServiceImplTest {
     void attachmentsAreUnavailableToAnotherDraftAuthor() throws Exception {
         when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("other-login");
 
-        assertThatThrownBy(() -> service().listAttachments(author, 77L))
+        assertThatThrownBy(() -> sharedService().listAttachments(author, 77L))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
         verifyNoInteractions(fileService);
     }
 
     @Test
-    void temporaryEmbeddedImagesUseAuthenticatedTenant() throws Exception {
-        EmbeddedImageUploadVO uploaded = new EmbeddedImageUploadVO();
-        when(imageStorageService.uploadTemporaryImage(4L, null)).thenReturn(uploaded);
-
-        assertThat(service(imageStorageService).uploadTemporaryEmbeddedImage(author, null)).isSameAs(uploaded);
-
-        verify(imageStorageService).uploadTemporaryImage(4L, null);
-    }
-
-    @Test
-    void temporaryEmbeddedImageDeletionUsesAuthenticatedTenant() throws Exception {
-        service(imageStorageService).deleteTemporaryEmbeddedImage(author, "token", "image.png");
-
-        verify(imageStorageService).deleteTemporaryImage(4L, "token", "image.png");
-    }
-
-    @Test
     void embeddedImageStreamRequiresDraftOwnerBeforeStorageLookup() throws Exception {
         when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("other-login");
 
-        assertThatThrownBy(() -> service(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null))
+        assertThatThrownBy(() -> sharedService(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
@@ -1411,110 +858,40 @@ class DocumentApprovalServiceImplTest {
     void embeddedImageStreamUsesApprovalOwnerAfterDraftOwnerCheck() throws Exception {
         when(approvalDAO.selectIsDocumentParticipant(anyMap())).thenReturn(true);
 
-        service(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null);
+        sharedService(imageStorageService).streamEmbeddedImage(author, 77L, 91L, null);
 
         verify(imageStorageService).streamOwnedImage(4L, "APPROVAL", 77L, 91L, null);
     }
 
-    @Test
-    void saveDraftPromotesReferencedTemporaryImagesAndPersistsStableBody() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
-        when(imageStorageService.listOwnedImages(4L, "APPROVAL", 77L)).thenReturn(Collections.emptyList());
-        when(imageStorageService.promoteTemporaryImage(4L, "APPROVAL", 77L, "token", "image.png", "login-author"))
-            .thenReturn(ownedEmbeddedImage(77L, 91L));
 
-        DocumentApprovalDraftSaveRequestVO request = requestWithTemporaryImage(true);
-        DocumentApprovalDraftVO saved = service(imageStorageService).saveDraft(author, request);
 
-        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
-        ArgumentCaptor<Map<String, Object>> updateParams = mapCaptor();
-        verify(approvalDAO).updateDocumentApprovalMain(updateParams.capture());
-        assertThat(updateParams.getValue().get("contentsHtml").toString())
-            .contains("/api/v1/groupware/approvals/77/embedded-images/91")
-            .doesNotContain("data-upload-token");
-        assertThat(updateParams.getValue().get("contentsJson").toString())
-            .contains("/api/v1/groupware/approvals/77/embedded-images/91")
-            .doesNotContain("data-upload-token");
-        verify(imageStorageService).completeOwnerSave(
-            eq(4L),
-            eq("APPROVAL"),
-            eq(77L),
-            argThat(uploads -> uploads.size() == 1
-                && "token".equals(uploads.get(0).getUploadToken())
-                && "image.png".equals(uploads.get(0).getFileName())),
-            argThat(fileIds -> fileIds.contains(91L)));
-        verify(approvalDAO, org.mockito.Mockito.times(2)).insertDocumentApprovalLine(anyMap());
-        verify(commentDAO).insertSystemComment(anyMap());
+    private DocumentApprovalAccessServiceImpl accessService() {
+        return new DocumentApprovalAccessServiceImpl(approvalDAO);
     }
 
-    @Test
-    void updateDraftPromotesImagesUnderExistingApprovalOwner() throws Exception {
-        when(approvalDAO.selectDraftDrafterId(anyMap())).thenReturn("login-author");
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
-        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
-        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
-        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
-        when(imageStorageService.listOwnedImages(4L, "APPROVAL", 77L)).thenReturn(Collections.emptyList());
-        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("DRAFT"));
-        when(imageStorageService.promoteTemporaryImage(4L, "APPROVAL", 77L, "token", "image.png", "login-author"))
-            .thenReturn(ownedEmbeddedImage(77L, 91L));
-
-        DocumentApprovalDraftVO saved =
-            service(imageStorageService).saveDraft(author, 77L, requestWithTemporaryImage(true));
-
-        assertThat(saved.getElectronicApprovalId()).isEqualTo(77L);
-        verify(imageStorageService).promoteTemporaryImage(
-            4L, "APPROVAL", 77L, "token", "image.png", "login-author");
-        verify(imageStorageService).completeOwnerSave(
-            eq(4L),
-            eq("APPROVAL"),
-            eq(77L),
-            argThat(uploads -> uploads.size() == 1
-                && "token".equals(uploads.get(0).getUploadToken())),
-            argThat(fileIds -> fileIds.contains(91L)));
-        verify(approvalDAO).updateDocumentApprovalMain(org.mockito.ArgumentMatchers.argThat(
-            params -> params.get("contentsHtml").toString()
-                .contains("/api/v1/groupware/approvals/77/embedded-images/91")));
+    private DocumentApprovalDraftSupportServiceImpl draftSupportService(EmbeddedImageStorageService storage,
+            DocumentApprovalAccessServiceImpl access) {
+        return new DocumentApprovalDraftSupportServiceImpl(approvalDAO, commentDAO, documentSanitizer, storage, access);
     }
 
-    @Test
-    void saveDraftRejectsImageOutsideTemporarySessionBeforeWritingLinesOrSystemEvent() throws Exception {
-        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
-            participant("101", "작성자", "기획팀"),
-            participant("202", "결재자", "재무팀")));
-        when(approvalDAO.insertDocumentApprovalMain(anyMap())).thenReturn(77L);
-        DocumentApprovalDraftSaveRequestVO request = requestWithTemporaryImage(false);
-
-        assertThatThrownBy(() -> service(imageStorageService).saveDraft(author, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("본문 이미지가 현재 임시 업로드 세션에 속하지 않습니다.");
-
-        verify(approvalDAO, never()).insertDocumentApprovalLine(anyMap());
-        verifyNoInteractions(commentDAO);
-        verify(imageStorageService, never()).completeOwnerSave(
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.anyList(),
-            org.mockito.ArgumentMatchers.anySet());
+    private DocumentApprovalCommentSupportServiceImpl commentSupportService() {
+        return new DocumentApprovalCommentSupportServiceImpl(commentDAO, fileService);
     }
 
-    private DocumentApprovalServiceImpl service() {
-        return service(imageStorageService);
+    private DocumentApprovalWriteServiceImpl writeService() { return writeService(imageStorageService); }
+
+    private DocumentApprovalWriteServiceImpl writeService(EmbeddedImageStorageService storage) {
+        DocumentApprovalAccessServiceImpl access = accessService();
+        return new DocumentApprovalWriteServiceImpl(approvalDAO, fileService, storage, access,
+                draftSupportService(storage, access), commentSupportService());
     }
 
-    private DocumentApprovalServiceImpl service(EmbeddedImageStorageService imageStorageService) {
-        return new DocumentApprovalServiceImpl(
-            approvalDAO, commentDAO, fileService, documentSanitizer, imageStorageService);
+    private DocumentApprovalInteractionServiceImpl sharedService() { return sharedService(imageStorageService); }
+
+    private DocumentApprovalInteractionServiceImpl sharedService(EmbeddedImageStorageService storage) {
+        DocumentApprovalAccessServiceImpl access = accessService();
+        return new DocumentApprovalInteractionServiceImpl(approvalDAO, commentDAO, fileService, storage, access,
+                draftSupportService(storage, access), commentSupportService());
     }
 
     private DocumentApprovalDetailVO detail(int viewCount) {
@@ -1525,14 +902,15 @@ class DocumentApprovalServiceImplTest {
     }
 
     private Object invokeApprovalMethod(String name, Class<?>[] parameterTypes, Object... arguments) throws Exception {
-        Method method = Arrays.stream(DocumentApprovalServiceImpl.class.getMethods())
+        Method method = java.util.stream.Stream.of(DocumentApprovalWriteServiceImpl.class, DocumentApprovalInteractionServiceImpl.class).flatMap(type -> Arrays.stream(type.getMethods()))
             .filter(candidate -> candidate.getName().equals(name))
             .filter(candidate -> Arrays.equals(candidate.getParameterTypes(), parameterTypes))
             .findFirst()
             .orElse(null);
-        assertThat(method).as("DocumentApprovalServiceImpl.%s is implemented", name).isNotNull();
+        assertThat(method).as("DocumentApproval feature service method %s is implemented", name).isNotNull();
         try {
-            return method.invoke(service(), arguments);
+            return method.invoke(DocumentApprovalWriteServiceImpl.class.isAssignableFrom(method.getDeclaringClass())
+                    ? writeService() : sharedService(), arguments);
         } catch (InvocationTargetException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof Exception) {

@@ -53,7 +53,4 @@ export type DocumentStatusFilters = {
   updatedAtTo?: string;
 };
 
-export type DocumentStatusPageResponse = {
-  resultList: DocumentStatusRow[];
-  totalRowCount: number;
-};
+export type { DocumentStatusPageResponse } from './documentStatusApi.types';

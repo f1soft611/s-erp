@@ -87,13 +87,18 @@ const selectedModule = {
 const SYSTEM_TODAY = '2026-10-20';
 const SYSTEM_DATE_RANGE = { from: '2026-09-20', to: SYSTEM_TODAY };
 
-function renderDocumentStatusPage(currentPageKey = 'documents') {
+function renderDocumentStatusPage(currentPageKey = 'documents', read?: boolean) {
   return render(
     <DashboardContent
       selectedModule={selectedModule}
       currentMenuName="문서현황"
       currentPageKey={currentPageKey}
       breadcrumbItems={['그룹웨어', '문서현황']}
+      selectedMenuPermissions={
+        read === undefined
+          ? undefined
+          : { read, create: false, update: false, delete: false }
+      }
       content={{
         title: '문서현황',
         description: '전자결재 문서를 검색하고 확인합니다.',
@@ -131,6 +136,60 @@ describe('document status page', () => {
         ? Promise.resolve({ resultList: [row], totalRowCount: 1 })
         : Promise.resolve({});
     });
+  });
+
+  it('shows the header read action only with menu read permission', async () => {
+    const view = renderDocumentStatusPage('documents', true);
+    expect(screen.getByRole('button', { name: '조회' })).toBeInTheDocument();
+    await waitFor(() => expect(getListRequests()).toBe(1));
+    view.unmount();
+
+    const denied = renderDocumentStatusPage('documents', false);
+    expect(screen.queryByRole('button', { name: '조회' })).not.toBeInTheDocument();
+    await waitFor(() => expect(getListRequests()).toBe(2));
+    denied.unmount();
+
+    renderDocumentStatusPage();
+    expect(screen.queryByRole('button', { name: '조회' })).not.toBeInTheDocument();
+    await waitFor(() => expect(getListRequests()).toBe(3));
+  });
+
+  it('disables the header read action until search defaults are ready', async () => {
+    let resolveDate!: (value: { today: string }) => void;
+    const pendingDate = new Promise<{ today: string }>((resolve) => {
+      resolveDate = resolve;
+    });
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? pendingDate
+        : Promise.resolve({ resultList: [row], totalRowCount: 1 }),
+    );
+
+    renderDocumentStatusPage('documents', true);
+    const button = screen.getByRole('button', { name: '조회' });
+    expect(button).toBeDisabled();
+    expect(getListRequests()).toBe(0);
+    await act(async () => resolveDate({ today: SYSTEM_TODAY }));
+    await waitFor(() => expect(button).toBeEnabled());
+    await waitFor(() => expect(getListRequests()).toBe(1));
+  });
+
+  it('applies current search input and repeats the same query from the header', async () => {
+    renderDocumentStatusPage('documents', true);
+    await waitFor(() => expect(getListRequests()).toBe(1));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '문서현황 빠른 검색' }),
+      { target: { value: 'Updated plan' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(getListRequests()).toBe(2));
+    expect(getListRequest().get('keyword')).toBe('Updated plan');
+    expect(window.sessionStorage.getItem('s-erp:page:document-status'))
+      .toContain('Updated plan');
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(getListRequests()).toBe(3));
+    expect(getListRequest().get('keyword')).toBe('Updated plan');
   });
 
   it('declares the submitted date default using server date metadata', () => {
@@ -176,7 +235,6 @@ describe('document status page', () => {
       'myParticipantType',
       'myActionStatus',
       'currentApprovalStep',
-      'updatedAt',
     ]);
     expect(fields.find((field) => field.field === 'submittedAt')?.type).toBe(
       'date',
@@ -187,7 +245,7 @@ describe('document status page', () => {
         to: { type: 'systemDate' },
       });
     expect(fields.find((field) => field.field === 'electronicApprovalId')?.type)
-      .toBe('number');
+      .toBe('text');
     expect(fields.find((field) => field.field === 'myParticipantType')?.type)
       .toBe('select');
     expect(
@@ -218,7 +276,6 @@ describe('document status page', () => {
       ['myParticipantType', 1],
       ['myActionStatus', 1],
       ['currentApprovalStep', 4],
-      ['updatedAt', 2],
     ]);
   });
 
@@ -255,8 +312,8 @@ describe('document status page', () => {
     expect(await screen.findByText('41')).toBeInTheDocument();
     const request = getListRequest();
     expect(request.get('scope')).toBe('ALL');
-    expect(request.get('offset')).toBe('0');
-    expect(request.get('limit')).toBe('200');
+    expect(request.has('offset')).toBe(false);
+    expect(request.has('limit')).toBe(false);
     expect(request.get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
     expect(request.get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
 
@@ -462,11 +519,12 @@ describe('document status page', () => {
       '아래에 행 삽입',
       '행 복사',
       '행 삭제',
-      '필터 해제',
     ]) {
       expect(within(menu).queryByRole('menuitem', { name }))
         .not.toBeInTheDocument();
     }
+    expect(within(menu).getByRole('menuitem', { name: '필터 해제' }))
+      .toHaveAttribute('aria-disabled', 'true');
 
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
@@ -514,6 +572,89 @@ describe('document status page', () => {
     );
   });
 
+  it('loads all matching status rows without paging parameters', async () => {
+    const allRows = Array.from({ length: 205 }, (_, index) => ({
+      ...row,
+      electronicApprovalId: index + 1,
+      title: `Document ${index + 1}`,
+    }));
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : path.includes('/documents/search?')
+          ? Promise.resolve({ resultList: allRows, totalRowCount: 205 })
+          : Promise.resolve({}),
+    );
+
+    renderDocumentStatusPage();
+    const grid = await screen.findByRole('grid', { name: '문서현황' });
+    await waitFor(() => expect(grid).toHaveAttribute('aria-rowcount', '205'));
+
+    expect(getListRequest().has('offset')).toBe(false);
+    expect(getListRequest().has('limit')).toBe(false);
+  });
+
+  it('clears the editing document and refreshes the list when the composer closes', async () => {
+    renderDocumentStatusPage();
+    const cell = await screen.findByRole('gridcell', { name: row.title });
+    fireEvent.click(cell);
+    await screen.findByTestId('page-area-overlay');
+    const feedProps = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1)?.[0];
+    if (!feedProps) throw new Error('Detail panel props were not captured.');
+    act(() => feedProps.onEditDocument(detail));
+    const composerProps = vi.mocked(DocumentComposerDialog).mock.calls.at(-1)?.[0];
+    if (!composerProps) throw new Error('Composer props were not captured.');
+    expect(composerProps.open).toBe(true);
+    const previousRequests = getListRequests();
+
+    act(() => composerProps.onClose());
+
+    await waitFor(() => expect(getListRequests()).toBe(previousRequests + 1));
+    const closedComposer = vi.mocked(DocumentComposerDialog).mock.calls.at(-1)?.[0];
+    expect(closedComposer?.open).toBe(false);
+    expect(closedComposer?.initialDocument).toBeNull();
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+  });
+
+  it('sorts and filters loaded status rows without reloading them', async () => {
+    const otherRow = {
+      ...row,
+      electronicApprovalId: 42,
+      title: 'Other document',
+    };
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : path.includes('/documents/search?')
+          ? Promise.resolve({
+              resultList: [row, otherRow],
+              totalRowCount: 2,
+            })
+          : Promise.resolve({}),
+    );
+
+    renderDocumentStatusPage();
+    const grid = await screen.findByRole('grid', { name: '문서현황' });
+    await waitFor(() => expect(grid).toHaveAttribute('aria-rowcount', '2'));
+    const initialRequests = getListRequests();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '문서번호 컬럼 메뉴' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: '오름차순 정렬' }));
+    expect(getListRequests()).toBe(initialRequests);
+
+    fireEvent.click(screen.getByRole('button', { name: '제목 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터' }));
+    fireEvent.change(screen.getByLabelText('제목 필터 값'), {
+      target: { value: 'Annual' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    await waitFor(() => expect(grid).toHaveAttribute('aria-rowcount', '1'));
+    expect(getListRequests()).toBe(initialRequests);
+  });
+
   it('applies the detailed title filter to the next remote query', async () => {
     renderDocumentStatusPage();
     await screen.findByText('41');
@@ -534,7 +675,7 @@ describe('document status page', () => {
     await screen.findByText('41');
 
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
-    fireEvent.change(screen.getByRole('spinbutton', { name: '문서번호' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '문서번호' }), {
       target: { value: '41' },
     });
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '내 결재 역할' }));

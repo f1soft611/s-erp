@@ -842,6 +842,15 @@ class DocumentApprovalMapperTest {
                         "submittedAtFrom", "submittedAtTo",
                         "updatedAtFrom", "updatedAtTo", "limit", "offset");
 
+        Map<String, Object> allRowsParams = new HashMap<>(params);
+        allRowsParams.remove("limit");
+        allRowsParams.remove("offset");
+        String allRowsSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")
+                .getBoundSql(allRowsParams).getSql().replaceAll("\\s+", " ");
+        assertThat(allRowsSql).contains("ORDER BY m.submitted_at DESC")
+                .doesNotContain("LIMIT", "OFFSET");
+
         params.put("sortField", "participantName");
         String participantSortSql = configuration
                 .getMappedStatement("DocumentApprovalDAO.selectRelatedDocumentPage")

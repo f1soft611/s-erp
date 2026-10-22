@@ -33,6 +33,7 @@ egovframework.let.groupware.approval
 │       └── impl
 ├── common
 │   └── service
+│       └── impl
 ├── domain
 │   ├── model
 │   └── repository
@@ -54,10 +55,10 @@ backend/src/main/java/egovframework/let/groupware/approval/common/service/
 - `write`: 초안 저장·수정, 작성 목록/피드, 고정 목록·상태, 요약, 임시 본문 이미지 업무.
 - `status`: `/documents/search` 현황 검색, 조건·범위·정렬 검증 및 결과 조회.
 - `shared`: 문서 상세, 결재 처리 및 취소, 삭제, 댓글, 첨부와 이미지 조회 등 작성/현황 화면이 함께 쓰는 문서 업무.
-- `common`: 인증 사용자 및 문서 접근/소유권 검증과 작성·상신이 함께 사용하는 초안 검증/참여자/본문 이미지 처리 보조.
+- `common`: 인증 사용자 및 문서 접근/소유권 검증, 작성·상신이 함께 사용하는 초안 처리 보조, 피드·댓글 API가 함께 사용하는 댓글 스트림 조립.
 - `domain`: 공유 VO 및 DAO. 기능 전용 모델은 사용처와 API 바인딩 호환성을 확인한 뒤 필요한 경우 해당 기능 하위로 이동한다. Mapper SQL은 공유 DAO에서 그대로 사용한다.
 
-기능 간 호출은 Controller를 경유하지 않는다. 각 기능 Service는 `common` 서비스와 공용 도메인/DAO를 사용할 수 있으며, `write`와 `status`가 서로의 구현체에 의존하지 않도록 한다. 초안 저장과 상신이 공유하는 검증·이미지 처리 코드는 복제하거나 feature 간 직접 의존시키지 않고 `common` 지원 서비스로 추출한다.
+기능 간 호출은 Controller를 경유하지 않는다. 각 기능 Service는 `common` 서비스와 공용 도메인/DAO를 사용할 수 있으며, 기능 간 구현체에 직접 의존하지 않도록 한다. 초안 저장과 상신이 공유하는 검증·이미지 처리 및 작성 피드와 공유 댓글 API가 공통으로 사용하는 댓글 스트림 조립은 복제하거나 기능 간 직접 의존시키지 않고 `common` 지원 서비스로 추출한다.
 
 ## 구현 기준
 

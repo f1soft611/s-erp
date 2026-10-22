@@ -671,7 +671,9 @@
             <otherwise>DESC</otherwise>
         </choose>,
         m.electronic_approval_id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        <if test="limit != null and offset != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
     </select>
 
     <select id="countRelatedDocuments" parameterType="map" resultType="long">
