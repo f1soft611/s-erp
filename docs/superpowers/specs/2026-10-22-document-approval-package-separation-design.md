@@ -54,15 +54,15 @@ backend/src/main/java/egovframework/let/groupware/approval/common/service/
 - `write`: 초안 저장·수정, 작성 목록/피드, 고정 목록·상태, 요약, 임시 본문 이미지 업무.
 - `status`: `/documents/search` 현황 검색, 조건·범위·정렬 검증 및 결과 조회.
 - `shared`: 문서 상세, 결재 처리 및 취소, 삭제, 댓글, 첨부와 이미지 조회 등 작성/현황 화면이 함께 쓰는 문서 업무.
-- `common`: 인증 사용자 및 문서 접근/소유권 검증처럼 기능 간 공통 정책.
+- `common`: 인증 사용자 및 문서 접근/소유권 검증과 작성·상신이 함께 사용하는 초안 검증/참여자/본문 이미지 처리 보조.
 - `domain`: 공유 VO 및 DAO. 기능 전용 모델은 사용처와 API 바인딩 호환성을 확인한 뒤 필요한 경우 해당 기능 하위로 이동한다. Mapper SQL은 공유 DAO에서 그대로 사용한다.
 
-기능 간 호출은 Controller를 경유하지 않는다. 각 기능 Service는 `common` 서비스와 공용 도메인/DAO를 사용할 수 있으며, `write`와 `status`가 서로의 구현체에 의존하지 않도록 한다.
+기능 간 호출은 Controller를 경유하지 않는다. 각 기능 Service는 `common` 서비스와 공용 도메인/DAO를 사용할 수 있으며, `write`와 `status`가 서로의 구현체에 의존하지 않도록 한다. 초안 저장과 상신이 공유하는 검증·이미지 처리 코드는 복제하거나 feature 간 직접 의존시키지 않고 `common` 지원 서비스로 추출한다.
 
 ## 구현 기준
 
 1. 기존 통합 `DocumentApprovalServiceImpl`의 실제 업무 메서드를 write/status/shared의 ServiceImpl로 옮긴다. 각 ServiceImpl이 기존 통합 구현체에 호출을 위임하는 형태는 허용하지 않는다.
-2. 공통 인증 및 접근 검증은 `common` 서비스에서 제공하고 각 기능 서비스가 이를 사용한다.
+2. 공통 인증/접근 검증과 초안 처리 보조는 `common` 서비스에서 제공하고 각 기능 서비스가 이를 사용한다.
 3. 신규·이동된 ServiceImpl은 `EgovAbstractServiceImpl`을 상속하고 생성자 주입과 필요한 트랜잭션 경계를 유지한다.
 4. 각 API 경로와 HTTP method는 정확히 하나의 Controller에만 매핑한다. 경로, 파라미터, 응답 필드/래퍼, HTTP 상태, 인증·tenant·사용자 범위를 변경하지 않는다.
 5. 모든 업무 로직 이전 및 참조 검증이 완료되면 기존 공통 `DocumentApprovalService`와 `DocumentApprovalServiceImpl`을 제거한다.
@@ -89,4 +89,3 @@ backend/src/main/java/egovframework/let/groupware/approval/common/service/
 ## 완료 전 검토가 필요한 점
 
 문서작성/현황이 공유하는 상세 화면 업무 중 어느 API가 shared에 속하는지는 현재 승인된 경계(문서 상세·결재·댓글·첨부·이미지)를 기준으로 한다. 구현 중 새로운 교차 의존성이 확인되면 API 계약이나 기능 범위를 바꾸지 않고 shared 서비스의 책임 경계 안에서 해결한다.
-
