@@ -20,7 +20,7 @@ Sanitize only when the user changes an input. Existing values should remain unch
 
 ## Implementation Shape
 
-Use a small reusable input sanitizer and a per-column F1-Grid input-normalization hook, rather than changing all text fields globally. Invoke it while editing both inline cells and row-form fields. Normalize the two detailed-search values in the controlled search-value change handler. The filter is an input affordance, not a database/API migration or a server-side rewrite.
+Use a small reusable input sanitizer and a per-column F1-Grid input-normalization hook, rather than changing all text fields globally. Invoke it while editing inline cells, row-form fields, and clipboard-pasted grid cells. Normalize the two detailed-search values in the controlled search-value change handler. The filter is an input affordance, not a database/API migration or a server-side rewrite.
 
 ## Alternatives Considered
 
@@ -32,6 +32,7 @@ Use a small reusable input sanitizer and a per-column F1-Grid input-normalizatio
 
 - Unit-test the sanitizer with digits, hyphens, mixed input, pasted text, and empty input.
 - Verify customer row-form and inline editing apply the filter only to the five named fields.
+- Verify F1-Grid TSV clipboard paste applies the same filter to configured fields.
 - Verify detailed-search business/corporate number values are filtered as they are entered.
 - Verify unrelated text fields and existing values are not modified.
 - Run focused customer-management tests and the frontend production build.

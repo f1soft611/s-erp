@@ -142,6 +142,8 @@ export function CellEditor<T extends object>({
       onChange={onChange}
       onKeyDown={onKeyDown}
       selectOnFocus={selectOnFocus}
+      inputFormat={column.inputFormat}
+      sanitizeInput={column.sanitizeInput}
     />
   );
 }

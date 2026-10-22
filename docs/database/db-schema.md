@@ -701,6 +701,44 @@
 
 `tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 거래처 코드는 기존 전자정부 ID Generator의 `public.ids` 카운터 중 `table_name = 'tb_customer_info'` 행을 사용한다. `20261022_005` migration은 기존 1~6자리 숫자 거래처 코드의 최댓값보다 큰 `next_id`를 설정하고, 기존 카운터가 더 크면 그 값을 보존한다. 앱의 `customerCodeIdGnrService`는 `IDS` 테이블/`tb_customer_info` 키, 6자리 zero-padding, block size 1을 사용한다. 신규 테이블이나 시퀀스는 만들지 않는다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 
+### tb_material_info (MCP 확인: 2026-10-22)
+
+기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.
+
+| 컬럼 | 타입 | NULL/기본값 | 설명 |
+| --- | --- | --- | --- |
+| material_id | bigint | NOT NULL, 기본 sequence | PK |
+| tenant_id | bigint | NOT NULL | tb_tenant FK |
+| material_code | varchar(20) | NOT NULL | tenant 내 유일한 품목코드 |
+| material_name | varchar(200) | NOT NULL | 품목명 |
+| material_eng_name, material_model_name | varchar(200) | NULL | 영문명/모델명 |
+| material_spec, material_spec2 | varchar(100) | NULL | 규격/규격2 |
+| material_weight | bigint | NULL | 중량 |
+| unit, material_quality | varchar(6) | NULL | 단위/재질 |
+| material_type_code | varchar(14) | NOT NULL | 품목계정코드 |
+| customer_code | varchar(10) | NULL | 제조사 코드 |
+| safe_invoice | double precision | NULL | 안전재고(기존 컬럼명 유지) |
+| accounting_code | varchar(7) | NULL | 회계코드 |
+| warehouse_code, drawing | varchar(10) | NULL | 창고코드/도면번호 |
+| etc, manufactory | varchar(100) | NULL | 비고/제조 |
+| part_no | varchar(30) | NULL | Part No |
+| deleted_at | timestamp | NULL | 삭제일시 |
+| mat_cata_type | varchar(10) | NOT NULL, 빈 문자열 | 품목분류 |
+| location | varchar(1000) | NULL | 위치정보 |
+| item_type | varchar(10) | NULL | 품목계정 |
+| search_item_name | varchar(200) | NULL | 통합검색명칭 |
+| item_barcode, material_no, kfda_report_no | varchar(20) | NULL | 바코드/품목번호/품목보고번호 |
+| delete_status | varchar(10) | NOT NULL, N | 삭제여부 |
+| created_by, updated_by | varchar(10) | NULL | 감사 사용자 ID 문자열 |
+| created_at, updated_at | timestamp | NULL | 감사 시각 |
+| material_kind, store_method | varchar(50) | NULL | MATERIAL_TYPE/STORE_METHOD 공통코드 |
+| expiryed_status | varchar(10) | NOT NULL, NONE | NONE/DAY/MONTH/YEAR CHECK |
+| expiryed_count | integer | NULL | NULL 또는 양수 CHECK |
+
+- PK: `material_id`; unique: `(material_id, tenant_id)`, `(tenant_id, material_code)`; FK: `tenant_id → tb_tenant`.
+- 조회/수정은 인증 tenant 및 `delete_status = 'N' AND deleted_at IS NULL` 조건으로 제한한다. 코드 중복 검사는 삭제 행을 포함한다.
+- 품목코드는 `materialCodeIdGnrService`의 기존 IDS/`tb_material_info` 키, 6자리, block size 1을 사용한다. `20261022_010`은 기존 1~6자리 숫자 품목코드 최댓값 다음 값으로 카운터를 초기화하며 더 높은 카운터를 유지한다. SQL은 작성만 했으며 현재 DB에 적용하지 않았다.
+
 ### ids (전자정부 ID Generator 관리 테이블)
 
 | 컬럼 | 타입 | NULL | 기본값 | 설명 |
@@ -712,11 +750,13 @@
 
 - MCP에서 확인한 PK는 `ids_pkey (table_name)`이다.
 - eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
-- 테이블과 스키마는 기존 것을 사용하며 거래처별 generator row만 추가/상향한다.
+- 테이블과 스키마는 기존 것을 사용하며 거래처/품목별 generator row만 추가/상향한다.
 
 ---
 
 ## 변경 이력
+
+- 2026-10-22: 지정 tenant MCP로 기존 `tb_material_info`의 타입/길이/주석/제약을 확인하고 품목관리와 IDS 초기화 `20261022_010`을 정의했다. DDL 변경과 SQL 적용은 수행하지 않았다.
 
 - 2026-10-22: 신규 환경용 그룹웨어 기준 DDL 및 공통코드 시드를 작성했다. MCP로 확인한 현행 그룹웨어 스키마 13개 테이블과 공통코드 5개 그룹/23개 항목을 반영했으며 현재 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 - 2026-10-22: 기존 eGov `ids` 테이블의 `tb_customer_info` generator counter를 기존 거래처 코드 최댓값 기준으로 초기화하는 `20261022_005` migration을 정의했다. tenant 전용 PostgreSQL MCP에서 `tb_customer_info`/`ids` 컬럼과 제약 메타데이터를 확인했고 업무 데이터 및 ID 카운터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.

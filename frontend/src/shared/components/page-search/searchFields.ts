@@ -2,6 +2,7 @@ import type {
   F1GridColumn,
   F1GridDateRangeDefault,
   F1GridEditorType,
+  F1GridInputFormat,
   F1GridOption,
 } from '../f1-grid';
 
@@ -29,6 +30,8 @@ export type PageSearchField = {
   group?: string;
   options?: F1GridOption[];
   defaultValue?: F1GridDateRangeDefault;
+  inputFormat?: F1GridInputFormat;
+  sanitizeInput?: (value: string) => string;
 };
 
 const SEARCH_FIELD_TYPES = new Set<PageSearchFieldType>([
@@ -72,6 +75,8 @@ export function toPageSearchFields<T extends object>(
       searchSpan: column.search?.span ?? 1,
       ...(column.search?.group ? { group: column.search.group } : {}),
       ...(column.options ? { options: column.options } : {}),
+      ...(column.inputFormat ? { inputFormat: column.inputFormat } : {}),
+      ...(column.sanitizeInput ? { sanitizeInput: column.sanitizeInput } : {}),
       ...(column.search?.defaultValue
         ? { defaultValue: column.search.defaultValue }
         : {}),

@@ -84,6 +84,7 @@ import {
 import { toggleGridSort, sortGridRows } from '../sorting/GridSort';
 import { applyGridFilters } from '../filter/GridFilter';
 import { normalizeDateInput } from '../editing/DateEditor';
+import { normalizeF1GridInput } from '../editing/inputFormat';
 import {
   getGridColumnPinOffsets,
   getGridColumnPinSide,
@@ -1386,7 +1387,12 @@ function F1GridInner<T extends object>(
           const column =
             visibleColumns[focusedCell.columnIndex + valueColumnIndex];
           if (!column || !isCellEditable(column, targetRow)) return;
-          const value = coerceClipboardValue(rawValue, column);
+          const normalizedValue = normalizeF1GridInput(
+            rawValue,
+            column.inputFormat,
+            column.sanitizeInput,
+          );
+          const value = coerceClipboardValue(normalizedValue, column);
           if (value !== undefined) {
             (changes as Record<keyof T, unknown>)[column.field] = value;
           }

@@ -57,6 +57,7 @@ const adminPermissions: MenuPermission = {
   create: true,
   update: true,
   delete: true,
+  excel: true,
 };
 
 function renderArchive(
@@ -181,6 +182,17 @@ describe('Archive dashboard page', () => {
     expect(
       screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
     ).toBeVisible();
+  });
+
+  it('hides Excel export when the archive menu does not grant Excel permission', async () => {
+    renderArchive({ ...adminPermissions, excel: false });
+    const grid = await screen.findByRole('grid', { name: '자료실' });
+
+    fireEvent.contextMenu(grid);
+
+    expect(
+      screen.queryByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).not.toBeInTheDocument();
   });
 
   it('sends keyword search to file-list API', async () => {

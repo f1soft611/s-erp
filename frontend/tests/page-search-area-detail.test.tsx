@@ -18,6 +18,68 @@ describe('PageSearchArea 상세 검색', () => {
     },
   ];
 
+  it('sanitizes configured string search fields but leaves ordinary text unchanged', () => {
+    const onSearch = vi.fn();
+    const onValuesChange = vi.fn();
+    const sanitizeInput = (value: string) => value.replace(/[^0-9-]/g, '');
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'businessNo',
+            label: '사업자번호',
+            type: 'text',
+            searchSpan: 1,
+            sanitizeInput,
+          },
+          { field: 'customerName', label: '거래처명', type: 'text', searchSpan: 1 },
+        ]}
+        onDetailValuesChange={onValuesChange}
+        onDetailSearch={onSearch}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const businessNo = screen.getByRole('textbox', { name: '사업자번호' });
+    fireEvent.change(businessNo, { target: { value: 'AB012-3X' } });
+    expect(businessNo).toHaveValue('012-3');
+    expect(onValuesChange).toHaveBeenLastCalledWith({ businessNo: '012-3' });
+    fireEvent.change(screen.getByRole('textbox', { name: '거래처명' }), {
+      target: { value: 'Acme 12' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({
+      businessNo: '012-3',
+      customerName: 'Acme 12',
+    });
+  });
+
+  it('formats detailed search values using the field input format', () => {
+    const onValuesChange = vi.fn();
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'businessNo',
+            label: '사업자번호',
+            type: 'text',
+            searchSpan: 1,
+            inputFormat: { type: 'digits', groupSizes: [3, 2] },
+          },
+        ]}
+        onDetailValuesChange={onValuesChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const businessNo = screen.getByRole('textbox', { name: '사업자번호' });
+    fireEvent.change(businessNo, { target: { value: '1234567890' } });
+
+    expect(businessNo).toHaveValue('123-45-67890');
+    expect(onValuesChange).toHaveBeenLastCalledWith({
+      businessNo: '123-45-67890',
+    });
+  });
+
   it.each([
     ['20261022', '2026-10-22'],
     ['261022', '2026-10-22'],

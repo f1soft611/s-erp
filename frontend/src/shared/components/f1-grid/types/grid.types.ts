@@ -36,6 +36,10 @@ export type F1GridDraftValue = string | number | null | Array<string | number>;
 
 export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
+export type F1GridInputFormat =
+  | { type: 'digits'; groupSizes?: number[]; separator?: string }
+  | { type: 'korean-phone' };
+
 export type F1GridFormMode = 'create' | 'edit';
 
 export type F1GridDateDefault =
@@ -148,6 +152,8 @@ export type F1GridColumn<T extends object> = {
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
+  inputFormat?: F1GridInputFormat;
+  sanitizeInput?: (value: string) => string;
   min?: number;
   max?: number;
   validate?: (value: T[keyof T], row: T) => string | boolean;

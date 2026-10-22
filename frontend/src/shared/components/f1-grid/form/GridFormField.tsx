@@ -22,6 +22,8 @@ import {
   normalizeGridNumberInput,
 } from '../utils/grid.utils';
 import { UserSelectEditor } from '../editing/UserSelectEditor';
+import { normalizeF1GridInput } from '../editing/inputFormat';
+import { useF1GridFormattedInput } from '../editing/useF1GridFormattedInput';
 
 export type GridFormFieldProps<T extends object> = {
   column: F1GridColumn<T>;
@@ -71,12 +73,28 @@ export function GridFormField<T extends object>({
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
 
-  const applyValue = (nextValue: unknown) => {
+  const applyValue = (nextValue: unknown, normalizeString = true) => {
+    const normalizedValue =
+      normalizeString && typeof nextValue === 'string'
+        ? normalizeF1GridInput(
+            nextValue,
+            column.inputFormat,
+            column.sanitizeInput,
+          )
+        : nextValue;
     onPatch(
-      column.onValueChange?.(row, nextValue) ??
-        ({ [column.field]: nextValue } as Partial<T>),
+      column.onValueChange?.(row, normalizedValue) ??
+        ({ [column.field]: normalizedValue } as Partial<T>),
     );
   };
+
+  const { inputRef, handleChange: handleFormattedChange } =
+    useF1GridFormattedInput({
+      value: String(displayedValue ?? ''),
+      inputFormat: column.inputFormat,
+      sanitizeInput: column.sanitizeInput,
+      onChange: (nextValue) => applyValue(nextValue, false),
+    });
 
   const sharedTextFieldProps = {
     fullWidth: true,
@@ -350,10 +368,15 @@ export function GridFormField<T extends object>({
     <TextField
       {...sharedTextFieldProps}
       type={inputType}
+      inputRef={inputRef}
       value={
         normalizedDisplayValue == null ? '' : String(normalizedDisplayValue)
       }
       onChange={(event) => {
+        if (!isNumber) {
+          handleFormattedChange(event);
+          return;
+        }
         const nextTextValue = isNumber
           ? normalizeGridNumberInput(event.target.value, column.decimalPlaces)
           : event.target.value;

@@ -6,6 +6,7 @@ import {
   type F1GridRef,
 } from '../../../../../shared/components/f1-grid';
 import type { CustomerRow } from '../types/customerManagement.types';
+import { sanitizeCustomerNumberInput } from '../utils/customerNumberInput';
 
 export type CustomerGridProps = {
   rows: CustomerRow[];
@@ -91,6 +92,8 @@ export function createCustomerColumns(
       headerName: '사업자번호',
       width: 130,
       editable: canEdit,
+      inputFormat: { type: 'digits', groupSizes: [3, 2] },
+      sanitizeInput: sanitizeCustomerNumberInput,
       form: { group: '사업자정보', order: 2 },
       search: { label: '사업자번호', order: 2 },
     },
@@ -115,6 +118,8 @@ export function createCustomerColumns(
       headerName: '전화번호',
       width: 130,
       editable: canEdit,
+      inputFormat: { type: 'korean-phone' },
+      sanitizeInput: sanitizeCustomerNumberInput,
       form: { group: '연락처', order: 1 },
       search: { hidden: true },
     },
@@ -146,6 +151,8 @@ export function createCustomerColumns(
       hidden: true,
       editable: canEdit,
       form: { hidden: false, group: '사업자정보', order: 3 },
+      inputFormat: { type: 'digits', groupSizes: [6] },
+      sanitizeInput: sanitizeCustomerNumberInput,
       search: { label: '법인등록번호', order: 3 },
     },
     {
@@ -154,6 +161,8 @@ export function createCustomerColumns(
       hidden: true,
       editable: canEdit,
       form: { hidden: false, group: '연락처', order: 2 },
+      inputFormat: { type: 'digits' },
+      sanitizeInput: sanitizeCustomerNumberInput,
       search: { hidden: true },
     },
     {
@@ -162,6 +171,8 @@ export function createCustomerColumns(
       hidden: true,
       editable: canEdit,
       form: { hidden: false, group: '연락처', order: 4 },
+      inputFormat: { type: 'korean-phone' },
+      sanitizeInput: sanitizeCustomerNumberInput,
       search: { hidden: true },
     },
     {

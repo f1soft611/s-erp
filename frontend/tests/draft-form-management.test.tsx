@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import {
   fireEvent,
   render,
@@ -9,9 +10,12 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
-import { createDraftFormColumns } from '../src/pages/co/workflow/form/components/DraftFormGrid';
+import {
+  createDraftFormColumns,
+  DraftFormGrid,
+} from '../src/pages/co/workflow/form/components/DraftFormGrid';
 import { fetchDraftFormUsers } from '../src/pages/co/workflow/form/services/draftFormManagement.service';
-import { F1Grid } from '../src/shared/components/f1-grid';
+import { F1Grid, type F1GridRef } from '../src/shared/components/f1-grid';
 import type { DraftFormRow } from '../src/pages/co/workflow/form/types/draftFormManagement.types';
 
 const apiMocks = vi.hoisted(() => ({
@@ -88,6 +92,54 @@ beforeEach(() => {
 });
 
 describe('Draft form management page', () => {
+  it('hides Excel export when the grid does not have Excel permission', async () => {
+    render(
+      <DraftFormGrid
+        rows={[]}
+        columns={[]}
+        canCreate={false}
+        canUpdate={false}
+        canExportExcel={false}
+        loading={false}
+        gridKey={0}
+        gridRef={createRef<F1GridRef<DraftFormRow>>()}
+        onChangesChange={vi.fn()}
+      />,
+    );
+    fireEvent.contextMenu(
+      await screen.findByRole('grid', { name: '기안양식 목록' }),
+    );
+
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu).queryByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Excel export when the grid has Excel permission', async () => {
+    render(
+      <DraftFormGrid
+        rows={[]}
+        columns={[]}
+        canCreate={false}
+        canUpdate={false}
+        canExportExcel
+        loading={false}
+        gridKey={0}
+        gridRef={createRef<F1GridRef<DraftFormRow>>()}
+        onChangesChange={vi.fn()}
+      />,
+    );
+    fireEvent.contextMenu(
+      await screen.findByRole('grid', { name: '기안양식 목록' }),
+    );
+
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu).getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeInTheDocument();
+  });
+
   it('defines each F1-Grid data column field once with row numbering first', () => {
     const columns = createDraftFormColumns([], [], [], true);
     const fields = columns.map((column) => String(column.field));

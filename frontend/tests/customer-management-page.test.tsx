@@ -89,6 +89,21 @@ beforeEach(() => {
 });
 
 describe('customer management page', () => {
+  it('configures reusable input formats for customer numbers and contacts', () => {
+    const columns = createCustomerColumns(true);
+    const formats = Object.fromEntries(
+      columns.map((column) => [String(column.field), column.inputFormat]),
+    );
+
+    expect(formats).toMatchObject({
+      businessNo: { type: 'digits', groupSizes: [3, 2] },
+      juridNo: { type: 'digits', groupSizes: [6] },
+      postCode: { type: 'digits' },
+      telephoneNo: { type: 'korean-phone' },
+      facsimileNo: { type: 'korean-phone' },
+    });
+  });
+
   it('does not leave saved inserts dirty when the subsequent reload fails', async () => {
     apiMocks.apiPost.mockResolvedValue({ item: { customers: [customer] } });
     const { result } = renderHook(() => useCustomerManagement(), {
@@ -221,6 +236,31 @@ describe('customer management page', () => {
       expect.arrayContaining(['juridNo', 'postCode', 'facsimileNo', 'custMemo']),
     );
     expect(searchFields).toContain('juridNo');
+  });
+
+  it('configures numeric-hyphen filtering only for customer number/contact columns', () => {
+    const columns = createCustomerColumns(true);
+    const normalizedColumns = columns.filter((column) => column.sanitizeInput);
+    expect(normalizedColumns.map((column) => column.field)).toEqual([
+      'businessNo',
+      'telephoneNo',
+      'juridNo',
+      'postCode',
+      'facsimileNo',
+    ]);
+    for (const field of ['businessNo', 'juridNo']) {
+      const searchField = toPageSearchFields(columns).find(
+        (candidate) => candidate.field === field,
+      );
+      expect(searchField?.sanitizeInput?.('A01-2B')).toBe('01-2');
+    }
+    expect(
+      columns.find((column) => column.field === 'customerName')?.sanitizeInput,
+    ).toBeUndefined();
+    expect(
+      toPageSearchFields(columns).find((field) => field.field === 'presidentName')
+        ?.sanitizeInput,
+    ).toBeUndefined();
   });
 
   it('renders customer results through the co/customers dashboard route', async () => {

@@ -107,6 +107,7 @@ export function DocumentStatusPage({
             <DocumentStatusGrid
               rows={list.rows}
               loading={list.loading}
+              canExportExcel={selectedMenuPermissions?.excel ?? false}
               onSelectionChange={detail.handleSelectionChange}
             />
           </Box>
