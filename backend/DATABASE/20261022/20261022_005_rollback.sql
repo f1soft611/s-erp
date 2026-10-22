@@ -1,5 +1,5 @@
 BEGIN;
 
-DROP SEQUENCE tb_customer_info_customer_code_seq;
+-- Keep the generator counter to prevent reissuing any customer codes already saved.
 
 COMMIT;

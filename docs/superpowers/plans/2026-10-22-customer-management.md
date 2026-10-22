@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a tenant-scoped customer management page at `/co/master/customers` backed by `tb_customer_info`, with F1-Grid search, create/update, and six-digit customer-code generation.
+**Goal:** Add a tenant-scoped customer management page at `/co/master/customers` backed by `tb_customer_info`, with F1-Grid search, create/update, and six-digit customer-code generation through the existing eGov ID Generator.
 
-**Architecture:** Connect the existing `co` dashboard page key `customers` to a page feature package under `pages/co/master/customers`. The React page calls a new tenant-scoped Spring API, whose service/DAO/Mapper operate on `tb_customer_info`; `customer_id` remains DB-generated and a new PostgreSQL sequence supplies exactly six-digit customer codes when none is provided. Tenant admins with the relevant menu permissions can write; list/search always uses the authenticated tenant.
+**Architecture:** Connect the existing `co` dashboard page key `customers` to a page feature package under `pages/co/master/customers`. The React page calls a new tenant-scoped Spring API, whose service/DAO/Mapper operate on `tb_customer_info`; `customer_id` remains DB-generated and a dedicated `EgovIdGnrService` bean uses the existing `IDS` table to supply six-digit customer codes when none is provided. Tenant admins with the relevant menu permissions can write; list/search always uses the authenticated tenant.
 
 **Tech Stack:** React 19, TypeScript, MUI, F1-Grid, Vitest, Spring Boot/eGovFrame, MyBatis, PostgreSQL, Maven.
 
@@ -17,7 +17,7 @@
 - Reference F1-Grid columns/forms: `frontend/src/pages/co/workflow/form/components/DraftFormGrid.tsx`
 - Reference frontend API flow: `frontend/src/pages/co/workflow/form/services/draftFormManagement.service.ts`
 - Reference backend tenant/master-data pattern: `backend/src/main/java/egovframework/let/co/workflow/form/` and `backend/src/main/java/egovframework/let/co/master/commoncode/`
-- Database evidence: tenant MCP `tb_customer_info` column metadata and PostgreSQL constraints. No data rows were read.
+- Database evidence: tenant MCP `tb_customer_info` and existing `ids` column/constraint metadata. No business rows or generator-counter rows were read.
 
 ## File Structure
 
@@ -27,10 +27,10 @@
 - Create `docs/plan/20261022/20261022_008_거래처_관리_페이지_계획서.md` from the work instruction.
 - Create `docs/spec/20261022/20261022_008_거래처_관리_페이지_상세사양서.md` from the plan, including the database-backed API and field/search contract.
 
-### Database sequence
+### eGov customer-code generator
 
-- Create matching migration, change record, and rollback files under `backend/DATABASE/20261022/` and `docs/database/20261022/`, numbered `20261022_005`.
-- Modify `docs/database/db-schema.md` to document the confirmed `tb_customer_info` structure and the new customer-code sequence.
+- Create matching counter-initialization, change-record, and safe rollback files under `backend/DATABASE/20261022/` and `docs/database/20261022/`, numbered `20261022_005`.
+- Modify `docs/database/db-schema.md` to document the confirmed `tb_customer_info`/`ids` metadata and the eGov customer-code generator key.
 
 ### Backend
 
@@ -42,6 +42,7 @@
 - Create `backend/src/main/java/egovframework/let/co/master/customer/domain/model/CustomerInfoSaveRequestVO.java`.
 - Create `backend/src/main/java/egovframework/let/co/master/customer/domain/repository/CustomerInfoDAO.java`.
 - Create `backend/src/main/resources/egovframework/mapper/let/co/master/customer/CustomerInfo_SQL_postgresql.xml`.
+- Modify `backend/src/main/java/egovframework/com/config/EgovConfigAppIdGen.java` to register `customerCodeIdGnrService`.
 - Create `backend/src/test/java/egovframework/let/co/master/customer/controller/CustomerInfoApiControllerTest.java`.
 - Create `backend/src/test/java/egovframework/let/co/master/customer/service/impl/CustomerInfoServiceImplTest.java`.
 
@@ -70,11 +71,11 @@
 
 - [ ] **Step 1: Write the work instruction from the approved design**
 
-Record the `/co/master/customers` route, tenant-scoped `tb_customer_info` CRUD-without-delete scope, approved search and field list, admin/menu permission behavior, six-digit code sequence, F1-Grid row form, responsive checks, and result/screenshot requirements. State that no tenant data rows were inspected and no MCP writes are allowed.
+Record the `/co/master/customers` route, tenant-scoped `tb_customer_info` CRUD-without-delete scope, approved search and field list, admin/menu permission behavior, six-digit eGov ID Generator, F1-Grid row form, responsive checks, and result/screenshot requirements. State that no tenant data rows were inspected and no MCP writes are allowed.
 
 - [ ] **Step 2: Write the dated project plan and detailed spec**
 
-Make the project plan point to the work instruction and this implementation plan. In the detailed spec, define the request/response properties in camelCase for all `tb_customer_info` fields, query parameters, status/error behavior, permission checks, six-digit sequence exhaustion behavior, and the exact search/grid/form fields listed below.
+Make the project plan point to the work instruction and this implementation plan. In the detailed spec, define the request/response properties in camelCase for all `tb_customer_info` fields, query parameters, status/error behavior, permission checks, six-digit generator exhaustion behavior, and the exact search/grid/form fields listed below.
 
 - [ ] **Step 3: Verify document consistency before changing application code**
 
@@ -96,58 +97,44 @@ git add -- docs/directions/20261022/20261022_008_거래처_관리_페이지_작�
 git commit -m "docs(co): specify customer management page" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-## Task 2: Add the customer-code sequence migration and schema history
+## Task 2: Initialize the eGov customer-code generator and schema history
 
 **Files:**
-- Create matching SQL, change-record Markdown, and rollback SQL under `backend/DATABASE/20261022/` and `docs/database/20261022/` with prefix `20261022_005`.
+- Create matching counter-initialization SQL, change-record Markdown, and safe rollback SQL under `backend/DATABASE/20261022/` and `docs/database/20261022/` with prefix `20261022_005`.
 - Modify `docs/database/db-schema.md`.
 
-- [ ] **Step 1: Create the forward migration**
+- [ ] **Step 1: Initialize the existing eGov generator counter**
 
-Create `tb_customer_info_customer_code_seq` as a global, non-cycling PostgreSQL sequence. Initialize it from the maximum existing numeric `customer_code` matching one to six digits across `tb_customer_info`; start at 1 if no positive numeric code exists. Do not select or export business rows. Do not change the existing `customer_id` sequence or table columns.
+Do not create a separate sequence or table. Initialize the existing `public.ids` row keyed by `tb_customer_info` to at least the maximum existing 1–6 digit numeric `customer_code` plus one. If no matching code exists, seed `1`. If the generator row already exists with a larger `next_id`, keep the larger value. Do not select or export business rows. Do not change the existing `customer_id` sequence or table columns.
 
 Use this migration structure, adding the standard transaction wrapper used by the dated schema scripts:
 
 ```sql
-CREATE SEQUENCE tb_customer_info_customer_code_seq
-    AS BIGINT
-    START WITH 1
-    INCREMENT BY 1
-    MINVALUE 1
-    NO CYCLE;
-
-DO $$
-DECLARE
-    max_code BIGINT;
-BEGIN
-    SELECT COALESCE(MAX(customer_code::BIGINT), 0)
-      INTO max_code
-      FROM tb_customer_info
-     WHERE customer_code ~ '^[0-9]{1,6}$';
-
-    IF max_code = 0 THEN
-        PERFORM setval('tb_customer_info_customer_code_seq', 1, false);
-    ELSE
-        PERFORM setval('tb_customer_info_customer_code_seq', max_code, true);
-    END IF;
-END $$;
+INSERT INTO public.ids (table_name, next_id)
+SELECT 'tb_customer_info',
+       COALESCE(MAX(customer_code::BIGINT), 0) + 1
+  FROM public.tb_customer_info
+ WHERE customer_code ~ '^[0-9]{1,6}$'
+ON CONFLICT (table_name) DO UPDATE
+SET next_id = GREATEST(public.ids.next_id, EXCLUDED.next_id),
+    updated_at = CURRENT_TIMESTAMP;
 ```
 
-- [ ] **Step 2: Create the rollback and change record**
+- [ ] **Step 2: Create the safe rollback and change record**
 
-The rollback drops only `tb_customer_info_customer_code_seq`; it does not alter customer rows or the existing unique constraint. Document that rollback must be coordinated with application rollback and that customer codes already saved remain unchanged. Include date, sequence object, affected application behavior, scope, and rollback instructions.
+Rollback the application version but retain the `ids` counter. Never lower or delete it because customer codes may already have been issued and saved. The SQL rollback is intentionally a no-op with an explanation. Record the existing eGov generator row as the affected object, the application behavior, scope, MCP metadata evidence, and rollback instructions.
 
 - [ ] **Step 3: Update the cumulative schema document**
 
-Add the MCP-confirmed `tb_customer_info` column/nullability/default/constraint summary and document `tb_customer_info_customer_code_seq` as the allocator for generated `customer_code` values. Preserve existing document sections.
+Add the MCP-confirmed `tb_customer_info` and `ids` column/nullability/default/constraint summaries. Document that `EgovConfigAppIdGen` configures `customerCodeIdGnrService` with `IDS`, key `tb_customer_info`, six-digit padding, and block size 1. Preserve existing document sections.
 
 - [ ] **Step 4: Verify migration copies and patch quality**
 
 Run:
 
 ```powershell
-Get-FileHash backend\DATABASE\20261022\20261022_005_customer_code_sequence.sql, docs\database\20261022\20261022_005_customer_code_sequence.sql
-Get-FileHash backend\DATABASE\20261022\20261022_005_change_customer_code_sequence.md, docs\database\20261022\20261022_005_change_customer_code_sequence.md
+Get-FileHash backend\DATABASE\20261022\20261022_005_customer_code_id_generator.sql, docs\database\20261022\20261022_005_customer_code_id_generator.sql
+Get-FileHash backend\DATABASE\20261022\20261022_005_change_customer_code_id_generator.md, docs\database\20261022\20261022_005_change_customer_code_id_generator.md
 Get-FileHash backend\DATABASE\20261022\20261022_005_rollback.sql, docs\database\20261022\20261022_005_rollback.sql
 git diff --check
 ```
@@ -159,8 +146,8 @@ Expected: each same-purpose pair has identical hashes and `git diff --check` rep
 Stage the six SQL/change-record/rollback files plus `docs/database/db-schema.md`, then commit:
 
 ```powershell
-git add -- backend/DATABASE/20261022/20261022_005_customer_code_sequence.sql backend/DATABASE/20261022/20261022_005_change_customer_code_sequence.md backend/DATABASE/20261022/20261022_005_rollback.sql docs/database/20261022/20261022_005_customer_code_sequence.sql docs/database/20261022/20261022_005_change_customer_code_sequence.md docs/database/20261022/20261022_005_rollback.sql docs/database/db-schema.md
-git commit -m "feat(db): add customer code sequence" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git add -- backend/DATABASE/20261022/20261022_005_customer_code_id_generator.sql backend/DATABASE/20261022/20261022_005_change_customer_code_id_generator.md backend/DATABASE/20261022/20261022_005_rollback.sql docs/database/20261022/20261022_005_customer_code_id_generator.sql docs/database/20261022/20261022_005_change_customer_code_id_generator.md docs/database/20261022/20261022_005_rollback.sql docs/database/db-schema.md
+git commit -m "feat(db): initialize customer code generator" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
 ## Task 3: Implement and test the tenant-scoped backend API
@@ -201,7 +188,7 @@ Expected before implementation: FAIL because the customer controller and service
 
 - [ ] **Step 3: Write service and mapper tests**
 
-In `CustomerInfoServiceImplTest`, assert that list conditions contain the authenticated tenant and trimmed filters; reject blank `customer_name` and `use_at` values other than `Y`/`N`; retain supplied customer codes; format generated codes as six digits; skip a generated code already in use; reject values beyond `999999`; reject same-tenant duplicates; and prevent updates to another tenant's row. Parse `CustomerInfo_SQL_postgresql.xml` with `XMLMapperBuilder` and assert list, insert, update, existence-check, and `nextval` statements are registered. Assert list/update SQL includes tenant predicates and update SQL cannot change `customer_id` or `tenant_id`.
+In `CustomerInfoServiceImplTest`, assert that list conditions contain the authenticated tenant and trimmed filters; reject blank `customer_name` and `use_at` values other than `Y`/`N`; retain supplied customer codes without invoking the generator; accept six-digit generated codes; skip a generated code already in use by requesting the next code; reject malformed or exhausted generator output; reject same-tenant duplicates; and prevent updates to another tenant's row. Parse `CustomerInfo_SQL_postgresql.xml` with `XMLMapperBuilder` and assert list, insert, update, and existence-check statements are registered. Assert list/update SQL includes tenant predicates and update SQL cannot change `customer_id` or `tenant_id`.
 
 The service contract is:
 
@@ -215,7 +202,7 @@ CustomerInfoVO updateCustomer(
         CustomerInfoSaveRequestVO payload) throws Exception;
 ```
 
-For example, the generated-code test sets the DAO sequence values to `1L` then `2L`, marks `"000001"` as already used and `"000002"` as unused, and asserts the inserted customer code is `"000002"`. A sequence value of `1_000_000L` must throw `IllegalArgumentException` before insert.
+For example, the generated-code test sets `EgovIdGnrService.getNextStringId()` to return `"000001"` then `"000002"`, marks `"000001"` as already used and `"000002"` as unused, and asserts the inserted customer code is `"000002"`. A generated value of `"1000000"` must throw `IllegalArgumentException` before insert.
 
 - [ ] **Step 4: Run service tests and confirm failure**
 
@@ -229,15 +216,15 @@ Expected before implementation: FAIL because the customer service, DAO, and mapp
 
 - [ ] **Step 5: Implement models, DAO, and MyBatis statements**
 
-Map the database fields to typed `CustomerInfoVO` properties: `customerId`, `tenantId`, `customerCode`, `customerName`, `custNameAbbr`, `presidentName`, `businessNo`, `juridNo`, `businessStatus1`, `businessItem1`, `postCode`, `address`, `telephoneNo`, `facsimileNo`, `custMemo`, `useAt`, `createdBy`, `createdAt`, `updatedBy`, and `updatedAt`. The search condition contains tenant ID, keyword, president name, business number, juridical number, business status, business item, and use status. Add tenant-scoped list/detail/duplicate queries, sequence `nextval`, insert with `RETURNING customer_id`, and tenant-scoped update. Search is partial-match for text fields and exact-match for `use_at`; order by customer code then customer ID.
+Map the database fields to typed `CustomerInfoVO` properties: `customerId`, `tenantId`, `customerCode`, `customerName`, `custNameAbbr`, `presidentName`, `businessNo`, `juridNo`, `businessStatus1`, `businessItem1`, `postCode`, `address`, `telephoneNo`, `facsimileNo`, `custMemo`, `useAt`, `createdBy`, `createdAt`, `updatedBy`, and `updatedAt`. The search condition contains tenant ID, keyword, president name, business number, juridical number, business status, business item, and use status. Add tenant-scoped list/detail/duplicate queries, insert with `RETURNING customer_id`, and tenant-scoped update. Search is partial-match for text fields and exact-match for `use_at`; order by customer code then customer ID.
 
-Expose these mapper operations from the DAO: `selectCustomerList(condition)`, `selectCustomerById(params)`, `selectCustomerIdByCode(params)`, `selectNextCustomerCode()`, `insertCustomer(params)`, and `updateCustomer(params)`. The insert omits `customer_id` so its existing default remains authoritative; the insert returns that ID, then the service reloads the row using both ID and tenant.
+Expose these mapper operations from the DAO: `selectCustomerList(condition)`, `selectCustomerById(params)`, `selectCustomerIdByCode(params)`, `insertCustomer(params)`, and `updateCustomer(params)`. Do not implement a customer-code `nextval` mapper. The insert omits `customer_id` so its existing default remains authoritative; the insert returns that ID, then the service reloads the row using both ID and tenant.
 
 - [ ] **Step 6: Implement service and controller**
 
-Create and update require a tenant-admin principal, trim text input, require customer name, strictly validate `use_at`, and check duplicates within the tenant. A blank create code uses the dedicated sequence, formats with `String.format("%06d", value)`, checks for an existing tenant code, and tries the next sequence value up to 10 times before returning a clear validation error. Values above `999999` produce an explicit exhaustion error. Insert leaves `customer_id` to its existing database default. Update preserves server-owned tenant/identity/audit fields and returns 404 if the tenant-scoped row does not exist. GET derives tenant ID from `LoginVO`; clients cannot provide it.
+Create and update require a tenant-admin principal, trim text input, require customer name, strictly validate `use_at`, and check duplicates within the tenant. A blank create code calls the configured eGov generator, which formats values with six digits; the service checks for an existing tenant code and requests the next generated code up to 10 times before returning a clear validation error. Malformed output or values above `999999` produce an explicit exhaustion error. Insert leaves `customer_id` to its existing database default. Update preserves server-owned tenant/identity/audit fields and returns 404 if the tenant-scoped row does not exist. GET derives tenant ID from `LoginVO`; clients cannot provide it.
 
-Format generated values with `Locale.ROOT`, and stop before insert when the value is greater than `999999`. If a provided code or update code already exists in the same tenant, return a validation error; do not silently replace it with an automatically generated value.
+Configure a dedicated `customerCodeIdGnrService` bean in `EgovConfigAppIdGen` using the existing `IDS` table, key `tb_customer_info`, empty prefix, `cipers = 6`, fill character `0`, and block size 1. If a provided code or update code already exists in the same tenant, return a validation error; do not silently replace it with an automatically generated value.
 
 - [ ] **Step 7: Run backend focused tests**
 
@@ -251,10 +238,10 @@ Expected: both new suites pass; mapper parsing confirms the XML statements and t
 
 - [ ] **Step 8: Commit the backend API**
 
-Stage only the new `co/master/customer` Java, mapper, and customer test paths, then commit:
+Stage only the new `co/master/customer` Java, mapper, customer tests, and the scoped `EgovConfigAppIdGen.java` modification, then commit:
 
 ```powershell
-git add -- backend/src/main/java/egovframework/let/co/master/customer/ backend/src/main/resources/egovframework/mapper/let/co/master/customer/ backend/src/test/java/egovframework/let/co/master/customer/
+git add -- backend/src/main/java/egovframework/let/co/master/customer/ backend/src/main/resources/egovframework/mapper/let/co/master/customer/ backend/src/test/java/egovframework/let/co/master/customer/ backend/src/main/java/egovframework/com/config/EgovConfigAppIdGen.java
 git commit -m "feat(co): add tenant-scoped customer API" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
@@ -418,7 +405,7 @@ Use the existing S-ERP Vite server on `http://127.0.0.1:4173` only after confirm
 
 - [ ] **Step 4: Save screenshots and the result report**
 
-Save viewport screenshots with lowercase ASCII filenames in `docs/result/20261022/customer-management/screenshots/`. The result report records implementation files, approved requirements, DB MCP metadata evidence, sequence migration files, tests/build/browser results, and any limitations. Do not record tenant data rows, credentials, or connection details.
+Save viewport screenshots with lowercase ASCII filenames in `docs/result/20261022/customer-management/screenshots/`. The result report records implementation files, approved requirements, DB MCP metadata evidence, eGov counter-initialization files, tests/build/browser results, and any limitations. Do not record tenant data rows, credentials, or connection details.
 
 - [ ] **Step 5: Perform final review**
 

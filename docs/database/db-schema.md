@@ -736,13 +736,26 @@
 - `tb_customer_info_tenant_id_fkey`: `tenant_id`가 `tb_tenant(tenant_id)`를 참조하며 tenant 삭제 시 cascade 된다.
 - `tb_customer_info_use_at_check`: `use_at`은 `Y` 또는 `N`만 허용한다.
 
-`tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 신규 `tb_customer_info_customer_code_seq`는 `20261022_005` migration에서 추가를 제안한 전역 거래처 코드 채번 시퀀스다. 기존 1~6자리 숫자 거래처 코드 최댓값 다음부터 채번하도록 초기화하고, 애플리케이션에서 6자리 문자열로 포맷한다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+`tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 거래처 코드는 기존 전자정부 ID Generator의 `public.ids` 카운터 중 `table_name = 'tb_customer_info'` 행을 사용한다. `20261022_005` migration은 기존 1~6자리 숫자 거래처 코드의 최댓값보다 큰 `next_id`를 설정하고, 기존 카운터가 더 크면 그 값을 보존한다. 앱의 `customerCodeIdGnrService`는 `IDS` 테이블/`tb_customer_info` 키, 6자리 zero-padding, block size 1을 사용한다. 신규 테이블이나 시퀀스는 만들지 않는다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+
+### ids (전자정부 ID Generator 관리 테이블)
+
+| 컬럼 | 타입 | NULL | 기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| table_name | varchar | 불가 | 없음 | 전자정부 ID Generator의 테이블 키 |
+| next_id | bigint | 불가 | `1` | 다음 발급 값 |
+| created_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 생성 일시 |
+| updated_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 갱신 일시 |
+
+- MCP에서 확인한 PK는 `ids_pkey (table_name)`이다.
+- eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
+- 테이블과 스키마는 기존 것을 사용하며 거래처별 generator row만 추가/상향한다.
 
 ---
 
 ## 변경 이력
 
-- 2026-10-22: `tb_customer_info_customer_code_seq` 신규 시퀀스와 거래처 코드 자동 채번 migration 초안을 정의했다. tenant 전용 PostgreSQL MCP에서 거래처 컬럼/제약 메타데이터를 확인했고 업무 데이터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+- 2026-10-22: 기존 eGov `ids` 테이블의 `tb_customer_info` generator counter를 기존 거래처 코드 최댓값 기준으로 초기화하는 `20261022_005` migration을 정의했다. tenant 전용 PostgreSQL MCP에서 `tb_customer_info`/`ids` 컬럼과 제약 메타데이터를 확인했고 업무 데이터 및 ID 카운터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 
 - 2026-10-20: 전자결재 문서의 개인별 고정 기능을 위해 `tb_electronic_approval_pin`과 사용자·tenant·문서 FK, 조회 인덱스를 추가하는 `20261020_007` migration 초안을 정의했다. 기본 읽기 전용 PostgreSQL MCP에서 `tb_electronic_approval_main`, `tb_user`, `tb_tenant`의 메타데이터를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
 - 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
