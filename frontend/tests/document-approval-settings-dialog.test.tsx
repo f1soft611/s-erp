@@ -732,6 +732,45 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(vi.mocked(onApply).mock.calls[0][1]).toEqual(['reference-2']);
   });
 
+  it('centers favorite row action buttons in the action column', async () => {
+    templateApi.list.mockResolvedValue([
+      { templateId: 9, name: '기본 결재선', eabusNo: '001' },
+    ]);
+    renderSettings();
+    await openTemplateManagerGrid();
+
+    const grid = getTemplateGrid();
+    const applyButton = within(grid).getByRole('button', {
+      name: '결재선 적용 기본 결재선',
+    });
+    const deleteButton = within(grid).getByRole('button', {
+      name: '결재선 삭제 기본 결재선',
+    });
+    const actionGroup = applyButton.parentElement;
+
+    expect(actionGroup).not.toBeNull();
+    if (!actionGroup) {
+      throw new Error('Expected the row actions to share a container.');
+    }
+    expect(actionGroup).toContainElement(deleteButton);
+    expect(actionGroup).toHaveStyle({
+      display: 'flex',
+      width: '100%',
+      justifyContent: 'center',
+      gap: '4px',
+    });
+    expect(applyButton).toHaveStyle({
+      minWidth: '0px',
+      paddingLeft: '6px',
+      paddingRight: '6px',
+    });
+    expect(deleteButton).toHaveStyle({
+      minWidth: '0px',
+      paddingLeft: '6px',
+      paddingRight: '6px',
+    });
+  });
+
   it('saves inline template name changes and confirms deletion for that row', async () => {
     templateApi.list.mockResolvedValue([
       { templateId: 9, name: '기본 결재선', eabusNo: '001' },

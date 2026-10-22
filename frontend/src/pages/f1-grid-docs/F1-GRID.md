@@ -375,6 +375,8 @@ interface F1GridColumn<T> {
 
 결재선 템플릿 관리에서는 `name` 컬럼을 인라인 편집하고, 행별 `renderCell` 액션을 제공한다. 편집 내용은 Grid 변경 집합으로 추적하며, 페이지의 하단 저장 액션에서 기존 서비스 호출을 수행한다.
 
+행 액션 버튼을 그룹으로 셀 가운데 정렬할 때는 `renderCell`의 flex wrapper에 `width: '100%'`, `justifyContent: 'center'`와 버튼 간격을 지정한다. MUI 버튼 두 개가 좁은 액션 셀을 넘치면 해당 버튼에 `minWidth: 0`과 작은 가로 패딩을 적용한다. 이는 화면별 표시 선택이며 공통 F1-Grid 동작을 변경하지 않는다.
+
 ```tsx
 type TemplateRow = {
   templateId: number;
