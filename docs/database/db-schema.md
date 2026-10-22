@@ -705,6 +705,8 @@
 
 기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.
 
+테이블이 없는 신규 환경용 [생성 SQL](20261022/20261022_010_create_material_schema.sql)을 추가했다. `public.tb_tenant` 준비 후 생성 SQL을 실행하고, 기존 `public.ids`가 준비된 상태에서 [채번 초기화 SQL](20261022/20261022_010_material_code_id_generator.sql)을 적용한다. 이미 테이블이 있는 환경에서는 생성 SQL을 실행하지 않는다. [생성 롤백](20261022/20261022_010_rollback_material_schema.sql)은 신규 생성한 빈 테이블만 삭제하며 데이터가 있거나 외부 의존 객체가 있으면 실패한다. IDS 카운터는 보존한다. 실제 DB에 실행하지 않았다.
+
 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 | --- | --- | --- | --- |
 | material_id | bigint | NOT NULL, 기본 sequence | PK |
@@ -736,6 +738,7 @@
 | expiryed_count | integer | NULL | NULL 또는 양수 CHECK |
 
 - PK: `material_id`; unique: `(material_id, tenant_id)`, `(tenant_id, material_code)`; FK: `tenant_id → tb_tenant`.
+- 별도 B-tree 인덱스: `ix_tb_material_info_material_name (material_name)`, `ix_tb_material_info_tenant_id (tenant_id)`. 기본 시퀀스는 BIGSERIAL 소유 `tb_material_info_material_id_seq`다.
 - 조회/수정은 인증 tenant 및 `delete_status = 'N' AND deleted_at IS NULL` 조건으로 제한한다. 코드 중복 검사는 삭제 행을 포함한다.
 - 품목코드는 `materialCodeIdGnrService`의 기존 IDS/`tb_material_info` 키, 6자리, block size 1을 사용한다. `20261022_010`은 기존 1~6자리 숫자 품목코드 최댓값 다음 값으로 카운터를 초기화하며 더 높은 카운터를 유지한다. SQL은 작성만 했으며 현재 DB에 적용하지 않았다.
 
@@ -755,6 +758,8 @@
 ---
 
 ## 변경 이력
+
+- 2026-10-22: 품목 테이블이 없는 환경의 DDL 누락을 보완했다. tenant MCP로 37개 컬럼과 기본값/주석/제약/인덱스를 재확인하고 `20261022_010_create_material_schema.sql`과 빈 신규 테이블 전용 롤백을 두 DB 이력 폴더에 추가했다. 기존 테이블 수정 및 실제 DB 적용은 수행하지 않았다.
 
 - 2026-10-22: 지정 tenant MCP로 기존 `tb_material_info`의 타입/길이/주석/제약을 확인하고 품목관리와 IDS 초기화 `20261022_010`을 정의했다. DDL 변경과 SQL 적용은 수행하지 않았다.
 

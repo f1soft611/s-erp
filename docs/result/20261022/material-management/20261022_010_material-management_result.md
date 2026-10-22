@@ -89,6 +89,17 @@ mvn -q '-Dtest=MaterialInfoServiceImplTest,MaterialInfoBatchServiceImplTest,Mate
 
 ## 발견 및 회귀 방지
 
+### 후속 생성 SQL 누락 보완
+
+- 재현/원인: 최초 채번 SQL은 `tb_material_info`가 이미 존재한다고 전제하므로 테이블이 없는 환경에서 실행할 수 없었다. 기존 테이블을 수정하지 않는다는 범위를 신규 환경 DDL까지 제외하는 것으로 처리한 누락이다.
+- MCP 근거: 지정 tenant 서버의 `list_tables` → `describe_table(tb_material_info/ids)` → 컬럼 타입·길이·기본값·주석/제약/인덱스 카탈로그 제한 조회를 재수행했다. 업무 행은 조회하지 않았다.
+- [생성 SQL](../../../database/20261022/20261022_010_create_material_schema.sql): 전체 37개 컬럼, BIGSERIAL 시퀀스, 기존 PK/FK/unique/CHECK 및 별도 B-tree 인덱스 2개, 테이블/컬럼 주석을 반영했다.
+- 적용 순서: **tb_tenant 준비 → 품목 테이블 생성 → 기존 ids 준비 상태에서 채번 초기화**. 테이블이 이미 존재하는 환경은 생성 SQL을 실행하지 않는다. 생성 SQL은 기존 스키마를 조용히 무시하지 않고 오류로 중단한다.
+- [생성 롤백](../../../database/20261022/20261022_010_rollback_material_schema.sql): 신규 생성한 테이블에만 사용한다. 배타 잠금/빈 테이블 확인 후 삭제하며 데이터가 있으면 예외로 중단한다. 의존 객체 강제 삭제 없이 IDS 카운터를 보존한다. 기존 채번 no-op 롤백과 분리했다.
+- 생성/롤백/초기화/변경 이력 사본은 두 DB 폴더에서 동일하게 유지한다.
+- 정적 검증: `node --test tools\tests\test_material_schema.cjs` **5개 통과, 실패 0**. 생성 SQL 누락으로 5개 실패를 먼저 확인한 뒤 전체 컬럼·제약·인덱스·주석·사본·롤백 검증을 수행했다. 두 DB 폴더의 관련 5개 파일 SHA-256도 모두 일치했다.
+- 생성 SQL과 롤백은 실제 PostgreSQL에서 실행하지 않았다. 정적 계약 검사와 실제 DB 적용 검증을 구분한다. UI 변경이 없어 스크린샷 재생성은 해당하지 않는다.
+
 ### 후속 Java 8 API 호환성 수정
 
 - 재현: 사용자 환경에서 `MaterialInfoServiceImpl`의 `Set.of`를 찾을 수 없는 컴파일 오류가 발생했다.

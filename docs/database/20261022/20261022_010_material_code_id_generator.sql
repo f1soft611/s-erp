@@ -1,3 +1,5 @@
+-- Requires public.ids and public.tb_material_info.
+-- If the material table is absent, run 20261022_010_create_material_schema.sql first.
 BEGIN;
 
 -- Preserve issued codes across reapplication and include deleted materials.

@@ -42,6 +42,10 @@
 
 ## 4. DB 및 문서
 
+- [x] 생성 SQL 누락 보완: MCP로 스키마/인덱스를 재확인하고 `tools/tests/test_material_schema.cjs`에 전체 컬럼 및 제약/인덱스/사본 일치/롤백 검증을 추가해 실패를 확인했다.
+- [x] `20261022_010_create_material_schema.sql`과 `20261022_010_rollback_material_schema.sql`을 두 DB 폴더에 추가했다. 생성은 테이블 미존재 환경에만 적용하며 롤백은 비어 있는 테이블만 삭제하고 IDS 발급 이력은 보존한다.
+- [x] 채번 SQL 헤더, 변경 이력, 누적 스키마 및 결과 문서에 적용 순서를 반영하고 Node 집중 검증 5개 통과 및 5개 파일 해시 일치를 확인했다. 실제 DB 적용은 수행하지 않았다.
+
 - [x] `docs/database/20261022/20261022_010_*` 및 `backend/DATABASE/20261022/20261022_010_*`: 품목 IDS 초기화·변경기록·카운터를 낮추지 않는 롤백을 동일하게 추가한다.
 - [x] `docs/database/db-schema.md`에 품목의 MCP 확인 구조와 자동채번 계약을 반영한다.
 - [x] `frontend/src/pages/f1-grid-docs/F1-GRID.md`에 품목 검색/행 폼/배치 사용 흐름을 추가한다.
