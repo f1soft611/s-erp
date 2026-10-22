@@ -7,7 +7,7 @@
 ## 설계 결정
 
 - 공유 기반 스키마인 테넌트, 로그인 계정, 사용자, 공통코드, 공통 파일, 공통 댓글 및 댓글 좋아요 테이블은 선행 구축된 것으로 전제한다.
-- 그룹웨어 전용 DDL은 커뮤니티 게시판/게시글/조회이력, 기안 업무분류 및 권한, 전자결재 본문/결재선/템플릿/핀/조회이력 테이블을 포함한다.
+- 그룹웨어 전용 DDL은 커뮤니티 게시판 유형/게시글/게시글 조회이력/공지 팝업 닫기 이력(`tb_board_type`, `tb_board_post`, `tb_board_post_view_history`, `tb_notice_popup_dismissal`), 기안 업무분류 및 권한(`tb_drafting_work_category_group`, `tb_drafting_work_category`, `tb_drafting_work_category_authority`), 전자결재 본문/결재선/템플릿/핀/조회이력(`tb_electronic_approval_main`, `tb_electronic_approval_line_info`, `tb_electronic_approval_line_template`, `tb_electronic_approval_line_template_info`, `tb_electronic_approval_pin`, `tb_electronic_approval_view_history`) 등 총 13개 테이블을 포함한다.
 - DDL은 기존 날짜별 생성 및 변경 이력과 현재 읽기 전용 DB MCP 스키마를 기준으로 구성하고, PK/FK, 유일성·검사 제약, 기본값 및 인덱스를 반영한다.
 - 공통코드 시드는 현재 그룹웨어에서 확인된 `NOTICE_GUBUN`, `WF_ARCHIVE_CATEGORY`, `WF_DOC_CATEGORY`, `WF_FORM_CATEGORY`, `WF_FORM_CYCLE` 그룹과 기존 항목을 기준으로 한다. 활성 테넌트별로 생성하고 기존 `(tenant_id, group_code)` 및 `(group_id, item_code)` 키와 충돌하지 않도록 멱등하게 작성한다.
 - 전자결재 상태 및 참여자 유형처럼 현행 DB 제약과 애플리케이션 값으로 관리되는 항목은 공통코드 그룹으로 새로 만들지 않는다.
