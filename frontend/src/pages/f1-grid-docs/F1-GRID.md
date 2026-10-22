@@ -490,9 +490,11 @@ const detailFields = useMemo(
 );
 ```
 
-`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`/`defaultValue`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`/`defaultValue`를 만든다. `search.hidden: true`인 컬럼은 제외한다. `column.hidden: true`인 컬럼은 기본적으로 제외하지만, 명시적 `search` metadata가 있으면 상세검색에 포함할 수 있다. 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
 
 페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
+
+거래처 관리 화면은 `customerCode`, `customerName`, `custNameAbbr`를 별도 기본 키워드 검색으로 처리하고, 대표자·사업자번호·법인등록번호·업태·종목·사용여부를 `search` metadata 기반 상세검색에 연결한다. 법인등록번호는 목록 컬럼에서 숨기되 `search` metadata를 지정해 상세검색에 노출한다. 기본 키워드와 상세 조건은 한 번의 서버 조회에 함께 전달된다.
 
 날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
 
@@ -736,6 +738,8 @@ interface F1GridProps<T extends object> {
 - `onBeforeApply`가 `false`를 반환하면 적용을 중단하고 모달을 유지한다.
 - 취소, 닫기, `Escape`, backdrop 닫기는 모두 draft를 폐기한다.
 - 모달은 API를 호출하거나 서버에 저장하지 않는다. 최종 저장은 화면이 `getChanges()`와 기존 저장 버튼 흐름으로 수행한다.
+
+거래처 관리 화면은 `customerCode`와 `customerName` 등을 행 폼에서 등록·수정한다. 신규 `customerCode`는 비워둘 수 있고 서버가 eGov ID Generator로 생성하지만, 수정 시에는 필수이며 화면과 서버에서 함께 검증한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
 
 ### F1-Tree와 반응형 UI
 

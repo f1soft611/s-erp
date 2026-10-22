@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CustomerInfoDAO">
+
+    <resultMap id="customerInfoMap" type="egovframework.let.co.master.customer.domain.model.CustomerInfoVO">
+        <result property="customerId" column="customer_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="custNameAbbr" column="cust_name_abbr"/>
+        <result property="presidentName" column="president_name"/>
+        <result property="businessNo" column="business_no"/>
+        <result property="juridNo" column="jurid_no"/>
+        <result property="businessStatus1" column="business_status_1"/>
+        <result property="businessItem1" column="business_item_1"/>
+        <result property="postCode" column="post_code"/>
+        <result property="address" column="address"/>
+        <result property="telephoneNo" column="telephone_no"/>
+        <result property="facsimileNo" column="facsimile_no"/>
+        <result property="custMemo" column="cust_memo"/>
+        <result property="useAt" column="use_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="customerColumns">
+        customer_id,
+        tenant_id,
+        customer_code,
+        customer_name,
+        cust_name_abbr,
+        president_name,
+        business_no,
+        jurid_no,
+        business_status_1,
+        business_item_1,
+        post_code,
+        address,
+        telephone_no,
+        facsimile_no,
+        cust_memo,
+        use_at,
+        created_by,
+        created_at,
+        updated_by,
+        updated_at
+    </sql>
+
+    <select id="selectCustomerList"
+            parameterType="map"
+            resultMap="customerInfoMap">
+        SELECT <include refid="customerColumns"/>
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (
+                customer_code ILIKE '%' || #{keyword} || '%'
+                OR customer_name ILIKE '%' || #{keyword} || '%'
+                OR COALESCE(cust_name_abbr, '') ILIKE '%' || #{keyword} || '%'
+            )
+        </if>
+        <if test="presidentName != null and presidentName != ''">
+            AND COALESCE(president_name, '') ILIKE '%' || #{presidentName} || '%'
+        </if>
+        <if test="businessNo != null and businessNo != ''">
+            AND COALESCE(business_no, '') ILIKE '%' || #{businessNo} || '%'
+        </if>
+        <if test="juridNo != null and juridNo != ''">
+            AND COALESCE(jurid_no, '') ILIKE '%' || #{juridNo} || '%'
+        </if>
+        <if test="businessStatus1 != null and businessStatus1 != ''">
+            AND COALESCE(business_status_1, '') ILIKE '%' || #{businessStatus1} || '%'
+        </if>
+        <if test="businessItem1 != null and businessItem1 != ''">
+            AND COALESCE(business_item_1, '') ILIKE '%' || #{businessItem1} || '%'
+        </if>
+        <if test="useAt != null and useAt != ''">
+            AND use_at = #{useAt}
+        </if>
+        ORDER BY customer_code ASC, customer_id ASC
+    </select>
+
+    <select id="selectCustomerById" parameterType="map" resultMap="customerInfoMap">
+        SELECT <include refid="customerColumns"/>
+        FROM tb_customer_info
+        WHERE customer_id = #{customerId}
+          AND tenant_id = #{tenantId}
+    </select>
+
+    <select id="selectCustomerIdByCode" parameterType="map" resultType="long">
+        SELECT customer_id
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId}
+          AND customer_code = #{customerCode}
+        <if test="excludeCustomerId != null">
+            AND customer_id != #{excludeCustomerId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="insertCustomer" parameterType="map" resultType="long">
+        INSERT INTO tb_customer_info (
+            tenant_id,
+            customer_code,
+            customer_name,
+            cust_name_abbr,
+            president_name,
+            business_no,
+            jurid_no,
+            business_status_1,
+            business_item_1,
+            post_code,
+            address,
+            telephone_no,
+            facsimile_no,
+            cust_memo,
+            use_at,
+            created_by,
+            updated_by
+        ) VALUES (
+            #{tenantId},
+            #{customerCode},
+            #{customerName},
+            #{custNameAbbr},
+            #{presidentName},
+            #{businessNo},
+            #{juridNo},
+            #{businessStatus1},
+            #{businessItem1},
+            #{postCode},
+            #{address},
+            #{telephoneNo},
+            #{facsimileNo},
+            #{custMemo},
+            #{useAt},
+            #{createdBy},
+            #{updatedBy}
+        )
+        RETURNING customer_id
+    </select>
+
+    <update id="updateCustomer" parameterType="map">
+        UPDATE tb_customer_info
+        SET customer_code = #{customerCode},
+            customer_name = #{customerName},
+            cust_name_abbr = #{custNameAbbr},
+            president_name = #{presidentName},
+            business_no = #{businessNo},
+            jurid_no = #{juridNo},
+            business_status_1 = #{businessStatus1},
+            business_item_1 = #{businessItem1},
+            post_code = #{postCode},
+            address = #{address},
+            telephone_no = #{telephoneNo},
+            facsimile_no = #{facsimileNo},
+            cust_memo = #{custMemo},
+            use_at = #{useAt},
+            updated_by = #{updatedBy},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE customer_id = #{customerId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+</mapper>

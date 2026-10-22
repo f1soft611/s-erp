@@ -19,6 +19,7 @@ import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPa
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
+import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -245,6 +246,19 @@ export function DashboardContent({
         content={content}
         breadcrumbItems={breadcrumbItems}
         selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'co' && currentPageKey === 'customers') {
+    return (
+      <CustomerManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
       />
     );
   }
