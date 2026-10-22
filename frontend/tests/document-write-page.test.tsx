@@ -1790,10 +1790,16 @@ describe('Document write page', () => {
         writerProfileImage: 'data:image/png;base64,commenter',
         content: '<p>프로필 댓글</p>',
       }],
+      systemEvents: [{
+        commentId: 1102, ownerId: 1, eventType: 'SUBMITTED',
+        writerName: '시스템 처리자',
+        writerProfileImage: 'data:image/png;base64,event-actor',
+        content: '문서가 결재신청되었습니다.',
+      }],
     });
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce(detail);
     composerApi.listApprovalComments.mockResolvedValueOnce({
-      comments: detail.comments, systemEvents: [], resultCnt: 1,
+      comments: detail.comments, systemEvents: detail.systemEvents, resultCnt: 2,
       hasPrevious: false, nextBeforeCommentId: null,
     });
     const sharedProps = {
@@ -1819,6 +1825,11 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-reference-avatar-73')).toHaveTextContent('참');
     expect(await screen.findByRole('img', { name: '댓글 작성자' }))
       .toHaveAttribute('src', 'data:image/png;base64,commenter');
+    expect(await screen.findByRole('img', { name: '시스템 처리자' }))
+      .toHaveAttribute('src', 'data:image/png;base64,event-actor');
+    expect(screen.getByTestId('system-event-badge')).toHaveTextContent('결재신청');
+    expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템 처리자' }))
+      .not.toBeInTheDocument();
   });
 
   it.each(['panel', 'feed'] as const)('formats legacy system reasons in the %s presentation', async (presentation) => {

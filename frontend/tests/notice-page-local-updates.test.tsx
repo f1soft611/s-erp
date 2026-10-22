@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
   CommunityNoticePage,
@@ -86,6 +86,20 @@ const detail = {
   commentCount: 1,
 };
 
+class ImmediateIntersectionObserver {
+  constructor(
+    private readonly callback: (
+      entries: Array<{ isIntersecting: boolean }>,
+    ) => void,
+  ) {}
+
+  observe() {
+    this.callback([{ isIntersecting: true }]);
+  }
+
+  disconnect() {}
+}
+
 function renderPage() {
   return render(
     <ThemeProvider theme={createTheme()}>
@@ -101,6 +115,10 @@ function renderPage() {
 }
 
 describe('CommunityNoticePage local updates', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     noticeServiceMocks.fetchNoticePosts.mockResolvedValue([
@@ -179,6 +197,90 @@ describe('CommunityNoticePage local updates', () => {
     expect(within(listRegion).getByText('기존 공지')).toBeInTheDocument();
     expect(within(listRegion).getByText('관리자')).toBeInTheDocument();
   });
+
+  it('shows pinned notices separately when there are no ordinary notices', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValue({
+      resultList: [],
+      resultCnt: 0,
+    });
+    noticeServiceMocks.fetchPinnedNoticePosts.mockResolvedValue({
+      resultList: [{
+        ...detail,
+        postId: 77,
+        title: '고정 전용 공지',
+        isPinned: 'Y',
+      }],
+      resultCnt: 1,
+    });
+
+    renderPage();
+
+    const pinnedRegion = await screen.findByRole('region', {
+      name: '상단 고정 공지',
+    });
+    expect(within(pinnedRegion).getByText('고정 전용 공지')).toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 공지가 없습니다.')).toBeInTheDocument();
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledWith(
+      1,
+      20,
+      '',
+      undefined,
+      'N',
+    );
+  });
+
+  it.each(['feed', 'list'] as const)(
+    'uses the shared 20-item pagination in %s mode',
+    async (mode) => {
+      vi.stubGlobal('IntersectionObserver', ImmediateIntersectionObserver);
+      noticeServiceMocks.fetchNoticePosts.mockImplementation(
+        (page: number) =>
+          Promise.resolve({
+            resultList:
+              page === 1
+                ? [{
+                    ...detail,
+                    postId: 1,
+                    title: '공지 1',
+                    isPinned: 'N',
+                  }]
+                : [{
+                    ...detail,
+                    postId: 2,
+                    title: '공지 2',
+                    isPinned: 'N',
+                  }],
+            resultCnt: 2,
+          }),
+      );
+      noticeServiceMocks.fetchPinnedNoticePosts.mockResolvedValue({
+        resultList: [],
+        resultCnt: 0,
+      });
+
+      renderPage();
+      await screen.findByTestId('notice-feed-list');
+
+      if (mode === 'list') {
+        noticeServiceMocks.fetchNoticePosts.mockClear();
+        fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
+        await screen.findByRole('region', { name: '리스트형 공지 목록' });
+      }
+
+      await waitFor(() => {
+        expect(
+          noticeServiceMocks.fetchNoticePosts.mock.calls.some(
+            ([page, size, , , isPinned]) =>
+              page === 2 && size === 20 && isPinned === 'N',
+          ),
+        ).toBe(true);
+      });
+
+      expect(
+        noticeServiceMocks.fetchNoticePosts.mock.calls[0],
+      ).toEqual([1, 20, '', undefined, 'N']);
+    },
+  );
 
   it('shows the list skeleton while the list view reloads', async () => {
     let resolveReload: (posts: []) => void = () => undefined;

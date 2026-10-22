@@ -21,6 +21,7 @@ type ListViewProps<T extends CommonViewItem> = {
     error?: string;
     onLoadMore: () => void;
     onRetry?: () => void;
+    loadingLabel?: string;
   };
 };
 

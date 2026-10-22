@@ -114,6 +114,35 @@ describe('common notice view mode components', () => {
     },
   );
 
+  it.each(['feed', 'list'] as const)(
+    'supports a caller-specific pagination loading label in %s mode',
+    (mode) => {
+      const pagination = {
+        scrollRoot: null,
+        hasNext: true,
+        isLoadingMore: true,
+        loadingLabel: '다음 공지 불러오는 중',
+        onLoadMore: vi.fn(),
+      };
+
+      render(
+        mode === 'feed'
+          ? (
+              <FeedView
+                items={[]}
+                renderItem={() => <span>피드 항목</span>}
+                pagination={pagination}
+              />
+            )
+          : <ListView items={[]} pagination={pagination} />,
+      );
+
+      expect(
+        screen.getByRole('status', { name: '다음 공지 불러오는 중' }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('switches between feed and list modes through a callback', () => {
     const onChange = vi.fn();
 

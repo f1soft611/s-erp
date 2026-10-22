@@ -90,7 +90,15 @@ type NoticeFeedListProps = {
     commentId: number | string,
     attachmentId: string,
   ) => void;
-  onReachEnd?: () => void;
+  pagination?: {
+    scrollRoot: Element | null;
+    hasNext: boolean;
+    isLoadingMore: boolean;
+    error?: string;
+    onLoadMore: () => void;
+    onRetry?: () => void;
+    loadingLabel?: string;
+  };
   serverItemRevision?: number;
 };
 
@@ -556,10 +564,9 @@ export function NoticeFeedList({
   onLoadPreviousCommentsError,
   onDownloadCommentAttachment,
   onDeleteCommentAttachment,
-  onReachEnd,
+  pagination,
   serverItemRevision = 0,
 }: NoticeFeedListProps) {
-  const endRef = useRef<HTMLDivElement | null>(null);
   const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
     Record<number, NoticeCommentItem[]>
   >({});
@@ -848,27 +855,6 @@ export function NoticeFeedList({
   }, [expandedNoticeId, expandedBodySourceHtml]);
 
   useEffect(() => {
-    const element = endRef.current;
-    if (
-      !element ||
-      !onReachEnd ||
-      typeof IntersectionObserver === 'undefined'
-    ) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onReachEnd();
-        }
-      },
-      { rootMargin: '320px' },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [onReachEnd]);
-
-  useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
     const changedByNoticeId = new Map<number, boolean>();
     items.forEach((item) => {
@@ -1016,6 +1002,7 @@ export function NoticeFeedList({
     <Box data-testid="notice-feed-list">
       <FeedView
         items={items}
+        pagination={pagination}
         renderItem={(item) => {
           const isExpanded = expandedNoticeId === item.id;
           const hasMore = item.body !== item.summary;
@@ -1523,8 +1510,6 @@ export function NoticeFeedList({
           );
         }}
       />
-
-      <Box ref={endRef} sx={{ height: 1 }} aria-hidden="true" />
 
       <ImageViewerDialog
         open={Boolean(viewerImage)}

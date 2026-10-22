@@ -207,6 +207,7 @@ export type DocumentApprovalSystemEvent = {
   eventType: string;
   content: string;
   writerName: string;
+  writerProfileImage?: string | null;
   createdAt?: string | null;
 };
 

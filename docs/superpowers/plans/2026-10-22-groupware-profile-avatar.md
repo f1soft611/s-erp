@@ -15,14 +15,14 @@
 - Create `frontend/src/shared/components/ProfileAvatar.tsx`: typed MUI Avatar wrapper with optional image URL and required existing fallback content.
 - Create `frontend/tests/profile-avatar.test.tsx`: image, missing-image, and image-error behavior.
 - Modify `frontend/src/shared/components/feed/FeedCard.tsx`: allow optional `authorProfileImageUrl` without changing the author name or card layout.
-- Modify `frontend/src/shared/components/feed/TiptapCommentThread.tsx`: pass optional `authorProfileImageUrl` on person comment items to the avatar while retaining its current fallback; leave system-event behavior unchanged.
+- Modify `frontend/src/shared/components/feed/TiptapCommentThread.tsx`: pass optional `authorProfileImageUrl` on comments and system-event actor items to the avatar while retaining the current fallback, badges, and read-only controls.
 - Modify notice types and `noticePostAdapter.ts`: carry `writerProfileImage` from API records to `NoticeFeedList` and map comment `writerProfileImage` to the feed comment's `authorProfileImageUrl`.
 - Modify `frontend/src/shared/services/commonContentApi.ts` and `frontend/src/pages/groupware/documents/write/types/documentWrite.types.ts`: carry `writerProfileImage?: string | null` in common and document comment read types.
 - Modify `frontend/src/pages/groupware/community/notice/components/NoticeFeedList.tsx`: use the shared avatar for the post author.
 - Modify `frontend/src/pages/groupware/documents/write/types/documentWrite.types.ts` and the document detail read adapter/types: carry the drafter image and existing participant images.
 - Modify `frontend/src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed.tsx`: use the shared avatar for people (drafter, comments, agreement/reference participants); keep status seals as MUI `Avatar`.
 - Modify `backend/src/main/java/egovframework/let/groupware/community/notice/domain/model/NoticeBoardPostVO.java` and `backend/src/main/resources/egovframework/mapper/let/groupware/community/notice/NoticeBoard_SQL_postgresql.xml`: return nullable post-writer image on list and detail reads.
-- Modify `backend/src/main/java/egovframework/com/common/domain/model/CommonCommentVO.java` and `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`: return nullable writer image on user-comment list/page reads used by notice and approval comments; do not alter system-event behavior.
+- Modify `backend/src/main/java/egovframework/com/common/domain/model/CommonCommentVO.java` and `backend/src/main/resources/egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml`: return nullable writer image on comment and system-event reads, including mixed streams and cursors; retain event filtering and ordering.
 - Modify `backend/src/main/java/egovframework/let/groupware/approval/domain/model/DocumentApprovalDetailVO.java`, `DocumentApprovalFeedItemVO.java`, `DocumentApprovalWriteServiceImpl.java`, and `backend/src/main/resources/egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml`: return nullable drafter image on detail reads and copy it into assembled feed items.
 - Extend existing notice/approval mapper tests and add a common-comment mapper test only if the current test suite lacks one.
 
@@ -70,7 +70,7 @@
 
 - [ ] **Step 4: Add tenant-scoped image projections to existing reads.**
 
-  Join `tb_login_account` on verified tenant and `login_code` for notice `writer_id`, comment `writer_id`, and approval `drafter_id`; keep the existing tenant-scoped `tb_user` to account join for approval-line participants. Select the nullable image under the matching snake-case alias and add the result-map mapping. Include common-comment read-by-ID queries so create/update responses return the same image as list responses. Keep existing filters, pagination, order, tenant predicates, response envelope, detail authorization, and row preservation unchanged. Do not add profile images to system-event output.
+  Join `tb_login_account` on verified tenant and `login_code` for notice `writer_id`, comment `writer_id`, and approval `drafter_id`; keep the existing tenant-scoped `tb_user` to account join for approval-line participants. Select the nullable image under the matching snake-case alias and add the result-map mapping. Include common-comment read-by-ID queries so create/update responses return the same image as list responses. Keep existing filters, pagination, order, tenant predicates, response envelope, detail authorization, and row preservation unchanged. Include system-event actor images following the user's approved follow-up; deleted rows continue to return null images.
 
 - [ ] **Step 5: Re-run focused backend tests.**
 
@@ -130,7 +130,7 @@
 
 - [ ] **Step 1: Add failing tests for the data path and render behavior.**
 
-  Assert notice post/comment API `writerProfileImage` reaches the card/comment avatar, the image is rendered when present, and current fallback remains for null/failed image. Assert deleted/system comments do not accidentally use a profile image.
+  Assert notice post/comment API `writerProfileImage` reaches the card/comment avatar, the image is rendered when present, and current fallback remains for null/failed image. Assert deleted comments do not use a profile image; system events use only their actual actor image.
 
 - [ ] **Step 2: Run the focused notice/feed tests and confirm the new assertions fail.**
 
@@ -140,7 +140,7 @@
 
 - [ ] **Step 3: Extend frontend API/domain types and adapters.**
 
-  Add optional nullable `writerProfileImage` fields to the notice post/comment API and domain types. Map the post value to `authorProfileImageUrl` on the card and comment values to `authorProfileImageUrl` on comment items. In `TiptapCommentThread`, render a `ProfileAvatar` only for person comments; preserve existing system-event avatar appearance and author/time/menu behavior.
+  Add optional nullable `writerProfileImage` fields to the notice post/comment API and domain types. Map the post value to `authorProfileImageUrl` on the card and comment/event values to `authorProfileImageUrl` on comment items. In `TiptapCommentThread`, render `ProfileAvatar` for comments and system-event actors, preserving the current two-character fallback and event author/time/badge/read-only behavior.
 
 - [ ] **Step 4: Run focused notice/feed tests and confirm they pass.**
 

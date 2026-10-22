@@ -406,6 +406,27 @@ describe('shared feed components', () => {
     expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
   });
 
+  it('renders the system actor image with unchanged badge and read-only controls', () => {
+    render(<CommentThread comments={[{
+      id: 'system-with-profile',
+      author: '처리자',
+      authorProfileImageUrl: 'data:image/png;base64,actor',
+      time: '방금',
+      content: '문서가 결재신청되었습니다.',
+      isSystemEvent: true,
+      systemEventBadge: { label: '결재신청', color: 'info', variant: 'filled' },
+    }]} showComposer={false} />);
+
+    const image = screen.getByRole('img', { name: '처리자' });
+    expect(image).toHaveAttribute('src', 'data:image/png;base64,actor');
+    expect(screen.getByTestId('system-event-badge')).toHaveTextContent('결재신청');
+    expect(screen.queryByRole('button', { name: '댓글 메뉴 처리자' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '답글' })).not.toBeInTheDocument();
+    fireEvent.error(image);
+    expect(screen.queryByRole('img', { name: '처리자' })).not.toBeInTheDocument();
+    expect(screen.getByText('처리')).toBeInTheDocument();
+  });
+
   it('preserves multiline system reasons as plain text', () => {
     const content = '반려 하였습니다.\n사유: 첫 번째 줄\n두 번째 줄\n\n<b>마지막 줄</b>';
     render(<CommentThread comments={[{

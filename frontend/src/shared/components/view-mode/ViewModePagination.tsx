@@ -8,6 +8,7 @@ type ViewModePaginationProps = {
   error?: string;
   onLoadMore: () => void;
   onRetry?: () => void;
+  loadingLabel?: string;
   itemCount: number;
 };
 
@@ -18,6 +19,7 @@ export function ViewModePagination({
   error,
   onLoadMore,
   onRetry,
+  loadingLabel = '다음 문서 불러오는 중',
   itemCount,
 }: ViewModePaginationProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -75,7 +77,7 @@ export function ViewModePagination({
       {isLoadingMore ? (
         <Box
           role="status"
-          aria-label="다음 문서 불러오는 중"
+          aria-label={loadingLabel}
           sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}
         >
           <CircularProgress size={22} />

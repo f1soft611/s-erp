@@ -23,7 +23,7 @@
 
     <sql id="writerProfileImageSelect">
         CASE
-            WHEN c.comment_type = 'USER' AND c.deleted_yn = 'N'
+            WHEN c.deleted_yn = 'N'
             THEN la.profile_image
             ELSE NULL
         END AS writer_profile_image
@@ -128,32 +128,36 @@
     </select>
 
     <select id="selectApprovalSystemEvents" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND owner_type = 'APPROVAL'
-          AND owner_id = #{ownerId}
-          AND comment_type = 'SYSTEM'
-          AND deleted_yn = 'N'
-        ORDER BY created_at ASC, comment_id ASC
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.owner_type = 'APPROVAL'
+          AND c.owner_id = #{ownerId}
+          AND c.comment_type = 'SYSTEM'
+          AND c.deleted_yn = 'N'
+        ORDER BY c.created_at ASC, c.comment_id ASC
     </select>
 
     <select id="selectApprovalSystemEventsByOwnerIds" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND owner_type = #{ownerType}
-          AND owner_id IN
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.owner_type = #{ownerType}
+          AND c.owner_id IN
           <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
               #{ownerId}
           </foreach>
-          AND comment_type = 'SYSTEM'
-          AND deleted_yn = 'N'
-        ORDER BY owner_id, created_at ASC, comment_id ASC
+          AND c.comment_type = 'SYSTEM'
+          AND c.deleted_yn = 'N'
+        ORDER BY c.owner_id, c.created_at ASC, c.comment_id ASC
     </select>
 
     <select id="selectCommonCommentPage" parameterType="map" resultMap="commonCommentMap">
@@ -599,7 +603,7 @@
                cursor.writer_id, cursor.writer_name, cursor.last_modified_by,
                cursor.last_modified_by_name, cursor.deleted_yn, cursor.created_at, cursor.updated_at,
                CASE
-                   WHEN cursor.comment_type = 'USER' AND cursor.deleted_yn = 'N'
+                   WHEN cursor.deleted_yn = 'N'
                    THEN la.profile_image
                    ELSE NULL
                END AS writer_profile_image

@@ -770,7 +770,7 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
-    void userCommentReadsReturnTenantScopedProfileImagesButSystemEventsDoNot() throws Exception {
+    void commentAndSystemEventReadsReturnTenantScopedProfileImages() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
 
@@ -797,7 +797,9 @@ class DocumentApprovalMapperTest {
                 "selectApprovalUserCommentThreadsByRootIds",
                 "selectApprovalCommentStreamCursor",
                 "selectApprovalUserCommentById",
-                "selectCommonCommentById"
+                "selectCommonCommentById",
+                "selectApprovalSystemEvents",
+                "selectApprovalSystemEventsByOwnerIds"
         }) {
             String query = configuration.getMappedStatement("CommonCommentDAO." + statement)
                     .getBoundSql(params).getSql();
@@ -807,13 +809,8 @@ class DocumentApprovalMapperTest {
                     .contains("LEFT JOIN public.tb_login_account la")
                     .contains("la.tenant_id = " + commentAlias + ".tenant_id")
                     .contains("la.login_code = " + commentAlias + ".writer_id")
-                    .contains(commentAlias + ".comment_type = 'USER'");
-        }
-
-        for (String statement : new String[] {"selectApprovalSystemEvents", "selectApprovalSystemEventsByOwnerIds"}) {
-            String query = configuration.getMappedStatement("CommonCommentDAO." + statement)
-                    .getBoundSql(params).getSql();
-            assertThat(query).as(statement).doesNotContain("writer_profile_image", "tb_login_account");
+                    .contains("WHEN " + commentAlias + ".deleted_yn = 'N'")
+                    .doesNotContain("WHEN " + commentAlias + ".comment_type = 'USER'");
         }
     }
 

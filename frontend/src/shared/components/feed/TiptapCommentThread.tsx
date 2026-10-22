@@ -404,40 +404,20 @@ function CommentItem({
       <Box
         sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}
       >
-        {isSystemEvent ? (
-          <Box
-            sx={{
-              width: 28,
-              height: 28,
-              flexShrink: 0,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.65rem',
-              fontWeight: 700,
-              bgcolor: isDark ? '#334155' : '#e2e8f0',
-              color: isDark ? '#e2e8f0' : '#334155',
-            }}
-          >
-            {comment.author.slice(0, 2)}
-          </Box>
-        ) : (
-          <ProfileAvatar
-            name={comment.author}
-            imageUrl={comment.authorProfileImageUrl}
-            fallback={comment.author.slice(0, 2)}
-            sx={{
-              width: 28,
-              height: 28,
-              flexShrink: 0,
-              fontSize: '0.65rem',
-              fontWeight: 700,
-              bgcolor: isDark ? '#334155' : '#e2e8f0',
-              color: isDark ? '#e2e8f0' : '#334155',
-            }}
-          />
-        )}
+        <ProfileAvatar
+          name={comment.author}
+          imageUrl={comment.authorProfileImageUrl}
+          fallback={comment.author.slice(0, 2)}
+          sx={{
+            width: 28,
+            height: 28,
+            flexShrink: 0,
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            bgcolor: isDark ? '#334155' : '#e2e8f0',
+            color: isDark ? '#e2e8f0' : '#334155',
+          }}
+        />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack
             direction="row"

@@ -239,6 +239,7 @@ function toApprovalCommentTree(
     roots.push({
       id: eventId,
       author: event.writerName || '시스템',
+      authorProfileImageUrl: event.writerProfileImage,
       time: formatCommentTime(event.createdAt),
       content: formatApprovalSystemEventContent(event.eventType, event.content),
       isSystemEvent: true,

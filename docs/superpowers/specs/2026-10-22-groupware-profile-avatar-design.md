@@ -8,6 +8,7 @@ Show a user's saved profile image wherever a person is already represented by a 
 
 - Document author and approval detail, including approval, agreement, and reference participants.
 - Notice author and comment author displays in the notice feed/detail.
+- Document system-event actor avatars are included following the user's follow-up approval. Use the event writer's nullable profile image with the existing two-character fallback; preserve event text, badges, and read-only controls.
 - Existing user selection/profile displays in document and notice compose flows.
 - No new profile UI in places that currently show only plain text.
 - No profile editing, image upload, or unrelated groupware domains.
