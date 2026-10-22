@@ -39,6 +39,25 @@ class NoticeBoardTenantScopeMapperTest {
     }
 
     @Test
+    void postReadProfileImagesUseTenantAndWriterLoginCode() throws Exception {
+        Configuration configuration = parseMapper();
+        Map<String, Object> params = noticeParams();
+
+        assertThat(configuration.getResultMap("NoticeBoardDAO.noticePostMap").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("writerProfileImage");
+
+        for (String statement : new String[] {"selectNoticePostList", "selectNoticePostById"}) {
+            String query = sql(configuration, statement, params).getSql();
+            assertThat(query).as(statement)
+                    .contains("la.profile_image AS writer_profile_image")
+                    .contains("LEFT JOIN public.tb_login_account la")
+                    .contains("la.tenant_id = p.tenant_id")
+                    .contains("la.login_code = p.writer_id");
+        }
+    }
+
+    @Test
     void postMutationsAreScopedByTenantPostAndBoardType() throws Exception {
         Configuration configuration = parseMapper();
         Map<String, Object> params = noticeParams();

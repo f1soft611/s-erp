@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getNoticeCategoryPresentation } from '../data/noticeCategoryPresentation';
 import {
   Box,
-  Chip,
   Divider,
   IconButton,
   Menu,
@@ -30,6 +28,8 @@ import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import { fetchCommonFileBlob } from '../../../../../shared/services/commonContentApi';
+import { NoticeLoginPopupBadge } from './NoticeLoginPopupBadge';
+import { NoticeCategoryBadge } from './NoticeCategoryBadge';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -135,6 +135,7 @@ function normalizeCommentTree(
     normalizedById.set(String(comment.id), {
       id: comment.id,
       author: comment.author,
+      authorProfileImageUrl: comment.authorProfileImageUrl,
       time: comment.time,
       content: comment.content,
       isEditable: comment.isEditable,
@@ -1064,19 +1065,17 @@ export function NoticeFeedList({
               objectKey?: string | null;
               bucketName?: string | null;
             }>);
-          const categoryPresentation = getNoticeCategoryPresentation(
-            item.noticeGubunCode,
-            isDark,
-          );
 
           return (
             <FeedCard
               key={item.id}
               author={item.meta.split('·')[0].trim()}
+              authorProfileImageUrl={item.writerProfileImage}
               meta={item.meta}
               avatar={item.meta.slice(1, 3)}
               actions={
                 <>
+                  <NoticeLoginPopupBadge loginPopupYn={item.loginPopupYn} popupEndDate={item.popupEndDate} />
                   <IconButton
                     size="small"
                     aria-label={`${item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
@@ -1134,21 +1133,10 @@ export function NoticeFeedList({
                 </>
               }
               badges={
-                <Chip
+                <NoticeCategoryBadge
                   label={item.state}
-                  size="small"
-                  sx={{
-                    bgcolor: categoryPresentation.backgroundColor,
-                    color: (theme) =>
-                      item.state === '필독'
-                        ? '#ffffff'
-                        : theme.palette.getContrastText(
-                            categoryPresentation.backgroundColor,
-                          ),
-                    height: 28,
-                    borderRadius: '8px',
-                    fontWeight: 700,
-                  }}
+                  code={item.noticeGubunCode}
+                  isDark={isDark}
                 />
               }
               isDark={isDark}

@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -33,6 +34,8 @@ import {
 } from './components/NoticeFeedList';
 import { NoticeEmptyState } from './components/NoticeEmptyState';
 import { NoticeFilterMenu } from './components/NoticeFilterMenu';
+import { NoticeLoginPopupBadge } from './components/NoticeLoginPopupBadge';
+import { NoticeCategoryBadge } from './components/NoticeCategoryBadge';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import { deriveNoticeSummary } from './data/noticeSummary';
 import { toNoticeViewItems } from './data/noticeViewAdapter';
@@ -551,6 +554,16 @@ export function CommunityNoticePage({
                     <ListView
                       items={unpinnedNoticeViewItems}
                       ariaLabel="리스트형 공지 목록"
+                      renderCategoryBadge={(item) => (
+                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                          <NoticeLoginPopupBadge loginPopupYn={item.loginPopupYn} popupEndDate={item.popupEndDate} />
+                          <PushPinOutlinedIcon fontSize="small"
+                            aria-label={item.isPinned ? '상단 고정' : '상단 고정 안 됨'}
+                            sx={{ color: item.isPinned ? 'primary.main' : 'text.disabled', flexShrink: 0 }} />
+                          <NoticeCategoryBadge code={item.noticeGubunCode}
+                            label={item.categoryLabel ?? '공지'} compact />
+                        </Box>
+                      )}
                       onItemClick={(item) => {
                         void handleSelectNotice(item);
                       }}

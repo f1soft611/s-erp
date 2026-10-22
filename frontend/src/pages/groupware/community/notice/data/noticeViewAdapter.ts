@@ -1,6 +1,8 @@
 import type { CommonViewItem } from '../../../../../shared/components/view-mode/commonViewTypes';
 import type { NoticeFeedItem } from '../types/community.types';
 
+export type NoticeViewItem = CommonViewItem & Pick<NoticeFeedItem, 'loginPopupYn' | 'popupEndDate' | 'noticeGubunCode'>;
+
 function formatNoticeDate(value: NoticeFeedItem['createdAt']): string {
   if (!value) {
     return '날짜 미상';
@@ -24,7 +26,7 @@ function resolveAuthorLabel(item: NoticeFeedItem): string {
   return item.meta.split('·')[0]?.trim() || '관리자';
 }
 
-export function toNoticeViewItem(item: NoticeFeedItem): CommonViewItem {
+export function toNoticeViewItem(item: NoticeFeedItem): NoticeViewItem {
   return {
     id: item.id,
     title: item.title,
@@ -34,9 +36,12 @@ export function toNoticeViewItem(item: NoticeFeedItem): CommonViewItem {
     categoryLabel: item.noticeGubunName ?? item.noticeGubunCode ?? '공지',
     metaLabel: item.meta,
     summary: item.summary,
+    loginPopupYn: item.loginPopupYn,
+    popupEndDate: item.popupEndDate,
+    noticeGubunCode: item.noticeGubunCode,
   };
 }
 
-export function toNoticeViewItems(items: NoticeFeedItem[]): CommonViewItem[] {
+export function toNoticeViewItems(items: NoticeFeedItem[]): NoticeViewItem[] {
   return items.map(toNoticeViewItem);
 }

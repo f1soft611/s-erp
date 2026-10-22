@@ -177,3 +177,52 @@ npm run build
 - 375/768/1280px 브라우저에서 진행 배지의 제목 우측 정렬, 작성 정보의 헤더 내 위치, 모바일 작성일시 다음 행 배치, 가로 넘침 없음을 좌표로 검증했다. 기존 순차 표시/개별 숨김/새로고침 복원/오류 재시도도 통과했다.
 - 화면: [모바일](screenshots/popup-single-375.png), [태블릿](screenshots/popup-single-768.png), [데스크톱](screenshots/popup-single-1280.png).
 - 스크린샷 및 브라우저 측정 JSON은 최종 디자인으로 갱신했다. 실제 DB/API 계약 변경이나 서버 재시작은 없다.
+
+## 10. 피드·리스트의 팝업 상태 아이콘과 분류색 통일
+
+아래 초기 위치 설명은 11절의 후속 최종 배치로 대체되었다. 스크린샷과 브라우저 JSON은 최종 배치로 갱신했다.
+
+### 최종 표시
+
+- 사용자 후속 지시를 반영하여 텍스트 배지 대신 핀 바로 옆에 작은 상태 아이콘만 표시한다. 피드는 기존 핀 버튼 앞, 리스트와 상단 고정 패널은 선두 핀 옆에 배치한다.
+- 로그인 팝업 설정 공지는 파란 알림 아이콘, 종료일 다음 날부터 회색 알림 해제 아이콘을 표시한다. 일반 공지는 팝업 아이콘이 없다. 접근성 이름은 각각 '로그인 팝업', '팝업 종료'이다.
+- 마우스를 올리면 종료일을 안내한다. 종료일 누락은 누락 안내로 명시하며 개인별 하루 숨김과는 독립적이다. 한국 자정과 탭 복귀 시 상태를 갱신한다.
+- 피드·리스트 분류 배지는 `NoticeCategoryBadge`에서 동일한 코드별·테마별 배경색과 글자색을 사용한다. 기존 '필독'의 흰 글자와 피드 28px/리스트 22px 높이를 유지한다.
+- 공통 `ListView`/`PinnedItemsPanel`은 선택적 아이콘 렌더러, `ListView`는 추가로 선택적 분류 렌더러를 제공한다. 사용하지 않는 기존 화면의 기본 아이콘/배지와 행 선택 동작은 유지한다.
+- 기존 목록 응답의 설정/분류 코드를 어댑터로 보존한다. 아이콘 표시용 상세 API 요청이나 조회수 집계는 없으며 백엔드/DB 계약 변경도 없다.
+
+### 검증
+
+```powershell
+cd frontend
+npm run test -- tests\notice-login-popup-badge.test.tsx tests\notice-view-adapter.test.ts tests\notice-post-adapter.test.ts tests\common-view-mode.test.tsx tests\notice-category-presentation.test.ts
+node .\node_modules\vitest\vitest.mjs run tests\notice-page.test.tsx --testNamePattern=category
+npm run build
+```
+
+- 집중 테스트 38개 통과: 아이콘 9개, 뷰 어댑터 2개, 게시글 어댑터 2개, 공통 뷰 17개, 분류색 8개. 기존 피드의 light/dark 분류색·고정 상태 회귀 2개도 통과했다.
+- 일반/기존 설정 미지정 공지 미표시, 종료일 당일 포함·한국 자정 전환·탭 복귀, 종료일/누락 툴팁, 핀 인접 위치, light/dark의 피드·리스트 배경/글자색 및 높이, 공통 뷰 기본 동작과 선택적 렌더러를 확인했다.
+- 테스트를 먼저 실행하여 미구현 분류 컴포넌트 및 아이콘 슬롯의 실패를 확인한 뒤 구현했다.
+- TypeScript/Vite 빌드 성공. 기존 큰 번들 경고는 유지된다. 변경 파일 oxlint 오류 0건이며 기존 공지 페이지/피드의 effect·혼합 export 및 뷰 어댑터 테스트의 중복 키 경고는 별도 변경하지 않았다.
+- 첫 기존 회귀 실행에서 npm이 `-t`를 소비하여 파일 전체와 분류 테스트가 실행되었다(38개 성공, 기존 skeleton 1개 실패). 위 `node ... --testNamePattern=category`로 정확한 선택자를 전달하여 해당 2개 성공을 확인했다. 전체 테스트가 모두 성공한 것으로 표현하지 않는다.
+- 기존 4173 서버를 재사용하고 격리된 브라우저 컨텍스트의 합성 API/인증만 사용했다. 375/768/1280px에서 활성·종료·일반 공지, 고정 패널, 핀 인접, 툴팁, 페이지/목록/행의 가로 넘침 없음과 상세 요청 0건을 확인했다. 실제 computed style의 분류 배경색·글자색이 피드/리스트에서 일치했다.
+- 서버 재시작·커밋·DB 실행이나 실제 사용자 데이터 조회는 하지 않았다. 기본 기능의 DB 배포·통합 검증 한계는 7절과 동일하며 이번 UI 작업에서 현재 DB 적용 여부를 새로 확인하지 않았다.
+
+| 화면 | 모바일 | 태블릿 | 데스크톱 |
+|---|---|---|---|
+| 피드형 | [375px](screenshots/popup-badge-feed-375.png) | [768px](screenshots/popup-badge-feed-768.png) | [1280px](screenshots/popup-badge-feed-1280.png) |
+| 리스트형 | [375px](screenshots/popup-badge-list-375.png) | [768px](screenshots/popup-badge-list-768.png) | [1280px](screenshots/popup-badge-list-1280.png) |
+
+[브라우저 측정 결과](screenshots/badge-browser-checks.json)
+
+## 11. 최종 리스트 배치 및 상단 고정 영역 정리
+
+- 사용자 승인 배치: `문서 아이콘 · 제목 … 팝업 아이콘 · 핀 아이콘 · 분류 배지`.
+- 선두 문서 아이콘은 문서작성 리스트의 공통 `ListView` 기본 `DescriptionOutlinedIcon`을 그대로 재사용한다. 오른쪽 상태 아이콘은 분류 바로 옆에 묶었으며 제목 말줄임과 기존 행 선택을 유지한다.
+- 상단 고정 영역은 로그인 팝업 표시를 제거하고 기존 핀만 표시한다. 피드의 팝업·핀·분류 배지는 그대로 유지한다.
+- 불필요해진 상단 전용 아이콘 helper/타입과 `PinnedItemsPanel`의 신규 아이콘 슬롯은 제거하여 공통 패널은 기존 구현으로 유지했다. 백엔드/DB 계약 변경 없음.
+- 구현 전 브라우저에서 선두 문서 아이콘 누락과 상단 팝업 표시 잔존의 실패를 각각 확인했다. 최종 공통 뷰 18개·팝업 아이콘 9개 총 27개 테스트 및 TypeScript/Vite 빌드가 통과했다. 큰 번들 경고는 기존과 동일하다.
+- 변경 파일 lint 오류 0건, 기존 공지 페이지 effect 의존성 경고 1건은 유지했다.
+- 375/768/1280px 합성 API 브라우저에서 선두 문서 아이콘, 제목 오른쪽 팝업→핀→분류 순서, 상단 팝업 없음/핀 유지, 활성·종료·일반 표시, 분류색 일치, 상세 조회 0건 및 가로 넘침 없음을 검증했다.
+- [모바일 최종 리스트](screenshots/popup-badge-list-375.png), [태블릿](screenshots/popup-badge-list-768.png), [데스크톱](screenshots/popup-badge-list-1280.png). 피드 스크린샷도 상단 팝업 제거 상태로 갱신했다.
+- 실제 사용자 데이터 접근·커밋·서버 재시작·DB 적용은 하지 않았다. 기본 기능의 배포 통합 검증 한계는 유지된다.

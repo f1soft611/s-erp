@@ -98,6 +98,7 @@ class DocumentApprovalWriteServiceImplTest {
         when(approvalDAO.selectRelatedDocumentList(anyMap())).thenReturn(Arrays.asList(firstItem, secondItem));
 
         DocumentApprovalDetailVO firstDetail = detail(8);
+        firstDetail.setDrafterProfileImage("profile-image");
         firstDetail.setContentsJson("{\"type\":\"doc\"}");
         firstDetail.setContentsHtml("<p>첫 본문</p>");
         firstDetail.setContentsText("첫 본문");
@@ -169,6 +170,7 @@ class DocumentApprovalWriteServiceImplTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getElectronicApprovalId()).isEqualTo(77L);
         assertThat(result.get(0).getSummary()).isEqualTo("첫 요약");
+        assertThat(result.get(0).getDrafterProfileImage()).isEqualTo("profile-image");
         assertThat(result.get(0).getContentsHtml()).isEqualTo("<p>첫 본문</p>");
         assertThat(result.get(0).getApprovalLines()).extracting(DocumentApprovalLineVO::getElectronicApprovalLineId)
             .containsExactly(501L);

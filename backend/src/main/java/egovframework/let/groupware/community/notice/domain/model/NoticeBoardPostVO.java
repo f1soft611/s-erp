@@ -35,6 +35,8 @@ public class NoticeBoardPostVO implements Serializable {
     private String writerId;
     @Schema(description = "작성자명")
     private String writerName;
+    @Schema(description = "작성자 프로필 이미지")
+    private String writerProfileImage;
     @Schema(description = "마지막 행위자 ID")
     private String lastModifiedBy;
     @Schema(description = "마지막 행위자명")
@@ -192,6 +194,16 @@ public class NoticeBoardPostVO implements Serializable {
     @Generated
     public void setWriterName(String writerName) {
         this.writerName = writerName;
+    }
+
+    @Generated
+    public String getWriterProfileImage() {
+        return writerProfileImage;
+    }
+
+    @Generated
+    public void setWriterProfileImage(String writerProfileImage) {
+        this.writerProfileImage = writerProfileImage;
     }
 
     @Generated

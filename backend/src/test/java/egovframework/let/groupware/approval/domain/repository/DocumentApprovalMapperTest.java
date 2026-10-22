@@ -733,12 +733,88 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void approvalDetailProfileImageUsesTenantAndDrafterLoginCode() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration,
+                "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+
+        assertThat(configuration.getResultMap("DocumentApprovalDAO.detail").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("drafterProfileImage");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("electronicApprovalId", 77L);
+        params.put("ownerIds", java.util.Collections.singletonList(77L));
+        params.put("drafterId", "login-author");
+        for (String statement : new String[] {
+                "selectDocumentApprovalDetail", "selectDocumentApprovalDetailsByIds"
+        }) {
+            String query = configuration.getMappedStatement("DocumentApprovalDAO." + statement)
+                    .getBoundSql(params).getSql();
+            assertThat(query).as(statement)
+                    .contains("la.profile_image AS drafter_profile_image")
+                    .contains("LEFT JOIN public.tb_login_account la")
+                    .contains("la.tenant_id = m.tenant_id")
+                    .contains("la.login_code = m.drafter_id");
+        }
+    }
+
+    @Test
     void approvalUserCommentPageAndCountStatementsAreMapped() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
 
         assertThat(configuration.hasStatement("CommonCommentDAO.selectApprovalUserCommentPage")).isTrue();
         assertThat(configuration.hasStatement("CommonCommentDAO.countApprovalUserComments")).isTrue();
+    }
+
+    @Test
+    void userCommentReadsReturnTenantScopedProfileImagesButSystemEventsDoNot() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/com/common/CommonComment_SQL_postgresql.xml");
+
+        assertThat(configuration.getResultMap("CommonCommentDAO.commonCommentMap").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("writerProfileImage");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("ownerType", "NOTICE");
+        params.put("ownerId", 77L);
+        params.put("ownerIds", java.util.Collections.singletonList(77L));
+        params.put("rootIds", java.util.Collections.singletonList(55L));
+        params.put("commentId", 55L);
+        params.put("beforeCommentId", null);
+        params.put("limit", 3);
+        for (String statement : new String[] {
+                "selectCommonCommentList",
+                "selectCommonCommentPageByOwnerIds",
+                "selectCommonCommentPage",
+                "selectApprovalUserCommentPage",
+                "selectApprovalUserCommentPagesByOwnerIds",
+                "selectApprovalCommentStreamPagesByOwnerIds",
+                "selectApprovalUserCommentThreadsByRootIds",
+                "selectApprovalCommentStreamCursor",
+                "selectApprovalUserCommentById",
+                "selectCommonCommentById"
+        }) {
+            String query = configuration.getMappedStatement("CommonCommentDAO." + statement)
+                    .getBoundSql(params).getSql();
+            String commentAlias = statement.equals("selectApprovalCommentStreamCursor") ? "cursor" : "c";
+            assertThat(query).as(statement)
+                    .contains("writer_profile_image")
+                    .contains("LEFT JOIN public.tb_login_account la")
+                    .contains("la.tenant_id = " + commentAlias + ".tenant_id")
+                    .contains("la.login_code = " + commentAlias + ".writer_id")
+                    .contains(commentAlias + ".comment_type = 'USER'");
+        }
+
+        for (String statement : new String[] {"selectApprovalSystemEvents", "selectApprovalSystemEventsByOwnerIds"}) {
+            String query = configuration.getMappedStatement("CommonCommentDAO." + statement)
+                    .getBoundSql(params).getSql();
+            assertThat(query).as(statement).doesNotContain("writer_profile_image", "tb_login_account");
+        }
     }
 
     @Test

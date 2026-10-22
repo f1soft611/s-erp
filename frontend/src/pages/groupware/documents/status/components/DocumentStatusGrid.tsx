@@ -21,6 +21,7 @@ export function DocumentStatusGrid({
     <F1Grid
       ariaLabel="문서현황"
       columns={columns}
+      storageKey="documentStatusGrid"
       rowKey="electronicApprovalId"
       rows={rows}
       loading={loading}

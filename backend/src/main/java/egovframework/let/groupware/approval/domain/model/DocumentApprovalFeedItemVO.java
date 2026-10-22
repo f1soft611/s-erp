@@ -12,6 +12,7 @@ public class DocumentApprovalFeedItemVO extends DocumentApprovalListItemVO {
     private String contentsJson;
     private String contentsHtml;
     private String contentsText;
+    private String drafterProfileImage;
     private Integer viewCount;
     private List<DocumentApprovalLineVO> approvalLines = new ArrayList<>();
     private List<CommonFileVO> attachments = new ArrayList<>();
@@ -31,6 +32,10 @@ public class DocumentApprovalFeedItemVO extends DocumentApprovalListItemVO {
     public void setContentsHtml(String contentsHtml) { this.contentsHtml = contentsHtml; }
     public String getContentsText() { return contentsText; }
     public void setContentsText(String contentsText) { this.contentsText = contentsText; }
+    public String getDrafterProfileImage() { return drafterProfileImage; }
+    public void setDrafterProfileImage(String drafterProfileImage) {
+        this.drafterProfileImage = drafterProfileImage;
+    }
     public Integer getViewCount() { return viewCount; }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
     public List<DocumentApprovalLineVO> getApprovalLines() { return approvalLines; }

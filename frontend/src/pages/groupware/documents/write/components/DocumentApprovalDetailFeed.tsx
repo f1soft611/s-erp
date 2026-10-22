@@ -27,6 +27,7 @@ import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBo
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
+import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
@@ -194,6 +195,8 @@ function toApprovalCommentTree(
     comments.set(commentKey, {
       id: record.commentId,
       author: record.deletedYn === 'Y' ? '삭제된 댓글' : record.writerName,
+      authorProfileImageUrl:
+        record.deletedYn === 'Y' ? null : record.writerProfileImage,
       time: formatCommentTime(record.createdAt),
       content:
         record.deletedYn === 'Y' ? '[삭제된 댓글입니다.]' : record.content,
@@ -1139,9 +1142,12 @@ export function DocumentApprovalDetailFeed(
                 spacing={1.5}
                 sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
               >
-                <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                  {detail.drafterName.slice(0, 1)}
-                </Avatar>
+                <ProfileAvatar
+                  name={detail.drafterName}
+                  imageUrl={detail.drafterProfileImage}
+                  fallback={detail.drafterName.slice(0, 1)}
+                  sx={{ width: 40, height: 40, flexShrink: 0 }}
+                />
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
                     {detail.drafterName}
@@ -1604,24 +1610,17 @@ export function DocumentApprovalDetailFeed(
                                                 bgcolor: 'background.paper',
                                               }}
                                             >
-                                              <Avatar
+                                              <ProfileAvatar
                                                 data-testid={`approval-line-agreement-avatar-${line.electronicApprovalLineId}`}
-                                                src={
-                                                  line.participantProfileImage ??
-                                                  undefined
-                                                }
-                                                alt={line.participantName}
+                                                name={line.participantName}
+                                                imageUrl={line.participantProfileImage}
+                                                fallback={line.participantName.slice(0, 1)}
                                                 sx={{
                                                   width: 32,
                                                   height: 32,
                                                   flexShrink: 0,
                                                 }}
-                                              >
-                                                {line.participantName.slice(
-                                                  0,
-                                                  1,
-                                                )}
-                                              </Avatar>
+                                              />
                                               <Box
                                                 sx={{
                                                   display: 'flex',
@@ -1737,21 +1736,17 @@ export function DocumentApprovalDetailFeed(
                                         bgcolor: 'background.paper',
                                       }}
                                     >
-                                      <Avatar
+                                      <ProfileAvatar
                                         data-testid={`approval-line-reference-avatar-${line.electronicApprovalLineId}`}
-                                        src={
-                                          line.participantProfileImage ??
-                                          undefined
-                                        }
-                                        alt={line.participantName}
+                                        name={line.participantName}
+                                        imageUrl={line.participantProfileImage}
+                                        fallback={line.participantName.slice(0, 1)}
                                         sx={{
                                           width: 32,
                                           height: 32,
                                           flexShrink: 0,
                                         }}
-                                      >
-                                        {line.participantName.slice(0, 1)}
-                                      </Avatar>
+                                      />
                                       <Box sx={{ minWidth: 0, flex: 1 }}>
                                         <Typography
                                           variant="body1"
@@ -1942,6 +1937,11 @@ export function DocumentApprovalDetailFeed(
       {props.presentation === 'feed' ? (
         <FeedCard
           author={detail?.drafterName ?? props.feedItem.author}
+          authorProfileImageUrl={
+            detail
+              ? detail.drafterProfileImage
+              : props.feedItem.feedData.drafterProfileImage
+          }
           meta={
             detail
               ? `기안자 · ${displayDate} · 조회 ${detail.viewCount}`

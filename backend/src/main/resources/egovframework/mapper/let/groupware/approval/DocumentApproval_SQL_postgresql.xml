@@ -148,6 +148,7 @@
         <result property="documentType" column="document_type"/>
         <result property="documentStatus" column="document_status"/>
         <result property="drafterName" column="drafter_name"/>
+        <result property="drafterProfileImage" column="drafter_profile_image"/>
         <result property="createdAt" column="created_at"/>
         <result property="submittedAt" column="submitted_at"/>
         <result property="title" column="title"/>
@@ -871,11 +872,15 @@
     <select id="selectDocumentApprovalDetail" parameterType="map" resultMap="detail">
         SELECT m.electronic_approval_id, m.drafting_work_category_id,
                m.eabus_no, m.document_type, m.document_status,
-               m.drafter_name, m.created_at, m.submitted_at, m.title,
+               m.drafter_name, la.profile_image AS drafter_profile_image,
+               m.created_at, m.submitted_at, m.title,
                m.contents_json::text AS contents_json, m.contents_html, m.contents_text,
                m.view_count,
                (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = m.tenant_id
+         AND la.login_code = m.drafter_id
         WHERE m.tenant_id = #{tenantId}
           AND m.electronic_approval_id = #{electronicApprovalId}
           AND m.deleted_yn = 'N'
@@ -885,11 +890,15 @@
     <select id="selectDocumentApprovalDetailsByIds" parameterType="map" resultMap="detail">
         SELECT m.electronic_approval_id, m.drafting_work_category_id,
                m.eabus_no, m.document_type, m.document_status,
-               m.drafter_name, m.created_at, m.submitted_at, m.title,
+               m.drafter_name, la.profile_image AS drafter_profile_image,
+               m.created_at, m.submitted_at, m.title,
                m.contents_json::text AS contents_json, m.contents_html, m.contents_text,
                m.view_count,
                (m.drafter_id = #{drafterId}) AS is_drafter
         FROM public.tb_electronic_approval_main m
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = m.tenant_id
+         AND la.login_code = m.drafter_id
         WHERE m.tenant_id = #{tenantId}
           AND m.electronic_approval_id IN
           <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">

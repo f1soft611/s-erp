@@ -39,6 +39,7 @@ export type CommonCommentItem = {
   content?: string | null;
   writerId?: string | null;
   writerName?: string | null;
+  writerProfileImage?: string | null;
   deletedYn?: string | null;
   createdAt?: string | Date | null;
   attachments?: CommonFileItem[];

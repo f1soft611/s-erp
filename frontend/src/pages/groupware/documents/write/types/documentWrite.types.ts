@@ -150,6 +150,7 @@ export type DocumentApprovalRecord = {
   documentStatus: ApprovalDocumentStatus;
   title: string;
   drafterName: string;
+  drafterProfileImage?: string | null;
   isDrafter?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -305,6 +306,7 @@ export type DocumentApprovalComment = {
   eventType?: null;
   writerId: string | null;
   writerName: string;
+  writerProfileImage?: string | null;
   deletedYn?: 'Y' | 'N';
   createdAt?: string | null;
   updatedAt?: string | null;

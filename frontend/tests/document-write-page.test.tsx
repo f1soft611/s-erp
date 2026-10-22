@@ -1756,6 +1756,71 @@ describe('Document write page', () => {
     );
   });
 
+  it.each(['panel', 'feed'] as const)('renders profile images and existing fallbacks in the %s presentation', async (presentation) => {
+    const detail = toFeedRecord(defaultDocumentRecords[0]!, {
+      drafterProfileImage: 'data:image/png;base64,drafter',
+      approvalLines: [
+        {
+          electronicApprovalLineId: 72,
+          stageOrder: 1,
+          participantOrder: 1,
+          participantType: 'AGREEMENT',
+          participantUserId: 'reviewer',
+          participantName: '합의자',
+          participantProfileImage: 'data:image/png;base64,reviewer',
+          actionStatus: 'PENDING',
+        },
+        {
+          electronicApprovalLineId: 73,
+          stageOrder: 2,
+          participantOrder: 1,
+          participantType: 'REFERENCE',
+          participantUserId: 'reader',
+          participantName: '참조자',
+          participantProfileImage: null,
+          actionStatus: 'WAITING',
+        },
+      ],
+      comments: [{
+        commentId: 1101,
+        ownerId: 1,
+        commentType: 'USER',
+        writerId: 'commenter',
+        writerName: '댓글 작성자',
+        writerProfileImage: 'data:image/png;base64,commenter',
+        content: '<p>프로필 댓글</p>',
+      }],
+    });
+    composerApi.getDocumentApprovalDetail.mockResolvedValueOnce(detail);
+    composerApi.listApprovalComments.mockResolvedValueOnce({
+      comments: detail.comments, systemEvents: [], resultCnt: 1,
+      hasPrevious: false, nextBeforeCommentId: null,
+    });
+    const sharedProps = {
+      open: true, electronicApprovalId: 1, detailRefreshToken: 0,
+      onActionComplete: vi.fn(), onEditDocument: vi.fn(),
+    };
+    render(presentation === 'panel'
+      ? <DocumentApprovalDetailFeed {...sharedProps} onClose={vi.fn()} />
+      : <DocumentApprovalDetailFeed {...sharedProps} presentation="feed"
+          employeeId="emp-1"
+          feedItem={{ id: 1, title: detail.title, author: detail.drafterName,
+            kind: '기안서', status: '결재진행중', summary: '',
+            date: '', feedData: detail }} />);
+
+    expect(await screen.findByRole('img', { name: '김민수' }))
+      .toHaveAttribute('src', 'data:image/png;base64,drafter');
+    if (presentation === 'feed') {
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    }
+    const agreement = screen.getByTestId('approval-line-agreement-avatar-72');
+    fireEvent.error(within(agreement).getByRole('img', { name: '합의자' }));
+    await waitFor(() => expect(agreement).toHaveTextContent('합'));
+    expect(screen.getByTestId('approval-line-reference-avatar-73')).toHaveTextContent('참');
+    expect(await screen.findByRole('img', { name: '댓글 작성자' }))
+      .toHaveAttribute('src', 'data:image/png;base64,commenter');
+  });
+
   it.each(['panel', 'feed'] as const)('formats legacy system reasons in the %s presentation', async (presentation) => {
     const record = defaultDocumentRecords[0];
     if (!record) throw new Error('Missing document fixture.');

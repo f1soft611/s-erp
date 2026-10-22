@@ -364,6 +364,7 @@ public class DocumentApprovalWriteServiceImpl extends EgovAbstractServiceImpl
             feedItem.setContentsJson(detail.getContentsJson());
             feedItem.setContentsHtml(detail.getContentsHtml());
             feedItem.setContentsText(detail.getContentsText());
+            feedItem.setDrafterProfileImage(detail.getDrafterProfileImage());
             feedItem.setViewCount(detail.getViewCount());
             feedItem.setDrafter(detail.isDrafter());
             feedItem.setApprovalLines(approvalLinesByApprovalId.getOrDefault(

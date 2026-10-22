@@ -21,6 +21,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
+import { ProfileAvatar } from '../ProfileAvatar';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 function getFileBadgeMeta(fileName: string) {
@@ -54,6 +55,7 @@ export type FeedCommentAttachment = {
 export type FeedCommentItem = {
   id: string | number;
   author: string;
+  authorProfileImageUrl?: string | null;
   time: string;
   content: string;
   isDeleted?: boolean;
@@ -402,23 +404,40 @@ function CommentItem({
       <Box
         sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}
       >
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            flexShrink: 0,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            bgcolor: isDark ? '#334155' : '#e2e8f0',
-            color: isDark ? '#e2e8f0' : '#334155',
-          }}
-        >
-          {comment.author.slice(0, 2)}
-        </Box>
+        {isSystemEvent ? (
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              bgcolor: isDark ? '#334155' : '#e2e8f0',
+              color: isDark ? '#e2e8f0' : '#334155',
+            }}
+          >
+            {comment.author.slice(0, 2)}
+          </Box>
+        ) : (
+          <ProfileAvatar
+            name={comment.author}
+            imageUrl={comment.authorProfileImageUrl}
+            fallback={comment.author.slice(0, 2)}
+            sx={{
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              bgcolor: isDark ? '#334155' : '#e2e8f0',
+              color: isDark ? '#e2e8f0' : '#334155',
+            }}
+          />
+        )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack
             direction="row"

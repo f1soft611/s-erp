@@ -1,0 +1,50 @@
+[
+  {
+    "width": 375,
+    "feed": true,
+    "list": true,
+    "pinned": true,
+    "activeAndExpired": true,
+    "ordinaryNotMarked": true,
+    "tooltipEndDate": true,
+    "iconBesidePin": true,
+    "listIconsBesideCategory": true,
+    "leadingDocumentIcon": true,
+    "pinnedPopupHidden": true,
+    "categoryColorsMatch": true,
+    "noDetailRequests": true,
+    "overflow": false
+  },
+  {
+    "width": 768,
+    "feed": true,
+    "list": true,
+    "pinned": true,
+    "activeAndExpired": true,
+    "ordinaryNotMarked": true,
+    "tooltipEndDate": true,
+    "iconBesidePin": true,
+    "listIconsBesideCategory": true,
+    "leadingDocumentIcon": true,
+    "pinnedPopupHidden": true,
+    "categoryColorsMatch": true,
+    "noDetailRequests": true,
+    "overflow": false
+  },
+  {
+    "width": 1280,
+    "feed": true,
+    "list": true,
+    "pinned": true,
+    "activeAndExpired": true,
+    "ordinaryNotMarked": true,
+    "tooltipEndDate": true,
+    "iconBesidePin": true,
+    "listIconsBesideCategory": true,
+    "leadingDocumentIcon": true,
+    "pinnedPopupHidden": true,
+    "categoryColorsMatch": true,
+    "noDetailRequests": true,
+    "overflow": false
+  }
+]

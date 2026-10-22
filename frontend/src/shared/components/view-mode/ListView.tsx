@@ -10,6 +10,8 @@ type ListViewProps<T extends CommonViewItem> = {
   renderItemHeaderAction?: (item: T) => ReactNode;
   renderItemToolbar?: (item: T) => ReactNode;
   renderItemAction?: (item: T) => ReactNode;
+  renderItemIcon?: (item: T) => ReactNode;
+  renderCategoryBadge?: (item: T) => ReactNode;
   ariaLabel?: string;
   badgeOrder?: 'category-status' | 'status-category';
   pagination?: {
@@ -28,6 +30,8 @@ export function ListView<T extends CommonViewItem>({
   renderItemHeaderAction,
   renderItemToolbar,
   renderItemAction,
+  renderItemIcon,
+  renderCategoryBadge,
   ariaLabel = '리스트형 목록',
   badgeOrder = 'category-status',
   pagination,
@@ -44,7 +48,7 @@ export function ListView<T extends CommonViewItem>({
       }}
     >
       {items.map((item) => {
-        const categoryChip = item.categoryLabel ? (
+        const categoryChip = renderCategoryBadge ? renderCategoryBadge(item) : item.categoryLabel ? (
           <Chip
             data-testid="list-category-chip"
             label={item.categoryLabel}
@@ -117,7 +121,7 @@ export function ListView<T extends CommonViewItem>({
                 gridColumn: 1,
                 gridRow: renderItemToolbar ? { xs: '1', sm: '1 / 3' } : '1 / 3',
                 display: 'grid',
-                gridTemplateColumns: '24px minmax(0, 1fr)',
+                gridTemplateColumns: renderItemIcon ? 'auto minmax(0, 1fr)' : '24px minmax(0, 1fr)',
                 gap: 1.5,
                 alignItems: 'center',
                 width: '100%',
@@ -129,10 +133,10 @@ export function ListView<T extends CommonViewItem>({
                 cursor: onItemClick ? 'pointer' : 'default',
               }}
             >
-              <DescriptionOutlinedIcon
+              {renderItemIcon ? renderItemIcon(item) : <DescriptionOutlinedIcon
                 fontSize="small"
                 sx={{ color: item.isPinned ? 'primary.main' : 'text.secondary' }}
-              />
+              />}
               <Box sx={{ minWidth: 0 }}>
                 <Box
                   sx={{

@@ -16,6 +16,10 @@ const item: NoticeFeedItem = {
 };
 
 describe('notice view adapter', () => {
+  it('preserves popup configuration for list and pinned-row badges', () => {
+    expect(toNoticeViewItem({ ...item, loginPopupYn: 'Y', popupEndDate: '2026-10-31', noticeGubunCode: 'GENERAL' }))
+      .toMatchObject({ loginPopupYn: 'Y', popupEndDate: '2026-10-31', noticeGubunCode: 'GENERAL' });
+  });
   it('maps notice data to a reusable view item', () => {
     expect(toNoticeViewItem(item)).toMatchObject({
       id: 42,

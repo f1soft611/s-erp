@@ -254,6 +254,24 @@ describe('shared feed components', () => {
     expect(card).toHaveTextContent('카드 본문');
   });
 
+  it('renders a feed author image and keeps the existing fallback when absent', () => {
+    const { rerender } = render(
+      <FeedCard
+        author="관리자"
+        authorProfileImageUrl="data:image/png;base64,profile"
+        avatar="관"
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: '관리자' })).toHaveAttribute(
+      'src',
+      'data:image/png;base64,profile',
+    );
+
+    rerender(<FeedCard author="관리자" avatar="관" />);
+    expect(screen.getByText('관')).toBeInTheDocument();
+  });
+
   it('forwards clicks from a clickable shared feed card', () => {
     const onClick = vi.fn();
 

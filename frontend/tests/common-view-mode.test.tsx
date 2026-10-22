@@ -38,6 +38,32 @@ class ImmediateIntersectionObserver {
 }
 
 describe('common notice view mode components', () => {
+  it('keeps the default document icon and leading column used by document lists', () => {
+    const onItemClick = vi.fn();
+    render(<ListView items={[items[0]]} onItemClick={onItemClick} />);
+    const button = screen.getByText('고정 공지').closest('button')!;
+    expect(getComputedStyle(button).gridTemplateColumns).toBe('24px minmax(0, 1fr)');
+    expect(button.firstElementChild).toBe(screen.getByTestId('DescriptionOutlinedIcon'));
+    fireEvent.click(button);
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
+  });
+
+  it('supports opt-in leading icons and category rendering without replacing item selection', () => {
+    const onItemClick = vi.fn();
+    const view = render(<ListView items={items} onItemClick={onItemClick}
+      renderItemIcon={() => <span data-testid="custom-icon">상태 아이콘</span>}
+      renderCategoryBadge={(item) => <span>맞춤 {item.categoryLabel}</span>} />);
+    expect(screen.getAllByTestId('custom-icon')).toHaveLength(2);
+    expect(screen.getByText('맞춤 시스템')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('고정 공지'));
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
+    view.unmount();
+    render(<PinnedItemsPanel items={items} onItemClick={onItemClick} />);
+    expect(screen.getByTestId('PushPinOutlinedIcon')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('고정 공지'));
+    expect(onItemClick).toHaveBeenCalledTimes(2);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });

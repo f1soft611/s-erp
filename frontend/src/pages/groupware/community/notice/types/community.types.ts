@@ -33,6 +33,7 @@ export type NoticeBoardPostApi = {
   contentsText?: string | null;
   writerId?: string | null;
   writerName?: string | null;
+  writerProfileImage?: string | null;
   lastModifiedBy?: string | null;
   lastModifiedByName?: string | null;
   viewCount?: number | string | null;
@@ -135,6 +136,7 @@ export type NoticeEditorDraft = {
 export type NoticeCommentItem = {
   id: number;
   author: string;
+  authorProfileImageUrl?: string | null;
   time: string;
   content: string;
   isDeleted?: boolean;
@@ -153,6 +155,7 @@ export type NoticeCommentItem = {
 export type NoticeFeedItem = {
   id: number;
   writerId?: string | null;
+  writerProfileImage?: string | null;
   isPostOwner?: boolean;
   title: string;
   viewCount?: number;

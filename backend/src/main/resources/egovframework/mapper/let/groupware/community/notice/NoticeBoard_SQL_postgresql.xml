@@ -13,6 +13,7 @@
         <result property="contentsText" column="contents_text"/>
         <result property="writerId" column="writer_id"/>
         <result property="writerName" column="writer_name"/>
+        <result property="writerProfileImage" column="writer_profile_image"/>
         <result property="lastModifiedBy" column="last_modified_by"/>
         <result property="lastModifiedByName" column="last_modified_by_name"/>
         <result property="viewCount" column="view_count"/>
@@ -56,6 +57,7 @@
             p.contents_text,
             p.writer_id,
             p.writer_name,
+            la.profile_image AS writer_profile_image,
             p.last_modified_by,
             p.last_modified_by_name,
             p.view_count,
@@ -74,6 +76,9 @@
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = p.tenant_id
+         AND la.login_code = p.writer_id
         WHERE p.tenant_id = #{tenantId}
           AND p.board_type_code = #{boardTypeCode}
           AND p.is_deleted = 'N'
@@ -127,6 +132,7 @@
             p.contents_text,
             p.writer_id,
             p.writer_name,
+            la.profile_image AS writer_profile_image,
             p.last_modified_by,
             p.last_modified_by_name,
             p.view_count,
@@ -145,6 +151,9 @@
                   AND bf.deleted_yn = 'N'
             ), 0) AS attachment_count
         FROM tb_board_post p
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = p.tenant_id
+         AND la.login_code = p.writer_id
         WHERE p.tenant_id = #{tenantId}
           AND p.post_id = #{postId}
           AND p.board_type_code = #{boardTypeCode}
