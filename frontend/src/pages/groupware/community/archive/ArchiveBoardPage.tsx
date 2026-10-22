@@ -1,56 +1,47 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useMemo, useRef, useState } from 'react';
+import AddOutlined from '@mui/icons-material/AddOutlined';
+import CreateNewFolderOutlined from '@mui/icons-material/CreateNewFolderOutlined';
 import {
   Alert,
   Box,
   Button,
-  CircularProgress,
-  Container,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
-  InputAdornment,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import AddOutlined from '@mui/icons-material/AddOutlined';
-import ClearIcon from '@mui/icons-material/Clear';
-import SearchIcon from '@mui/icons-material/Search';
+import dayjs from 'dayjs';
+import { CommonCodeItemHelpDialog } from '../../../../shared/components/common-code/CommonCodeItemHelpDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
-import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
-import { PostDetailPanel } from '../../../../shared/components/feed/PostDetailPanel';
-import {
-  toPageSearchFields,
-  type PageSearchFieldValue,
-} from '../../../../shared/components/page-search/searchFields';
-import type { F1GridDataSource } from '../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../shared/context/NotificationContext';
+import {
+  createCommonCodeItem,
+  updateCommonCodeItem,
+} from '../../../co/master/common-code/services/commonCodeManagement.service';
+import type { PageSearchField } from '../../../../shared/components/page-search/searchFields';
+import type {
+  PageSearchFieldValue,
+} from '../../../../shared/components/page-search/searchFields';
 import type {
   MenuPermission,
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
-import { ArchiveComposerDialog } from './components/ArchiveComposerDialog';
-import { ArchivePostDetail } from './components/ArchivePostDetail';
-import {
-  ArchivePostGrid,
-  createArchivePostColumns,
-} from './components/ArchivePostGrid';
+import { ArchiveFileEditDialog } from './components/ArchiveFileEditDialog';
+import { ArchiveFileGrid } from './components/ArchiveFileGrid';
 import { useArchiveCategories } from './hooks/useArchiveCategories';
 import { useArchiveList } from './hooks/useArchiveList';
 import { useArchiveMutations } from './hooks/useArchiveMutations';
-import {
-  downloadArchiveAttachment,
-  fetchArchivePostDetail,
-} from './services/archiveBoardService';
+import { downloadArchiveAttachment } from './services/archiveBoardService';
 import type {
-  ArchiveAttachment,
-  ArchiveId,
-  ArchivePost,
-  ArchivePostSavePayload,
+  ArchiveBrowserRow,
+  ArchiveFileRow,
+  ArchiveFileType,
 } from './types/archive.types';
 
 type ArchiveBoardPageProps = {
@@ -61,6 +52,129 @@ type ArchiveBoardPageProps = {
   isTenantAdmin?: boolean;
 };
 
+const FILE_TYPE_VALUES: ArchiveFileType[] = [
+  'ALL',
+  'DOCUMENT',
+  'SPREADSHEET',
+  'PRESENTATION',
+  'PDF',
+  'IMAGE',
+  'VIDEO',
+  'ARCHIVE',
+];
+
+const DETAIL_FIELDS: PageSearchField[] = [
+  { field: 'uploadedAt', label: '올린 날짜', type: 'date', searchSpan: 2 },
+  {
+    field: 'fileType',
+    label: '유형',
+    type: 'select',
+    searchSpan: 1,
+    options: [
+      { value: 'DOCUMENT', label: '문서' },
+      { value: 'SPREADSHEET', label: '스프레드시트' },
+      { value: 'PRESENTATION', label: '프레젠테이션' },
+      { value: 'PDF', label: 'PDF' },
+      { value: 'IMAGE', label: '이미지' },
+      { value: 'VIDEO', label: '비디오' },
+      { value: 'ARCHIVE', label: '압축' },
+    ],
+  },
+];
+
+function getDateRange(value: PageSearchFieldValue | undefined) {
+  if (!value || typeof value !== 'object') return { from: '', to: '' };
+  return { from: value.from ?? '', to: value.to ?? '' };
+}
+
+function getDateSummary(from: string, to: string) {
+  const today = dayjs().format('YYYY-MM-DD');
+  const lastYear = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
+  if (from === lastYear && to === today) return '최근 1년';
+  if (!from && !to) return '전체 기간';
+  return `${from || '시작 제한 없음'} ~ ${to || '종료 제한 없음'}`;
+}
+
+function getFileType(value: PageSearchFieldValue | undefined): ArchiveFileType {
+  if (typeof value !== 'string') return 'ALL';
+  return FILE_TYPE_VALUES.find((fileType) => fileType === value) ?? 'ALL';
+}
+
+const FOLDERS_SECTION_ID = 'section:folders';
+const FILES_SECTION_ID = 'section:files';
+
+function buildBrowserRows(
+  categories: ReturnType<typeof useArchiveCategories>['categories'],
+  files: ArchiveFileRow[],
+  folderCode: string,
+  keyword: string,
+): ArchiveBrowserRow[] {
+  const fileRows: ArchiveBrowserRow[] = files.map((file) => {
+    const category = categories.find((item) => item.code === file.categoryCode);
+    return {
+      rowKey: `file:${file.boardFileId}`,
+      parentId: FILES_SECTION_ID,
+      rowType: 'file',
+      name: file.fileName,
+      ownerName: file.writerName,
+      uploadedAt: file.uploadedAt,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+      file,
+      active: !file.categoryCode || category?.active === true,
+    };
+  });
+
+  if (folderCode) {
+    return [
+      {
+        rowKey: FILES_SECTION_ID,
+        parentId: null,
+        rowType: 'section',
+        name: '파일',
+        label: '파일',
+      },
+      ...fileRows,
+    ];
+  }
+
+  const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+  const folderRows: ArchiveBrowserRow[] = categories
+    .filter(
+      (category) =>
+        !normalizedKeyword ||
+        category.name.toLocaleLowerCase().includes(normalizedKeyword),
+    )
+    .map((category) => ({
+      rowKey: `folder:${category.code}`,
+      parentId: FOLDERS_SECTION_ID,
+      rowType: 'folder',
+      name: category.name,
+      folderCode: category.code,
+      folderName: category.name,
+      active: category.active,
+    }));
+
+  return [
+    {
+      rowKey: FOLDERS_SECTION_ID,
+      parentId: null,
+      rowType: 'section',
+      name: '폴더',
+      label: '폴더',
+    },
+    ...folderRows,
+    {
+      rowKey: FILES_SECTION_ID,
+      parentId: null,
+      rowType: 'section',
+      name: '파일',
+      label: '파일',
+    },
+    ...fileRows,
+  ];
+}
+
 export function ArchiveBoardPage({
   selectedModule,
   currentMenuName,
@@ -70,145 +184,139 @@ export function ArchiveBoardPage({
 }: ArchiveBoardPageProps) {
   const { showError, showSuccess } = useNotification();
   const [searchDraft, setSearchDraft] = useState('');
+  const [currentFolderCode, setCurrentFolderCode] = useState('');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >({});
-  const [listError, setListError] = useState<Error | null>(null);
-  const [listErrorDismissed, setListErrorDismissed] = useState(false);
-  const [retryToken, setRetryToken] = useState(0);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [totalRowCount, setTotalRowCount] = useState(0);
-  const { dataSource, setKeyword, setCategoryCode } = useArchiveList({
-    retryToken,
+  >(() => {
+    const today = dayjs();
+    return {
+      uploadedAt: {
+        from: today.subtract(1, 'year').format('YYYY-MM-DD'),
+        to: today.format('YYYY-MM-DD'),
+      },
+      fileType: '',
+    };
   });
-  const {
-    categories,
-    isLoading: categoriesLoading,
-    error: categoriesError,
-    loadCategories,
-  } = useArchiveCategories();
-  const [selectedPost, setSelectedPost] = useState<ArchivePost | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<Error | null>(null);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ArchivePost | null>(null);
-  const detailRequest = useRef(0);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingFile, setEditingFile] = useState<ArchiveFileRow | null>(null);
+  const [deletingFile, setDeletingFile] = useState<ArchiveFileRow | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canCreate = isTenantAdmin && Boolean(selectedMenuPermissions?.create);
   const canUpdate = isTenantAdmin && Boolean(selectedMenuPermissions?.update);
   const canDelete = isTenantAdmin && Boolean(selectedMenuPermissions?.delete);
-
-  const loadDetail = useCallback(
-    async (postId: ArchiveId) => {
-      const request = ++detailRequest.current;
-      setIsDetailLoading(true);
-      setDetailError(null);
-      try {
-        const detail = await fetchArchivePostDetail(postId);
-        if (request === detailRequest.current) setSelectedPost(detail);
-      } catch (cause) {
-        if (request === detailRequest.current) {
-          const error =
-            cause instanceof Error ? cause : new Error(String(cause));
-          setDetailError(error);
-          showError(`자료 상세를 불러오지 못했습니다: ${error.message}`);
-        }
-      } finally {
-        if (request === detailRequest.current) setIsDetailLoading(false);
-      }
-    },
-    [showError],
+  const canEditCategories = Boolean(
+    isTenantAdmin &&
+      (selectedMenuPermissions?.create || selectedMenuPermissions?.update),
   );
 
-  const closeDetail = useCallback(() => {
-    detailRequest.current += 1;
-    setSelectedPost(null);
-    setDetailError(null);
-    setIsDetailLoading(false);
-  }, []);
-
-  const handleSelectPost = useCallback(
-    (post: ArchivePost) => {
-      setSelectedPost(post);
-      void loadDetail(post.postId);
-    },
-    [loadDetail],
-  );
-
-  const columns = useMemo(
-    () => createArchivePostColumns(categories, handleSelectPost),
-    [categories, handleSelectPost],
-  );
-  const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
-  const gridDataSource = useMemo<F1GridDataSource<ArchivePost>>(
-    () => ({
-      pageSize: dataSource.pageSize,
-      async load(query) {
-        const result = await dataSource.load(query);
-        setHasLoaded(true);
-        setTotalRowCount(result.totalRowCount);
-        return result;
-      },
-    }),
-    [dataSource],
-  );
-
-  useEffect(() => {
-    setHasLoaded(false);
-    setTotalRowCount(0);
-    setListError(null);
-    setListErrorDismissed(false);
-  }, [gridDataSource]);
-
-  const reloadList = useCallback(async () => {
-    setListError(null);
-    setListErrorDismissed(false);
-    setRetryToken((current) => current + 1);
-  }, []);
-  const handleDataSourceError = useCallback((error: Error) => {
-    setHasLoaded(false);
-    setListErrorDismissed(false);
-    setListError(error);
-  }, []);
-  const handleListErrorClose = useCallback(
-    () => setListErrorDismissed(true),
-    [],
-  );
-
+  const categories = useArchiveCategories();
+  const archiveList = useArchiveList();
+  const reloadList = async () => {
+    archiveList.retry();
+  };
   const mutations = useArchiveMutations({
     reloadList,
-    reloadDetail: loadDetail,
-    onPostDeleted: closeDetail,
     showError,
     showSuccess,
   });
 
-  const handleSave = (
-    postId: ArchiveId | null,
-    payload: ArchivePostSavePayload,
-    files: File[],
-    removedAttachments: Parameters<typeof mutations.savePost>[3],
-  ) => mutations.savePost(postId, payload, files, removedAttachments);
+  const currentFolder = categories.categories.find(
+    (item) => item.code === currentFolderCode,
+  );
+  const currentFolderName = currentFolder?.name ?? currentFolderCode;
+  const rows = useMemo(
+    () =>
+      buildBrowserRows(
+        categories.categories,
+        archiveList.rows,
+        currentFolderCode,
+        archiveList.filters.keyword,
+      ),
+    [
+      archiveList.filters.keyword,
+      archiveList.rows,
+      categories.categories,
+      currentFolderCode,
+    ],
+  );
+  const fileCount = archiveList.rows.length;
+  const dateSummary = getDateSummary(
+    archiveList.filters.uploadedFrom,
+    archiveList.filters.uploadedTo,
+  );
 
-  const handleDownload = async (attachment: ArchiveAttachment) => {
+  const applySearch = (filters: {
+    uploadedFrom: string;
+    uploadedTo: string;
+    fileType: ArchiveFileType;
+  }) => {
+    archiveList.setFilters({
+      ...archiveList.filters,
+      keyword: searchDraft.trim(),
+      folderCode: currentFolderCode,
+      ...filters,
+    });
+  };
+
+  const handleDefaultSearch = () => {
+    archiveList.setFilters({
+      ...archiveList.filters,
+      keyword: searchDraft.trim(),
+      folderCode: currentFolderCode,
+    });
+  };
+
+  const handleDetailSearch = (
+    values: Record<string, PageSearchFieldValue>,
+  ) => {
+    const range = getDateRange(values.uploadedAt);
+    if (range.from && range.to && range.from > range.to) {
+      showError('시작일은 종료일보다 늦을 수 없습니다.');
+      return;
+    }
+    applySearch({
+      uploadedFrom: range.from,
+      uploadedTo: range.to,
+      fileType: getFileType(values.fileType),
+    });
+  };
+
+  const handleFolderChange = (folderCode: string) => {
+    setCurrentFolderCode(folderCode);
+    archiveList.setFilters({
+      ...archiveList.filters,
+      folderCode,
+    });
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(event.target.files ?? []);
+    await mutations.uploadFiles(files, currentFolderCode || null);
+    event.target.value = '';
+  };
+
+  const handleDownload = async (row: ArchiveFileRow) => {
     try {
-      await downloadArchiveAttachment(attachment);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      await downloadArchiveAttachment(row);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       showError(`파일 다운로드에 실패했습니다: ${message}`);
     }
   };
 
-  const handleSearch = () => setKeyword(searchDraft.trim());
-  const handleDetailSearch = (
-    values: Record<string, PageSearchFieldValue>,
-  ) => {
-    const value = values.categoryCode;
-    setCategoryCode(
-      value == null || typeof value === 'object' ? '' : String(value).trim(),
-    );
+  const handleConfirmDelete = async () => {
+    if (!deletingFile) return;
+    const deleted = await mutations.deleteFile(deletingFile);
+    if (deleted) setDeletingFile(null);
   };
+
   const showReadDenied =
     selectedMenuPermissions != null && !selectedMenuPermissions.read;
 
@@ -224,262 +332,227 @@ export function ArchiveBoardPage({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        position: 'relative',
       }}
     >
       <PageHeader
         breadcrumbItems={[selectedModule.name, currentMenuName]}
         description={content.description}
-        actionGroups={
-          canCreate
+        actionGroups={[
+          ...(canCreate
             ? [
                 {
                   key: 'archive-create',
                   actions: [
                     {
-                      key: 'create-archive',
-                      label: '새 자료 등록',
+                      key: 'upload-archive',
+                      label: '파일 업로드',
                       icon: AddOutlined,
-                      onClick: () => {
-                        setIsEditing(false);
-                        setComposerOpen(true);
-                      },
+                      onClick: handleUploadClick,
+                    },
+                    {
+                      key: 'create-archive-folder',
+                      label: '새 폴더',
+                      icon: CreateNewFolderOutlined,
+                      onClick: () => setCategoryDialogOpen(true),
                     },
                   ],
                 },
               ]
-            : undefined
-        }
+            : []),
+          ...(!canCreate && canEditCategories
+            ? [
+                {
+                  key: 'archive-category-management',
+                  actions: [
+                    {
+                      key: 'manage-archive-folders',
+                      label: '폴더 관리',
+                      icon: CreateNewFolderOutlined,
+                      onClick: () => setCategoryDialogOpen(true),
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ]}
       />
-      {showReadDenied ? (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          <Alert severity="warning">자료실을 조회할 권한이 없습니다.</Alert>
-        </Container>
-      ) : (
-        <>
-          <PageSearchArea
-            searchField={
-              <TextField
-                size="small"
-                margin="none"
-                placeholder="제목, 본문, 작성자 통합검색"
-                value={searchDraft}
-                onChange={(event) => setSearchDraft(event.target.value)}
-                slotProps={{
-                  htmlInput: { 'aria-label': '자료 검색' },
-                  input: {
-                    endAdornment: searchDraft ? (
-                      <InputAdornment position="end">
-                        <IconButton
-                          type="button"
-                          size="small"
-                          edge="end"
-                          aria-label="자료 검색어 초기화"
-                          onClick={() => setSearchDraft('')}
-                          sx={{ p: 0.25 }}
-                        >
-                          <ClearIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : null,
-                  },
-                }}
-                sx={{ width: '100%', height: 40 }}
-              />
-            }
-            onDefaultSearch={handleSearch}
-            detailFields={detailFields}
-            detailValues={detailValues}
-            onDetailValuesChange={setDetailValues}
-            onDetailSearch={handleDetailSearch}
-          >
-            <Button
-              type="button"
-              variant="contained"
-              size="small"
-              startIcon={<SearchIcon fontSize="small" />}
-              onClick={handleSearch}
-              sx={{ minHeight: 40, whiteSpace: 'nowrap' }}
-            >
-              검색
-            </Button>
-          </PageSearchArea>
-          {categoriesLoading && (
-            <Box
-              role="status"
-              aria-label="분류 불러오는 중"
-              sx={{ px: 3, pt: 1 }}
-            >
-              <CircularProgress size={20} />
-            </Box>
-          )}
-          {categoriesError && (
-            <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1 }}>
-              <Alert
-                severity="error"
-                action={
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={() => void loadCategories()}
-                  >
-                    분류 다시 시도
-                  </Button>
-                }
-              >
-                분류를 불러오지 못했습니다: {categoriesError.message}
-              </Alert>
-            </Box>
-          )}
-          <PageMessageArea
-            message={
-              listError && !listErrorDismissed
-                ? `자료 목록을 불러오지 못했습니다: ${listError.message}`
-                : ''
-            }
-            onClose={handleListErrorClose}
-          />
-          <Box
-            sx={{
-              flex: 1,
-              minHeight: 0,
-              minWidth: 0,
-              px: { xs: 1, sm: 2 },
-              pb: 2,
-              pt: 1,
-              display: 'flex',
-              flexDirection: 'column',
+
+      <PageSearchArea
+        searchField={
+          <TextField
+            fullWidth
+            size="small"
+            margin="none"
+            placeholder="파일명 또는 소유자 검색"
+            value={searchDraft}
+            onChange={(event) => setSearchDraft(event.target.value)}
+            slotProps={{
+              htmlInput: { 'aria-label': '자료 검색' },
             }}
-          >
-            {listError && (
-              <Button
-                type="button"
-                size="small"
-                onClick={() => void reloadList()}
-                aria-label="다시 시도"
-                sx={{ alignSelf: 'flex-start', mb: 1 }}
-              >
-                다시 시도
-              </Button>
-            )}
-            <ArchivePostGrid
-              columns={columns}
-              dataSource={gridDataSource}
-              onDataSourceError={handleDataSourceError}
-            />
-            {hasLoaded && totalRowCount === 0 && !listError && (
-              <Box
-                role="status"
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  px: 2,
-                  py: 1.5,
-                  mt: 1,
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  등록된 자료가 없습니다.
-                </Typography>
-              </Box>
-            )}
-          </Box>
-          {selectedPost && (
-            <PageAreaOverlay onClose={closeDetail}>
-              {isDetailLoading ? (
-                <PostDetailPanel
-                  onClose={closeDetail}
-                  isLoading
-                  loadingLabel="자료 상세 불러오는 중"
-                >
-                  <span />
-                </PostDetailPanel>
-              ) : detailError ? (
-                <PostDetailPanel onClose={closeDetail} title="자료 상세">
-                  <Alert
-                    severity="error"
-                    action={
-                      <Button
-                        color="inherit"
-                        size="small"
-                        onClick={() => void loadDetail(selectedPost.postId)}
-                      >
-                        다시 시도
-                      </Button>
-                    }
-                  >
-                    상세를 불러오지 못했습니다: {detailError.message}
-                  </Alert>
-                </PostDetailPanel>
-              ) : (
-                <ArchivePostDetail
-                  post={selectedPost}
-                  categories={categories}
-                  onClose={closeDetail}
-                  onDownload={handleDownload}
-                  onEdit={
-                    canUpdate
-                      ? () => {
-                          setIsEditing(true);
-                          setComposerOpen(true);
-                        }
-                      : undefined
-                  }
-                  onDelete={
-                    canDelete ? () => setDeleteTarget(selectedPost) : undefined
-                  }
-                  isDeletePending={mutations.isDeleting}
-                />
-              )}
-            </PageAreaOverlay>
-          )}
-          <ArchiveComposerDialog
-            open={composerOpen}
-            post={isEditing ? selectedPost : null}
-            categories={categories}
-            isSaving={mutations.isSaving}
-            onClose={() => setComposerOpen(false)}
-            onSave={handleSave}
+            sx={{ height: 40 }}
           />
-          <Dialog
-            open={deleteTarget != null}
-            onClose={
-              mutations.isDeleting ? undefined : () => setDeleteTarget(null)
+        }
+        onDefaultSearch={handleDefaultSearch}
+        detailFields={DETAIL_FIELDS}
+        detailValues={detailValues}
+        onDetailValuesChange={setDetailValues}
+        onDetailSearch={handleDetailSearch}
+        detailLoading={archiveList.isLoading}
+      >
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`올린 날짜: ${dateSummary}`}
+          aria-label={`적용된 날짜: ${dateSummary}`}
+        />
+      </PageSearchArea>
+
+      <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1.5, pb: 1 }}>
+        {showReadDenied && (
+          <Alert severity="warning">조회 권한이 없어 자료실을 볼 수 없습니다.</Alert>
+        )}
+        {categories.error && (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => void categories.loadCategories()}>
+                재시도
+              </Button>
             }
-            aria-labelledby="archive-delete-title"
           >
-            <DialogTitle id="archive-delete-title">자료 삭제 확인</DialogTitle>
-            <DialogContent>
-              <Typography>이 자료를 삭제하시겠습니까?</Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                disabled={mutations.isDeleting}
-              >
-                취소
+            {categories.error.message}
+          </Alert>
+        )}
+        {archiveList.error && (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={archiveList.retry}>
+                재시도
               </Button>
-              <Button
-                type="button"
-                color="error"
-                variant="contained"
-                aria-label="삭제 확인"
-                disabled={mutations.isDeleting}
-                onClick={() => {
-                  if (!deleteTarget) return;
-                  const target = deleteTarget;
-                  setDeleteTarget(null);
-                  void mutations.deletePost(target.postId);
-                }}
-              >
-                삭제 확인
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </>
+            }
+          >
+            자료 파일을 불러오지 못했습니다: {archiveList.error.message}
+          </Alert>
+        )}
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', mt: 1, minWidth: 0, flexWrap: 'wrap' }}
+          aria-label="자료실 경로"
+        >
+          <Button
+            type="button"
+            size="small"
+            variant={currentFolderCode ? 'text' : 'contained'}
+            onClick={() => handleFolderChange('')}
+          >
+            자료실
+          </Button>
+          {currentFolderCode && (
+            <>
+              <Typography color="text.secondary">/</Typography>
+              <Typography variant="body2" noWrap>
+                {currentFolderName}
+              </Typography>
+              {!currentFolder?.active && (
+                <Chip label="사용 중지" size="small" variant="outlined" />
+              )}
+            </>
+          )}
+        </Stack>
+      </Box>
+
+      {!archiveList.isLoading && !archiveList.error && fileCount === 0 && (
+        <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
+          <Alert severity="info">조건에 맞는 파일이 없습니다.</Alert>
+        </Box>
       )}
+
+      {(categories.isLoading ||
+        mutations.isUploading ||
+        mutations.isDeleting ||
+        mutations.isUpdating) && (
+        <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
+          <Alert severity="info">
+            {categories.isLoading
+              ? '분류 정보를 불러오는 중입니다.'
+              : '요청 처리 중입니다.'}
+          </Alert>
+        </Box>
+      )}
+
+      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, px: { xs: 1, sm: 2 }, pb: 2 }}>
+        <ArchiveFileGrid
+          rows={rows}
+          loading={archiveList.isLoading}
+          onFolderOpen={handleFolderChange}
+          onDownload={(row) => void handleDownload(row)}
+          onEdit={setEditingFile}
+          onDelete={setDeletingFile}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+        />
+      </Box>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={handleFileInputChange}
+        aria-label="자료 파일 선택"
+      />
+
+      <CommonCodeItemHelpDialog
+        open={categoryDialogOpen}
+        groupId={categories.groupId}
+        items={categories.items}
+        canEdit={canEditCategories}
+        dialogTitle="자료실 폴더 관리"
+        gridAriaLabel="자료실 폴더 목록"
+        onClose={() => setCategoryDialogOpen(false)}
+        onCreateItem={(payload) =>
+          createCommonCodeItem(categories.groupId, payload)
+        }
+        onUpdateItem={(itemId, payload) =>
+          updateCommonCodeItem(categories.groupId, itemId, payload)
+        }
+        onReload={categories.loadCategories}
+      />
+
+      <ArchiveFileEditDialog
+        file={editingFile}
+        categories={categories.categories}
+        saving={mutations.isUpdating}
+        onClose={() => setEditingFile(null)}
+        onSave={(file, payload) => mutations.updateFile(file, payload)}
+      />
+
+      <Dialog
+        open={deletingFile !== null}
+        onClose={mutations.isDeleting ? undefined : () => setDeletingFile(null)}
+        aria-labelledby="archive-delete-title"
+        aria-describedby="archive-delete-description"
+      >
+        <DialogTitle id="archive-delete-title">자료 삭제 확인</DialogTitle>
+        <DialogContent id="archive-delete-description">
+          {deletingFile?.fileName} 파일을 삭제하시겠습니까?
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingFile(null)} disabled={mutations.isDeleting}>
+            취소
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void handleConfirmDelete()}
+            disabled={mutations.isDeleting}
+          >
+            삭제 확인
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

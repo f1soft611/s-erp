@@ -375,6 +375,8 @@ interface F1GridColumn<T> {
 
 결재선 템플릿 관리에서는 `name` 컬럼을 인라인 편집하고, 행별 `renderCell` 액션을 제공한다. 편집 내용은 Grid 변경 집합으로 추적하며, 페이지의 하단 저장 액션에서 기존 서비스 호출을 수행한다.
 
+행 액션 버튼을 그룹으로 셀 가운데 정렬할 때는 `renderCell`의 flex wrapper에 `width: '100%'`, `justifyContent: 'center'`와 버튼 간격을 지정한다. MUI 버튼 두 개가 좁은 액션 셀을 넘치면 해당 버튼에 `minWidth: 0`과 작은 가로 패딩을 적용한다. 이는 화면별 표시 선택이며 공통 F1-Grid 동작을 변경하지 않는다.
+
 ```tsx
 type TemplateRow = {
   templateId: number;
@@ -460,6 +462,21 @@ const columns: F1GridColumn<Item>[] = [
 
 > ⚠️ 아직 미구현: 위 앞선 컬럼 예시의 `aggregate` 옵션(합계/소계)은 현재 `F1GridColumn` 타입에 없다. 실제 지원 옵션은 `frontend/src/shared/components/f1-grid/types/grid.types.ts`의 `F1GridColumn`을 기준으로 하며(예: `format`, `decimalPlaces`, `selectOnFocus`, `syncWithTreeCheckbox`는 실제 구현되어 있다), 위 인터페이스 예시는 초기 설계 목표를 단순화한 것이다.
 
+## date 컬럼 표시 형식
+
+`type: 'date'`는 `format`으로 표시 형식을 지정한다. 미지정 또는 빈 문자열이면 기본값은 `yyyy-mm-dd`다. 문서현황의 결재신청일/최종 변경일처럼 ISO timestamp를 받는 컬럼도 기본적으로 날짜만 표시한다.
+
+```typescript
+{ field: 'submittedAt', headerName: '결재신청일', type: 'date' }
+// 2026-10-20T09:21:00 -> 2026-10-20
+{ field: 'updatedAt', headerName: '최종 변경일', type: 'date', format: 'yyyy/mm/dd' }
+// 2026-10-20T09:21:00 -> 2026/10/20
+```
+
+지원 토큰은 `yyyy`/`YYYY`(4자리 연도), `yy`/`YY`(2자리 연도), `mm`/`MM`(2자리 월), `m`/`M`(월), `dd`/`DD`(2자리 일), `d`/`D`(일)이다. 구분자와 한글을 조합할 수 있으며, `[문자열]`은 토큰 치환 없이 표시한다. ISO 날짜/timestamp, 8자리 `yyyymmdd`, 유효한 `Date` 객체를 지원한다. Timestamp 문자열은 시간대 변환 없이 명시된 날짜를 사용한다.
+
+빈 값은 빈 셀, 잘못된 날짜는 원문으로 표시한다. 표시 포맷은 원본 데이터, 날짜 편집기의 `YYYY-MM-DD` 값, 검색/정렬/필터 값을 변경하지 않는다. 사용자 `renderCell`이 있으면 기존처럼 우선 적용된다. 공통 표시 함수를 사용하는 자동 너비 계산과 Excel 텍스트 출력에도 같은 형식이 적용된다. 기존 숫자 `format`과 `datetime`/`time` 동작은 유지한다.
+
 ## PageSearchArea 상세 검색 연결
 
 Grid 헤더 필터와 페이지의 상세검색은 서로 다른 기능이다. 헤더 필터는 그리드에 표시된 행을 필터링하고, `PageSearchArea` 상세검색은 컬럼의 검색 설정을 페이지 조회조건에 연결한다. 흐름은 `F1GridColumn.search` → `toPageSearchFields(columns)` → `PageSearchArea` → 페이지 필터 → 목록 API 순서다. F1-Grid는 검색 필드 설정을 제공하며 업무 API를 직접 호출하지 않는다.
@@ -473,13 +490,36 @@ const detailFields = useMemo(
 );
 ```
 
-`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
+`toPageSearchFields`는 UI용 `field`, `label`, `type`, `searchSpan`, 선택적 `group`/`options`/`defaultValue`를 만든다. `column.hidden` 또는 `search.hidden`인 컬럼은 제외되고, 레이블은 `search.label`을 우선 사용한 뒤 `headerName`을 사용한다. `search.order`는 필드 순서를, `search.span`은 검색 필드 너비인 `searchSpan`을 정한다. `search.span`의 기본값은 1이며 `form.span`과는 독립적이다. `PageSearchArea`에서 연속된 같은 `search.group` 값은 새 행 안에 배치되고 다른 group이 시작되면 행도 나뉜다. Group 이름은 표시하지 않는다. `search.span`은 group 여부와 관계없이 필드 너비를 계속 제어하며, 그룹 행 안에서도 기존 5열 기준 및 반응형 축소 규칙이 적용된다. 지원 타입은 `text`, `number`, `decimal`, `currency`, `date`, `select`, `checkbox`이고, 지원하지 않는 컬럼 타입은 `text`로 변환된다. `select` 필드는 컬럼의 `options`를 사용한다.
 
 페이지는 `detailValues` 상태를 `PageSearchArea`에 전달하고 `onDetailValuesChange`로 입력 변경을 저장한다. 상세검색 실행 시 `onDetailSearch(values)`에서 실제 조회조건으로 변환한다. 기안양식의 분류/등록주기 값은 숫자로 바꾸며 사용여부는 `'Y'` 또는 `'N'`만 적용한다. 기본 키워드와 상세조건의 결합, API 요청, 로딩 및 오류 표시는 페이지와 management hook/service의 책임이다. 실제 화면은 미저장 Grid 변경이 있을 때 확인 대화상자에서 변경을 버린 뒤 검색을 적용한다.
 
 날짜 검색을 추가하는 다른 화면에서는 `type: 'date'` 필드 값이 `{ from, to }` 범위 형태다. 이 값은 검색 UI의 입력값이며 서버 파라미터명은 각 API 계약에 맞춰 페이지에서 정해야 한다.
 
-문서현황 페이지는 같은 메타데이터 연결을 원격 조회와 결합한다. 컬럼의 `search.order`, `search.group`, `search.label`, `search.span`, `type`, `options`가 상세검색 폼에 반영되고, 조회 실행 시 페이지가 날짜 범위·상태·기안자/부서/참여자 값을 API 파라미터로 변환한다. 그룹 행은 결재신청일(span 4), 결재상태·문서종류(span 2씩), 제목(span 4), 기안자·기안부서·결재 참여자(기본 span 1) 순이다. 날짜 범위 위에 별도 날짜 제목은 표시하지 않지만, 두 입력은 시작일/종료일 라벨로 식별한다. 빠른 검색어는 문서번호·제목·기안자 부분 검색에 사용한다. 목록은 F1-Grid `F1GridDataSource`의 `offset`, `limit`, 정렬 및 `AbortSignal`을 서비스에 전달하고, 서버가 반환한 현재 페이지 행과 `totalRowCount`를 그리드에 공급한다. 조회 권한 범위와 필터링은 서버에서 유지한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
+공통 상세검색의 시작일·종료일은 셀 날짜 편집기와 같은 숫자 축약 입력 및 달력 선택을 지원한다. `20261022` 또는 `261022`는 `2026-10-22`로, `1022`와 `10-22`는 올해 10월 22일로, `22`는 이번 달 22일로 변환한다. 표준 `YYYY-MM-DD`도 입력할 수 있다. 필드에서 포커스를 옮기거나 조회할 때 실제 존재하는 날짜인지 검증한 뒤 ISO 문자열로 확정한다. 잘못된 날짜는 입력을 유지하고 오류를 표시하며, 조회하지 않고 상세검색창을 유지한다. 빈 값은 해당 시작일/종료일 제한이 없다는 의미다. 좁은 영역에서는 두 입력을 세로로 배치하고 모바일에서는 숫자 키보드를 제공한다.
+
+입력 중 `onDetailValuesChange`에는 미완성 문자열이 포함될 수 있으나, 실제 `onDetailSearch`에는 정규화·검증된 날짜만 전달한다. 수동 축약 입력에서 생략한 연·월은 기존 셀 편집기와 동일하게 브라우저 로컬 날짜를 기준으로 채운다. 이는 아래의 서버 기준 날짜 검색 기본값과 별개이며, 기존 기본값·초기화·세션 복원 정책은 변경하지 않는다.
+
+날짜 검색 기본값은 `search.defaultValue`에 검색 필드 범위로 선언한다. 이 설정은 상세검색 값만 초기화하며 Grid 셀/행 편집 기본값과는 별개다. 각 끝점은 고정일 또는 서버 시스템 날짜 기준 상대일을 사용할 수 있고, 생략한 끝점은 빈 값으로 남는다.
+
+```typescript
+search: {
+  defaultValue: {
+    from: { type: 'systemDate', offset: { months: -1 } },
+    to: { type: 'systemDate' },
+  },
+}
+```
+
+고정일은 `{ type: 'fixed', year: 2026, month: 10, day: 20 }`처럼 지정한다. `systemDate`는 `GET /api/v1/common/system-date`의 `result.today` (`yyyy-MM-dd`)를 기준으로 하며 `years`, `months`, `days`의 정수 offset을 지정할 수 있다. 상대 계산은 연도 → 월 → 일 순서로 달력 연산을 적용하고, 대상 월에 해당 일이 없으면 월말로 보정한다. 예를 들어 3월 31일에서 한 달 전은 2월 말일이며 윤년은 2월 29일을 허용한다. API 실패나 잘못된 날짜 설정은 오류로 표시하고 프런트엔드 시계로 대체하지 않는다.
+
+기본값이 지정된 날짜 필드는 첫 조회와 상세검색 초기화에 해석된 기본값을 사용한다. 초기화 시 공통 검색 영역은 값을 갱신하지만 자동 조회 여부는 페이지가 선택한다. 문서현황은 서버 날짜 해석이 완료된 뒤 첫 목록을 조회하고, 저장된 탭 세션 조건이 있으면 이를 우선 복원한다. 사용자가 초기화하면 최근 1개월 범위를 서버 날짜 기준으로 다시 적용하고 같은 조건을 세션에 저장한다.
+
+문서현황 페이지는 같은 메타데이터 연결로 상세검색을 구성하고, 실행한 검색조건에 맞는 전체 결과를 조회한다. 컬럼의 `search.order`, `search.group`, `search.label`, `search.span`, `type`, `options`가 상세검색 폼에 반영되고, `hidden: true`인 컬럼도 명시적인 `search` metadata가 있으면 그리드에는 표시하지 않고 상세검색에는 제공할 수 있다. 검색 자체를 제외하려면 `search.hidden: true`를 지정한다.
+
+문서현황의 문서번호는 DB PK인 `electronicApprovalId`이며, `eabusNo`는 문서 유형별 구분 코드이므로 문서번호로 표시하지 않는다. 결재 참여자 전체 이름 요약은 기본 그리드에서 제거하고, 대신 현재 결재단계·담당자 및 내 결재 역할·처리상태를 표시한다. 현재 사용자가 기안자이면 결재선 참여유형보다 `기안` 역할을 우선 표시하고, 상세검색의 `기안` 조건은 현재 사용자가 기안한 문서만 조회한다. 숨김 `participantName` 컬럼의 검색 metadata로 참여자 이름 상세검색은 유지한다. 상세검색 순서는 결재신청일, 결재상태/문서종류, 문서번호, 제목, 기안자/부서, 결재 참여자, 내 역할/처리상태, 현재 결재담당자, 최종 변경일이다. 결재신청일 기간 검색은 일반 문서의 `submitted_at`, 임시저장 문서의 `created_at`을 사용하며 임시저장은 기안자 본인 문서만 표시한다. 결재신청일 기본 범위는 컬럼 metadata의 시스템 날짜 기준 최근 1개월이며, 백엔드 날짜 조회가 완료될 때까지 초기 목록 요청을 보류한다. 실패 시 재시도 가능한 오류를 표시하고 브라우저 날짜를 사용하지 않는다. 빠른 검색어는 문서번호 PK·제목·기안자 부분 검색에 사용한다. 검색 실행 시 빠른 검색어와 상세검색 조건은 현재 브라우저 탭 세션에 저장되며, 페이지 재진입 시 해당 값으로 조회한다. 검색 실행 전 입력한 값은 저장되지 않는다. 검색 조건 초기화 시 검색어와 나머지 상세조건을 비우고 결재신청일은 서버 날짜 기준 최근 1개월 범위로 되돌려 즉시 조회하며, 이 범위도 세션에 저장해 재진입 후 유지한다. 세션 저장 대상은 검색조건뿐이며 행 선택과 상세 패널 및 Grid 레이아웃은 저장하지 않는다.
+
+문서현황 검색 요청은 기존 검색조건과 날짜 범위를 전달하되 `offset`/`limit` 없이 실행해 일치하는 전체 행을 받는다. 페이지 조회가 필요한 기존 API 호출은 `offset`/`limit`을 전달해 최대 200건 페이징을 그대로 사용할 수 있다. 문서현황 화면은 전체 결과를 `F1Grid.rows`로 제공하므로 헤더 정렬과 필터는 클라이언트에서 처리하고, 정렬·필터 조작만으로 목록 API를 다시 호출하지 않는다. 새로운 상세검색 실행, 재시도 및 문서 변경 후에는 기존 검색조건으로 전체 목록을 다시 조회한다. 행 선택 시 문서작성 페이지의 기존 우측 상세 오버레이를 사용하며, 결재·수정·취소·댓글 등의 기능은 기존 사용자 권한과 문서 상태 조건에 따라 표시한다.
 
 커뮤니티 자료실은 기본 영역의 통합검색어를 기존 `keyword` 파라미터로 보내고, `categoryCode` 컬럼의 `search` 설정만 상세검색에 노출한다. API가 `pageIndex`/`pageUnit`을 사용하므로 자료실의 `F1GridDataSource`는 `floor(offset / limit) + 1`과 `limit`으로 변환하고, 요청 취소 signal을 서비스까지 전달한다. 이 화면은 서버의 최신순을 유지하기 위해 그리드 정렬/필터를 비활성화하고, 조회 실패는 `onDataSourceError`에서 오류와 재시도 상태로 표시한다. 제목 셀은 버튼으로 렌더링하여 상세 패널 열기를 명시적으로 실행하며 분류, 작성자, 등록일, 첨부 수는 읽기 전용 컬럼으로 표시한다.
 
@@ -1516,7 +1556,7 @@ interface GridDataState<T> {
 
 # 25. Grid Context Menu
 
-기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 우클릭 대상 셀/행 선택은 유지한다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
+기본적으로 F1Grid/F1Tree 바디 영역(체크박스 열, 데이터 셀, 빈 여백 포함)을 우클릭하면 커서 위치에 컨텍스트 메뉴가 표시된다. `disableContextMenu={true}`이면 그리드 메뉴와 브라우저 기본 우클릭 메뉴를 모두 표시하지 않지만 기본 설정에서는 우클릭 대상 셀/행 선택은 유지한다. `selectRowOnContextMenu={false}`이면 메뉴 활성화 여부와 무관하게 행 선택은 변경하지 않는다. 헤더 영역 우클릭은 대상에서 제외되며 기존 헤더 클릭 메뉴(정렬/필터/고정/숨김)는 그대로 사용할 수 있다.
 
 일반 F1Grid의 메뉴 구성:
 
@@ -1542,7 +1582,8 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 관련 Props:
 
-- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
+- `disableContextMenu?: boolean` — F1Grid/F1Tree 바디 우클릭 컨텍스트 메뉴와 브라우저 기본 메뉴 비활성화 여부. 기본값 `false`. 비활성화 중에도 기본 설정에서는 우클릭 대상 선택은 유지하며, 옵션이 켜지면 열려 있는 메뉴를 닫는다. 헤더 메뉴에는 영향을 주지 않는다.
+- `selectRowOnContextMenu?: boolean` — 우클릭 시 대상 행 선택 여부. 기본값 `true`로 기존 선택 동작을 유지한다. `false`이면 기존 행 선택을 변경하거나 `onSelectionChange`를 발생시키지 않고 대상 셀 포커스/범위 및 메뉴만 갱신한다. `disableContextMenu`와 독립적으로 적용되며, 우클릭은 좌클릭 드래그 선택을 시작하지 않는다.
 - `canExportExcel?: boolean` — 엑셀 내보내기 메뉴 노출 여부. 기본값 `false`(미표시). 페이지별 엑셀 권한과 연동해서 사용한다(예: 메뉴관리 화면).
 - `excelFileName?: string` — 내보낼 파일명(확장자 `.xlsx`는 자동 부여). 기본값은 `${ariaLabel}-export`.
 - `allowAddRowInContextMenu?: boolean` — 우클릭 메뉴에 `행 추가` 및 일반 F1Grid의 `위에 행 삽입`/`아래에 행 삽입`을 노출할지 여부. 기본값 `true`.
@@ -1552,7 +1593,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 동작 요약:
 
-- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식은 Excel number format으로 반영한다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
 - **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
 - **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
 - **행 추가**: 일반 F1Grid에서는 데이터 순서의 맨 아래에 새 행을 추가한다. F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가) 기존 트리 동작을 유지한다.
@@ -1564,10 +1605,12 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 화면별 Custom Menu 확장은 아직 지원하지 않는다(⚠️ 아직 미구현).
 
+문서현황은 행 선택 시 상세를 여는 화면이므로 `selectRowOnContextMenu={false}`로 우클릭 상세 열기를 막는다. 전체 조회된 행에 대한 헤더 필터 메뉴를 제공하며, 정렬·필터는 서버 재조회 없이 로컬 적용한다. 메뉴는 활성화하고 `canExportExcel`로 엑셀 내보내기를 제공하며, `allowAddRowInContextMenu`, `allowDuplicateRowInContextMenu`, `allowDeleteRowInContextMenu`를 모두 false로 지정해 행 추가·삽입·복사·삭제 메뉴를 숨긴다. 필터 상태가 없더라도 행 컨텍스트 메뉴의 `필터 해제`는 표시되며 비활성화된다. 왼쪽 클릭 및 체크박스 선택의 상세 열기는 유지한다.
+
 컨텍스트 메뉴 닫힘/재오픈 규칙:
 
 - 메뉴가 열린 상태에서 그리드 바깥(다른 카드, 검색 영역, 브레드크럼 등)을 좌클릭하거나 우클릭하면 메뉴는 그 자리에서 다시 열리지 않고 즉시 닫힌다.
-- 메뉴가 열린 상태에서 같은 그리드 또는 다른 그리드 영역(바디 여백 또는 셀)을 다시 우클릭하면, 기존 메뉴는 닫히고 새로 클릭한 셀/행이 먼저 선택된 뒤 그 위치에 메뉴가 다시 열린다.
+- 메뉴가 열린 상태에서 같은 그리드 또는 다른 그리드 영역(바디 여백 또는 셀)을 다시 우클릭하면, 기존 메뉴는 닫히고 새로 클릭한 셀/행이 먼저 선택된 뒤 그 위치에 메뉴가 다시 열린다. `selectRowOnContextMenu={false}`인 그리드는 기존 행 선택을 유지하고 셀 포커스/범위만 이동한다.
 - 내부적으로 그리드 컨테이너의 `getBoundingClientRect()` 좌표와 클릭 좌표를 비교해 "그리드 영역 안인지"를 판정하며, DOM 트리 상 조상 관계만으로 판단하지 않는다. MUI `Menu`가 열려 있는 동안에는 전체 화면을 덮는 투명 백드롭이 렌더링되고, 이 백드롭은 React 컴포넌트 트리 상 그리드의 자식으로 포탈되어 실제 DOM 위치와 무관하게 그리드의 `onContextMenu` 핸들러로 이벤트가 버블링될 수 있다. 이 문제를 막기 위해 백드롭의 `pointerEvents`를 `none`으로 비활성화해, 클릭이 항상 실제 화면상의 요소(그리드 내부 셀 또는 그리드 바깥 요소)에 도달하도록 한다. 추가로 `document.elementsFromPoint()`를 우선 사용해 포털/백드롭 같은 비그리드 래퍼가 맨 위에 있어도 실제 그리드 셀을 우선 복원해 선택한다.
 
 ---
@@ -2263,3 +2306,18 @@ Outlined 사용자 선택 필드의 비축소 라벨은 작은 입력 높이와 
 # 38. 행 식별자 고유성
 
 F1-Grid에 전달하는 모든 행은 `rowKey` 값이 안정적이고 서로 달라야 한다. API 조인 결과에 같은 업무 행이 여러 번 포함되어 같은 `rowKey`가 반복되면 React key 충돌과 잘못된 행 렌더링이 발생할 수 있다. 중복 행이 나타나면 화면에서 임의로 행을 숨기기보다 API 쿼리 또는 데이터 관계의 조인 cardinality를 바로잡는다.
+
+# 39. 커뮤니티 자료실 파일/폴더 그리드
+
+커뮤니티 자료실은 게시글 중심 그리드에서 파일 중심 그리드로 전환했다.
+
+- 목록 API는 `/api/v1/groupware/boards/archive/files`를 사용하며 `keyword`, `folderCode`, `uploadedFrom`, `uploadedTo`, `fileType`을 한 번에 전달해 전체 검색 결과를 한 응답으로 받는다. `offset`/`limit`, 페이지 이동, 더 보기 동작은 사용하지 않는다.
+- 날짜 검색은 최근 1년을 기본값으로 사용하고, 종료일을 포함해 검색한다. 유형 `ALL`은 API 조건에서 생략한다.
+- 2026-10-21부터 목록은 F1Grid 대신 `F1Tree`(`parentKey="parentId"`, `treeColumn="name"`, `defaultExpandAll`)로 표시하며 `F1GridDataSource` 대신 로컬 `rows`를 전달한다. `rowKey`/`parentId`는 `section:folders`(부모 `null`), `section:files`(부모 `null`), `folder:<itemCode>`(부모 `section:folders`), `file:<boardFileId>`(부모 `section:files`)이다. 파일을 분류 아래로 중첩하지 않으며, 분류 이름 클릭은 기존처럼 현재 폴더 필터를 바꾼다.
+- 파일 업로드(`POST` 직접 업로드)는 게시글 INSERT 시 인증 사용자의 `writerId`/`writerName`을 함께 전달한다(`tb_board_post.writer_id` NOT NULL). 누락 시 공통 DB 오류 메시지가 표시되던 문제의 수정이다.
+- 루트에는 분류 폴더와 파일 섹션을 함께 표시한다. 폴더를 선택하면 경로와 해당 폴더의 파일만 표시하고, 루트 이동으로 돌아올 수 있다. 파일 날짜/유형 검색 중에도 루트의 폴더 탐색은 유지한다.
+- 컬럼은 `이름`, `소유자`, `올린 날짜`, `크기`, `작업` 순서이며, 정렬/필터는 비활성화한다. 우클릭 메뉴의 엑셀 내보내기는 활성화하고 루트 추가, 행 추가, 행 삭제, 행 복제 메뉴는 비활성화한다. 컨텍스트 메뉴 구분선은 비어 있지 않은 액션 그룹 사이에만 표시되므로, 자료실에서는 일반 메뉴와 기본 설정 복원 사이에 하나만 표시된다.
+- 폴더 생성은 기존 `WF_ARCHIVE_CATEGORY` 공통코드 도움창을 사용한다. 새 항목의 코드가 비어 있으면 공통코드 서비스가 코드를 자동 생성한다.
+- 업로드/폴더 생성/파일 수정/삭제 작업은 tenant 관리자 및 메뉴 권한으로 제어한다. 비활성 폴더는 탐색·다운로드할 수 있지만 업로드, 이름 변경, 이동, 삭제는 허용하지 않는다.
+- `새 자료 등록`은 메타데이터 입력 폼 없이 hidden `input[type=file][multiple]`을 즉시 열고, 선택 파일을 개별 업로드 요청으로 처리한다.
+- 업로드/삭제 같은 mutation 후에는 파일 목록을 재조회하여 서버 상태와 즉시 동기화한다.

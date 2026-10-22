@@ -27,6 +27,9 @@ import egovframework.com.cmm.ResponseCode;
 import egovframework.com.cmm.service.ResultVO;
 import egovframework.com.cmm.util.ResultVoHelper;
 import egovframework.let.common.dto.ListResult;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileSearchVO;
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileUpdateRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSaveRequestVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostSearchVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO;
@@ -41,6 +44,18 @@ public class ArchiveBoardApiController {
     public ArchiveBoardApiController(ResultVoHelper resultVoHelper, ArchiveBoardService archiveBoardService) {
         this.resultVoHelper = resultVoHelper;
         this.archiveBoardService = archiveBoardService;
+    }
+
+    @GetMapping("/files")
+    public ResultVO listFiles(@ModelAttribute ArchiveBoardFileSearchVO search,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        search.setTenantId(user.getTenantId());
+        ListResult<ArchiveBoardFileItemVO> result = archiveBoardService.listFiles(search, user);
+        Map<String, Object> values = new HashMap<>();
+        values.put("resultList", result.getResultList());
+        values.put("resultCnt", result.getResultCnt());
+        return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
     @GetMapping("/posts")
@@ -61,11 +76,20 @@ public class ArchiveBoardApiController {
         return item(archiveBoardService.getPost(postId, user));
     }
 
-    @PostMapping("/posts")
-    public ResponseEntity<ResultVO> createPost(@RequestBody ArchiveBoardPostSaveRequestVO payload,
+    @PostMapping("/files")
+    public ResponseEntity<ResultVO> uploadFile(@RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String folderCode,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(item(archiveBoardService.createPost(payload, user)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(item(archiveBoardService.uploadFile(file, folderCode, user)));
+    }
+
+    @PutMapping("/files/{boardFileId}")
+    public ResponseEntity<ResultVO> updateFile(@PathVariable Long boardFileId,
+            @RequestBody ArchiveBoardFileUpdateRequestVO payload,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        return ResponseEntity.ok(item(archiveBoardService.updateFile(boardFileId, payload, user)));
     }
 
     @PutMapping("/posts/{postId}")

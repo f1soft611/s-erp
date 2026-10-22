@@ -16,6 +16,7 @@ public class DocumentApprovalDetailVO {
     private String documentType;
     private String documentStatus;
     private String drafterName;
+    private String drafterProfileImage;
     private Date createdAt;
     private Date submittedAt;
     private String title;
@@ -42,6 +43,10 @@ public class DocumentApprovalDetailVO {
     public void setDocumentStatus(String documentStatus) { this.documentStatus = documentStatus; }
     public String getDrafterName() { return drafterName; }
     public void setDrafterName(String drafterName) { this.drafterName = drafterName; }
+    public String getDrafterProfileImage() { return drafterProfileImage; }
+    public void setDrafterProfileImage(String drafterProfileImage) {
+        this.drafterProfileImage = drafterProfileImage;
+    }
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
     public Date getSubmittedAt() { return submittedAt; }

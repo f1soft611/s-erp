@@ -3,6 +3,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
 import { useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { useNotification } from '../../../../shared/context/NotificationContext';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
 import { FeedView } from '../../../../shared/components/view-mode/FeedView';
@@ -12,6 +13,7 @@ import { ListViewSkeleton } from '../../../../shared/components/view-mode/ListVi
 import { PinnedItemsPanel } from '../../../../shared/components/view-mode/PinnedItemsPanel';
 import { PinnedViewToolbar } from '../../../../shared/components/view-mode/PinnedViewToolbar';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { NoticeFilterMenu } from '../../community/notice/components/NoticeFilterMenu';
 import { ApprovalSummaryPanel } from './components/ApprovalSummaryPanel';
 import { ApprovalNoticePanel } from './components/ApprovalNoticePanel';
@@ -20,6 +22,7 @@ import { DocumentApprovalDetailFeed } from './components/DocumentApprovalDetailF
 import { DocumentFeedItem } from './components/DocumentFeedItem';
 import { DocumentStatusPanel } from './components/DocumentStatusPanel';
 import { EmptyDocumentList } from './components/EmptyDocumentList';
+import { DocumentFileList } from './components/DocumentFileList';
 import { documentKinds } from './data/documentWriteData';
 import { useDocumentWritePage } from './hooks/useDocumentWritePage';
 import type {
@@ -28,6 +31,12 @@ import type {
   DocumentWritePageProps,
 } from './types/documentWrite.types';
 
+type PendingDocumentPinAction = {
+  electronicApprovalId: number;
+  isPinned: boolean;
+  title: string;
+};
+
 export function DocumentWritePage({
   selectedModule,
   currentMenuName,
@@ -35,8 +44,13 @@ export function DocumentWritePage({
 }: DocumentWritePageProps) {
   const [editingDocument, setEditingDocument] =
     useState<DocumentApprovalDetail | null>(null);
+  const [pendingPinAction, setPendingPinAction] =
+    useState<PendingDocumentPinAction | null>(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const { showError } = useNotification();
   const {
+    files,
     viewMode,
     setViewMode,
     selectedKind,
@@ -46,10 +60,10 @@ export function DocumentWritePage({
     openComposer,
     closeComposer,
     pinnedDocuments,
-    unpinnedDocuments,
+    listDocuments,
     feedDocuments,
     pinnedViewItems,
-    unpinnedViewItems,
+    listViewItems,
     summary,
     notices,
     isLoading,
@@ -64,11 +78,40 @@ export function DocumentWritePage({
     closeDetail,
     detailDocumentId,
     refresh,
+    togglePin,
+    isPinPending,
+    hasNextPage,
+    isLoadingMore,
+    pageError,
+    loadMore,
+    retryLoadMore,
   } = useDocumentWritePage();
+  const requestPinToggle = (
+    electronicApprovalId: number,
+    isPinned: boolean,
+    title: string,
+  ) => {
+    setPendingPinAction({ electronicApprovalId, isPinned, title });
+  };
+  const confirmPinToggle = async () => {
+    const action = pendingPinAction;
+    setPendingPinAction(null);
+    if (!action) return;
+
+    try {
+      await togglePin(action.electronicApprovalId, action.isPinned);
+    } catch (error: unknown) {
+      showError(
+        error instanceof Error
+          ? error.message
+          : '문서 고정 상태를 변경하지 못했습니다.',
+      );
+    }
+  };
   const hasVisibleDocuments =
     viewMode === 'feed'
       ? feedDocuments.length > 0
-      : pinnedDocuments.length + unpinnedDocuments.length > 0;
+      : pinnedDocuments.length + listDocuments.length > 0;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'document-write',
@@ -103,7 +146,7 @@ export function DocumentWritePage({
         actionGroups={pageActionGroups}
       />
 
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <Box ref={setScrollRoot} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <Container
           maxWidth="xl"
           sx={{
@@ -116,6 +159,7 @@ export function DocumentWritePage({
             left={
               <>
                 <PinnedViewToolbar
+                  enableFileView
                   pinnedCount={pinnedDocuments.length}
                   mode={viewMode}
                   onChange={setViewMode}
@@ -201,7 +245,14 @@ export function DocumentWritePage({
                     {feedEmployeeError}
                   </Alert>
                 )}
-                {isLoading ? (
+                {viewMode === 'file' ? (
+                  <DocumentFileList
+                    files={files}
+                    scrollRoot={scrollRoot}
+                    onRefresh={retry}
+                    onOpenDocument={openDetail}
+                  />
+                ) : isLoading ? (
                   <Box
                     role="status"
                     aria-label="문서 목록 불러오는 중"
@@ -217,11 +268,12 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <>
-                {viewMode === 'list' && pinnedDocuments.length > 0 && (
+                {pinnedDocuments.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
                     <PinnedItemsPanel
                       items={pinnedViewItems}
                       ariaLabel="상단 고정 문서"
+                      onItemClick={(item) => openDetail(Number(item.id))}
                     />
                   </Box>
                 )}
@@ -230,12 +282,22 @@ export function DocumentWritePage({
                   {feedDocuments.length > 0 ? (
                       <FeedView
                         items={feedDocuments}
+                        pagination={{
+                          scrollRoot,
+                          hasNext: hasNextPage,
+                          isLoadingMore,
+                          error: pageError || undefined,
+                          onLoadMore: loadMore,
+                          onRetry: retryLoadMore,
+                        }}
                         renderItem={(item) => (
                           <DocumentFeedItem
                             key={item.id}
                             item={item}
                             employeeId={feedEmployeeId}
+                            pinPending={isPinPending(item.id)}
                             detailRefreshToken={detailRefreshToken}
+                            onTogglePin={requestPinToggle}
                             onActionComplete={refresh}
                             onEditDocument={(document) => {
                               setEditingDocument(document);
@@ -250,11 +312,19 @@ export function DocumentWritePage({
                   </Box>
                 ) : (
                   <Box data-testid="document-list">
-                    {unpinnedViewItems.length > 0 ? (
+                    {listViewItems.length > 0 ? (
                       <ListView
-                        items={unpinnedViewItems}
+                        items={listViewItems}
                         ariaLabel="리스트형 문서 목록"
                         badgeOrder="status-category"
+                        pagination={{
+                          scrollRoot,
+                          hasNext: hasNextPage,
+                          isLoadingMore,
+                          error: pageError || undefined,
+                          onLoadMore: loadMore,
+                          onRetry: retryLoadMore,
+                        }}
                         onItemClick={(item) => openDetail(Number(item.id))}
                       />
                     ) : (
@@ -299,9 +369,36 @@ export function DocumentWritePage({
               openComposer();
             }}
             detailRefreshToken={detailRefreshToken}
+            isPinned={pinnedDocuments.some(
+              (document) => document.id === detailDocumentId,
+            )}
+            pinPending={isPinPending(detailDocumentId)}
+            onTogglePin={requestPinToggle}
           />
         </PageAreaOverlay>
       )}
+      <UnsavedChangesConfirmDialog
+        open={Boolean(pendingPinAction)}
+        title={
+          pendingPinAction?.isPinned ? '상단 고정 해제' : '상단 고정'
+        }
+        description={
+          pendingPinAction?.isPinned
+            ? '이 문서의 상단 고정을 해제하시겠습니까?'
+            : '이 문서를 상단에 고정하시겠습니까?'
+        }
+        cancelLabel="취소"
+        continueLabel="확인"
+        disableContinue={
+          pendingPinAction
+            ? isPinPending(pendingPinAction.electronicApprovalId)
+            : false
+        }
+        onCancel={() => setPendingPinAction(null)}
+        onContinue={() => {
+          void confirmPinToggle();
+        }}
+      />
     </Box>
   );
 }

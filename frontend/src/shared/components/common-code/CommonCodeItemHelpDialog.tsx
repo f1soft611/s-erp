@@ -22,6 +22,8 @@ type CommonCodeItemHelpDialogProps = {
   groupId: string;
   items: CommonCodeItemRow[];
   canEdit: boolean;
+  dialogTitle?: string;
+  gridAriaLabel?: string;
   onClose: () => void;
   onCreateItem: (payload: ItemSavePayload) => Promise<unknown>;
   onUpdateItem: (itemId: string, payload: ItemSavePayload) => Promise<unknown>;
@@ -57,6 +59,8 @@ export function CommonCodeItemHelpDialog({
   groupId,
   items,
   canEdit,
+  dialogTitle = '기안양식 분류 설정',
+  gridAriaLabel = '기안양식 분류 목록',
   onClose,
   onCreateItem,
   onUpdateItem,
@@ -197,7 +201,7 @@ export function CommonCodeItemHelpDialog({
       <CommonDialog
         open={open}
         onClose={requestClose}
-        title="기안양식 분류 설정"
+        title={dialogTitle}
         size="lg"
         bodyMode="fill"
         paperHeight="60vh"
@@ -255,7 +259,7 @@ export function CommonCodeItemHelpDialog({
             <F1Grid
               key={gridKey}
               ref={gridRef}
-              ariaLabel="기안양식 분류 목록"
+              ariaLabel={gridAriaLabel}
               rows={items}
               columns={columns}
               rowKey="id"

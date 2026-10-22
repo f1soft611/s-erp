@@ -4,6 +4,7 @@ const apiMocks = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   apiDownload: vi.fn(),
   apiGet: vi.fn(),
+  apiGetBlob: vi.fn(),
   apiPost: vi.fn(),
   apiPostFormData: vi.fn(),
   apiPut: vi.fn(),
@@ -17,12 +18,26 @@ import {
   deleteCommonFile,
   downloadCommonFile,
   fetchCommonComments,
+  fetchCommonFileBlob,
   fetchCommonFiles,
   updateCommonComment,
   uploadCommonFile,
 } from '../src/shared/services/commonContentApi';
 
 describe('common content API contracts', () => {
+  it('fetches a comment attachment Blob through the owner-scoped route', async () => {
+    const blob = new Blob(['image']);
+    apiMocks.apiGetBlob.mockResolvedValue(blob);
+
+    await expect(fetchCommonFileBlob('NOTICE_COMMENT', 51, 91)).resolves.toBe(
+      blob,
+    );
+
+    expect(apiMocks.apiGetBlob).toHaveBeenCalledWith(
+      '/api/v1/common/files/91/download?ownerType=NOTICE_COMMENT&ownerId=51',
+    );
+  });
+
   it('fetches files by owner type and owner id', async () => {
     apiMocks.apiGet.mockResolvedValue({ resultList: [{ fileId: 7 }] });
 

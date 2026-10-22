@@ -13,8 +13,6 @@ import {
   DialogTitle,
   Divider,
   IconButton,
-  Menu,
-  MenuItem,
   Popover,
   Stack,
   TextField,
@@ -29,11 +27,12 @@ import type { FeedBodyImage } from '../../../../../shared/components/feed/FeedBo
 import { FeedCommentsSection } from '../../../../../shared/components/feed/FeedCommentsSection';
 import { FeedReactionBar } from '../../../../../shared/components/feed/FeedReactionBar';
 import { FeedCard } from '../../../../../shared/components/feed/FeedCard';
+import { ProfileAvatar } from '../../../../../shared/components/ProfileAvatar';
 import { PostDetailPanel } from '../../../../../shared/components/feed/PostDetailPanel';
 import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerDialog';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { DocumentActionsMenu } from './DocumentActionsMenu';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MessageOutlinedIcon from '@mui/icons-material/MessageOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -79,6 +78,13 @@ type DocumentApprovalDetailFeedSharedProps = {
   electronicApprovalId: number | null;
   onActionComplete: () => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
+  onTogglePin?: (
+    electronicApprovalId: number,
+    pinned: boolean,
+    title: string,
+  ) => void;
+  isPinned?: boolean;
+  pinPending?: boolean;
   detailRefreshToken: number;
 };
 
@@ -176,6 +182,7 @@ function toApprovalCommentTree(
   records: DocumentApprovalComment[],
   systemEvents: DocumentApprovalSystemEvent[],
   commentImageUrls: Record<string, string>,
+  commentImageErrors: Record<string, string>,
 ): FeedCommentItem[] {
   const comments = new Map<string, FeedCommentItem>();
   const createdAtById = new Map<string, string | null | undefined>();
@@ -188,6 +195,8 @@ function toApprovalCommentTree(
     comments.set(commentKey, {
       id: record.commentId,
       author: record.deletedYn === 'Y' ? '삭제된 댓글' : record.writerName,
+      authorProfileImageUrl:
+        record.deletedYn === 'Y' ? null : record.writerProfileImage,
       time: formatCommentTime(record.createdAt),
       content:
         record.deletedYn === 'Y' ? '[삭제된 댓글입니다.]' : record.content,
@@ -200,6 +209,7 @@ function toApprovalCommentTree(
         size: file.fileSize,
         mimeType: file.mimeType,
         previewUrl: commentImageUrls[`${record.commentId}:${file.fileId}`],
+        previewError: commentImageErrors[`${record.commentId}:${file.fileId}`],
       })),
       replies: [],
     });
@@ -229,6 +239,7 @@ function toApprovalCommentTree(
     roots.push({
       id: eventId,
       author: event.writerName || '시스템',
+      authorProfileImageUrl: event.writerProfileImage,
       time: formatCommentTime(event.createdAt),
       content: formatApprovalSystemEventContent(event.eventType, event.content),
       isSystemEvent: true,
@@ -270,6 +281,8 @@ export function DocumentApprovalDetailFeed(
     electronicApprovalId,
     onActionComplete,
     onEditDocument,
+    onTogglePin,
+    pinPending = false,
     detailRefreshToken,
   } = props;
   const theme = useTheme();
@@ -318,7 +331,9 @@ export function DocumentApprovalDetailFeed(
   const [commentImageUrls, setCommentImageUrls] = useState<
     Record<string, string>
   >({});
-  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [commentImageErrors, setCommentImageErrors] = useState<
+    Record<string, string>
+  >({});
   const [reasonPopover, setReasonPopover] = useState<{
     anchorEl: HTMLElement;
     reason: string;
@@ -492,6 +507,7 @@ export function DocumentApprovalDetailFeed(
         .map((file) => ({ commentId: comment.commentId, file })),
     );
     setCommentImageUrls({});
+    setCommentImageErrors({});
     if (electronicApprovalId === null || imageAttachments.length === 0) {
       return () => {
         active = false;
@@ -510,13 +526,21 @@ export function DocumentApprovalDetailFeed(
     ).then((results) => {
       if (!active) return;
       const urls: Record<string, string> = {};
-      results.forEach((result) => {
-        if (result.status !== 'fulfilled') return;
-        const url = URL.createObjectURL(result.value.blob);
-        objectUrls.push(url);
-        urls[result.value.key] = url;
+      const errors: Record<string, string> = {};
+      results.forEach((result, index) => {
+        const attachment = imageAttachments[index];
+        if (!attachment) return;
+        const key = `${attachment.commentId}:${attachment.file.fileId}`;
+        if (result.status === 'fulfilled') {
+          const url = URL.createObjectURL(result.value.blob);
+          objectUrls.push(url);
+          urls[key] = url;
+          return;
+        }
+        errors[key] = '이미지 미리보기를 불러오지 못했습니다.';
       });
       setCommentImageUrls(urls);
+      setCommentImageErrors(errors);
     });
     return () => {
       active = false;
@@ -603,19 +627,6 @@ export function DocumentApprovalDetailFeed(
       bodyHtml.includes('data-approval-embedded-image-file-id')),
   );
   const shouldShowApprovalLine = !hasMoreBody || isBodyExpanded;
-  const canEditDraft = useMemo(
-    () =>
-      Boolean(
-        detail &&
-        detail.isDrafter &&
-        (detail.documentStatus === 'DRAFT' ||
-          detail.documentStatus === 'REVISION_REQUESTED'),
-      ),
-    [detail],
-  );
-  const canDeleteDocument = useMemo(() => {
-    return Boolean(detail?.isDrafter && detail.documentStatus === 'DRAFT');
-  }, [detail]);
 
   const handleDeleteDocument = async () => {
     if (electronicApprovalId === null || isDeleting) return;
@@ -664,7 +675,8 @@ export function DocumentApprovalDetailFeed(
         setActionComment('');
       }
       onActionComplete();
-      onClose?.();
+      setDetailRetryToken((token) => token + 1);
+      await loadComments();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
@@ -703,6 +715,7 @@ export function DocumentApprovalDetailFeed(
       setCancelDialogType(null);
       onActionComplete();
       setDetailRetryToken((token) => token + 1);
+      await loadComments();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 취소에 실패했습니다.',
@@ -913,54 +926,29 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
-  const documentMenu =
-    detail?.isDrafter && (canEditDraft || canDeleteDocument) ? (
-      <>
-        <IconButton
-          aria-label="문서 더보기"
-          size="small"
-          onClick={(event) => setMenuAnchor(event.currentTarget)}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-        <Menu
-          anchorEl={menuAnchor}
-          open={Boolean(menuAnchor)}
-          onClose={() => setMenuAnchor(null)}
-        >
-          {canEditDraft && (
-            <MenuItem
-              onClick={() => {
-                setMenuAnchor(null);
-                onEditDocument(detail);
-              }}
-            >
-              {detail.documentStatus === 'REVISION_REQUESTED'
-                ? '수정 후 재상신'
-                : '문서 수정'}
-            </MenuItem>
-          )}
-          {canDeleteDocument && (
-            <MenuItem
-              onClick={() => {
-                setMenuAnchor(null);
-                setIsDeleteDialogOpen(true);
-              }}
-            >
-              삭제
-            </MenuItem>
-          )}
-        </Menu>
-      </>
-    ) : null;
+  const documentMenu = detail ? (
+    <DocumentActionsMenu
+      isDrafter={detail.isDrafter}
+      documentStatus={detail.documentStatus}
+      onEdit={() => onEditDocument(detail)}
+      onDelete={() => setIsDeleteDialogOpen(true)}
+    />
+  ) : null;
 
   const feedItem = props.presentation === 'feed' ? props.feedItem : null;
+  const isPinned = feedItem
+    ? Boolean(feedItem.isPinned)
+    : Boolean(props.isPinned);
+  const pinTitle = detail?.title ?? feedItem?.title ?? '';
+  const pinAriaLabel = isPinned
+    ? `상단 고정 해제 ${pinTitle}`
+    : `상단 고정 ${pinTitle}`;
   const displayDocumentStatus =
     detail?.documentStatus ?? feedItem?.feedData.documentStatus;
   const displayDocumentType =
     detail?.documentType ?? feedItem?.feedData.documentType;
   const statusPresentation = displayDocumentStatus
-    ? getApprovalStatusPresentation(displayDocumentStatus)
+    ? getApprovalStatusPresentation(displayDocumentStatus, displayDocumentType)
     : null;
   const kindPresentation = displayDocumentType
     ? getDocumentKindPresentation(displayDocumentType)
@@ -1008,7 +996,7 @@ export function DocumentApprovalDetailFeed(
                 </Button>
               </>
             )}
-            {!isFeedPresentation && canCancelSubmission && (
+            {canCancelSubmission && (
               <Button
                 size="small"
                 variant="outlined"
@@ -1023,7 +1011,7 @@ export function DocumentApprovalDetailFeed(
                 상신 취소
               </Button>
             )}
-            {!isFeedPresentation && canCancelApproval && (
+            {canCancelApproval && (
               <Button
                 size="small"
                 variant="contained"
@@ -1054,8 +1042,22 @@ export function DocumentApprovalDetailFeed(
           />
         }
         pinControl={
-          <IconButton aria-label="고정된 문서" disabled size="small">
-            <PushPinOutlinedIcon fontSize="small" />
+          <IconButton
+            aria-label={pinAriaLabel}
+            title={pinAriaLabel}
+            disabled={
+              pinPending || !onTogglePin || electronicApprovalId === null
+            }
+            size="small"
+            onClick={() => {
+              if (!onTogglePin || electronicApprovalId === null) return;
+              onTogglePin(electronicApprovalId, isPinned, pinTitle);
+            }}
+          >
+            <PushPinOutlinedIcon
+              fontSize="small"
+              color={isPinned ? 'primary' : 'inherit'}
+            />
           </IconButton>
         }
         moreMenu={documentMenu}
@@ -1141,9 +1143,12 @@ export function DocumentApprovalDetailFeed(
                 spacing={1.5}
                 sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}
               >
-                <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                  {detail.drafterName.slice(0, 1)}
-                </Avatar>
+                <ProfileAvatar
+                  name={detail.drafterName}
+                  imageUrl={detail.drafterProfileImage}
+                  fallback={detail.drafterName.slice(0, 1)}
+                  sx={{ width: 40, height: 40, flexShrink: 0 }}
+                />
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
                     {detail.drafterName}
@@ -1153,8 +1158,7 @@ export function DocumentApprovalDetailFeed(
                     variant="caption"
                     color="text.secondary"
                   >
-                    기안자 · {displayDate} · 조회{' '}
-                    {detail.viewCount}
+                    기안자 · {displayDate} · 조회 {detail.viewCount}
                   </Typography>
                 </Box>
               </Stack>
@@ -1205,7 +1209,9 @@ export function DocumentApprovalDetailFeed(
                       variant="body1"
                       sx={{ fontWeight: 700 }}
                     >
-                      결재선
+                      {displayDocumentType === 'BUSINESS_CONTACT'
+                        ? '참조자'
+                        : '결재선'}
                     </Typography>
                     <Typography
                       data-testid="approval-line-drafter-meta"
@@ -1221,7 +1227,9 @@ export function DocumentApprovalDetailFeed(
                 approvalLineGroups.agreement.length === 0 &&
                 approvalLineGroups.reference.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    결재선 정보가 없습니다.
+                    {displayDocumentType === 'BUSINESS_CONTACT'
+                      ? '참조자 정보가 없습니다.'
+                      : '결재선 정보가 없습니다.'}
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
@@ -1243,10 +1251,9 @@ export function DocumentApprovalDetailFeed(
                               const hasReasonPopover =
                                 line.actionStatus === 'REJECTED' ||
                                 line.actionStatus === 'RETURNED';
-                              const actionReason =
-                                hasReasonPopover
-                                  ? line.actionComment
-                                  : null;
+                              const actionReason = hasReasonPopover
+                                ? line.actionComment
+                                : null;
                               const reasonTitle =
                                 line.actionStatus === 'RETURNED'
                                   ? '보완요청 사유'
@@ -1354,7 +1361,8 @@ export function DocumentApprovalDetailFeed(
                                             ],
                                           fontSize: '1rem',
                                           fontWeight: 700,
-                                          ...(line.actionStatus === 'RETURNED' && {
+                                          ...(line.actionStatus ===
+                                            'RETURNED' && {
                                             whiteSpace: 'pre-line',
                                             textAlign: 'center',
                                             lineHeight: 1.05,
@@ -1368,37 +1376,39 @@ export function DocumentApprovalDetailFeed(
                                               line.actionStatus,
                                             )}
                                       </Avatar>
-                                      {actionReason &&
-                                        actionReason.trim() && (
-                                          <IconButton
-                                            size="small"
-                                            aria-label={`${line.participantName} ${reasonTitle} 보기`}
-                                            aria-haspopup="dialog"
-                                            onClick={(event) =>
-                                              setReasonPopover({
-                                                anchorEl: event.currentTarget,
-                                                reason: actionReason,
-                                                title: reasonTitle,
-                                              })
-                                            }
-                                            sx={{
-                                              position: 'absolute',
-                                              top: 4,
-                                              right: 8,
-                                              width: 24,
-                                              height: 24,
-                                              bgcolor: 'background.paper',
-                                              color: approvalLineStatusColors[statusTone],
-                                              '&:hover': {
-                                                bgcolor: 'background.default',
-                                              },
-                                            }}
-                                          >
-                                            <MessageOutlinedIcon
-                                              sx={{ fontSize: 16 }}
-                                            />
-                                          </IconButton>
-                                        )}
+                                      {actionReason && actionReason.trim() && (
+                                        <IconButton
+                                          size="small"
+                                          aria-label={`${line.participantName} ${reasonTitle} 보기`}
+                                          aria-haspopup="dialog"
+                                          onClick={(event) =>
+                                            setReasonPopover({
+                                              anchorEl: event.currentTarget,
+                                              reason: actionReason,
+                                              title: reasonTitle,
+                                            })
+                                          }
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 4,
+                                            right: 8,
+                                            width: 24,
+                                            height: 24,
+                                            bgcolor: 'background.paper',
+                                            color:
+                                              approvalLineStatusColors[
+                                                statusTone
+                                              ],
+                                            '&:hover': {
+                                              bgcolor: 'background.default',
+                                            },
+                                          }}
+                                        >
+                                          <MessageOutlinedIcon
+                                            sx={{ fontSize: 16 }}
+                                          />
+                                        </IconButton>
+                                      )}
                                       {!hasReasonPopover &&
                                         line.actionComment && (
                                           <Typography
@@ -1601,24 +1611,17 @@ export function DocumentApprovalDetailFeed(
                                                 bgcolor: 'background.paper',
                                               }}
                                             >
-                                              <Avatar
+                                              <ProfileAvatar
                                                 data-testid={`approval-line-agreement-avatar-${line.electronicApprovalLineId}`}
-                                                src={
-                                                  line.participantProfileImage ??
-                                                  undefined
-                                                }
-                                                alt={line.participantName}
+                                                name={line.participantName}
+                                                imageUrl={line.participantProfileImage}
+                                                fallback={line.participantName.slice(0, 1)}
                                                 sx={{
                                                   width: 32,
                                                   height: 32,
                                                   flexShrink: 0,
                                                 }}
-                                              >
-                                                {line.participantName.slice(
-                                                  0,
-                                                  1,
-                                                )}
-                                              </Avatar>
+                                              />
                                               <Box
                                                 sx={{
                                                   display: 'flex',
@@ -1734,21 +1737,17 @@ export function DocumentApprovalDetailFeed(
                                         bgcolor: 'background.paper',
                                       }}
                                     >
-                                      <Avatar
+                                      <ProfileAvatar
                                         data-testid={`approval-line-reference-avatar-${line.electronicApprovalLineId}`}
-                                        src={
-                                          line.participantProfileImage ??
-                                          undefined
-                                        }
-                                        alt={line.participantName}
+                                        name={line.participantName}
+                                        imageUrl={line.participantProfileImage}
+                                        fallback={line.participantName.slice(0, 1)}
                                         sx={{
                                           width: 32,
                                           height: 32,
                                           flexShrink: 0,
                                         }}
-                                      >
-                                        {line.participantName.slice(0, 1)}
-                                      </Avatar>
+                                      />
                                       <Box sx={{ minWidth: 0, flex: 1 }}>
                                         <Typography
                                           variant="body1"
@@ -1893,6 +1892,7 @@ export function DocumentApprovalDetailFeed(
                     commentRecords,
                     commentSystemEvents,
                     commentImageUrls,
+                    commentImageErrors,
                   )}
                   onSubmitComment={(content, files) =>
                     handleAddComment(content, files)
@@ -1904,6 +1904,7 @@ export function DocumentApprovalDetailFeed(
                   onDeleteComment={handleDeleteComment}
                   onDownloadAttachment={handleDownloadCommentAttachment}
                   onDeleteAttachment={handleDeleteCommentAttachment}
+                  onOpenAttachmentImage={setSelectedBodyImage}
                   expandReplies
                 />
               </>
@@ -1937,6 +1938,11 @@ export function DocumentApprovalDetailFeed(
       {props.presentation === 'feed' ? (
         <FeedCard
           author={detail?.drafterName ?? props.feedItem.author}
+          authorProfileImageUrl={
+            detail
+              ? detail.drafterProfileImage
+              : props.feedItem.feedData.drafterProfileImage
+          }
           meta={
             detail
               ? `기안자 · ${displayDate} · 조회 ${detail.viewCount}`
@@ -2061,6 +2067,8 @@ export function DocumentApprovalDetailFeed(
         </DialogContent>
         <DialogActions>
           <Button
+            variant="outlined"
+            color="error"
             onClick={() => void handleCancelDocumentAction()}
             disabled={isActing}
           >
@@ -2095,17 +2103,18 @@ export function DocumentApprovalDetailFeed(
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => setIsDeleteDialogOpen(false)}
-            disabled={isDeleting}
-          >
-            취소
-          </Button>
-          <Button
             color="error"
+            variant="contained"
             onClick={() => void handleDeleteDocument()}
             disabled={isDeleting}
           >
             {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+          <Button
+            onClick={() => setIsDeleteDialogOpen(false)}
+            disabled={isDeleting}
+          >
+            취소
           </Button>
         </DialogActions>
       </Dialog>

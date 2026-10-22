@@ -3,6 +3,7 @@ import {
   fetchCommonCodeGroups,
   fetchCommonCodeItems,
 } from '../../../../co/master/common-code/services/commonCodeManagement.service';
+import type { CommonCodeItemRow } from '../../../../co/master/common-code/types/commonCodeManagement.types';
 import type { ArchiveCategory } from '../types/archive.types';
 
 function asError(value: unknown): Error {
@@ -11,6 +12,8 @@ function asError(value: unknown): Error {
 
 export function useArchiveCategories() {
   const [categories, setCategories] = useState<ArchiveCategory[]>([]);
+  const [groupId, setGroupId] = useState('');
+  const [items, setItems] = useState<CommonCodeItemRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const requestSequence = useRef(0);
@@ -35,13 +38,15 @@ export function useArchiveCategories() {
         );
       }
 
-      const items = await fetchCommonCodeItems(group.id);
+      const groupItems = await fetchCommonCodeItems(group.id);
       if (currentRequest === requestSequence.current) {
-        setCategories(
-          items
-            .filter((item) => item.useAt === 'Y')
-            .map((item) => ({ code: item.itemCode, name: item.itemNm })),
-        );
+        setGroupId(group.id);
+        setItems(groupItems);
+        setCategories(groupItems.map((item) => ({
+          code: item.itemCode,
+          name: item.itemNm,
+          active: item.useAt === 'Y',
+        })));
       }
     } catch (cause) {
       if (currentRequest === requestSequence.current) {
@@ -61,5 +66,5 @@ export function useArchiveCategories() {
     };
   }, [loadCategories]);
 
-  return { categories, isLoading, error, loadCategories };
+  return { categories, groupId, items, isLoading, error, loadCategories };
 }

@@ -55,6 +55,7 @@ export const toNoticeCommentTree = (
     deletedYn?: string | null;
     writerName?: string | null;
     writerId?: string | null;
+    writerProfileImage?: string | null;
     content?: string | null;
     createdAt?: string | Date | null;
     attachments?: CommonFileItem[];
@@ -72,6 +73,8 @@ export const toNoticeCommentTree = (
         record.deletedYn === 'Y'
           ? '삭제된 댓글'
           : record.writerName || record.writerId || '사용자',
+      authorProfileImageUrl:
+        record.deletedYn === 'Y' ? null : record.writerProfileImage,
       time: formatCommentTime(record.createdAt),
       content:
         record.deletedYn === 'Y'
@@ -83,6 +86,7 @@ export const toNoticeCommentTree = (
         id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
         name: file.fileName ?? '첨부파일',
         size: Number(file.fileSize ?? 0) || undefined,
+        mimeType: file.mimeType ?? file.contentType ?? undefined,
       })),
       replies: [],
     });
@@ -141,6 +145,7 @@ export function mapNoticePost(
   return {
     id: Number(post.postId ?? 0),
     writerId: post.writerId ?? undefined,
+    writerProfileImage: post.writerProfileImage,
     isPostOwner: Boolean(
       post.writerId &&
       getStoredAuth()?.userId &&
@@ -170,5 +175,7 @@ export function mapNoticePost(
     liked: false,
     bookmarked: false,
     isPinned: post.isPinned ?? 'N',
+    loginPopupYn: post.loginPopupYn ?? 'N',
+    popupEndDate: post.popupEndDate,
   };
 }

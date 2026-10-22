@@ -7,6 +7,15 @@ import {
 } from '../src/pages/groupware/documents/write/data/documentPresentation';
 
 describe('document presentation metadata', () => {
+  it('labels a completed business contact as sent instead of approved', () => {
+    expect(getApprovalStatusPresentation('COMPLETED', 'BUSINESS_CONTACT')).toEqual({
+      label: '발송완료',
+      color: 'success',
+      variant: 'filled',
+    });
+    expect(getApprovalStatusPresentation('COMPLETED', 'DRAFTING').label).toBe('승인');
+  });
+
   it.each([
     ['REJECTED', '문서가 반려되었습니다.'],
     ['RETURNED', '문서 보완이 요청되었습니다.'],
@@ -31,6 +40,7 @@ describe('document presentation metadata', () => {
   it.each([
     ['DRAFT_SAVED', '임시저장', 'default', 'outlined', 'DRAFT'],
     ['SUBMITTED', '결재신청', 'info', 'filled', 'PENDING'],
+    ['RESUBMITTED', '재상신', 'info', 'filled', 'PENDING'],
     ['SUBMISSION_CANCELED', '결재신청 취소', 'error', 'outlined', 'DRAFT'],
     ['APPROVAL_CANCELED', '결재 승인 취소', 'error', 'outlined', 'DRAFT'],
     ['REJECTED', '반려', 'error', 'filled', 'REJECTED'],
@@ -47,7 +57,7 @@ describe('document presentation metadata', () => {
     });
   });
 
-  it.each(['RESUBMITTED', 'DELETED', 'UNKNOWN', 'toString', ''])(
+  it.each(['DELETED', 'UNKNOWN', 'toString', ''])(
     'preserves the existing display for unsupported event %s',
     (eventType) => {
       expect(getApprovalSystemEventPresentation(eventType)).toBeUndefined();

@@ -78,7 +78,10 @@ function isTemplateSummary(value: unknown): value is ApprovalLineTemplateSummary
     value.name.trim().length > 0 &&
     Array.from(value.name).length <= 100 &&
     isEabusNo(value.eabusNo) &&
-    (value.updatedAt === undefined || typeof value.updatedAt === 'string')
+    (value.updatedAt === undefined ||
+      value.updatedAt === null ||
+      typeof value.updatedAt === 'string' ||
+      (typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt)))
   );
 }
 

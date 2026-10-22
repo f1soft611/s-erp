@@ -6,11 +6,32 @@ import java.util.Map;
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
+import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileItemVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardFileVO;
 import egovframework.let.groupware.community.archive.domain.model.ArchiveBoardPostVO;
 
 @Repository("archiveBoardDAO")
 public class ArchiveBoardDAO extends EgovAbstractMapper {
+    public List<ArchiveBoardFileItemVO> selectArchiveFileList(Map<String, Object> params) throws Exception {
+        return selectList("ArchiveBoardDAO.selectArchiveFileList", params);
+    }
+
+    public Long selectArchiveFileCount(Map<String, Object> params) throws Exception {
+        return selectOne("ArchiveBoardDAO.selectArchiveFileCount", params);
+    }
+
+    public ArchiveBoardFileItemVO selectArchiveFileItemById(Map<String, Object> params) throws Exception {
+        return selectOne("ArchiveBoardDAO.selectArchiveFileItemById", params);
+    }
+
+    public int updateArchiveFileNameAndCategory(Map<String, Object> params) throws Exception {
+        return update("ArchiveBoardDAO.updateArchiveFileNameAndCategory", params);
+    }
+
+    public int updateArchivePostCategoryAndTitle(Map<String, Object> params) throws Exception {
+        return update("ArchiveBoardDAO.updateArchivePostCategoryAndTitle", params);
+    }
+
     public List<ArchiveBoardPostVO> selectArchivePostList(Map<String, Object> params) throws Exception {
         return selectList("ArchiveBoardDAO.selectArchivePostList", params);
     }

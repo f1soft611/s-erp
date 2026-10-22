@@ -93,6 +93,131 @@ class ArchiveBoardServiceImplTest {
     }
 
     @Test
+    void listFilesAppliesSearchFiltersAndAllowsReadingInactiveFolders() throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setTenantId(999L);
+        search.setKeyword(" manual ");
+        search.setFolderCode(" INACTIVE ");
+        search.setUploadedFrom("2025-10-20");
+        search.setUploadedTo("2026-10-20");
+        search.setFileType("PDF");
+        when(dao.selectArchiveFileList(anyMap())).thenReturn(Collections.emptyList());
+        when(dao.selectArchiveFileCount(anyMap())).thenReturn(0L);
+
+        assertThat(service.listFiles(search, user).getResultCnt()).isZero();
+
+        verify(dao).selectArchiveFileList(argThat((Map<String, Object> params) ->
+                Long.valueOf(71L).equals(params.get("tenantId"))
+                        && "manual".equals(params.get("keyword"))
+                        && "INACTIVE".equals(params.get("folderCode"))
+                        && "2025-10-20".equals(params.get("uploadedFrom"))
+                        && "2026-10-20".equals(params.get("uploadedTo"))
+                        && "PDF".equals(params.get("fileType"))
+                        && Boolean.FALSE.equals(params.get("rootOnly"))
+                        && !params.containsKey("offset")
+                        && !params.containsKey("limit")));
+        verify(dao).selectArchiveFileCount(anyMap());
+        verifyNoInteractions(categories);
+    }
+
+    @Test
+    void listFilesAllowsAnOpenDateBoundAndOmitsAllTypeFilter() throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setUploadedFrom("2026-01-01");
+        search.setUploadedTo(" ");
+        search.setFileType("ALL");
+        when(dao.selectArchiveFileList(anyMap())).thenReturn(Collections.emptyList());
+        when(dao.selectArchiveFileCount(anyMap())).thenReturn(0L);
+
+        service.listFiles(search, user);
+
+        verify(dao).selectArchiveFileList(argThat((Map<String, Object> params) ->
+                Long.valueOf(71L).equals(params.get("tenantId"))
+                        && Boolean.TRUE.equals(params.get("rootOnly"))
+                        && "2026-01-01".equals(params.get("uploadedFrom"))
+                        && !params.containsKey("uploadedTo")
+                        && !params.containsKey("fileType")
+                        && !params.containsKey("offset")
+                        && !params.containsKey("limit")));
+    }
+
+    @Test
+    void listFilesRejectsInvalidDatesReversedRangeAndUnknownType() throws Exception {
+        assertInvalidListSearch("2025-02-30", "", "ALL");
+        assertInvalidListSearch("2026-10-21", "2026-10-20", "ALL");
+        assertInvalidListSearch("", "", "AUDIO");
+        verify(dao, never()).selectArchiveFileList(anyMap());
+        verify(dao, never()).selectArchiveFileCount(anyMap());
+    }
+
+    private void assertInvalidListSearch(String from, String to, String fileType) throws Exception {
+        ArchiveBoardFileSearchVO search = new ArchiveBoardFileSearchVO();
+        search.setUploadedFrom(from);
+        search.setUploadedTo(to);
+        search.setFileType(fileType);
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class, () -> service.listFiles(search, user));
+        assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void directUploadCreatesArchivePostWithFileNameTitle() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "manual.txt", "text/plain", new byte[] {1, 2});
+        when(dao.insertArchivePost(anyMap())).thenReturn(44L);
+        CommonFileVO uploaded = ownedFile(77L);
+        uploaded.setOwnerId(44L);
+        uploaded.setFileName("manual.txt");
+        when(files.uploadFile(eq(71L), eq("ARCHIVE"), eq(44L), any(), eq("test-admin"))).thenReturn(uploaded);
+        ArchiveBoardFileItemVO item = new ArchiveBoardFileItemVO();
+        item.setBoardFileId(77L);
+        when(dao.selectArchiveFileItemById(anyMap())).thenReturn(item);
+
+        ArchiveBoardFileItemVO result = service.uploadFile(file, null, user);
+
+        assertThat(result.getBoardFileId()).isEqualTo(77L);
+        verify(dao).insertArchivePost(argThat((Map<String, Object> params) ->
+                "manual.txt".equals(params.get("title"))
+                        && params.get("categoryCode") == null
+                        && "test-admin".equals(params.get("writerId"))
+                        && "Test administrator".equals(params.get("writerName"))
+                        && "test-admin".equals(params.get("lastModifiedBy"))
+                        && "Test administrator".equals(params.get("lastModifiedByName"))));
+    }
+
+    @Test
+    void updateFileRenamesAndMovesOwnedArchiveFile() throws Exception {
+        ArchiveBoardFileVO attachment = new ArchiveBoardFileVO();
+        attachment.setBoardFileId(31L);
+        attachment.setTenantId(71L);
+        attachment.setPostId(13L);
+        attachment.setOwnerType("ARCHIVE");
+        attachment.setFileUsageType("ATTACHMENT");
+        attachment.setDeletedYn("N");
+        when(dao.selectArchiveAttachmentById(anyMap())).thenReturn(attachment);
+        when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.singletonList(ownedFile(31L)));
+        ArchiveBoardFileItemVO updated = new ArchiveBoardFileItemVO();
+        updated.setBoardFileId(31L);
+        updated.setFileName("renamed.txt");
+        when(dao.selectArchiveFileItemById(anyMap())).thenReturn(updated);
+
+        ArchiveBoardFileUpdateRequestVO request = new ArchiveBoardFileUpdateRequestVO();
+        request.setPostId(13L);
+        request.setFileName("renamed.txt");
+        request.setFolderCode("GENERAL");
+
+        ArchiveBoardFileItemVO result = service.updateFile(31L, request, user);
+
+        assertThat(result.getFileName()).isEqualTo("renamed.txt");
+        verify(categories).validate(71L, "ARCHIVE", "GENERAL");
+        verify(dao).updateArchiveFileNameAndCategory(argThat((Map<String, Object> params) ->
+                Long.valueOf(13L).equals(params.get("postId"))
+                        && Long.valueOf(31L).equals(params.get("boardFileId"))
+                        && "renamed.txt".equals(params.get("fileName"))
+                        && "GENERAL".equals(params.get("categoryCode"))));
+    }
+
+    @Test
     void createAndUpdateKeepPlainTextAndAuthenticatedWriter() throws Exception {
         when(dao.insertArchivePost(anyMap())).thenReturn(13L);
         service.createPost(payload, user);
@@ -319,6 +444,25 @@ class ArchiveBoardServiceImplTest {
         verify(dao, times(2)).selectArchiveAttachmentById(argThat(map ->
                 Long.valueOf(71).equals(map.get("tenantId")) && Long.valueOf(13).equals(map.get("postId"))
                 && Long.valueOf(31).equals(map.get("boardFileId")) && "ARCHIVE".equals(map.get("boardTypeCode"))));
+    }
+
+    @Test
+    void deletingLastAttachmentAlsoSoftDeletesPost() throws Exception {
+        ArchiveBoardFileVO file = new ArchiveBoardFileVO();
+        file.setBoardFileId(31L);
+        file.setTenantId(71L);
+        file.setPostId(13L);
+        file.setOwnerType("ARCHIVE");
+        file.setFileUsageType("ATTACHMENT");
+        file.setDeletedYn("N");
+        when(dao.selectArchiveAttachmentById(anyMap())).thenReturn(file);
+        when(files.listFiles(71L, "ARCHIVE", 13L)).thenReturn(Collections.emptyList());
+
+        service.deleteAttachment(13L, 31L, user);
+
+        verify(dao).softDeleteArchivePost(argThat(params ->
+                Long.valueOf(13L).equals(params.get("postId"))
+                        && Long.valueOf(71L).equals(params.get("tenantId"))));
     }
 
     @Test

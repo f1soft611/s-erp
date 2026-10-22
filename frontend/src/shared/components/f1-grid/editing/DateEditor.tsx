@@ -9,8 +9,14 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 type DateEditorProps = {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
   selectOnFocus?: boolean;
+  autoFocus?: boolean;
+  variant?: 'standard' | 'outlined';
+  label?: string;
+  onBlur?: () => void;
+  error?: boolean;
+  helperText?: string;
 };
 
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -72,6 +78,12 @@ export function DateEditor({
   onChange,
   onKeyDown,
   selectOnFocus = true,
+  autoFocus = true,
+  variant = 'standard',
+  label,
+  onBlur,
+  error,
+  helperText,
 }: DateEditorProps) {
   const [draftValue, setDraftValue] = useState(value);
   const [calendarAnchor, setCalendarAnchor] =
@@ -90,10 +102,15 @@ export function DateEditor({
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <TextField
-        autoFocus
+        autoFocus={autoFocus}
         fullWidth
+        size={variant === 'outlined' ? 'small' : undefined}
         margin="none"
-        variant="standard"
+        variant={variant}
+        label={label}
+        placeholder={variant === 'outlined' ? DATE_FORMAT : undefined}
+        error={error}
+        helperText={helperText}
         value={draftValue}
         onChange={(event) => {
           const nextValue = event.target.value
@@ -117,14 +134,20 @@ export function DateEditor({
           }
         }}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
         slotProps={{
+          htmlInput: {
+            'aria-label': label,
+            ...(variant === 'outlined' ? { inputMode: 'numeric' } : {}),
+          },
+          ...(variant === 'outlined' ? { inputLabel: { shrink: true } } : {}),
           input: {
-            disableUnderline: true,
+            ...(variant === 'standard' ? { disableUnderline: true } : {}),
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
                   size="small"
-                  aria-label="달력 열기"
+                  aria-label={label ? `${label} 달력 열기` : '달력 열기'}
                   onClick={(event) => setCalendarAnchor(event.currentTarget)}
                 >
                   <CalendarMonthIcon fontSize="small" />
@@ -133,39 +156,43 @@ export function DateEditor({
             ),
           },
         }}
-        sx={{
-          width: '100%',
-          height: '100%',
-          minHeight: 0,
-          fontSize: 'inherit',
-          bgcolor: 'background.paper',
-          '& .MuiInputBase-root': {
-            height: '100%',
-            minHeight: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '0 !important',
-            padding: 0,
-            fontSize: 'inherit',
-            '&:before, &:after': {
-              borderBottom: '0 !important',
-            },
-          },
-          '& .MuiInputBase-input': {
-            padding: '0 4px',
-            lineHeight: 'normal',
-            height: 'auto',
-            minHeight: 0,
-            boxSizing: 'border-box',
-            textAlign: 'center',
-            font: 'inherit',
-            fontSize: 'inherit',
-          },
-          '& .MuiInputAdornment-root': {
-            marginLeft: 0,
-          },
-        }}
+        sx={
+          variant === 'standard'
+            ? {
+                width: '100%',
+                height: '100%',
+                minHeight: 0,
+                fontSize: 'inherit',
+                bgcolor: 'background.paper',
+                '& .MuiInputBase-root': {
+                  height: '100%',
+                  minHeight: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '0 !important',
+                  padding: 0,
+                  fontSize: 'inherit',
+                  '&:before, &:after': {
+                    borderBottom: '0 !important',
+                  },
+                },
+                '& .MuiInputBase-input': {
+                  padding: '0 4px',
+                  lineHeight: 'normal',
+                  height: 'auto',
+                  minHeight: 0,
+                  boxSizing: 'border-box',
+                  textAlign: 'center',
+                  font: 'inherit',
+                  fontSize: 'inherit',
+                },
+                '& .MuiInputAdornment-root': {
+                  marginLeft: 0,
+                },
+              }
+            : { minWidth: 0, '& .MuiInputBase-input': { minWidth: 0 } }
+        }
       />
       <Popover
         open={Boolean(calendarAnchor)}

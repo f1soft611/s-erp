@@ -3,14 +3,18 @@
     "s-erp-postgresql-readonly": {
       "type": "stdio",
       "command": "node",
-      "args": ["D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"]
+      "args": [
+        "D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"
+      ]
     },
-    "s-erp-postgresql-readonly-tenant-1212123312": {
+    "s-erp-postgresql-readonly-tenant-1110011111": {
       "type": "stdio",
       "command": "node",
-      "args": ["D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"],
+      "args": [
+        "D:/f1soft/dev/react/S-ERP/tools/mcp-postgresql-readonly/dist/index.js"
+      ],
       "env": {
-        "S_ERP_DB_NAME": "tenant_1212123312"
+        "S_ERP_DB_NAME": "tenant_1110011111"
       }
     }
   }

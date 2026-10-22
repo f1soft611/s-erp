@@ -2,6 +2,7 @@ package egovframework.let.groupware.approval.domain.repository;
 
 import java.util.List;
 import java.util.Map;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFileItemVO;
 
 import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
@@ -14,10 +15,19 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalStatusListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalWritePageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
 
 @Repository("documentApprovalDAO")
 public class DocumentApprovalDAO extends EgovAbstractMapper {
+
+    public List<DocumentApprovalFileItemVO> selectRelatedFilePage(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectRelatedFilePage", params);
+    }
+
+    public Long selectRelatedFileCursor(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectRelatedFileCursor", params);
+    }
 
     public Boolean selectActiveDraftingCategory(Map<String, Object> params) throws Exception {
         return (Boolean) selectOne("DocumentApprovalDAO.selectActiveDraftingCategory", params);
@@ -122,6 +132,28 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public List<DocumentApprovalListItemVO> selectRelatedDocumentList(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectRelatedDocumentList", params);
+    }
+
+    public List<DocumentApprovalListItemVO> selectRelatedDocumentWritePage(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectRelatedDocumentWritePage", params);
+    }
+
+    public Long countRelatedWriteDocuments(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.countRelatedWriteDocuments", params);
+    }
+
+    public int insertDocumentApprovalPin(Map<String, Object> params) throws Exception {
+        return insert("DocumentApprovalDAO.insertDocumentApprovalPin", params);
+    }
+
+    public int deleteDocumentApprovalPin(Map<String, Object> params) throws Exception {
+        return delete("DocumentApprovalDAO.deleteDocumentApprovalPin", params);
+    }
+
+    public List<DocumentApprovalListItemVO> selectPinnedRelatedDocumentList(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectPinnedRelatedDocumentList", params);
     }
 
     public List<DocumentApprovalStatusListItemVO> selectRelatedDocumentPage(Map<String, Object> params)

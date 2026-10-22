@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -33,6 +34,8 @@ import {
 } from './components/NoticeFeedList';
 import { NoticeEmptyState } from './components/NoticeEmptyState';
 import { NoticeFilterMenu } from './components/NoticeFilterMenu';
+import { NoticeLoginPopupBadge } from './components/NoticeLoginPopupBadge';
+import { NoticeCategoryBadge } from './components/NoticeCategoryBadge';
 import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import { deriveNoticeSummary } from './data/noticeSummary';
 import { toNoticeViewItems } from './data/noticeViewAdapter';
@@ -75,6 +78,7 @@ export function CommunityNoticePage({
     attachments: [],
   });
   const [viewMode, setViewMode] = useState<CommonViewMode>('feed');
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const { noticeGubunOptions, selectedNoticeFilter, setSelectedNoticeFilter } =
     useNoticeCategories();
   const noticeGubunNames = useMemo(
@@ -95,8 +99,12 @@ export function CommunityNoticePage({
     isRefreshing,
     errorMessage,
     setErrorMessage,
+    noticeHasMore,
+    isLoadingMore,
+    pageError,
     loadNoticePosts,
     loadMoreNoticePosts,
+    retryLoadMoreNoticePosts,
   } = useNoticeList({ selectedNoticeFilter, noticeGubunNamesRef });
   const {
     expandedNoticeId,
@@ -140,9 +148,17 @@ export function CommunityNoticePage({
       showSuccess,
     });
   const noticeSummary = useMemo(
-    () =>
-      deriveNoticeSummary(
-        noticeItems.map((item) => ({
+    () => {
+      const seenNoticeIds = new Set<number>();
+      const summaryItems = [...pinnedNoticeItems, ...noticeItems].filter(
+        (item) => {
+          if (seenNoticeIds.has(item.id)) return false;
+          seenNoticeIds.add(item.id);
+          return true;
+        },
+      );
+      return deriveNoticeSummary(
+        summaryItems.map((item) => ({
           id: item.id,
           title: item.title,
           viewCount: item.viewCount,
@@ -151,8 +167,9 @@ export function CommunityNoticePage({
           createdAt: item.createdAt,
           attachmentCount: item.attachmentDetails?.length ?? 0,
         })),
-      ),
-    [noticeItems],
+      );
+    },
+    [noticeItems, pinnedNoticeItems],
   );
   const noticeViewItems = useMemo(
     () => toNoticeViewItems(noticeItems),
@@ -274,6 +291,8 @@ export function CommunityNoticePage({
               item.id,
             ),
             isPinned: item.isPinned,
+            loginPopupYn: item.loginPopupYn,
+            popupEndDate: item.popupEndDate,
             noticeGubunCode: item.noticeGubunCode,
             attachments: mappedAttachments,
           });
@@ -320,6 +339,7 @@ export function CommunityNoticePage({
       <PageMessageArea message="" onClose={() => setErrorMessage(null)} />
 
       <Box
+        ref={setScrollRoot}
         sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
       >
         <Container
@@ -352,7 +372,7 @@ export function CommunityNoticePage({
                   />
                   {pinnedNoticeCount > 0 && (
                     <PinnedItemsPanel
-                      items={noticeViewItems}
+                      items={pinnedNoticeViewItems}
                       ariaLabel="상단 고정 공지"
                     />
                   )}
@@ -421,6 +441,18 @@ export function CommunityNoticePage({
                       />
                     }
                   />
+                  {pinnedNoticeItems.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <PinnedItemsPanel
+                        items={pinnedNoticeViewItems}
+                        ariaLabel="상단 고정 공지"
+                        selectedItemId={selectedNoticeId}
+                        onItemClick={(item) => {
+                          void handleSelectNotice(item);
+                        }}
+                      />
+                    </Box>
+                  )}
                   <NoticeEmptyState onCreate={() => setIsComposerOpen(true)} />
                 </>
               }
@@ -465,8 +497,14 @@ export function CommunityNoticePage({
                   {viewMode === 'feed' ? (
                     <NoticeFeedList
                       items={unpinnedNoticeItems}
-                      onReachEnd={() => {
-                        void loadMoreNoticePosts();
+                      pagination={{
+                        scrollRoot,
+                        hasNext: noticeHasMore,
+                        isLoadingMore,
+                        error: pageError || undefined,
+                        onLoadMore: loadMoreNoticePosts,
+                        onRetry: retryLoadMoreNoticePosts,
+                        loadingLabel: '다음 공지 불러오는 중',
                       }}
                       isDark={isDark}
                       isRefreshing={isRefreshing}
@@ -517,6 +555,8 @@ export function CommunityNoticePage({
                             item.id,
                           ),
                           isPinned: item.isPinned,
+                          loginPopupYn: item.loginPopupYn,
+                          popupEndDate: item.popupEndDate,
                           noticeGubunCode: item.noticeGubunCode,
                           attachments: mappedAttachments,
                         });
@@ -547,6 +587,25 @@ export function CommunityNoticePage({
                     <ListView
                       items={unpinnedNoticeViewItems}
                       ariaLabel="리스트형 공지 목록"
+                      pagination={{
+                        scrollRoot,
+                        hasNext: noticeHasMore,
+                        isLoadingMore,
+                        error: pageError || undefined,
+                        onLoadMore: loadMoreNoticePosts,
+                        onRetry: retryLoadMoreNoticePosts,
+                        loadingLabel: '다음 공지 불러오는 중',
+                      }}
+                      renderCategoryBadge={(item) => (
+                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                          <NoticeLoginPopupBadge loginPopupYn={item.loginPopupYn} popupEndDate={item.popupEndDate} />
+                          <PushPinOutlinedIcon fontSize="small"
+                            aria-label={item.isPinned ? '상단 고정' : '상단 고정 안 됨'}
+                            sx={{ color: item.isPinned ? 'primary.main' : 'text.disabled', flexShrink: 0 }} />
+                          <NoticeCategoryBadge code={item.noticeGubunCode}
+                            label={item.categoryLabel ?? '공지'} compact />
+                        </Box>
+                      )}
                       onItemClick={(item) => {
                         void handleSelectNotice(item);
                       }}
@@ -588,6 +647,8 @@ export function CommunityNoticePage({
         defaultTitle={editorDraft.title}
         noticeGubunOptions={noticeGubunOptions}
         defaultNoticeGubunCode={editorDraft.noticeGubunCode ?? ''}
+        defaultLoginPopupYn={editorDraft.loginPopupYn ?? 'N'}
+        defaultPopupEndDate={editorDraft.popupEndDate}
         defaultBody={editorDraft.body}
         defaultAttachments={editorDraft.attachments}
       />

@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import {
   CommunityNoticePage,
@@ -38,6 +38,7 @@ const noticeServiceMocks = vi.hoisted(() => ({
 
 const commentServiceMocks = vi.hoisted(() => ({
   fetchCommonComments: vi.fn(),
+  fetchCommonFileBlob: vi.fn(),
   createCommonComment: vi.fn(),
   updateCommonComment: vi.fn(),
   deleteCommonComment: vi.fn(),
@@ -85,6 +86,20 @@ const detail = {
   commentCount: 1,
 };
 
+class ImmediateIntersectionObserver {
+  constructor(
+    private readonly callback: (
+      entries: Array<{ isIntersecting: boolean }>,
+    ) => void,
+  ) {}
+
+  observe() {
+    this.callback([{ isIntersecting: true }]);
+  }
+
+  disconnect() {}
+}
+
 function renderPage() {
   return render(
     <ThemeProvider theme={createTheme()}>
@@ -100,6 +115,10 @@ function renderPage() {
 }
 
 describe('CommunityNoticePage local updates', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     noticeServiceMocks.fetchNoticePosts.mockResolvedValue([
@@ -178,6 +197,90 @@ describe('CommunityNoticePage local updates', () => {
     expect(within(listRegion).getByText('기존 공지')).toBeInTheDocument();
     expect(within(listRegion).getByText('관리자')).toBeInTheDocument();
   });
+
+  it('shows pinned notices separately when there are no ordinary notices', async () => {
+    noticeServiceMocks.fetchNoticePosts.mockResolvedValue({
+      resultList: [],
+      resultCnt: 0,
+    });
+    noticeServiceMocks.fetchPinnedNoticePosts.mockResolvedValue({
+      resultList: [{
+        ...detail,
+        postId: 77,
+        title: '고정 전용 공지',
+        isPinned: 'Y',
+      }],
+      resultCnt: 1,
+    });
+
+    renderPage();
+
+    const pinnedRegion = await screen.findByRole('region', {
+      name: '상단 고정 공지',
+    });
+    expect(within(pinnedRegion).getByText('고정 전용 공지')).toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 공지가 없습니다.')).toBeInTheDocument();
+    expect(noticeServiceMocks.fetchNoticePosts).toHaveBeenCalledWith(
+      1,
+      20,
+      '',
+      undefined,
+      'N',
+    );
+  });
+
+  it.each(['feed', 'list'] as const)(
+    'uses the shared 20-item pagination in %s mode',
+    async (mode) => {
+      vi.stubGlobal('IntersectionObserver', ImmediateIntersectionObserver);
+      noticeServiceMocks.fetchNoticePosts.mockImplementation(
+        (page: number) =>
+          Promise.resolve({
+            resultList:
+              page === 1
+                ? [{
+                    ...detail,
+                    postId: 1,
+                    title: '공지 1',
+                    isPinned: 'N',
+                  }]
+                : [{
+                    ...detail,
+                    postId: 2,
+                    title: '공지 2',
+                    isPinned: 'N',
+                  }],
+            resultCnt: 2,
+          }),
+      );
+      noticeServiceMocks.fetchPinnedNoticePosts.mockResolvedValue({
+        resultList: [],
+        resultCnt: 0,
+      });
+
+      renderPage();
+      await screen.findByTestId('notice-feed-list');
+
+      if (mode === 'list') {
+        noticeServiceMocks.fetchNoticePosts.mockClear();
+        fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
+        await screen.findByRole('region', { name: '리스트형 공지 목록' });
+      }
+
+      await waitFor(() => {
+        expect(
+          noticeServiceMocks.fetchNoticePosts.mock.calls.some(
+            ([page, size, , , isPinned]) =>
+              page === 2 && size === 20 && isPinned === 'N',
+          ),
+        ).toBe(true);
+      });
+
+      expect(
+        noticeServiceMocks.fetchNoticePosts.mock.calls[0],
+      ).toEqual([1, 20, '', undefined, 'N']);
+    },
+  );
 
   it('shows the list skeleton while the list view reloads', async () => {
     let resolveReload: (posts: []) => void = () => undefined;
@@ -956,6 +1059,138 @@ describe('CommunityNoticePage local updates', () => {
         2,
       );
     });
+  });
+
+  it('shows notice comment image previews separately and opens the existing viewer', async () => {
+    const imageUrl = 'blob:notice-comment-image';
+    vi.mocked(URL.createObjectURL).mockReturnValue(imageUrl);
+    commentServiceMocks.fetchCommonFileBlob.mockResolvedValue(
+      new Blob(['image'], { type: 'image/png' }),
+    );
+    const item = {
+      ...noticeFeed[0],
+      id: 301,
+      comments: [
+        {
+          id: 31,
+          author: '작성자',
+          time: '2026-10-20 10:00',
+          content: '공지 댓글',
+          attachments: [
+            {
+              id: '91',
+              name: 'photo.png',
+              size: 123,
+              mimeType: 'image/png',
+            },
+          ],
+        },
+      ],
+      commentCount: 1,
+      hasPreviousComments: true,
+    };
+
+    const { unmount } = render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        expandedNoticeId={item.id}
+        onLoadPreviousComments={vi.fn()}
+      />,
+    );
+
+    const attachmentLists = await screen.findAllByTestId(
+      'notice-attachment-list',
+    );
+    const attachmentList = attachmentLists.find((element) =>
+      within(element).queryByText('photo.png'),
+    );
+    expect(attachmentList).toBeDefined();
+    expect(within(attachmentList).getByText('photo.png')).toBeInTheDocument();
+    expect(within(attachmentList).queryByRole('img')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', {
+        name: '댓글 이미지 미리보기 1: photo.png',
+      }),
+    ).toBeInTheDocument();
+    expect(commentServiceMocks.fetchCommonFileBlob).toHaveBeenCalledWith(
+      'NOTICE_COMMENT',
+      31,
+      '91',
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: '댓글 이미지 미리보기 1: photo.png',
+      }),
+    );
+    const viewer = screen.getByRole('dialog');
+    expect(within(viewer).getByRole('img', { name: 'photo.png' })).toHaveAttribute(
+      'src',
+      imageUrl,
+    );
+    expect(commentServiceMocks.fetchCommonComments).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '이미지 뷰어 닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(imageUrl);
+  }, 20000);
+
+  it('keeps notice comment image files downloadable and reports preview failures', async () => {
+    commentServiceMocks.fetchCommonFileBlob.mockRejectedValue(
+      new Error('image request failed'),
+    );
+    const onDownloadCommentAttachment = vi.fn();
+    const item = {
+      ...noticeFeed[0],
+      id: 302,
+      comments: [
+        {
+          id: 32,
+          author: '작성자',
+          time: '2026-10-20 10:00',
+          content: '미리보기 실패 댓글',
+          attachments: [
+            {
+              id: '92',
+              name: 'failed.png',
+              size: 123,
+              mimeType: 'image/png',
+            },
+          ],
+        },
+      ],
+      commentCount: 1,
+    };
+
+    render(
+      <NoticeFeedList
+        items={[item]}
+        isDark={false}
+        expandedNoticeId={item.id}
+        onDownloadCommentAttachment={onDownloadCommentAttachment}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '이미지 미리보기를 불러오지 못했습니다.',
+    );
+    const attachmentList = screen
+      .getAllByTestId('notice-attachment-list')
+      .find((element) => within(element).queryByText('failed.png'));
+    if (!attachmentList) throw new Error('Comment attachment list was not rendered.');
+    expect(within(attachmentList).getByText('failed.png')).toBeInTheDocument();
+    fireEvent.click(
+      within(attachmentList).getByRole('button', {
+        name: '첨부 파일 다운로드',
+      }),
+    );
+    expect(onDownloadCommentAttachment).toHaveBeenCalledWith(
+      32,
+      '92',
+      'failed.png',
+    );
   });
 
   it('loads the remaining older comments in one larger batch when expanding the thread', async () => {

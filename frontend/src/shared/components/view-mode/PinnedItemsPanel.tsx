@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -8,6 +9,7 @@ type PinnedItemsPanelProps<T extends CommonViewItem = CommonViewItem> = {
   ariaLabel?: string;
   selectedItemId?: string | number | null;
   onItemClick?: (item: T) => void;
+  renderItemAction?: (item: T) => ReactNode;
 };
 
 export function PinnedItemsPanel<T extends CommonViewItem>({
@@ -15,6 +17,7 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
   ariaLabel = '상단 고정 항목',
   selectedItemId,
   onItemClick,
+  renderItemAction,
 }: PinnedItemsPanelProps<T>) {
   const theme = useTheme();
   const pinnedItems = items.filter((item) => item.isPinned);
@@ -34,12 +37,7 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
       <Stack spacing={1}>
         {pinnedItems.map((item) => (
           <Box
-            component="button"
-            type="button"
             key={item.id}
-            aria-label={item.title}
-            aria-pressed={selectedItemId === item.id}
-            onClick={() => onItemClick?.(item)}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -63,17 +61,41 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
               }),
             }}
           >
-            <PushPinOutlinedIcon fontSize="small" color="primary" />
-            <Typography
-              variant="body2"
+            <Box
+              component="button"
+              type="button"
+              aria-label={item.title}
+              aria-pressed={selectedItemId === item.id}
+              onClick={() => onItemClick?.(item)}
               sx={{
-                fontWeight: 700,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                minWidth: 0,
+                flex: 1,
+                p: 0,
+                border: 0,
+                bgcolor: 'transparent',
+                color: 'inherit',
+                textAlign: 'left',
+                cursor: onItemClick ? 'pointer' : 'default',
               }}
             >
-              {item.title}
-            </Typography>
+              <PushPinOutlinedIcon fontSize="small" color="primary" />
+              <Typography
+                variant="body2"
+                sx={{
+                  minWidth: 0,
+                  flex: 1,
+                  fontWeight: 700,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {item.title}
+              </Typography>
+            </Box>
+            {renderItemAction?.(item)}
           </Box>
         ))}
       </Stack>

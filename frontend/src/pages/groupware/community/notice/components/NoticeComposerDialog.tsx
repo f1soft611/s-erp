@@ -3,6 +3,8 @@ import {
   Box,
   Button,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
   IconButton,
   MenuItem,
   TextField,
@@ -28,6 +30,7 @@ import {
   getAttachmentIconMeta,
 } from '../../../../../shared/components/feed/attachmentIconMeta';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { DateEditor, normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
 import type {
   NoticeComposerDialogProps,
   NoticeComposerDraftAttachment,
@@ -134,6 +137,8 @@ export function NoticeComposerDialog({
   defaultTitle = '',
   noticeGubunOptions = [],
   defaultNoticeGubunCode = '',
+  defaultLoginPopupYn = 'N',
+  defaultPopupEndDate = '',
   defaultBody,
   defaultAttachments = [],
 }: NoticeComposerDialogProps) {
@@ -155,6 +160,9 @@ export function NoticeComposerDialog({
     defaultNoticeGubunCode,
   );
   const [noticeGubunError, setNoticeGubunError] = useState(false);
+  const [loginPopup, setLoginPopup] = useState(defaultLoginPopupYn === 'Y');
+  const [popupEndDate, setPopupEndDate] = useState(defaultPopupEndDate ?? '');
+  const [popupDateError, setPopupDateError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -174,6 +182,9 @@ export function NoticeComposerDialog({
     setTitle(defaultTitle);
     setNoticeGubunCode(defaultNoticeGubunCode);
     setNoticeGubunError(false);
+    setLoginPopup(defaultLoginPopupYn === 'Y');
+    setPopupEndDate(defaultPopupEndDate ?? '');
+    setPopupDateError(false);
     setAttachments(defaultAttachments);
     setImageUploadError(null);
     setPasteDebugLog(
@@ -332,6 +343,11 @@ export function NoticeComposerDialog({
       return;
     }
     if (saving || closing) return;
+    const normalizedPopupEndDate = normalizeDateInput(popupEndDate);
+    if (loginPopup && !normalizedPopupEndDate) {
+      setPopupDateError(true);
+      return;
+    }
     if (editorSaveLifecycle.uploadingCount > 0) {
       setImageUploadError('본문 이미지 업로드가 끝난 뒤 저장해 주세요.');
       return;
@@ -360,6 +376,8 @@ export function NoticeComposerDialog({
         await onSubmit({
           title,
           noticeGubunCode,
+          loginPopupYn: loginPopup ? 'Y' : 'N',
+          popupEndDate: loginPopup ? normalizedPopupEndDate : null,
           body,
           bodyJson: JSON.stringify(snapshot.json),
           bodyText,
@@ -517,6 +535,7 @@ export function NoticeComposerDialog({
           }}
           required
           fullWidth
+          size="small"
           margin="none"
           error={noticeGubunError}
           helperText={noticeGubunError ? '구분을 선택해 주세요.' : undefined}
@@ -525,10 +544,6 @@ export function NoticeComposerDialog({
             '& .MuiOutlinedInput-root': {
               bgcolor: fieldSurfaceBackground,
               borderRadius: 1.5,
-              border: 'none',
-              '& fieldset': {
-                border: 'none',
-              },
               '&.Mui-error fieldset': {
                 border: `1px solid ${theme.palette.error.main}`,
               },
@@ -539,6 +554,8 @@ export function NoticeComposerDialog({
             },
             '& .MuiFormLabel-root': {
               color: theme.palette.text.secondary,
+              fontSize: '0.82rem',
+              fontWeight: 600,
             },
           }}
         >
@@ -548,7 +565,38 @@ export function NoticeComposerDialog({
             </MenuItem>
           ))}
         </TextField>
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' },
+          gap: 1.25,
+          flexShrink: 0,
+          alignItems: 'start',
+        }}>
+          <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 1.25, minHeight: 40, display: 'flex', alignItems: 'center' }}>
+            <FormControlLabel
+              label="로그인 시 팝업"
+              control={<Checkbox checked={loginPopup} disabled={saving || closing}
+                onChange={(event) => { setLoginPopup(event.target.checked); setPopupDateError(false); }} />}
+              sx={{ my: 0 }}
+            />
+          </Box>
+          <Box component="fieldset" disabled={!loginPopup || saving || closing}
+            sx={{ border: 0, p: 0, m: 0, minWidth: 0, opacity: loginPopup ? 1 : 0.6 }}>
+            <DateEditor label="팝업 종료일" variant="outlined" autoFocus={false}
+              value={popupEndDate} error={popupDateError}
+              helperText={popupDateError
+                ? (popupEndDate ? '올바른 팝업 종료일을 입력해 주세요.' : '팝업 종료일을 입력해 주세요.')
+                : '종료일 당일까지 팝업을 표시합니다.'}
+              onChange={(value) => { setPopupEndDate(value); setPopupDateError(false); }}
+              onBlur={() => {
+                const normalized = normalizeDateInput(popupEndDate);
+                if (normalized) setPopupEndDate(normalized);
+              }}
+            />
+          </Box>
+        </Box>
         <TextField
+          label="제목"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           fullWidth
@@ -557,16 +605,18 @@ export function NoticeComposerDialog({
           slotProps={{
             input: {
               'aria-label': '제목',
+              sx: {
+                fontSize: '1.25rem',
+                lineHeight: 1.4,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+              },
             },
           }}
           sx={{
             '& .MuiOutlinedInput-root': {
               bgcolor: fieldSurfaceBackground,
               borderRadius: 1.5,
-              border: 'none',
-              '& fieldset': {
-                border: 'none',
-              },
             },
             '& .MuiInputBase-root': {
               bgcolor: fieldSurfaceBackground,
@@ -575,12 +625,6 @@ export function NoticeComposerDialog({
             '& .MuiInputBase-input::placeholder': {
               color: theme.palette.text.disabled,
               opacity: 1,
-            },
-            '& .MuiInputBase-input': {
-              fontSize: '1.25rem',
-              lineHeight: 1.4,
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
             },
             '& .MuiFormLabel-root': {
               color: theme.palette.text.secondary,

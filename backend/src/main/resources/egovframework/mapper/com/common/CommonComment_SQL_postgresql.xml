@@ -13,6 +13,7 @@
         <result property="eventType" column="event_type"/>
         <result property="writerId" column="writer_id"/>
         <result property="writerName" column="writer_name"/>
+        <result property="writerProfileImage" column="writer_profile_image"/>
         <result property="lastModifiedBy" column="last_modified_by"/>
         <result property="lastModifiedByName" column="last_modified_by_name"/>
         <result property="deletedYn" column="deleted_yn"/>
@@ -20,16 +21,32 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
+    <sql id="writerProfileImageSelect">
+        CASE
+            WHEN c.deleted_yn = 'N'
+            THEN la.profile_image
+            ELSE NULL
+        END AS writer_profile_image
+    </sql>
+
+    <sql id="writerProfileImageJoin">
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = c.tenant_id
+         AND la.login_code = c.writer_id
+    </sql>
+
     <select id="selectCommonCommentList" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND owner_type = #{ownerType}
-          AND owner_id = #{ownerId}
-          AND deleted_yn = 'N'
-        ORDER BY created_at ASC
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.owner_type = #{ownerType}
+          AND c.owner_id = #{ownerId}
+          AND c.deleted_yn = 'N'
+        ORDER BY c.created_at ASC
     </select>
 
     <select id="selectCommonCommentPageByOwnerIds" parameterType="map" resultMap="commonCommentMap">
@@ -87,11 +104,13 @@
               </foreach>
               AND NOT child.comment_id = ANY(tree.comment_path)
         )
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM comment_tree
-        ORDER BY owner_id, root_order, comment_path
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM comment_tree c
+        <include refid="writerProfileImageJoin"/>
+        ORDER BY c.owner_id, c.root_order, c.comment_path
     </select>
 
     <select id="selectCommonCommentCountsByOwnerIds" parameterType="map" resultType="map">
@@ -109,32 +128,36 @@
     </select>
 
     <select id="selectApprovalSystemEvents" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND owner_type = 'APPROVAL'
-          AND owner_id = #{ownerId}
-          AND comment_type = 'SYSTEM'
-          AND deleted_yn = 'N'
-        ORDER BY created_at ASC, comment_id ASC
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.owner_type = 'APPROVAL'
+          AND c.owner_id = #{ownerId}
+          AND c.comment_type = 'SYSTEM'
+          AND c.deleted_yn = 'N'
+        ORDER BY c.created_at ASC, c.comment_id ASC
     </select>
 
     <select id="selectApprovalSystemEventsByOwnerIds" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND owner_type = #{ownerType}
-          AND owner_id IN
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.owner_type = #{ownerType}
+          AND c.owner_id IN
           <foreach collection="ownerIds" item="ownerId" open="(" separator="," close=")">
               #{ownerId}
           </foreach>
-          AND comment_type = 'SYSTEM'
-          AND deleted_yn = 'N'
-        ORDER BY owner_id, created_at ASC, comment_id ASC
+          AND c.comment_type = 'SYSTEM'
+          AND c.deleted_yn = 'N'
+        ORDER BY c.owner_id, c.created_at ASC, c.comment_id ASC
     </select>
 
     <select id="selectCommonCommentPage" parameterType="map" resultMap="commonCommentMap">
@@ -189,11 +212,13 @@
               AND child.owner_id = #{ownerId}
               AND NOT child.comment_id = ANY(tree.comment_path)
         )
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM comment_tree
-        ORDER BY root_order, comment_path
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM comment_tree c
+        <include refid="writerProfileImageJoin"/>
+        ORDER BY c.root_order, c.comment_path
     </select>
 
     <select id="selectApprovalUserCommentPage" parameterType="map" resultMap="commonCommentMap">
@@ -250,11 +275,13 @@
               AND child.comment_type = 'USER'
               AND NOT child.comment_id = ANY(tree.comment_path)
         )
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM comment_tree
-        ORDER BY root_order, comment_path
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM comment_tree c
+        <include refid="writerProfileImageJoin"/>
+        ORDER BY c.root_order, c.comment_path
     </select>
 
     <select id="selectApprovalUserCommentPagesByOwnerIds" parameterType="map" resultMap="commonCommentMap">
@@ -316,11 +343,13 @@
               AND child.comment_type = 'USER'
               AND NOT child.comment_id = ANY(tree.comment_path)
         )
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM comment_tree
-        ORDER BY owner_id, root_order, comment_path
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM comment_tree c
+        <include refid="writerProfileImageJoin"/>
+        ORDER BY c.owner_id, c.root_order, c.comment_path
     </select>
 
     <select id="selectApprovalUserCommentCountsByOwnerIds" parameterType="map" resultType="map">
@@ -435,11 +464,13 @@
         SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id,
                c.parent_comment_id, c.content, c.comment_type, c.event_type,
                c.writer_id, c.writer_name, c.last_modified_by, c.last_modified_by_name,
-               c.deleted_yn, c.created_at, c.updated_at
+               c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
         FROM ranked_roots root
         JOIN tb_common_comment c
           ON c.comment_id = root.comment_id
          AND c.owner_id = root.owner_id
+        <include refid="writerProfileImageJoin"/>
         WHERE root.stream_order &lt;= #{limit}
         ORDER BY root.owner_id, root.stream_order
     </select>
@@ -482,11 +513,13 @@
               AND child.comment_type = 'USER'
               AND NOT child.comment_id = ANY(tree.comment_path)
         )
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM comment_tree
-        ORDER BY owner_id, root_created_at, root_comment_id, comment_path
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM comment_tree c
+        <include refid="writerProfileImageJoin"/>
+        ORDER BY c.owner_id, c.root_created_at, c.root_comment_id, c.comment_path
     </select>
 
     <select id="selectApprovalCommentStreamCountsByOwnerIds" parameterType="map" resultType="map">
@@ -568,8 +601,16 @@
         SELECT cursor.comment_id, cursor.tenant_id, cursor.owner_type, cursor.owner_id,
                cursor.parent_comment_id, cursor.content, cursor.comment_type, cursor.event_type,
                cursor.writer_id, cursor.writer_name, cursor.last_modified_by,
-               cursor.last_modified_by_name, cursor.deleted_yn, cursor.created_at, cursor.updated_at
+               cursor.last_modified_by_name, cursor.deleted_yn, cursor.created_at, cursor.updated_at,
+               CASE
+                   WHEN cursor.deleted_yn = 'N'
+                   THEN la.profile_image
+                   ELSE NULL
+               END AS writer_profile_image
         FROM tb_common_comment cursor
+        LEFT JOIN public.tb_login_account la
+          ON la.tenant_id = cursor.tenant_id
+         AND la.login_code = cursor.writer_id
         WHERE cursor.tenant_id = #{tenantId}
           AND cursor.owner_type = 'APPROVAL'
           AND cursor.owner_id = #{ownerId}
@@ -611,26 +652,30 @@
     </select>
 
     <select id="selectApprovalUserCommentById" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND comment_id = #{commentId}
-          AND owner_type = 'APPROVAL'
-          AND owner_id = #{ownerId}
-          AND comment_type = 'USER'
-          AND deleted_yn = 'N'
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.comment_id = #{commentId}
+          AND c.owner_type = 'APPROVAL'
+          AND c.owner_id = #{ownerId}
+          AND c.comment_type = 'USER'
+          AND c.deleted_yn = 'N'
     </select>
 
     <select id="selectCommonCommentById" parameterType="map" resultMap="commonCommentMap">
-        SELECT comment_id, tenant_id, owner_type, owner_id, parent_comment_id,
-               content, comment_type, event_type, writer_id, writer_name, last_modified_by,
-               last_modified_by_name, deleted_yn, created_at, updated_at
-        FROM tb_common_comment
-        WHERE tenant_id = #{tenantId}
-          AND comment_id = #{commentId}
-          AND deleted_yn = 'N'
+        SELECT c.comment_id, c.tenant_id, c.owner_type, c.owner_id, c.parent_comment_id,
+               c.content, c.comment_type, c.event_type, c.writer_id, c.writer_name, c.last_modified_by,
+               c.last_modified_by_name, c.deleted_yn, c.created_at, c.updated_at,
+               <include refid="writerProfileImageSelect"/>
+        FROM tb_common_comment c
+        <include refid="writerProfileImageJoin"/>
+        WHERE c.tenant_id = #{tenantId}
+          AND c.comment_id = #{commentId}
+          AND c.deleted_yn = 'N'
     </select>
 
     <select id="insertCommonComment" parameterType="map" resultType="long">

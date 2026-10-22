@@ -28,7 +28,14 @@ describe('toPageSearchFields', () => {
         field: 'createdAt',
         headerName: '생성일',
         type: 'date',
-        search: { order: 3, span: 3 },
+        search: {
+          order: 3,
+          span: 3,
+          defaultValue: {
+            from: { type: 'systemDate', offset: { months: -1 } },
+            to: { type: 'fixed', year: 2026, month: 10, day: 20 },
+          },
+        },
       },
       {
         field: 'status',
@@ -61,6 +68,10 @@ describe('toPageSearchFields', () => {
         label: '생성일',
         type: 'date',
         searchSpan: 3,
+        defaultValue: {
+          from: { type: 'systemDate', offset: { months: -1 } },
+          to: { type: 'fixed', year: 2026, month: 10, day: 20 },
+        },
       },
       {
         field: 'status',

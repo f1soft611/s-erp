@@ -76,6 +76,8 @@ export function useNoticeMutations({
       bodyJson,
       bodyText,
       noticeGubunCode,
+      loginPopupYn,
+      popupEndDate,
       attachments,
       removedAttachmentIds,
       embeddedImages,
@@ -97,6 +99,8 @@ export function useNoticeMutations({
         contentsJson: safeJson,
         contentsText: safeText,
         noticeGubunCode,
+        loginPopupYn,
+        popupEndDate,
         embeddedImages,
         temporaryImages,
       };

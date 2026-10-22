@@ -23,18 +23,22 @@ describe('DocumentApprovalToolbar', () => {
     const status = within(toolbar).getByText('결재상태');
     const divider = within(toolbar).getByRole('separator');
     const pin = within(toolbar).getByRole('button', { name: '상단고정' });
+    const more = within(toolbar).getByRole('button', { name: '더보기' });
     const orderedElements = [
       within(toolbar).getByRole('button', { name: '승인 액션' }),
       status,
+      within(toolbar).getByText('문서구분'),
       divider,
       pin,
-      within(toolbar).getByRole('button', { name: '더보기' }),
-      within(toolbar).getByText('문서구분'),
+      more,
     ];
 
     expect(getComputedStyle(toolbar).columnGap).toBe('4px');
+    expect(getComputedStyle(divider).height).toBe('20px');
+    expect(getComputedStyle(divider).alignSelf).toBe('center');
     expect(getComputedStyle(status).marginRight).toBe('4px');
     expect(getComputedStyle(pin).marginLeft).toBe('4px');
+    expect(pin.nextElementSibling).toBe(more);
     for (let index = 0; index < orderedElements.length - 1; index += 1) {
       const current = orderedElements[index];
       const next = orderedElements[index + 1];
@@ -45,7 +49,7 @@ describe('DocumentApprovalToolbar', () => {
     }
   });
 
-  it('keeps the divider between status and pin when optional slots are empty', () => {
+  it('keeps the divider after the document kind and before pin when optional slots are empty', () => {
     render(
       <DocumentApprovalToolbar
         status={<span>결재상태</span>}
@@ -56,13 +60,17 @@ describe('DocumentApprovalToolbar', () => {
 
     const toolbar = screen.getByTestId('document-approval-toolbar');
     const status = within(toolbar).getByText('결재상태');
+    const documentKind = within(toolbar).getByText('문서구분');
     const divider = within(toolbar).getByRole('separator');
     const pin = within(toolbar).getByRole('button', { name: '상단고정' });
 
     expect(within(toolbar).queryByRole('button', { name: '승인 액션' })).toBeNull();
     expect(within(toolbar).queryByRole('button', { name: '더보기' })).toBeNull();
     expect(
-      status.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING,
+      status.compareDocumentPosition(documentKind) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      documentKind.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     expect(
       divider.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING,

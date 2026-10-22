@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import type {
   F1GridColumn,
   F1GridPinSide,
@@ -212,10 +213,54 @@ function formatNumericValue(
   }).format(numericValue);
 }
 
+export function getGridDateValue(value: unknown): Date | undefined {
+  if (value instanceof Date) {
+    if (!dayjs(value).isValid()) return undefined;
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value !== 'string') return undefined;
+
+  const match = value.match(/^(\d{4})-?(\d{2})-?(\d{2})(?:$|[T ])/);
+  if (!match) return undefined;
+  const dateText = `${match[1]}-${match[2]}-${match[3]}`;
+  const parsed = dayjs(dateText);
+  if (!parsed.isValid() || parsed.format('YYYY-MM-DD') !== dateText) {
+    return undefined;
+  }
+  return new Date(parsed.year(), parsed.month(), parsed.date());
+}
+
+function formatDateValue(value: unknown, format = 'yyyy-mm-dd'): string {
+  const rawValue = String(value ?? '');
+  if (rawValue === '') return '';
+
+  const dateValue = getGridDateValue(value);
+  if (!dateValue) return rawValue;
+  const parsed = dayjs(dateValue);
+
+  const tokens: Record<string, string> = {
+    yyyy: parsed.format('YYYY'),
+    yy: parsed.format('YY'),
+    mm: parsed.format('MM'),
+    m: parsed.format('M'),
+    dd: parsed.format('DD'),
+    d: parsed.format('D'),
+  };
+  return (format || 'yyyy-mm-dd').replace(
+    /\[([^\]]*)\]|yyyy|YYYY|yy|YY|mm|MM|dd|DD|m|M|d|D/g,
+    (token: string, literal: string | undefined) =>
+      literal ?? tokens[token.toLowerCase()],
+  );
+}
+
 export function getCellDisplayValue<T extends object>(
   column: F1GridColumn<T>,
-  value: T[keyof T],
+  value: unknown,
 ): string {
+  if (column.type === 'date') {
+    return formatDateValue(value, column.format);
+  }
+
   if (column.type === 'user') {
     const selectedValues = Array.isArray(value) ? value : [value];
     return selectedValues

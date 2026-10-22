@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 export type PageSessionStateOptions<T> = {
   version?: number;
   validate?: (value: unknown) => value is T;
+  persistWhen?: boolean | ((value: T) => boolean);
 };
 
 const getSessionStorage = (): Storage | null => {
@@ -99,20 +100,26 @@ export function usePageSessionState<T>(
   options: PageSessionStateOptions<T> = {},
 ) {
   const key = (pageKey || 'page-session').trim();
-  const { version, validate } = options;
+  const { version, validate, persistWhen = true } = options;
   const skipNextPersistRef = useRef(false);
   const [state, setState] = useState<T>(() =>
     readPageSessionState<T>(key, initialState, options),
   );
 
   useEffect(() => {
+    const shouldPersist =
+      typeof persistWhen === 'function' ? persistWhen(state) : persistWhen;
+    if (!shouldPersist) {
+      return;
+    }
+
     if (skipNextPersistRef.current) {
       skipNextPersistRef.current = false;
       return;
     }
 
     writePageSessionState(key, state, { version, validate });
-  }, [key, state, validate, version]);
+  }, [key, persistWhen, state, validate, version]);
 
   const resetState = () => {
     skipNextPersistRef.current = true;

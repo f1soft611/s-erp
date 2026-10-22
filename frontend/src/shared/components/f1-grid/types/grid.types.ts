@@ -38,6 +38,18 @@ export type F1GridNumberFormat = 'number' | 'decimal' | 'currency';
 
 export type F1GridFormMode = 'create' | 'edit';
 
+export type F1GridDateDefault =
+  | { type: 'fixed'; year: number; month: number; day: number }
+  | {
+      type: 'systemDate';
+      offset?: { years?: number; months?: number; days?: number };
+    };
+
+export type F1GridDateRangeDefault = {
+  from?: F1GridDateDefault;
+  to?: F1GridDateDefault;
+};
+
 export type F1GridColumnFormOptions<T extends object> = {
   hidden?: boolean;
   readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
@@ -56,6 +68,7 @@ export type F1GridColumnSearchOptions = {
   group?: string;
   order?: number;
   span?: 1 | 2 | 3 | 4 | 5;
+  defaultValue?: F1GridDateRangeDefault;
 };
 
 export type F1GridRowFormContext<T extends object> = {
@@ -129,7 +142,7 @@ export type F1GridColumn<T extends object> = {
   maxWidth?: number;
   editable?: boolean | ((row: T) => boolean);
   type?: F1GridEditorType;
-  format?: F1GridNumberFormat;
+  format?: string;
   decimalPlaces?: number;
   options?: F1GridOption[];
   userOptions?: F1GridUserOption[];
@@ -268,6 +281,7 @@ export type F1GridProps<T extends object> = {
   disableSorting?: boolean;
   disableFiltering?: boolean;
   disableContextMenu?: boolean;
+  selectRowOnContextMenu?: boolean;
   canExportExcel?: boolean;
   excelFileName?: string;
   allowAddRootInContextMenu?: boolean;

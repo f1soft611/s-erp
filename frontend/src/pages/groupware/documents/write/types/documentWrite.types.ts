@@ -8,7 +8,7 @@ import type { RichTextEditorImage } from '../../../../../shared/components/rich-
 import type { DocumentDateSourceLabel } from '../data/documentDate';
 
 export type DocumentKind = '기안서' | '업무연락' | '지출결의서' | '근태신청';
-export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청';
+export type ApprovalStatus = '임시저장' | '결재진행중' | '승인' | '반려' | '보완요청' | '발송완료';
 export type ApprovalStatusColor = 'default' | 'info' | 'success' | 'error' | 'warning';
 export type ApprovalDocumentStatus =
   | 'DRAFT'
@@ -50,7 +50,7 @@ export type ApprovalLineTemplateSummary = {
   templateId: number;
   name: string;
   eabusNo: ApprovalLineTemplateEabusNo;
-  updatedAt?: string;
+  updatedAt?: string | number | null;
 };
 
 export type ApprovalLineTemplate = ApprovalLineTemplateSummary & {
@@ -78,6 +78,7 @@ export type DocumentWriteItem = {
   submittedDate?: string;
   summary: string;
   isPinned?: boolean;
+  isDrafter?: boolean;
   documentStatus?: ApprovalDocumentStatus;
   feedData?: DocumentApprovalFeedRecord;
 };
@@ -149,11 +150,28 @@ export type DocumentApprovalRecord = {
   documentStatus: ApprovalDocumentStatus;
   title: string;
   drafterName: string;
+  drafterProfileImage?: string | null;
+  isDrafter?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
   submittedAt?: string | null;
   summary: string;
   noticeType?: 'ACTION_REQUIRED' | 'REVISION_REQUESTED' | null;
+};
+
+export type DocumentApprovalPageRequest = {
+  offset: number;
+  limit: number;
+};
+
+export type DocumentApprovalPage<T> = {
+  resultList: T[];
+  totalRowCount: number;
+};
+
+export type DocumentApprovalPinState = {
+  electronicApprovalId: number;
+  pinned: boolean;
 };
 
 export type DocumentApprovalSummary = {
@@ -189,6 +207,7 @@ export type DocumentApprovalSystemEvent = {
   eventType: string;
   content: string;
   writerName: string;
+  writerProfileImage?: string | null;
   createdAt?: string | null;
 };
 
@@ -212,6 +231,7 @@ export type DocumentApprovalDetail = Omit<DocumentApprovalRecord, 'summary'> & {
 
 export type DocumentApprovalFeedRecord = DocumentApprovalRecord &
   Omit<DocumentApprovalDetail, keyof DocumentApprovalRecord> & {
+    isDrafter: boolean;
     contentsText: string;
     systemEvents: DocumentApprovalPageSystemEvent[];
     comments: DocumentApprovalComment[];
@@ -251,6 +271,31 @@ export type DocumentDraftAttachmentResponse = {
 
 export type DocumentApprovalCommentAttachment = DocumentDraftAttachmentResponse;
 
+export type DocumentFileItem = {
+  fileId: number;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+  uploadedByName: string;
+  createdAt: string;
+  electronicApprovalId: number;
+  documentTitle: string;
+  commentId: number | null;
+};
+
+export type DocumentFileQuery = {
+  scope: DocumentApprovalScope;
+  documentType?: DocumentApprovalRecord['documentType'];
+  electronicApprovalId?: number;
+  beforeFileId?: number;
+};
+
+export type DocumentFilePage = {
+  resultList: DocumentFileItem[];
+  hasNext: boolean;
+  nextBeforeFileId: number | null;
+};
+
 export type DocumentApprovalComment = {
   commentId: number;
   tenantId?: number;
@@ -262,6 +307,7 @@ export type DocumentApprovalComment = {
   eventType?: null;
   writerId: string | null;
   writerName: string;
+  writerProfileImage?: string | null;
   deletedYn?: 'Y' | 'N';
   createdAt?: string | null;
   updatedAt?: string | null;

@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { ChipProps } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -20,6 +21,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
+import { ProfileAvatar } from '../ProfileAvatar';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 function getFileBadgeMeta(fileName: string) {
@@ -48,10 +50,12 @@ export type FeedCommentAttachment = {
   size?: number;
   mimeType?: string;
   previewUrl?: string;
+  previewError?: string;
 };
 export type FeedCommentItem = {
   id: string | number;
   author: string;
+  authorProfileImageUrl?: string | null;
   time: string;
   content: string;
   isDeleted?: boolean;
@@ -90,6 +94,7 @@ export type CommentThreadProps = {
     commentId: string | number,
     attachmentId: string,
   ) => Promise<void> | void;
+  onOpenAttachmentImage?: (image: { src: string; alt: string }) => void;
   isDark?: boolean;
   showComposer?: boolean;
   placeholder?: string;
@@ -385,6 +390,9 @@ function CommentItem({
   const isSystemEvent = comment.isSystemEvent === true;
   const canEditAttachments = isEditing;
   const replyCount = comment.replies?.length ?? 0;
+  const imageAttachments = (comment.attachments ?? []).filter((attachment) =>
+    attachment.mimeType?.startsWith('image/'),
+  );
   return (
     <Box
       sx={{
@@ -396,23 +404,20 @@ function CommentItem({
       <Box
         sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}
       >
-        <Box
+        <ProfileAvatar
+          name={comment.author}
+          imageUrl={comment.authorProfileImageUrl}
+          fallback={comment.author.slice(0, 2)}
           sx={{
             width: 28,
             height: 28,
             flexShrink: 0,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             fontSize: '0.65rem',
             fontWeight: 700,
             bgcolor: isDark ? '#334155' : '#e2e8f0',
             color: isDark ? '#e2e8f0' : '#334155',
           }}
-        >
-          {comment.author.slice(0, 2)}
-        </Box>
+        />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack
             direction="row"
@@ -571,10 +576,94 @@ function CommentItem({
                   __html: sanitizeCommentHtml(comment.content),
                 }}
               />
+              {imageAttachments.length > 0 && (
+                <Box
+                  data-testid={`comment-image-previews-${comment.id}`}
+                  sx={{ mt: 0.75, maxWidth: '100%' }}
+                >
+                  {imageAttachments.some((attachment) => attachment.previewUrl) && (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: 76,
+                        overflow: 'hidden',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          height: '100%',
+                          width: '100%',
+                          overflow: 'hidden',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {imageAttachments.map((attachment, index) =>
+                          attachment.previewUrl ? (
+                            <Box
+                              key={attachment.id}
+                              component="button"
+                              type="button"
+                              aria-label={`댓글 이미지 미리보기 ${index + 1}: ${attachment.name}`}
+                              onClick={() =>
+                                props.onOpenAttachmentImage?.({
+                                  src: attachment.previewUrl ?? '',
+                                  alt: attachment.name,
+                                })
+                              }
+                              sx={{
+                                display: 'block',
+                                flexShrink: 0,
+                                width: 112,
+                                height: 76,
+                                p: 0,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                overflow: 'hidden',
+                                bgcolor: 'background.paper',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={attachment.previewUrl}
+                                alt={attachment.name}
+                                sx={{
+                                  display: 'block',
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            </Box>
+                          ) : null,
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
+                  {imageAttachments.map((attachment) =>
+                    attachment.previewError ? (
+                      <Typography
+                        key={`${attachment.id}-preview-error`}
+                        role="alert"
+                        color="error"
+                        variant="body2"
+                        sx={{ mt: 0.5 }}
+                      >
+                        {attachment.previewError}
+                      </Typography>
+                    ) : null,
+                  )}
+                </Box>
+              )}
               {comment.attachments && comment.attachments.length > 0 && (
                 <Box sx={{ mt: 0.75, maxWidth: '100%' }}>
                   <AttachmentList
                     files={comment.attachments}
+                    showImagePreview={false}
                     isDark={isDark}
                     mode={canEditAttachments ? 'edit' : 'view'}
                     showActions
@@ -783,13 +872,16 @@ export function TiptapCommentThread({
   onDeleteComment,
   onDownloadAttachment,
   onDeleteAttachment,
-  isDark = false,
+  onOpenAttachmentImage,
+  isDark: isDarkProp,
   showComposer = true,
   placeholder = '줄바꿈 Shift+Enter, 입력 Enter',
   composerLabel = '댓글 입력',
   submitLabel = '등록',
   expandReplies = false,
 }: CommentThreadProps) {
+  const theme = useTheme();
+  const isDark = isDarkProp ?? theme.palette.mode === 'dark';
   const [replyTargetId, setReplyTargetId] = useState<string | number | null>(
     null,
   );
@@ -805,6 +897,7 @@ export function TiptapCommentThread({
     onDeleteComment,
     onDownloadAttachment,
     onDeleteAttachment,
+    onOpenAttachmentImage,
     isDark,
     showComposer,
     placeholder,

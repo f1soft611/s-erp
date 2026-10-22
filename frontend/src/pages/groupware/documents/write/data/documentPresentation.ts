@@ -65,7 +65,11 @@ function isDocumentType(
 
 export function getApprovalStatusPresentation(
   status: ApprovalDocumentStatus,
+  documentType?: DocumentApprovalRecord['documentType'],
 ): ApprovalStatusPresentation {
+  if (status === 'COMPLETED' && documentType === 'BUSINESS_CONTACT') {
+    return { label: '발송완료', color: 'success', variant: 'filled' };
+  }
   return approvalStatusPresentation[status];
 }
 
@@ -91,6 +95,8 @@ export function getApprovalSystemEventPresentation(
       return getApprovalStatusPresentation('DRAFT');
     case 'SUBMITTED':
       return { ...getApprovalStatusPresentation('PENDING'), label: '결재신청' };
+    case 'RESUBMITTED':
+      return { ...getApprovalStatusPresentation('PENDING'), label: '재상신' };
     case 'SUBMISSION_CANCELED':
       return { ...getApprovalStatusPresentation('REJECTED'), label: '결재신청 취소', variant: 'outlined' };
     case 'APPROVAL_CANCELED':

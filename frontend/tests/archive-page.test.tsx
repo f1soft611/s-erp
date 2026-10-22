@@ -1,24 +1,20 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import dayjs from 'dayjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
-import type {
-  ArchiveAttachment,
-  ArchivePost,
-} from '../src/pages/groupware/community/archive/types/archive.types';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
 
 const archiveServices = vi.hoisted(() => ({
-  fetchArchivePosts: vi.fn(),
-  fetchArchivePostDetail: vi.fn(),
-  createArchivePost: vi.fn(),
-  updateArchivePost: vi.fn(),
-  deleteArchivePost: vi.fn(),
-  uploadArchiveAttachment: vi.fn(),
+  fetchArchiveFiles: vi.fn(),
+  uploadArchiveFile: vi.fn(),
+  updateArchiveFile: vi.fn(),
   deleteArchiveAttachment: vi.fn(),
   downloadArchiveAttachment: vi.fn(),
   fetchCommonCodeGroups: vi.fn(),
   fetchCommonCodeItems: vi.fn(),
+  createCommonCodeItem: vi.fn(),
+  updateCommonCodeItem: vi.fn(),
 }));
 
 vi.mock(
@@ -27,12 +23,9 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../src/pages/groupware/community/archive/services/archiveBoardService')
     >()),
-    fetchArchivePosts: archiveServices.fetchArchivePosts,
-    fetchArchivePostDetail: archiveServices.fetchArchivePostDetail,
-    createArchivePost: archiveServices.createArchivePost,
-    updateArchivePost: archiveServices.updateArchivePost,
-    deleteArchivePost: archiveServices.deleteArchivePost,
-    uploadArchiveAttachment: archiveServices.uploadArchiveAttachment,
+    fetchArchiveFiles: archiveServices.fetchArchiveFiles,
+    uploadArchiveFile: archiveServices.uploadArchiveFile,
+    updateArchiveFile: archiveServices.updateArchiveFile,
     deleteArchiveAttachment: archiveServices.deleteArchiveAttachment,
     downloadArchiveAttachment: archiveServices.downloadArchiveAttachment,
   }),
@@ -46,6 +39,8 @@ vi.mock(
     >()),
     fetchCommonCodeGroups: archiveServices.fetchCommonCodeGroups,
     fetchCommonCodeItems: archiveServices.fetchCommonCodeItems,
+    createCommonCodeItem: archiveServices.createCommonCodeItem,
+    updateCommonCodeItem: archiveServices.updateCommonCodeItem,
   }),
 );
 
@@ -64,24 +59,6 @@ const adminPermissions: MenuPermission = {
   delete: true,
 };
 
-const archivePost: ArchivePost = {
-  postId: 12,
-  title: '업무 가이드',
-  contents: '첫 번째 줄\n두 번째 줄',
-  contentsText: '첫 번째 줄\n두 번째 줄',
-  categoryCode: 'GUIDE',
-  attachmentCount: 1,
-  writerName: '홍길동',
-  createdAt: '2026-10-15T09:00:00',
-};
-
-const attachment: ArchiveAttachment = {
-  boardFileId: 31,
-  postId: 12,
-  fileName: 'guide.pdf',
-  fileSize: 120,
-};
-
 function renderArchive(
   permissions: MenuPermission = adminPermissions,
   isTenantAdmin = true,
@@ -93,7 +70,7 @@ function renderArchive(
       currentPageKey="archive"
       breadcrumbItems={['그룹웨어', '자료실']}
       content={
-        pageContentMap['archive'] ?? {
+        pageContentMap.archive ?? {
           title: '자료실',
           description: '자료실 설명',
           cards: [],
@@ -106,372 +83,257 @@ function renderArchive(
   );
 }
 
-async function openPostDetail() {
-  fireEvent.click(await screen.findByRole('button', { name: /업무 가이드/ }));
-  return screen.findByRole('region', { name: '자료 상세' });
-}
-
-async function openPostActions() {
-  fireEvent.click(await screen.findByRole('button', { name: '자료 더보기' }));
-}
-
-async function choosePostAction(name: string) {
-  await openPostActions();
-  fireEvent.click(await screen.findByRole('menuitem', { name }));
-}
-
 describe('Archive dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    archiveServices.fetchArchivePosts.mockResolvedValue({
-      resultList: [archivePost],
-      resultCnt: 1,
+    archiveServices.fetchArchiveFiles.mockImplementation(async (filters) => ({
+      resultList:
+        filters.folderCode === 'OLD'
+          ? [
+              {
+                boardFileId: 55,
+                postId: 14,
+                fileName: '이전 자료.pdf',
+                writerName: '홍길동',
+                uploadedAt: '2026-10-15T09:00:00',
+                fileSize: 1024,
+                categoryCode: 'OLD',
+              },
+            ]
+          : filters.folderCode === 'MANUAL'
+            ? []
+            : [
+                {
+                  boardFileId: 31,
+                  postId: 12,
+                  fileName: '업무 가이드.pdf',
+                  writerName: '홍길동',
+                  uploadedAt: '2026-10-15T09:00:00',
+                  fileSize: 1024,
+                  categoryCode: 'GUIDE',
+                },
+              ],
+      resultCnt: filters.folderCode === 'MANUAL' ? 0 : 1,
+    }));
+    archiveServices.uploadArchiveFile.mockResolvedValue({
+      boardFileId: 44,
+      postId: 40,
+      fileName: 'new-file.pdf',
+      writerName: '홍길동',
     });
-    archiveServices.fetchArchivePostDetail.mockResolvedValue({
-      ...archivePost,
-      attachments: [attachment],
+    archiveServices.updateArchiveFile.mockResolvedValue({
+      boardFileId: 31,
+      postId: 12,
+      fileName: '새 이름.pdf',
+      categoryCode: 'MANUAL',
     });
-    archiveServices.createArchivePost.mockResolvedValue({
-      ...archivePost,
-      postId: 42,
-    });
-    archiveServices.updateArchivePost.mockResolvedValue(archivePost);
-    archiveServices.deleteArchivePost.mockResolvedValue(undefined);
-    archiveServices.uploadArchiveAttachment.mockResolvedValue(attachment);
     archiveServices.deleteArchiveAttachment.mockResolvedValue(undefined);
     archiveServices.downloadArchiveAttachment.mockResolvedValue(undefined);
     archiveServices.fetchCommonCodeGroups.mockResolvedValue([
       { id: 8, groupCode: 'WF_ARCHIVE_CATEGORY', useAt: 'Y' },
     ]);
     archiveServices.fetchCommonCodeItems.mockResolvedValue([
-      { itemCode: 'GUIDE', itemNm: '업무양식', useAt: 'Y' },
-      { itemCode: 'MANUAL', itemNm: '매뉴얼', useAt: 'Y' },
-      { itemCode: 'DISABLED', itemNm: '비활성 분류', useAt: 'N' },
+      { id: '21', groupId: '8', itemCode: 'GUIDE', itemNm: '업무양식', useAt: 'Y' },
+      { id: '22', groupId: '8', itemCode: 'MANUAL', itemNm: '매뉴얼', useAt: 'Y' },
+      { id: '23', groupId: '8', itemCode: 'OLD', itemNm: '이전 폴더', useAt: 'N' },
     ]);
+    archiveServices.createCommonCodeItem.mockResolvedValue(undefined);
+    archiveServices.updateCommonCodeItem.mockResolvedValue(undefined);
   });
 
-  it('dispatches the groupware archive key to the 자료실 page', async () => {
-    expect('archive' in pageContentMap).toBe(true);
+  it('renders the folder and file sections with folder navigation', async () => {
     renderArchive();
-
     expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
+    expect(screen.getByText('폴더')).toBeInTheDocument();
+    expect(screen.getByText('파일')).toBeInTheDocument();
     expect(
-      screen.queryByRole('table', { name: '자료실 목록' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getAllByRole('textbox', { name: '자료 검색' })).toHaveLength(
-      1,
-    );
-  });
+      screen.getByRole('button', { name: '폴더 접기' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '파일 접기' })).toBeInTheDocument();
+    expect(await screen.findByText('업무양식')).toBeInTheDocument();
+    expect(screen.getByText('매뉴얼')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '업무양식' }));
 
-  it('provides active common-code categories in detailed search and the editor', async () => {
-    renderArchive();
-
-    fireEvent.click(
-      await screen.findByRole('button', { name: '상세 검색 열기' }),
-    );
-    const detailSearch = screen.getByRole('dialog', { name: '상세 검색' });
-    const filter = within(detailSearch).getByRole('combobox', { name: '분류' });
-    fireEvent.mouseDown(filter);
-    expect(await screen.findByRole('option', { name: '업무양식' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '매뉴얼' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: '비활성 분류' })).not.toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole('option', { name: '매뉴얼' }));
-    fireEvent.click(within(detailSearch).getByRole('button', { name: '조회' }));
     await waitFor(() =>
-      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
-        1,
-        expect.any(Number),
-        '',
-        'MANUAL',
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ folderCode: 'GUIDE' }),
         expect.any(AbortSignal),
       ),
     );
+    fireEvent.click(screen.getByRole('button', { name: '자료실' }));
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ folderCode: '' }),
+        expect.any(AbortSignal),
+      ),
+    );
+  }, 15000);
 
-    fireEvent.click(screen.getByRole('button', { name: '새 자료 등록' }));
-    const editorCategory = await screen.findByRole('combobox', { name: '자료 분류' });
-    fireEvent.mouseDown(editorCategory);
-    expect(await screen.findByRole('option', { name: '업무양식' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: '비활성 분류' })).not.toBeInTheDocument();
+  it('shows Excel export without root-add in the archive tree context menu', async () => {
+    renderArchive();
+    const grid = await screen.findByRole('grid', { name: '자료실' });
+
+    fireEvent.contextMenu(grid);
+
+    expect(
+      screen.queryByRole('menuitem', { name: '루트 추가' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).toBeVisible();
   });
 
-  it('sends integrated search through the server keyword and resets pagination', async () => {
+  it('sends keyword search to file-list API', async () => {
     renderArchive();
-
     const search = await screen.findByRole('textbox', { name: '자료 검색' });
     fireEvent.change(search, { target: { value: '홍길동' } });
     fireEvent.keyDown(search, { key: 'Enter' });
 
     await waitFor(() =>
-      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
-        1,
-        expect.any(Number),
-        '홍길동',
-        '',
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: '홍길동' }),
         expect.any(AbortSignal),
       ),
     );
   });
 
-  it('preserves integrated search when applying a detailed category filter', async () => {
+  it('initializes detailed date controls and summary to the recent year', async () => {
     renderArchive();
-
-    const search = await screen.findByRole('textbox', { name: '자료 검색' });
-    fireEvent.change(search, { target: { value: 'policy' } });
-    fireEvent.keyDown(search, { key: 'Enter' });
-    await waitFor(() =>
-      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
-        1,
-        expect.any(Number),
-        'policy',
-        '',
-        expect.any(AbortSignal),
-      ),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
-    const detailSearch = screen.getByRole('dialog', { name: '상세 검색' });
-    fireEvent.mouseDown(
-      within(detailSearch).getByRole('combobox', { name: '분류' }),
-    );
-    fireEvent.click(await screen.findByRole('option', { name: '매뉴얼' }));
-    fireEvent.click(within(detailSearch).getByRole('button', { name: '조회' }));
-
-    await waitFor(() =>
-      expect(archiveServices.fetchArchivePosts).toHaveBeenLastCalledWith(
-        1,
-        expect.any(Number),
-        'policy',
-        'MANUAL',
-        expect.any(AbortSignal),
-      ),
-    );
-  });
-
-  it('loads detail, preserves multiline plain text, and downloads each attachment individually', async () => {
-    renderArchive();
-    const detail = await openPostDetail();
-
-    expect(archiveServices.fetchArchivePostDetail).toHaveBeenCalledWith(12);
-    expect(screen.getByLabelText('자료 설명').textContent).toBe(
-      '첫 번째 줄\n두 번째 줄',
-    );
-    expect(within(detail).getByText('업무양식')).toBeInTheDocument();
-    expect(screen.getByText('guide.pdf')).toBeInTheDocument();
-    expect(screen.getByTestId('archive-attachment-list')).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole('button', { name: '첨부 파일 다운로드' }),
-    );
-    await waitFor(() =>
-      expect(archiveServices.downloadArchiveAttachment).toHaveBeenCalledWith(
-        attachment,
-      ),
-    );
-  });
-
-  it('shows each mutation only when tenant-admin and its menu permission are both granted', async () => {
-    const permissions = { ...adminPermissions, create: false, update: false, delete: true };
-    renderArchive(permissions, true);
-    expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '새 자료 등록' })).not.toBeInTheDocument();
-
-    await openPostDetail();
-    await openPostActions();
-    expect(screen.queryByRole('menuitem', { name: '수정' })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '삭제' })).toBeInTheDocument();
-  });
-
-  it('hides all mutation actions when the user is not a tenant administrator', async () => {
-    renderArchive(adminPermissions, false);
-    expect(screen.queryByRole('button', { name: '새 자료 등록' })).not.toBeInTheDocument();
-
-    await openPostDetail();
+    const today = dayjs().format('YYYY-MM-DD');
+    const lastYear = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
     expect(
-      screen.queryByRole('button', { name: '자료 더보기' }),
-    ).not.toBeInTheDocument();
+      await screen.findByLabelText('적용된 날짜: 최근 1년'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+
+    expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue(lastYear);
+    expect(screen.getByLabelText('올린 날짜 종료일')).toHaveValue(today);
   });
 
-  it('creates the post before uploading files and reports partial upload failure without discarding the draft', async () => {
-    archiveServices.uploadArchiveAttachment.mockRejectedValueOnce(
-      new Error('파일 업로드 실패'),
-    );
+  it('submits date and file type filters from detailed search', async () => {
     renderArchive();
-    fireEvent.click(await screen.findByRole('button', { name: '새 자료 등록' }));
-
-    fireEvent.change(await screen.findByRole('textbox', { name: '제목' }), {
-      target: { value: '신규 가이드' },
+    fireEvent.click(
+      await screen.findByRole('button', { name: '상세 검색 열기' }),
+    );
+    fireEvent.change(screen.getByLabelText('올린 날짜 시작일'), {
+      target: { value: '2026-01-01' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: '설명' }), {
-      target: { value: '설명 초안' },
+    fireEvent.change(screen.getByLabelText('올린 날짜 종료일'), {
+      target: { value: '2026-10-20' },
     });
-    const category = screen.getByRole('combobox', { name: '자료 분류' });
-    fireEvent.mouseDown(category);
-    fireEvent.click(await screen.findByRole('option', { name: '업무양식' }));
-    fireEvent.change(screen.getByLabelText('첨부파일 추가'), {
-      target: { files: [new File(['file'], 'draft.txt', { type: 'text/plain' })] },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '유형' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
 
     await waitFor(() =>
-      expect(archiveServices.createArchivePost).toHaveBeenCalledWith({
-        title: '신규 가이드',
-        contents: '설명 초안',
-        categoryCode: 'GUIDE',
-      }),
-    );
-    expect(archiveServices.uploadArchiveAttachment).toHaveBeenCalledWith(
-      42,
-      expect.objectContaining({ name: 'draft.txt' }),
-    );
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'draft.txt 업로드 실패: 파일 업로드 실패',
-    );
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('신규 가이드');
-    expect(screen.getByRole('textbox', { name: '설명' })).toHaveValue('설명 초안');
-  });
-
-  it('disables editor fields and attachment controls while a file upload is pending', async () => {
-    let resolveUpload!: (value: ArchiveAttachment) => void;
-    const pendingUpload = new Promise<ArchiveAttachment>((resolve) => {
-      resolveUpload = resolve;
-    });
-    archiveServices.fetchArchivePostDetail.mockResolvedValueOnce({
-      ...archivePost,
-      attachments: [
-        attachment,
-        { ...attachment, boardFileId: 32, fileName: 'template.docx' },
-      ],
-    });
-    archiveServices.uploadArchiveAttachment.mockReturnValueOnce(pendingUpload);
-    renderArchive();
-    await openPostDetail();
-    await choosePostAction('수정');
-    const title = await screen.findByRole('textbox', { name: '제목' });
-    const category = screen.getByRole('combobox', { name: '자료 분류' });
-    const fileInput = screen.getByLabelText('첨부파일 추가');
-    fireEvent.click((await screen.findAllByRole('button', { name: '제거' }))[0]);
-    fireEvent.change(fileInput, {
-      target: { files: [new File(['file'], 'pending.txt', { type: 'text/plain' })] },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    await waitFor(() =>
-      expect(archiveServices.uploadArchiveAttachment).toHaveBeenCalled(),
-    );
-    expect(title).toBeDisabled();
-    expect(screen.getByRole('textbox', { name: '설명' })).toBeDisabled();
-    expect(category).toHaveAttribute('aria-disabled', 'true');
-    expect(fileInput).toBeDisabled();
-    expect(screen.getByRole('button', { name: '파일 추가' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    screen
-      .getAllByRole('button', { name: '제거' })
-      .forEach((button) => expect(button).toBeDisabled());
-    expect(screen.getByRole('button', { name: '복원' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '제외' })).toBeDisabled();
-
-    await act(async () => {
-      resolveUpload(attachment);
-      await pendingUpload;
-    });
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('dialog', { name: '자료 수정' }),
-      ).not.toBeInTheDocument(),
-    );
-  });
-
-  it('retains existing attachments during edits unless they are explicitly removed', async () => {
-    renderArchive();
-    await openPostDetail();
-    await choosePostAction('수정');
-    expect(await screen.findAllByText('guide.pdf')).not.toHaveLength(0);
-
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() =>
-      expect(archiveServices.updateArchivePost).toHaveBeenCalledWith(
-        12,
-        expect.objectContaining({ title: '업무 가이드' }),
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          uploadedFrom: '2026-01-01',
+          uploadedTo: '2026-10-20',
+          fileType: 'PDF',
+        }),
+        expect.any(AbortSignal),
       ),
     );
-    expect(archiveServices.deleteArchiveAttachment).not.toHaveBeenCalled();
+  }, 15000);
+
+  it('opens common-code management for folder creation only when permitted', async () => {
+    const first = renderArchive();
+    expect(await screen.findByText('업무 가이드.pdf')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '새 폴더' }));
+
+    expect(
+      await screen.findByRole('grid', { name: '자료실 폴더 목록' }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).toBeNull(),
+    );
+    first.unmount();
   });
 
-  it('keeps a failed attachment removal retryable and reports which file failed', async () => {
-    archiveServices.deleteArchiveAttachment.mockRejectedValueOnce(
-      new Error('파일 삭제 실패'),
+  it('hides create actions when create permission is absent', async () => {
+    renderArchive(
+      { read: true, create: false, update: false, delete: false },
+      true,
     );
+    expect(await screen.findByText('업무 가이드.pdf')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).toBeNull(),
+    );
+    expect(screen.queryByRole('button', { name: '파일 업로드' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '새 폴더' })).toBeNull();
+  });
+
+  it('shows edit and delete actions only for the corresponding permissions', async () => {
+    renderArchive({ read: true, create: true, update: false, delete: false });
+    expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '파일 정보 수정' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
+  });
+
+  it('opens the edit dialog and updates the file name and folder', async () => {
     renderArchive();
-    await openPostDetail();
-    await choosePostAction('수정');
-    fireEvent.click(await screen.findByRole('button', { name: '제거' }));
+    fireEvent.click(await screen.findByRole('button', { name: '파일 정보 수정' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '파일명' }), {
+      target: { value: '새 이름.pdf' },
+    });
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '저장 폴더' }));
+    fireEvent.click(await screen.findByRole('option', { name: '매뉴얼' }));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'guide.pdf 제거 실패: 파일 삭제 실패',
+    await waitFor(() =>
+      expect(archiveServices.updateArchiveFile).toHaveBeenCalledWith(
+        31,
+        { postId: 12, fileName: '새 이름.pdf', folderCode: 'MANUAL' },
+      ),
     );
-    expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue('업무 가이드');
-    expect(screen.getByRole('button', { name: '복원' })).toBeInTheDocument();
+  }, 15000);
+
+  it('keeps files in inactive folders downloadable and read-only', async () => {
+    renderArchive();
+    fireEvent.click(await screen.findByRole('button', { name: '이전 폴더' }));
+
+    expect(await screen.findByText('이전 자료.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다운로드' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '파일 정보 수정' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
   });
 
-  it('requires confirmation before deleting a post', async () => {
+  it('confirms a file deletion before sending the request', async () => {
     renderArchive();
-    await openPostDetail();
-    await choosePostAction('삭제');
-
-    const dialog = await screen.findByRole('dialog', { name: /자료 삭제 확인/ });
-    expect(within(dialog).getByText(/삭제하시겠습니까/)).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: '삭제 확인' }));
+    fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+    expect(
+      await screen.findByRole('dialog', { name: '자료 삭제 확인' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '삭제 확인' }));
 
     await waitFor(() =>
-      expect(archiveServices.deleteArchivePost).toHaveBeenCalledWith(12),
+      expect(archiveServices.deleteArchiveAttachment).toHaveBeenCalledWith(31, 12),
     );
   });
 
-  it('disables the detail delete action while deletion is pending', async () => {
-    let resolveDelete!: () => void;
-    const pendingDelete = new Promise<void>((resolve) => {
-      resolveDelete = resolve;
-    });
-    archiveServices.deleteArchivePost.mockReturnValueOnce(pendingDelete);
+  it('opens file picker and uploads selected files immediately', async () => {
     renderArchive();
-    await openPostDetail();
-    await choosePostAction('삭제');
-    const dialog = await screen.findByRole('dialog', {
-      name: /자료 삭제 확인/,
+    const upload = await screen.findByLabelText('자료 파일 선택');
+    const first = new File(['first'], 'first.pdf', { type: 'application/pdf' });
+    const second = new File(['second'], 'second.pdf', {
+      type: 'application/pdf',
     });
-    fireEvent.click(within(dialog).getByRole('button', { name: '삭제 확인' }));
+
+    fireEvent.change(upload, { target: { files: [first, second] } });
 
     await waitFor(() =>
-      expect(archiveServices.deleteArchivePost).toHaveBeenCalledWith(12),
+      expect(archiveServices.uploadArchiveFile).toHaveBeenCalledTimes(2),
     );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('dialog', { name: /자료 삭제 확인/ }),
-      ).not.toBeInTheDocument(),
+    expect(archiveServices.uploadArchiveFile).toHaveBeenNthCalledWith(
+      1,
+      first,
+      undefined,
     );
-    await openPostActions();
-    expect(screen.getByRole('menuitem', { name: '삭제' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
+    expect(archiveServices.uploadArchiveFile).toHaveBeenNthCalledWith(
+      2,
+      second,
+      undefined,
     );
-
-    await act(async () => {
-      resolveDelete();
-      await pendingDelete;
-    });
-  });
-
-  it('renders a retry action for list failures rather than an empty success state', async () => {
-    archiveServices.fetchArchivePosts
-      .mockRejectedValueOnce(new Error('일시적인 오류'))
-      .mockResolvedValueOnce({ resultList: [], resultCnt: 0 });
-    renderArchive();
-
-    expect(await screen.findByText(/일시적인 오류/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-    expect(await screen.findByText(/등록된 자료가 없습니다/)).toBeInTheDocument();
   });
 });

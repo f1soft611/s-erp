@@ -844,9 +844,17 @@ export function DocumentApprovalSettingsDialog({
       editable: false,
       align: 'center',
       renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'center',
+            gap: 0.5,
+          }}
+        >
           <Button
             size="small"
+            sx={{ minWidth: 0, px: 0.75 }}
             aria-label={`결재선 적용 ${row.name}`}
             disabled={favoriteOperation !== null}
             onClick={(event) => {
@@ -862,6 +870,7 @@ export function DocumentApprovalSettingsDialog({
           <Button
             size="small"
             color="error"
+            sx={{ minWidth: 0, px: 0.75 }}
             aria-label={`결재선 삭제 ${row.name}`}
             disabled={favoriteOperation !== null}
             onClick={(event) => {

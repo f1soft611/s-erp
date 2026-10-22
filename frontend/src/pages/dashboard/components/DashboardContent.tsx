@@ -161,6 +161,7 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }

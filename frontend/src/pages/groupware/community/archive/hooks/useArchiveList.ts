@@ -1,63 +1,66 @@
-import { useCallback, useMemo, useState } from 'react';
-import { fetchArchivePosts } from '../services/archiveBoardService';
-import type { F1GridDataSource } from '../../../../../shared/components/f1-grid';
-import type { ArchivePost } from '../types/archive.types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import dayjs from 'dayjs';
+import { fetchArchiveFiles } from '../services/archiveBoardService';
+import type {
+  ArchiveFileRow,
+  ArchiveFileSearchFilters,
+} from '../types/archive.types';
 
-type UseArchiveListOptions = {
-  pageUnit?: number;
-  retryToken?: number;
-};
-
-type ArchiveListFilters = {
-  keyword: string;
-  categoryCode: string;
-};
-
-export function useArchiveList({
-  pageUnit = 20,
-  retryToken = 0,
-}: UseArchiveListOptions = {}) {
-  const [filters, setFilters] = useState<ArchiveListFilters>({
-    keyword: '',
-    categoryCode: '',
-  });
-  const dataSource = useMemo<F1GridDataSource<ArchivePost>>(
-    () => ({
-      pageSize: pageUnit,
-      async load({ offset, limit, signal }) {
-        const result = await fetchArchivePosts(
-          Math.floor(offset / limit) + 1,
-          limit,
-          filters.keyword,
-          filters.categoryCode,
-          signal,
-        );
-        return {
-          rows: result.resultList,
-          totalRowCount: result.resultCnt,
-        };
-      },
-    }),
-    [filters, pageUnit, retryToken],
-  );
-
-  const setKeyword = useCallback((keyword: string) => {
-    setFilters((current) =>
-      current.keyword === keyword ? current : { ...current, keyword },
-    );
-  }, []);
-  const setCategoryCode = useCallback((categoryCode: string) => {
-    setFilters((current) =>
-      current.categoryCode === categoryCode ? current : { ...current, categoryCode },
-    );
-  }, []);
-
+function createInitialFilters(): ArchiveFileSearchFilters {
+  const today = dayjs();
   return {
-    dataSource,
-    pageUnit,
-    keyword: filters.keyword,
-    categoryCode: filters.categoryCode,
-    setKeyword,
-    setCategoryCode,
+    keyword: '',
+    folderCode: '',
+    uploadedFrom: today.subtract(1, 'year').format('YYYY-MM-DD'),
+    uploadedTo: today.format('YYYY-MM-DD'),
+    fileType: 'ALL',
   };
+}
+
+function asError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+export function useArchiveList() {
+  const [filters, setFilters] =
+    useState<ArchiveFileSearchFilters>(createInitialFilters);
+  const [rows, setRows] = useState<ArchiveFileRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+  const requestSequence = useRef(0);
+
+  useEffect(() => {
+    const currentRequest = ++requestSequence.current;
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError(null);
+
+    void fetchArchiveFiles(filters, controller.signal)
+      .then((result) => {
+        if (currentRequest === requestSequence.current) {
+          setRows(result.resultList);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted || currentRequest !== requestSequence.current) {
+          return;
+        }
+        setRows([]);
+        setError(asError(cause));
+      })
+      .finally(() => {
+        if (currentRequest === requestSequence.current) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [filters, retryToken]);
+
+  const retry = useCallback(() => {
+    setRetryToken((current) => current + 1);
+  }, []);
+
+  return { filters, setFilters, rows, isLoading, error, retry };
 }

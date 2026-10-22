@@ -35,6 +35,8 @@ public class NoticeBoardPostVO implements Serializable {
     private String writerId;
     @Schema(description = "작성자명")
     private String writerName;
+    @Schema(description = "작성자 프로필 이미지")
+    private String writerProfileImage;
     @Schema(description = "마지막 행위자 ID")
     private String lastModifiedBy;
     @Schema(description = "마지막 행위자명")
@@ -43,6 +45,15 @@ public class NoticeBoardPostVO implements Serializable {
     private Integer viewCount;
     @Schema(description = "상단 고정 여부")
     private String isPinned;
+    @Schema(description = "로그인 팝업 여부 Y/N")
+    private String loginPopupYn;
+    @Schema(description = "팝업 종료일 YYYY-MM-DD")
+    private String popupEndDate;
+
+    public String getLoginPopupYn() { return loginPopupYn; }
+    public void setLoginPopupYn(String loginPopupYn) { this.loginPopupYn = loginPopupYn; }
+    public String getPopupEndDate() { return popupEndDate; }
+    public void setPopupEndDate(String popupEndDate) { this.popupEndDate = popupEndDate; }
     @Schema(description = "삭제 여부")
     private String isDeleted;
     @Schema(description = "등록 일시")
@@ -183,6 +194,16 @@ public class NoticeBoardPostVO implements Serializable {
     @Generated
     public void setWriterName(String writerName) {
         this.writerName = writerName;
+    }
+
+    @Generated
+    public String getWriterProfileImage() {
+        return writerProfileImage;
+    }
+
+    @Generated
+    public void setWriterProfileImage(String writerProfileImage) {
+        this.writerProfileImage = writerProfileImage;
     }
 
     @Generated

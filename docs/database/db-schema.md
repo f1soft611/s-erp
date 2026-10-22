@@ -371,6 +371,8 @@
 | category_code         | varchar   | 게시판 종류별 공통 분류 코드 |
 | view_count            | int       | 조회수                       |
 | is_pinned             | char      | 상단 고정 여부 (`Y`/`N`)     |
+| login_popup_yn        | char(1)   | 로그인 팝업 여부, 기본 N (20261022_004 미적용 migration) |
+| popup_end_date        | date      | 팝업 종료일, 해당 한국 날짜까지 유효 (위 migration) |
 | is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
 | created_at            | timestamp | 생성 일시                    |
 | updated_at            | timestamp | 수정 일시                    |
@@ -409,6 +411,18 @@
 
 - 첨부 파일 메타데이터를 보관
 - 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
+
+### tb_notice_popup_dismissal (20261022_004 migration, 실제 DB 미적용)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| tenant_id | bigint | tenant FK, 복합 PK |
+| post_id | bigint | 공지 FK, 복합 PK, 삭제 시 cascade |
+| login_id | bigint | 로그인 FK, 복합 PK, 삭제 시 cascade |
+| dismissed_on | date | Asia/Seoul 기준 마지막 하루 숨김 날짜 |
+
+`backend/DATABASE/20261022` 및 `docs/database/20261022`의 `20261022_004` SQL/변경 이력/롤백 참조.
+기존 최초 조회수 이력과 별개이며 과거 숨김 일자는 다음 날짜 팝업 노출을 막지 않는다.
 
 ### 2-19. tb_board_post_view_history
 
@@ -670,8 +684,28 @@
 
 ---
 
+### 2-31. tb_electronic_approval_pin
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| tenant_id | bigint | 소속 tenant FK |
+| user_id | bigint | 고정한 사용자 FK |
+| electronic_approval_id | bigint | 고정한 전자결재 문서 FK |
+| created_at | timestamp | 고정 생성 시각 |
+
+제약/역할:
+
+- `(tenant_id, user_id, electronic_approval_id)` 복합 PK로 사용자별 중복 고정을 차단한다. PK 인덱스의 `(tenant_id, user_id)` 선두 컬럼은 현재 사용자의 전체 고정 목록 조회를 지원한다.
+- `tenant_id`와 `user_id`는 각각 `tb_tenant`와 `tb_user`를 참조하며, `(tenant_id, electronic_approval_id)` 복합 FK는 동일 tenant의 문서를 참조한다.
+- 문서·사용자 또는 tenant가 실제 삭제되면 해당 pin 관계도 cascade 삭제한다.
+- `idx_electronic_approval_pin_document`는 문서 FK 조회를 지원한다.
+- `20261020_007` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
+
+---
+
 ## 변경 이력
 
+- 2026-10-20: 전자결재 문서의 개인별 고정 기능을 위해 `tb_electronic_approval_pin`과 사용자·tenant·문서 FK, 조회 인덱스를 추가하는 `20261020_007` migration 초안을 정의했다. 기본 읽기 전용 PostgreSQL MCP에서 `tb_electronic_approval_main`, `tb_user`, `tb_tenant`의 메타데이터를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
 - 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
 - 2026-10-15: 커뮤니티 게시글의 tenant 격리 및 공유 분류 저장을 위해 `tb_board_post.tenant_id`와 `category_code` 전환 migration 초안을 정의했다. 단일 tenant guard가 충족되지 않으면 백필을 중단하며 롤백은 여러 tenant 게시글이 있으면 거부한다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
 - 2026-10-14: 전자결재 기안 상신 취소 및 결재자 승인 취소 이력을 위해 `tb_common_comment` SYSTEM event CHECK에 `SUBMISSION_CANCELED`, `APPROVAL_CANCELED` 허용을 추가하는 `20261014_003` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 이벤트 계약을 확인했으며 USER NULL 조건과 기존 SYSTEM 이벤트를 보존했다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.

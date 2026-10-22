@@ -23,7 +23,8 @@ export type CommonDialogProps = {
   open: boolean;
   onClose: () => void;
   title: string;
-  description?: string;
+  description?: ReactNode;
+  titleAside?: ReactNode;
   children: ReactNode;
   footerStart?: ReactNode;
   actions?: ReactNode;
@@ -43,6 +44,7 @@ export function CommonDialog({
   onClose,
   title,
   description,
+  titleAside,
   children,
   footerStart,
   actions,
@@ -123,7 +125,16 @@ export function CommonDialog({
           py: 1.75,
         }}
       >
-        <Box sx={{ minWidth: 0, width: '100%' }}>
+        <Box sx={{
+          minWidth: 0,
+          width: '100%',
+          ...(titleAside ? {
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) auto',
+            alignItems: 'center',
+            columnGap: 1.5,
+          } : {}),
+        }}>
           <DialogTitle
             component="h2"
             id={titleId}
@@ -137,12 +148,13 @@ export function CommonDialog({
           >
             {title}
           </DialogTitle>
+          {titleAside}
           {description && (
             <Typography
               id={descriptionId}
               component="p"
               variant="body2"
-              sx={{ color: 'text.secondary', mt: 0.5 }}
+              sx={{ color: 'text.secondary', mt: 0.5, ...(titleAside ? { gridColumn: '1 / -1' } : {}) }}
             >
               {description}
             </Typography>

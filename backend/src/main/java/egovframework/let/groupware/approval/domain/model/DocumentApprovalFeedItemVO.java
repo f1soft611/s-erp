@@ -3,7 +3,6 @@ package egovframework.let.groupware.approval.domain.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.common.domain.model.CommonFileVO;
 
@@ -13,8 +12,8 @@ public class DocumentApprovalFeedItemVO extends DocumentApprovalListItemVO {
     private String contentsJson;
     private String contentsHtml;
     private String contentsText;
+    private String drafterProfileImage;
     private Integer viewCount;
-    private boolean isDrafter;
     private List<DocumentApprovalLineVO> approvalLines = new ArrayList<>();
     private List<CommonFileVO> attachments = new ArrayList<>();
     private List<CommonCommentVO> systemEvents = new ArrayList<>();
@@ -33,12 +32,12 @@ public class DocumentApprovalFeedItemVO extends DocumentApprovalListItemVO {
     public void setContentsHtml(String contentsHtml) { this.contentsHtml = contentsHtml; }
     public String getContentsText() { return contentsText; }
     public void setContentsText(String contentsText) { this.contentsText = contentsText; }
+    public String getDrafterProfileImage() { return drafterProfileImage; }
+    public void setDrafterProfileImage(String drafterProfileImage) {
+        this.drafterProfileImage = drafterProfileImage;
+    }
     public Integer getViewCount() { return viewCount; }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
-    @JsonProperty("isDrafter")
-    public boolean isDrafter() { return isDrafter; }
-    @JsonProperty("isDrafter")
-    public void setDrafter(boolean drafter) { isDrafter = drafter; }
     public List<DocumentApprovalLineVO> getApprovalLines() { return approvalLines; }
     public void setApprovalLines(List<DocumentApprovalLineVO> approvalLines) {
         this.approvalLines = approvalLines == null ? new ArrayList<>() : approvalLines;

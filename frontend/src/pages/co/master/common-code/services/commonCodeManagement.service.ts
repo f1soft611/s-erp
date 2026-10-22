@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
+import { apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
 import type {
   CommonCodeGroupRow,
   CommonCodeItemRow,
@@ -14,6 +14,11 @@ export type CommonCodeBatchPayload = {
   groups: CommonCodeBatchChangeSet<CommonCodeGroupRow>;
   items: CommonCodeBatchChangeSet<CommonCodeItemRow>;
 };
+
+export type CommonCodeItemSavePayload = Pick<
+  CommonCodeItemRow,
+  'itemCode' | 'itemNm' | 'itemDc' | 'sortOrder' | 'useAt'
+>;
 
 export type CommonCodeGroupSearchFilters = {
   keyword?: string;
@@ -153,4 +158,22 @@ export function buildCommonCodeBatchPayload(payload: {
 
 export async function saveCommonCodeBatch(payload: CommonCodeBatchPayload) {
   return apiPost('/api/v1/co/master/common-code/save-batch', payload);
+}
+
+export function createCommonCodeItem(
+  groupId: string,
+  payload: CommonCodeItemSavePayload,
+) {
+  return apiPost(`/api/v1/co/master/common-code/groups/${groupId}/items`, payload);
+}
+
+export function updateCommonCodeItem(
+  groupId: string,
+  itemId: string,
+  payload: CommonCodeItemSavePayload,
+) {
+  return apiPut(
+    `/api/v1/co/master/common-code/groups/${groupId}/items/${itemId}`,
+    payload,
+  );
 }

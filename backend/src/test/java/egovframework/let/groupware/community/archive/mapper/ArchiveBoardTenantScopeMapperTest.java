@@ -80,6 +80,49 @@ class ArchiveBoardTenantScopeMapperTest {
                 .contains("board_type_code = 'ARCHIVE'", "write_auth_level", "file_upload_yn", "use_yn");
     }
 
+    @Test
+    void fileListMapperScopesTenantAndFiltersWithoutPaging() throws Exception {
+        Configuration configuration = parse();
+        BoundSql list = sql(configuration, "selectArchiveFileList");
+        assertThat(list.getSql()).contains("f.tenant_id = ?", "p.tenant_id = ?", "p.board_type_code = 'ARCHIVE'",
+                "f.owner_type = 'ARCHIVE'", "f.file_usage_type = 'ATTACHMENT'", "f.deleted_yn = 'N'",
+                "p.category_code = ?", "f.created_at >= CAST(? AS date)",
+                "f.created_at < CAST(? AS date) + INTERVAL '1 day'", "f.mime_type",
+                "LOWER(COALESCE(f.mime_type, '')) = 'application/pdf'",
+                "LOWER(f.file_name) LIKE '%.pdf'", "ORDER BY f.created_at DESC, f.file_id DESC")
+                .doesNotContain("LIMIT", "OFFSET");
+        assertThat(properties(list)).contains("tenantId", "keyword", "folderCode", "uploadedFrom", "uploadedTo")
+                .doesNotContain("offset", "limit");
+
+        BoundSql count = sql(configuration, "selectArchiveFileCount");
+        assertThat(properties(count)).contains("tenantId", "keyword", "folderCode", "uploadedFrom", "uploadedTo");
+        assertThat(count.getSql()).contains("application/pdf", "LOWER(f.file_name) LIKE '%.pdf'");
+    }
+
+    @Test
+    void fileTypeMapperBranchesUseKnownMimeAndGenericExtensionFallbacks() throws Exception {
+        Configuration configuration = parse();
+        Map<String, String> typeMarkers = new HashMap<>();
+        typeMarkers.put("DOCUMENT", "application/msword");
+        typeMarkers.put("SPREADSHEET", "application/vnd.ms-excel");
+        typeMarkers.put("PRESENTATION", "application/vnd.ms-powerpoint");
+        typeMarkers.put("PDF", "application/pdf");
+        typeMarkers.put("IMAGE", "LIKE 'image/%'");
+        typeMarkers.put("VIDEO", "LIKE 'video/%'");
+        typeMarkers.put("ARCHIVE", "application/zip");
+
+        for (Map.Entry<String, String> type : typeMarkers.entrySet()) {
+            String renderedSql = sql(configuration, "selectArchiveFileList", type.getKey()).getSql();
+            assertThat(renderedSql).contains(type.getValue(), "application/octet-stream",
+                    "LOWER(f.file_name) LIKE");
+            assertThat(renderedSql).doesNotContain("LIMIT", "OFFSET");
+        }
+
+        String allTypesSql = sql(configuration, "selectArchiveFileList", "ALL").getSql();
+        assertThat(allTypesSql).doesNotContain("application/msword", "application/pdf",
+                "LIKE 'image/%'", "LIKE 'video/%'");
+    }
+
     private Configuration parse() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
@@ -89,12 +132,23 @@ class ArchiveBoardTenantScopeMapperTest {
     }
 
     private BoundSql sql(Configuration configuration, String id) {
+        return sql(configuration, id, "PDF");
+    }
+
+    private BoundSql sql(Configuration configuration, String id, String fileType) {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", 71L);
         params.put("postId", 13L);
         params.put("boardFileId", 31L);
         params.put("keyword", "manual");
         params.put("categoryCode", "GENERAL");
+        params.put("folderCode", "GENERAL");
+        params.put("rootOnly", false);
+        params.put("uploadedFrom", "2025-10-20");
+        params.put("uploadedTo", "2026-10-20");
+        params.put("fileType", fileType);
+        params.put("offset", 0);
+        params.put("limit", 20);
         return configuration.getMappedStatement("ArchiveBoardDAO." + id).getBoundSql(params);
     }
 

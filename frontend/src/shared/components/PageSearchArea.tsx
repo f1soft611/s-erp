@@ -14,6 +14,7 @@ import {
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
 import type {
   PageSearchField,
   PageSearchFieldValue,
@@ -22,6 +23,8 @@ import type {
 type SearchRenderBlock =
   | { group: string; fields: PageSearchField[] }
   | { field: PageSearchField };
+
+const EMPTY_SEARCH_VALUES: Record<string, PageSearchFieldValue> = {};
 
 function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
   const blocks: SearchRenderBlock[] = [];
@@ -50,8 +53,10 @@ export type PageSearchAreaProps = {
   onDefaultSearch?: () => void;
   detailFields?: PageSearchField[];
   detailValues?: Record<string, PageSearchFieldValue>;
+  defaultValues?: Record<string, PageSearchFieldValue>;
   onDetailValuesChange?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailSearch?: (values: Record<string, PageSearchFieldValue>) => void;
+  onDetailReset?: (values: Record<string, PageSearchFieldValue>) => void;
   onDetailClose?: () => void;
   detailLoading?: boolean;
 };
@@ -59,9 +64,20 @@ export type PageSearchAreaProps = {
 function getFieldValue(
   values: Record<string, PageSearchFieldValue>,
   field: PageSearchField,
+  defaultValues: Record<string, PageSearchFieldValue>,
 ): PageSearchFieldValue {
   if (values[field.field] !== undefined) return values[field.field];
+  if (defaultValues[field.field] !== undefined) {
+    return defaultValues[field.field];
+  }
   return field.type === 'date' ? { from: '', to: '' } : '';
+}
+
+function mergeSearchValues(
+  defaults: Record<string, PageSearchFieldValue>,
+  values: Record<string, PageSearchFieldValue>,
+): Record<string, PageSearchFieldValue> {
+  return { ...defaults, ...values };
 }
 
 function getDateValue(value: PageSearchFieldValue, key: 'from' | 'to'): string {
@@ -98,20 +114,26 @@ export function PageSearchArea({
   searchField,
   onDefaultSearch,
   detailFields = [],
-  detailValues = {},
+  detailValues = EMPTY_SEARCH_VALUES,
+  defaultValues = EMPTY_SEARCH_VALUES,
   onDetailValuesChange,
   onDetailSearch,
+  onDetailReset,
   onDetailClose,
   detailLoading = false,
 }: PageSearchAreaProps) {
   const [detailOpen, setDetailOpen] = useState(false);
-  const [draftValues, setDraftValues] = useState(detailValues);
+  const [draftValues, setDraftValues] = useState(() =>
+    mergeSearchValues(defaultValues, detailValues),
+  );
+  const [dateErrors, setDateErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    const resolvedValues = mergeSearchValues(defaultValues, detailValues);
     setDraftValues((current) =>
-      areSearchValuesEqual(current, detailValues) ? current : detailValues,
+      areSearchValuesEqual(current, resolvedValues) ? current : resolvedValues,
     );
-  }, [detailValues]);
+  }, [defaultValues, detailValues]);
 
   const updateValue = (field: string, value: PageSearchFieldValue) => {
     const next = { ...draftValues, [field]: value };
@@ -124,8 +146,62 @@ export function PageSearchArea({
     onDetailClose?.();
   };
 
+  const updateDateValue = (
+    field: PageSearchField,
+    endpoint: 'from' | 'to',
+    input: string,
+    commit = false,
+  ) => {
+    const normalized = input ? normalizeDateInput(input) : '';
+    const invalid = Boolean(input && !normalized);
+    if (commit || !invalid) {
+      setDateErrors((current) => ({
+        ...current,
+        [`${field.field}.${endpoint}`]: invalid,
+      }));
+    }
+    if (commit && invalid) return;
+    const value = getFieldValue(draftValues, field, defaultValues);
+    updateValue(field.field, {
+      from: getDateValue(value, 'from'),
+      to: getDateValue(value, 'to'),
+      [endpoint]: commit ? normalized : input,
+    });
+  };
+
+  const searchDetails = () => {
+    const next = { ...draftValues };
+    const errors: Record<string, boolean> = {};
+    for (const field of detailFields) {
+      if (field.type !== 'date') continue;
+      const value = getFieldValue(draftValues, field, defaultValues);
+      const range = { from: '', to: '' };
+      for (const endpoint of ['from', 'to'] as const) {
+        const input = getDateValue(value, endpoint);
+        range[endpoint] = input ? normalizeDateInput(input) : '';
+        if (input && !range[endpoint]) {
+          errors[`${field.field}.${endpoint}`] = true;
+        }
+      }
+      if (
+        draftValues[field.field] !== undefined ||
+        defaultValues[field.field] !== undefined
+      ) {
+        next[field.field] = range;
+      }
+    }
+    setDateErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setDraftValues(next);
+    if (!areSearchValuesEqual(draftValues, next)) {
+      onDetailValuesChange?.(next);
+    }
+    onDetailSearch?.(next);
+    closeDetails();
+  };
+
   const renderSearchField = (field: PageSearchField) => {
-    const value = getFieldValue(draftValues, field);
+    const value = getFieldValue(draftValues, field, defaultValues);
     const span = field.searchSpan ?? 1;
     const gridColumn = {
       xs: 'span 1',
@@ -144,43 +220,33 @@ export function PageSearchArea({
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))',
               gap: 1,
               minWidth: 0,
             }}
           >
-            <TextField
-              size="small"
-              margin="none"
-              type="date"
-              label={`${field.label} 시작일`}
-              value={getDateValue(value, 'from')}
-              onChange={(event) =>
-                updateValue(field.field, {
-                  from: event.target.value,
-                  to: getDateValue(value, 'to'),
-                })
-              }
-              slotProps={{
-                htmlInput: { 'aria-label': `${field.label} 시작일` },
-              }}
-            />
-            <TextField
-              size="small"
-              margin="none"
-              type="date"
-              label={`${field.label} 종료일`}
-              value={getDateValue(value, 'to')}
-              onChange={(event) =>
-                updateValue(field.field, {
-                  from: getDateValue(value, 'from'),
-                  to: event.target.value,
-                })
-              }
-              slotProps={{
-                htmlInput: { 'aria-label': `${field.label} 종료일` },
-              }}
-            />
+            {(['from', 'to'] as const).map((endpoint) => {
+              const input = getDateValue(value, endpoint);
+              const error = Boolean(
+                dateErrors[`${field.field}.${endpoint}`] &&
+                  input &&
+                  !normalizeDateInput(input),
+              );
+              return (
+                <DateEditor
+                  key={endpoint}
+                  variant="outlined"
+                  autoFocus={false}
+                  selectOnFocus={false}
+                  label={`${field.label} ${endpoint === 'from' ? '시작일' : '종료일'}`}
+                  value={input}
+                  onChange={(next) => updateDateValue(field, endpoint, next)}
+                  onBlur={() => updateDateValue(field, endpoint, input, true)}
+                  error={error}
+                  helperText={error ? '올바른 날짜를 입력하세요.' : undefined}
+                />
+              );
+            })}
           </Box>
         ) : field.type === 'select' || field.type === 'checkbox' ? (
           <FormControl size="small" fullWidth>
@@ -490,8 +556,10 @@ export function PageSearchArea({
               type="button"
               variant="outlined"
               onClick={() => {
-                setDraftValues({});
-                onDetailValuesChange?.({});
+                setDraftValues(defaultValues);
+                setDateErrors({});
+                onDetailValuesChange?.(defaultValues);
+                onDetailReset?.(defaultValues);
               }}
               disabled={detailLoading}
             >
@@ -500,10 +568,7 @@ export function PageSearchArea({
             <Button
               type="button"
               variant="contained"
-              onClick={() => {
-                onDetailSearch?.(draftValues);
-                closeDetails();
-              }}
+              onClick={searchDetails}
               disabled={detailLoading}
             >
               조회

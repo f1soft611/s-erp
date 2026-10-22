@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { getNoticeCategoryPresentation } from '../data/noticeCategoryPresentation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
-  Chip,
   Divider,
   IconButton,
   Menu,
@@ -29,6 +27,9 @@ import type {
 import { prepareNoticeFeedHtml } from '../utils/noticeHtml';
 import { resolveApiBaseUrl } from '../../../../../shared/services/authService';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
+import { fetchCommonFileBlob } from '../../../../../shared/services/commonContentApi';
+import { NoticeLoginPopupBadge } from './NoticeLoginPopupBadge';
+import { NoticeCategoryBadge } from './NoticeCategoryBadge';
 
 type NoticeFeedListProps = {
   items: NoticeFeedItem[];
@@ -89,12 +90,52 @@ type NoticeFeedListProps = {
     commentId: number | string,
     attachmentId: string,
   ) => void;
-  onReachEnd?: () => void;
+  pagination?: {
+    scrollRoot: Element | null;
+    hasNext: boolean;
+    isLoadingMore: boolean;
+    error?: string;
+    onLoadMore: () => void;
+    onRetry?: () => void;
+    loadingLabel?: string;
+  };
   serverItemRevision?: number;
 };
 
+type NoticeCommentImagePreview = {
+  previewUrl?: string;
+  previewError?: string;
+};
+
+function getNoticeCommentImageKey(
+  noticeId: number,
+  commentId: number | string,
+  attachmentId: string,
+): string {
+  return `${noticeId}:${commentId}:${attachmentId}`;
+}
+
+function getNoticeCommentImageAttachments(
+  comments: NoticeCommentItem[],
+): Array<{
+  commentId: number;
+  attachmentId: string;
+}> {
+  return comments.flatMap((comment) => [
+    ...(comment.attachments ?? [])
+      .filter((attachment) => attachment.mimeType?.startsWith('image/'))
+      .map((attachment) => ({
+        commentId: comment.id,
+        attachmentId: attachment.id,
+      })),
+    ...getNoticeCommentImageAttachments(comment.replies ?? []),
+  ]);
+}
+
 function normalizeCommentTree(
   comments: NoticeCommentItem[] = [],
+  noticeId: number,
+  imagePreviews: Record<string, NoticeCommentImagePreview>,
 ): FeedCommentItem[] {
   const normalizedById = new Map<string, FeedCommentItem>();
 
@@ -102,12 +143,22 @@ function normalizeCommentTree(
     normalizedById.set(String(comment.id), {
       id: comment.id,
       author: comment.author,
+      authorProfileImageUrl: comment.authorProfileImageUrl,
       time: comment.time,
       content: comment.content,
       isEditable: comment.isEditable,
       isDeleted: comment.isDeleted,
-      attachments: comment.attachments,
-      replies: normalizeCommentTree(comment.replies ?? []),
+      attachments: (comment.attachments ?? []).map((attachment) => ({
+        ...attachment,
+        ...imagePreviews[
+          getNoticeCommentImageKey(noticeId, comment.id, attachment.id)
+        ],
+      })),
+      replies: normalizeCommentTree(
+        comment.replies ?? [],
+        noticeId,
+        imagePreviews,
+      ),
     });
   });
 
@@ -456,7 +507,9 @@ function prepareExpandedNoticeLoadingHtml(
       );
       return;
     }
-    image.replaceWith(document.createComment(`notice-image-${noticeId}-${index}`));
+    image.replaceWith(
+      document.createComment(`notice-image-${noticeId}-${index}`),
+    );
   });
   return document.body.innerHTML;
 }
@@ -511,10 +564,9 @@ export function NoticeFeedList({
   onLoadPreviousCommentsError,
   onDownloadCommentAttachment,
   onDeleteCommentAttachment,
-  onReachEnd,
+  pagination,
   serverItemRevision = 0,
 }: NoticeFeedListProps) {
-  const endRef = useRef<HTMLDivElement | null>(null);
   const [localCommentsByNoticeId, setLocalCommentsByNoticeId] = useState<
     Record<number, NoticeCommentItem[]>
   >({});
@@ -555,6 +607,95 @@ export function NoticeFeedList({
   const serverCommentSnapshots = useRef<Record<number, string>>({});
   const previousCommentIdsByNoticeId = useRef<Record<number, Set<string>>>({});
   const serverItemRevisionRef = useRef<number | undefined>(undefined);
+  const expandedCommentItems = useMemo(
+    () =>
+      expandedNotice
+        ? (localCommentsByNoticeId[expandedNotice.id] ??
+          expandedNotice.comments ??
+          [])
+        : [],
+    [expandedNotice, localCommentsByNoticeId],
+  );
+  const visibleExpandedComments = useMemo(
+    () =>
+      expandedNotice &&
+      !loadedPreviousByNoticeId[expandedNotice.id] &&
+      expandedCommentItems.length > 3
+        ? expandedCommentItems.slice(-3)
+        : expandedCommentItems,
+    [expandedCommentItems, expandedNotice, loadedPreviousByNoticeId],
+  );
+  const expandedCommentImages = useMemo(
+    () => getNoticeCommentImageAttachments(visibleExpandedComments),
+    [visibleExpandedComments],
+  );
+  const commentImageRequestKey = JSON.stringify(
+    expandedCommentImages.map(({ commentId, attachmentId }) => [
+      expandedNotice?.id,
+      commentId,
+      attachmentId,
+    ]),
+  );
+  const [commentImagePreviews, setCommentImagePreviews] = useState<
+    Record<string, NoticeCommentImagePreview>
+  >({});
+
+  useEffect(() => {
+    let active = true;
+    const objectUrls: string[] = [];
+    setCommentImagePreviews({});
+
+    if (expandedNoticeId == null || expandedCommentImages.length === 0) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.allSettled(
+      expandedCommentImages.map(async ({ commentId, attachmentId }) => ({
+        commentId,
+        attachmentId,
+        blob: await fetchCommonFileBlob(
+          'NOTICE_COMMENT',
+          commentId,
+          attachmentId,
+        ),
+      })),
+    ).then((results) => {
+      if (!active) return;
+
+      const previews: Record<string, NoticeCommentImagePreview> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const { commentId, attachmentId, blob } = result.value;
+          const previewUrl = URL.createObjectURL(blob);
+          objectUrls.push(previewUrl);
+          previews[
+            getNoticeCommentImageKey(expandedNoticeId, commentId, attachmentId)
+          ] = { previewUrl };
+          return;
+        }
+
+        const attachment = expandedCommentImages[index];
+        if (!attachment) return;
+        previews[
+          getNoticeCommentImageKey(
+            expandedNoticeId,
+            attachment.commentId,
+            attachment.attachmentId,
+          )
+        ] = {
+          previewError: '이미지 미리보기를 불러오지 못했습니다.',
+        };
+      });
+      setCommentImagePreviews(previews);
+    });
+
+    return () => {
+      active = false;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [commentImageRequestKey, expandedNoticeId]);
 
   useEffect(() => {
     if (
@@ -576,9 +717,7 @@ export function NoticeFeedList({
       ),
     );
     const imageRecords = images.flatMap((image, index) => {
-      const source = image.getAttribute(
-        'data-notice-embedded-image-source',
-      );
+      const source = image.getAttribute('data-notice-embedded-image-source');
       if (!source) return [];
       const layout = getDeclaredNoticeImageLayout(image);
       const placeholder = layout
@@ -593,7 +732,13 @@ export function NoticeFeedList({
         image.replaceWith(marker);
       }
       return [
-        { image, index, source, placeholder, marker: placeholder ? null : marker },
+        {
+          image,
+          index,
+          source,
+          placeholder,
+          marker: placeholder ? null : marker,
+        },
       ];
     });
     if (imageRecords.length === 0) {
@@ -708,27 +853,6 @@ export function NoticeFeedList({
       objectUrls.clear();
     };
   }, [expandedNoticeId, expandedBodySourceHtml]);
-
-  useEffect(() => {
-    const element = endRef.current;
-    if (
-      !element ||
-      !onReachEnd ||
-      typeof IntersectionObserver === 'undefined'
-    ) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onReachEnd();
-        }
-      },
-      { rootMargin: '320px' },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [onReachEnd]);
 
   useEffect(() => {
     const isServerReset = serverItemRevisionRef.current !== serverItemRevision;
@@ -878,6 +1002,7 @@ export function NoticeFeedList({
     <Box data-testid="notice-feed-list">
       <FeedView
         items={items}
+        pagination={pagination}
         renderItem={(item) => {
           const isExpanded = expandedNoticeId === item.id;
           const hasMore = item.body !== item.summary;
@@ -887,9 +1012,8 @@ export function NoticeFeedList({
               item.id,
             ),
           );
-          const previewHtml = deferNoticeEmbeddedImageSources(
-            sanitizedPreviewHtml,
-          );
+          const previewHtml =
+            deferNoticeEmbeddedImageSources(sanitizedPreviewHtml);
           const hydratedBody =
             hydratedNoticeBody?.noticeId === item.id &&
             hydratedNoticeBody.sourceHtml === previewHtml
@@ -928,19 +1052,17 @@ export function NoticeFeedList({
               objectKey?: string | null;
               bucketName?: string | null;
             }>);
-          const categoryPresentation = getNoticeCategoryPresentation(
-            item.noticeGubunCode,
-            isDark,
-          );
 
           return (
             <FeedCard
               key={item.id}
               author={item.meta.split('·')[0].trim()}
+              authorProfileImageUrl={item.writerProfileImage}
               meta={item.meta}
               avatar={item.meta.slice(1, 3)}
               actions={
                 <>
+                  <NoticeLoginPopupBadge loginPopupYn={item.loginPopupYn} popupEndDate={item.popupEndDate} />
                   <IconButton
                     size="small"
                     aria-label={`${item.isPinned === 'Y' ? '상단 고정 해제' : '상단 고정'} ${item.title}`}
@@ -998,412 +1120,396 @@ export function NoticeFeedList({
                 </>
               }
               badges={
-                <Chip
+                <NoticeCategoryBadge
                   label={item.state}
-                  size="small"
-                  sx={{
-                    bgcolor: categoryPresentation.backgroundColor,
-                    color: (theme) =>
-                      item.state === '필독'
-                        ? '#ffffff'
-                        : theme.palette.getContrastText(
-                            categoryPresentation.backgroundColor,
-                          ),
-                    height: 28,
-                    borderRadius: '8px',
-                    fontWeight: 700,
-                  }}
+                  code={item.noticeGubunCode}
+                  isDark={isDark}
                 />
               }
               isDark={isDark}
               testId={`notice-feed-card-${item.id}`}
             >
-                <Typography
-                  variant="h6"
-                  onClick={() => {
-                    if (!hasMore) {
-                      void onToggleExpand?.(item.id);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (
-                      !hasMore ||
-                      (event.key !== 'Enter' && event.key !== ' ')
-                    ) {
-                      return;
-                    }
-                    event.preventDefault();
+              <Typography
+                variant="h6"
+                onClick={() => {
+                  if (!hasMore) {
                     void onToggleExpand?.(item.id);
-                  }}
-                  role={!hasMore ? 'button' : undefined}
-                  tabIndex={!hasMore ? 0 : undefined}
-                  sx={{
-                    fontSize: '1.25rem',
-                    lineHeight: 1.4,
-                    fontWeight: 700,
-                    letterSpacing: '-0.02em',
-                    mb: 1.5,
-                    color: 'text.primary',
-                    cursor: !hasMore ? 'pointer' : 'default',
-                  }}
-                >
-                  {item.title}
-                </Typography>
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    !hasMore ||
+                    (event.key !== 'Enter' && event.key !== ' ')
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  void onToggleExpand?.(item.id);
+                }}
+                role={!hasMore ? 'button' : undefined}
+                tabIndex={!hasMore ? 0 : undefined}
+                sx={{
+                  fontSize: '1.25rem',
+                  lineHeight: 1.4,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  mb: 1.5,
+                  color: 'text.primary',
+                  cursor: !hasMore ? 'pointer' : 'default',
+                }}
+              >
+                {item.title}
+              </Typography>
 
-                <FeedBodyContent
-                  hasMore={hasMore}
-                  isExpanded={isExpanded}
-                  onToggleExpand={() => onToggleExpand?.(item.id)}
-                  contentTestId={`notice-preview-${item.id}`}
-                  imagePreviewTestId={`notice-embedded-image-preview-${item.id}`}
-                  onContentClick={(event) => {
-                    const imageElement = (event.target as HTMLElement).closest('img');
-                    if (imageElement) {
-                      const src = imageElement.getAttribute('src');
-                      if (src) {
-                        setViewerImage({
-                          src,
-                          alt: imageElement.getAttribute('alt') || '원본 이미지',
-                        });
-                      }
-                      if (!hasMore) {
-                        void onNoticeInteract?.(item.id);
-                      }
-                      return;
+              <FeedBodyContent
+                hasMore={hasMore}
+                isExpanded={isExpanded}
+                onToggleExpand={() => onToggleExpand?.(item.id)}
+                contentTestId={`notice-preview-${item.id}`}
+                imagePreviewTestId={`notice-embedded-image-preview-${item.id}`}
+                onContentClick={(event) => {
+                  const imageElement = (event.target as HTMLElement).closest(
+                    'img',
+                  );
+                  if (imageElement) {
+                    const src = imageElement.getAttribute('src');
+                    if (src) {
+                      setViewerImage({
+                        src,
+                        alt: imageElement.getAttribute('alt') || '원본 이미지',
+                      });
                     }
                     if (!hasMore) {
-                      void onToggleExpand?.(item.id);
+                      void onNoticeInteract?.(item.id);
                     }
-                  }}
-                  contentSx={{
-                    '& br': { display: 'inline' },
-                    '& img': { cursor: 'pointer' },
+                    return;
+                  }
+                  if (!hasMore) {
+                    void onToggleExpand?.(item.id);
+                  }
+                }}
+                contentSx={{
+                  '& br': { display: 'inline' },
+                  '& img': { cursor: 'pointer' },
+                  '& [data-notice-expanded-image-skeleton="true"]': {
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                    borderRadius: 1,
+                    backgroundColor: isDark
+                      ? 'rgba(51,65,85,0.7)'
+                      : 'rgba(226,232,240,0.9)',
+                    backgroundImage: isDark
+                      ? 'linear-gradient(90deg, transparent, rgba(148,163,184,0.14), transparent)'
+                      : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
+                    backgroundSize: '200% 100%',
+                    animation:
+                      'notice-expanded-image-wave 1.5s ease-in-out infinite',
+                  },
+                  '@keyframes notice-expanded-image-wave': {
+                    '0%': { backgroundPosition: '100% 0' },
+                    '100%': { backgroundPosition: '-100% 0' },
+                  },
+                  '@media (prefers-reduced-motion: reduce)': {
                     '& [data-notice-expanded-image-skeleton="true"]': {
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      borderRadius: 1,
-                      backgroundColor: isDark
-                        ? 'rgba(51,65,85,0.7)'
-                        : 'rgba(226,232,240,0.9)',
-                      backgroundImage: isDark
-                        ? 'linear-gradient(90deg, transparent, rgba(148,163,184,0.14), transparent)'
-                        : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
-                      backgroundSize: '200% 100%',
-                      animation: 'notice-expanded-image-wave 1.5s ease-in-out infinite',
+                      animation: 'none',
                     },
-                    '@keyframes notice-expanded-image-wave': {
-                      '0%': { backgroundPosition: '100% 0' },
-                      '100%': { backgroundPosition: '-100% 0' },
-                    },
-                    '@media (prefers-reduced-motion: reduce)': {
-                      '& [data-notice-expanded-image-skeleton="true"]': {
-                        animation: 'none',
-                      },
-                    },
-                  }}
-                  richText={
-                    hasRichHtml
-                      ? {
-                          collapsedHtml: collapsedPreviewHtml,
-                          expandedHtml:
-                            hydratedBody?.html ??
-                            expandedBodyLoadingHtml ??
-                            previewHtml,
-                          images: embeddedImagePreviews,
-                          imageError:
-                            isExpanded && hydratedBody?.hasImageLoadError
-                              ? '본문 이미지를 불러오지 못했습니다.'
-                              : undefined,
-                          onOpenImage: setViewerImage,
-                          renderImagePreview: (image, index, openImage) => {
-                            const imageKey = `${image.src}-${index}`;
-                            const isLoaded = loadedImageKeys.has(imageKey);
-                            return (
-                              <Box
-                                component="button"
-                                type="button"
-                                aria-label={`본문 이미지 미리보기 ${index + 1}: ${image.alt}`}
-                                onClick={(event) => {
-                                  const imageElement =
-                                    event.currentTarget.querySelector('img');
-                                  if (isLoaded && imageElement) {
-                                    openImage({
-                                      src: imageElement.src,
-                                      alt: image.alt,
-                                    });
-                                  }
-                                  if (!hasMore) {
-                                    void onNoticeInteract?.(item.id);
-                                  }
-                                }}
-                                sx={{
-                                  position: 'relative',
-                                  display: 'block',
-                                  width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                                  height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                                  p: 0,
-                                  border: 0,
-                                  borderRadius: 1,
-                                  overflow: 'hidden',
-                                  bgcolor: 'background.paper',
-                                  cursor: isLoaded ? 'pointer' : 'default',
-                                }}
-                              >
-                                {!isLoaded && (
-                                  <Skeleton
-                                    variant="rounded"
-                                    animation="wave"
-                                    data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
-                                    sx={{
-                                      position: 'absolute',
-                                      inset: 0,
-                                      width: NOTICE_IMAGE_PREVIEW_WIDTH,
-                                      height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                                      borderRadius: 1,
-                                      bgcolor: isDark
-                                        ? 'rgba(51,65,85,0.7)'
-                                        : 'rgba(226,232,240,0.9)',
-                                    }}
-                                  />
-                                )}
-                                <AuthenticatedNoticeImage
-                                  src={image.src}
-                                  alt={image.alt}
-                                  onLoad={() =>
-                                    setLoadedImageKeys((current) => {
-                                      const next = new Set(current);
-                                      next.add(imageKey);
-                                      return next;
-                                    })
-                                  }
+                  },
+                }}
+                richText={
+                  hasRichHtml
+                    ? {
+                        collapsedHtml: collapsedPreviewHtml,
+                        expandedHtml:
+                          hydratedBody?.html ??
+                          expandedBodyLoadingHtml ??
+                          previewHtml,
+                        images: embeddedImagePreviews,
+                        imageError:
+                          isExpanded && hydratedBody?.hasImageLoadError
+                            ? '본문 이미지를 불러오지 못했습니다.'
+                            : undefined,
+                        onOpenImage: setViewerImage,
+                        renderImagePreview: (image, index, openImage) => {
+                          const imageKey = `${image.src}-${index}`;
+                          const isLoaded = loadedImageKeys.has(imageKey);
+                          return (
+                            <Box
+                              component="button"
+                              type="button"
+                              aria-label={`본문 이미지 미리보기 ${index + 1}: ${image.alt}`}
+                              onClick={(event) => {
+                                const imageElement =
+                                  event.currentTarget.querySelector('img');
+                                if (isLoaded && imageElement) {
+                                  openImage({
+                                    src: imageElement.src,
+                                    alt: image.alt,
+                                  });
+                                }
+                                if (!hasMore) {
+                                  void onNoticeInteract?.(item.id);
+                                }
+                              }}
+                              sx={{
+                                position: 'relative',
+                                display: 'block',
+                                width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                p: 0,
+                                border: 0,
+                                borderRadius: 1,
+                                overflow: 'hidden',
+                                bgcolor: 'background.paper',
+                                cursor: isLoaded ? 'pointer' : 'default',
+                              }}
+                            >
+                              {!isLoaded && (
+                                <Skeleton
+                                  variant="rounded"
+                                  animation="wave"
+                                  data-testid={`notice-embedded-image-skeleton-${item.id}-${index}`}
                                   sx={{
+                                    position: 'absolute',
+                                    inset: 0,
                                     width: NOTICE_IMAGE_PREVIEW_WIDTH,
                                     height: NOTICE_IMAGE_PREVIEW_HEIGHT,
-                                    objectFit: 'cover',
                                     borderRadius: 1,
-                                    border: '1px solid',
-                                    borderColor: isDark
-                                      ? 'rgba(148,163,184,0.24)'
-                                      : 'rgba(148,163,184,0.3)',
                                     bgcolor: isDark
-                                      ? 'rgba(15,23,42,0.7)'
-                                      : '#f8fafc',
-                                    cursor: isLoaded ? 'pointer' : 'default',
-                                    opacity: isLoaded ? 1 : 0,
-                                    display: 'block',
+                                      ? 'rgba(51,65,85,0.7)'
+                                      : 'rgba(226,232,240,0.9)',
                                   }}
                                 />
-                              </Box>
-                            );
-                          },
-                        }
-                      : undefined
-                  }
-                  text={{
-                    collapsed: item.summary,
-                    expanded: item.body,
-                  }}
-                />
-
-                {attachmentFiles.length > 0 && (
-                  <Box
-                    onClick={() => {
-                      if (!hasMore) {
-                        void onNoticeInteract?.(item.id);
+                              )}
+                              <AuthenticatedNoticeImage
+                                src={image.src}
+                                alt={image.alt}
+                                onLoad={() =>
+                                  setLoadedImageKeys((current) => {
+                                    const next = new Set(current);
+                                    next.add(imageKey);
+                                    return next;
+                                  })
+                                }
+                                sx={{
+                                  width: NOTICE_IMAGE_PREVIEW_WIDTH,
+                                  height: NOTICE_IMAGE_PREVIEW_HEIGHT,
+                                  objectFit: 'cover',
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: isDark
+                                    ? 'rgba(148,163,184,0.24)'
+                                    : 'rgba(148,163,184,0.3)',
+                                  bgcolor: isDark
+                                    ? 'rgba(15,23,42,0.7)'
+                                    : '#f8fafc',
+                                  cursor: isLoaded ? 'pointer' : 'default',
+                                  opacity: isLoaded ? 1 : 0,
+                                  display: 'block',
+                                }}
+                              />
+                            </Box>
+                          );
+                        },
                       }
-                    }}
-                  >
-                    {/* <Divider sx={{ my: 1.5 }} /> */}
-                    <AttachmentList
-                      files={attachmentFiles.map((attachment) => ({
-                        id: String(attachment.id),
-                        name: attachment.name,
-                        size: attachment.size,
-                      }))}
-                      isDark={isDark}
-                      showActions
-                      onDownload={(attachmentId) => {
-                        const match = attachmentFiles.find(
-                          (attachment) =>
-                            String(attachment.id) === attachmentId,
-                        );
+                    : undefined
+                }
+                text={{
+                  collapsed: item.summary,
+                  expanded: item.body,
+                }}
+              />
 
-                        if (!match) {
-                          return;
-                        }
-
-                        onDownload?.(item.id, {
-                          ...match,
-                          name: match.name,
-                        });
-                      }}
-                    />
-                  </Box>
-                )}
-
-                {attachmentFiles.length > 0 && (
-                  <Divider sx={{ my: 1.5 }} />
-                )}
-                <FeedReactionBar
-                  liked={Boolean(item.liked)}
-                  likeCount={item.likeCount ?? 0}
-                  bookmarked={Boolean(item.bookmarked)}
-                  commentCount={item.commentCount}
-                  onToggleLike={() => onToggleLike?.(item.id)}
-                  onToggleBookmark={() => onToggleBookmark?.(item.id)}
-                  isDark={isDark}
-                />
-
-                <FeedCommentsSection
-                  showPrevious={canLoadPrevious}
-                  isLoadingPrevious={Boolean(loadingPreviousByNoticeId[item.id])}
-                  remainingPreviousCount={
-                    Number.isFinite(item.commentCount)
-                      ? Math.max(
-                          0,
-                          item.commentCount - countLoadedComments(itemComments),
-                        )
-                      : undefined
-                  }
-                  onLoadPrevious={async () => {
-                      if (loadingPreviousByNoticeId[item.id]) return;
-                      const cursor =
-                        previousCursorByNoticeId[item.id] ??
-                        visibleComments[0]?.id;
-                      if (!cursor || !onLoadPreviousComments) return;
-
-                      setLoadingPreviousByNoticeId((current) => ({
-                        ...current,
-                        [item.id]: true,
-                      }));
-                      try {
-                        const previousResult = await onLoadPreviousComments(
-                          item.id,
-                          cursor,
-                        );
-                        const previous = previousResult.comments;
-                        const currentComments =
-                          localCommentsByNoticeId[item.id] ?? itemComments;
-                        const merged = mergeCommentTrees(
-                          currentComments,
-                          previous,
-                        );
-                        const nextCursor = previousResult.nextBeforeCommentId;
-                        const hasNewComments =
-                          countComments(merged) >
-                          countComments(currentComments);
-                        const previousIds = collectCommentIds(previous);
-                        previousCommentIdsByNoticeId.current[item.id] = new Set(
-                          [
-                            ...(previousCommentIdsByNoticeId.current[item.id] ??
-                              []),
-                            ...previousIds,
-                          ],
-                        );
-                        setLocalCommentsByNoticeId((current) => ({
-                          ...current,
-                          [item.id]: merged,
-                        }));
-                        setPreviousCursorByNoticeId((cursors) => ({
-                          ...cursors,
-                          [item.id]: nextCursor ?? undefined,
-                        }));
-                        setLoadedPreviousByNoticeId((loaded) => ({
-                          ...loaded,
-                          [item.id]: true,
-                        }));
-                        if (
-                          !previousResult.hasPrevious ||
-                          !hasNewComments ||
-                          nextCursor == null ||
-                          String(nextCursor) === String(cursor)
-                        ) {
-                          setExhaustedPreviousByNoticeId((exhausted) => ({
-                            ...exhausted,
-                            [item.id]: true,
-                          }));
-                        }
-                      } catch (error) {
-                        onLoadPreviousCommentsError?.(error);
-                      } finally {
-                        setLoadingPreviousByNoticeId((current) => ({
-                          ...current,
-                          [item.id]: false,
-                        }));
-                      }
+              {attachmentFiles.length > 0 && (
+                <Box
+                  onClick={() => {
+                    if (!hasMore) {
+                      void onNoticeInteract?.(item.id);
+                    }
                   }}
                 >
-                  <Box
-                    onClick={() => {
-                      if (!hasMore) {
-                        void onNoticeInteract?.(item.id);
+                  {/* <Divider sx={{ my: 1.5 }} /> */}
+                  <AttachmentList
+                    files={attachmentFiles.map((attachment) => ({
+                      id: String(attachment.id),
+                      name: attachment.name,
+                      size: attachment.size,
+                    }))}
+                    isDark={isDark}
+                    showActions
+                    onDownload={(attachmentId) => {
+                      const match = attachmentFiles.find(
+                        (attachment) => String(attachment.id) === attachmentId,
+                      );
+
+                      if (!match) {
+                        return;
                       }
+
+                      onDownload?.(item.id, {
+                        ...match,
+                        name: match.name,
+                      });
                     }}
-                  >
-                    <CommentThread
-                      comments={normalizeCommentTree(visibleComments)}
-                      expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
-                      onSubmitComment={async (content, files) => {
-                        await handleLocalCommentAdd(
-                          item.id,
-                          content,
-                          undefined,
-                          files,
-                        );
-                      }}
-                      onSubmitReply={async (
+                  />
+                </Box>
+              )}
+
+              {attachmentFiles.length > 0 && <Divider sx={{ my: 1.5 }} />}
+              <FeedReactionBar
+                liked={Boolean(item.liked)}
+                likeCount={item.likeCount ?? 0}
+                bookmarked={Boolean(item.bookmarked)}
+                commentCount={item.commentCount}
+                onToggleLike={() => onToggleLike?.(item.id)}
+                onToggleBookmark={() => onToggleBookmark?.(item.id)}
+                isDark={isDark}
+              />
+
+              <FeedCommentsSection
+                showPrevious={canLoadPrevious}
+                isLoadingPrevious={Boolean(loadingPreviousByNoticeId[item.id])}
+                remainingPreviousCount={
+                  Number.isFinite(item.commentCount)
+                    ? Math.max(
+                        0,
+                        item.commentCount - countLoadedComments(itemComments),
+                      )
+                    : undefined
+                }
+                onLoadPrevious={async () => {
+                  if (loadingPreviousByNoticeId[item.id]) return;
+                  const cursor =
+                    previousCursorByNoticeId[item.id] ?? visibleComments[0]?.id;
+                  if (!cursor || !onLoadPreviousComments) return;
+
+                  setLoadingPreviousByNoticeId((current) => ({
+                    ...current,
+                    [item.id]: true,
+                  }));
+                  try {
+                    const previousResult = await onLoadPreviousComments(
+                      item.id,
+                      cursor,
+                    );
+                    const previous = previousResult.comments;
+                    const currentComments =
+                      localCommentsByNoticeId[item.id] ?? itemComments;
+                    const merged = mergeCommentTrees(currentComments, previous);
+                    const nextCursor = previousResult.nextBeforeCommentId;
+                    const hasNewComments =
+                      countComments(merged) > countComments(currentComments);
+                    const previousIds = collectCommentIds(previous);
+                    previousCommentIdsByNoticeId.current[item.id] = new Set([
+                      ...(previousCommentIdsByNoticeId.current[item.id] ?? []),
+                      ...previousIds,
+                    ]);
+                    setLocalCommentsByNoticeId((current) => ({
+                      ...current,
+                      [item.id]: merged,
+                    }));
+                    setPreviousCursorByNoticeId((cursors) => ({
+                      ...cursors,
+                      [item.id]: nextCursor ?? undefined,
+                    }));
+                    setLoadedPreviousByNoticeId((loaded) => ({
+                      ...loaded,
+                      [item.id]: true,
+                    }));
+                    if (
+                      !previousResult.hasPrevious ||
+                      !hasNewComments ||
+                      nextCursor == null ||
+                      String(nextCursor) === String(cursor)
+                    ) {
+                      setExhaustedPreviousByNoticeId((exhausted) => ({
+                        ...exhausted,
+                        [item.id]: true,
+                      }));
+                    }
+                  } catch (error) {
+                    onLoadPreviousCommentsError?.(error);
+                  } finally {
+                    setLoadingPreviousByNoticeId((current) => ({
+                      ...current,
+                      [item.id]: false,
+                    }));
+                  }
+                }}
+              >
+                <Box
+                  onClick={() => {
+                    if (!hasMore) {
+                      void onNoticeInteract?.(item.id);
+                    }
+                  }}
+                >
+                  <CommentThread
+                    comments={normalizeCommentTree(
+                      visibleComments,
+                      item.id,
+                      commentImagePreviews,
+                    )}
+                    expandReplies={Boolean(loadedPreviousByNoticeId[item.id])}
+                    onSubmitComment={async (content, files) => {
+                      await handleLocalCommentAdd(
+                        item.id,
+                        content,
+                        undefined,
+                        files,
+                      );
+                    }}
+                    onSubmitReply={async (
+                      commentId,
+                      content,
+                      files,
+                      parentCommentId,
+                    ) => {
+                      await handleLocalCommentAdd(
+                        item.id,
+                        content,
+                        parentCommentId,
+                        files,
+                        commentId,
+                      );
+                    }}
+                    onEditComment={async (commentId, content, files) => {
+                      await handleLocalCommentEdit(
+                        item.id,
                         commentId,
                         content,
                         files,
-                        parentCommentId,
-                      ) => {
-                        await handleLocalCommentAdd(
-                          item.id,
-                          content,
-                          parentCommentId,
-                          files,
-                          commentId,
-                        );
-                      }}
-                      onEditComment={async (commentId, content, files) => {
-                        await handleLocalCommentEdit(
-                          item.id,
-                          commentId,
-                          content,
-                          files,
-                        );
-                      }}
-                      onDeleteComment={async (commentId) => {
-                        await handleLocalCommentDelete(item.id, commentId);
-                      }}
-                      onDownloadAttachment={(commentId, attachmentId, fileName) =>
-                        onDownloadCommentAttachment?.(
-                          commentId,
-                          attachmentId,
-                          fileName,
-                        )
-                      }
-                      onDeleteAttachment={(commentId, attachmentId) =>
-                        onDeleteCommentAttachment?.(
-                          item.id,
-                          commentId,
-                          attachmentId,
-                        )
-                      }
-                      isDark={isDark}
-                      showComposer
-                      placeholder="줄바꿈 Shift+Enter, 입력 Enter"
-                      composerLabel="댓글 입력"
-                      submitLabel="등록"
-                    />
-                  </Box>
-                </FeedCommentsSection>
+                      );
+                    }}
+                    onDeleteComment={async (commentId) => {
+                      await handleLocalCommentDelete(item.id, commentId);
+                    }}
+                    onDownloadAttachment={(commentId, attachmentId, fileName) =>
+                      onDownloadCommentAttachment?.(
+                        commentId,
+                        attachmentId,
+                        fileName,
+                      )
+                    }
+                    onDeleteAttachment={(commentId, attachmentId) =>
+                      onDeleteCommentAttachment?.(
+                        item.id,
+                        commentId,
+                        attachmentId,
+                      )
+                    }
+                    onOpenAttachmentImage={setViewerImage}
+                    isDark={isDark}
+                    showComposer
+                    placeholder="줄바꿈 Shift+Enter, 입력 Enter"
+                    composerLabel="댓글 입력"
+                    submitLabel="등록"
+                  />
+                </Box>
+              </FeedCommentsSection>
             </FeedCard>
           );
         }}
       />
-
-      <Box ref={endRef} sx={{ height: 1 }} aria-hidden="true" />
 
       <ImageViewerDialog
         open={Boolean(viewerImage)}

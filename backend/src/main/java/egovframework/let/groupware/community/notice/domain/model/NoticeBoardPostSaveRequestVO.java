@@ -30,6 +30,15 @@ public class NoticeBoardPostSaveRequestVO implements Serializable {
     private String writerName;
     @Schema(description = "상단 고정 여부")
     private String isPinned;
+    @Schema(description = "로그인 팝업 여부 Y/N")
+    private String loginPopupYn;
+    @Schema(description = "팝업 종료일 YYYY-MM-DD")
+    private String popupEndDate;
+
+    public String getLoginPopupYn() { return loginPopupYn; }
+    public void setLoginPopupYn(String loginPopupYn) { this.loginPopupYn = loginPopupYn; }
+    public String getPopupEndDate() { return popupEndDate; }
+    public void setPopupEndDate(String popupEndDate) { this.popupEndDate = popupEndDate; }
     @Schema(description = "첨부파일 ID 목록")
     private List<Long> attachmentIds;
     @Schema(description = "본문 임베드 이미지 메타데이터")

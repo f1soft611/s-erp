@@ -39,6 +39,25 @@ class NoticeBoardTenantScopeMapperTest {
     }
 
     @Test
+    void postReadProfileImagesUseTenantAndWriterLoginCode() throws Exception {
+        Configuration configuration = parseMapper();
+        Map<String, Object> params = noticeParams();
+
+        assertThat(configuration.getResultMap("NoticeBoardDAO.noticePostMap").getResultMappings())
+                .extracting(mapping -> mapping.getProperty())
+                .contains("writerProfileImage");
+
+        for (String statement : new String[] {"selectNoticePostList", "selectNoticePostById"}) {
+            String query = sql(configuration, statement, params).getSql();
+            assertThat(query).as(statement)
+                    .contains("la.profile_image AS writer_profile_image")
+                    .contains("LEFT JOIN public.tb_login_account la")
+                    .contains("la.tenant_id = p.tenant_id")
+                    .contains("la.login_code = p.writer_id");
+        }
+    }
+
+    @Test
     void postMutationsAreScopedByTenantPostAndBoardType() throws Exception {
         Configuration configuration = parseMapper();
         Map<String, Object> params = noticeParams();
@@ -65,6 +84,26 @@ class NoticeBoardTenantScopeMapperTest {
         }
         return configuration;
     }
+        @Test
+        void loginPopupsHaveIndependentSettingsAndServerScopedDailyDismissal() throws Exception {
+            Configuration configuration = parseMapper();
+            Map<String, Object> params = noticeParams();
+            params.put("today", "2026-10-22");
+            params.put("loginId", 10L);
+            for (String statement : new String[] {"selectLoginPopupList", "selectLoginPopupById"}) {
+                assertThat(sql(configuration, statement, params).getSql()).as(statement)
+                        .contains("p.tenant_id = ?", "p.board_type_code = 'NOTICE'", "p.is_deleted = 'N'",
+                                "p.login_popup_yn = 'Y'", "p.popup_end_date >= CAST(? AS date)",
+                                "d.login_id = ?", "d.dismissed_on = CAST(? AS date)", "NOT EXISTS");
+            }
+            assertThat(sql(configuration, "dismissLoginPopup", params).getSql())
+                    .contains("ON CONFLICT (tenant_id, post_id, login_id)", "DO UPDATE",
+                            "p.tenant_id = ?", "p.board_type_code = 'NOTICE'", "p.is_deleted = 'N'");
+            assertThat(sql(configuration, "insertNoticePost", params).getSql())
+                    .contains("login_popup_yn", "popup_end_date");
+            assertThat(sql(configuration, "updateNoticePost", params).getSql())
+                    .contains("login_popup_yn", "popup_end_date");
+        }
 
     private BoundSql sql(Configuration configuration, String statement, Map<String, Object> params) {
         return configuration.getMappedStatement("NoticeBoardDAO." + statement).getBoundSql(params);

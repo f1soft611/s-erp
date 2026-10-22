@@ -113,6 +113,72 @@ describe('approval line template service', () => {
     );
   });
 
+  it.each([undefined, null, '2026-10-20T00:00:00Z', 1792454400000])(
+    'accepts updatedAt %s across template responses',
+    async (updatedAt) => {
+      const template = {
+        templateId: 3,
+        name: '기본',
+        eabusNo: '001',
+        updatedAt,
+        approvalLines: [],
+      };
+      api.post.mockResolvedValue({ item: template });
+      await expect(
+        createApprovalLineTemplate({
+          eabusNo: '001',
+          name: '기본',
+          approvalLines: [],
+        }),
+      ).resolves.toEqual(template);
+
+      api.get.mockResolvedValue({ resultList: [template] });
+      await expect(listApprovalLineTemplates('001')).resolves.toEqual([template]);
+
+      api.get.mockResolvedValue({ item: template });
+      await expect(getApprovalLineTemplate(3)).resolves.toEqual(template);
+
+      api.put.mockResolvedValue({ item: template });
+      await expect(renameApprovalLineTemplate(3, '기본')).resolves.toEqual(template);
+    },
+  );
+
+  it.each([true, {}, [], NaN, Infinity, -Infinity].map((updatedAt) => ({ updatedAt })))(
+    'rejects invalid updatedAt $updatedAt across template responses',
+    async ({ updatedAt }) => {
+      const template = {
+        templateId: 3,
+        name: '기본',
+        eabusNo: '001',
+        updatedAt,
+        approvalLines: [],
+      };
+      api.post.mockResolvedValue({ item: template });
+      await expect(
+        createApprovalLineTemplate({
+          eabusNo: '001',
+          name: '기본',
+          approvalLines: [],
+        }),
+      ).rejects.toThrow('자주 쓰는 결재선 저장 응답을 확인할 수 없습니다.');
+
+      api.get.mockResolvedValue({ resultList: [template] });
+      await expect(listApprovalLineTemplates('001')).rejects.toThrow(
+        '자주 쓰는 결재선 목록 응답을 확인할 수 없습니다.',
+      );
+
+      api.get.mockResolvedValue({ item: template });
+      await expect(getApprovalLineTemplate(3)).rejects.toThrow(
+        '자주 쓰는 결재선 상세 응답을 확인할 수 없습니다.',
+      );
+
+      api.put.mockResolvedValue({ item: template });
+      await expect(renameApprovalLineTemplate(3, '기본')).rejects.toThrow(
+        '자주 쓰는 결재선 이름 변경 응답을 확인할 수 없습니다.',
+      );
+    },
+  );
+
   it('rejects malformed API payloads and invalid input', async () => {
     api.get.mockResolvedValue({ resultList: null });
     await expect(listApprovalLineTemplates('001')).rejects.toThrow(

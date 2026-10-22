@@ -8,7 +8,6 @@ import {
   Chip,
   CircularProgress,
   IconButton,
-  MenuItem,
   Tab,
   Tabs,
   TextField,
@@ -28,12 +27,11 @@ import type {
   DocumentApprovalDetail,
   DocumentKind,
 } from '../types/documentWrite.types';
-import {
-  ALL_CATEGORY_VALUE,
-  useDocumentComposer,
-} from '../hooks/useDocumentComposer';
+import { useDocumentComposer } from '../hooks/useDocumentComposer';
 import { DocumentApprovalFields } from './DocumentApprovalFields';
 import { DocumentApprovalSettingsDialog } from './DocumentApprovalSettingsDialog';
+import { DocumentMetadataFields } from './DocumentMetadataFields';
+import { DocumentReferenceField } from './DocumentReferenceField';
 
 const DOCUMENT_CODE_BY_KIND: Record<DocumentKind, ApprovalLineTemplateEabusNo> =
   {
@@ -59,7 +57,11 @@ export function DocumentComposerDialog({
   const [approvalSettingsSession, setApprovalSettingsSession] = useState(0);
   const {
     activeDocumentKind,
-    setActiveDocumentKind,
+    requestDocumentKindChange,
+    documentKindConfirmOpen,
+    confirmDocumentKindChange,
+    cancelDocumentKindChange,
+    referenceUserOptions,
     composerTitle,
     setComposerTitle,
     draftDate,
@@ -123,25 +125,7 @@ export function DocumentComposerDialog({
   const isComposerLoading = isLoading || templateLoading;
   const editorTextColor = theme.palette.text.primary;
   const editorPlaceholderColor = theme.palette.text.disabled;
-  const formFieldSx = {
-    '& .MuiInputBase-root': {
-      minHeight: 38,
-    },
-    '& .MuiInputBase-input, & .MuiSelect-select': {
-      fontSize: '0.93rem',
-      paddingBottom: '8.5px',
-      paddingTop: '8.5px',
-    },
-    '& .MuiInputLabel-root': {
-      color: 'text.secondary',
-      fontSize: '0.82rem',
-      fontWeight: 600,
-      opacity: 1,
-    },
-    '& .MuiInputLabel-root.Mui-focused': {
-      color: 'primary.main',
-    },
-  };
+  const tabChangeDisabled = isComposerLoading || isSaving || uploadingCount > 0;
 
   const composerFooterStart = (
     <Box
@@ -201,12 +185,12 @@ export function DocumentComposerDialog({
               sx={{
                 borderRadius: 1.5,
                 fontWeight: 700,
-                minWidth: 112,
-                px: 2.5,
+                minWidth: { xs: 96, sm: 112 },
+                px: { xs: 2, sm: 2.5 },
                 boxShadow: 'none',
               }}
             >
-              {isSaving ? '처리 중...' : '결재신청'}
+              {isSaving ? '처리 중...' : activeDocumentKind === '업무연락' ? '발송' : '결재신청'}
             </Button>
             <Button
               variant="contained"
@@ -215,8 +199,8 @@ export function DocumentComposerDialog({
               sx={{
                 borderRadius: 1.5,
                 fontWeight: 700,
-                minWidth: 96,
-                px: 2.5,
+                minWidth: { xs: 80, sm: 96 },
+                px: { xs: 2, sm: 2.5 },
                 boxShadow: 'none',
               }}
             >
@@ -230,7 +214,12 @@ export function DocumentComposerDialog({
               variant="text"
               color="primary"
               onClick={closeComposer}
-              sx={{ borderRadius: 1.5, fontWeight: 600, px: 2 }}
+              sx={{
+                borderRadius: 1.5,
+                fontWeight: 600,
+                minWidth: { xs: 56, sm: 64 },
+                px: { xs: 1.5, sm: 2 },
+              }}
             >
               닫기
             </Button>
@@ -254,7 +243,7 @@ export function DocumentComposerDialog({
           {templateError && <Alert severity="error">{templateError}</Alert>}
           <Tabs
             value={activeDocumentKind}
-            onChange={(_, value: DocumentKind) => setActiveDocumentKind(value)}
+            onChange={(_, value: DocumentKind) => requestDocumentKindChange(value)}
             aria-label="결재문서 구분"
             variant="scrollable"
             scrollButtons="auto"
@@ -265,11 +254,11 @@ export function DocumentComposerDialog({
               borderColor: 'divider',
             }}
           >
-            <Tab value="기안서" label="기안서" disabled={isComposerLoading} />
+            <Tab value="기안서" label="기안서" disabled={tabChangeDisabled} />
             <Tab
               value="업무연락"
               label="업무연락"
-              disabled={isComposerLoading}
+              disabled={tabChangeDisabled}
             />
             <Tab value="지출결의서" label="지출결의서" disabled />
             <Tab value="근태신청" label="근태신청" disabled />
@@ -290,110 +279,40 @@ export function DocumentComposerDialog({
             </Box>
           )}
           <Box sx={{ display: isComposerLoading ? 'none' : 'contents' }}>
-            {activeDocumentKind === '기안서' && (
-              <>
-                <Box
-                  data-testid="document-draft-metadata"
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: {
-                      xs: 'minmax(0, 1fr)',
-                      sm: 'repeat(2, minmax(0, 1fr))',
-                    },
-                    gap: 1.25,
-                    flexShrink: 0,
-                  }}
-                >
-                  <TextField
-                    label="기안일"
-                    value={draftDate}
-                    fullWidth
-                    size="small"
-                    margin="none"
-                    slotProps={{ htmlInput: { readOnly: true } }}
-                    sx={formFieldSx}
-                  />
-                  <TextField
-                    label="기안자"
-                    value={drafterName}
-                    fullWidth
-                    size="small"
-                    margin="none"
-                    slotProps={{ htmlInput: { readOnly: true } }}
-                    sx={formFieldSx}
-                  />
-                  <TextField
-                    select
-                    label="구분"
-                    value={selectedCategoryId}
-                    onChange={(event) =>
-                      handleCategoryChange(event.target.value)
-                    }
-                    fullWidth
-                    size="small"
-                    margin="none"
-                    disabled={isLoading || templateLoading}
-                    helperText={
-                      !isLoading && categoryItems.length === 0
-                        ? '등록된 분류가 없습니다.'
-                        : undefined
-                    }
-                    sx={formFieldSx}
-                  >
-                    <MenuItem value={ALL_CATEGORY_VALUE}>전체</MenuItem>
-                    {categoryItems.map((category) => (
-                      <MenuItem key={category.id} value={category.id}>
-                        {category.itemNm}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    select
-                    label="기안양식"
-                    value={selectedFormId}
-                    onChange={(event) => handleFormChange(event.target.value)}
-                    fullWidth
-                    size="small"
-                    margin="none"
-                    disabled={
-                      isLoading ||
-                      templateLoading ||
-                      availableForms.length === 0
-                    }
-                    helperText={
-                      !isLoading && availableForms.length === 0
-                        ? '선택 가능한 기안양식이 없습니다.'
-                        : undefined
-                    }
-                    sx={formFieldSx}
-                  >
-                    {availableForms.map((form) => (
-                      <MenuItem
-                        key={form.draftingWorkCategoryId}
-                        value={String(form.draftingWorkCategoryId)}
-                      >
-                        {form.codeName}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
+            <DocumentMetadataFields
+              draftDate={draftDate}
+              drafterName={drafterName}
+              categoryItems={categoryItems}
+              availableForms={availableForms}
+              selectedCategoryId={selectedCategoryId}
+              selectedFormId={selectedFormId}
+              disabled={isLoading || templateLoading || isSaving}
+              onCategoryChange={handleCategoryChange}
+              onFormChange={handleFormChange}
+            />
 
-                <Divider />
+            <Divider />
 
-                <DocumentApprovalFields
-                  userOptions={userOptions}
-                  selectedApprovalUserIds={selectedApprovalUserIds}
-                  referenceUserIds={referenceUserIds}
-                  approvalStages={approvalStages}
-                  approvalSettingsDisabled={isLoading}
-                  onApprovalUserChange={handleApprovalUserChange}
-                  onReferenceUserChange={handleReferenceUserChange}
-                  onAddApproval={addApproval}
-                  onAddAgreement={addAgreement}
-                  onOpenApprovalSettings={openApprovalSettings}
-                  onRemoveApprovalUser={removeApprovalUser}
-                />
-              </>
+            {activeDocumentKind === '기안서' ? (
+              <DocumentApprovalFields
+                userOptions={userOptions}
+                selectedApprovalUserIds={selectedApprovalUserIds}
+                referenceUserIds={referenceUserIds}
+                approvalStages={approvalStages}
+                approvalSettingsDisabled={isLoading}
+                onApprovalUserChange={handleApprovalUserChange}
+                onReferenceUserChange={handleReferenceUserChange}
+                onAddApproval={addApproval}
+                onAddAgreement={addAgreement}
+                onOpenApprovalSettings={openApprovalSettings}
+                onRemoveApprovalUser={removeApprovalUser}
+              />
+            ) : (
+              <DocumentReferenceField
+                userOptions={referenceUserOptions}
+                referenceUserIds={referenceUserIds}
+                onChange={handleReferenceUserChange}
+              />
             )}
 
             <Divider />
@@ -646,6 +565,15 @@ export function DocumentComposerDialog({
             </Box>
           </Box>
         </Box>
+        <UnsavedChangesConfirmDialog
+          open={documentKindConfirmOpen}
+          title="문서 유형 변경"
+          description="다른 문서 유형으로 이동하시겠습니까? 결재선과 참조자는 초기화되며, 제목과 본문은 유지됩니다."
+          cancelLabel="취소"
+          continueLabel="이동"
+          onCancel={cancelDocumentKindChange}
+          onContinue={confirmDocumentKindChange}
+        />
         <UnsavedChangesConfirmDialog
           open={templateReplaceConfirmOpen}
           title="작성 중인 본문 교체"

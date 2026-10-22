@@ -33,10 +33,13 @@ export type NoticeBoardPostApi = {
   contentsText?: string | null;
   writerId?: string | null;
   writerName?: string | null;
+  writerProfileImage?: string | null;
   lastModifiedBy?: string | null;
   lastModifiedByName?: string | null;
   viewCount?: number | string | null;
   isPinned?: string | null;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   createdAt?: string | Date | null;
   attachments?: NoticeBoardAttachmentApi[];
   comments?: Array<
@@ -84,6 +87,8 @@ export type NoticeComposerEmbeddedImage = {
 export type NoticeComposerSubmitPayload = {
   title: string;
   noticeGubunCode: string;
+  loginPopupYn: 'Y' | 'N';
+  popupEndDate: string | null;
   body: string;
   bodyJson?: string;
   bodyText?: string;
@@ -111,6 +116,8 @@ export type NoticeComposerDialogProps = {
   defaultTitle?: string;
   noticeGubunOptions?: Array<{ code: string; name: string }>;
   defaultNoticeGubunCode?: string;
+  defaultLoginPopupYn?: 'Y' | 'N';
+  defaultPopupEndDate?: string | null;
   defaultBody?: string;
   defaultAttachments?: NoticeComposerDraftAttachment[];
 };
@@ -120,6 +127,8 @@ export type NoticeEditorDraft = {
   title: string;
   body: string;
   isPinned?: string;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   noticeGubunCode?: string;
   attachments: NoticeComposerDraftAttachment[];
 };
@@ -127,6 +136,7 @@ export type NoticeEditorDraft = {
 export type NoticeCommentItem = {
   id: number;
   author: string;
+  authorProfileImageUrl?: string | null;
   time: string;
   content: string;
   isDeleted?: boolean;
@@ -135,6 +145,9 @@ export type NoticeCommentItem = {
     id: string;
     name: string;
     size?: number;
+    mimeType?: string;
+    previewUrl?: string;
+    previewError?: string;
   }>;
   replies?: NoticeCommentItem[];
 };
@@ -142,6 +155,7 @@ export type NoticeCommentItem = {
 export type NoticeFeedItem = {
   id: number;
   writerId?: string | null;
+  writerProfileImage?: string | null;
   isPostOwner?: boolean;
   title: string;
   viewCount?: number;
@@ -168,6 +182,8 @@ export type NoticeFeedItem = {
   nextBeforeCommentId?: number | string | null;
   commentCount: number;
   isPinned?: string;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   liked?: boolean;
   likeCount?: number;
   bookmarked?: boolean;

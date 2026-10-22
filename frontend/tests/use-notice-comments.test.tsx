@@ -64,4 +64,54 @@ describe('useNoticeComments', () => {
     expect(result.current.noticeItems[0].comments?.[0].content).toBe('새 댓글');
     expect(showSuccess).toHaveBeenCalledWith('댓글이 등록되었습니다.');
   });
+
+  it('preserves image MIME metadata for files uploaded while editing a comment', async () => {
+    commonMocks.updateCommonComment.mockResolvedValue({
+      commentId: 51,
+      content: '<p>수정 댓글</p>',
+    });
+    commonMocks.uploadCommonFile.mockResolvedValue({
+      fileId: 77,
+      fileName: 'photo.png',
+      fileSize: 123,
+      mimeType: 'image/png',
+    });
+    const noticeWithComment: NoticeFeedItem = {
+      ...notice,
+      comments: [
+        {
+          id: 51,
+          author: '사용자',
+          time: '2026-10-20 10:00',
+          content: '기존 댓글',
+          attachments: [],
+        },
+      ],
+    };
+    const { result } = renderHook(() => {
+      const [noticeItems, setNoticeItems] = useState([noticeWithComment]);
+      const comments = useNoticeComments({
+        setNoticeItems,
+        showError: vi.fn(),
+        showSuccess: vi.fn(),
+      });
+      return { noticeItems, comments };
+    });
+
+    await act(async () => {
+      await result.current.comments.handleUpdateComment(
+        7,
+        51,
+        '<p>수정 댓글</p>',
+        [new File(['image'], 'photo.png', { type: 'image/png' })],
+      );
+    });
+
+    expect(result.current.noticeItems[0].comments?.[0].attachments?.[0]).toMatchObject({
+      id: '77',
+      name: 'photo.png',
+      size: 123,
+      mimeType: 'image/png',
+    });
+  });
 });

@@ -2,20 +2,19 @@ import {
   apiDelete,
   apiDownload,
   apiGet,
-  apiPost,
   apiPostFormData,
   apiPut,
 } from '../../../../../shared/services/apiClient';
 import type {
-  ArchiveAttachment,
+  ArchiveFileRow,
+  ArchiveFileSearchFilters,
+  ArchiveFileUpdatePayload,
   ArchiveId,
   ArchivePageResult,
-  ArchivePost,
-  ArchivePostSavePayload,
 } from '../types/archive.types';
 
 type ArchiveListApiResponse = {
-  resultList?: ArchivePost[];
+  resultList?: ArchiveFileRow[];
   resultCnt?: number | string | null;
 };
 
@@ -30,22 +29,21 @@ function requireItem<T>(response: ArchiveItemApiResponse<T>, label: string): T {
   return response.item;
 }
 
-export async function fetchArchivePosts(
-  pageIndex: number,
-  pageUnit: number,
-  keyword?: string,
-  categoryCode?: string,
+export async function fetchArchiveFiles(
+  filters: ArchiveFileSearchFilters,
   signal?: AbortSignal,
 ): Promise<ArchivePageResult> {
-  const query = new URLSearchParams({
-    pageIndex: String(pageIndex),
-    pageUnit: String(pageUnit),
-  });
-  const normalizedKeyword = keyword?.trim();
+  const query = new URLSearchParams();
+  const normalizedKeyword = filters.keyword.trim();
   if (normalizedKeyword) query.set('keyword', normalizedKeyword);
-  if (categoryCode?.trim()) query.set('categoryCode', categoryCode.trim());
+  const normalizedFolderCode = filters.folderCode.trim();
+  if (normalizedFolderCode) query.set('folderCode', normalizedFolderCode);
+  if (filters.uploadedFrom) query.set('uploadedFrom', filters.uploadedFrom);
+  if (filters.uploadedTo) query.set('uploadedTo', filters.uploadedTo);
+  if (filters.fileType !== 'ALL') query.set('fileType', filters.fileType);
 
-  const url = `/api/v1/groupware/boards/archive/posts?${query.toString()}`;
+  const queryString = query.toString();
+  const url = `/api/v1/groupware/boards/archive/files${queryString ? `?${queryString}` : ''}`;
   const response =
     signal === undefined
       ? await apiGet<ArchiveListApiResponse>(url)
@@ -56,55 +54,31 @@ export async function fetchArchivePosts(
   };
 }
 
-export async function fetchArchivePostDetail(
-  postId: ArchiveId,
-): Promise<ArchivePost> {
-  const response = await apiGet<ArchiveItemApiResponse<ArchivePost>>(
-    `/api/v1/groupware/boards/archive/posts/${encodeURIComponent(String(postId))}`,
-  );
-  return requireItem(response, 'detail');
-}
-
-export async function createArchivePost(
-  payload: ArchivePostSavePayload,
-): Promise<ArchivePost> {
-  const response = await apiPost<ArchiveItemApiResponse<ArchivePost>>(
-    '/api/v1/groupware/boards/archive/posts',
-    payload,
-  );
-  return requireItem(response, 'create');
-}
-
-export async function updateArchivePost(
-  postId: ArchiveId,
-  payload: ArchivePostSavePayload,
-): Promise<ArchivePost> {
-  const response = await apiPut<ArchiveItemApiResponse<ArchivePost>>(
-    `/api/v1/groupware/boards/archive/posts/${encodeURIComponent(String(postId))}`,
-    payload,
-  );
-  return requireItem(response, 'update');
-}
-
-export function deleteArchivePost(postId: ArchiveId): Promise<void> {
-  return apiDelete(
-    `/api/v1/groupware/boards/archive/posts/${encodeURIComponent(String(postId))}`,
-  );
-}
-
-export async function uploadArchiveAttachment(
-  postId: ArchiveId,
+export async function uploadArchiveFile(
   file: File,
-): Promise<ArchiveAttachment> {
+  folderCode?: string,
+): Promise<ArchiveFileRow> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiPostFormData<
-    ArchiveItemApiResponse<ArchiveAttachment>
-  >(
-    `/api/v1/groupware/boards/archive/posts/${encodeURIComponent(String(postId))}/attachments`,
+  if (folderCode?.trim()) {
+    formData.append('folderCode', folderCode.trim());
+  }
+  const response = await apiPostFormData<ArchiveItemApiResponse<ArchiveFileRow>>(
+    '/api/v1/groupware/boards/archive/files',
     formData,
   );
-  return requireItem(response, 'attachment upload');
+  return requireItem(response, 'file upload');
+}
+
+export async function updateArchiveFile(
+  boardFileId: ArchiveId,
+  payload: ArchiveFileUpdatePayload,
+): Promise<ArchiveFileRow> {
+  const response = await apiPut<ArchiveItemApiResponse<ArchiveFileRow>>(
+    `/api/v1/groupware/boards/archive/files/${encodeURIComponent(String(boardFileId))}`,
+    payload,
+  );
+  return requireItem(response, 'file update');
 }
 
 export function deleteArchiveAttachment(
@@ -117,10 +91,12 @@ export function deleteArchiveAttachment(
   );
 }
 
-export function downloadArchiveAttachment(
-  attachment: ArchiveAttachment,
-): Promise<void> {
-  const query = new URLSearchParams({ postId: String(attachment.postId) });
-  const path = `/api/v1/groupware/boards/archive/attachments/${encodeURIComponent(String(attachment.boardFileId))}/download?${query.toString()}`;
-  return apiDownload(path, attachment.fileName);
+export function downloadArchiveAttachment(file: {
+  boardFileId: ArchiveId;
+  postId: ArchiveId;
+  fileName: string;
+}): Promise<void> {
+  const query = new URLSearchParams({ postId: String(file.postId) });
+  const path = `/api/v1/groupware/boards/archive/attachments/${encodeURIComponent(String(file.boardFileId))}/download?${query.toString()}`;
+  return apiDownload(path, file.fileName);
 }

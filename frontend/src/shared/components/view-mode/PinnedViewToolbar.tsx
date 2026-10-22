@@ -10,6 +10,7 @@ type PinnedViewToolbarProps = {
   countLabel?: string;
   modeLabel?: string;
   filterAction?: ReactNode;
+  enableFileView?: boolean;
 };
 
 export function PinnedViewToolbar({
@@ -19,6 +20,7 @@ export function PinnedViewToolbar({
   countLabel = '고정',
   modeLabel = '보기 방식',
   filterAction,
+  enableFileView = false,
 }: PinnedViewToolbarProps) {
   return (
     <Box
@@ -27,16 +29,17 @@ export function PinnedViewToolbar({
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: 1.5,
+        flexWrap: 'wrap',
         mb: 1.5,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Typography variant="subtitle2" color="text.secondary">
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap' }}>
+        {mode !== 'file' && <Typography variant="subtitle2" color="text.secondary">
           {countLabel} {pinnedCount}건
-        </Typography>
+        </Typography>}
         {filterAction}
       </Box>
-      <ViewModeToggle mode={mode} onChange={onChange} ariaLabel={modeLabel} />
+      <ViewModeToggle mode={mode} onChange={onChange} ariaLabel={modeLabel} enableFileView={enableFileView} />
     </Box>
   );
 }

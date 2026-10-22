@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeedView } from '../src/shared/components/view-mode/FeedView';
 import { FeedViewSkeleton } from '../src/shared/components/view-mode/FeedViewSkeleton';
 import { ListView } from '../src/shared/components/view-mode/ListView';
@@ -27,7 +27,122 @@ const items: CommonViewItem[] = [
   },
 ];
 
+class ImmediateIntersectionObserver {
+  constructor(private readonly callback: (entries: Array<{ isIntersecting: boolean }>) => void) {}
+
+  observe() {
+    this.callback([{ isIntersecting: true }]);
+  }
+
+  disconnect() {}
+}
+
 describe('common notice view mode components', () => {
+  it('keeps the default document icon and leading column used by document lists', () => {
+    const onItemClick = vi.fn();
+    render(<ListView items={[items[0]]} onItemClick={onItemClick} />);
+    const button = screen.getByText('고정 공지').closest('button')!;
+    expect(getComputedStyle(button).gridTemplateColumns).toBe('24px minmax(0, 1fr)');
+    expect(button.firstElementChild).toBe(screen.getByTestId('DescriptionOutlinedIcon'));
+    fireEvent.click(button);
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
+  });
+
+  it('supports opt-in leading icons and category rendering without replacing item selection', () => {
+    const onItemClick = vi.fn();
+    const view = render(<ListView items={items} onItemClick={onItemClick}
+      renderItemIcon={() => <span data-testid="custom-icon">상태 아이콘</span>}
+      renderCategoryBadge={(item) => <span>맞춤 {item.categoryLabel}</span>} />);
+    expect(screen.getAllByTestId('custom-icon')).toHaveLength(2);
+    expect(screen.getByText('맞춤 시스템')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('고정 공지'));
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
+    view.unmount();
+    render(<PinnedItemsPanel items={items} onItemClick={onItemClick} />);
+    expect(screen.getByTestId('PushPinOutlinedIcon')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('고정 공지'));
+    expect(onItemClick).toHaveBeenCalledTimes(2);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['feed', 'list'] as const)(
+    'supports opt-in pagination in %s mode',
+    (mode) => {
+      const onLoadMore = vi.fn();
+      const scrollRoot = document.createElement('div');
+      vi.stubGlobal('IntersectionObserver', ImmediateIntersectionObserver);
+
+      const pagination = {
+        scrollRoot,
+        hasNext: true,
+        isLoadingMore: false,
+        onLoadMore,
+      };
+      const view = mode === 'feed'
+        ? (
+            <FeedView
+              items={[]}
+              renderItem={() => <span>피드 항목</span>}
+              pagination={pagination}
+            />
+          )
+        : <ListView items={[]} pagination={pagination} />;
+
+      const { rerender } = render(view);
+
+      expect(onLoadMore).toHaveBeenCalledOnce();
+      expect(screen.queryByRole('status', { name: '다음 문서 불러오는 중' }))
+        .not.toBeInTheDocument();
+
+      const loadingView = mode === 'feed'
+        ? (
+            <FeedView
+              items={[]}
+              renderItem={() => <span>피드 항목</span>}
+              pagination={{ ...pagination, isLoadingMore: true }}
+            />
+          )
+        : <ListView items={[]} pagination={{ ...pagination, isLoadingMore: true }} />;
+      rerender(loadingView);
+
+      expect(onLoadMore).toHaveBeenCalledOnce();
+      expect(screen.getByRole('status', { name: '다음 문서 불러오는 중' }))
+        .toBeInTheDocument();
+    },
+  );
+
+  it.each(['feed', 'list'] as const)(
+    'supports a caller-specific pagination loading label in %s mode',
+    (mode) => {
+      const pagination = {
+        scrollRoot: null,
+        hasNext: true,
+        isLoadingMore: true,
+        loadingLabel: '다음 공지 불러오는 중',
+        onLoadMore: vi.fn(),
+      };
+
+      render(
+        mode === 'feed'
+          ? (
+              <FeedView
+                items={[]}
+                renderItem={() => <span>피드 항목</span>}
+                pagination={pagination}
+              />
+            )
+          : <ListView items={[]} pagination={pagination} />,
+      );
+
+      expect(
+        screen.getByRole('status', { name: '다음 공지 불러오는 중' }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('switches between feed and list modes through a callback', () => {
     const onChange = vi.fn();
 
@@ -51,6 +166,53 @@ describe('common notice view mode components', () => {
     expect(
       screen.queryByRole('region', { name: '상단 고정 공지' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps pinned panel actions outside the selectable item button', () => {
+    const onItemClick = vi.fn();
+    const onAction = vi.fn();
+
+    render(
+      <PinnedItemsPanel
+        items={[items[0]]}
+        onItemClick={onItemClick}
+        renderItemAction={() => (
+          <button type="button" onClick={onAction}>고정 해제</button>
+        )}
+      />,
+    );
+
+    const action = screen.getByRole('button', { name: '고정 해제' });
+
+    expect(action.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(action);
+
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps a custom list toolbar outside selection and replaces default badges', () => {
+    const onItemClick = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ListView
+        items={[items[0]]}
+        onItemClick={onItemClick}
+        renderItemToolbar={() => (
+          <button type="button" onClick={onAction}>Toolbar action</button>
+        )}
+      />,
+    );
+
+    const action = screen.getByRole('button', { name: 'Toolbar action' });
+    expect(action.parentElement?.closest('button')).toBeNull();
+    expect(screen.queryByText('시스템')).not.toBeInTheDocument();
+    fireEvent.click(action);
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /고정 공지/ }));
+    expect(onItemClick).toHaveBeenCalledWith(items[0]);
   });
 
   it('keeps feed and list item rendering separate', () => {
@@ -189,6 +351,49 @@ describe('common notice view mode components', () => {
     );
 
     expect(screen.getByTestId('list-category-chip')).toHaveClass('MuiChip-colorInfo');
+  });
+
+  it('keeps header and metadata actions outside the clickable list row', () => {
+    const onItemClick = vi.fn();
+    const onHeaderAction = vi.fn();
+    const onMetadataAction = vi.fn();
+
+    render(
+      <ListView
+        items={[
+          {
+            id: 22,
+            title: '고정 대상 문서',
+            authorLabel: '작성자',
+            dateLabel: '2026-10-21',
+            categoryLabel: '업무연락',
+          },
+        ]}
+        onItemClick={onItemClick}
+        renderItemHeaderAction={() => (
+          <button type="button" onClick={onHeaderAction}>문서 고정</button>
+        )}
+        renderItemAction={() => (
+          <button type="button" onClick={onMetadataAction}>기존 액션</button>
+        )}
+      />,
+    );
+
+    const category = screen.getByTestId('list-category-chip');
+    const pin = screen.getByRole('button', { name: '문서 고정' });
+    const metadataAction = screen.getByRole('button', { name: '기존 액션' });
+
+    expect(category.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
+    expect(pin.parentElement?.closest('button')).toBeNull();
+    expect(metadataAction.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(pin);
+    fireEvent.click(metadataAction);
+
+    expect(onHeaderAction).toHaveBeenCalledOnce();
+    expect(onMetadataAction).toHaveBeenCalledOnce();
+    expect(onItemClick).not.toHaveBeenCalled();
   });
 
   it('provides mode-specific skeletons', () => {

@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
+import { ProfileAvatar } from '../ProfileAvatar';
 
 export type FeedCardProps = {
   author: string;
+  authorProfileImageUrl?: string | null;
   meta?: ReactNode;
   avatar?: ReactNode;
   badges?: ReactNode;
@@ -17,6 +19,7 @@ export type FeedCardProps = {
 
 export function FeedCard({
   author,
+  authorProfileImageUrl,
   meta,
   avatar,
   badges,
@@ -62,15 +65,14 @@ export function FeedCard({
             minWidth: 0,
           }}
         >
-          <Box
+          <ProfileAvatar
+            name={author}
+            imageUrl={authorProfileImageUrl}
+            fallback={avatar ?? author.slice(0, 1)}
             sx={{
               width: 36,
               height: 36,
               flexShrink: 0,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               fontSize: '0.8rem',
               fontWeight: 700,
               background: isDark
@@ -78,9 +80,7 @@ export function FeedCard({
                 : 'linear-gradient(135deg, #dbeafe, #ede9fe)',
               color: isDark ? '#eff6ff' : '#1f2937',
             }}
-          >
-            {avatar ?? author.slice(0, 1)}
-          </Box>
+          />
           <Box sx={{ flex: '1 1 120px', minWidth: 0 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
               {author}

@@ -6,6 +6,7 @@ import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/
 import type { F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { DocumentApprovalStage } from '../types/documentWrite.types';
 import { ApprovalSequenceBadge } from './ApprovalSequenceBadge';
+import { DocumentReferenceField } from './DocumentReferenceField';
 
 const MIN_APPROVAL_SLOT_WIDTH = 88;
 const APPROVAL_SLOT_GAP = 4;
@@ -481,25 +482,11 @@ export function DocumentApprovalFields({
         </>
       )}
 
-      <Box
-        data-testid="document-reference-row"
-        sx={{ ...labeledRowSx, alignItems: 'center' }}
-      >
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-          참조
-        </Typography>
-        <Box sx={{ minWidth: 0 }}>
-          <UserSelectEditor
-            value={referenceUserIds}
-            options={referenceOptions}
-            multiple
-            label="참조자 선택"
-            onChange={onReferenceUserChange}
-            hideSelectedOptions
-            preserveSelectionOrder
-          />
-        </Box>
-      </Box>
+      <DocumentReferenceField
+        userOptions={referenceOptions}
+        referenceUserIds={referenceUserIds}
+        onChange={onReferenceUserChange}
+      />
     </Box>
   );
 }
