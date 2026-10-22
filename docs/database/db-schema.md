@@ -371,6 +371,8 @@
 | category_code         | varchar   | 게시판 종류별 공통 분류 코드 |
 | view_count            | int       | 조회수                       |
 | is_pinned             | char      | 상단 고정 여부 (`Y`/`N`)     |
+| login_popup_yn        | char(1)   | 로그인 팝업 여부, 기본 N (20261022_004 미적용 migration) |
+| popup_end_date        | date      | 팝업 종료일, 해당 한국 날짜까지 유효 (위 migration) |
 | is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
 | created_at            | timestamp | 생성 일시                    |
 | updated_at            | timestamp | 수정 일시                    |
@@ -409,6 +411,18 @@
 
 - 첨부 파일 메타데이터를 보관
 - 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
+
+### tb_notice_popup_dismissal (20261022_004 migration, 실제 DB 미적용)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| tenant_id | bigint | tenant FK, 복합 PK |
+| post_id | bigint | 공지 FK, 복합 PK, 삭제 시 cascade |
+| login_id | bigint | 로그인 FK, 복합 PK, 삭제 시 cascade |
+| dismissed_on | date | Asia/Seoul 기준 마지막 하루 숨김 날짜 |
+
+`backend/DATABASE/20261022` 및 `docs/database/20261022`의 `20261022_004` SQL/변경 이력/롤백 참조.
+기존 최초 조회수 이력과 별개이며 과거 숨김 일자는 다음 날짜 팝업 노출을 막지 않는다.
 
 ### 2-19. tb_board_post_view_history
 

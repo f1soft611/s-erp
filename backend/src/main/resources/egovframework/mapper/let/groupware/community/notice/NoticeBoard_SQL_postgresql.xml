@@ -17,6 +17,8 @@
         <result property="lastModifiedByName" column="last_modified_by_name"/>
         <result property="viewCount" column="view_count"/>
         <result property="isPinned" column="is_pinned"/>
+        <result property="loginPopupYn" column="login_popup_yn"/>
+        <result property="popupEndDate" column="popup_end_date"/>
         <result property="isDeleted" column="is_deleted"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -58,6 +60,8 @@
             p.last_modified_by_name,
             p.view_count,
             p.is_pinned,
+            p.login_popup_yn,
+            p.popup_end_date,
             p.is_deleted,
             p.created_at,
             p.updated_at,
@@ -127,6 +131,8 @@
             p.last_modified_by_name,
             p.view_count,
             p.is_pinned,
+            p.login_popup_yn,
+            p.popup_end_date,
             p.is_deleted,
             p.created_at,
             p.updated_at,
@@ -144,6 +150,46 @@
           AND p.board_type_code = #{boardTypeCode}
           AND p.is_deleted = 'N'
     </select>
+
+    <sql id="activeLoginPopup">
+        p.tenant_id = #{tenantId}
+        AND p.board_type_code = 'NOTICE'
+        AND p.is_deleted = 'N'
+        AND p.login_popup_yn = 'Y'
+        AND p.popup_end_date >= CAST(#{today} AS date)
+    </sql>
+
+    <sql id="notDismissedToday">
+        NOT EXISTS (
+            SELECT 1 FROM tb_notice_popup_dismissal d
+            WHERE d.tenant_id = p.tenant_id AND d.post_id = p.post_id
+              AND d.login_id = #{loginId} AND d.dismissed_on = CAST(#{today} AS date)
+        )
+    </sql>
+
+    <select id="selectLoginPopupList" parameterType="map" resultMap="noticePostMap">
+        SELECT p.post_id, p.title, p.created_at
+        FROM tb_board_post p
+        WHERE <include refid="activeLoginPopup"/>
+          AND <include refid="notDismissedToday"/>
+        ORDER BY p.created_at DESC, p.post_id DESC
+    </select>
+
+    <select id="selectLoginPopupById" parameterType="map" resultMap="noticePostMap">
+        SELECT p.post_id FROM tb_board_post p
+        WHERE <include refid="activeLoginPopup"/>
+          AND p.post_id = #{postId}
+          AND <include refid="notDismissedToday"/>
+    </select>
+
+    <insert id="dismissLoginPopup" parameterType="map">
+        INSERT INTO tb_notice_popup_dismissal (tenant_id, post_id, login_id, dismissed_on)
+        SELECT p.tenant_id, p.post_id, #{loginId}, CAST(#{today} AS date)
+        FROM tb_board_post p
+        WHERE <include refid="activeLoginPopup"/> AND p.post_id = #{postId}
+        ON CONFLICT (tenant_id, post_id, login_id)
+        DO UPDATE SET dismissed_on = EXCLUDED.dismissed_on
+    </insert>
 
     <select id="selectLoginIdByLoginCode" parameterType="map" resultType="long">
         SELECT login_id
@@ -194,6 +240,8 @@
             last_modified_by_name,
             view_count,
             is_pinned,
+            login_popup_yn,
+            popup_end_date,
             is_deleted,
             created_at,
             updated_at
@@ -212,6 +260,8 @@
             #{lastModifiedByName},
             0,
             #{isPinned},
+            #{loginPopupYn},
+            CAST(#{popupEndDate} AS date),
             'N',
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
@@ -231,6 +281,8 @@
             last_modified_by = #{lastModifiedBy},
             last_modified_by_name = #{lastModifiedByName},
             is_pinned = #{isPinned},
+            login_popup_yn = #{loginPopupYn},
+            popup_end_date = CAST(#{popupEndDate} AS date),
             updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = #{tenantId}
           AND post_id = #{postId}

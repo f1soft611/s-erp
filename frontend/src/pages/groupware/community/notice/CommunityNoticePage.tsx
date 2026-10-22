@@ -274,6 +274,8 @@ export function CommunityNoticePage({
               item.id,
             ),
             isPinned: item.isPinned,
+            loginPopupYn: item.loginPopupYn,
+            popupEndDate: item.popupEndDate,
             noticeGubunCode: item.noticeGubunCode,
             attachments: mappedAttachments,
           });
@@ -517,6 +519,8 @@ export function CommunityNoticePage({
                             item.id,
                           ),
                           isPinned: item.isPinned,
+                          loginPopupYn: item.loginPopupYn,
+                          popupEndDate: item.popupEndDate,
                           noticeGubunCode: item.noticeGubunCode,
                           attachments: mappedAttachments,
                         });
@@ -588,6 +592,8 @@ export function CommunityNoticePage({
         defaultTitle={editorDraft.title}
         noticeGubunOptions={noticeGubunOptions}
         defaultNoticeGubunCode={editorDraft.noticeGubunCode ?? ''}
+        defaultLoginPopupYn={editorDraft.loginPopupYn ?? 'N'}
+        defaultPopupEndDate={editorDraft.popupEndDate}
         defaultBody={editorDraft.body}
         defaultAttachments={editorDraft.attachments}
       />

@@ -524,6 +524,19 @@ describe('F1-Grid docs portal', () => {
     expect(guideContent).toContain('fallback');
   });
 
+  it('documents compact date entry and invalid-date search blocking', () => {
+    const section = getF1GridDoc('filtering-sorting').sections.find(
+      (item) => item.heading === '날짜 숫자 입력과 달력 선택',
+    );
+    expect(section?.type).toBe('prose');
+    if (section?.type !== 'prose') return;
+    expect(section.body).toContain('20261022');
+    expect(section.body).toContain('YYYY-MM-DD');
+    expect(section.body).toContain('조회하지 않고');
+    expect(section.body).toContain('브라우저');
+    expect(section.body).toContain('서버');
+  });
+
   it('documents each public F1-Grid API identifier and nested contract field', () => {
     const apiDoc = getF1GridDoc('api-reference');
     for (const [heading, expectedNames] of Object.entries(

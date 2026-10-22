@@ -43,6 +43,15 @@ public class NoticeBoardPostVO implements Serializable {
     private Integer viewCount;
     @Schema(description = "상단 고정 여부")
     private String isPinned;
+    @Schema(description = "로그인 팝업 여부 Y/N")
+    private String loginPopupYn;
+    @Schema(description = "팝업 종료일 YYYY-MM-DD")
+    private String popupEndDate;
+
+    public String getLoginPopupYn() { return loginPopupYn; }
+    public void setLoginPopupYn(String loginPopupYn) { this.loginPopupYn = loginPopupYn; }
+    public String getPopupEndDate() { return popupEndDate; }
+    public void setPopupEndDate(String popupEndDate) { this.popupEndDate = popupEndDate; }
     @Schema(description = "삭제 여부")
     private String isDeleted;
     @Schema(description = "등록 일시")

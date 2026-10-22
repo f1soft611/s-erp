@@ -29,6 +29,18 @@ const matchMobile = (matches: boolean) => {
 };
 
 describe('CommonDialog', () => {
+  it('supports a separate title badge and rich description without changing the dialog name', () => {
+    render(<CommonDialog open title="공지 모달" onClose={vi.fn()}
+      titleAside={<span role="status">1 / 1</span>}
+      description={<span>작성자 <strong>검증 작성자</strong></span>}>
+      <p>본문</p>
+    </CommonDialog>);
+    const dialog = screen.getByRole('dialog', { name: '공지 모달' });
+    expect(dialog).toHaveAccessibleDescription('작성자 검증 작성자');
+    expect(screen.getByRole('status').parentElement).toBe(
+      screen.getByRole('heading', { name: '공지 모달' }).parentElement);
+  });
+
   it('uses the dark page palette with a distinct slate shell', () => {
     render(
       <ThemeProvider theme={createAppTheme('dark')}>

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import dayjs from 'dayjs';
+import { useState } from 'react';
 import { PageSearchArea } from '../src/shared/components/PageSearchArea';
 import type { PageSearchField } from '../src/shared/components/page-search/searchFields';
 
@@ -15,6 +17,144 @@ describe('PageSearchArea 상세 검색', () => {
       options: [{ value: 'Y', label: '사용' }],
     },
   ];
+
+  it.each([
+    ['20261022', '2026-10-22'],
+    ['261022', '2026-10-22'],
+    ['1022', `${dayjs().year()}-10-22`],
+    ['22', `${dayjs().format('YYYY-MM')}-22`],
+    ['10-22', `${dayjs().year()}-10-22`],
+    ['2024-02-29', '2024-02-29'],
+  ])('날짜 %s를 blur에서 %s로 확정한다', (input, expected) => {
+    const onChange = vi.fn();
+    render(<PageSearchArea detailFields={fields} onDetailValuesChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const start = screen.getByLabelText('생성일 시작일');
+    expect(start).toHaveAttribute('type', 'text');
+    fireEvent.change(start, { target: { value: input } });
+    fireEvent.blur(start);
+    expect(start).toHaveValue(expected);
+    expect(onChange).toHaveBeenLastCalledWith({
+      createdAt: { from: expected, to: '' },
+    });
+  });
+
+  it('blur 없이 조회해도 양쪽 날짜를 ISO로 정규화한다', () => {
+    const onSearch = vi.fn();
+    render(<PageSearchArea detailFields={fields} onDetailSearch={onSearch} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(screen.getByLabelText('생성일 시작일'), {
+      target: { value: '20261001' },
+    });
+    fireEvent.change(screen.getByLabelText('생성일 종료일'), {
+      target: { value: '261022' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({
+      createdAt: { from: '2026-10-01', to: '2026-10-22' },
+    });
+  });
+
+  it('잘못된 날짜는 입력을 보존하고 오류를 표시하며 조회를 차단한다', () => {
+    const onSearch = vi.fn();
+    render(<PageSearchArea detailFields={fields} onDetailSearch={onSearch} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const start = screen.getByLabelText('생성일 시작일');
+    fireEvent.change(start, { target: { value: '20260230' } });
+    fireEvent.blur(start);
+    expect(start).toHaveValue('20260230');
+    expect(start).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('올바른 날짜를 입력하세요.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '상세 검색' })).toBeVisible();
+    fireEvent.change(start, { target: { value: '20240229' } });
+    fireEvent.blur(start);
+    expect(start).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({
+      createdAt: { from: '2024-02-29', to: '' },
+    });
+  });
+
+  it('오류 날짜를 삭제하면 한쪽만 지정한 검색을 허용한다', () => {
+    const onSearch = vi.fn();
+    render(<PageSearchArea detailFields={fields} onDetailSearch={onSearch} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const start = screen.getByLabelText('생성일 시작일');
+    fireEvent.change(start, { target: { value: '20260230' } });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).not.toHaveBeenCalled();
+    fireEvent.change(start, { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('생성일 종료일'), {
+      target: { value: '20261022' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({
+      createdAt: { from: '', to: '2026-10-22' },
+    });
+  });
+
+  it('초기화와 외부 ISO 날짜 복원은 날짜 오류도 해제한다', () => {
+    const defaults = { createdAt: { from: '2026-10-01', to: '2026-10-22' } };
+    const { rerender } = render(
+      <PageSearchArea detailFields={fields} defaultValues={defaults} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const start = screen.getByLabelText('생성일 시작일');
+    fireEvent.change(start, { target: { value: '20260230' } });
+    fireEvent.blur(start);
+    fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+    expect(start).toHaveValue('2026-10-01');
+    expect(start).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.change(start, { target: { value: '20260230' } });
+    fireEvent.blur(start);
+    rerender(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ createdAt: { from: '2026-09-01', to: '' } }}
+      />,
+    );
+    expect(start).toHaveValue('2026-09-01');
+    expect(start).toHaveAttribute('aria-invalid', 'false');
+  });
+
+  it('각 날짜의 달력을 열고 날짜 선택 결과를 ISO로 반영한다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ createdAt: { from: '2026-10-01', to: '' } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '생성일 시작일 달력 열기' }));
+    fireEvent.click(screen.getByRole('gridcell', { name: '22', exact: true }));
+    expect(screen.getByLabelText('생성일 시작일')).toHaveValue('2026-10-22');
+    expect(screen.getByLabelText('생성일 종료일')).toHaveValue('');
+  });
+
+  it('controlled 폼에서 다른 날짜를 편집해도 기존 오류를 유지한다', () => {
+    function ControlledSearch() {
+      const [values, setValues] = useState({});
+      return (
+        <PageSearchArea
+          detailFields={fields}
+          detailValues={values}
+          onDetailValuesChange={setValues}
+        />
+      );
+    }
+    render(<ControlledSearch />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const start = screen.getByLabelText('생성일 시작일');
+    fireEvent.change(start, { target: { value: '20260230' } });
+    fireEvent.blur(start);
+    expect(start).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(screen.getByLabelText('생성일 종료일'), {
+      target: { value: '20261022' },
+    });
+    expect(start).toHaveAttribute('aria-invalid', 'true');
+  });
   const groupedFields: PageSearchField[] = [
     {
       field: 'submittedAt',

@@ -89,6 +89,8 @@ describe('useNoticeMutations', () => {
       await result.current.handleSaveNotice({
         title: '  신규 공지  ',
         noticeGubunCode: 'OPS',
+        loginPopupYn: 'Y',
+        popupEndDate: '2026-10-31',
         body: '<p>본문</p>',
         bodyJson: '{"type":"doc"}',
         bodyText: '본문',
@@ -107,6 +109,8 @@ describe('useNoticeMutations', () => {
         contentsJson: '{"type":"doc"}',
         contentsText: '본문',
         noticeGubunCode: 'OPS',
+        loginPopupYn: 'Y',
+        popupEndDate: '2026-10-31',
         embeddedImages: [],
         temporaryImages: [{ uploadToken: 'temp-1', fileName: 'image.png' }],
       }),

@@ -1,6 +1,8 @@
 package egovframework.let.groupware.community.notice.service.impl;
 
 import java.security.MessageDigest;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.URLDecoder;
@@ -350,6 +352,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
         params.put("isPinned", StringUtils.hasText(payload.getIsPinned()) ? payload.getIsPinned().toUpperCase() : "N");
+        putPopupSettings(params, payload);
 
         Long postId = noticeBoardDAO.insertNoticePost(params);
         if (payload.getAttachmentIds() != null && !payload.getAttachmentIds().isEmpty()) {
@@ -419,6 +422,7 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
         params.put("lastModifiedBy", actorId);
         params.put("lastModifiedByName", actorName);
         params.put("isPinned", StringUtils.hasText(payload.getIsPinned()) ? payload.getIsPinned().toUpperCase() : "N");
+        putPopupSettings(params, payload);
         if (imageStorageService != null) {
             EmbeddedImageDocumentProcessor.Result imageSave = rewriteAndPromoteEmbeddedImages(
                     tenantId, postId, contentsHtml, contentsJson, payload.getEmbeddedImages(),
@@ -434,6 +438,27 @@ public class NoticeBoardServiceImpl extends EgovAbstractServiceImpl implements N
             noticeBoardDAO.updateNoticePost(params);
         }
         return getPost(tenantId, postId);
+    }
+
+    private void putPopupSettings(Map<String, Object> params, NoticeBoardPostSaveRequestVO payload) {
+        String enabled = payload.getLoginPopupYn() == null ? "N" : payload.getLoginPopupYn();
+        if (!"Y".equals(enabled) && !"N".equals(enabled)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "로그인 팝업 여부는 Y 또는 N이어야 합니다.");
+        }
+        String endDate = null;
+        if ("Y".equals(enabled)) {
+            String value = payload.getPopupEndDate();
+            try {
+                if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}") || value.startsWith("0000-")) {
+                    throw new DateTimeParseException("Invalid date", value == null ? "" : value, 0);
+                }
+                endDate = LocalDate.parse(value).toString();
+            } catch (DateTimeParseException exception) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 팝업 종료일을 입력해 주세요.", exception);
+            }
+        }
+        params.put("loginPopupYn", enabled);
+        params.put("popupEndDate", endDate);
     }
 
     private EmbeddedImageDocumentProcessor.Result rewriteAndPromoteEmbeddedImages(

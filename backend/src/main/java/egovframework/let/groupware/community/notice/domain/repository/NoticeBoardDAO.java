@@ -12,6 +12,18 @@ import egovframework.let.groupware.community.notice.domain.model.NoticeBoardPost
 @Repository("noticeBoardDAO")
 public class NoticeBoardDAO extends EgovAbstractMapper {
 
+    public List<NoticeBoardPostVO> selectLoginPopupList(Map<String, Object> params) throws Exception {
+        return selectList("NoticeBoardDAO.selectLoginPopupList", params);
+    }
+
+    public NoticeBoardPostVO selectLoginPopupById(Map<String, Object> params) throws Exception {
+        return selectOne("NoticeBoardDAO.selectLoginPopupById", params);
+    }
+
+    public int dismissLoginPopup(Map<String, Object> params) throws Exception {
+        return insert("NoticeBoardDAO.dismissLoginPopup", params);
+    }
+
     public List<NoticeBoardPostVO> selectNoticePostList(Map<String, Object> params) throws Exception {
         return selectList("NoticeBoardDAO.selectNoticePostList", params);
     }

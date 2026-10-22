@@ -37,6 +37,8 @@ export type NoticeBoardPostApi = {
   lastModifiedByName?: string | null;
   viewCount?: number | string | null;
   isPinned?: string | null;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   createdAt?: string | Date | null;
   attachments?: NoticeBoardAttachmentApi[];
   comments?: Array<
@@ -84,6 +86,8 @@ export type NoticeComposerEmbeddedImage = {
 export type NoticeComposerSubmitPayload = {
   title: string;
   noticeGubunCode: string;
+  loginPopupYn: 'Y' | 'N';
+  popupEndDate: string | null;
   body: string;
   bodyJson?: string;
   bodyText?: string;
@@ -111,6 +115,8 @@ export type NoticeComposerDialogProps = {
   defaultTitle?: string;
   noticeGubunOptions?: Array<{ code: string; name: string }>;
   defaultNoticeGubunCode?: string;
+  defaultLoginPopupYn?: 'Y' | 'N';
+  defaultPopupEndDate?: string | null;
   defaultBody?: string;
   defaultAttachments?: NoticeComposerDraftAttachment[];
 };
@@ -120,6 +126,8 @@ export type NoticeEditorDraft = {
   title: string;
   body: string;
   isPinned?: string;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   noticeGubunCode?: string;
   attachments: NoticeComposerDraftAttachment[];
 };
@@ -171,6 +179,8 @@ export type NoticeFeedItem = {
   nextBeforeCommentId?: number | string | null;
   commentCount: number;
   isPinned?: string;
+  loginPopupYn?: 'Y' | 'N';
+  popupEndDate?: string | null;
   liked?: boolean;
   likeCount?: number;
   bookmarked?: boolean;

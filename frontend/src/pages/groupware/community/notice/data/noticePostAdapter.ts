@@ -171,5 +171,7 @@ export function mapNoticePost(
     liked: false,
     bookmarked: false,
     isPinned: post.isPinned ?? 'N',
+    loginPopupYn: post.loginPopupYn ?? 'N',
+    popupEndDate: post.popupEndDate,
   };
 }

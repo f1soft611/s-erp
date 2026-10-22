@@ -3,6 +3,7 @@ import type { LoginFormValues } from '../../pages/auth/types/auth';
 export interface LoginRequest extends LoginFormValues {}
 
 export interface AuthSession {
+  popupSessionId?: string;
   tenantCode: string;
   userId: string;
   accessToken: string;
@@ -252,6 +253,10 @@ export const login = async (
   }
 
   const session: AuthSession = {
+    popupSessionId: Array.from(
+      crypto.getRandomValues(new Uint32Array(4)),
+      (value) => value.toString(16).padStart(8, '0'),
+    ).join(''),
     tenantCode: credentials.tenantCode,
     userId: credentials.userId,
     accessToken: body.jToken,
@@ -270,6 +275,13 @@ export const login = async (
 };
 
 export const logout = (): void => {
+  try {
+    for (const key of Object.keys(window.sessionStorage)) {
+      if (key.startsWith('s-erp-notice-popups:')) window.sessionStorage.removeItem(key);
+    }
+  } catch {
+    console.warn('공지 팝업 진행 정보를 정리하지 못했습니다.');
+  }
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
   setSessionNotice(null);
   syncBrowserLocation('/login');

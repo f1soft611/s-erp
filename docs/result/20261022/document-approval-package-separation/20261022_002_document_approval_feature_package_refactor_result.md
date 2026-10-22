@@ -24,6 +24,13 @@
 - `git diff --check` — **통과**
 - 구조 테스트를 포함한 전체 백엔드 테스트에서 기존 통합 서비스 참조 및 기능별 route 회귀 검증을 확인했다.
 
+## 후속 기동 오류 점검
+
+- 기동 중 `GET /api/v1/groupware/approvals/files` 중복 매핑 오류가 발생해 확인한 결과, 소스에 중복 Controller는 없었지만 이전 `DocumentApprovalApiController.class`가 `target/s-erp-backend/WEB-INF/classes`에 남아 새 Controller와 함께 패키징되어 있었다.
+- 실행 중인 8080 포트의 백엔드가 배포 산출물을 잠가 clean이 실패했다. 해당 프로세스를 중지한 후 `mvn clean package`로 전체 산출물을 재생성했다.
+- clean package는 **410개 테스트 통과, 실패 0, 오류 0, 건너뜀 2**로 성공했다. 재생성된 exploded 배포 디렉터리와 WAR 모두에서 구 `DocumentApprovalApiController.class`가 제거되고 새 기능별 Controller만 포함됨을 확인했다.
+- 새 산출물은 준비되었으며, 로컬 백엔드 프로세스는 clean 작업을 위해 중지된 상태다. 애플리케이션을 다시 시작해 기동을 확인해야 한다.
+
 ## 데이터베이스 및 스크린샷
 
 - 이번 분리 작업에서는 DB 스키마·데이터·API 데이터 계약·Mapper SQL을 변경하지 않았다. 기존 작업 트리의 현황 전체조회 관련 Mapper 변경은 보존했으며, DB 마이그레이션이나 스키마 이력 추가는 하지 않았다.

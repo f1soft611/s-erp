@@ -1,0 +1,55 @@
+[
+  {
+    "width": 375,
+    "headerProgressAndMetadata": true,
+    "popupSequential": true,
+    "onlyCurrentDismissed": true,
+    "refreshResumed": true,
+    "fieldOrder": true,
+    "requiredDate": true,
+    "savedSettings": true,
+    "overflow": false
+  },
+  {
+    "width": 768,
+    "headerProgressAndMetadata": true,
+    "popupSequential": true,
+    "onlyCurrentDismissed": true,
+    "refreshResumed": true,
+    "fieldOrder": true,
+    "requiredDate": true,
+    "savedSettings": true,
+    "overflow": false
+  },
+  {
+    "width": 1280,
+    "headerProgressAndMetadata": true,
+    "popupSequential": true,
+    "onlyCurrentDismissed": true,
+    "refreshResumed": true,
+    "fieldOrder": true,
+    "requiredDate": true,
+    "savedSettings": true,
+    "overflow": false
+  },
+  {
+    "width": 375,
+    "singleNoticeHeader": true,
+    "overflow": false
+  },
+  {
+    "width": 768,
+    "singleNoticeHeader": true,
+    "overflow": false
+  },
+  {
+    "width": 1280,
+    "singleNoticeHeader": true,
+    "overflow": false
+  },
+  {
+    "errorRetry": true,
+    "expiredSkip": true,
+    "dismissFailureRetainsCurrent": true
+  }
+]
