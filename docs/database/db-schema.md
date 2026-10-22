@@ -703,7 +703,46 @@
 
 ---
 
+### tb_customer_info (MCP 확인: 2026-10-22)
+
+| 컬럼 | 타입 | NULL | 기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| customer_id | bigint | 불가 | `nextval('tb_customer_info_customer_id_seq')` | 거래처 PK |
+| tenant_id | bigint | 불가 | 없음 | 소속 tenant |
+| customer_code | varchar | 불가 | 없음 | 거래처 코드 |
+| customer_name | varchar | 불가 | 없음 | 거래처명 |
+| cust_name_abbr | varchar | 가능 | 없음 | 거래처 약칭 |
+| president_name | varchar | 가능 | 없음 | 대표자명 |
+| business_no | varchar | 가능 | 없음 | 사업자등록번호 |
+| jurid_no | varchar | 가능 | 없음 | 법인등록번호 |
+| business_status_1 | varchar | 가능 | 없음 | 업태 |
+| business_item_1 | varchar | 가능 | 없음 | 종목 |
+| post_code | varchar | 가능 | 없음 | 우편번호 |
+| address | varchar | 가능 | 없음 | 주소 |
+| telephone_no | varchar | 가능 | 없음 | 전화번호 |
+| facsimile_no | varchar | 가능 | 없음 | 팩스번호 |
+| cust_memo | varchar | 가능 | `''` | 메모 |
+| use_at | char(1) | 불가 | `'Y'` | 사용 여부 (`Y`/`N`) |
+| created_by | bigint | 가능 | 없음 | 생성 사용자 ID |
+| created_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 생성 일시 |
+| updated_by | bigint | 가능 | 없음 | 최종 수정 사용자 ID |
+| updated_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 최종 수정 일시 |
+
+제약 및 관계:
+
+- `tb_customer_info_pkey`: `PRIMARY KEY (customer_id)`
+- `uq_customer_id_tenant_id`: `UNIQUE (customer_id, tenant_id)`
+- `uq_tb_customer_info_tenant_code`: `UNIQUE (tenant_id, customer_code)`
+- `tb_customer_info_tenant_id_fkey`: `tenant_id`가 `tb_tenant(tenant_id)`를 참조하며 tenant 삭제 시 cascade 된다.
+- `tb_customer_info_use_at_check`: `use_at`은 `Y` 또는 `N`만 허용한다.
+
+`tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 신규 `tb_customer_info_customer_code_seq`는 `20261022_005` migration에서 추가를 제안한 전역 거래처 코드 채번 시퀀스다. 기존 1~6자리 숫자 거래처 코드 최댓값 다음부터 채번하도록 초기화하고, 애플리케이션에서 6자리 문자열로 포맷한다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+
+---
+
 ## 변경 이력
+
+- 2026-10-22: `tb_customer_info_customer_code_seq` 신규 시퀀스와 거래처 코드 자동 채번 migration 초안을 정의했다. tenant 전용 PostgreSQL MCP에서 거래처 컬럼/제약 메타데이터를 확인했고 업무 데이터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 
 - 2026-10-20: 전자결재 문서의 개인별 고정 기능을 위해 `tb_electronic_approval_pin`과 사용자·tenant·문서 FK, 조회 인덱스를 추가하는 `20261020_007` migration 초안을 정의했다. 기본 읽기 전용 PostgreSQL MCP에서 `tb_electronic_approval_main`, `tb_user`, `tb_tenant`의 메타데이터를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
 - 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
