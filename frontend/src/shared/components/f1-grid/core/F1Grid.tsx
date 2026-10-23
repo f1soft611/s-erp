@@ -1,4 +1,5 @@
 import {
+  useCallback,
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -917,6 +918,11 @@ function F1GridInner<T extends object>(
         .slice(showCheckbox ? 1 : 0),
     [dataColumnTracks, showCheckbox],
   );
+  const allColumnIndexes = useMemo(
+    () => new Set(visibleColumns.map((_, index) => index)),
+    [visibleColumns],
+  );
+  const previousVirtualColumnIndexesRef = useRef(new Set<number>());
   const renderedColumnIndexes = useMemo(() => {
     const viewportWidth =
       bodyScrollMetrics.viewportWidth || gridContainerWidth || 800;
@@ -929,7 +935,7 @@ function F1GridInner<T extends object>(
       (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
         totalWidth > viewportWidth);
     if (!virtualizationActive) {
-      return new Set(visibleColumns.map((_, index) => index));
+      return allColumnIndexes;
     }
 
     const pinnedIndexes = visibleColumns
@@ -946,8 +952,7 @@ function F1GridInner<T extends object>(
       copiedCellRange?.focus.columnIndex,
     ].filter((index): index is number => index !== undefined);
 
-    return new Set(
-      getVirtualColumnIndexes({
+    const nextIndexes = getVirtualColumnIndexes({
         widths: resolvedColumnWidths,
         scrollLeft: Math.max(
           0,
@@ -962,9 +967,17 @@ function F1GridInner<T extends object>(
         overscan: columnOverscan,
         pinnedIndexes,
         protectedIndexes,
-      }),
-    );
+      });
+    const previous = previousVirtualColumnIndexesRef.current;
+    if (previous.size === nextIndexes.length &&
+      nextIndexes.every((index) => previous.has(index))) {
+      return previous;
+    }
+    const next = new Set(nextIndexes);
+    previousVirtualColumnIndexesRef.current = next;
+    return next;
   }, [
+    allColumnIndexes,
     bodyScrollMetrics.scrollLeft,
     bodyScrollMetrics.viewportWidth,
     cellSelection,
@@ -1122,9 +1135,9 @@ function F1GridInner<T extends object>(
     }));
   }
 
-  function getPinOffset(
+  const getPinOffset = useCallback((
     column: F1GridColumn<T>,
-  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined {
+  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined => {
     const side = getGridColumnPinSide(pinnedFields, column);
     if (!side) return undefined;
     const offset =
@@ -1138,7 +1151,13 @@ function F1GridInner<T extends object>(
       offset,
       shadow: side === 'right' ? offset === rightPinnedBoundaryOffset : true,
     };
-  }
+  }, [leftOffsets, pinnedFields, rightOffsets]);
+
+  const getCellError = useCallback(
+    (rowId: F1GridRowId, field: keyof T) =>
+      cellErrors[getErrorKey(rowId, field)],
+    [cellErrors],
+  );
 
   useEffect(() => {
     if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
@@ -2860,9 +2879,7 @@ function F1GridInner<T extends object>(
                 updateGridRow(current, rowKey, rowId, changes),
               );
             }}
-            getCellError={(rowId, field) =>
-              cellErrors[getErrorKey(rowId, field)]
-            }
+            getCellError={getCellError}
             onStopEdit={stopEdit}
             onCellRef={(rowId, columnIndex, node) => {
               const key = `${String(rowId)}:${columnIndex}`;

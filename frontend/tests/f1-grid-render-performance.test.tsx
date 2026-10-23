@@ -10,15 +10,19 @@ function renderGrid() {
     id: String(index + 1), name: `Item ${index + 1}`, code: `Code ${index + 1}`,
   }));
   const renderCell = vi.fn(({ value }: { value: unknown }) => String(value));
+  const editable = vi.fn((_row: Row) => true);
   const columns: F1GridColumn<Row>[] = [
-    { field: 'name', headerName: 'Name', editable: true, pinned: 'left', renderCell },
-    { field: 'code', headerName: 'Code', editable: true, renderCell },
+    { field: 'name', headerName: 'Name', editable, pinned: 'left', renderCell },
+    { field: 'code', headerName: 'Code', editable, renderCell },
   ];
   const ref = createRef<F1GridRef<Row>>();
+  const cellAdornment = vi.fn((_row: Row) => null);
   render(<F1Grid ref={ref} rows={rows} columns={columns} rowKey="id"
-    showCheckbox={false} virtualizeRows={false} ariaLabel="Performance grid" />);
+    cellAdornment={cellAdornment} showCheckbox={false}
+    virtualizeRows={false} virtualizeColumns ariaLabel="Performance grid" />);
   renderCell.mockClear();
-  return { renderCell, ref };
+  cellAdornment.mockClear();
+  return { renderCell, cellAdornment, editable, ref };
 }
 
 describe('F1Grid interaction render isolation', () => {
@@ -41,6 +45,37 @@ describe('F1Grid interaction render isolation', () => {
     expect(ref.current?.getChanges().updatedRows).toEqual([
       expect.objectContaining({ id: '1', name: 'Edited item' }),
     ]);
+  });
+
+  it('does not visit unrelated row bodies while typing', () => {
+    const { cellAdornment } = renderGrid();
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));
+    cellAdornment.mockClear();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft' } });
+    expect(cellAdornment).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not visit unrelated row bodies for a single-cell selection', () => {
+    const { cellAdornment } = renderGrid();
+    fireEvent.click(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));
+    expect(cellAdornment).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not visit unrelated row bodies for a complete pointer click', () => {
+    const { cellAdornment } = renderGrid();
+    const cell = screen.getByRole('gridcell', { name: 'Item 1', exact: true });
+    fireEvent.mouseDown(cell, { button: 0 });
+    fireEvent.mouseUp(cell);
+    fireEvent.click(cell);
+    expect(cellAdornment.mock.calls.filter(([row]) => row.id !== '1')).toHaveLength(0);
+  });
+
+  it('does not rescan every row for header checkboxes while typing in a text column', () => {
+    const { editable } = renderGrid();
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));
+    editable.mockClear();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Header isolation' } });
+    expect(editable.mock.calls.filter(([row]) => row.id !== '1')).toHaveLength(0);
   });
 
   it('uses the latest edit state when committing from a memoized neighboring cell', () => {

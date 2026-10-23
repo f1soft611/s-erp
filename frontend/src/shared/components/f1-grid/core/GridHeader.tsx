@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { memo, useMemo, useRef, useState, type MouseEvent } from 'react';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -94,7 +94,7 @@ type GridHeaderProps<T extends object> = {
   ) => void;
 };
 
-export function GridHeader<T extends object>({
+function GridHeaderInner<T extends object>({
   columns,
   allColumns,
   renderedColumnIndexes,
@@ -363,7 +363,9 @@ export function GridHeader<T extends object>({
             return null;
           }
 
-          const checkboxState = getColumnCheckboxState(column);
+          const checkboxState = column.type === 'checkbox' && column.headerCheckbox
+            ? getColumnCheckboxState(column)
+            : { allChecked: false, indeterminate: false, hasEditableRows: false };
           const pinSide = getGridColumnPinSide(pinnedFields, column);
           const sortIndicator = getGridSortIndicator(sorts, column.field);
           const hasFilter = filters.some(
@@ -916,4 +918,24 @@ export function GridHeader<T extends object>({
       </Menu>
     </>
   );
+}
+
+const MemoizedGridHeader = memo(GridHeaderInner) as typeof GridHeaderInner;
+
+export function GridHeader<T extends object>(props: GridHeaderProps<T>) {
+  const latestProps = useRef(props);
+  latestProps.current = props;
+  const handlers = useMemo(() => ({
+    onResizeColumn: (...args: Parameters<GridHeaderProps<T>['onResizeColumn']>) => latestProps.current.onResizeColumn(...args),
+    getColumnCheckboxState: (...args: Parameters<GridHeaderProps<T>['getColumnCheckboxState']>) => latestProps.current.getColumnCheckboxState(...args),
+    onToggleAllRows: () => latestProps.current.onToggleAllRows(),
+    onToggleColumnCheckbox: (...args: Parameters<GridHeaderProps<T>['onToggleColumnCheckbox']>) => latestProps.current.onToggleColumnCheckbox(...args),
+    onToggleColumnVisibility: (...args: Parameters<GridHeaderProps<T>['onToggleColumnVisibility']>) => latestProps.current.onToggleColumnVisibility(...args),
+    onToggleSort: (...args: Parameters<GridHeaderProps<T>['onToggleSort']>) => latestProps.current.onToggleSort(...args),
+    onApplyFilter: (...args: Parameters<GridHeaderProps<T>['onApplyFilter']>) => latestProps.current.onApplyFilter(...args),
+    onPinColumn: (...args: Parameters<GridHeaderProps<T>['onPinColumn']>) => latestProps.current.onPinColumn(...args),
+    onReorderColumn: (source: string, target: string, position?: 'before' | 'after') => latestProps.current.onReorderColumn?.(source, target, position),
+  }), []);
+  return <MemoizedGridHeader {...props} {...handlers}
+    onReorderColumn={props.onReorderColumn ? handlers.onReorderColumn : undefined} />;
 }

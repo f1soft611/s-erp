@@ -105,6 +105,7 @@ export const RoleManagementPanel = forwardRef<
   const [pendingRoleId, setPendingRoleId] = useState<string>();
   const [roleSwitchDialogOpen, setRoleSwitchDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingRoleRows, setSavingRoleRows] = useState<RoleManagementRow[]>([]);
   const roleGridRef = useRef<F1GridRef<RoleManagementRow>>(null);
   const userGridRef = useRef<F1GridRef<RoleUserRow>>(null);
   const userRequestIdRef = useRef(0);
@@ -129,7 +130,10 @@ export const RoleManagementPanel = forwardRef<
     );
   }, [roles, searchQuery]);
 
+  const displayedRoles = saving ? savingRoleRows : filteredRoles;
+
   useEffect(() => {
+    if (saving) return;
     if (!filteredRoles.length) {
       setSelectedRoleId('');
       return;
@@ -137,9 +141,9 @@ export const RoleManagementPanel = forwardRef<
     if (!filteredRoles.some((role) => role.id === selectedRoleId)) {
       setSelectedRoleId(filteredRoles[0].id);
     }
-  }, [filteredRoles, selectedRoleId]);
+  }, [filteredRoles, selectedRoleId, saving]);
 
-  const selectedRole = filteredRoles.find((role) => role.id === selectedRoleId);
+  const selectedRole = displayedRoles.find((role) => role.id === selectedRoleId);
 
   const loadUserRows = useCallback(
     async (roleId: string, options: { silent?: boolean } = {}) => {
@@ -177,6 +181,10 @@ export const RoleManagementPanel = forwardRef<
           error instanceof Error
             ? error.message
             : '사용자 매핑을 불러오지 못했습니다.';
+        if (options.silent) {
+          onError?.(message);
+          throw error;
+        }
         setUserRows([]);
         setUnassignedUsers([]);
         setUserError(message);
@@ -398,6 +406,7 @@ export const RoleManagementPanel = forwardRef<
     if (saveInFlightRef.current) return saveInFlightRef.current;
 
     const savePromise = (async () => {
+      setSavingRoleRows(roleGridRef.current?.getActiveRows() ?? filteredRoles);
       setSaving(true);
       onSavingChange?.(true);
       const roleChanges =
@@ -495,6 +504,7 @@ export const RoleManagementPanel = forwardRef<
     );
     return savePromise;
   }, [
+    filteredRoles,
     loadUserRows,
     onCreateRole,
     onRolesSaved,
@@ -624,7 +634,7 @@ export const RoleManagementPanel = forwardRef<
               <F1Grid
                 key={roleGridKey}
                 ref={roleGridRef}
-                rows={filteredRoles}
+                rows={displayedRoles}
                 columns={
                   saving
                     ? roleColumns.map((column) => ({ ...column, editable: false }))
