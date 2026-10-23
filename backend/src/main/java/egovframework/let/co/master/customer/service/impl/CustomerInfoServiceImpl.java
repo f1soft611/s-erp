@@ -81,7 +81,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         String useAt = normalizeUseAt(payload.getUseAt(), true);
         ensureCustomerNameAvailable(tenantId, customerName, null);
         ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), null);
-        String customerCode = resolveCustomerCode(tenantId, payload.getCustomerCode(), null);
+        String customerCode = resolveCustomerCode(tenantId);
 
         Map<String, Object> params = buildSaveParams(
                 tenantId, currentUserId, customerCode, customerName, useAt, payload);
@@ -114,11 +114,8 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         String useAt = normalizeUseAt(payload.getUseAt(), false);
         ensureCustomerNameAvailable(tenantId, customerName, customerId);
         ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), customerId);
-        String customerCode = resolveCustomerCode(
-                tenantId, payload.getCustomerCode(), customerId);
-
         Map<String, Object> params = buildSaveParams(
-                tenantId, currentUserId, customerCode, customerName, useAt, payload);
+                tenantId, currentUserId, null, customerName, useAt, payload);
         params.put("customerId", customerId);
         int updatedRows;
         try {
@@ -141,7 +138,9 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
             CustomerInfoSaveRequestVO payload) {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
-        params.put("customerCode", customerCode);
+        if (customerCode != null) {
+            params.put("customerCode", customerCode);
+        }
         params.put("customerName", customerName);
         params.put("custNameAbbr", normalizeText(payload.getCustNameAbbr()));
         params.put("presidentName", normalizeText(payload.getPresidentName()));
@@ -160,16 +159,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         return params;
     }
 
-    private String resolveCustomerCode(Long tenantId, String rawCode, Long excludeCustomerId) throws Exception {
-        if (StringUtils.hasText(rawCode)) {
-            String code = rawCode.trim();
-            ensureCustomerCodeAvailable(tenantId, code, excludeCustomerId);
-            return code;
-        }
-        if (excludeCustomerId != null) {
-            throw new IllegalArgumentException("거래처 코드는 필수입니다.");
-        }
-
+    private String resolveCustomerCode(Long tenantId) throws Exception {
         for (int attempt = 0; attempt < MAX_GENERATED_CODE_ATTEMPTS; attempt++) {
             String generatedCode = customerCodeIdGnrService.getNextStringId();
             validateGeneratedCode(generatedCode);
@@ -187,15 +177,6 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         int value = Integer.parseInt(code);
         if (value < 1 || value > 999999) {
             throw new IllegalArgumentException("거래처 코드 채번이 6자리 범위를 초과했습니다.");
-        }
-    }
-
-    private void ensureCustomerCodeAvailable(
-            Long tenantId,
-            String customerCode,
-            Long excludeCustomerId) throws Exception {
-        if (findCustomerIdByCode(tenantId, customerCode, excludeCustomerId) != null) {
-            throw duplicateCodeError();
         }
     }
 

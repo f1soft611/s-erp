@@ -703,7 +703,8 @@ type F1GridFormMode = 'create' | 'edit';
 type F1GridColumnFormOptions<T extends object> = {
   hidden?: boolean;
   readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
-  label?: string;
+  label?: string | ((row: T) => string);
+  disabled?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
@@ -737,7 +738,8 @@ interface F1GridProps<T extends object> {
 
 - `headerName`은 기본 필드 라벨이고 `headerGroup`은 기본 폼 섹션이다.
 - 그룹은 `form.group` → `headerGroup` → `기본 정보` 순으로 결정한다.
-- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
+- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다. `form.label`은 현재 row를 받아 동적으로 표시할 수 있고 row가 없으면 `headerName`을 사용한다.
+- `form.disabled`는 boolean 또는 `(row, mode)` 콜백으로 입력을 비활성화한다. 비활성 필드도 폼에 남으며 셀 편집 가능 여부와 `form.readOnly` 판정에는 영향을 주지 않는다.
 - 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
 - `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
 - `type: 'select'`에서 `form.multiple: true`를 지정하면 row form은 선택값 배열을 보존한다. Grid 표시용 `getValue`가 요약 문자열을 반환해도 form 입력은 원본 row 배열을 사용한다.
@@ -793,9 +795,9 @@ interface F1GridProps<T extends object> {
 
 거래처관리 백엔드는 같은 tenant의 사용/미사용 이름을 trim 후 검사하고 수정 자기 ID를 제외한다. 신규 `uq_tb_customer_info_tenant_name` 인덱스를 적용하면 동시 저장도 DB에서 차단한다. 기존 거래처코드 중복 방지와는 별도 규칙이다. 인덱스 스크립트는 [20261023 DB 변경 이력](../../../../docs/database/20261023/20261023_001_change_customer_name_unique.md)을 참고하며 실제 적용은 별도 운영 절차다.
 
-거래처 관리 화면은 `customerCode`와 `customerName` 등을 행 폼에서 등록·수정한다. 신규 `customerCode`는 비워둘 수 있고 서버가 eGov ID Generator로 생성하지만, 수정 시에는 필수이며 화면과 서버에서 함께 검증한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
+거래처 관리 화면은 `customerCode`를 목록에 표시하되 행 폼과 셀 편집에서는 제외하며, 신규 저장 시 서버의 eGov ID Generator가 코드를 생성하고 요청 코드 값은 무시한다. 수정 요청의 코드 값도 무시하여 기존 코드를 유지한다. `customerName` 등 나머지 업무 필드는 기존 행 폼에서 등록·수정한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
 
-품목관리(`/co/master/materials`)도 같은 행 폼과 배치 저장 패턴을 사용한다. `materialCode`는 신규 미입력 시 eGov IDS 6자리 자동채번, 수정 시 필수다. `materialName`과 `materialTypeCode`는 필수이며 업무 컬럼의 길이와 중량/안전재고/소비기한 숫자 계약을 저장 전에 검증한다. 목록에서 숨기는 규격2, 바코드, 위치, 품목보고번호 등은 `form.hidden: false`로 그룹별 폼에 포함한다. 단일 키워드와 컬럼 metadata 기반 상세검색을 함께 서버에 전달한다. 품목유형/보관방법/소비기한 기준의 표시명은 인증 tenant의 활성 공통코드에서 가져온다. `POST /api/v1/co/master/materials/save-batch`로 신규·수정을 단일 트랜잭션으로 저장하며 실패 시 dirty를 보존한다. 빈 숫자는 null, 0은 0으로 유지한다. 품목 테이블에는 거래처의 `useAt` 컬럼이 없으므로 사용여부를 추가하지 않고, 삭제되지 않은 품목만 조회/수정하며 삭제 액션과 삭제 변경 요청은 허용하지 않는다.
+품목관리(`/co/master/materials`)도 같은 행 폼과 배치 저장 패턴을 사용한다. `materialCode`는 목록에 표시하되 행 폼과 셀 편집에서는 제외하며, 신규 저장 시 서버의 eGov IDS 6자리 채번 결과를 사용하고 요청 코드 값은 무시한다. 수정 요청의 코드 값도 무시하여 기존 코드를 유지한다. `materialName`과 `materialTypeCode`는 필수이며 업무 컬럼의 길이와 중량/안전재고/소비기한 숫자 계약을 저장 전에 검증한다. 목록에서 숨기는 규격2, 바코드, 위치, 품목보고번호 등은 `form.hidden: false`로 그룹별 폼에 포함한다. 단일 키워드와 컬럼 metadata 기반 상세검색을 함께 서버에 전달한다. 품목유형/보관방법/소비기한 기준의 표시명은 인증 tenant의 활성 공통코드에서 가져온다. `expiryedCount`는 소비기한 기준 옆에 배치하고 `DAY`/`MONTH`/`YEAR` 선택에 따라 `일`/`개월`/`년` 단위 label을 표시한다. `NONE`에서는 숫자를 NULL로 비우고 입력을 비활성화하며, 활성 기준은 1~2147483647 양의 정수를 요구한다. 활성 기준끼리는 숫자를 유지하고 단위 label만 바뀐다. 공통코드 그룹·상세 seed는 [tenant 지정 SQL](../../../../docs/database/20261023/20261023_004_seed_material_common_codes.sql)에 보관하며 기존 자연 키 정의를 덮어쓰지 않는다. `POST /api/v1/co/master/materials/save-batch`로 신규·수정을 단일 트랜잭션으로 저장하며 실패 시 dirty를 보존한다. 빈 숫자는 null, 0은 0으로 유지한다. 품목 테이블에는 거래처의 `useAt` 컬럼이 없으므로 사용여부를 추가하지 않고, 삭제되지 않은 품목만 조회/수정하며 삭제 액션과 삭제 변경 요청은 허용하지 않는다.
 
 ### F1-Tree와 반응형 UI
 

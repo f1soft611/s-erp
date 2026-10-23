@@ -60,8 +60,8 @@ export function createCustomerColumns(
       headerName: '거래처코드',
       width: 110,
       align: 'center',
-      editable: canEdit,
-      form: { group: '기본정보', order: 1 },
+      editable: false,
+      form: { hidden: true },
       search: { hidden: true },
     },
     {

@@ -165,8 +165,7 @@
 
     <update id="updateCustomer" parameterType="map">
         UPDATE tb_customer_info
-        SET customer_code = #{customerCode},
-            customer_name = #{customerName},
+        SET customer_name = #{customerName},
             cust_name_abbr = #{custNameAbbr},
             president_name = #{presidentName},
             business_no = #{businessNo},

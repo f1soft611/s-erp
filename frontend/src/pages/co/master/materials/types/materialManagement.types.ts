@@ -1,4 +1,4 @@
-export const materialTextFields = [
+const materialTextFieldDefinitions = [
   {
     field: 'materialCode',
     label: '품목코드',
@@ -118,6 +118,13 @@ export const materialTextFields = [
     group: '기타·소비기한',
   },
 ] as const;
+
+type MaterialTextFieldAlignment = 'left' | 'center' | 'right';
+export const materialTextFields: readonly (
+  (typeof materialTextFieldDefinitions)[number] & {
+    align?: MaterialTextFieldAlignment;
+  }
+)[] = materialTextFieldDefinitions;
 
 export const expiryStatuses = ['NONE', 'DAY', 'MONTH', 'YEAR'] as const;
 export type ExpiryStatus = (typeof expiryStatuses)[number];

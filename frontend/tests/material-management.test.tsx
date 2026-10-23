@@ -126,11 +126,22 @@ describe('material management contract', () => {
       expiryedCount: 30,
     };
     const sections = buildGridFormSections(columns, row);
-    const countField = sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.field === 'expiryedCount');
+    const expirySection = sections.find(
+      (section) => section.group === '기타·소비기한',
+    );
+    const countField = expirySection?.fields.find(
+      (field) => field.field === 'expiryedCount',
+    );
+    const basisIndex = expirySection?.fields.findIndex(
+      (field) => field.field === 'expiryedStatus',
+    );
+    const countIndex = expirySection?.fields.findIndex(
+      (field) => field.field === 'expiryedCount',
+    );
 
     expect(countField?.label).toBe('소비기한 숫자 (일)');
+    expect(basisIndex).toBe(6);
+    expect(countIndex).toBe((basisIndex ?? -1) + 1);
     expect(countColumn?.form?.disabled).toEqual(expect.any(Function));
     expect(
       countColumn?.form?.disabled?.(row, 'edit'),
@@ -183,6 +194,9 @@ describe('material management contract', () => {
       'safeInvoice', 'materialSpec2', 'materialKind', 'storeMethod', 'expiryedCount',
       'kfdaReportNo', 'partNo', 'materialNo', 'location',
     ]));
+    expect(columns.find((column) => column.field === 'materialCode')?.editable).toBe(false);
+    expect(columns.find((column) => column.field === 'materialCode')?.hidden).not.toBe(true);
+    expect(fields).not.toContain('materialCode');
     expect(fields).not.toContain('tenantId');
     expect(columns.find((c) => c.field === 'materialKind')?.options)
       .toContainEqual({ value: 'FOOD', label: '식품' });
@@ -289,6 +303,15 @@ describe('material workflow', () => {
     </NotificationProvider></ThemeProvider>);
     await waitFor(() => expect(screen.getByLabelText('품목 목록')).toBeInTheDocument());
     expect(await screen.findByText('Sample')).toBeInTheDocument();
+    const codeCell = await screen.findByRole('gridcell', { name: '000012' });
+    fireEvent.click(codeCell);
+    fireEvent.paste(codeCell, {
+      clipboardData: { getData: () => '999999' },
+    });
+    expect(screen.queryByRole('gridcell', { name: '999999' })).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: '000012' })).toBeVisible();
+    fireEvent.doubleClick(codeCell);
+    expect(screen.queryByDisplayValue('000012')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('품목 검색'), { target: { value: 'Sample' } });
     fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith('/api/v1/co/master/materials?keyword=Sample'));

@@ -100,7 +100,8 @@ class CustomerInfoServiceImplTest {
     }
 
     @Test
-    void createCustomerRetainsSuppliedCodeWithoutCallingGenerator() throws Exception {
+    void createCustomerAlwaysGeneratesCodeEvenWhenCodeIsSupplied() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
         stubInsertAndReload();
 
         service.createCustomer(9L, 101L, payload("MANUAL-A", "Acme", "Y"));
@@ -108,9 +109,9 @@ class CustomerInfoServiceImplTest {
         ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
         verify(customerInfoDAO).insertCustomer(captured.capture());
         assertThat(captured.getValue()).containsEntry("tenantId", 9L)
-                .containsEntry("customerCode", "MANUAL-A")
+                .containsEntry("customerCode", "000001")
                 .containsEntry("customerName", "Acme");
-        verify(customerCodeIdGnrService, never()).getNextStringId();
+        verify(customerCodeIdGnrService).getNextStringId();
     }
 
     @Test
@@ -153,18 +154,20 @@ class CustomerInfoServiceImplTest {
     }
 
     @Test
-    void createCustomerRejectsSuppliedDuplicateCodeWithinTenant() throws Exception {
-        when(customerInfoDAO.selectCustomerIdByCode(anyMap())).thenReturn(55L);
+    void createCustomerChecksTheGeneratedCodeRatherThanTheSuppliedCode() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
+        stubInsertAndReload();
 
-        assertThatThrownBy(() -> service.createCustomer(9L, 101L, payload("MANUAL-A", "Acme", "Y")))
-                .isInstanceOf(IllegalArgumentException.class);
+        service.createCustomer(9L, 101L, payload("MANUAL-A", "Acme", "Y"));
 
-        verify(customerInfoDAO, never()).insertCustomer(anyMap());
-        verify(customerCodeIdGnrService, never()).getNextStringId();
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO).selectCustomerIdByCode(captured.capture());
+        assertThat(captured.getValue()).containsEntry("customerCode", "000001");
     }
 
     @Test
     void createCustomerConvertsConcurrentUniqueCodeConflictToValidationError() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
         when(customerInfoDAO.selectCustomerIdByCode(anyMap())).thenReturn(null);
         when(customerInfoDAO.insertCustomer(anyMap())).thenThrow(new DuplicateKeyException("duplicate key"));
 
@@ -175,6 +178,7 @@ class CustomerInfoServiceImplTest {
 
     @Test
     void createCustomerConvertsConcurrentUniqueNameConflictToNameError() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
         PSQLException cause = new PSQLException(new ServerErrorMessage(
                 "SERROR\0C23505\0Mduplicate key\0nuq_tb_customer_info_tenant_name\0\0"));
         when(customerInfoDAO.insertCustomer(anyMap()))
@@ -187,6 +191,7 @@ class CustomerInfoServiceImplTest {
 
     @Test
     void insertAndUpdateClassifyConcurrentBusinessNumberConflicts() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
         PSQLException cause = new PSQLException(new ServerErrorMessage(
                 "SERROR\0C23505\0Mduplicate key\0nuq_tb_customer_info_tenant_business_no\0\0"));
         when(customerInfoDAO.insertCustomer(anyMap()))
@@ -271,6 +276,7 @@ class CustomerInfoServiceImplTest {
 
     @Test
     void createCustomerKeepsOptionalEmptyBusinessNumberContract() throws Exception {
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
         stubInsertAndReload();
         for (String value : new String[] { null, "", " ", "---" }) {
             CustomerInfoSaveRequestVO request = payload("MANUAL-A", "Acme", "Y");
@@ -309,6 +315,21 @@ class CustomerInfoServiceImplTest {
                 .isSameAs(current);
         verify(customerInfoDAO).selectCustomerIdByName(org.mockito.ArgumentMatchers.argThat(
                 params -> Long.valueOf(77L).equals(params.get("excludeCustomerId"))));
+    }
+
+    @Test
+    void updateCustomerIgnoresMissingOrForgedCodeAndDoesNotPassCodeToUpdate() throws Exception {
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(customerInfoDAO.updateCustomer(anyMap())).thenReturn(1);
+
+        service.updateCustomer(9L, 101L, 77L, payload("", "Acme", "Y"));
+        service.updateCustomer(9L, 101L, 77L, payload("FORGED", "Acme", "Y"));
+
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO, org.mockito.Mockito.times(2)).updateCustomer(captured.capture());
+        assertThat(captured.getAllValues())
+                .allSatisfy(params -> assertThat(params).doesNotContainKey("customerCode"));
+        verify(customerInfoDAO, never()).selectCustomerIdByCode(anyMap());
     }
 
     @Test
@@ -423,7 +444,7 @@ class CustomerInfoServiceImplTest {
                 .getBoundSql(params).getSql();
         String updateAssignments = updateSql.substring(updateSql.indexOf("SET"), updateSql.indexOf("WHERE"));
         assertThat(updateSql).contains("tenant_id = ?");
-        assertThat(updateAssignments).doesNotContain("customer_id", "tenant_id");
+        assertThat(updateAssignments).doesNotContain("customer_id", "customer_code", "tenant_id");
     }
 
     private void stubInsertAndReload() throws Exception {

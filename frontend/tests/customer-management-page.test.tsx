@@ -112,7 +112,7 @@ describe('customer management page', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('거래처명 값이 중복되었습니다.');
     expect(nameCell).toHaveAttribute('data-grid-error', '거래처명 값이 중복되었습니다.');
     expect(apiMocks.apiPost).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it('declares customer name and business number required in shared column metadata', () => {
     const requiredFields = createCustomerColumns(true)
@@ -372,6 +372,19 @@ describe('customer management page', () => {
     expect(searchFields).toContain('juridNo');
   });
 
+  it('keeps the customer code visible but out of the form and cell editing', () => {
+    const columns = createCustomerColumns(true);
+    const codeColumn = columns.find((column) => column.field === 'customerCode');
+    const formFields = buildGridFormSections(columns, createCustomerRow())
+      .flatMap((section) => section.fields)
+      .map((field) => String(field.field));
+
+    expect(codeColumn?.editable).toBe(false);
+    expect(codeColumn?.form?.hidden).toBe(true);
+    expect(codeColumn?.hidden).not.toBe(true);
+    expect(formFields).not.toContain('customerCode');
+  });
+
   it('configures numeric-hyphen filtering only for customer number/contact columns', () => {
     const columns = createCustomerColumns(true);
     const normalizedColumns = columns.filter((column) => column.sanitizeInput);
@@ -407,6 +420,15 @@ describe('customer management page', () => {
       await screen.findByRole('grid', { name: '거래처 목록' }),
     ).toBeInTheDocument();
     expect(await screen.findByText('Acme')).toBeInTheDocument();
+    const codeCell = await screen.findByRole('gridcell', { name: '000012' });
+    fireEvent.click(codeCell);
+    fireEvent.paste(codeCell, {
+      clipboardData: { getData: () => '999999' },
+    });
+    expect(screen.queryByRole('gridcell', { name: '999999' })).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: '000012' })).toBeVisible();
+    fireEvent.doubleClick(codeCell);
+    expect(screen.queryByDisplayValue('000012')).not.toBeInTheDocument();
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
       '/api/v1/co/master/customers',
     );

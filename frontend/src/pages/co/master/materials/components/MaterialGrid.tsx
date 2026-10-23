@@ -69,19 +69,26 @@ export function createMaterialColumns(
       headerName: definition.label,
       width: definition.field === 'materialName' ? 180 : 125,
       hidden: !('visible' in definition && definition.visible),
-      editable: canEdit,
+      editable: definition.field === 'materialCode' ? false : canEdit,
       align: definition.align ?? 'left',
       required:
         definition.field === 'materialName' ||
         definition.field === 'materialTypeCode',
       type: codeGroup ? 'select' : 'text',
       ...(codeGroup ? { options: fieldOptions } : {}),
-      form: {
-        hidden: false,
-        group: definition.group,
-        order: index,
-        ...(definition.field === 'location' ? { span: 2 } : {}),
-      },
+      form: definition.field === 'materialCode'
+        ? { hidden: true }
+        : {
+            hidden: false,
+            group: definition.group,
+            order:
+              definition.field === 'materialNo'
+                ? 25
+                : definition.field === 'kfdaReportNo'
+                  ? 26
+                  : index,
+            ...(definition.field === 'location' ? { span: 2 } : {}),
+          },
       search: 'search' in definition ? { order: index } : { hidden: true },
     });
   });
@@ -129,7 +136,7 @@ export function createMaterialColumns(
           ...(status === 'NONE' ? { expiryedCount: null } : {}),
         };
       },
-      form: { group: '기타·소비기한', order: 30 },
+      form: { group: '기타·소비기한', order: 23 },
       search: { order: 30 },
     },
     {
@@ -153,7 +160,7 @@ export function createMaterialColumns(
       form: {
         hidden: false,
         group: '기타·소비기한',
-        order: 31,
+        order: 24,
         label: (row) =>
           row.expiryedStatus === 'NONE'
             ? '소비기한 숫자'

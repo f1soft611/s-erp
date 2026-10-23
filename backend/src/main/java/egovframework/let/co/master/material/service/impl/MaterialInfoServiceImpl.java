@@ -75,8 +75,8 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MaterialInfoVO createMaterial(Long tenantId, String actor, MaterialInfoSaveRequestVO payload) throws Exception {
-        Map<String, Object> params = saveParams(tenantId, actor, payload, true);
-        params.put("materialCode", resolveCode(tenantId, (String) params.get("materialCode"), null));
+        Map<String, Object> params = saveParams(tenantId, actor, payload);
+        params.put("materialCode", resolveCode(tenantId));
         Long id;
         try {
             id = dao.insertMaterial(params);
@@ -90,10 +90,9 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MaterialInfoVO updateMaterial(Long tenantId, String actor, Long id, MaterialInfoSaveRequestVO payload) throws Exception {
-        Map<String, Object> params = saveParams(tenantId, actor, payload, false);
+        Map<String, Object> params = saveParams(tenantId, actor, payload);
         if (id == null || id <= 0) throw new IllegalArgumentException("올바른 품목 ID가 필요합니다.");
         findById(tenantId, id);
-        params.put("materialCode", resolveCode(tenantId, (String) params.get("materialCode"), id));
         params.put("materialId", id);
         try {
             if (dao.updateMaterial(params) == 0) throw notFound();
@@ -119,11 +118,7 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
         return new IllegalArgumentException("이미 사용 중인 품목코드입니다.");
     }
 
-    private String resolveCode(Long tenantId, String code, Long excludeId) throws Exception {
-        if (!code.isEmpty()) {
-            if (codeExists(tenantId, code, excludeId)) throw duplicateCode();
-            return code;
-        }
+    private String resolveCode(Long tenantId) throws Exception {
         for (int attempt = 0; attempt < 10; attempt++) {
             String next = generator.getNextStringId();
             if ("000000".equals(next)) {
@@ -159,10 +154,9 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
         params.put(field, value);
     }
 
-    private Map<String, Object> saveParams(Long tenantId, String actor, MaterialInfoSaveRequestVO p, boolean isNew) {
+    private Map<String, Object> saveParams(Long tenantId, String actor, MaterialInfoSaveRequestVO p) {
         Map<String, Object> params = tenantParams(tenantId);
         if (p == null) throw new IllegalArgumentException("품목 저장 요청이 비어 있습니다.");
-        putText(params, "materialCode", "품목코드", p.getMaterialCode(), 20, !isNew);
         putText(params, "materialName", "품목명", p.getMaterialName(), 200, true);
         putText(params, "materialEngName", "품목영문명", p.getMaterialEngName(), 200, false);
         putText(params, "materialModelName", "품목모델명", p.getMaterialModelName(), 200, false);
@@ -196,13 +190,19 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
                 || p.getMaterialWeight() > 9007199254740991L)) {
             throw new IllegalArgumentException("중량은 안전한 정수 범위여야 합니다.");
         }
-        if (p.getExpiryedCount() != null && p.getExpiryedCount() <= 0) {
-            throw new IllegalArgumentException("소비기한계산숫자는 양의 정수여야 합니다.");
+        String expiryStatusValue = expiryStatus(p.getExpiryedStatus());
+        Integer expiryCount = p.getExpiryedCount();
+        if ("NONE".equals(expiryStatusValue) && expiryCount != null) {
+            throw new IllegalArgumentException("소비기한 기준이 없음이면 숫자를 비워 주세요.");
+        }
+        if (!"NONE".equals(expiryStatusValue)
+                && (expiryCount == null || expiryCount <= 0)) {
+            throw new IllegalArgumentException("소비기한 숫자는 양의 정수여야 합니다.");
         }
         params.put("materialWeight", p.getMaterialWeight());
         params.put("safeInvoice", p.getSafeInvoice());
-        params.put("expiryedStatus", expiryStatus(p.getExpiryedStatus()));
-        params.put("expiryedCount", p.getExpiryedCount());
+        params.put("expiryedStatus", expiryStatusValue);
+        params.put("expiryedCount", expiryCount);
         return params;
     }
 }
