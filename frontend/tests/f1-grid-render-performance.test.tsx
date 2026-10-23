@@ -94,4 +94,21 @@ describe('F1Grid interaction render isolation', () => {
       expect.objectContaining({ id: '1', name: 'Latest draft', code: 'Latest code' }),
     ]);
   });
+
+  it('can restart a drag from an earlier row after clearing selection elsewhere', () => {
+    renderGrid();
+    const first = screen.getByRole('gridcell', { name: 'Item 1', exact: true });
+    const second = screen.getByRole('gridcell', { name: 'Item 2', exact: true });
+    const third = screen.getByRole('gridcell', { name: 'Item 3', exact: true });
+    for (const cell of [first, second]) {
+      fireEvent.mouseDown(cell, { button: 0 });
+      fireEvent.mouseUp(cell);
+      fireEvent.click(cell);
+    }
+    fireEvent.keyDown(second, { key: 'Escape' });
+    fireEvent.mouseDown(first, { button: 0 });
+    fireEvent.mouseEnter(third);
+    fireEvent.mouseUp(third);
+    expect(third).toHaveAttribute('data-grid-selected', 'true');
+  });
 });

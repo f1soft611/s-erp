@@ -346,15 +346,6 @@ const GridRowInner = <T extends object>({
       }
       if (event.button !== 0) return;
 
-      const previousCell = previousDragCellRef.current;
-      const isSameDragCell =
-        previousCell?.rowId === cell.rowId &&
-        previousCell?.columnIndex === cell.columnIndex;
-
-      if (isSameDragCell && !latestPropsRef?.current.selectedCellRange) {
-        return;
-      }
-
       dragSelectionStateRef.current = {
         active: true,
         previousCell: cell,

@@ -13,13 +13,21 @@
 
 ## 단계
 
-- [ ] `frontend/tests/f1-grid-render-performance.test.tsx`에 고정열 포함 100행 선택·편집 렌더 횟수와 최신 키보드/콜백 회귀 테스트를 작성하고 실패를 확인한다.
-- [ ] `frontend/src/shared/components/f1-grid/core/GridRow.tsx`에서 `draftValue={editing ? draftValue : ''}`로 전달한다.
-- [ ] `frontend/src/shared/components/f1-grid/core/GridCell.tsx`에서 고정 위치의 side/offset/shadow를 비교하고 이벤트 콜백은 최신 props를 통해 실행한다. 기존 셀 표시 계약은 유지한다.
-- [ ] 저장 후 재조회 대기 중 gridKey가 바뀌지 않는 테스트를 추가한다. 품목·거래처 관리 훅에서 재조회 종료 후 초기화하되, 저장 성공/조회 실패 시에도 변경사항을 지워 중복 저장을 막는다.
-- [ ] 집중 테스트, 기존 그리드 회귀 테스트 및 `npm run build`를 실행한다.
-- [ ] 동일 브라우저 합성 100행에서 전후 렌더 횟수와 React commit 시간을 비교하고 반응형 스크린샷을 저장한다.
-- [ ] F1-Grid 사용자 문서와 결과 문서에 원인·수정·검증·API 미측정 한계를 기록한다.
+- [x] `frontend/tests/f1-grid-render-performance.test.tsx`에 고정열 포함 100행 선택·편집 렌더 횟수와 최신 키보드/콜백 회귀 테스트를 작성하고 실패를 확인한다.
+- [x] `frontend/src/shared/components/f1-grid/core/GridRow.tsx`에서 `draftValue={editing ? draftValue : ''}`로 전달한다.
+- [x] `frontend/src/shared/components/f1-grid/core/GridCell.tsx`에서 고정 위치의 side/offset/shadow를 비교하고 이벤트 콜백은 최신 props를 통해 실행한다. 기존 셀 표시 계약은 유지한다.
+- [x] 저장 후 재조회 대기 중 gridKey가 바뀌지 않는 테스트를 추가한다. 품목·거래처 관리 훅에서 재조회 종료 후 초기화하되, 저장 성공/조회 실패 시에도 변경사항을 지워 중복 저장을 막는다.
+- [x] 집중 테스트, 기존 그리드 회귀 테스트 및 `npm run build`를 실행한다.
+- [x] 동일 브라우저 합성 100행에서 전후 렌더 횟수와 React commit 시간을 비교하고 반응형 스크린샷을 저장한다.
+- [x] F1-Grid 사용자 문서와 결과 문서에 원인·수정·검증·API 미측정 한계를 기록한다.
+
+## 실제 공유 화면을 통한 추가 확인
+
+- 품목 화면의 103행, 표시 셀 1,133개 및 열 가상화 활성 상태를 확인했다. 표시 인덱스가 동일해도 Set 참조가 바뀌는 경로가 초기 합성 테스트에서 누락됐다.
+- 표시 열 집합 재사용, 행별 선택/편집 상태 비교, 최신 이벤트 전달, 드래그 상태의 부모 CSS 전달, 헤더 memo와 비체크박스 열의 불필요한 전체 행 조회 제거를 추가했다.
+- 8개 성능 회귀 테스트는 열 가상화를 활성화한 상태로 검증한다. 다른 행에서 선택 취소 후 이전 행에서 드래그를 다시 시작하는 동작도 포함한다.
+- 공유 화면에서 실제 데이터를 저장하지 않고 선택 및 임시 편집/Escape 취소를 측정했다.
+- 구현·집중 검증·브라우저 측정·스크린샷·문서 기록을 수행했다. 광역 테스트의 기존 실패와 확인 한계는 결과 문서에 별도로 기록한다.
 
 ## 검증 명령
 
