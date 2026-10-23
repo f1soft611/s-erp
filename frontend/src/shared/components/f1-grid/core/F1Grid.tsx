@@ -44,6 +44,7 @@ import type {
   F1GridRef,
   F1GridRowId,
   F1GridSort,
+  F1GridValidationError,
 } from '../types/grid.types';
 import { findNextEditableCell } from '../keyboard/GridKeyboard';
 import {
@@ -161,6 +162,7 @@ function F1GridInner<T extends object>(
     afterEdit,
     onChangesChange,
     onSelectionChange,
+    onValidationErrors,
     initialSelectedRowIds,
     rowProjection,
     cellAdornment,
@@ -1281,15 +1283,18 @@ function F1GridInner<T extends object>(
 
   function validate(): boolean {
     const nextErrors: Record<string, string> = {};
+    const validationErrors: F1GridValidationError[] = [];
     visibleRows.forEach((row) => {
       const rowId = getGridRowId(row, rowKey);
       Object.entries(validateGridRow(row, columns)).forEach(
         ([field, message]) => {
           nextErrors[`${String(rowId)}:${field}`] = message;
+          validationErrors.push({ rowId, field, message });
         },
       );
     });
     setCellErrors(nextErrors);
+    onValidationErrors?.(validationErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
@@ -3022,6 +3027,7 @@ function F1GridInner<T extends object>(
           rowKey={rowKey}
           plugin={rowFormPlugin}
           externalErrors={rowFormErrors}
+          onValidationErrors={onValidationErrors}
           onCancel={closeRowForm}
           onApply={applyRowForm}
           onDraftChange={(fields) => {

@@ -9,7 +9,10 @@ import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import { type F1GridRef } from '../../../../shared/components/f1-grid';
+import {
+  type F1GridRef,
+  type F1GridValidationError,
+} from '../../../../shared/components/f1-grid';
 import {
   toPageSearchFields,
   type PageSearchFieldValue,
@@ -109,11 +112,14 @@ export function CustomerManagementPage({
   const handleGridSave = () => {
     const grid = gridRef.current;
     if (!grid) return;
-    if (!grid.validate()) {
-      management.setError('필수 입력 항목을 확인해 주세요.');
-      return;
-    }
+    if (!grid.validate()) return;
     void management.saveChanges(grid.getChanges());
+  };
+
+  const handleValidationErrors = (errors: F1GridValidationError[]) => {
+    management.setError(
+      [...new Set(errors.map((error) => error.message))].join('\n'),
+    );
   };
 
   const cancelPendingSearch = () => {
@@ -249,6 +255,7 @@ export function CustomerManagementPage({
           gridKey={management.gridKey}
           gridRef={gridRef}
           onChangesChange={management.handleChangesChange}
+          onValidationErrors={handleValidationErrors}
         />
       </Box>
       <UnsavedChangesConfirmDialog

@@ -6,7 +6,9 @@ import type {
   F1GridColumn,
   F1GridFormMode,
   F1GridRowFormPlugin,
+  F1GridValidationError,
 } from '../types/grid.types';
+import { getGridRowId } from '../utils/grid.utils';
 import { validateGridRow } from '../validation/GridValidation';
 import { GridFormField } from './GridFormField';
 import {
@@ -26,6 +28,7 @@ export type F1GridFormModalProps<T extends object> = {
   onCancel: () => void;
   onApply: (draftRow: T) => void;
   onDraftChange?: (fields: string[]) => void;
+  onValidationErrors?: (errors: F1GridValidationError[]) => void;
 };
 
 export function F1GridFormModal<T extends object>({
@@ -40,6 +43,7 @@ export function F1GridFormModal<T extends object>({
   onCancel,
   onApply,
   onDraftChange,
+  onValidationErrors,
 }: F1GridFormModalProps<T>) {
   const fieldRefs = useRef(new Map<string, HTMLDivElement>());
   const [draftRow, setDraftRow] = useState<T>(() => ({ ...row }));
@@ -111,6 +115,13 @@ export function F1GridFormModal<T extends object>({
       .find((field) => Boolean(nextErrors[field]));
 
     setValidationErrors(nextValidationErrors);
+    onValidationErrors?.(
+      Object.entries(nextErrors).map(([field, message]) => ({
+        rowId: getGridRowId(draftRow, rowKey),
+        field,
+        message,
+      })),
+    );
     if (firstInvalidField) {
       setFocusRequest({ field: firstInvalidField });
       return;

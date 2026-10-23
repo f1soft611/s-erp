@@ -33,6 +33,44 @@ type MultiSelectRow = {
 };
 
 describe('F1-Grid form model', () => {
+  it('reports required and digit-count errors consistently from form apply and grid validate', () => {
+    const ref = createRef<F1GridRef<{ id: string; number: string }>>();
+    const onValidationErrors = vi.fn();
+    render(
+      <F1Grid
+        ref={ref}
+        rows={[{ id: 'row-1', number: '' }]}
+        columns={[{
+          field: 'number',
+          headerName: '번호',
+          editable: true,
+          required: true,
+          inputFormat: { type: 'digits', validDigitCounts: [10] },
+        }]}
+        rowKey="id"
+        rowFormPlugin={{}}
+        onValidationErrors={onValidationErrors}
+      />,
+    );
+    act(() => expect(ref.current?.validate()).toBe(false));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([
+      { rowId: 'row-1', field: 'number', message: '번호은(는) 필수입니다.' },
+    ]);
+    act(() => ref.current?.addRow({ id: 'row-2', number: '123' }));
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([
+      { rowId: 'row-2', field: 'number', message: '번호은(는) 10자리여야 합니다.' },
+    ]);
+    fireEvent.change(screen.getByRole('textbox', { name: '번호' }), {
+      target: { value: '1234567890' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+    act(() => ref.current?.setCellValue('row-1', 'number', '1234567890'));
+    act(() => expect(ref.current?.validate()).toBe(true));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+  });
+
   it('builds form sections from editable fields only by default', () => {
     const columns: F1GridColumn<FormRow>[] = [
       { field: 'id', headerName: '번호', type: 'rownumber' },

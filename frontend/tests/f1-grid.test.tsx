@@ -1336,6 +1336,80 @@ describe('F1-GRID clipboard', () => {
 });
 
 describe('F1-GRID custom cell rendering', () => {
+  it('preserves drop target shadows without an editable header indicator', () => {
+    const theme = createAppTheme();
+    render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={[
+            { field: 'code', headerName: 'Source' },
+            { field: 'status', headerName: 'Target', editable: true },
+          ]}
+          rowKey="id"
+          showCheckbox={false}
+          editorPlugins={[{}]}
+        />
+      </ThemeProvider>,
+    );
+    const source = screen.getByRole('columnheader', { name: 'Source' });
+    const target = screen.getByRole('columnheader', { name: 'Target' });
+    const dataTransfer = { setData: vi.fn(), effectAllowed: 'move' };
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+
+    expect(target).toHaveAttribute('data-drop-target', 'true');
+    const dropShadow = getComputedStyle(target).boxShadow;
+    expect(dropShadow).not.toContain('inset 0 2px');
+    expect(dropShadow).toContain('inset 0 0 0 1px rgba(25, 118, 210, 0.35)');
+    expect(dropShadow).toContain('0 0 0 1px rgba(25, 118, 210, 0.15)');
+    fireEvent.dragEnd(source);
+    expect(getComputedStyle(target).boxShadow).toBe('');
+  });
+
+  it.each([
+    { mode: 'light', pinned: undefined, headerGroup: undefined },
+    { mode: 'dark', pinned: undefined, headerGroup: 'Details' },
+    { mode: 'light', pinned: 'left', headerGroup: undefined },
+    { mode: 'dark', pinned: 'right', headerGroup: undefined },
+  ] as const)('does not highlight editable headers while preserving existing dividers and shadows: %j', ({
+    mode,
+    pinned,
+    headerGroup,
+  }) => {
+    const theme = createAppTheme(mode);
+    render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={[
+            { field: 'code', headerName: 'Editable', editable: true, pinned, headerGroup },
+            { field: 'status', headerName: 'Read only' },
+          ]}
+          rowKey="id"
+          showCheckbox={false}
+          editorPlugins={[{}]}
+        />
+      </ThemeProvider>,
+    );
+
+    const header = screen.getByRole('columnheader', { name: 'Editable' });
+    const style = getComputedStyle(header);
+    expect(header).toHaveAttribute('data-editable-column', 'true');
+    expect(style.boxShadow).not.toContain('inset 0 2px');
+    if (!pinned) expect(style.boxShadow).toBe('');
+    expect(style.borderBottomWidth).not.toBe('2px');
+    expect(style.borderTopWidth).toBe(headerGroup ? '1px' : '0px');
+    if (pinned) {
+      expect(style.boxShadow).toContain(
+        `${pinned === 'left' ? '2px' : '-2px'} 0 4px -2px rgba(0, 0, 0, 0.32)`,
+      );
+    }
+    const readOnlyHeader = screen.getByRole('columnheader', { name: 'Read only' });
+    expect(readOnlyHeader).not.toHaveAttribute('data-editable-column');
+    expect(getComputedStyle(readOnlyHeader).boxShadow).not.toContain('inset 0 2px');
+  });
+
   it('renders custom cell markup and applies dynamic styling and properties', () => {
     const customColumns: F1GridColumn<MenuRow>[] = [
       {

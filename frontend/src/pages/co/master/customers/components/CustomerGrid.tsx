@@ -4,6 +4,7 @@ import {
   type F1GridChanges,
   type F1GridColumn,
   type F1GridRef,
+  type F1GridValidationError,
 } from '../../../../../shared/components/f1-grid';
 import type { CustomerRow } from '../types/customerManagement.types';
 import { sanitizeCustomerNumberInput } from '../utils/customerNumberInput';
@@ -18,6 +19,7 @@ export type CustomerGridProps = {
   gridKey: number;
   gridRef: RefObject<F1GridRef<CustomerRow> | null>;
   onChangesChange: (changes: F1GridChanges<CustomerRow>) => void;
+  onValidationErrors: (errors: F1GridValidationError[]) => void;
 };
 
 export function createCustomerRow(): CustomerRow {
@@ -90,6 +92,7 @@ export function createCustomerColumns(
     {
       field: 'businessNo',
       headerName: '사업자번호',
+      required: true,
       width: 130,
       editable: canEdit,
       inputFormat: {
@@ -246,6 +249,7 @@ export function CustomerGrid({
   gridKey,
   gridRef,
   onChangesChange,
+  onValidationErrors,
 }: CustomerGridProps) {
   const rowFormPlugin = useMemo(() => {
     if (!canCreate && !canUpdate) return { enabled: false };
@@ -269,6 +273,7 @@ export function CustomerGrid({
       rowFormPlugin={rowFormPlugin}
       createRow={createCustomerRow}
       onChangesChange={onChangesChange}
+      onValidationErrors={onValidationErrors}
       loading={loading}
       height="100%"
       showCheckbox={false}

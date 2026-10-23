@@ -249,6 +249,12 @@ export type F1GridContextMenuTreeConfig = {
   onAddChild: (targetRowId?: F1GridRowId) => void;
 };
 
+export type F1GridValidationError = {
+  rowId: F1GridRowId;
+  field: string;
+  message: string;
+};
+
 export type F1GridProps<T extends object> = {
   rows?: T[];
   dataSource?: F1GridDataSource<T>;
@@ -287,6 +293,7 @@ export type F1GridProps<T extends object> = {
   afterEdit?: F1GridEditLifecycle<T>;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
   onSelectionChange?: (rowIds: F1GridRowId[]) => void;
+  onValidationErrors?: (errors: F1GridValidationError[]) => void;
   initialSelectedRowIds?: F1GridRowId[];
   rowProjection?: (rows: T[]) => F1GridRowProjection<T>;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;

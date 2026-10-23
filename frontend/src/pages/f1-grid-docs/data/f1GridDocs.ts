@@ -215,7 +215,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Editable header indicator',
-        body: '편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다. 판정은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족해야 한다.',
+        body: '편집 가능 여부에 따른 헤더 강조선은 표시하지 않는다. 별도 아이콘이나 배경색은 추가하지 않으며 기존 셀 편집 테두리, 고정 컬럼 및 드롭 대상 그림자와 그룹 헤더 구분선은 유지된다. 테스트/디버깅용 data-editable-column 속성은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족할 때 적용된다.',
       },
       { type: 'code', heading: 'Editable column', code },
       {

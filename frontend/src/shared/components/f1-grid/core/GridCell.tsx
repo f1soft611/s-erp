@@ -342,7 +342,7 @@ const GridCellInner = <T extends object>({
             : undefined,
         color: errorMessage ? 'error.main' : undefined,
         outline: activeHighlight ? '2px solid' : 'none',
-        outlineColor: 'primary.main',
+        outlineColor: errorMessage ? 'error.main' : 'primary.main',
         outlineOffset: -2,
         textAlign:
           column.align ?? (column.type === 'number' ? 'right' : 'left'),

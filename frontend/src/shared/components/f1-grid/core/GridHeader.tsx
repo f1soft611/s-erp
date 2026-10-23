@@ -471,10 +471,6 @@ export function GridHeader<T extends object>({
                 borderRightColor: 'divider',
                 borderLeft: columnLine && columnIndex > 0 ? 1 : 0,
                 borderLeftColor: 'divider',
-                borderBottom: isEditableHeader ? 2 : undefined,
-                borderBottomColor: isEditableHeader
-                  ? 'primary.main'
-                  : undefined,
                 minWidth: 0,
                 width: '100%',
                 boxSizing: 'border-box',

@@ -748,10 +748,27 @@ interface F1GridProps<T extends object> {
 
 - 수정 모달은 원본 행의 얕은 복사본을 draft로 사용한다. 입력 중에는 Grid 행과 변경 상태를 건드리지 않고, 적용 시 달라진 필드만 기존 dirty/updated 상태에 반영한다.
 - 활성 플러그인에서 `addRow(partial?)`는 `createRow()`와 partial을 합친 신규 draft를 연다. 적용 시에만 inserted 행을 생성하고 취소 시 빈 행이나 변경 이력을 남기지 않는다.
-- `required`, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
+- `required`, `inputFormat` 자리수 규칙, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
 - `onBeforeApply`가 `false`를 반환하면 적용을 중단하고 모달을 유지한다.
 - 취소, 닫기, `Escape`, backdrop 닫기는 모두 draft를 폐기한다.
 - 모달은 API를 호출하거나 서버에 저장하지 않는다. 최종 저장은 화면이 `getChanges()`와 기존 저장 버튼 흐름으로 수행한다.
+
+### 공통 검증 오류와 페이지 메시지 연결
+
+`F1Grid.onValidationErrors`는 `validate()`와 행 폼 적용 검증에서 호출되는 선택적 콜백이다. 오류는 `{ rowId, field, message }[]`이며 검증 성공 시 빈 배열을 전달한다. `validate(): boolean` 반환 계약은 유지한다. 콜백을 지정하지 않은 화면에는 변경이 없다. F1Tree도 같은 prop을 전달할 수 있다.
+
+```tsx
+<F1Grid
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  onValidationErrors={(errors) =>
+    setError([...new Set(errors.map((error) => error.message))].join('\n'))
+  }
+/>
+```
+
+거래처명과 사업자번호는 컬럼 `required: true`로 헤더·폼 필수 표시와 공통 검증을 통일한다. 저장 훅에서 거래처명 필수 검사를 반복하지 않는다. 사업자번호 등 번호 자리수는 `inputFormat.validDigitCounts`와 국내 전화 규칙을 기존 `validateGridRow`에서 검사한다. 거래처 페이지는 폼 적용·최종 저장의 실제 오류를 상단 `PageMessageArea`에 전달한다. 폼은 빨간 입력 테두리와 하단 설명, 그리드는 오류 셀의 빨간 강조와 툴팁을 유지한다. 오류 셀에 포커스가 남아 있어도 선택 테두리는 파란색 대신 오류 빨간색을 우선한다. 모달이 열린 동안 페이지 메시지는 배경에 있으며 폼 내부 오류로 즉시 확인한다. 검증에 성공하면 상단 메시지를 비운다.
 
 거래처 관리 화면은 `customerCode`와 `customerName` 등을 행 폼에서 등록·수정한다. 신규 `customerCode`는 비워둘 수 있고 서버가 eGov ID Generator로 생성하지만, 수정 시에는 필수이며 화면과 서버에서 함께 검증한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
 
@@ -1656,15 +1673,15 @@ Selected Row
 
 ## 편집 가능 컬럼 헤더 표시
 
-편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다.
+편집 가능 여부에 따른 헤더 강조선은 표시하지 않는다. 상단/하단 강조선, 별도 아이콘이나 배경색은 추가하지 않으며 기존 셀 편집 테두리는 유지한다.
 
-판정 조건(모두 만족해야 표시):
+편집 가능 헤더 속성의 판정 조건(모두 만족해야 적용):
 
 1. 그리드에 활성화된 editor plugin이 하나 이상 존재한다.
 2. 화면에 보이는 행(`visibleRows`) 중 하나 이상에서 `isCellEditable(column, row)`이 참이다. 즉 컬럼의 `editable: true` 선언만으로는 표시되지 않는다.
 3. 활성 editor plugin에 `canEdit(context)`가 정의되어 있다면 그 조건도 함께 만족해야 한다.
 
-실제 구현은 `editableColumnFields` 집합을 계산할 때 위 조건을 모두 통과한 컬럼만 `data-editable-column="true"`로 헤더에 반영한다. 헤더 하단 border 표시는 정렬 인디케이터, 필터 표시, 컬럼 고정, 드래그앤드롭 드롭 위치 표시와 공존한다.
+실제 구현은 `editableColumnFields` 집합을 계산할 때 위 조건을 모두 통과한 컬럼만 `data-editable-column="true"`로 헤더에 반영한다. 이 속성은 테스트/디버깅용이며 시각적 강조를 추가하지 않는다. 정렬 인디케이터, 필터 표시, 고정 컬럼과 드롭 대상의 기존 그림자, 그룹 헤더 구분선은 유지한다.
 
 ---
 

@@ -14,7 +14,6 @@ import type {
 function toPayload(row: CustomerRow, isNew: boolean): CustomerPayload {
   const customerName = row.customerName.trim();
   const customerCode = row.customerCode.trim();
-  if (!customerName) throw new Error('거래처명은 필수입니다.');
   if (!isNew && !customerCode) {
     throw new Error('수정 시 거래처코드를 입력해 주세요.');
   }

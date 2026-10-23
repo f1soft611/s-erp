@@ -89,6 +89,75 @@ beforeEach(() => {
 });
 
 describe('customer management page', () => {
+  it('declares customer name and business number required in shared column metadata', () => {
+    const requiredFields = createCustomerColumns(true)
+      .filter((column) => column.required)
+      .map((column) => column.field);
+    expect(requiredFields).toEqual(['customerName', 'businessNo']);
+  });
+
+  it('reports form required and digit-count errors above the page and clears them on valid apply', async () => {
+    renderCustomerPage();
+    await screen.findByText('Acme');
+    fireEvent.click(screen.getByRole('button', { name: '거래처 추가' }));
+    const dialog = screen.getByRole('dialog', { name: '거래처 등록' });
+    const name = within(dialog).getByRole('textbox', { name: '거래처명' });
+    const businessNo = within(dialog).getByRole('textbox', { name: '사업자번호' });
+    expect(name).toHaveAttribute('aria-required', 'true');
+    expect(businessNo).toHaveAttribute('aria-required', 'true');
+    fireEvent.change(name, { target: { value: '   ' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('거래처명은(는) 필수입니다.');
+    expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('사업자번호은(는) 필수입니다.');
+    expect(businessNo).toHaveAttribute('aria-invalid', 'true');
+    expect(businessNo.closest('.MuiInputBase-root')).toHaveClass('Mui-error');
+    await waitFor(() => expect(name).toHaveFocus());
+    fireEvent.change(name, { target: { value: 'New customer' } });
+    fireEvent.change(businessNo, { target: { value: '123456789' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('사업자번호은(는) 10자리여야 합니다.');
+    await waitFor(() => expect(businessNo).toHaveFocus());
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+    fireEvent.change(businessNo, { target: { value: '1234567890' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('New customer')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['', '사업자번호은(는) 필수입니다.'],
+    ['123-45-6789', '사업자번호은(는) 10자리여야 합니다.'],
+  ])('blocks saving an existing invalid business number "%s" with its actual error', async (businessNo, message) => {
+    apiMocks.apiGet.mockResolvedValue({ resultList: [{ ...customer, businessNo }] });
+    renderCustomerPage();
+    const nameCell = await screen.findByRole('gridcell', { name: 'Acme' });
+    fireEvent.doubleClick(nameCell);
+    const editor = screen.getByDisplayValue('Acme');
+    fireEvent.change(editor, { target: { value: 'Updated customer' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    const invalidCell = document.querySelector('[data-grid-error]');
+    expect(invalidCell).toHaveAttribute('data-grid-error', message);
+    expect(invalidCell).toHaveAttribute('title', message);
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('keeps a focused invalid cell outline red after save validation', async () => {
+    renderCustomerPage();
+    await screen.findByText('Acme');
+    const businessCell = screen.getByRole('gridcell', { name: '123-45-67890' });
+    fireEvent.doubleClick(businessCell);
+    const editor = screen.getByDisplayValue('123-45-67890');
+    fireEvent.change(editor, { target: { value: '123456789' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(businessCell).toHaveAttribute('data-grid-error', '사업자번호은(는) 10자리여야 합니다.');
+    expect(getComputedStyle(businessCell).outlineColor).toBe('rgb(211, 47, 47)');
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
   it('configures reusable input formats for customer numbers and contacts', () => {
     const columns = createCustomerColumns(true);
     const formats = Object.fromEntries(
@@ -136,7 +205,7 @@ describe('customer management page', () => {
     );
   });
 
-  it('validates every row and rejects deletion before submitting any batch', async () => {
+  it('retains update-code and deletion business rules before submitting a batch', async () => {
     const { result } = renderHook(() => useCustomerManagement(), {
       wrapper: ({ children }: PropsWithChildren) => (
         <NotificationProvider>{children}</NotificationProvider>
@@ -144,16 +213,13 @@ describe('customer management page', () => {
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
     const changes = {
-      insertedRows: [
-        { ...createCustomerRow(), customerName: 'Valid' },
-        { ...createCustomerRow(), customerName: '' },
-      ],
-      updatedRows: [],
+      insertedRows: [],
+      updatedRows: [{ ...normalizeCustomerRow(customer), customerCode: '' }],
       deletedRows: [],
     };
     act(() => result.current.handleChangesChange(changes));
     await act(async () => result.current.saveChanges(changes));
-    expect(result.current.error).toBe('거래처명은 필수입니다.');
+    expect(result.current.error).toBe('수정 시 거래처코드를 입력해 주세요.');
     expect(result.current.hasChanges).toBe(true);
     await act(async () => result.current.saveChanges({
       insertedRows: [],
