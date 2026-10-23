@@ -16,6 +16,22 @@ const columns: F1GridColumn<Row>[] = [
 ];
 
 describe('F1Grid unique column validation', () => {
+  it('normalizes digit-only unique keys without changing values or losing leading zeroes', () => {
+    const digitColumns: F1GridColumn<Row>[] = [
+      { field: 'name', headerName: '번호', validation: { unique: 'digits' } },
+    ];
+    const rows = [row('1', '012-34-56789'), row('2', 'Other')];
+    const context = createGridValidationContext(rows, digitColumns, 'id');
+    expect(validateGridRow(row('2', '0123456789'), digitColumns, context))
+      .toEqual({ name: '번호 값이 중복되었습니다.' });
+    expect(validateGridRow(row('2', '012 34 56789'), digitColumns, context))
+      .toEqual({ name: '번호 값이 중복되었습니다.' });
+    expect(validateGridRow(row('1', '0123456789'), digitColumns, context)).toEqual({});
+    expect(validateGridRow(row('3', '123456789'), digitColumns, context)).toEqual({});
+    expect(validateGridRow(row('3', '---'), digitColumns, context)).toEqual({});
+    expect(rows[0].name).toBe('012-34-56789');
+  });
+
   it('compares trimmed names while excluding self and preserving case sensitivity', () => {
     const rows = [row('1', ' Acme '), row('2', 'Other')];
     const context = createGridValidationContext(rows, columns, 'id');

@@ -97,7 +97,7 @@ describe('customer management page', () => {
     fireEvent.click(screen.getByRole('button', { name: '거래처 추가' }));
     const dialog = screen.getByRole('dialog', { name: '거래처 등록' });
     fireEvent.change(within(dialog).getByRole('textbox', { name: '거래처명' }), { target: { value: ' Acme ' } });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: '사업자번호' }), { target: { value: '1234567890' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '사업자번호' }), { target: { value: '2234567890' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
     expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('거래처명 값이 중복되었습니다.');
     expect(within(dialog).getByRole('textbox', { name: '거래처명' })).toHaveAttribute('aria-invalid', 'true');
@@ -143,7 +143,7 @@ describe('customer management page', () => {
     expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('사업자번호은(는) 10자리여야 합니다.');
     await waitFor(() => expect(businessNo).toHaveFocus());
     expect(apiMocks.apiPost).not.toHaveBeenCalled();
-    fireEvent.change(businessNo, { target: { value: '1234567890' } });
+    fireEvent.change(businessNo, { target: { value: '2234567890' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -180,6 +180,39 @@ describe('customer management page', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(businessCell).toHaveAttribute('data-grid-error', '사업자번호은(는) 10자리여야 합니다.');
     expect(getComputedStyle(businessCell).outlineColor).toBe('rgb(211, 47, 47)');
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('rejects business number duplicates across formatting differences in form apply and final save', async () => {
+    expect(createCustomerColumns(true).find((column) => column.field === 'businessNo')?.validation)
+      .toEqual({ unique: 'digits' });
+    apiMocks.apiGet.mockResolvedValue({
+      resultList: [{ ...customer, businessNo: '1234567890', useAt: 'N' }],
+    });
+    renderCustomerPage();
+    await screen.findByText('Acme');
+    fireEvent.click(screen.getByRole('button', { name: '거래처 추가' }));
+    const dialog = screen.getByRole('dialog', { name: '거래처 등록' });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '거래처명' }), {
+      target: { value: 'Different name' },
+    });
+    const businessNo = within(dialog).getByRole('textbox', { name: '사업자번호' });
+    fireEvent.change(businessNo, { target: { value: '123-45-67890' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('사업자번호 값이 중복되었습니다.');
+    expect(businessNo).toHaveAttribute('aria-invalid', 'true');
+    expect(businessNo.closest('.MuiInputBase-root')).toHaveClass('Mui-error');
+    fireEvent.change(businessNo, { target: { value: '2234567890' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const cell = screen.getByRole('gridcell', { name: '223-45-67890' });
+    fireEvent.doubleClick(cell);
+    const editor = screen.getByDisplayValue('223-45-67890');
+    fireEvent.change(editor, { target: { value: '1234567890' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('사업자번호 값이 중복되었습니다.');
+    expect(cell).toHaveAttribute('data-grid-error', '사업자번호 값이 중복되었습니다.');
     expect(apiMocks.apiPost).not.toHaveBeenCalled();
   });
 
@@ -377,6 +410,45 @@ describe('customer management page', () => {
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
       '/api/v1/co/master/customers',
     );
+  });
+
+  it('keeps the customer grid visible during save and its quiet reload', async () => {
+    let finishSave!: (value: unknown) => void;
+    let finishReload!: (value: unknown) => void;
+    let listRequests = 0;
+    apiMocks.apiGet.mockImplementation((url: string) => {
+      if (url !== '/api/v1/co/master/customers') return Promise.resolve({});
+      listRequests += 1;
+      return listRequests === 1
+        ? Promise.resolve({ resultList: [customer] })
+        : new Promise((resolve) => { finishReload = resolve; });
+    });
+    apiMocks.apiPost.mockImplementation(
+      () => new Promise((resolve) => { finishSave = resolve; }),
+    );
+
+    renderCustomerPage();
+    const nameCell = await screen.findByRole('gridcell', { name: 'Acme' });
+    fireEvent.doubleClick(nameCell);
+    const editor = screen.getByDisplayValue('Acme');
+    fireEvent.change(editor, { target: { value: 'Updated Acme' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalled());
+    expect(screen.getByRole('progressbar', { name: '거래처 저장 중' })).toBeVisible();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
+
+    await act(async () => finishSave({ item: { customers: [customer] } }));
+    await waitFor(() => expect(listRequests).toBe(2));
+    expect(screen.getByRole('progressbar', { name: '거래처 저장 중' })).toBeVisible();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Acme' })).toBeVisible();
+
+    await act(async () => finishReload({ resultList: [{ ...customer, customerName: 'Updated Acme' }] }));
+    await waitFor(() => expect(screen.queryByRole('progressbar', { name: '거래처 저장 중' })).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
   });
 
   it('applies basic and detailed search values in one list request', async () => {

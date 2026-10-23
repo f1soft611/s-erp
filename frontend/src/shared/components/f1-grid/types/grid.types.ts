@@ -63,7 +63,8 @@ export type F1GridDateRangeDefault = {
 export type F1GridColumnFormOptions<T extends object> = {
   hidden?: boolean;
   readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
-  label?: string;
+  label?: string | ((row: T) => string);
+  disabled?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
@@ -158,7 +159,7 @@ export type F1GridColumn<T extends object> = {
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
-  validation?: { unique?: boolean };
+  validation?: { unique?: boolean | 'digits' };
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;
   min?: number;

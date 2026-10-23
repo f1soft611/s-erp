@@ -93,7 +93,7 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `type: 'select'`의 표시 label은 저장값과 `options[].value`가 같은 타입과 값으로 일치할 때 매핑된다. 숫자 ID는 행과 옵션 양쪽에서 같은 숫자 타입으로 정규화한다. null 같은 실제 저장값의 표시 문구가 옵션 값과 다르면 `renderCell`에서만 placeholder를 표현하고 저장값은 변경하지 않는다.
 - select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
-- 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
+- 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리한다. 저장 액션에 비차단 진행 표시를 두고 저장 요청 및 저장 후 조용한 재조회 중 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다. 품목관리와 거래처관리는 Grid `loading`에 조회 상태만 전달하고 저장 진행 아이콘으로 저장 중임을 표시한다.
 - 인라인 편집 중 같은 Grid의 다른 셀 또는 툴바/액션으로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. Grid가 중첩 MUI Dialog/Modal 안에 있어도 조상 모달의 이벤트를 editor popup으로 오인하지 않는다. 실제 editor popup으로 포인터/포커스가 이동할 때만 commit을 보류한다. 따라서 폼 바깥의 저장 버튼도 편집 commit으로 갱신된 dirty 상태를 기준으로 동작한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
@@ -288,7 +288,7 @@ interface F1GridColumn<T> {
   type?: F1GridEditorType;
   options?: { value: string | number | boolean; label: string }[];
   required?: boolean;
-  validation?: { unique?: boolean };
+  validation?: { unique?: boolean | 'digits' };
   min?: number;
   max?: number;
   validate?: (value: T[keyof T], row: T) => string | boolean;
@@ -786,6 +786,10 @@ interface F1GridProps<T extends object> {
 `validation.unique`는 폼 적용과 `validate()`에서 같은 공통 중복 검증을 실행한다. 비교 대상은 삭제되지 않은 전체 로드 행과 신규/수정 행이며 그리드 필터·정렬·가상화로 숨겨진 행도 포함한다. 문자열은 앞뒤 공백을 제거하고 대소문자를 구분한다. 빈 값은 고유성 검사에서 제외해 `required`가 처리하고, 숫자 0과 boolean false는 비교한다. 수정 중인 자기 행은 `rowKey`로 제외한다. 실패 시 `거래처명 값이 중복되었습니다.`를 기존 오류 콜백·상단 메시지·빨간 표시로 전달한다.
 
 여러 행을 검사할 때 `createGridValidationContext(rows, columns, rowKey)`로 고유값 인덱스를 한 번 생성한 후 `validateGridRow(row, columns, context)`에 전달한다. 단독 `F1GridFormModal` 사용자는 `validationRows`로 비교할 행을 전달한다. 기본 F1Grid는 활성 행을 자동 연결한다. 서버 검색으로 로드되지 않은 데이터와 동시 저장은 클라이언트 검증 범위가 아니므로 서버의 검증이 반드시 필요하다.
+
+사업자번호처럼 표시 구분자를 무시해야 하는 컬럼은 `validation: { unique: 'digits' }`를 선언한다. ASCII 숫자만 비교하므로 `012-34-56789`, `0123456789`, `012 34 56789`는 같은 값이다. 앞자리 0은 유지하고 입력/저장 표기는 변경하지 않는다. 숫자가 없는 값은 중복 비교에서 제외하며 필수/자리수 검증은 기존대로 우선한다. 거래처 사업자번호는 폼 적용과 최종 저장에서 `사업자번호 값이 중복되었습니다.`를 공통 오류 경로로 표시한다.
+
+거래처 서버도 같은 tenant의 사용/미사용 사업자번호를 숫자로 비교하고 수정 자기 ID를 제외한다. `uq_tb_customer_info_tenant_business_no` 인덱스는 빈 숫자키를 제외한 동일 규칙으로 동시 저장을 방어한다. [사업자번호 DB 변경 이력](../../../../docs/database/20261023/20261023_002_change_customer_business_no_unique.md)의 스크립트는 별도 배포 대상이며 실제 DB에는 적용하지 않았다.
 
 거래처관리 백엔드는 같은 tenant의 사용/미사용 이름을 trim 후 검사하고 수정 자기 ID를 제외한다. 신규 `uq_tb_customer_info_tenant_name` 인덱스를 적용하면 동시 저장도 DB에서 차단한다. 기존 거래처코드 중복 방지와는 별도 규칙이다. 인덱스 스크립트는 [20261023 DB 변경 이력](../../../../docs/database/20261023/20261023_001_change_customer_name_unique.md)을 참고하며 실제 적용은 별도 운영 절차다.
 

@@ -6,6 +6,7 @@ import { createMaterialColumns, createMaterialRow } from '../src/pages/co/master
 import { fetchMaterials, normalizeMaterialRow, toMaterialPayload } from '../src/pages/co/master/materials/services/materialManagement.service';
 import { useMaterialManagement } from '../src/pages/co/master/materials/hooks/useMaterialManagement';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { F1GridFormModal } from '../src/shared/components/f1-grid/form/F1GridFormModal';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { buildGridFormSections } from '../src/shared/components/f1-grid/form/GridFormModel';
 import { toPageSearchFields } from '../src/shared/components/page-search/searchFields';
@@ -65,6 +66,110 @@ describe('material management contract', () => {
     expect(() => toMaterialPayload({ ...row, safeInvoice: Infinity }, true)).toThrow();
     expect(() => toMaterialPayload({ ...row, expiryedCount: 0 }, true)).toThrow();
     expect(() => toMaterialPayload({ ...row, expiryedCount: 2147483648 }, true)).toThrow();
+  });
+
+  it('requires a positive integer expiry count for active expiry statuses only', () => {
+    const row = {
+      ...createMaterialRow(),
+      materialName: 'Sample',
+      materialTypeCode: 'RAW',
+    };
+
+    expect(
+      toMaterialPayload({ ...row, expiryedStatus: 'NONE', expiryedCount: null }, true)
+        .expiryedCount,
+    ).toBeNull();
+    for (const expiryedStatus of ['DAY', 'MONTH', 'YEAR'] as const) {
+      expect(
+        toMaterialPayload({ ...row, expiryedStatus, expiryedCount: 1 }, true)
+          .expiryedCount,
+      ).toBe(1);
+      expect(() =>
+        toMaterialPayload({ ...row, expiryedStatus, expiryedCount: null }, true),
+      ).toThrow('소비기한 숫자');
+    }
+
+    for (const expiryedCount of [1, 0, -1, 1.5, 2147483648]) {
+      expect(() =>
+        toMaterialPayload({ ...row, expiryedStatus: 'NONE', expiryedCount }, true),
+      ).toThrow('소비기한');
+    }
+  });
+
+  it('clears the expiry count only when the basis changes to NONE', () => {
+    const row = {
+      ...createMaterialRow(),
+      expiryedStatus: 'DAY' as const,
+      expiryedCount: 30,
+    };
+    const statusColumn = createMaterialColumns(true).find(
+      (column) => column.field === 'expiryedStatus',
+    );
+
+    expect(statusColumn?.onValueChange?.(row, 'NONE')).toEqual({
+      expiryedStatus: 'NONE',
+      expiryedCount: null,
+    });
+    expect(statusColumn?.onValueChange?.(row, 'MONTH')).toEqual({
+      expiryedStatus: 'MONTH',
+    });
+  });
+
+  it('derives the expiry count label and disabled state from its basis', () => {
+    const columns = createMaterialColumns(true);
+    const countColumn = columns.find(
+      (column) => column.field === 'expiryedCount',
+    );
+    const row = {
+      ...createMaterialRow(),
+      expiryedStatus: 'DAY' as const,
+      expiryedCount: 30,
+    };
+    const sections = buildGridFormSections(columns, row);
+    const countField = sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.field === 'expiryedCount');
+
+    expect(countField?.label).toBe('소비기한 숫자 (일)');
+    expect(countColumn?.form?.disabled).toEqual(expect.any(Function));
+    expect(
+      countColumn?.form?.disabled?.(row, 'edit'),
+    ).toBe(false);
+    expect(
+      countColumn?.form?.disabled?.(
+        { ...row, expiryedStatus: 'NONE' },
+        'edit',
+      ),
+    ).toBe(true);
+  });
+
+  it('blocks applying an active expiry basis without its required count', () => {
+    const row = {
+      ...createMaterialRow(),
+      materialName: 'Sample',
+      materialTypeCode: 'RAW',
+      expiryedStatus: 'DAY' as const,
+      expiryedCount: null,
+    };
+    const onApply = vi.fn();
+
+    render(
+      <F1GridFormModal
+        open
+        mode="edit"
+        row={row}
+        originalRow={row}
+        columns={createMaterialColumns(true)}
+        rowKey="materialId"
+        plugin={{}}
+        onCancel={vi.fn()}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.getByText('소비기한 숫자를 입력해 주세요.')).toBeInTheDocument();
   });
 
   it('exposes every business field in the form, lookup options and detailed search', () => {
@@ -190,6 +295,54 @@ describe('material workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: '품목 추가' }));
     expect(await screen.findByRole('dialog', { name: '품목 등록' })).toBeInTheDocument();
   }, 15000);
+
+  it('keeps the material grid visible during save and its quiet reload', async () => {
+    let finishSave!: (value: unknown) => void;
+    let finishReload!: (value: unknown) => void;
+    let listRequests = 0;
+    api.apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('/options')) return Promise.resolve({ resultList: [] });
+      listRequests += 1;
+      return listRequests === 1
+        ? Promise.resolve({ resultList: [material] })
+        : new Promise((resolve) => { finishReload = resolve; });
+    });
+    api.apiPost.mockImplementation(
+      () => new Promise((resolve) => { finishSave = resolve; }),
+    );
+
+    render(<ThemeProvider theme={createTheme()}><NotificationProvider>
+      <DashboardContent
+        selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
+        currentMenuName="품목관리" currentPageKey="materials" breadcrumbItems={['품목관리']}
+        content={{ title: '품목관리', description: '품목', cards: [], items: [] }}
+        selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: false }}
+        isTenantAdmin
+      />
+    </NotificationProvider></ThemeProvider>);
+
+    const nameCell = await screen.findByRole('gridcell', { name: 'Sample' });
+    fireEvent.doubleClick(nameCell);
+    const editor = screen.getByDisplayValue('Sample');
+    fireEvent.change(editor, { target: { value: 'Updated Sample' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(api.apiPost).toHaveBeenCalled());
+    expect(screen.getByRole('progressbar', { name: '품목 저장 중' })).toBeVisible();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
+
+    await act(async () => finishSave({ item: { materials: [material] } }));
+    await waitFor(() => expect(listRequests).toBe(2));
+    expect(screen.getByRole('progressbar', { name: '품목 저장 중' })).toBeVisible();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Sample' })).toBeVisible();
+
+    await act(async () => finishReload({ resultList: [{ ...material, materialName: 'Updated Sample' }] }));
+    await waitFor(() => expect(screen.queryByRole('progressbar', { name: '품목 저장 중' })).not.toBeInTheDocument());
+    expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
+  });
 
   it('does not expose write actions to a non-admin user', async () => {
     render(<ThemeProvider theme={createTheme()}><NotificationProvider>

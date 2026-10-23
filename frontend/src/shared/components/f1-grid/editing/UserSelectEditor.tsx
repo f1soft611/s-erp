@@ -22,6 +22,7 @@ export type UserSelectEditorProps = {
   anchorEl?: HTMLElement | null;
   label: string;
   readOnly?: boolean;
+  disabled?: boolean;
   required?: boolean;
   error?: boolean;
   helperText?: string;
@@ -51,6 +52,7 @@ export function UserSelectEditor({
   anchorEl,
   label,
   readOnly = false,
+  disabled = false,
   required = false,
   error = false,
   helperText,
@@ -101,6 +103,7 @@ export function UserSelectEditor({
       fullWidth
       multiple={multiple}
       readOnly={readOnly}
+      disabled={disabled}
       openOnFocus
       disableCloseOnSelect={multiple}
       filterSelectedOptions={hideSelectedOptions}
@@ -206,6 +209,7 @@ export function UserSelectEditor({
                 label={option.label}
                 size="small"
                 onDelete={() => {
+                  if (disabled) return;
                   const remaining = selectedItems.filter(
                     (item) => String(item.value) !== String(option.value),
                   );
@@ -225,6 +229,7 @@ export function UserSelectEditor({
           label={compact ? undefined : label}
           variant={compact ? 'standard' : 'outlined'}
           margin="none"
+          disabled={disabled}
           required={required}
           error={error}
           helperText={helperText}

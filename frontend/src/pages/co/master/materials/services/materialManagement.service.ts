@@ -42,11 +42,20 @@ export function toMaterialPayload(row: MaterialPayload, isNew: boolean): Materia
   if (!isNew && !payload.materialCode) throw new Error('수정 시 품목코드를 입력해 주세요.');
   payload.materialWeight = numeric(row.materialWeight, '중량', true);
   payload.safeInvoice = numeric(row.safeInvoice, '안전재고');
-  payload.expiryedCount = numeric(row.expiryedCount, '소비기한계산숫자', true);
-  if (payload.expiryedCount != null && (payload.expiryedCount <= 0 || payload.expiryedCount > 2147483647)) {
-    throw new Error('소비기한계산숫자는 1~2147483647의 정수여야 합니다.');
-  }
   payload.expiryedStatus = requireExpiryStatus(row.expiryedStatus);
+  payload.expiryedCount = numeric(row.expiryedCount, '소비기한 숫자', true);
+  if (payload.expiryedStatus === 'NONE' && payload.expiryedCount !== null) {
+    throw new Error('소비기한 기준이 없음이면 숫자를 비워 주세요.');
+  }
+  if (payload.expiryedStatus !== 'NONE' && payload.expiryedCount === null) {
+    throw new Error('소비기한 숫자를 입력해 주세요.');
+  }
+  if (
+    payload.expiryedCount !== null &&
+    (payload.expiryedCount < 1 || payload.expiryedCount > 2147483647)
+  ) {
+    throw new Error('소비기한 숫자는 1~2147483647의 정수여야 합니다.');
+  }
   return payload;
 }
 

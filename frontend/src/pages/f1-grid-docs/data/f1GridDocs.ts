@@ -155,7 +155,7 @@ export const f1GridDocs: F1GridDoc[] = [
           ['format', 'number | decimal | currency', '숫자 컬럼 표시 형식'],
           ['decimalPlaces', 'number', '숫자 표시 소수점 자릿수'],
           ['required / min / max', 'boolean / number', '기본 검증 규칙'],
-          ['validation.unique', 'boolean', '전체 활성 행의 고유값 검사. 문자열 trim, 자기 행·빈 값 제외'],
+          ['validation.unique', "boolean | 'digits'", "전체 활성 행의 고유값 검사. true는 문자열 trim, 'digits'는 숫자만 비교. 자기 행·빈 비교키 제외"],
           ['validate', '(value, row) => string | boolean', '값 검증 규칙'],
           [
             'selectOnFocus',

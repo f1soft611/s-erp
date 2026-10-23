@@ -6,7 +6,10 @@ export type F1GridValidationContext<T extends object> = {
   isDuplicate: (row: T, field: keyof T) => boolean;
 };
 
-function normalizeUniqueValue(value: unknown): unknown {
+function normalizeUniqueValue(value: unknown, mode: boolean | 'digits' | undefined): unknown {
+  if (mode === 'digits' && value !== null && value !== undefined) {
+    return String(value).replace(/[^0-9]/g, '');
+  }
   return typeof value === 'string' ? value.trim() : value;
 }
 
@@ -20,21 +23,24 @@ export function createGridValidationContext<T extends object>(
   rowKey: keyof T,
 ): F1GridValidationContext<T> {
   const indexes = new Map<keyof T, Map<unknown, Set<F1GridRowId>>>();
+  const modes = new Map<keyof T, boolean | 'digits'>();
   columns.forEach((column) => {
-    if (!column.validation?.unique) return;
+    const mode = column.validation?.unique;
+    if (!mode) return;
     const values = new Map<unknown, Set<F1GridRowId>>();
     rows.forEach((row) => {
-      const value = normalizeUniqueValue(row[column.field]);
+      const value = normalizeUniqueValue(row[column.field], mode);
       if (isEmptyValue(value)) return;
       const ids = values.get(value) ?? new Set<F1GridRowId>();
       ids.add(getGridRowId(row, rowKey));
       values.set(value, ids);
     });
     indexes.set(column.field, values);
+    modes.set(column.field, mode);
   });
   return {
     isDuplicate(row, field) {
-      const ids = indexes.get(field)?.get(normalizeUniqueValue(row[field]));
+      const ids = indexes.get(field)?.get(normalizeUniqueValue(row[field], modes.get(field)));
       if (!ids?.size) return false;
       return ids.size > 1 || !ids.has(getGridRowId(row, rowKey));
     },

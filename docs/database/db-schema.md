@@ -708,6 +708,14 @@
 - 실제 DB 미적용. 현재 이름 중복 데이터 유무는 업무 행을 조회하지 않아 미확인이다. 중복이 있으면 migration은 명시적 오류로 중단하고 데이터는 자동 변경하지 않는다.
 - [변경 이력 및 배포/롤백 절차](20261023/20261023_001_change_customer_name_unique.md), [backend 사본](../../backend/DATABASE/20261023) 참고.
 
+### 2026-10-23 사업자번호 고유 인덱스 추가 계획 (미적용)
+
+- `20261023_002`는 `uq_tb_customer_info_tenant_business_no` on `(tenant_id, regexp_replace(business_no, '[^0-9]', '', 'g'))`를 정의한다. 같은 tenant의 사용/미사용 번호를 숫자로 비교하고 앞자리 0을 유지한다.
+- 숫자 정규화 결과가 빈 문자열인 행과 NULL은 부분 인덱스에서 제외한다. 기존 nullable 계약과 저장 표기는 바꾸지 않는다.
+- 기본 DB MCP metadata에서 사업자번호 고유 인덱스가 없는 것을 확인했다. 업무 행은 조회하지 않아 현재 중복 여부는 미확인이다. migration은 잠금 후 기존 중복이 있으면 데이터 변경 없이 중단한다.
+- 실제 DB에 적용하지 않았다. 인덱스 적용 전에는 서버 사전 조회만으로 동시 중복을 완전히 방어할 수 없다.
+- [변경 이력 및 배포/롤백 절차](20261023/20261023_002_change_customer_business_no_unique.md), [backend 사본](../../backend/DATABASE/20261023) 참고.
+
 ### tb_material_info (MCP 확인: 2026-10-22)
 
 기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.
@@ -744,6 +752,7 @@
 | expiryed_status | varchar(10) | NOT NULL, NONE | NONE/DAY/MONTH/YEAR CHECK |
 | expiryed_count | integer | NULL | NULL 또는 양수 CHECK |
 
+- 추가 CHECK `ck_tb_material_info_expiryed_pair`: `NONE`이면 `expiryed_count IS NULL`, `DAY`/`MONTH`/`YEAR`이면 양수여야 한다. 기존 기준/숫자 CHECK를 보완한다. [변경 이력과 적용/롤백 SQL](20261023/20261023_004_change_material_expiry_count.md)은 작성했으며 실제 DB에는 적용하지 않았다.
 - PK: `material_id`; unique: `(material_id, tenant_id)`, `(tenant_id, material_code)`; FK: `tenant_id → tb_tenant`.
 - 별도 B-tree 인덱스: `ix_tb_material_info_material_name (material_name)`, `ix_tb_material_info_tenant_id (tenant_id)`. 기본 시퀀스는 BIGSERIAL 소유 `tb_material_info_material_id_seq`다.
 - 조회/수정은 인증 tenant 및 `delete_status = 'N' AND deleted_at IS NULL` 조건으로 제한한다. 코드 중복 검사는 삭제 행을 포함한다.

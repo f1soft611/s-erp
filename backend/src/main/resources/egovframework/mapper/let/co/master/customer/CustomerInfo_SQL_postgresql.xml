@@ -111,6 +111,17 @@
         LIMIT 1
     </select>
 
+    <select id="selectCustomerIdByBusinessNo" parameterType="map" resultType="long">
+        SELECT customer_id
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId}
+          AND regexp_replace(business_no, '[^0-9]', '', 'g') = #{businessNo}
+        <if test="excludeCustomerId != null">
+            AND customer_id != #{excludeCustomerId}
+        </if>
+        LIMIT 1
+    </select>
+
     <select id="insertCustomer" parameterType="map" resultType="long">
         INSERT INTO tb_customer_info (
             tenant_id,

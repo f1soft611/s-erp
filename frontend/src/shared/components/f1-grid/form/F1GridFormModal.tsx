@@ -16,6 +16,7 @@ import {
 import { GridFormField } from './GridFormField';
 import {
   buildGridFormSections,
+  isGridFormFieldDisabled,
   isGridFormFieldReadOnly,
 } from './GridFormModel';
 
@@ -300,6 +301,11 @@ export function F1GridFormModal<T extends object>({
                       mode={mode}
                       value={draftRow[field.field]}
                       readOnly={isGridFormFieldReadOnly(
+                        field.column,
+                        draftRow,
+                        mode,
+                      )}
+                      disabled={isGridFormFieldDisabled(
                         field.column,
                         draftRow,
                         mode,

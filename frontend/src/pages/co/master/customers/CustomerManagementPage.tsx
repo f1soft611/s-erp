@@ -251,7 +251,7 @@ export function CustomerManagementPage({
           canCreate={pagePermissions.create && !management.saving}
           canUpdate={pagePermissions.update && !management.saving}
           canExportExcel={pagePermissions.excel}
-          loading={management.loading || management.saving}
+          loading={management.loading}
           gridKey={management.gridKey}
           gridRef={gridRef}
           onChangesChange={management.handleChangesChange}

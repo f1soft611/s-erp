@@ -96,7 +96,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         canCreate={canCreate && !management.loading && !management.saving}
         canUpdate={canUpdate && !management.loading && !management.saving}
         canExportExcel={Boolean(selectedMenuPermissions?.excel)}
-        loading={management.loading || management.saving} gridKey={management.gridKey}
+        loading={management.loading} gridKey={management.gridKey}
         gridRef={gridRef} onChangesChange={management.handleChangesChange} />
     </Box>
     <UnsavedChangesConfirmDialog open={pendingFilters !== null} title="저장하지 않은 변경사항"

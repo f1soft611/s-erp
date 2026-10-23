@@ -25,7 +25,7 @@ public class CustomerInfoSaveRequestVO implements Serializable {
     @Schema(description = "대표자명")
     private String presidentName;
 
-    @Schema(description = "사업자등록번호")
+    @Schema(description = "사업자등록번호. 숫자 기준으로 같은 테넌트의 사용/미사용 번호와 중복 불가. 수정 시 자기 행 제외, 저장 표기 유지")
     private String businessNo;
 
     @Schema(description = "법인등록번호")

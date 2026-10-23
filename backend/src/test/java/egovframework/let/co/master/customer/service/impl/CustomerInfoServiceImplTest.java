@@ -52,6 +52,7 @@ class CustomerInfoServiceImplTest {
         service = new CustomerInfoServiceImpl(customerInfoDAO, customerCodeIdGnrService);
         org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByName(anyMap())).thenReturn(null);
         org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByCode(anyMap())).thenReturn(null);
+        org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByBusinessNo(anyMap())).thenReturn(null);
     }
 
     @Test
@@ -185,6 +186,21 @@ class CustomerInfoServiceImplTest {
     }
 
     @Test
+    void insertAndUpdateClassifyConcurrentBusinessNumberConflicts() throws Exception {
+        PSQLException cause = new PSQLException(new ServerErrorMessage(
+                "SERROR\0C23505\0Mduplicate key\0nuq_tb_customer_info_tenant_business_no\0\0"));
+        when(customerInfoDAO.insertCustomer(anyMap()))
+                .thenThrow(new DuplicateKeyException("duplicate key", cause));
+        assertThatThrownBy(() -> service.createCustomer(9L, 101L, payload("MANUAL-A", "Acme", "Y")))
+                .hasMessage("이미 사용 중인 사업자번호입니다.");
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(customerInfoDAO.updateCustomer(anyMap()))
+                .thenThrow(new DuplicateKeyException("duplicate key", cause));
+        assertThatThrownBy(() -> service.updateCustomer(9L, 101L, 77L, payload("000077", "Acme", "N")))
+                .hasMessage("이미 사용 중인 사업자번호입니다.");
+    }
+
+    @Test
     void createCustomerRejectsTrimmedDuplicateNameBeforeGeneratingCode() throws Exception {
         when(customerInfoDAO.selectCustomerIdByName(anyMap())).thenReturn(55L);
 
@@ -199,6 +215,69 @@ class CustomerInfoServiceImplTest {
                 .containsEntry("excludeCustomerId", null);
         verify(customerInfoDAO, never()).insertCustomer(anyMap());
         verify(customerCodeIdGnrService, never()).getNextStringId();
+    }
+
+    @Test
+    void createCustomerRejectsNormalizedBusinessNumberBeforeGeneratingCode() throws Exception {
+        CustomerInfoSaveRequestVO request = payload("", "Acme", "Y");
+        request.setBusinessNo(" 012-34 56789 ");
+        when(customerInfoDAO.selectCustomerIdByBusinessNo(anyMap())).thenReturn(55L);
+
+        assertThatThrownBy(() -> service.createCustomer(9L, 101L, request))
+                .hasMessage("이미 사용 중인 사업자번호입니다.");
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO).selectCustomerIdByBusinessNo(captured.capture());
+        assertThat(captured.getValue()).containsEntry("tenantId", 9L)
+                .containsEntry("businessNo", "0123456789")
+                .containsEntry("excludeCustomerId", null);
+        verify(customerCodeIdGnrService, never()).getNextStringId();
+        verify(customerInfoDAO, never()).insertCustomer(anyMap());
+    }
+
+    @Test
+    void updateCustomerRejectsOtherBusinessNumberAndExcludesItsOwnId() throws Exception {
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(customerInfoDAO.selectCustomerIdByBusinessNo(anyMap())).thenReturn(55L);
+        CustomerInfoSaveRequestVO request = payload("000077", "Acme", "N");
+        request.setBusinessNo("012-34-56789");
+
+        assertThatThrownBy(() -> service.updateCustomer(9L, 101L, 77L, request))
+                .hasMessage("이미 사용 중인 사업자번호입니다.");
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO).selectCustomerIdByBusinessNo(captured.capture());
+        assertThat(captured.getValue()).containsEntry("tenantId", 9L)
+                .containsEntry("businessNo", "0123456789")
+                .containsEntry("excludeCustomerId", 77L);
+        verify(customerInfoDAO, never()).updateCustomer(anyMap());
+    }
+
+    @Test
+    void updateCustomerPreservesBusinessNumberFormattingWhenNoOtherRowMatches() throws Exception {
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(customerInfoDAO.updateCustomer(anyMap())).thenReturn(1);
+        CustomerInfoSaveRequestVO request = payload("000077", "Acme", "N");
+        request.setBusinessNo(" 012-34-56789 ");
+
+        service.updateCustomer(9L, 101L, 77L, request);
+
+        verify(customerInfoDAO).selectCustomerIdByBusinessNo(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(77L).equals(params.get("excludeCustomerId"))
+                        && "0123456789".equals(params.get("businessNo"))));
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO).updateCustomer(captured.capture());
+        assertThat(captured.getValue()).containsEntry("businessNo", "012-34-56789");
+        assertThat(request.getBusinessNo()).isEqualTo(" 012-34-56789 ");
+    }
+
+    @Test
+    void createCustomerKeepsOptionalEmptyBusinessNumberContract() throws Exception {
+        stubInsertAndReload();
+        for (String value : new String[] { null, "", " ", "---" }) {
+            CustomerInfoSaveRequestVO request = payload("MANUAL-A", "Acme", "Y");
+            request.setBusinessNo(value);
+            service.createCustomer(9L, 101L, request);
+        }
+        verify(customerInfoDAO, never()).selectCustomerIdByBusinessNo(anyMap());
     }
 
     @Test
@@ -277,6 +356,30 @@ class CustomerInfoServiceImplTest {
     }
 
     @Test
+    void businessNumberMigrationCopiesMatchAndOnlyConstrainNonemptyDigitKeys() throws Exception {
+        Path backendDirectory = Paths.get("DATABASE", "20261023");
+        Path docsDirectory = Paths.get("..", "docs", "database", "20261023");
+        for (String file : new String[] {
+                "20261023_002_customer_business_no_unique.sql",
+                "20261023_002_change_customer_business_no_unique.md",
+                "20261023_002_rollback.sql" }) {
+            assertThat(Files.readAllBytes(backendDirectory.resolve(file)))
+                    .isEqualTo(Files.readAllBytes(docsDirectory.resolve(file)));
+        }
+        String sql = new String(Files.readAllBytes(
+                backendDirectory.resolve("20261023_002_customer_business_no_unique.sql")), StandardCharsets.UTF_8);
+        assertThat(sql).contains("BEGIN;", "LOCK TABLE", "HAVING COUNT(*) > 1", "RAISE EXCEPTION",
+                "CREATE UNIQUE INDEX uq_tb_customer_info_tenant_business_no",
+                "(tenant_id, regexp_replace(business_no, '[^0-9]', '', 'g'))",
+                "WHERE regexp_replace(business_no, '[^0-9]', '', 'g') <> ''", "COMMIT;")
+                .doesNotContain("DELETE FROM", "UPDATE public.tb_customer_info", "use_at");
+        String rollback = new String(Files.readAllBytes(
+                backendDirectory.resolve("20261023_002_rollback.sql")), StandardCharsets.UTF_8);
+        assertThat(rollback).contains("DROP INDEX IF EXISTS public.uq_tb_customer_info_tenant_business_no")
+                .doesNotContain("tenant_name", "DROP TABLE", "DELETE FROM");
+    }
+
+    @Test
     void postgresMapperRegistersCustomerStatementsAndScopesUpdatesToTenant() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream stream = getClass().getClassLoader().getResourceAsStream(
@@ -293,6 +396,7 @@ class CustomerInfoServiceImplTest {
         assertThat(configuration.hasStatement("CustomerInfoDAO.selectCustomerById")).isTrue();
         assertThat(configuration.hasStatement("CustomerInfoDAO.selectCustomerIdByCode")).isTrue();
         assertThat(configuration.hasStatement("CustomerInfoDAO.selectCustomerIdByName")).isTrue();
+        assertThat(configuration.hasStatement("CustomerInfoDAO.selectCustomerIdByBusinessNo")).isTrue();
         assertThat(configuration.hasStatement("CustomerInfoDAO.insertCustomer")).isTrue();
         assertThat(configuration.hasStatement("CustomerInfoDAO.updateCustomer")).isTrue();
 
@@ -306,6 +410,11 @@ class CustomerInfoServiceImplTest {
         String nameSql = configuration.getMappedStatement("CustomerInfoDAO.selectCustomerIdByName")
                 .getBoundSql(params).getSql().replaceAll("\\s+", " ");
         assertThat(nameSql).contains("tenant_id = ?", "btrim(customer_name) = ?", "customer_id != ?")
+                .doesNotContain("use_at");
+        String businessSql = configuration.getMappedStatement("CustomerInfoDAO.selectCustomerIdByBusinessNo")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(businessSql).contains("tenant_id = ?",
+                "regexp_replace(business_no, '[^0-9]', '', 'g') = ?", "customer_id != ?")
                 .doesNotContain("use_at");
         params.remove("excludeCustomerId");
         assertThat(configuration.getMappedStatement("CustomerInfoDAO.selectCustomerIdByName")

@@ -283,8 +283,8 @@ const sections: DocSection[] = [
       api('required', 'boolean', '값 입력을 필수로 검증.', 'false'),
       api(
         'validation',
-        '{ unique?: boolean }',
-        'unique: true이면 전체 활성 행에서 고유값 검증. 문자열 trim 후 비교, 자기 행·빈 값 제외. 폼 적용과 validate() 공통 적용.',
+        "{ unique?: boolean | 'digits' }",
+        "unique: true는 문자열 trim 비교, 'digits'는 ASCII 숫자만 비교(앞자리 0 유지). 전체 활성 행 대상, 자기 행·빈 비교키 제외. 폼 적용과 validate() 공통 적용.",
         '미지정',
       ),
       api('min', 'number', '숫자 편집 값의 최소 허용치.', '미지정'),

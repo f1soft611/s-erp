@@ -39,6 +39,13 @@ class MaterialInfoServiceImplTest {
         return p;
     }
 
+    private MaterialInfoSaveRequestVO expiryPayload(String code, String status, Integer count) {
+        MaterialInfoSaveRequestVO p = payload(code);
+        p.setExpiryedStatus(status);
+        p.setExpiryedCount(count);
+        return p;
+    }
+
     private void stubInsert() throws Exception {
         when(dao.selectMaterialIdByCode(anyMap())).thenReturn(null);
         when(dao.insertMaterial(anyMap())).thenReturn(12L);
@@ -61,6 +68,37 @@ class MaterialInfoServiceImplTest {
         stubInsert();
         service.createMaterial(9L, "101", payload("MANUAL"));
         verifyNoInteractions(generator);
+    }
+
+    @Test void acceptsAllConsistentExpiryPairs() throws Exception {
+        stubInsert();
+
+        service.createMaterial(9L, "101", expiryPayload("NONE", "NONE", null));
+        service.createMaterial(9L, "101", expiryPayload("DAY", "DAY", 1));
+        service.createMaterial(9L, "101", expiryPayload("MONTH", "MONTH", 30));
+        service.createMaterial(9L, "101", expiryPayload("YEAR", "YEAR", Integer.MAX_VALUE));
+
+        verify(dao, times(4)).insertMaterial(anyMap());
+    }
+
+    @Test void rejectsInconsistentExpiryPairsBeforeInsertOrUpdate() throws Exception {
+        when(dao.selectMaterialById(anyMap())).thenReturn(new MaterialInfoVO());
+        MaterialInfoSaveRequestVO[] invalid = {
+                expiryPayload("NONE_COUNT", "NONE", 1),
+                expiryPayload("DAY_NULL", "DAY", null),
+                expiryPayload("MONTH_ZERO", "MONTH", 0),
+                expiryPayload("YEAR_NEGATIVE", "YEAR", -1)
+        };
+
+        for (MaterialInfoSaveRequestVO p : invalid) {
+            assertThatThrownBy(() -> service.createMaterial(9L, "101", p))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.updateMaterial(9L, "101", 12L, p))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        verify(dao, never()).insertMaterial(anyMap());
+        verify(dao, never()).updateMaterial(anyMap());
     }
 
     @Test void rejectsExhaustionAndRetriesAlreadyUsedCodes() throws Exception {

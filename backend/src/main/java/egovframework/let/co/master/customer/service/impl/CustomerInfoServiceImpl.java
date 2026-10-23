@@ -80,6 +80,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), true);
         ensureCustomerNameAvailable(tenantId, customerName, null);
+        ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), null);
         String customerCode = resolveCustomerCode(tenantId, payload.getCustomerCode(), null);
 
         Map<String, Object> params = buildSaveParams(
@@ -112,6 +113,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), false);
         ensureCustomerNameAvailable(tenantId, customerName, customerId);
+        ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), customerId);
         String customerCode = resolveCustomerCode(
                 tenantId, payload.getCustomerCode(), customerId);
 
@@ -210,6 +212,26 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         }
     }
 
+    private void ensureBusinessNoAvailable(
+            Long tenantId,
+            String businessNo,
+            Long excludeCustomerId) throws Exception {
+        if (businessNo == null) {
+            return;
+        }
+        String digits = businessNo.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) {
+            return;
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("businessNo", digits);
+        params.put("excludeCustomerId", excludeCustomerId);
+        if (customerInfoDAO.selectCustomerIdByBusinessNo(params) != null) {
+            throw new IllegalArgumentException("이미 사용 중인 사업자번호입니다.");
+        }
+    }
+
     private Long findCustomerIdByCode(
             Long tenantId,
             String customerCode,
@@ -290,10 +312,15 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
                 continue;
             }
             PSQLException postgresError = (PSQLException) cause;
-            if (postgresError.getServerErrorMessage() != null
-                    && "uq_tb_customer_info_tenant_name".equals(
-                            postgresError.getServerErrorMessage().getConstraint())) {
+            if (postgresError.getServerErrorMessage() == null) {
+                continue;
+            }
+            String constraint = postgresError.getServerErrorMessage().getConstraint();
+            if ("uq_tb_customer_info_tenant_name".equals(constraint)) {
                 return new IllegalArgumentException("이미 사용 중인 거래처명입니다.", error);
+            }
+            if ("uq_tb_customer_info_tenant_business_no".equals(constraint)) {
+                return new IllegalArgumentException("이미 사용 중인 사업자번호입니다.", error);
             }
         }
         return duplicateCodeError();

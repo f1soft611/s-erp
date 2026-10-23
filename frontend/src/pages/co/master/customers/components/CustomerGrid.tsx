@@ -94,6 +94,7 @@ export function createCustomerColumns(
       field: 'businessNo',
       headerName: '사업자번호',
       required: true,
+      validation: { unique: 'digits' },
       width: 130,
       editable: canEdit,
       inputFormat: {

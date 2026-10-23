@@ -159,6 +159,36 @@ class CustomerInfoBatchServiceImplTest {
         verify(connection, never()).commit();
     }
 
+    @Test
+    void saveBatchRollsBackWhenSecondInsertDuplicatesNormalizedBusinessNumber() throws Exception {
+        CustomerInfoDAO dao = mock(CustomerInfoDAO.class);
+        EgovIdGnrService generator = mock(EgovIdGnrService.class);
+        when(dao.selectCustomerIdByName(anyMap())).thenReturn(null);
+        when(dao.selectCustomerIdByCode(anyMap())).thenReturn(null);
+        when(dao.selectCustomerIdByBusinessNo(anyMap())).thenReturn(null, 31L);
+        when(dao.insertCustomer(anyMap())).thenReturn(31L);
+        when(dao.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(generator.getNextStringId()).thenReturn("000031");
+        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator));
+        CustomerInfoChangeVO first = row("new-1", "");
+        first.setCustomerName("First");
+        first.setBusinessNo("012-34-56789");
+        CustomerInfoChangeVO second = row("new-2", "");
+        second.setCustomerName("Second");
+        second.setBusinessNo("0123456789");
+        CustomerInfoBatchSaveRequestVO payload = batch();
+        payload.getCustomers().setInsertedRows(Arrays.asList(first, second));
+        payload.getCustomers().setUpdatedRows(Collections.emptyList());
+
+        assertThatThrownBy(() -> transactionalService().saveBatch(9L, 101L, payload))
+                .hasMessage("이미 사용 중인 사업자번호입니다.");
+        verify(dao, times(1)).insertCustomer(anyMap());
+        verify(dao, times(2)).selectCustomerIdByBusinessNo(
+                org.mockito.ArgumentMatchers.argThat(params -> "0123456789".equals(params.get("businessNo"))));
+        verify(connection).rollback();
+        verify(connection, never()).commit();
+    }
+
     private CustomerInfoBatchService transactionalService() throws Exception {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.getAutoCommit()).thenReturn(true);
