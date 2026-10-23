@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoleManagementPage } from '../src/pages/settings/system/roles/RoleManagementPage';
 import { F1Grid, type F1GridColumn } from '../src/shared/components/f1-grid';
@@ -79,6 +85,213 @@ describe('RoleManagementPage notifications', () => {
     vi.clearAllMocks();
     window.localStorage.clear();
   });
+
+  it('quietly locks both grids through role save and all post-save refreshes', async () => {
+    const save = createDeferred<void>();
+    const mappingSave = createDeferred<void>();
+    const roleRefresh = createDeferred<unknown>();
+    const userRefresh = createDeferred<unknown>();
+    const finalRoleRefresh = createDeferred<unknown>();
+    let roleReads = 0;
+    let userReads = 0;
+    const roles = [createRole(7, '운영자'), createRole(8, '검토자')];
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/roles') {
+        roleReads += 1;
+        return roleReads === 1
+          ? Promise.resolve({ resultList: roles })
+          : roleReads === 2
+            ? roleRefresh.promise
+            : finalRoleRefresh.promise;
+      }
+      if (path === '/api/v1/system/roles/7/users') {
+        userReads += 1;
+        return userReads === 1
+          ? Promise.resolve({
+              assignedUsers: [],
+              unassignedUsers: [createMapping(12, '매핑 대상')],
+            })
+          : userRefresh.promise;
+      }
+      return Promise.reject(new Error(`Unexpected GET request: ${path}`));
+    });
+    apiMocks.apiPut.mockReturnValue(save.promise);
+    apiMocks.apiPost.mockReturnValue(mappingSave.promise);
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
+    );
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '운영자' }));
+    fireEvent.change(await screen.findByDisplayValue('운영자'), {
+      target: { value: '운영자 수정' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('운영자 수정'), { key: 'Enter' });
+    const saveButton = screen.getByRole('button', { name: '저장' });
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalledTimes(1));
+
+    const expectLocked = () => {
+      const roleGrid = screen.getByRole('grid', { name: 'F1-GRID 권한 관리' });
+      const userGrid = screen.getByRole('grid', { name: 'F1-GRID 사용자 매핑' });
+      expect(roleGrid).toBeVisible();
+      expect(userGrid).toBeVisible();
+      expect(screen.getByRole('gridcell', { name: '매핑 대상' })).toBeVisible();
+      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
+      expect(
+        screen.queryAllByTestId('grid-loading-row-skeleton'),
+      ).toHaveLength(0);
+      expect(roleGrid.closest('[aria-busy="true"]')).toBeNull();
+      expect(userGrid.closest('[aria-busy="true"]')).toBeNull();
+      expect(saveButton).toBeDisabled();
+      expect(screen.getByRole('button', { name: '조회' })).toBeDisabled();
+      expect(screen.getByLabelText('역할 검색')).toBeDisabled();
+      const rowCount = within(roleGrid).getAllByRole('row').length;
+      const mapping = screen.getByRole('checkbox', { name: '매핑 여부 12' });
+      expect(mapping).toBeDisabled();
+      fireEvent.click(mapping);
+      expect(mapping).toBeChecked();
+      fireEvent.click(screen.getByRole('gridcell', { name: '검토자' }));
+      expect(screen.getByText(/선택 역할: 운영자/)).toBeVisible();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.doubleClick(
+        screen.getByRole('gridcell', { name: '운영자 수정' }),
+      );
+      expect(screen.queryByDisplayValue('운영자 수정')).not.toBeInTheDocument();
+      for (const grid of [roleGrid, userGrid]) {
+        for (const checkbox of within(grid).getAllByRole('checkbox')) {
+          expect(checkbox).toBeDisabled();
+        }
+        fireEvent.contextMenu(grid);
+        for (const name of ['행 추가', '행 복사', '행 삭제']) {
+          expect(
+            screen.queryByRole('menuitem', { name }),
+          ).not.toBeInTheDocument();
+        }
+        for (const key of ['Insert', 'Delete', 'F2', 'Enter', ' ']) {
+          fireEvent.keyDown(grid, { key });
+        }
+        fireEvent.keyDown(grid, { key: 'd', ctrlKey: true });
+        fireEvent.keyDown(grid, { key: 'v', ctrlKey: true });
+        fireEvent.paste(grid, {
+          clipboardData: { getData: () => '저장 중 붙여넣기' },
+        });
+      }
+      expect(within(roleGrid).getAllByRole('row')).toHaveLength(rowCount);
+      expect(screen.getByRole('gridcell', { name: '운영자 수정' })).toBeVisible();
+      expect(mapping).toBeChecked();
+      const readCount = apiMocks.apiGet.mock.calls.length;
+      fireEvent.click(saveButton);
+      fireEvent.click(screen.getByRole('button', { name: '조회' }));
+      expect(apiMocks.apiGet).toHaveBeenCalledTimes(readCount);
+      expect(apiMocks.apiPut).toHaveBeenCalledTimes(1);
+      expect(apiMocks.apiGet).not.toHaveBeenCalledWith(
+        '/api/v1/system/roles/8/users',
+      );
+    };
+
+    expectLocked();
+    save.resolve();
+    await waitFor(() => expect(roleReads).toBe(2));
+    expectLocked();
+    roleRefresh.resolve({
+      resultList: [createRole(7, '운영자 수정'), roles[1]],
+    });
+    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
+    expectLocked();
+    mappingSave.resolve();
+    await waitFor(() => expect(userReads).toBe(2));
+    expectLocked();
+    userRefresh.resolve({
+      assignedUsers: [createMapping(12, '매핑 대상', true)],
+      unassignedUsers: [],
+    });
+    await waitFor(() => expect(roleReads).toBe(3));
+    expectLocked();
+    finalRoleRefresh.resolve({
+      resultList: [createRole(7, '운영자 수정'), roles[1]],
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText('역할 검색')).not.toBeDisabled(),
+    );
+    expect(apiMocks.apiPut).toHaveBeenCalledWith('/api/v1/system/roles/7', {
+      roleCode: 'ROLE_7',
+      roleNm: '운영자 수정',
+      roleDc: '운영자 역할',
+      useAt: 'Y',
+    });
+    expect(apiMocks.apiPost).toHaveBeenCalledTimes(1);
+    expect(apiMocks.apiPost).toHaveBeenCalledWith(
+      '/api/v1/system/roles/7/users',
+      { loginId: 12 },
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: '매핑 여부 12' }));
+    expect(
+      screen.getByRole('checkbox', { name: '매핑 여부 12' }),
+    ).not.toBeChecked();
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '운영자 수정' }));
+    expect(await screen.findByDisplayValue('운영자 수정')).toBeVisible();
+  }, 20000);
+
+  it.each(['save', 'role refresh', 'user refresh'])(
+    'releases the quiet save lock after a failed %s and preserves the error policy',
+    async (failure) => {
+      const pending = createDeferred<unknown>();
+      let roleReads = 0;
+      let userReads = 0;
+      apiMocks.apiGet.mockImplementation((path: string) => {
+        if (path === '/api/v1/system/roles') {
+          roleReads += 1;
+          return failure === 'role refresh' && roleReads > 1
+            ? pending.promise
+            : Promise.resolve({ resultList: [createRole(7, '운영자')] });
+        }
+        if (path === '/api/v1/system/roles/7/users') {
+          userReads += 1;
+          return failure === 'user refresh' && userReads > 1
+            ? pending.promise
+            : Promise.resolve({
+                assignedUsers: [],
+                unassignedUsers: [createMapping(12, '매핑 대상')],
+              });
+        }
+        return Promise.reject(new Error(`Unexpected GET request: ${path}`));
+      });
+      apiMocks.apiPost.mockImplementation(() =>
+        failure === 'save' ? pending.promise : Promise.resolve(),
+      );
+      renderPage();
+      fireEvent.click(
+        await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      await waitFor(() => {
+        expect(apiMocks.apiPost).toHaveBeenCalledTimes(1);
+        if (failure === 'role refresh') expect(roleReads).toBe(2);
+        if (failure === 'user refresh') expect(userReads).toBe(2);
+      });
+      expect(screen.getByLabelText('역할 검색')).toBeDisabled();
+      expect(screen.getByRole('gridcell', { name: '운영자' })).toBeVisible();
+      expect(screen.queryAllByTestId('grid-loading-skeleton')).toHaveLength(0);
+      pending.reject(new Error(`${failure} 실패`));
+      expect((await screen.findAllByText(`${failure} 실패`))[0]).toBeVisible();
+      await waitFor(() =>
+        expect(screen.getByLabelText('역할 검색')).not.toBeDisabled(),
+      );
+      expect(screen.getByRole('button', { name: '조회' })).not.toBeDisabled();
+      if (failure === 'save') {
+        expect(
+          screen.getByRole('checkbox', { name: '매핑 여부 12' }),
+        ).toBeChecked();
+        expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled();
+        fireEvent.click(
+          screen.getByRole('checkbox', { name: '매핑 여부 12' }),
+        );
+        expect(
+          screen.getByRole('checkbox', { name: '매핑 여부 12' }),
+        ).not.toBeChecked();
+      }
+    },
+  );
 
   it('fills the shared grid container when the loading skeleton is active', () => {
     const columns: F1GridColumn<{ id: number; roleNm: string }>[] = [
@@ -885,12 +1098,13 @@ describe('RoleManagementPage notifications', () => {
     fireEvent.click(
       await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
     const continueButton = await screen.findByRole('button', {
       name: '계속',
     });
+    // A confirmation opened before saving must also remain locked.
+    fireEvent.click(screen.getByRole('button', { name: '저장', hidden: true }));
+    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     expect(continueButton).toBeDisabled();
 
     saveForRoleA.resolve();
@@ -946,12 +1160,12 @@ describe('RoleManagementPage notifications', () => {
     fireEvent.click(
       await screen.findByRole('checkbox', { name: '매핑 여부 12' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole('gridcell', { name: '검토자' }));
     const continueButton = await screen.findByRole('button', {
       name: '계속',
     });
+    fireEvent.click(screen.getByRole('button', { name: '저장', hidden: true }));
+    await waitFor(() => expect(apiMocks.apiPost).toHaveBeenCalledTimes(1));
     expect(continueButton).toBeDisabled();
 
     saveForRoleA.resolve();

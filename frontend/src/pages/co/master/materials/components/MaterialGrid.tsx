@@ -46,6 +46,7 @@ export function createMaterialColumns(
     },
   ];
   materialTextFields.forEach((definition, index) => {
+    if (definition.field === 'matCataType') return;
     const codeGroup =
       'codeGroup' in definition ? definition.codeGroup : undefined;
     const fieldOptions = codeGroup
@@ -70,6 +71,9 @@ export function createMaterialColumns(
       width: definition.field === 'materialName' ? 180 : 125,
       hidden: !('visible' in definition && definition.visible),
       editable: definition.field === 'materialCode' ? false : canEdit,
+      ...(['materialTypeCode', 'materialCode', 'materialName'].includes(definition.field)
+        ? { pinned: 'left' as const }
+        : {}),
       align: definition.align ?? 'left',
       required:
         definition.field === 'materialName' ||
@@ -92,6 +96,15 @@ export function createMaterialColumns(
       search: 'search' in definition ? { order: index } : { hidden: true },
     });
   });
+  const expiryOptions = options
+    .filter((item) => item.groupCode === 'EXPIRY_STATUS' &&
+      expiryStatuses.some((status) => status === item.itemCode))
+    .map((item) => ({ value: item.itemCode, label: item.itemName }));
+  for (const row of rows) {
+    if (!expiryOptions.some((option) => option.value === row.expiryedStatus)) {
+      expiryOptions.push({ value: row.expiryedStatus, label: row.expiryedStatus });
+    }
+  }
   columns.push(
     {
       field: 'materialWeight',
@@ -106,6 +119,7 @@ export function createMaterialColumns(
       field: 'safeInvoice',
       headerName: '안전재고',
       type: 'decimal',
+      align: 'right',
       width: 110,
       editable: canEdit,
       form: { group: '재고·위치', order: 20 },
@@ -115,17 +129,10 @@ export function createMaterialColumns(
       field: 'expiryedStatus',
       headerName: '소비기한기준',
       type: 'select',
+      align: 'center',
       width: 130,
       editable: canEdit,
-      options: expiryStatuses.map((value) => ({
-        value,
-        label:
-          options.find(
-            (item) =>
-              item.groupCode === 'EXPIRY_STATUS' && item.itemCode === value,
-          )?.itemName ??
-          { NONE: '없음', DAY: '일', MONTH: '개월', YEAR: '년' }[value],
-      })),
+      options: expiryOptions,
       onValueChange: (_row, value) => {
         const status = expiryStatuses.find((candidate) => candidate === value);
         if (!status) {
@@ -213,7 +220,7 @@ export function MaterialGrid({
       key={gridKey}
       ref={gridRef}
       ariaLabel="품목 목록"
-      storageKey="co-master-material-grid"
+      storageKey="co-master-material-grid-v2"
       rows={rows}
       columns={columns}
       rowKey="materialId"

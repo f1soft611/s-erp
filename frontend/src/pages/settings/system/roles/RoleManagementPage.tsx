@@ -122,8 +122,7 @@ export function RoleManagementPage({
   );
 
   const handleSaveChanges = useCallback(async () => {
-    if (!rolePanelRef.current) return;
-    setSaving(true);
+    if (saving || !rolePanelRef.current) return;
     try {
       await rolePanelRef.current.saveCurrentChanges();
     } catch (requestError) {
@@ -132,25 +131,25 @@ export function RoleManagementPage({
           ? requestError.message
           : '역할 저장에 실패했습니다.',
       );
-    } finally {
-      setSaving(false);
     }
-  }, []);
+  }, [saving]);
 
   const requestRoleRefresh = useCallback(() => {
+    if (saving) return;
     if (panelDirty) {
       setRefreshConfirmOpen(true);
       return;
     }
     void loadRoles({ showSkeleton: true });
-  }, [loadRoles, panelDirty]);
+  }, [loadRoles, panelDirty, saving]);
 
   const confirmRoleRefresh = useCallback(() => {
+    if (saving) return;
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
     setRoleGridKey((current) => current + 1);
     void loadRoles({ showSkeleton: true });
-  }, [loadRoles]);
+  }, [loadRoles, saving]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -160,7 +159,7 @@ export function RoleManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pageActionPermissions.read,
-          disabled: false,
+          disabled: saving,
           onClick: requestRoleRefresh,
         },
       ],
@@ -206,7 +205,10 @@ export function RoleManagementPage({
           margin="none"
           placeholder="역할 코드/명/설명 검색"
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          disabled={saving}
+          onChange={(event) => {
+            if (!saving) setSearchQuery(event.target.value);
+          }}
           slotProps={{
             htmlInput: { 'aria-label': '역할 검색' },
           }}
@@ -237,6 +239,7 @@ export function RoleManagementPage({
         onRolesSaved={handleRolesSaved}
         onSaveSuccess={showSuccess}
         onDirtyChange={setPanelDirty}
+        onSavingChange={setSaving}
         onError={setError}
         roleGridKey={roleGridKey}
         roleGridLoading={pageLoading}
@@ -247,6 +250,7 @@ export function RoleManagementPage({
         description="변경사항을 버리고 권한 목록을 다시 불러오시겠습니까?"
         cancelLabel="취소"
         continueLabel="계속"
+        disableContinue={saving}
         onCancel={() => setRefreshConfirmOpen(false)}
         onContinue={confirmRoleRefresh}
       />

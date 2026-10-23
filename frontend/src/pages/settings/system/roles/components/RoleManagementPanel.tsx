@@ -22,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type SyntheticEvent,
 } from 'react';
 import {
   F1Grid,
@@ -52,6 +53,7 @@ type RoleManagementPanelProps = {
   onRolesSaved?: (options?: { silent?: boolean }) => Promise<void> | void;
   onSaveSuccess?: (message: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
   onError?: (message: string) => void;
   roleGridKey?: number;
   roleGridLoading?: boolean;
@@ -82,6 +84,7 @@ export const RoleManagementPanel = forwardRef<
     onRolesSaved,
     onSaveSuccess,
     onDirtyChange,
+    onSavingChange,
     onError,
     roleGridKey = 0,
     roleGridLoading = false,
@@ -192,6 +195,7 @@ export const RoleManagementPanel = forwardRef<
   }, [loadUserRows, selectedRoleId]);
 
   const handleRoleSelection = useCallback((rowIds: Array<string | number>) => {
+    if (saveInFlightRef.current) return;
     const nextRoleId = rowIds[0] == null ? '' : String(rowIds[0]);
     if (!nextRoleId || nextRoleId === selectedRoleIdRef.current) return;
     if (userGridDirtyRef.current) {
@@ -236,10 +240,12 @@ export const RoleManagementPanel = forwardRef<
       row: RoleManagementRow;
       field: keyof RoleManagementRow;
     }) =>
-      field === 'name' ||
-      field === 'description' ||
-      field === 'active' ||
-      (field === 'group' && row.id.startsWith('new-role-')),
+      !saving &&
+      !saveInFlightRef.current &&
+      (field === 'name' ||
+        field === 'description' ||
+        field === 'active' ||
+        (field === 'group' && row.id.startsWith('new-role-'))),
   };
 
   const roleColumns: F1GridColumn<RoleManagementRow>[] = [
@@ -393,6 +399,7 @@ export const RoleManagementPanel = forwardRef<
 
     const savePromise = (async () => {
       setSaving(true);
+      onSavingChange?.(true);
       const roleChanges =
         roleGridRef.current?.getChanges() ?? emptyChanges<RoleManagementRow>();
       const roleId = selectedRoleIdRef.current;
@@ -469,6 +476,7 @@ export const RoleManagementPanel = forwardRef<
         userGridDirtyRef.current = false;
       } finally {
         setSaving(false);
+        onSavingChange?.(false);
       }
     })();
 
@@ -491,6 +499,7 @@ export const RoleManagementPanel = forwardRef<
     onCreateRole,
     onRolesSaved,
     onSaveSuccess,
+    onSavingChange,
     onUpdateRole,
     userRows,
   ]);
@@ -501,7 +510,7 @@ export const RoleManagementPanel = forwardRef<
   }, []);
 
   const discardMappingAndMove = useCallback(() => {
-    if (!pendingRoleId) return;
+    if (saving || saveInFlightRef.current || !pendingRoleId) return;
     ++userRequestIdRef.current;
     userGridDirtyRef.current = false;
     setRoleGridDirty(false);
@@ -510,7 +519,7 @@ export const RoleManagementPanel = forwardRef<
     const nextRoleId = pendingRoleId;
     closeRoleSwitchDialog();
     setSelectedRoleId(nextRoleId);
-  }, [closeRoleSwitchDialog, pendingRoleId]);
+  }, [closeRoleSwitchDialog, pendingRoleId, saving]);
 
   const filteredCandidates = useMemo(() => {
     const query = userSearchQuery.trim().toLowerCase();
@@ -528,12 +537,19 @@ export const RoleManagementPanel = forwardRef<
     () => ({
       saveCurrentChanges,
       deleteSelectedRows: () => {
+        if (saving || saveInFlightRef.current) return;
         roleGridRef.current?.deleteSelectedRows();
       },
       exportCurrentRows,
     }),
-    [exportCurrentRows, saveCurrentChanges],
+    [exportCurrentRows, saveCurrentChanges, saving],
   );
+
+  const blockGridInteractionWhileSaving = (event: SyntheticEvent) => {
+    if (!saving && !saveInFlightRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <Box
@@ -598,12 +614,22 @@ export const RoleManagementPanel = forwardRef<
                 권한 관리
               </Typography>
             </Box>
-            <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+            <Box
+              sx={{ flex: 1, height: '100%', overflow: 'hidden' }}
+              onClickCapture={blockGridInteractionWhileSaving}
+              onDoubleClickCapture={blockGridInteractionWhileSaving}
+              onKeyDownCapture={blockGridInteractionWhileSaving}
+              onPasteCapture={blockGridInteractionWhileSaving}
+            >
               <F1Grid
                 key={roleGridKey}
                 ref={roleGridRef}
                 rows={filteredRoles}
-                columns={roleColumns}
+                columns={
+                  saving
+                    ? roleColumns.map((column) => ({ ...column, editable: false }))
+                    : roleColumns
+                }
                 rowKey="id"
                 storageKey="settings-system-role-grid"
                 ariaLabel="F1-GRID 권한 관리"
@@ -612,8 +638,13 @@ export const RoleManagementPanel = forwardRef<
                 minRowHeight={32}
                 maxRowHeight={320}
                 showCheckbox={false}
-                createRow={createRoleRow}
+                createRow={saving ? undefined : createRoleRow}
                 editorPlugins={[roleEditorPlugin]}
+                onBeforeEdit={() => !saving && !saveInFlightRef.current}
+                allowAddRowInContextMenu={!saving}
+                allowDuplicateRowInContextMenu={!saving}
+                allowDeleteRowInContextMenu={!saving}
+                disableContextMenu={saving}
                 onSelectionChange={handleRoleSelection}
                 onChangesChange={handleRoleGridChanges}
                 canExportExcel={canExportExcel}
@@ -680,7 +711,13 @@ export const RoleManagementPanel = forwardRef<
             </Box>
             {selectedRole || roleGridLoading ? (
               <>
-                <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                <Box
+                  sx={{ flex: 1, height: '100%', overflow: 'hidden' }}
+                  onClickCapture={blockGridInteractionWhileSaving}
+                  onDoubleClickCapture={blockGridInteractionWhileSaving}
+                  onKeyDownCapture={blockGridInteractionWhileSaving}
+                  onPasteCapture={blockGridInteractionWhileSaving}
+                >
                   {userError ? (
                     <Typography variant="body2" color="error.main">
                       {userError}
@@ -690,7 +727,14 @@ export const RoleManagementPanel = forwardRef<
                       key={userGridKey}
                       ref={userGridRef}
                       rows={userRows}
-                      columns={userColumns}
+                      columns={
+                        saving
+                          ? userColumns.map((column) => ({
+                              ...column,
+                              editable: false,
+                            }))
+                          : userColumns
+                      }
                       rowKey="id"
                       storageKey="settings-system-role-user-grid"
                       ariaLabel="F1-GRID 사용자 매핑"
@@ -703,9 +747,11 @@ export const RoleManagementPanel = forwardRef<
                         {
                           id: 'role-user-grid-editor',
                           enabled: true,
-                          canEdit: () => true,
+                          canEdit: () => !saving && !saveInFlightRef.current,
                         },
                       ]}
+                      onBeforeEdit={() => !saving && !saveInFlightRef.current}
+                      disableContextMenu={saving}
                       allowAddRowInContextMenu={false}
                       allowDuplicateRowInContextMenu={false}
                       allowDeleteRowInContextMenu={false}
@@ -764,8 +810,9 @@ export const RoleManagementPanel = forwardRef<
           <Button onClick={() => setUserDialogOpen(false)}>취소</Button>
           <Button
             variant="contained"
-            disabled={!candidateLoginId}
+            disabled={saving || !candidateLoginId}
             onClick={() => {
+              if (saving || saveInFlightRef.current) return;
               userGridRef.current?.setCellValue(
                 candidateLoginId,
                 'assigned',

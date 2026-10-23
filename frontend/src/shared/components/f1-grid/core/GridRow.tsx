@@ -543,7 +543,7 @@ const GridRowInner = <T extends object>({
             rowIndex={rowIndex}
             renderRowIndex={renderIndex}
             isLastRow={isLastRow}
-            draftValue={draftValue}
+            draftValue={editing ? draftValue : ''}
             dirtyCell={Boolean(
               dirtyCellMap[`${String(rowId)}:${String(column.field)}`],
             )}

@@ -1,0 +1,28 @@
+# F1-Grid Interaction Performance Implementation Plan
+
+**Goal:** 100행 선택·편집의 전체 셀 렌더와 저장 후 중복 재생성을 제거한다.
+
+**Architecture:** 표시 셀의 메모이제이션은 시각 상태를 비교하고, 이벤트는 최신 콜백을 유지하는 얇은 래퍼로 전달한다. 편집값은 편집 셀에만 전달하며 고정 위치는 값으로 비교한다. 저장 후 목록 재조회가 끝난 뒤 그리드를 초기화한다.
+
+**Tech Stack:** React 19, TypeScript, Vitest, Playwright.
+
+## 근거
+
+- [작업지시서](../../directions/20261023/20261023_013_f1grid_interaction_performance_작업지시서.md)
+- 기존 스크롤 사양은 유지하며 가상화 임계값이나 데이터 계약을 변경하지 않는다.
+
+## 단계
+
+- [ ] `frontend/tests/f1-grid-render-performance.test.tsx`에 고정열 포함 100행 선택·편집 렌더 횟수와 최신 키보드/콜백 회귀 테스트를 작성하고 실패를 확인한다.
+- [ ] `frontend/src/shared/components/f1-grid/core/GridRow.tsx`에서 `draftValue={editing ? draftValue : ''}`로 전달한다.
+- [ ] `frontend/src/shared/components/f1-grid/core/GridCell.tsx`에서 고정 위치의 side/offset/shadow를 비교하고 이벤트 콜백은 최신 props를 통해 실행한다. 기존 셀 표시 계약은 유지한다.
+- [ ] 저장 후 재조회 대기 중 gridKey가 바뀌지 않는 테스트를 추가한다. 품목·거래처 관리 훅에서 재조회 종료 후 초기화하되, 저장 성공/조회 실패 시에도 변경사항을 지워 중복 저장을 막는다.
+- [ ] 집중 테스트, 기존 그리드 회귀 테스트 및 `npm run build`를 실행한다.
+- [ ] 동일 브라우저 합성 100행에서 전후 렌더 횟수와 React commit 시간을 비교하고 반응형 스크린샷을 저장한다.
+- [ ] F1-Grid 사용자 문서와 결과 문서에 원인·수정·검증·API 미측정 한계를 기록한다.
+
+## 검증 명령
+
+`cd frontend; npm run test -- tests/f1-grid-render-performance.test.tsx tests/material-management.test.tsx`
+
+기대: 회귀 테스트 통과. 이후 기존 F1-Grid 테스트 묶음, 품목/거래처 관련 테스트와 빌드를 검증한다. 시간 단위 테스트 대신 렌더 개수의 결정적 상한을 검사하고 실제 시간은 브라우저에서 측정한다.

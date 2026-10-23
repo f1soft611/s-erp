@@ -1,10 +1,20 @@
 const materialTextFieldDefinitions = [
   {
+    field: 'materialTypeCode',
+    label: '품목계정코드',
+    max: 14,
+    group: '기본정보',
+    visible: true,
+    search: true,
+    codeGroup: 'ITEM_TYPE',
+  },
+  {
     field: 'materialCode',
     label: '품목코드',
     max: 20,
     group: '기본정보',
     visible: true,
+    align: 'center',
   },
   {
     field: 'materialName',
@@ -35,14 +45,13 @@ const materialTextFieldDefinitions = [
     search: true,
   },
   { field: 'materialSpec2', label: '품목규격2', max: 100, group: '규격·분류' },
-  { field: 'unit', label: '단위', max: 6, group: '규격·분류', visible: true },
   {
-    field: 'materialTypeCode',
-    label: '품목계정코드',
-    max: 14,
+    field: 'unit',
+    label: '단위',
+    max: 6,
     group: '규격·분류',
     visible: true,
-    search: true,
+    codeGroup: 'ITEM_UNIT',
   },
   {
     field: 'matCataType',
@@ -62,6 +71,7 @@ const materialTextFieldDefinitions = [
     visible: true,
     search: true,
     codeGroup: 'MATERIAL_TYPE',
+    align: 'center',
   },
   {
     field: 'customerCode',
@@ -86,6 +96,7 @@ const materialTextFieldDefinitions = [
     visible: true,
     search: true,
     codeGroup: 'STORE_METHOD',
+    align: 'center',
   },
   {
     field: 'accountingCode',
@@ -120,11 +131,9 @@ const materialTextFieldDefinitions = [
 ] as const;
 
 type MaterialTextFieldAlignment = 'left' | 'center' | 'right';
-export const materialTextFields: readonly (
-  (typeof materialTextFieldDefinitions)[number] & {
-    align?: MaterialTextFieldAlignment;
-  }
-)[] = materialTextFieldDefinitions;
+export const materialTextFields: readonly ((typeof materialTextFieldDefinitions)[number] & {
+  align?: MaterialTextFieldAlignment;
+})[] = materialTextFieldDefinitions;
 
 export const expiryStatuses = ['NONE', 'DAY', 'MONTH', 'YEAR'] as const;
 export type ExpiryStatus = (typeof expiryStatuses)[number];

@@ -61,6 +61,7 @@ export function DraftFormManagementPage({
 }: DraftFormManagementPageProps) {
   const management = useDraftFormManagement();
   const gridRef = useRef<F1GridRef<DraftFormRow>>(null);
+  const saveAttemptActiveRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
@@ -91,6 +92,7 @@ export function DraftFormManagementPage({
   const canEditTemplate = pagePermissions.update;
   const handleOpenTemplate = useCallback(
     (row: DraftFormRow) => {
+      if (management.saving) return;
       if (management.hasChanges) {
         setPendingTemplateTarget(row);
         setTemplateDiscardConfirmOpen(true);
@@ -98,7 +100,7 @@ export function DraftFormManagementPage({
       }
       setTemplateTarget(row);
     },
-    [management.hasChanges],
+    [management.hasChanges, management.saving],
   );
   const columns = useMemo(
     () =>
@@ -106,8 +108,8 @@ export function DraftFormManagementPage({
         management.categoryItems,
         management.cycleItems,
         management.users,
-        canWriteForms,
-        canEditTemplate ? handleOpenTemplate : undefined,
+        canWriteForms && !management.saving,
+        canEditTemplate && !management.saving ? handleOpenTemplate : undefined,
       ),
     [
       management.categoryItems,
@@ -115,12 +117,14 @@ export function DraftFormManagementPage({
       management.users,
       canWriteForms,
       canEditTemplate,
+      management.saving,
       handleOpenTemplate,
     ],
   );
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
 
   const requestSearch = (filters: DraftFormFilters) => {
+    if (management.saving) return;
     if (management.hasChanges) {
       setPendingFilters(filters);
       setRefreshConfirmOpen(true);
@@ -167,13 +171,19 @@ export function DraftFormManagementPage({
   };
 
   const handleGridSave = () => {
+    if (management.saving || saveAttemptActiveRef.current) return;
     const grid = gridRef.current;
     if (!grid) return;
     if (!grid.validate()) {
       management.setError('필수 입력 항목을 확인해 주세요.');
       return;
     }
-    void management.saveChanges(grid.getChanges());
+    saveAttemptActiveRef.current = true;
+    void management
+      .saveChanges(grid.getChanges())
+      .finally(() => {
+        saveAttemptActiveRef.current = false;
+      });
   };
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
@@ -184,6 +194,7 @@ export function DraftFormManagementPage({
           label: '분류 설정',
           icon: CategoryOutlinedIcon,
           visible: canEditCategories,
+          disabled: management.saving,
           onClick: () => setHelperOpen(true),
         },
         {
@@ -193,6 +204,7 @@ export function DraftFormManagementPage({
           disabled:
             management.loading ||
             management.optionsLoading ||
+            management.saving ||
             management.categoryItems.length === 0,
           onClick: () => gridRef.current?.addRow(),
         },
@@ -205,6 +217,7 @@ export function DraftFormManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pagePermissions.read,
+          disabled: management.saving,
           onClick: handleDefaultSearch,
         },
       ],
@@ -242,52 +255,59 @@ export function DraftFormManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
-      <PageSearchArea
-        searchField={
-          <TextField
-            size="small"
-            margin="none"
-            placeholder="양식코드/양식명 검색"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            slotProps={{
-              htmlInput: { 'aria-label': '기안양식 검색' },
-              input: {
-                endAdornment: searchQuery ? (
-                  <IconButton
-                    type="button"
-                    size="small"
-                    edge="end"
-                    aria-label="기안양식 검색어 초기화"
-                    onClick={() => setSearchQuery('')}
-                    sx={{ p: 0.25 }}
-                  >
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                ) : null,
-              },
-            }}
-            sx={(theme) => ({
-              width: '100%',
-              height: 40,
-              '& .MuiOutlinedInput-root': {
-                height: '100%',
-                borderRadius: '0 8px 8px 0',
-                backgroundColor:
-                  theme.palette.mode === 'dark'
-                    ? 'rgba(15, 23, 42, 0.72)'
-                    : 'rgba(255,255,255,0.72)',
-              },
-            })}
-          />
-        }
-        onDefaultSearch={handleDefaultSearch}
-        detailFields={detailFields}
-        detailValues={detailValues}
-        onDetailValuesChange={setDetailValues}
-        onDetailSearch={handleDetailSearch}
-        detailLoading={management.loading}
-      />
+      <Box
+        component="fieldset"
+        disabled={management.saving}
+        sx={{ border: 0, m: 0, minWidth: 0, p: 0 }}
+      >
+        <PageSearchArea
+          searchField={
+            <TextField
+              size="small"
+              margin="none"
+              placeholder="양식코드/양식명 검색"
+              value={searchQuery}
+              disabled={management.saving}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              slotProps={{
+                htmlInput: { 'aria-label': '기안양식 검색' },
+                input: {
+                  endAdornment: searchQuery ? (
+                    <IconButton
+                      type="button"
+                      size="small"
+                      edge="end"
+                      aria-label="기안양식 검색어 초기화"
+                      onClick={() => setSearchQuery('')}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  ) : null,
+                },
+              }}
+              sx={(theme) => ({
+                width: '100%',
+                height: 40,
+                '& .MuiOutlinedInput-root': {
+                  height: '100%',
+                  borderRadius: '0 8px 8px 0',
+                  backgroundColor:
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(15, 23, 42, 0.72)'
+                      : 'rgba(255,255,255,0.72)',
+                },
+              })}
+            />
+          }
+          onDefaultSearch={handleDefaultSearch}
+          detailFields={detailFields}
+          detailValues={detailValues}
+          onDetailValuesChange={setDetailValues}
+          onDetailSearch={handleDetailSearch}
+          detailLoading={management.loading || management.saving}
+        />
+      </Box>
       <PageMessageArea
         message={management.error}
         onClose={() => management.setError('')}
@@ -304,6 +324,18 @@ export function DraftFormManagementPage({
         onClose={() => setCategoryNoticeDismissed(true)}
       />
       <Box
+        onKeyDownCapture={(event) => {
+          // The grid's Delete shortcut bypasses its context-menu delete gate.
+          if (
+            management.saving &&
+            event.key === 'Delete' &&
+            event.target instanceof HTMLElement &&
+            event.target.closest('[role="grid"]')
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         sx={{
           flex: 1,
           minHeight: 280,
@@ -315,10 +347,13 @@ export function DraftFormManagementPage({
           rows={management.rows}
           columns={columns}
           canCreate={
-            pagePermissions.create && management.categoryItems.length > 0
+            pagePermissions.create &&
+            management.categoryItems.length > 0 &&
+            !management.saving
           }
-          canUpdate={pagePermissions.update}
+          canUpdate={pagePermissions.update && !management.saving}
           canExportExcel={pagePermissions.excel}
+          saving={management.saving}
           loading={management.loading}
           gridKey={management.gridKey}
           gridRef={gridRef}

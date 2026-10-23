@@ -218,6 +218,7 @@ class MaterialInfoServiceImplTest {
         String updateSql = c.getMappedStatement("MaterialInfoDAO.updateMaterial").getBoundSql(params).getSql();
         assertThat(updateSql).doesNotContain("material_code =");
         String options = c.getMappedStatement("MaterialInfoDAO.selectMaterialOptions").getBoundSql(params).getSql();
-        assertThat(options).contains("tenant_id", "MATERIAL_TYPE", "STORE_METHOD", "EXPIRY_STATUS");
+        assertThat(options).contains("g.tenant_id = ?", "g.use_at = 'Y'", "i.use_at = 'Y'",
+                "'ITEM_TYPE'", "'ITEM_UNIT'", "'MATERIAL_TYPE'", "'STORE_METHOD'", "'EXPIRY_STATUS'");
     }
 }

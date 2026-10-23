@@ -133,9 +133,9 @@ export function useCustomerManagement() {
         await saveCustomerBatch({
           customers: { insertedRows, updatedRows, deletedRows: [] },
         });
+        const refreshed = await loadRows(appliedFilters, { quiet: true });
         setHasChanges(false);
         setGridKey((current) => current + 1);
-        const refreshed = await loadRows(appliedFilters, { quiet: true });
         if (!refreshed) {
           setError('저장은 완료했지만 목록을 다시 불러오지 못했습니다. 조회를 다시 실행해 주세요.');
           return;

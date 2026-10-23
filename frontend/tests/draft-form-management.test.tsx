@@ -100,6 +100,7 @@ describe('Draft form management page', () => {
         canCreate={false}
         canUpdate={false}
         canExportExcel={false}
+        saving={false}
         loading={false}
         gridKey={0}
         gridRef={createRef<F1GridRef<DraftFormRow>>()}
@@ -124,6 +125,7 @@ describe('Draft form management page', () => {
         canCreate={false}
         canUpdate={false}
         canExportExcel
+        saving={false}
         loading={false}
         gridKey={0}
         gridRef={createRef<F1GridRef<DraftFormRow>>()}
@@ -138,6 +140,102 @@ describe('Draft form management page', () => {
     expect(
       within(menu).getByRole('menuitem', { name: '엑셀 내보내기' }),
     ).toBeInTheDocument();
+  });
+
+  it('blocks applying an open draft row form while saving', async () => {
+    const row: DraftFormRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const onChangesChange = vi.fn();
+    const props = {
+      rows: [row],
+      columns: createDraftFormColumns(
+        [
+          {
+            id: '101',
+            groupId: '11',
+            itemCode: 'INSPECTION',
+            itemNm: '점검',
+            parentItemId: null,
+            parentItemNm: '',
+            sortOrder: 10,
+            useAt: 'Y',
+            itemDc: '',
+          },
+        ],
+        [
+          {
+            id: '201',
+            groupId: '12',
+            itemCode: 'MONTH',
+            itemNm: '월',
+            parentItemId: null,
+            parentItemNm: '',
+            sortOrder: 30,
+            useAt: 'Y',
+            itemDc: '',
+          },
+        ],
+        [],
+        true,
+      ),
+      canCreate: true,
+      canUpdate: true,
+      canExportExcel: false,
+      saving: false,
+      loading: false,
+      gridKey: 0,
+      gridRef: createRef<F1GridRef<DraftFormRow>>(),
+      onChangesChange,
+    };
+    const { rerender } = render(<DraftFormGrid {...props} />);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '71 행 정보 수정' }),
+    );
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 수정',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
+      { target: { value: '저장 중 변경 시도' } },
+    );
+
+    rerender(
+      <DraftFormGrid
+        {...props}
+        canCreate={false}
+        canUpdate={false}
+        saving
+      />,
+    );
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+
+    expect(
+      onChangesChange.mock.calls.some(
+        ([changes]) => changes.updatedRows.length > 0,
+      ),
+    ).toBe(false);
+    expect(screen.getByRole('gridcell', { name: '정기점검' })).toBeVisible();
+    expect(
+      screen.queryByRole('gridcell', { name: '저장 중 변경 시도' }),
+    ).not.toBeInTheDocument();
   });
 
   it('defines each F1-Grid data column field once with row numbering first', () => {
@@ -1375,7 +1473,11 @@ describe('Draft form management page', () => {
     );
   });
 
-  it('blocks draft form edits during save and quiet refresh', async () => {
+  it.each([
+    { key: 'Insert', ctrlKey: false },
+    { key: 'd', ctrlKey: true },
+    { key: 'Delete', ctrlKey: false },
+  ])('blocks draft form edits during save and quiet refresh ($key)', async (shortcut) => {
     const sourceRow = {
       draftingWorkCategoryId: 71,
       cataTypeCode: '007',
@@ -1467,6 +1569,7 @@ describe('Draft form management page', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalledTimes(1));
+    await screen.findByRole('progressbar', { name: '기안양식 저장 중' });
 
     const expectLocked = () => {
       expect(
@@ -1480,6 +1583,12 @@ describe('Draft form management page', () => {
       ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '조회' })).toBeDisabled();
       expect(
+        screen.getByRole('textbox', { name: '기안양식 검색' }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: '분류 설정' }),
+      ).toBeDisabled();
+      expect(
         screen.getByRole('button', { name: '양식 추가' }),
       ).toBeDisabled();
       expect(
@@ -1492,27 +1601,42 @@ describe('Draft form management page', () => {
         screen.queryByRole('button', { name: '문서 작성: 정기점검' }),
       ).not.toBeInTheDocument();
 
-      fireEvent.doubleClick(
-        screen.getByRole('gridcell', { name: '정기점검' }),
-      );
-      expect(screen.getAllByRole('textbox')).toHaveLength(1);
-
-      fireEvent.contextMenu(
-        screen.getByRole('grid', { name: '기안양식 목록' }),
-      );
-      const menu = screen.queryByRole('menu');
+      const cell = screen.getByRole('gridcell', { name: '정기점검' });
+      fireEvent.click(cell);
+      fireEvent.contextMenu(cell);
+      const rowMenu = screen.getByRole('menu');
+      fireEvent.keyDown(rowMenu, { key: 'Escape', code: 'Escape' });
+      const grid = screen.getByRole('grid', { name: '기안양식 목록' });
+      const rowCount = within(grid).getAllByRole('row').length;
+      fireEvent.keyDown(cell, shortcut);
+      expect(within(grid).getAllByRole('row')).toHaveLength(rowCount);
       expect(
-        menu && within(menu).queryByRole('menuitem', { name: '행 추가' }),
-      ).not.toBeInTheDocument();
+        within(grid).getByRole('gridcell', { name: '정기점검' }),
+      ).toBeVisible();
       expect(
-        menu && within(menu).queryByRole('menuitem', { name: '행 복사' }),
+        screen.queryByRole('dialog', { name: '기안양식 등록' }),
       ).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: '저장' }));
-      expect(apiMocks.apiPut).toHaveBeenCalledTimes(1);
     };
 
+    const saveButton = screen
+      .getByRole('progressbar', { name: '기안양식 저장 중' })
+      .closest('button');
+    expect(saveButton).not.toBeNull();
+    fireEvent.click(saveButton!);
+    expect(apiMocks.apiPut).toHaveBeenCalledTimes(1);
     expectLocked();
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: '정기점검' }));
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    fireEvent.contextMenu(screen.getByRole('grid', { name: '기안양식 목록' }));
+    const menu = screen.queryByRole('menu');
+    expect(
+      menu && within(menu).queryByRole('menuitem', { name: '행 추가' }),
+    ).not.toBeInTheDocument();
+    expect(
+      menu && within(menu).queryByRole('menuitem', { name: '행 복사' }),
+    ).not.toBeInTheDocument();
+    if (menu) fireEvent.keyDown(menu, { key: 'Escape', code: 'Escape' });
+    expect(screen.getByRole('gridcell', { name: '정기점검' })).toBeVisible();
     resolveUpdate?.({ item: { ...sourceRow, reviewerId: 210 } });
     await waitFor(() => expect(formRequestCount).toBe(2));
     expectLocked();
@@ -1526,7 +1650,144 @@ describe('Draft form management page', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: '조회' })).toBeEnabled();
+    expect(
+      screen.getByRole('textbox', { name: '기안양식 검색' }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: '분류 설정' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '양식 추가' })).toBeEnabled();
+    const restoredCell = screen.getByRole('gridcell', { name: '정기점검' });
+    fireEvent.click(restoredCell);
+    fireEvent.contextMenu(restoredCell);
+    fireEvent.keyDown(screen.getByRole('menu'), {
+      key: 'Escape',
+      code: 'Escape',
+    });
+    fireEvent.keyDown(restoredCell, shortcut);
+    if (shortcut.key === 'Insert') {
+      expect(
+        await screen.findByRole('dialog', { name: '기안양식 등록' }),
+      ).toBeInTheDocument();
+    } else if (shortcut.key === 'd') {
+      expect(
+        await screen.findByRole('gridcell', { name: '정기점검 복사' }),
+      ).toBeVisible();
+    } else {
+      expect(
+        screen.queryByRole('gridcell', { name: '정기점검' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+    }
+  }, 15000);
+
+  it('releases the draft form lock after save and refresh failures', async () => {
+    const sourceRow = {
+      draftingWorkCategoryId: 71,
+      cataTypeCode: '007',
+      codeName: '정기점검',
+      categoryItemId: 101,
+      categoryName: '점검',
+      regTermId: 201,
+      regTerm: '월',
+      reviewerId: null,
+      reviewerName: '',
+      approverId: null,
+      approverName: '',
+      assigneeIds: [],
+      assigneeSummary: '-',
+      createdByName: '관리자',
+      createdAt: '2026-10-01 09:00',
+      hasDocument: false,
+      useAt: 'Y',
+    };
+    const originalApiGet = apiMocks.apiGet.getMockImplementation();
+    let formRequestCount = 0;
+    apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path !== '/api/v1/co/workflow/forms') {
+        return originalApiGet?.(path);
+      }
+      formRequestCount += 1;
+      if (formRequestCount === 1) {
+        return Promise.resolve({ resultList: [sourceRow] });
+      }
+      return Promise.reject(new Error('목록 새로고침 실패'));
+    });
+    apiMocks.apiPut
+      .mockRejectedValueOnce(new Error('기안양식 저장 실패'))
+      .mockResolvedValueOnce({});
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByRole('gridcell', { name: '정기점검' }),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: '71 행 정보 수정' }),
+    );
+    const formDialog = await screen.findByRole('dialog', {
+      name: '기안양식 수정',
+    });
+    fireEvent.change(
+      within(formDialog).getByRole('textbox', { name: '양식명' }),
+      { target: { value: '수정양식' } },
+    );
+    fireEvent.click(within(formDialog).getByRole('button', { name: '적용' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('기안양식 저장 실패')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('progressbar', { name: '기안양식 저장 중' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('gridcell', { name: '수정양식' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '조회' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('목록 새로고침 실패')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('progressbar', { name: '기안양식 저장 중' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('gridcell', { name: '수정양식' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '조회' })).toBeEnabled();
   });
 
   it('soft-disables a deleted Grid row by saving useAt N', async () => {

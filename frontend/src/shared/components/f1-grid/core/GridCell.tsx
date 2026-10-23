@@ -110,7 +110,9 @@ const areGridCellPropsEqual = <T extends object>(
     prev.draftValue === next.draftValue &&
     prev.dirtyCell === next.dirtyCell &&
     prev.errorMessage === next.errorMessage &&
-    Object.is(prev.pinOffset, next.pinOffset) &&
+    prev.pinOffset?.side === next.pinOffset?.side &&
+    prev.pinOffset?.offset === next.pinOffset?.offset &&
+    prev.pinOffset?.shadow === next.pinOffset?.shadow &&
     Object.is(prev.adornment, next.adornment)
   );
 };
@@ -438,9 +440,26 @@ const GridCellInner = <T extends object>({
   );
 };
 
-export const GridCell = memo(GridCellInner as any, (prev: any, next: any) =>
-  areGridCellPropsEqual(
-    prev as GridCellProps<object>,
-    next as GridCellProps<object>,
-  ),
-) as any;
+const MemoizedGridCell = memo(GridCellInner, areGridCellPropsEqual) as typeof GridCellInner;
+
+export function GridCell<T extends object>(props: GridCellProps<T>) {
+  const latestProps = useRef(props);
+  latestProps.current = props;
+
+  // Visual memoization must not retain handlers that captured an older edit.
+  const handlers = useMemo(() => ({
+    onFocus: () => latestProps.current.onFocus(),
+    onMouseDown: (event: MouseEvent<HTMLElement>) => latestProps.current.onMouseDown(event),
+    onMouseEnter: () => latestProps.current.onMouseEnter(),
+    onMouseUp: () => latestProps.current.onMouseUp(),
+    onBlur: () => latestProps.current.onBlur?.(),
+    onDoubleClick: () => latestProps.current.onDoubleClick(),
+    onDraftChange: (value: F1GridDraftValue) => latestProps.current.onDraftChange(value),
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => latestProps.current.onKeyDown(event),
+    onSelectChange: (value: unknown) => latestProps.current.onSelectChange(value),
+    onCheckboxChange: (checked: boolean) => latestProps.current.onCheckboxChange(checked),
+    onCodePick: () => latestProps.current.onCodePick(),
+  }), []);
+
+  return <MemoizedGridCell {...props} {...handlers} />;
+}

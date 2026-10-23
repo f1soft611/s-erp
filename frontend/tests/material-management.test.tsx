@@ -33,6 +33,95 @@ beforeEach(() => {
 });
 
 describe('material management contract', () => {
+  it('places and pins the account, code and name before other business columns', () => {
+    const columns = createMaterialColumns(true);
+    expect(columns.slice(0, 4).map((column) => column.field)).toEqual([
+      'materialId', 'materialTypeCode', 'materialCode', 'materialName',
+    ]);
+    expect(columns.slice(0, 4).every((column) => column.pinned === 'left')).toBe(true);
+    for (const field of ['materialCode', 'materialKind', 'storeMethod', 'expiryedStatus']) {
+      expect(columns.find((column) => column.field === field)?.align).toBe('center');
+    }
+    expect(columns.find((column) => column.field === 'safeInvoice')?.align).toBe('right');
+  });
+
+  it('uses common code labels for all five selects in columns and row forms', () => {
+    const options = [
+      { groupCode: 'ITEM_TYPE', itemCode: 'RAW', itemName: '원재료' },
+      { groupCode: 'ITEM_UNIT', itemCode: 'EA', itemName: '개' },
+      { groupCode: 'MATERIAL_TYPE', itemCode: 'TYPE_01', itemName: '초콜릿' },
+      { groupCode: 'STORE_METHOD', itemCode: 'REFRIG', itemName: '냉장' },
+      { groupCode: 'EXPIRY_STATUS', itemCode: 'DAY', itemName: '일 단위' },
+      { groupCode: 'EXPIRY_STATUS', itemCode: 'INVALID', itemName: '미지원' },
+    ];
+    const columns = createMaterialColumns(true, options);
+    const fields = buildGridFormSections(columns, createMaterialRow())
+      .flatMap((section) => section.fields);
+    const selectFields = ['materialTypeCode', 'unit', 'materialKind', 'storeMethod', 'expiryedStatus'];
+    selectFields.forEach((field, index) => {
+      const { itemCode, itemName } = options[index];
+      expect(columns.find((column) => column.field === field)).toMatchObject({
+        type: 'select', options: expect.arrayContaining([{ value: itemCode, label: itemName }]),
+      });
+      expect(fields.find((entry) => entry.field === field)?.column.type).toBe('select');
+    });
+    expect(columns.find((column) => column.field === 'expiryedStatus')?.options).toEqual([
+      { value: 'DAY', label: '일 단위' },
+    ]);
+    expect(toPageSearchFields(columns).find((field) => field.field === 'materialTypeCode'))
+      .toMatchObject({ type: 'select' });
+  });
+
+  it('removes classification from every UI surface but preserves its saved value', () => {
+    const row = normalizeMaterialRow({ ...material, matCataType: 'OLD_CLASS' });
+    const columns = createMaterialColumns(true, [], [row]);
+    expect(columns.some((column) => column.field === 'matCataType')).toBe(false);
+    expect(buildGridFormSections(columns, row).flatMap((section) => section.fields)
+      .some((field) => field.field === 'matCataType')).toBe(false);
+    expect(toPageSearchFields(columns).some((field) => field.field === 'matCataType')).toBe(false);
+    expect(toMaterialPayload(row, false).matCataType).toBe('OLD_CLASS');
+  });
+
+  it('applies account and unit selections as codes from the common code options', () => {
+    const row = { ...createMaterialRow(), materialName: 'Sample' };
+    const onApply = vi.fn();
+    render(
+      <F1GridFormModal
+        open
+        mode="create"
+        row={row}
+        columns={createMaterialColumns(true, [
+          { groupCode: 'ITEM_TYPE', itemCode: 'RAW', itemName: '원재료' },
+          { groupCode: 'ITEM_UNIT', itemCode: 'EA', itemName: '개' },
+          { groupCode: 'EXPIRY_STATUS', itemCode: 'NONE', itemName: '없음' },
+        ])}
+        rowKey="materialId"
+        plugin={{}}
+        onCancel={vi.fn()}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /품목계정코드/ }));
+    fireEvent.click(screen.getByRole('option', { name: '원재료' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '단위' }));
+    fireEvent.click(screen.getByRole('option', { name: '개' }));
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({
+      materialTypeCode: 'RAW', unit: 'EA',
+    }));
+  });
+
+  it('preserves saved account, unit and expiry codes without inventing new expiry choices', () => {
+    const row = { ...normalizeMaterialRow(material), unit: 'OLD_UNIT', expiryedStatus: 'MONTH' as const };
+    const columns = createMaterialColumns(true, [], [row]);
+    expect(columns.find((column) => column.field === 'materialTypeCode')?.options)
+      .toContainEqual({ value: 'RAW', label: 'RAW' });
+    expect(columns.find((column) => column.field === 'unit')?.options)
+      .toContainEqual({ value: 'OLD_UNIT', label: 'OLD_UNIT' });
+    expect(columns.find((column) => column.field === 'expiryedStatus')?.options)
+      .toEqual([{ value: 'MONTH', label: 'MONTH' }]);
+  });
+
   it('combines basic and detailed search without sending tenant identity', async () => {
     await fetchMaterials({ keyword: ' Sample ', materialSpec: ' A ', materialKind: 'FOOD' });
     expect(api.apiGet).toHaveBeenCalledWith(
@@ -170,7 +259,7 @@ describe('material management contract', () => {
         mode="edit"
         row={row}
         originalRow={row}
-        columns={createMaterialColumns(true)}
+        columns={createMaterialColumns(true, [], [row])}
         rowKey="materialId"
         plugin={{}}
         onCancel={vi.fn()}
@@ -345,6 +434,7 @@ describe('material workflow', () => {
     </NotificationProvider></ThemeProvider>);
 
     const nameCell = await screen.findByRole('gridcell', { name: 'Sample' });
+    const originalGrid = screen.getByRole('grid', { name: '품목 목록' });
     fireEvent.doubleClick(nameCell);
     const editor = screen.getByDisplayValue('Sample');
     fireEvent.change(editor, { target: { value: 'Updated Sample' } });
@@ -360,7 +450,8 @@ describe('material workflow', () => {
     await waitFor(() => expect(listRequests).toBe(2));
     expect(screen.getByRole('progressbar', { name: '품목 저장 중' })).toBeVisible();
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: 'Sample' })).toBeVisible();
+    expect(screen.getByRole('grid', { name: '품목 목록' })).toBe(originalGrid);
+    expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
 
     await act(async () => finishReload({ resultList: [{ ...material, materialName: 'Updated Sample' }] }));
     await waitFor(() => expect(screen.queryByRole('progressbar', { name: '품목 저장 중' })).not.toBeInTheDocument());

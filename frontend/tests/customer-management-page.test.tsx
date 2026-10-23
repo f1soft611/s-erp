@@ -451,6 +451,7 @@ describe('customer management page', () => {
 
     renderCustomerPage();
     const nameCell = await screen.findByRole('gridcell', { name: 'Acme' });
+    const originalGrid = screen.getByRole('grid', { name: '거래처 목록' });
     fireEvent.doubleClick(nameCell);
     const editor = screen.getByDisplayValue('Acme');
     fireEvent.change(editor, { target: { value: 'Updated Acme' } });
@@ -466,7 +467,8 @@ describe('customer management page', () => {
     await waitFor(() => expect(listRequests).toBe(2));
     expect(screen.getByRole('progressbar', { name: '거래처 저장 중' })).toBeVisible();
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: 'Acme' })).toBeVisible();
+    expect(screen.getByRole('grid', { name: '거래처 목록' })).toBe(originalGrid);
+    expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
 
     await act(async () => finishReload({ resultList: [{ ...customer, customerName: 'Updated Acme' }] }));
     await waitFor(() => expect(screen.queryByRole('progressbar', { name: '거래처 저장 중' })).not.toBeInTheDocument());

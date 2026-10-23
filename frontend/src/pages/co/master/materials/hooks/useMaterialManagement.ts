@@ -66,8 +66,9 @@ export function useMaterialManagement() {
         return { ...toMaterialPayload(row, false), materialId: String(id) };
       });
       await saveMaterialBatch({ materials: { insertedRows, updatedRows, deletedRows: [] } });
+      const refreshed = await loadRows(appliedFilters, true);
       discardChanges();
-      if (!await loadRows(appliedFilters, true)) {
+      if (!refreshed) {
         setError('저장은 완료했지만 목록을 다시 불러오지 못했습니다. 조회를 다시 실행해 주세요.');
         return;
       }
