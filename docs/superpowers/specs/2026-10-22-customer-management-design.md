@@ -2,8 +2,7 @@
 
 ## Status
 
-- Design approved in conversation on 2026-10-22.
-- Awaiting review of this written specification before implementation planning.
+- Design approved in conversation on 2026-10-22 and updated to use the existing eGov ID Generator after user clarification.
 - Visual layout: option A, full-width F1-Grid with a grid row form.
 - Scope: tenant-scoped listing/search, create, update, and use-status changes.
 
@@ -35,6 +34,8 @@ The tenant PostgreSQL MCP confirmed the `public.tb_customer_info` table has thes
 | `created_at`, `updated_at` | `timestamp` | not null; default to current timestamp |
 
 Metadata also confirmed a primary key on `customer_id`, a foreign key from `tenant_id` to `tb_tenant`, a `Y`/`N` check on `use_at`, and a unique constraint on `(tenant_id, customer_code)`. No tenant data rows were queried.
+
+The tenant MCP also confirmed the existing `public.ids` generator table and its `(table_name)` primary key. The project config already uses `EgovTableIdGnrServiceImpl` with table `IDS`, a configured `tableName`, and zero-padded output for other master-data codes. No business or generator-counter rows were queried.
 
 ## Approaches Considered
 
@@ -72,10 +73,11 @@ Metadata also confirmed a primary key on `customer_id`, a foreign key from `tena
 ### Code generation and database change
 
 - Leave the existing `customer_id` default sequence responsible for `customer_id`.
-- Add a dedicated PostgreSQL sequence for generated customer codes so automatic codes remain exactly six digits and are independent of the primary key.
-- Seed the code sequence from the largest existing numeric customer code across the table, without copying or publishing row data. Generated values above `999999` are rejected with an explicit exhaustion error.
+- Use the existing eGov ID Generator table `IDS` through a dedicated `customerCodeIdGnrService` bean configured with `tableName = "tb_customer_info"`, no prefix, six digits, and block size 1. Do not create a customer-specific sequence or table.
+- Initialize the existing `ids` counter row from the largest existing 1–6 digit numeric customer code plus one. If the row already has a larger counter, preserve it. This aggregate initialization does not copy or publish business rows.
+- Reject generated values outside the six-digit range, including values above `999999`, with an explicit exhaustion error.
 - Preserve the existing tenant-scoped unique constraint as the final duplicate guard.
-- No `tb_customer_info` columns or constraints are changed. Record the new sequence in the date-based SQL change/rollback history and keep the `docs/database` and `backend/DATABASE` copies identical.
+- No `tb_customer_info` columns or constraints are changed. Record the existing `ids` counter initialization in the date-based SQL change/rollback history and keep the `docs/database` and `backend/DATABASE` copies identical. A rollback must not reduce or delete the counter, since generated codes may already be saved.
 
 ### Responsive layout and validation
 

@@ -7,6 +7,7 @@ export { createDocumentStatusColumns } from '../data/documentStatusColumns';
 type DocumentStatusGridProps = {
   rows: DocumentStatusRow[];
   loading: boolean;
+  canExportExcel: boolean;
   onSelectionChange: (rowIds: Array<string | number>) => void;
 };
 
@@ -15,6 +16,7 @@ const columns = createDocumentStatusColumns();
 export function DocumentStatusGrid({
   rows,
   loading,
+  canExportExcel,
   onSelectionChange,
 }: DocumentStatusGridProps) {
   return (
@@ -31,7 +33,7 @@ export function DocumentStatusGrid({
       allowAddRowInContextMenu={false}
       allowDuplicateRowInContextMenu={false}
       allowDeleteRowInContextMenu={false}
-      canExportExcel
+      canExportExcel={canExportExcel}
       height="100%"
       minHeight={320}
     />

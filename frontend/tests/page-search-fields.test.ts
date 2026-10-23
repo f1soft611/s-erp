@@ -15,6 +15,7 @@ describe('toPageSearchFields', () => {
       {
         field: 'name',
         headerName: '이름',
+        inputFormat: { type: 'digits', groupSizes: [3, 2] },
         form: { span: 3 },
         search: { label: '검색 이름', group: '기본', order: 2, span: 5 },
       },
@@ -61,6 +62,7 @@ describe('toPageSearchFields', () => {
         label: '검색 이름',
         type: 'text',
         searchSpan: 5,
+        inputFormat: { type: 'digits', groupSizes: [3, 2] },
         group: '기본',
       },
       {

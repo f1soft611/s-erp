@@ -492,6 +492,7 @@ export function ArchiveBoardPage({
           onDelete={setDeletingFile}
           canUpdate={canUpdate}
           canDelete={canDelete}
+          canExportExcel={selectedMenuPermissions?.excel ?? false}
         />
       </Box>
 

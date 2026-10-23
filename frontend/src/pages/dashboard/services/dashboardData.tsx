@@ -100,6 +100,12 @@ export const defaultPage: PageContent = {
 };
 
 export const pageContentMap: Record<string, PageContent> = {
+  materials: {
+    title: '품목관리',
+    description: '품목의 규격, 분류, 재고 및 소비기한 기준정보를 관리합니다.',
+    cards: [],
+    items: [],
+  },
   overview: {
     title: '종합현황',
     description:

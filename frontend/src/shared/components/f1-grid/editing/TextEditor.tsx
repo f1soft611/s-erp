@@ -1,11 +1,15 @@
 import { InputBase } from '@mui/material';
 import type { KeyboardEvent } from 'react';
+import type { F1GridInputFormat } from '../types/grid.types';
+import { useF1GridFormattedInput } from './useF1GridFormattedInput';
 
 type TextEditorProps = {
   value: string;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   selectOnFocus?: boolean;
+  inputFormat?: F1GridInputFormat;
+  sanitizeInput?: (value: string) => string;
 };
 
 export function TextEditor({
@@ -13,13 +17,23 @@ export function TextEditor({
   onChange,
   onKeyDown,
   selectOnFocus = true,
+  inputFormat,
+  sanitizeInput,
 }: TextEditorProps) {
+  const { inputRef, handleChange } = useF1GridFormattedInput({
+    value,
+    inputFormat,
+    sanitizeInput,
+    onChange,
+  });
+
   return (
     <InputBase
       autoFocus
       fullWidth
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      inputRef={inputRef}
+      onChange={handleChange}
       onKeyDown={onKeyDown}
       onFocus={(event) => {
         if (!selectOnFocus) return;

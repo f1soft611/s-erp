@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="MaterialInfoDAO">
+    <resultMap id="materialMap" type="egovframework.let.co.master.material.domain.model.MaterialInfoVO">
+        <id property="materialId" column="material_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="materialCode" column="material_code"/>
+        <result property="materialName" column="material_name"/>
+        <result property="materialEngName" column="material_eng_name"/>
+        <result property="materialModelName" column="material_model_name"/>
+        <result property="materialSpec" column="material_spec"/>
+        <result property="materialWeight" column="material_weight"/>
+        <result property="unit" column="unit"/>
+        <result property="materialTypeCode" column="material_type_code"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="safeInvoice" column="safe_invoice"/>
+        <result property="accountingCode" column="accounting_code"/>
+        <result property="warehouseCode" column="warehouse_code"/>
+        <result property="drawing" column="drawing"/>
+        <result property="etc" column="etc"/>
+        <result property="partNo" column="part_no"/>
+        <result property="manufactory" column="manufactory"/>
+        <result property="matCataType" column="mat_cata_type"/>
+        <result property="location" column="location"/>
+        <result property="materialSpec2" column="material_spec2"/>
+        <result property="itemType" column="item_type"/>
+        <result property="searchItemName" column="search_item_name"/>
+        <result property="materialQuality" column="material_quality"/>
+        <result property="itemBarcode" column="item_barcode"/>
+        <result property="materialNo" column="material_no"/>
+        <result property="deleteStatus" column="delete_status"/>
+        <result property="deletedAt" column="deleted_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="materialKind" column="material_kind"/>
+        <result property="storeMethod" column="store_method"/>
+        <result property="expiryedStatus" column="expiryed_status"/>
+        <result property="expiryedCount" column="expiryed_count"/>
+        <result property="kfdaReportNo" column="kfda_report_no"/>
+    </resultMap>
+    <sql id="columns">
+        material_id, tenant_id, material_code, material_name, material_eng_name,
+        material_model_name, material_spec, material_weight, unit, material_type_code,
+        customer_code, safe_invoice, accounting_code, warehouse_code, drawing, etc,
+        part_no, manufactory, mat_cata_type, location, material_spec2, item_type,
+        search_item_name, material_quality, item_barcode, material_no, delete_status,
+        deleted_at, created_by, created_at, updated_by, updated_at,
+        material_kind, store_method, expiryed_status, expiryed_count, kfda_report_no
+    </sql>
+    <sql id="activeTenant">
+        tenant_id = #{tenantId} AND delete_status = 'N' AND deleted_at IS NULL
+    </sql>
+    <select id="selectMaterialList" parameterType="map" resultMap="materialMap">
+        SELECT <include refid="columns"/> FROM tb_material_info
+        WHERE <include refid="activeTenant"/>
+        <if test="keyword != null and keyword != ''">
+            AND (material_code ILIKE '%' || #{keyword} || '%'
+                OR material_name ILIKE '%' || #{keyword} || '%'
+                OR material_eng_name ILIKE '%' || #{keyword} || '%'
+                OR material_model_name ILIKE '%' || #{keyword} || '%'
+                OR search_item_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="materialSpec != null and materialSpec != ''">
+            AND material_spec ILIKE '%' || #{materialSpec} || '%'
+        </if>
+        <if test="materialTypeCode != null and materialTypeCode != ''">
+            AND material_type_code ILIKE '%' || #{materialTypeCode} || '%'
+        </if>
+        <if test="matCataType != null and matCataType != ''">
+            AND mat_cata_type ILIKE '%' || #{matCataType} || '%'
+        </if>
+        <if test="customerCode != null and customerCode != ''">
+            AND customer_code ILIKE '%' || #{customerCode} || '%'
+        </if>
+        <if test="warehouseCode != null and warehouseCode != ''">
+            AND warehouse_code ILIKE '%' || #{warehouseCode} || '%'
+        </if>
+        <if test="itemBarcode != null and itemBarcode != ''">
+            AND item_barcode ILIKE '%' || #{itemBarcode} || '%'
+        </if>
+        <if test="materialKind != null and materialKind != ''">
+            AND material_kind = #{materialKind}
+        </if>
+        <if test="storeMethod != null and storeMethod != ''">
+            AND store_method = #{storeMethod}
+        </if>
+        <if test="expiryedStatus != null and expiryedStatus != ''">
+            AND expiryed_status = #{expiryedStatus}
+        </if>
+        ORDER BY material_code ASC, material_id ASC
+    </select>
+    <select id="selectMaterialById" parameterType="map" resultMap="materialMap">
+        SELECT <include refid="columns"/> FROM tb_material_info
+        WHERE material_id = #{materialId} AND <include refid="activeTenant"/>
+    </select>
+    <select id="selectMaterialIdByCode" parameterType="map" resultType="long">
+        SELECT material_id FROM tb_material_info
+        WHERE tenant_id = #{tenantId} AND material_code = #{materialCode}
+        <if test="excludeMaterialId != null">AND material_id != #{excludeMaterialId}</if>
+        LIMIT 1
+    </select>
+    <select id="insertMaterial" parameterType="map" resultType="long">
+        INSERT INTO tb_material_info (
+            tenant_id, material_code, material_name, material_eng_name, material_model_name,
+            material_spec, material_weight, unit, material_type_code, customer_code,
+            safe_invoice, accounting_code, warehouse_code, drawing, etc, part_no, manufactory,
+            mat_cata_type, location, material_spec2, item_type, search_item_name, material_quality,
+            item_barcode, material_no, material_kind, store_method, expiryed_status, expiryed_count,
+            kfda_report_no, delete_status, created_by, created_at, updated_by, updated_at
+        ) VALUES (
+            #{tenantId}, #{materialCode}, #{materialName}, #{materialEngName}, #{materialModelName},
+            #{materialSpec}, #{materialWeight,jdbcType=BIGINT}, #{unit}, #{materialTypeCode}, #{customerCode},
+            #{safeInvoice,jdbcType=DOUBLE}, #{accountingCode}, #{warehouseCode}, #{drawing}, #{etc}, #{partNo}, #{manufactory},
+            #{matCataType}, #{location}, #{materialSpec2}, #{itemType}, #{searchItemName}, #{materialQuality},
+            #{itemBarcode}, #{materialNo}, #{materialKind}, #{storeMethod}, #{expiryedStatus}, #{expiryedCount,jdbcType=INTEGER},
+            #{kfdaReportNo}, 'N', #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
+        ) RETURNING material_id
+    </select>
+    <update id="updateMaterial" parameterType="map">
+        UPDATE tb_material_info SET
+            material_code = #{materialCode}, material_name = #{materialName},
+            material_eng_name = #{materialEngName}, material_model_name = #{materialModelName},
+            material_spec = #{materialSpec}, material_weight = #{materialWeight,jdbcType=BIGINT},
+            unit = #{unit}, material_type_code = #{materialTypeCode}, customer_code = #{customerCode},
+            safe_invoice = #{safeInvoice,jdbcType=DOUBLE}, accounting_code = #{accountingCode},
+            warehouse_code = #{warehouseCode}, drawing = #{drawing}, etc = #{etc},
+            part_no = #{partNo}, manufactory = #{manufactory}, mat_cata_type = #{matCataType},
+            location = #{location}, material_spec2 = #{materialSpec2}, item_type = #{itemType},
+            search_item_name = #{searchItemName}, material_quality = #{materialQuality},
+            item_barcode = #{itemBarcode}, material_no = #{materialNo},
+            material_kind = #{materialKind}, store_method = #{storeMethod},
+            expiryed_status = #{expiryedStatus}, expiryed_count = #{expiryedCount,jdbcType=INTEGER},
+            kfda_report_no = #{kfdaReportNo}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE material_id = #{materialId} AND <include refid="activeTenant"/>
+    </update>
+    <select id="selectMaterialOptions" parameterType="map"
+            resultType="egovframework.let.co.master.material.domain.model.MaterialInfoOptionVO">
+        SELECT g.group_code AS "groupCode", i.item_code AS "itemCode", i.item_nm AS "itemName"
+        FROM tb_common_code_group g
+        JOIN tb_common_code_item i ON i.group_id = g.common_code_group_id AND i.tenant_id = g.tenant_id
+        WHERE g.tenant_id = #{tenantId} AND g.use_at = 'Y' AND i.use_at = 'Y'
+          AND g.group_code IN ('MATERIAL_TYPE', 'STORE_METHOD', 'EXPIRY_STATUS')
+        ORDER BY g.sort_order, g.group_code, i.sort_order, i.item_code
+    </select>
+</mapper>

@@ -87,7 +87,11 @@ const selectedModule = {
 const SYSTEM_TODAY = '2026-10-20';
 const SYSTEM_DATE_RANGE = { from: '2026-09-20', to: SYSTEM_TODAY };
 
-function renderDocumentStatusPage(currentPageKey = 'documents', read?: boolean) {
+function renderDocumentStatusPage(
+  currentPageKey = 'documents',
+  read?: boolean,
+  excel = false,
+) {
   return render(
     <DashboardContent
       selectedModule={selectedModule}
@@ -97,7 +101,7 @@ function renderDocumentStatusPage(currentPageKey = 'documents', read?: boolean) 
       selectedMenuPermissions={
         read === undefined
           ? undefined
-          : { read, create: false, update: false, delete: false }
+          : { read, create: false, update: false, delete: false, excel }
       }
       content={{
         title: '문서현황',
@@ -492,8 +496,20 @@ describe('document status page', () => {
       .toHaveValue(SYSTEM_DATE_RANGE.to);
   });
 
+  it('hides Excel export when the menu does not grant Excel permission', async () => {
+    renderDocumentStatusPage('documents', false, false);
+    const grid = await screen.findByRole('grid', { name: '문서현황' });
+
+    fireEvent.contextMenu(grid);
+
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu).queryByRole('menuitem', { name: '엑셀 내보내기' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('opens only the read-only context menu on right-click and still opens detail on left-click', async () => {
-    renderDocumentStatusPage();
+    renderDocumentStatusPage('documents', false, true);
     const cell = await screen.findByRole('gridcell', { name: row.title });
 
     fireEvent.mouseDown(cell, { button: 2 });

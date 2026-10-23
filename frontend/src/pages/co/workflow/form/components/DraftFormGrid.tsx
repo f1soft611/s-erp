@@ -321,6 +321,7 @@ export function DraftFormGrid({
   columns,
   canCreate,
   canUpdate,
+  canExportExcel,
   loading,
   gridKey,
   gridRef,
@@ -353,7 +354,7 @@ export function DraftFormGrid({
       loading={loading}
       height="100%"
       showCheckbox={false}
-      canExportExcel={true}
+      canExportExcel={canExportExcel}
       allowAddRowInContextMenu={canCreate}
       allowDuplicateRowInContextMenu={canCreate}
       allowDeleteRowInContextMenu={false}

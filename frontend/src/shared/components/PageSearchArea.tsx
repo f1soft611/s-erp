@@ -15,6 +15,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { DateEditor, normalizeDateInput } from './f1-grid/editing/DateEditor';
+import { useF1GridFormattedInput } from './f1-grid/editing/useF1GridFormattedInput';
 import type {
   PageSearchField,
   PageSearchFieldValue,
@@ -25,6 +26,45 @@ type SearchRenderBlock =
   | { field: PageSearchField };
 
 const EMPTY_SEARCH_VALUES: Record<string, PageSearchFieldValue> = {};
+
+type PageSearchTextFieldProps = {
+  field: PageSearchField;
+  value: PageSearchFieldValue;
+  onChange: (value: string) => void;
+};
+
+function PageSearchTextField({
+  field,
+  value,
+  onChange,
+}: PageSearchTextFieldProps) {
+  const inputValue =
+    value == null || typeof value === 'object' ? '' : String(value);
+  const { inputRef, handleChange } = useF1GridFormattedInput({
+    value: inputValue,
+    inputFormat: field.inputFormat,
+    sanitizeInput: field.sanitizeInput,
+    onChange,
+  });
+
+  return (
+    <TextField
+      fullWidth
+      size="small"
+      margin="none"
+      type={
+        ['number', 'decimal', 'currency'].includes(field.type)
+          ? 'number'
+          : 'text'
+      }
+      label={field.label}
+      value={inputValue}
+      inputRef={inputRef}
+      onChange={handleChange}
+      slotProps={{ htmlInput: { 'aria-label': field.label } }}
+    />
+  );
+}
 
 function groupSearchFields(fields: PageSearchField[]): SearchRenderBlock[] {
   const blocks: SearchRenderBlock[] = [];
@@ -274,19 +314,10 @@ export function PageSearchArea({
             </Select>
           </FormControl>
         ) : (
-          <TextField
-            fullWidth
-            size="small"
-            margin="none"
-            type={
-              ['number', 'decimal', 'currency'].includes(field.type)
-                ? 'number'
-                : 'text'
-            }
-            label={field.label}
-            value={value == null || typeof value === 'object' ? '' : String(value)}
-            onChange={(event) => updateValue(field.field, event.target.value)}
-            slotProps={{ htmlInput: { 'aria-label': field.label } }}
+          <PageSearchTextField
+            field={field}
+            value={value}
+            onChange={(nextValue) => updateValue(field.field, nextValue)}
           />
         )}
       </Box>

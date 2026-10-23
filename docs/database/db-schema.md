@@ -330,7 +330,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 결재 처리 및 임시저장/취소 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시한다. SYSTEM 행은 `APPROVED`/`REJECTED`/`RETURNED`/`DRAFT_SAVED`/`SUBMITTED`/`RESUBMITTED`/`COMPLETED`/`DELETED`/`SUBMISSION_CANCELED`/`APPROVAL_CANCELED` 중 하나의 `event_type`을 가지며 서비스/API에서 수정·삭제·답글·좋아요를 차단해야 한다. `DRAFT_SAVED` 허용은 `20261008_004` migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. 신규 결재 이벤트 허용은 `20261012_001` 검토용 migration 초안에 기록되어 있으며 DB에는 적용하지 않았다. approval 문서 논리 삭제의 `DELETED` 허용은 `20261012_002` 검토용 migration 초안에 기록하며 DB에는 적용하지 않았다. 취소 이벤트 허용은 `20261014_003` 초안에 기록하며 DB에는 적용하지 않았다.
+- 현재 PostgreSQL MCP의 `chk_tb_common_comment_event_type`은 위의 SYSTEM 이벤트 10종과 USER의 NULL `event_type` 조건을 허용한다. 결재 처리 및 임시저장/취소 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시하며 서비스/API에서 수정·삭제·답글·좋아요를 차단한다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -371,8 +371,8 @@
 | category_code         | varchar   | 게시판 종류별 공통 분류 코드 |
 | view_count            | int       | 조회수                       |
 | is_pinned             | char      | 상단 고정 여부 (`Y`/`N`)     |
-| login_popup_yn        | char(1)   | 로그인 팝업 여부, 기본 N (20261022_004 미적용 migration) |
-| popup_end_date        | date      | 팝업 종료일, 해당 한국 날짜까지 유효 (위 migration) |
+| login_popup_yn        | char(1)   | 로그인 팝업 여부, 기본 N |
+| popup_end_date        | date      | 팝업 종료일, 해당 한국 날짜까지 유효 |
 | is_deleted            | char      | 삭제 여부 (`Y`/`N`)          |
 | created_at            | timestamp | 생성 일시                    |
 | updated_at            | timestamp | 수정 일시                    |
@@ -386,33 +386,10 @@
 - 목록/상세 조회와 삭제 처리의 기본 테이블
 - `tenant_id`는 `tb_tenant.tenant_id`를 참조하며, tenant + 게시판 종류 + 최신 등록순 인덱스로 목록 조회를 지원
 - `category_code`는 NOTICE의 `NOTICE_GUBUN`, ARCHIVE의 `WF_ARCHIVE_CATEGORY` tenant별 활성 항목으로 서비스에서 검증
+- `login_popup_yn`은 `Y/N` CHECK를 가지며 `Y`이면 `popup_end_date`가 필수다. 현재 MCP에서 컬럼과 CHECK 제약을 확인했다.
+- 첨부 메타데이터는 공유 테이블 `tb_common_file`을 사용한다. `tb_board_file`은 현재 public 스키마에 존재하지 않는다.
 
-### 2-18. tb_board_file
-
-| 컬럼             | 타입      | 설명                     |
-| ---------------- | --------- | ------------------------ |
-| board_file_id    | bigint    | 첨부 PK                  |
-| post_id          | bigint    | 게시글 FK                |
-| file_name        | varchar   | 원본 파일명              |
-| file_path        | varchar   | legacy 저장 경로(호환용) |
-| file_size        | bigint    | 파일 크기                |
-| mime_type        | varchar   | MIME 타입                |
-| object_key       | varchar   | MinIO object key         |
-| bucket_name      | varchar   | MinIO 버킷명             |
-| storage_provider | varchar   | 저장소 타입 (`minio`)    |
-| checksum_sha256  | varchar   | 파일 해시                |
-| content_type     | varchar   | 파일 컨텐츠 타입         |
-| uploaded_by      | varchar   | 업로더 ID                |
-| deleted_yn       | char      | 삭제 여부 (`Y`/`N`)      |
-| created_at       | timestamp | 생성 일시                |
-| updated_at       | timestamp | 수정 일시                |
-
-역할:
-
-- 첨부 파일 메타데이터를 보관
-- 실제 파일 바이너리는 MinIO에 저장하고 DB에는 경로/메타정보를 기록
-
-### tb_notice_popup_dismissal (20261022_004 migration, 실제 DB 미적용)
+### tb_notice_popup_dismissal (현재 public 스키마 확인)
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -421,7 +398,13 @@
 | login_id | bigint | 로그인 FK, 복합 PK, 삭제 시 cascade |
 | dismissed_on | date | Asia/Seoul 기준 마지막 하루 숨김 날짜 |
 
-`backend/DATABASE/20261022` 및 `docs/database/20261022`의 `20261022_004` SQL/변경 이력/롤백 참조.
+제약:
+
+- 복합 PK: `(tenant_id, post_id, login_id)`
+- `tenant_id`는 `tb_tenant`, `post_id`는 `tb_board_post`, `login_id`는 `tb_login_account`를 참조한다.
+- 게시글 또는 로그인 계정 삭제 시 해당 닫기 이력은 cascade 삭제된다.
+- 현재 MCP에서 테이블 및 제약 메타데이터를 확인했다. DDL 이력은 `20261022_004_notice_login_popup.sql`에 있다.
+
 기존 최초 조회수 이력과 별개이며 과거 숨김 일자는 다음 날짜 팝업 노출을 막지 않는다.
 
 ### 2-19. tb_board_post_view_history
@@ -494,7 +477,7 @@
 - `category_item_id`는 `WF_FORM_CATEGORY`, `reg_term_id`는 `WF_FORM_CYCLE` 그룹 항목을 서비스에서 검증
 - `code_name`은 양식명이다. `reg_term`은 `reg_term_id`가 가리키는 항목명과 동기화
 - `cata_type_code`는 `EgovConfigAppIdGen.codeIdGnrService`의 `tb_drafting_work_category` 3자리 설정으로 생성
-- `(tenant_id, cata_type_code)`는 `delete_status IS DISTINCT FROM 'Y'` 조건의 부분 unique index로 유일성 보장
+- 현재 MCP에서 확인한 인덱스는 tenant/group/reviewer/approver/type/use/category/reg-term 조회용 인덱스다. `delete_status` 조건의 `(tenant_id, cata_type_code)` 부분 unique index는 현재 스키마 메타데이터에 없다.
 
 ### 2-22. tb_drafting_work_category_authority
 
@@ -560,9 +543,8 @@
 - `(tenant_id, electronic_approval_id)` 복합 unique 키로 결재선의 tenant 일치를 강제한다.
 - `document_type`: `DRAFTING`, `BUSINESS_CONTACT`, `EXPENSE_RESOLUTION`, `ATTENDANCE_APPLICATION`
 - `document_status`: `DRAFT`, `PENDING`, `IN_PROGRESS`, `REVISION_REQUESTED`, `COMPLETED`, `REJECTED`
-- `deleted_yn`은 `document_status`를 변경하지 않는 논리 삭제 표시이며, `Y/N` CHECK를 둔다. 이 컬럼은 `20261012_002` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
-- `eabus_no` 유형별 CHECK와 NOT NULL은 `20261012_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
-- `view_count`는 인증 사용자가 상세 문서를 최초 조회할 때만 증가하며, 사용자별 중복 방지는 `tb_electronic_approval_view_history`에서 관리한다. `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+- 현재 MCP에서 `eabus_no` NOT NULL 및 문서 유형별 일치 CHECK, `deleted_yn`의 Y/N CHECK, `view_count >= 0` CHECK를 확인했다.
+- `view_count`는 인증 사용자가 상세 문서를 최초 조회할 때만 증가하며, 사용자별 중복 방지는 `tb_electronic_approval_view_history`에서 관리한다.
 - 본문 원본은 문서작성 편집기의 JSON이며 HTML/평문은 렌더링/검색을 위한 파생 표현이다.
 
 ### 2-25. tb_electronic_approval_line_info
@@ -587,7 +569,7 @@
 - 결재 본문과 `(tenant_id, electronic_approval_id)` FK로 연결되며 본문 삭제 시 결재선은 cascade 삭제된다.
 - 단계/참여자 순서와 문서 내 참여자 중복을 unique로 제한한다.
 - `action_status`: `WAITING`, `PENDING`, `APPROVED`, `REJECTED`, `RETURNED`
-- `PENDING` 행은 `pending_at`이 필수이고 `WAITING` 및 `REFERENCE` 행은 NULL이다. 이 제약은 `20261012_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+- 현재 MCP에서 `PENDING` 행은 `pending_at` 필수, `WAITING` 및 `REFERENCE` 행은 NULL인 검사 제약을 확인했다.
 - `REFERENCE`는 처리 상태/시각/의견을 가질 수 없다.
 - 승인/반려/보완요청 처리의 구조화된 값이 원본이며 공통 댓글 SYSTEM 행은 화면 타임라인 표시용이다.
 
@@ -625,7 +607,7 @@
 - tenant FK 및 `(tenant_id, template_id)` unique 키로 템플릿 상세의 tenant 일치를 강제한다.
 - 지원 문서 코드는 기안 `001`, 업무 `008`, 지출 `004`, 근태 `031`이다.
 - 사용자 소유권은 API에서 인증 `LoginVO`의 tenant 및 사용자 ID로 제한한다.
-- 2026-10-15: 결재선 자주 쓰기 기능을 위한 검토용 migration 초안. 실제 DB 적용 전 검토가 필요하다.
+- 현재 PostgreSQL MCP에서 해당 테이블, 제약 및 인덱스를 확인했다.
 
 ### 2-28. tb_electronic_approval_line_template_info
 
@@ -644,7 +626,7 @@
 - 템플릿 내 participant user ID는 중복될 수 없다.
 - 참여자 활성/tenant 검증은 템플릿 저장 및 불러오기 서비스에서 수행한다.
 - 기안자 고정 단계는 상세에 저장하지 않으며 참조자는 결재/합의 단계 뒤에 정렬한다.
-- 2026-10-15: 결재선 자주 쓰기 기능을 위한 검토용 migration 초안. 실제 DB 적용 전 검토가 필요하다.
+- 현재 PostgreSQL MCP에서 해당 테이블, 제약 및 인덱스를 확인했다.
 
 ### 2-29. tb_electronic_approval_view_history
 
@@ -661,30 +643,11 @@
 - `(tenant_id, electronic_approval_id, login_id)` unique로 사용자별 문서 최초 조회만 기록한다.
 - `(tenant_id, electronic_approval_id)` 복합 FK로 동일 tenant의 문서를 참조하며 문서 삭제 시 이력을 cascade 삭제한다.
 - 상세 조회수 컬럼은 `tb_electronic_approval_main.view_count`에 저장한다.
-- `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
+- 현재 PostgreSQL MCP에서 해당 테이블, 제약 및 인덱스를 확인했다.
 
 ---
 
-### 2-30. tb_electronic_approval_view_history
-
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| view_history_id | bigserial | 조회 이력 PK |
-| tenant_id | bigint | 소속 테넌트 FK |
-| electronic_approval_id | bigint | 전자결재 문서 FK |
-| login_id | bigint | 로그인 계정 FK |
-| viewed_at | timestamp | 최초 상세 조회 시각 |
-
-제약/역할:
-
-- `(tenant_id, electronic_approval_id, login_id)` unique로 사용자별 문서 최초 조회만 기록한다.
-- `(tenant_id, electronic_approval_id)` 복합 FK로 동일 tenant의 문서를 참조하며 문서 삭제 시 이력을 cascade 삭제한다.
-- 상세 조회수 컬럼은 `tb_electronic_approval_main.view_count`에 저장한다.
-- `20261014_001` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다.
-
----
-
-### 2-31. tb_electronic_approval_pin
+### 2-30. tb_electronic_approval_pin
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -699,19 +662,116 @@
 - `tenant_id`와 `user_id`는 각각 `tb_tenant`와 `tb_user`를 참조하며, `(tenant_id, electronic_approval_id)` 복합 FK는 동일 tenant의 문서를 참조한다.
 - 문서·사용자 또는 tenant가 실제 삭제되면 해당 pin 관계도 cascade 삭제한다.
 - `idx_electronic_approval_pin_document`는 문서 FK 조회를 지원한다.
-- `20261020_007` 검토용 migration 초안으로 제안되었으며 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
+- 현재 PostgreSQL MCP에서 해당 테이블, FK 및 인덱스를 확인했다. 생성 이력은 [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020)에서 확인할 수 있다.
+
+---
+
+### tb_customer_info (MCP 확인: 2026-10-22)
+
+| 컬럼 | 타입 | NULL | 기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| customer_id | bigint | 불가 | `nextval('tb_customer_info_customer_id_seq')` | 거래처 PK |
+| tenant_id | bigint | 불가 | 없음 | 소속 tenant |
+| customer_code | varchar | 불가 | 없음 | 거래처 코드 |
+| customer_name | varchar | 불가 | 없음 | 거래처명 |
+| cust_name_abbr | varchar | 가능 | 없음 | 거래처 약칭 |
+| president_name | varchar | 가능 | 없음 | 대표자명 |
+| business_no | varchar | 가능 | 없음 | 사업자등록번호 |
+| jurid_no | varchar | 가능 | 없음 | 법인등록번호 |
+| business_status_1 | varchar | 가능 | 없음 | 업태 |
+| business_item_1 | varchar | 가능 | 없음 | 종목 |
+| post_code | varchar | 가능 | 없음 | 우편번호 |
+| address | varchar | 가능 | 없음 | 주소 |
+| telephone_no | varchar | 가능 | 없음 | 전화번호 |
+| facsimile_no | varchar | 가능 | 없음 | 팩스번호 |
+| cust_memo | varchar | 가능 | `''` | 메모 |
+| use_at | char(1) | 불가 | `'Y'` | 사용 여부 (`Y`/`N`) |
+| created_by | bigint | 가능 | 없음 | 생성 사용자 ID |
+| created_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 생성 일시 |
+| updated_by | bigint | 가능 | 없음 | 최종 수정 사용자 ID |
+| updated_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 최종 수정 일시 |
+
+제약 및 관계:
+
+- `tb_customer_info_pkey`: `PRIMARY KEY (customer_id)`
+- `uq_customer_id_tenant_id`: `UNIQUE (customer_id, tenant_id)`
+- `uq_tb_customer_info_tenant_code`: `UNIQUE (tenant_id, customer_code)`
+- `tb_customer_info_tenant_id_fkey`: `tenant_id`가 `tb_tenant(tenant_id)`를 참조하며 tenant 삭제 시 cascade 된다.
+- `tb_customer_info_use_at_check`: `use_at`은 `Y` 또는 `N`만 허용한다.
+
+`tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 거래처 코드는 기존 전자정부 ID Generator의 `public.ids` 카운터 중 `table_name = 'tb_customer_info'` 행을 사용한다. `20261022_005` migration은 기존 1~6자리 숫자 거래처 코드의 최댓값보다 큰 `next_id`를 설정하고, 기존 카운터가 더 크면 그 값을 보존한다. 앱의 `customerCodeIdGnrService`는 `IDS` 테이블/`tb_customer_info` 키, 6자리 zero-padding, block size 1을 사용한다. 신규 테이블이나 시퀀스는 만들지 않는다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+
+### tb_material_info (MCP 확인: 2026-10-22)
+
+기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.
+
+테이블이 없는 신규 환경용 [생성 SQL](20261022/20261022_010_create_material_schema.sql)을 추가했다. `public.tb_tenant` 준비 후 생성 SQL을 실행하고, 기존 `public.ids`가 준비된 상태에서 [채번 초기화 SQL](20261022/20261022_010_material_code_id_generator.sql)을 적용한다. 이미 테이블이 있는 환경에서는 생성 SQL을 실행하지 않는다. [생성 롤백](20261022/20261022_010_rollback_material_schema.sql)은 신규 생성한 빈 테이블만 삭제하며 데이터가 있거나 외부 의존 객체가 있으면 실패한다. IDS 카운터는 보존한다. 실제 DB에 실행하지 않았다.
+
+| 컬럼 | 타입 | NULL/기본값 | 설명 |
+| --- | --- | --- | --- |
+| material_id | bigint | NOT NULL, 기본 sequence | PK |
+| tenant_id | bigint | NOT NULL | tb_tenant FK |
+| material_code | varchar(20) | NOT NULL | tenant 내 유일한 품목코드 |
+| material_name | varchar(200) | NOT NULL | 품목명 |
+| material_eng_name, material_model_name | varchar(200) | NULL | 영문명/모델명 |
+| material_spec, material_spec2 | varchar(100) | NULL | 규격/규격2 |
+| material_weight | bigint | NULL | 중량 |
+| unit, material_quality | varchar(6) | NULL | 단위/재질 |
+| material_type_code | varchar(14) | NOT NULL | 품목계정코드 |
+| customer_code | varchar(10) | NULL | 제조사 코드 |
+| safe_invoice | double precision | NULL | 안전재고(기존 컬럼명 유지) |
+| accounting_code | varchar(7) | NULL | 회계코드 |
+| warehouse_code, drawing | varchar(10) | NULL | 창고코드/도면번호 |
+| etc, manufactory | varchar(100) | NULL | 비고/제조 |
+| part_no | varchar(30) | NULL | Part No |
+| deleted_at | timestamp | NULL | 삭제일시 |
+| mat_cata_type | varchar(10) | NOT NULL, 빈 문자열 | 품목분류 |
+| location | varchar(1000) | NULL | 위치정보 |
+| item_type | varchar(10) | NULL | 품목계정 |
+| search_item_name | varchar(200) | NULL | 통합검색명칭 |
+| item_barcode, material_no, kfda_report_no | varchar(20) | NULL | 바코드/품목번호/품목보고번호 |
+| delete_status | varchar(10) | NOT NULL, N | 삭제여부 |
+| created_by, updated_by | varchar(10) | NULL | 감사 사용자 ID 문자열 |
+| created_at, updated_at | timestamp | NULL | 감사 시각 |
+| material_kind, store_method | varchar(50) | NULL | MATERIAL_TYPE/STORE_METHOD 공통코드 |
+| expiryed_status | varchar(10) | NOT NULL, NONE | NONE/DAY/MONTH/YEAR CHECK |
+| expiryed_count | integer | NULL | NULL 또는 양수 CHECK |
+
+- PK: `material_id`; unique: `(material_id, tenant_id)`, `(tenant_id, material_code)`; FK: `tenant_id → tb_tenant`.
+- 별도 B-tree 인덱스: `ix_tb_material_info_material_name (material_name)`, `ix_tb_material_info_tenant_id (tenant_id)`. 기본 시퀀스는 BIGSERIAL 소유 `tb_material_info_material_id_seq`다.
+- 조회/수정은 인증 tenant 및 `delete_status = 'N' AND deleted_at IS NULL` 조건으로 제한한다. 코드 중복 검사는 삭제 행을 포함한다.
+- 품목코드는 `materialCodeIdGnrService`의 기존 IDS/`tb_material_info` 키, 6자리, block size 1을 사용한다. `20261022_010`은 기존 1~6자리 숫자 품목코드 최댓값 다음 값으로 카운터를 초기화하며 더 높은 카운터를 유지한다. SQL은 작성만 했으며 현재 DB에 적용하지 않았다.
+
+### ids (전자정부 ID Generator 관리 테이블)
+
+| 컬럼 | 타입 | NULL | 기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| table_name | varchar | 불가 | 없음 | 전자정부 ID Generator의 테이블 키 |
+| next_id | bigint | 불가 | `1` | 다음 발급 값 |
+| created_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 생성 일시 |
+| updated_at | timestamp without time zone | 불가 | `CURRENT_TIMESTAMP` | 갱신 일시 |
+
+- MCP에서 확인한 PK는 `ids_pkey (table_name)`이다.
+- eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
+- 테이블과 스키마는 기존 것을 사용하며 거래처/품목별 generator row만 추가/상향한다.
 
 ---
 
 ## 변경 이력
 
-- 2026-10-20: 전자결재 문서의 개인별 고정 기능을 위해 `tb_electronic_approval_pin`과 사용자·tenant·문서 FK, 조회 인덱스를 추가하는 `20261020_007` migration 초안을 정의했다. 기본 읽기 전용 PostgreSQL MCP에서 `tb_electronic_approval_main`, `tb_user`, `tb_tenant`의 메타데이터를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
-- 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 결재선/사용자 테이블 메타데이터를 확인했으며 기존 문서 결재선은 재사용하지 않는다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
-- 2026-10-15: 커뮤니티 게시글의 tenant 격리 및 공유 분류 저장을 위해 `tb_board_post.tenant_id`와 `category_code` 전환 migration 초안을 정의했다. 단일 tenant guard가 충족되지 않으면 백필을 중단하며 롤백은 여러 tenant 게시글이 있으면 거부한다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
+- 2026-10-22: 품목 테이블이 없는 환경의 DDL 누락을 보완했다. tenant MCP로 37개 컬럼과 기본값/주석/제약/인덱스를 재확인하고 `20261022_010_create_material_schema.sql`과 빈 신규 테이블 전용 롤백을 두 DB 이력 폴더에 추가했다. 기존 테이블 수정 및 실제 DB 적용은 수행하지 않았다.
+
+- 2026-10-22: 지정 tenant MCP로 기존 `tb_material_info`의 타입/길이/주석/제약을 확인하고 품목관리와 IDS 초기화 `20261022_010`을 정의했다. DDL 변경과 SQL 적용은 수행하지 않았다.
+
+- 2026-10-22: 신규 환경용 그룹웨어 기준 DDL 및 공통코드 시드를 작성했다. MCP로 확인한 현행 그룹웨어 스키마 13개 테이블과 공통코드 5개 그룹/23개 항목을 반영했으며 현재 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+- 2026-10-22: 기존 eGov `ids` 테이블의 `tb_customer_info` generator counter를 기존 거래처 코드 최댓값 기준으로 초기화하는 `20261022_005` migration을 정의했다. tenant 전용 PostgreSQL MCP에서 `tb_customer_info`/`ids` 컬럼과 제약 메타데이터를 확인했고 업무 데이터 및 ID 카운터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
+
+- 2026-10-20: 전자결재 문서의 개인별 고정 기능을 위해 `tb_electronic_approval_pin`과 사용자·tenant·문서 FK, 조회 인덱스를 추가하는 `20261020_007` migration 초안을 정의했다. 현재 MCP에서 테이블, FK 및 인덱스를 확인했으며 신규 기준선에도 반영했다. [backend/DATABASE/20261020](../../backend/DATABASE/20261020) 및 [docs/database/20261020](20261020) 참고.
+- 2026-10-15: 사용자별 결재선 즐겨찾기 저장을 위해 `tb_electronic_approval_line_template` 및 `tb_electronic_approval_line_template_info` migration 초안을 정의했다. 현재 MCP에서 두 테이블과 제약/인덱스를 확인했으며 신규 기준선에도 반영했다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
+- 2026-10-15: 커뮤니티 게시글의 tenant 격리 및 공유 분류 저장을 위해 `tb_board_post.tenant_id`와 `category_code` 전환 migration 초안을 정의했다. 현재 MCP에서 해당 컬럼을 확인했으며 신규 기준선에도 반영했다. [backend/DATABASE/20261015](../../backend/DATABASE/20261015) 및 [docs/database/20261015](20261015) 참고.
 - 2026-10-14: 전자결재 기안 상신 취소 및 결재자 승인 취소 이력을 위해 `tb_common_comment` SYSTEM event CHECK에 `SUBMISSION_CANCELED`, `APPROVAL_CANCELED` 허용을 추가하는 `20261014_003` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 이벤트 계약을 확인했으며 USER NULL 조건과 기존 SYSTEM 이벤트를 보존했다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
-- 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
-- 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. `s-erp-postgresql-readonly` 메타데이터 확인에서 main의 논리 삭제 컬럼은 없고 기존 event CHECK 목록은 `20261012_001` 계약과 일치함을 확인했다. 본 migration은 검토용이며 실제 DB에 적용하지 않았다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
-- 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. `s-erp-postgresql-readonly` 메타데이터로 기존 main 고유 키와 로그인 계정 키를 확인했으며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
+- 2026-10-14: 전자결재 상세 사용자별 최초 조회 중복 방지를 위해 `tb_electronic_approval_main.view_count`와 `tb_electronic_approval_view_history`를 추가하는 `20261014_001` migration 초안을 정의했다. 현재 MCP에서 관련 컬럼, 테이블 및 제약을 확인했으며 신규 기준선에도 반영했다. [backend/DATABASE/20261014](../../backend/DATABASE/20261014) 및 [docs/database/20261014](20261014) 참고.
+- 2026-10-12: 전자결재 상세의 기안자 제한 논리 삭제를 위해 `tb_electronic_approval_main.deleted_yn` 및 `tb_common_comment` SYSTEM `DELETED` 이벤트 허용을 `20261012_002` migration 초안으로 정의했다. 당시 메타데이터에는 main 논리 삭제 컬럼이 없었으나 현재 MCP에서 `deleted_yn`과 CHECK를 확인했으며 신규 기준선에 반영했다. [backend/DATABASE/20261012](../../backend/DATABASE/20261012) 및 [docs/database/20261012](20261012) 참고.
 - 2026-10-08: `tb_common_comment` SYSTEM 이벤트 허용 목록에 `DRAFT_SAVED`를 추가하는 `20261008_004` migration 초안을 정의했다. 실제 DB 제약을 재확인하지 못했으며 적용하지 않았다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고.
 - 2026-10-08: 문서 결재 본문/참여자 테이블, 공통 댓글 SYSTEM 이벤트 구분, 댓글 좋아요 테이블의 미적용 SQL 초안을 정의했다. [backend/DATABASE/20261008](../../backend/DATABASE/20261008) 및 [docs/database/20261008](20261008) 참고. 실제 DB에는 적용하지 않았다.
 - 2026-10-01: HACCP 기안양식 기준정보 테이블 3종을 이관하고 `category_item_id`, `reg_term_id` 및 테넌트별 분류/주기 공통코드 seed를 정의했다. 적용 스크립트는 [backend/DATABASE/20261001](../../backend/DATABASE/20261001) 및 [docs/database/20261001](20261001) 참고. (미반영 SQL 초안)
