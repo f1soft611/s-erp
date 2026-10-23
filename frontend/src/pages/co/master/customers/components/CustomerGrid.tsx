@@ -70,6 +70,7 @@ export function createCustomerColumns(
       width: 180,
       editable: canEdit,
       required: true,
+      validation: { unique: true },
       form: { group: '기본정보', order: 2 },
       search: { hidden: true },
     },

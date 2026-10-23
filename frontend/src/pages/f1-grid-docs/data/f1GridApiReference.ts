@@ -147,6 +147,12 @@ const sections: DocSection[] = [
         '미지정',
       ),
       api(
+        'onValidationErrors',
+        '(errors: F1GridValidationError[]) => void',
+        '폼 적용과 validate()의 { rowId, field, message } 오류 목록. 성공은 빈 배열. 페이지 메시지 연결에 사용.',
+        '미지정',
+      ),
+      api(
         'initialSelectedRowIds',
         'F1GridRowId[]',
         '초기 선택할 행 ID 목록.',
@@ -275,6 +281,12 @@ const sections: DocSection[] = [
         '미지정',
       ),
       api('required', 'boolean', '값 입력을 필수로 검증.', 'false'),
+      api(
+        'validation',
+        '{ unique?: boolean }',
+        'unique: true이면 전체 활성 행에서 고유값 검증. 문자열 trim 후 비교, 자기 행·빈 값 제외. 폼 적용과 validate() 공통 적용.',
+        '미지정',
+      ),
       api('min', 'number', '숫자 편집 값의 최소 허용치.', '미지정'),
       api('max', 'number', '숫자 편집 값의 최대 허용치.', '미지정'),
       api(

@@ -73,7 +73,10 @@ import {
   parseGridTsv,
   toGridTsv,
 } from '../clipboard/GridClipboard';
-import { validateGridRow } from '../validation/GridValidation';
+import {
+  createGridValidationContext,
+  validateGridRow,
+} from '../validation/GridValidation';
 import { clampGridRowHeight } from '../layout/GridRowHeight';
 import {
   canHideGridColumn,
@@ -1284,9 +1287,10 @@ function F1GridInner<T extends object>(
   function validate(): boolean {
     const nextErrors: Record<string, string> = {};
     const validationErrors: F1GridValidationError[] = [];
+    const context = createGridValidationContext(activeRows, columns, rowKey);
     visibleRows.forEach((row) => {
       const rowId = getGridRowId(row, rowKey);
-      Object.entries(validateGridRow(row, columns)).forEach(
+      Object.entries(validateGridRow(row, columns, context)).forEach(
         ([field, message]) => {
           nextErrors[`${String(rowId)}:${field}`] = message;
           validationErrors.push({ rowId, field, message });
@@ -3025,6 +3029,7 @@ function F1GridInner<T extends object>(
           originalRow={rowFormSession.originalRow}
           columns={columns}
           rowKey={rowKey}
+          validationRows={activeRows}
           plugin={rowFormPlugin}
           externalErrors={rowFormErrors}
           onValidationErrors={onValidationErrors}

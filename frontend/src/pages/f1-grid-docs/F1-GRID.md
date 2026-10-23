@@ -288,6 +288,7 @@ interface F1GridColumn<T> {
   type?: F1GridEditorType;
   options?: { value: string | number | boolean; label: string }[];
   required?: boolean;
+  validation?: { unique?: boolean };
   min?: number;
   max?: number;
   validate?: (value: T[keyof T], row: T) => string | boolean;
@@ -769,6 +770,24 @@ interface F1GridProps<T extends object> {
 ```
 
 거래처명과 사업자번호는 컬럼 `required: true`로 헤더·폼 필수 표시와 공통 검증을 통일한다. 저장 훅에서 거래처명 필수 검사를 반복하지 않는다. 사업자번호 등 번호 자리수는 `inputFormat.validDigitCounts`와 국내 전화 규칙을 기존 `validateGridRow`에서 검사한다. 거래처 페이지는 폼 적용·최종 저장의 실제 오류를 상단 `PageMessageArea`에 전달한다. 폼은 빨간 입력 테두리와 하단 설명, 그리드는 오류 셀의 빨간 강조와 툴팁을 유지한다. 오류 셀에 포커스가 남아 있어도 선택 테두리는 파란색 대신 오류 빨간색을 우선한다. 모달이 열린 동안 페이지 메시지는 배경에 있으며 폼 내부 오류로 즉시 확인한다. 검증에 성공하면 상단 메시지를 비운다.
+
+### 컬럼 고유값 검증
+
+```typescript
+{
+  field: 'customerName',
+  headerName: '거래처명',
+  editable: true,
+  required: true,
+  validation: { unique: true },
+}
+```
+
+`validation.unique`는 폼 적용과 `validate()`에서 같은 공통 중복 검증을 실행한다. 비교 대상은 삭제되지 않은 전체 로드 행과 신규/수정 행이며 그리드 필터·정렬·가상화로 숨겨진 행도 포함한다. 문자열은 앞뒤 공백을 제거하고 대소문자를 구분한다. 빈 값은 고유성 검사에서 제외해 `required`가 처리하고, 숫자 0과 boolean false는 비교한다. 수정 중인 자기 행은 `rowKey`로 제외한다. 실패 시 `거래처명 값이 중복되었습니다.`를 기존 오류 콜백·상단 메시지·빨간 표시로 전달한다.
+
+여러 행을 검사할 때 `createGridValidationContext(rows, columns, rowKey)`로 고유값 인덱스를 한 번 생성한 후 `validateGridRow(row, columns, context)`에 전달한다. 단독 `F1GridFormModal` 사용자는 `validationRows`로 비교할 행을 전달한다. 기본 F1Grid는 활성 행을 자동 연결한다. 서버 검색으로 로드되지 않은 데이터와 동시 저장은 클라이언트 검증 범위가 아니므로 서버의 검증이 반드시 필요하다.
+
+거래처관리 백엔드는 같은 tenant의 사용/미사용 이름을 trim 후 검사하고 수정 자기 ID를 제외한다. 신규 `uq_tb_customer_info_tenant_name` 인덱스를 적용하면 동시 저장도 DB에서 차단한다. 기존 거래처코드 중복 방지와는 별도 규칙이다. 인덱스 스크립트는 [20261023 DB 변경 이력](../../../../docs/database/20261023/20261023_001_change_customer_name_unique.md)을 참고하며 실제 적용은 별도 운영 절차다.
 
 거래처 관리 화면은 `customerCode`와 `customerName` 등을 행 폼에서 등록·수정한다. 신규 `customerCode`는 비워둘 수 있고 서버가 eGov ID Generator로 생성하지만, 수정 시에는 필수이며 화면과 서버에서 함께 검증한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
 

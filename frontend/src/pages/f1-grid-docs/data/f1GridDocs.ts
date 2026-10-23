@@ -155,6 +155,7 @@ export const f1GridDocs: F1GridDoc[] = [
           ['format', 'number | decimal | currency', '숫자 컬럼 표시 형식'],
           ['decimalPlaces', 'number', '숫자 표시 소수점 자릿수'],
           ['required / min / max', 'boolean / number', '기본 검증 규칙'],
+          ['validation.unique', 'boolean', '전체 활성 행의 고유값 검사. 문자열 trim, 자기 행·빈 값 제외'],
           ['validate', '(value, row) => string | boolean', '값 검증 규칙'],
           [
             'selectOnFocus',
@@ -285,7 +286,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Automatic mapping and validation',
-        body: 'headerName은 기본 라벨, headerGroup은 자동 섹션이 되고 text, number, decimal, currency, checkbox, date, datetime, time, select, autocomplete, code 타입은 대응 입력으로 변환됩니다. 숨김·행번호·합성 열은 기본 제외되며 required, min, max, validate는 폼 포함 컬럼에만 적용됩니다. 읽기 전용은 form.readOnly, editable 함수, editable 값 순으로 판정합니다.',
+        body: 'headerName은 기본 라벨, headerGroup은 자동 섹션이 되고 text, number, decimal, currency, checkbox, date, datetime, time, select, autocomplete, code 타입은 대응 입력으로 변환됩니다. 숨김·행번호·합성 열은 기본 제외되며 required, inputFormat 자리수, min, max, validation.unique, validate는 폼 포함 컬럼에 적용됩니다. unique는 전체 활성 행을 비교하고 자기 행은 제외합니다. 폼 적용과 validate()의 실제 오류는 onValidationErrors 콜백으로 페이지 메시지에 연결할 수 있습니다. 읽기 전용은 form.readOnly, editable 함수, editable 값 순으로 판정합니다.',
       },
       {
         type: 'api',

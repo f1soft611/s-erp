@@ -89,6 +89,31 @@ beforeEach(() => {
 });
 
 describe('customer management page', () => {
+  it('rejects a trimmed duplicate customer name in the form and on final save', async () => {
+    expect(createCustomerColumns(true).find((column) => column.field === 'customerName')?.validation)
+      .toEqual({ unique: true });
+    renderCustomerPage();
+    await screen.findByText('Acme');
+    fireEvent.click(screen.getByRole('button', { name: '거래처 추가' }));
+    const dialog = screen.getByRole('dialog', { name: '거래처 등록' });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '거래처명' }), { target: { value: ' Acme ' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '사업자번호' }), { target: { value: '1234567890' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    expect(screen.getByRole('alert', { hidden: true })).toHaveTextContent('거래처명 값이 중복되었습니다.');
+    expect(within(dialog).getByRole('textbox', { name: '거래처명' })).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '거래처명' }), { target: { value: 'Unique' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '적용' }));
+    const nameCell = screen.getByRole('gridcell', { name: 'Unique' });
+    fireEvent.doubleClick(nameCell);
+    const editor = screen.getByDisplayValue('Unique');
+    fireEvent.change(editor, { target: { value: 'Acme' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('거래처명 값이 중복되었습니다.');
+    expect(nameCell).toHaveAttribute('data-grid-error', '거래처명 값이 중복되었습니다.');
+    expect(apiMocks.apiPost).not.toHaveBeenCalled();
+  });
+
   it('declares customer name and business number required in shared column metadata', () => {
     const requiredFields = createCustomerColumns(true)
       .filter((column) => column.required)

@@ -701,6 +701,13 @@
 
 `tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 거래처 코드는 기존 전자정부 ID Generator의 `public.ids` 카운터 중 `table_name = 'tb_customer_info'` 행을 사용한다. `20261022_005` migration은 기존 1~6자리 숫자 거래처 코드의 최댓값보다 큰 `next_id`를 설정하고, 기존 카운터가 더 크면 그 값을 보존한다. 앱의 `customerCodeIdGnrService`는 `IDS` 테이블/`tb_customer_info` 키, 6자리 zero-padding, block size 1을 사용한다. 신규 테이블이나 시퀀스는 만들지 않는다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 
+#### 거래처명 고유성 추가 (2026-10-23, 적용 예정)
+
+- `20261023_001`은 `uq_tb_customer_info_tenant_name` unique index on `(tenant_id, btrim(customer_name))`를 정의한다. 사용/미사용을 모두 포함하고 대소문자는 구분한다. 기존 NULL 허용 계약은 바꾸지 않으며 저장 API의 이름 필수 검사를 유지한다.
+- 기본 DB `s-erp-postgresql-readonly`의 테이블/컬럼/인덱스 metadata 확인 결과 이름 unique index는 없고 코드 unique index는 `uq_tb_customer_info_factory_customer_code`였다. 이 DB의 `customer_name`은 nullable이다. 위 2026-10-22 tenant 전용 DB 정보와 구분하며 현재 DB 계약을 동일하다고 간주하지 않는다.
+- 실제 DB 미적용. 현재 이름 중복 데이터 유무는 업무 행을 조회하지 않아 미확인이다. 중복이 있으면 migration은 명시적 오류로 중단하고 데이터는 자동 변경하지 않는다.
+- [변경 이력 및 배포/롤백 절차](20261023/20261023_001_change_customer_name_unique.md), [backend 사본](../../backend/DATABASE/20261023) 참고.
+
 ### tb_material_info (MCP 확인: 2026-10-22)
 
 기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.

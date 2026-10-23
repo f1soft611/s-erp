@@ -158,6 +158,7 @@ export type F1GridColumn<T extends object> = {
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
+  validation?: { unique?: boolean };
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;
   min?: number;

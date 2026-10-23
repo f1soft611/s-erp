@@ -16,7 +16,7 @@ public class CustomerInfoSaveRequestVO implements Serializable {
     @Schema(description = "거래처 코드. 신규 미입력 시 eGov IDS로 6자리 자동 채번하며 수정 시 필수", example = "000001")
     private String customerCode;
 
-    @Schema(description = "거래처명. 앞뒤 공백을 제거한 값이 필수", required = true)
+    @Schema(description = "거래처명. 앞뒤 공백 제거 후 필수이며 같은 테넌트의 사용/미사용 거래처명과 중복 불가. 수정 시 자기 행 제외", required = true)
     private String customerName;
 
     @Schema(description = "거래처 약칭")

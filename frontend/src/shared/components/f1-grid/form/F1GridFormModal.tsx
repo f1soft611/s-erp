@@ -9,7 +9,10 @@ import type {
   F1GridValidationError,
 } from '../types/grid.types';
 import { getGridRowId } from '../utils/grid.utils';
-import { validateGridRow } from '../validation/GridValidation';
+import {
+  createGridValidationContext,
+  validateGridRow,
+} from '../validation/GridValidation';
 import { GridFormField } from './GridFormField';
 import {
   buildGridFormSections,
@@ -23,6 +26,7 @@ export type F1GridFormModalProps<T extends object> = {
   originalRow?: T;
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
+  validationRows?: T[];
   plugin: F1GridRowFormPlugin<T>;
   externalErrors?: Record<string, string>;
   onCancel: () => void;
@@ -38,6 +42,7 @@ export function F1GridFormModal<T extends object>({
   originalRow,
   columns,
   rowKey,
+  validationRows = [],
   plugin,
   externalErrors = {},
   onCancel,
@@ -108,7 +113,16 @@ export function F1GridFormModal<T extends object>({
   };
 
   const applyDraft = () => {
-    const nextValidationErrors = validateGridRow(draftRow, includedColumns);
+    const validationContext = createGridValidationContext(
+      validationRows,
+      includedColumns,
+      rowKey,
+    );
+    const nextValidationErrors = validateGridRow(
+      draftRow,
+      includedColumns,
+      validationContext,
+    );
     const nextErrors = { ...nextValidationErrors, ...externalErrors };
     const firstInvalidField = includedColumns
       .map((column) => String(column.field))

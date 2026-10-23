@@ -3,19 +3,24 @@ package egovframework.let.co.master.customer.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.util.Collections;
+import java.util.Arrays;
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.egovframe.rte.fdl.idgnr.EgovIdGnrService;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.aop.framework.ProxyFactory;
@@ -28,6 +33,7 @@ import egovframework.let.co.master.customer.domain.model.CustomerInfoBatchSaveRe
 import egovframework.let.co.master.customer.domain.model.CustomerInfoBatchSaveResultVO;
 import egovframework.let.co.master.customer.domain.model.CustomerInfoChangeVO;
 import egovframework.let.co.master.customer.domain.model.CustomerInfoVO;
+import egovframework.let.co.master.customer.domain.repository.CustomerInfoDAO;
 import egovframework.let.co.master.customer.service.CustomerInfoBatchService;
 import egovframework.let.co.master.customer.service.CustomerInfoService;
 
@@ -124,6 +130,31 @@ class CustomerInfoBatchServiceImplTest {
                 .hasMessage("update failed");
 
         verify(customerInfoService).createCustomer(eq(9L), eq(101L), any());
+        verify(connection).rollback();
+        verify(connection, never()).commit();
+    }
+
+    @Test
+    void saveBatchRollsBackWhenSecondInsertDuplicatesFirstName() throws Exception {
+        CustomerInfoDAO dao = mock(CustomerInfoDAO.class);
+        EgovIdGnrService generator = mock(EgovIdGnrService.class);
+        when(dao.selectCustomerIdByName(anyMap())).thenReturn(null, 31L);
+        when(dao.selectCustomerIdByCode(anyMap())).thenReturn(null);
+        when(dao.insertCustomer(anyMap())).thenReturn(31L);
+        when(dao.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        when(generator.getNextStringId()).thenReturn("000031");
+        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator));
+        CustomerInfoBatchSaveRequestVO payload = batch();
+        payload.getCustomers().setInsertedRows(Arrays.asList(
+                row("new-1", ""), row("new-2", "")));
+        payload.getCustomers().setUpdatedRows(Collections.emptyList());
+
+        CustomerInfoBatchService transactional = transactionalService();
+        assertThatThrownBy(() -> transactional.saveBatch(9L, 101L, payload))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("이미 사용 중인 거래처명입니다.");
+
+        verify(dao, times(1)).insertCustomer(anyMap());
         verify(connection).rollback();
         verify(connection, never()).commit();
     }
