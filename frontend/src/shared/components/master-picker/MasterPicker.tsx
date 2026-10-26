@@ -36,7 +36,7 @@ export function MasterPicker({
           disabled={disabled}
           onClick={() => setOpen(true)}
           aria-label={`${label} 선택`}
-          sx={{ flexShrink: 0, minWidth: 76 }}
+          sx={{ flexShrink: 0, minWidth: 76, height: 40, minHeight: 40 }}
         >
           선택
         </Button>
