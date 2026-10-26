@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `frontend/tests/master-picker.test.tsx`
 
-- [ ] **Step 1: Add a failing test**
+- [x] **Step 1: Add a failing test**
 
 Add this test inside `describe('MasterPicker', ...)`:
 
@@ -37,7 +37,7 @@ it('matches the adjacent picker button height to the small input height', () => 
 });
 ```
 
-- [ ] **Step 2: Verify the test fails before the implementation**
+- [x] **Step 2: Verify the test fails before the implementation**
 
 Run from `frontend`: `npm run test -- tests/master-picker.test.tsx`
 
@@ -49,7 +49,7 @@ Expected: the new assertion fails because the picker button has no explicit 40px
 - Modify: `frontend/src/pages/sales/order/create/SalesOrderCreatePage.tsx`
 - Modify: `frontend/src/shared/components/master-picker/MasterPicker.tsx`
 
-- [ ] **Step 1: Use a four-column desktop header grid**
+- [x] **Step 1: Use a four-column desktop header grid**
 
 In `SalesOrderCreatePage.tsx`, set the grid breakpoints to one column below `sm`, two columns from `sm`, and four columns from `lg`:
 
@@ -63,7 +63,7 @@ gridTemplateColumns: {
 
 Keep the fields in their current DOM order: order number, order date, customer, quotation number, delivery date, delivery place, delivery method, status, remark. Keep remark spanning the full row from `sm` upward.
 
-- [ ] **Step 2: Match the adjacent customer-picker button height**
+- [x] **Step 2: Match the adjacent customer-picker button height**
 
 In `MasterPicker.tsx`, add `height: 40` and `minHeight: 40` to the existing button `sx`, retaining its current width, disabled state, and behavior:
 
@@ -71,7 +71,7 @@ In `MasterPicker.tsx`, add `height: 40` and `minHeight: 40` to the existing butt
 sx={{ flexShrink: 0, minWidth: 76, height: 40, minHeight: 40 }}
 ```
 
-- [ ] **Step 3: Run focused frontend tests**
+- [x] **Step 3: Run focused frontend tests**
 
 Run from `frontend`: `npm run test -- tests/master-picker.test.tsx tests/sales-order-create-page.test.tsx tests/sales-order-scroll.test.tsx`
 
