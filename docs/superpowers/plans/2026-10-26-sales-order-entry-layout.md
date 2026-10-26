@@ -91,7 +91,7 @@ Run from `frontend`: `npm run build`
 
 Expected: TypeScript and Vite finish successfully.
 
-- [ ] **Step 2: Verify real-browser layouts at required widths**
+- [x] **Step 2: Verify real-browser layouts at required widths**
 
 Open `/sales/order/create` in a browser at 375px, 768px, and 1280px. Confirm the 1280px form has the two approved four-field rows, the remark spans the card width, the adjacent picker button matches its input height, and the narrower views have no page-level horizontal overflow or clipped fields. Save one screenshot per width under the result directory.
 
@@ -99,4 +99,4 @@ Open `/sales/order/create` in a browser at 375px, 768px, and 1280px. Confirm the
 
 Record the changed layout, unchanged behavior, targeted test/build results, viewport observations, and screenshot links in the result document. Do not claim browser checks that were not completed.
 
-**Execution status (2026-10-26):** The frontend build passed. The focused regression command for the three files listed in Task 2 passed all 9 tests. The existing S-ERP Vite listener on `127.0.0.1:4173` was reused. Chromium reached `/login` instead of `/sales/order/create`; the login form reported `로그인 정보가 올바르지 않습니다.` after submission. Consequently, no required viewport layout was verified and no screenshots were captured. The result record documents this blocker; Task 3 browser verification remains incomplete.
+**Execution status (2026-10-26):** Browser inspection found the picker 16px above neighboring inputs and the read-only order-number guidance clipped at 375px. The picker top spacing and xs input font size were adjusted, with tests added for picker height and alignment spacing. The focused tests passed (10 tests), and `npm run build` passed. Chromium verified the actual route UI at 375px, 768px, and 1280px using an isolated synthetic auth/menu API context because ordinary local login was rejected; no real credentials or business data were used. No horizontal overflow was observed, all form inputs stayed in the viewport, 1280px fields aligned by row with a 40px picker control, and 375px order guidance fit its input. Screenshots are in `docs/result/20261026/sales-order-entry-layout/screenshots/`.

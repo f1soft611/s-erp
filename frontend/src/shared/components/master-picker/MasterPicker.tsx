@@ -22,7 +22,7 @@ export function MasterPicker({
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
+      <Stack direction="row" spacing={1} sx={{ minWidth: 0, mt: 2 }}>
         <TextField
           label={label}
           size="small"

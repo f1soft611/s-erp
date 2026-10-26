@@ -198,6 +198,11 @@ export function SalesOrderCreatePage({
               size="small"
               value="저장 연동 단계에서 채번 기준 확정"
               slotProps={{ input: { readOnly: true } }}
+              sx={{
+                '& .MuiInputBase-input': {
+                  fontSize: { xs: '0.75rem', sm: '1rem' },
+                },
+              }}
             />
             <TextField
               label="수주일자"

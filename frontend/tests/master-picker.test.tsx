@@ -24,6 +24,21 @@ describe('MasterPicker', () => {
     });
   });
 
+  it('aligns the picker field with neighboring normal-margin fields', () => {
+    render(
+      <MasterPicker
+        label="거래처"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '거래처 선택' }).parentElement,
+    ).toHaveStyle({ marginTop: '16px' });
+  });
+
   it('searches on Enter and returns the selected typed option', async () => {
     const search = vi.fn(async () => options);
     const onChange = vi.fn();
