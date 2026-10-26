@@ -4,7 +4,8 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, CircularProgress, IconButton, TextField } from '@mui/material';
+import { Box, IconButton, TextField } from '@mui/material';
+import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -47,7 +48,7 @@ type DraftFormManagementPageProps = {
 
 function DraftFormSaveProgressIcon() {
   return (
-    <CircularProgress size={16} color="inherit" aria-label="기안양식 저장 중" />
+    <AppLoadingSpinner size={16} color="inherit" aria-label="기안양식 저장 중" />
   );
 }
 

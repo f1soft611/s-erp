@@ -7,7 +7,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
   IconButton,
   MenuItem,
@@ -16,6 +15,7 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { F1Grid } from '../../../../../shared/components/f1-grid';
 import {
@@ -1288,7 +1288,7 @@ export function DocumentApprovalSettingsDialog({
             >
               {favoriteOperation === 'save' ? (
                 <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                  <CircularProgress size={18} color="inherit" />
+                  <AppLoadingSpinner size={18} color="inherit" />
                   저장 중...
                 </Box>
               ) : (
@@ -1338,7 +1338,7 @@ export function DocumentApprovalSettingsDialog({
             >
               {favoriteOperation === 'rename' ? (
                 <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                  <CircularProgress size={18} color="inherit" />
+                  <AppLoadingSpinner size={18} color="inherit" />
                   저장 중...
                 </Box>
               ) : (

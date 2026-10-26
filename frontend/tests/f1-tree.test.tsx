@@ -107,7 +107,7 @@ describe('F1Tree interaction', () => {
     expect(overlay).toBeInTheDocument();
     expect(progress).toHaveStyle({ width: '34px', height: '34px' });
     expect(circle).not.toBeNull();
-    expect(circle).toHaveAttribute('stroke-width', '1.8');
+    expect(circle).toHaveAttribute('stroke-width', '2.4');
   });
 
   it('uses fixed-width tracks for pinned flex columns inherited from F1Grid', () => {

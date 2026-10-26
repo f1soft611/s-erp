@@ -133,7 +133,8 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - `columnLine` 기본값은 `true`이며, 컬럼 사이 세로 구분선을 표시한다.
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
-- `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·1.8px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. F1Grid와 F1Tree는 동일한 공통 오버레이와 스피너 두께를 사용하며, F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. 앱 첫 접속 로더와 같은 컴포넌트를 사용하지만 그리드와 트리에서만 선을 얇게 표시한다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. F1Grid와 F1Tree는 동일한 공통 오버레이와 스피너 두께를 사용하며, F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. 앱 첫 접속 로더와 같은 컴포넌트를 사용하지만 그리드와 트리에서만 선을 얇게 표시한다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.

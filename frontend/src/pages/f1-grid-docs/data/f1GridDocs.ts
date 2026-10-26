@@ -115,7 +115,7 @@ export const f1GridDocs: F1GridDoc[] = [
           [
             'loading',
             'boolean',
-            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 1.8px 두께로 표시',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께로 표시',
           ],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
           [
@@ -945,7 +945,7 @@ const detailValues = {
           [
             'loading',
             'boolean',
-            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 1.8px 두께로 표시',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께로 표시',
           ],
           ['minHeight', 'number | string', '그리드 최소 높이 제어'],
           [

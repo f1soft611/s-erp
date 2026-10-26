@@ -23,4 +23,23 @@ describe('AppLoadingSpinner', () => {
     expect(defaultCircle).toHaveAttribute('stroke-width', '3.6');
     expect(overrideCircle).toHaveAttribute('stroke-width', '1.8');
   });
+
+  it('forwards contextual size, color, and accessibility props', () => {
+    render(
+      <AppLoadingSpinner
+        size={16}
+        thickness={2.4}
+        color="inherit"
+        aria-label="저장 중"
+      />,
+    );
+
+    const progressbar = screen.getByRole('progressbar', { name: '저장 중' });
+    expect(progressbar).toHaveStyle({ width: '16px', height: '16px' });
+    expect(progressbar).toHaveClass('MuiCircularProgress-colorInherit');
+    expect(progressbar.querySelector('circle')).toHaveAttribute(
+      'stroke-width',
+      '2.4',
+    );
+  });
 });

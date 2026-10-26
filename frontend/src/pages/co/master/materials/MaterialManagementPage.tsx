@@ -3,7 +3,8 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, CircularProgress, IconButton, TextField } from '@mui/material';
+import { Box, IconButton, TextField } from '@mui/material';
+import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -26,7 +27,7 @@ type Props = {
 };
 
 function SaveProgressIcon() {
-  return <CircularProgress size={16} color="inherit" aria-label="품목 저장 중" />;
+  return <AppLoadingSpinner size={16} color="inherit" aria-label="품목 저장 중" />;
 }
 
 export function MaterialManagementPage({ selectedModule, currentMenuName, content,

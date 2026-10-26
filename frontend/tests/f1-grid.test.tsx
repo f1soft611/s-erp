@@ -1,4 +1,6 @@
-﻿import { createRef, useState } from 'react';
+import { createRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import {
   act,
   fireEvent,
@@ -288,7 +290,89 @@ describe('F1-GRID size props', () => {
 });
 
 describe('F1-GRID loading overlay', () => {
-  it('uses the thinner shared spinner and restores grid editing after loading', () => {
+  it('commits fetched and empty rows before loading-complete updates return', () => {
+    const fetchedRows = [{ id: 'fetched', code: 'FETCHED' }];
+    const fetchedColumns: F1GridColumn<(typeof fetchedRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const reactActEnvironment = globalThis as typeof globalThis & {
+      IS_REACT_ACT_ENVIRONMENT?: boolean;
+    };
+    const previousActEnvironment = reactActEnvironment.IS_REACT_ACT_ENVIRONMENT;
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+
+    try {
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={[]}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading
+            />,
+          );
+        });
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={fetchedRows}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading={false}
+            />,
+          );
+        });
+        expect(container.querySelector('[role="gridcell"]')?.textContent).toBe(
+          'FETCHED',
+        );
+        expect(
+          container.querySelector('[data-testid="f1-grid-loading-overlay"]'),
+        ).toBeNull();
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={fetchedRows}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading
+            />,
+          );
+        });
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={[]}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading={false}
+            />,
+          );
+        });
+        expect(container.querySelector('[role="gridcell"]')).toBeNull();
+        expect(
+          container.querySelector('[data-testid="f1-grid-loading-overlay"]'),
+        ).toBeNull();
+      });
+    } finally {
+      act(() => {
+        flushSync(() => root.unmount());
+      });
+      reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+      container.remove();
+    }
+  });
+
+  it('uses the visible shared spinner and restores grid editing after loading', () => {
     const theme = createAppTheme('light');
     const { rerender } = render(
       <ThemeProvider theme={theme}>
@@ -315,7 +399,7 @@ describe('F1-GRID loading overlay', () => {
 
     expect(progress).toHaveStyle({ width: '34px', height: '34px' });
     expect(progressCircle).not.toBeNull();
-    expect(progressCircle).toHaveAttribute('stroke-width', '1.8');
+    expect(progressCircle).toHaveAttribute('stroke-width', '2.4');
     expect(getComputedStyle(overlay).backgroundColor).toBe(
       'rgba(244, 247, 251, 0.84)',
     );

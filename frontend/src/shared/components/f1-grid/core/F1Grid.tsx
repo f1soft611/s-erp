@@ -1164,7 +1164,7 @@ function F1GridInner<T extends object>(
     [cellErrors],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
     lastRowsPropRef.current = rows;
     if (acceptedRowsRef.current && rowsHaveEquivalentValues(acceptedRowsRef.current, rows)) {
@@ -2994,7 +2994,7 @@ function F1GridInner<T extends object>(
           }}
           aria-live="polite"
         >
-          <AppLoadingSpinner thickness={1.8} />
+          <AppLoadingSpinner thickness={2.4} />
         </Box>
       ) : null}
       <Menu
