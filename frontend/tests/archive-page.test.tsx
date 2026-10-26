@@ -179,6 +179,16 @@ describe('Archive dashboard page', () => {
     );
   }, 15000);
 
+  it('uses a flex column to pass remaining height to the file tree', async () => {
+    renderArchive();
+    await screen.findByRole('grid', { name: '자료실' });
+
+    const gridContainer = screen.getByTestId('archive-grid-container');
+
+    expect(getComputedStyle(gridContainer).display).toBe('flex');
+    expect(getComputedStyle(gridContainer).flexDirection).toBe('column');
+  });
+
   it('shows Excel export without root-add in the archive tree context menu', async () => {
     renderArchive();
     await screen.findByText('업무 가이드.pdf');

@@ -564,7 +564,17 @@ export function ArchiveBoardPage({
       )}
 
       <Box
-        sx={{ flex: 1, minHeight: 0, minWidth: 0, px: { xs: 1, sm: 2 }, pb: 2 }}
+        data-testid="archive-grid-container"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          px: { xs: 1, sm: 2 },
+          pb: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
         <ArchiveFileGrid
           rows={rows}

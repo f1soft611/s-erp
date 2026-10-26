@@ -13,7 +13,7 @@
 ## 변경 파일 및 책임
 
 - `frontend/src/pages/groupware/community/archive/ArchiveBoardPage.tsx`: 페이지 내 그리드 잔여 높이 배분을 연결한다. 같은 파일에 이미 존재하는 자료실 로딩 변경은 그대로 보존한다.
-- `frontend/tests/archive-page.test.tsx`: 자료실 검색/탐색 등 기존 회귀 테스트 기준을 유지하고 실행한다. flex 높이 전달은 jsdom의 실제 레이아웃 계산을 신뢰할 수 없으므로 브라우저에서 검증한다.
+- `frontend/tests/archive-page.test.tsx`: 자료실 그리드 호스트가 세로 flex 컨테이너임을 검사한다. 실제 잔여 높이 계산은 브라우저에서 검증한다.
 - `docs/result/20261026/community-archive-grid-fill-height/`: 원인, 수정, 테스트/브라우저 검증 및 캡처를 보관한다.
 
 ## Task 1: 기존 동작 기준 확인
@@ -44,6 +44,32 @@ Expected: 자료실 테스트가 모두 통과한다. 실패하면 먼저 기존
 
 - [ ] **Step 1: 마지막 그리드 호스트에 세로 flex 레이아웃 적용**
 
+먼저 `Archive dashboard page` 테스트 그룹에 다음 회귀 테스트를 추가한다.
+
+```tsx
+it('uses a flex column to pass remaining height to the file tree', async () => {
+  renderArchive();
+  await screen.findByRole('grid', { name: '자료실' });
+
+  const gridContainer = screen.getByTestId('archive-grid-container');
+
+  expect(getComputedStyle(gridContainer).display).toBe('flex');
+  expect(getComputedStyle(gridContainer).flexDirection).toBe('column');
+});
+```
+
+- [ ] **Step 2: 회귀 테스트가 레이아웃 부재로 실패하는지 확인**
+
+Run from `frontend`:
+
+```powershell
+npx vitest run tests/archive-page.test.tsx -t "uses a flex column to pass remaining height to the file tree"
+```
+
+Expected: `archive-grid-container`가 아직 없어 테스트가 실패한다.
+
+- [ ] **Step 3: 실패 테스트를 통과시키는 최소 레이아웃 수정**
+
 현재 마지막 그리드 호스트:
 
 ```tsx
@@ -52,10 +78,11 @@ Expected: 자료실 테스트가 모두 통과한다. 실패하면 먼저 기존
 >
 ```
 
-다음과 같이 바꿔 자식 `ArchiveFileGrid`가 flex item으로 가용 높이를 받게 한다.
+`data-testid`와 세로 flex 스타일을 추가해 자식 `ArchiveFileGrid`가 flex item으로 가용 높이를 받게 한다.
 
 ```tsx
 <Box
+  data-testid="archive-grid-container"
   sx={{
     flex: 1,
     minHeight: 0,
@@ -71,7 +98,7 @@ Expected: 자료실 테스트가 모두 통과한다. 실패하면 먼저 기존
 
 같은 호스트 내 기존 `ArchiveFileGrid` props는 바꾸지 않는다. `ArchiveBoardPage`의 다른 로딩, 오류, 폴더 경로 및 파일 작업 코드는 유지한다.
 
-- [ ] **Step 2: 관련 자료실 회귀 테스트 재실행**
+- [ ] **Step 4: 회귀 테스트 통과 확인**
 
 Run from `frontend`:
 
@@ -81,7 +108,7 @@ npm run test -- tests/archive-page.test.tsx
 
 Expected: 모든 테스트가 통과한다.
 
-- [ ] **Step 3: TypeScript 및 프로덕션 빌드 확인**
+- [ ] **Step 5: TypeScript 및 프로덕션 빌드 확인**
 
 Run from `frontend`:
 
