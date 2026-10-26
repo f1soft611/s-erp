@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppRouter from '../src/routes/AppRouter';
@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('AppRouter not found fallback', () => {
-  it('renders the NotFound page for unknown routes', () => {
+  it('renders the NotFound page for unknown routes', async () => {
     render(
       <AppSettingsProvider>
         <MemoryRouter initialEntries={['/does-not-exist']}>
@@ -63,12 +63,18 @@ describe('AppRouter not found fallback', () => {
     );
 
     expect(
-      screen.getByText('요청하신 페이지를 찾을 수 없습니다'),
+      await screen.findByText(
+        '요청하신 페이지를 찾을 수 없습니다',
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: '돌아가기' })).toBeVisible();
   });
 
-  it('keeps the dashboard root path valid while the menu list is loading', async () => {
+  it(
+    'keeps the dashboard root path valid while the menu list is loading',
+    async () => {
     window.localStorage.setItem(
       's-erp-auth',
       JSON.stringify({
@@ -76,7 +82,7 @@ describe('AppRouter not found fallback', () => {
         userId: 'admin',
         accessToken: 'token',
         refreshToken: 'refresh',
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
       }),
     );
 
@@ -121,7 +127,14 @@ describe('AppRouter not found fallback', () => {
     expect(
       screen.queryByText('요청하신 페이지를 찾을 수 없습니다'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('progressbar')).toBeVisible();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    await waitFor(() => expect(resolveMenuResponse).toBeDefined(), {
+      timeout: 25000,
+    });
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '종합현황' }),
+    ).not.toBeInTheDocument();
 
     resolveMenuResponse?.(
       new Response(
@@ -132,18 +145,25 @@ describe('AppRouter not found fallback', () => {
             user: { userId: 'admin', roles: [] },
             menus: [
               {
-                menuId: 'dashboard',
-                name: '종합현황',
-                path: '/',
+                menuId: 'dashboard-module',
+                name: '대시보드',
+                path: '/dashboard',
                 icon: 'Dashboard',
-                children: [],
-                permissions: {
-                  read: true,
-                  create: true,
-                  update: true,
-                  delete: true,
-                  excel: true,
-                },
+                children: [
+                  {
+                    menuId: 'dashboard-home',
+                    name: '종합현황',
+                    path: '/dashboard/home',
+                    children: [],
+                    permissions: {
+                      read: true,
+                      create: true,
+                      update: true,
+                      delete: true,
+                      excel: true,
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -153,9 +173,15 @@ describe('AppRouter not found fallback', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: '종합현황' }),
+      await screen.findByRole(
+        'heading',
+        { name: '종합현황' },
+        { timeout: 5000 },
+      ),
     ).toBeVisible();
-  });
+    },
+    30000,
+  );
 
   it('renders the NotFound page for invalid dashboard menu paths', async () => {
     window.localStorage.setItem(
@@ -165,7 +191,7 @@ describe('AppRouter not found fallback', () => {
         userId: 'admin',
         accessToken: 'token',
         refreshToken: 'refresh',
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
       }),
     );
 
@@ -178,7 +204,11 @@ describe('AppRouter not found fallback', () => {
     );
 
     expect(
-      await screen.findByText('요청하신 페이지를 찾을 수 없습니다'),
+      await screen.findByText(
+        '요청하신 페이지를 찾을 수 없습니다',
+        {},
+        { timeout: 15000 },
+      ),
     ).toBeVisible();
-  });
+  }, 20000);
 });

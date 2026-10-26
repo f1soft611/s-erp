@@ -23,7 +23,6 @@ import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AppLoadingSpinner } from '../../shared/components/AppLoadingSpinner';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { logout } from '../../shared/services/authService';
 import {
@@ -612,19 +611,7 @@ function DashboardPage() {
         color: theme.palette.text.primary,
       }}
     >
-      {menusLoading ? (
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-          }}
-        >
-          <AppLoadingSpinner thickness={3.6} />
-        </Box>
-      ) : (
+      {!menusLoading && (
         <>
           <DashboardSidebar
             moduleItems={moduleItems}

@@ -771,9 +771,47 @@
 - eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
 - 테이블과 스키마는 기존 것을 사용하며 거래처/품목별 generator row만 추가/상향한다.
 
+### tb_sales_order_hd / tb_sales_order_dt (신규 환경용, 미적용)
+
+`20261026_008` 신규 환경용 DDL을 정의했으며 실제 DB에는 적용하지 않았다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| `tb_sales_order_hd` | `sales_order_id` | `bigserial` | NOT NULL | 헤더 PK |
+|  | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+|  | `order_no` | `varchar(30)` | NOT NULL | tenant별 고유 수주번호 |
+|  | `order_dt` | `date` | NOT NULL | 수주일자 |
+|  | `customer_id` | `bigint` | NOT NULL | 거래처 FK |
+|  | `quot_no` | `varchar(30)` | NULL | 견적번호; 현 DB에 견적 테이블이 없어 FK 없음 |
+|  | `delivery_dt` | `date` | NULL | 헤더 납기일자 |
+|  | `delivery_place` | `varchar(200)` | NULL | 납품장소 |
+|  | `delivery_method` | `varchar(50)` | NULL | 배송방법 |
+|  | `status` | `varchar(20)` | NOT NULL, `수주등록` | 수주상태 |
+|  | `total_amt` | `numeric(15,2)` | NULL, `0` | 수주 총금액 |
+|  | `remark` | `varchar(500)` | NULL | 비고 |
+|  | `use_at` | `char(1)` | NOT NULL, `Y` | 사용 여부 (`Y`/`N`) |
+|  | `created_by`, `updated_by` | `varchar(10)` | NULL | 생성/수정 사용자 |
+|  | `created_at` | `timestamp without time zone` | NOT NULL, `CURRENT_TIMESTAMP` | 생성 일시 |
+|  | `updated_at` | `timestamp without time zone` | NULL | 수정 일시 |
+| `tb_sales_order_dt` | `sales_order_detail_id` | `bigserial` | NOT NULL | 상세 PK |
+|  | `sales_order_id` | `bigint` | NOT NULL | 헤더 FK |
+|  | `tenant_id` | `bigint` | NOT NULL | 헤더와 동일 tenant인지 복합 FK로 보장 |
+|  | `line_no` | `int` | NOT NULL | 수주 라인 번호 |
+|  | `material_id` | `bigint` | NOT NULL | 품목 FK |
+|  | `order_qty`, `unit_price`, `supply_amt`, `vat_amt`, `total_amt`, `shipped_qty` | `numeric(15,2)` | 주문/금액 NOT NULL, VAT/출하수량 NULL 기본 `0` | 수량 및 금액 |
+|  | `delivery_dt` | `date` | NULL | 라인 납기일자 |
+|  | `line_status` | `varchar(20)` | NULL, `대기` | 라인 상태 |
+
+- 헤더는 `sales_order_id` 단일 PK이며 `(tenant_id, order_no)`를 unique로 제한한다. 상세도 독립된 `sales_order_detail_id` PK를 사용하고 `(sales_order_id, line_no)`를 unique로 제한한다.
+- 거래처와 품목 FK는 각각 `(customer_id, tenant_id)` 및 `(material_id, tenant_id)`이며, 상세-헤더 FK `(sales_order_id, tenant_id)`가 tenant 경계를 보장한다. 헤더 삭제 시 상세는 cascade 삭제된다.
+- 수주상태 허용값은 `수주등록`, `생산대기`, `생산중`, `출하완료`, `취소`이며 `use_at`은 `Y`/`N`이다.
+- [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
+
 ---
 
 ## 변경 이력
+
+- 2026-10-26: 수주 헤더/상세 신규 테이블 DDL 초안 `20261026_008`을 정의했다. 테넌트 범위 FK와 별도 상세 ID, guarded rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261026](../../backend/DATABASE/20261026) 및 [docs/database/20261026](20261026) 참고.
 
 - 2026-10-22: 품목 테이블이 없는 환경의 DDL 누락을 보완했다. tenant MCP로 37개 컬럼과 기본값/주석/제약/인덱스를 재확인하고 `20261022_010_create_material_schema.sql`과 빈 신규 테이블 전용 롤백을 두 DB 이력 폴더에 추가했다. 기존 테이블 수정 및 실제 DB 적용은 수행하지 않았다.
 

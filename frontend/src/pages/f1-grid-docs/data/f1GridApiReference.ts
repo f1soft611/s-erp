@@ -218,7 +218,7 @@ const sections: DocSection[] = [
       api(
         'loading',
         'boolean',
-        '그리드 전체 입력을 차단하고 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께/테마 기본 색상으로 표시.',
+        '그리드 전체 입력을 차단하고 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께/테마 기본 색상으로 표시. MUI indeterminate 원호 애니메이션을 사용.',
         'false',
       ),
       api(

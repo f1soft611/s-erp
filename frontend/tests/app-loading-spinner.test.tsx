@@ -3,6 +3,28 @@ import { describe, expect, it } from 'vitest';
 import { AppLoadingSpinner } from '../src/shared/components/AppLoadingSpinner';
 
 describe('AppLoadingSpinner', () => {
+  it('uses the default MUI indeterminate circle animation', () => {
+    render(<AppLoadingSpinner />);
+
+    const progressbar = screen.getByRole('progressbar');
+    const injectedStyles = [
+      ...document.querySelectorAll('style[data-emotion]'),
+    ]
+      .map((style) => style.textContent ?? '')
+      .join('');
+
+    expect(injectedStyles).toMatch(
+      /MuiCircularProgress-circle\{[^}]*animation:animation-[^;]+;/,
+    );
+    expect(injectedStyles).toMatch(
+      /@keyframes animation-[^{]+\{[^}]*stroke-dasharray:1px,200px;/,
+    );
+    expect(injectedStyles).not.toMatch(
+      /MuiCircularProgress-circle\{[^}]*animation:none/,
+    );
+    expect(progressbar).toHaveClass('MuiCircularProgress-indeterminate');
+  });
+
   it('uses the 34px size with a 2.4px default and supports a custom thickness', () => {
     render(
       <>

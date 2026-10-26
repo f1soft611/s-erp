@@ -1589,12 +1589,9 @@ function F1GridInner<T extends object>(
         column.type !== 'currency') ||
         !Number.isNaN(value))
     ) {
-      const changes =
-        column.type === 'select' || column.type === 'user'
-          ? (column.onValueChange?.(row, value) ?? {
-              [column.field]: value,
-            })
-          : { [column.field]: value };
+      const changes = column.onValueChange?.(row, value) ?? {
+        [column.field]: value,
+      };
       const hasChanges = Object.entries(changes).some(
         ([field, nextValue]) =>
           !areGridValuesEqual(row[field as keyof T], nextValue),
