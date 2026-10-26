@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress } from '@mui/material';
+import { Alert, Box, Button } from '@mui/material';
 import type { JSONContent } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
@@ -270,7 +271,7 @@ export function DraftFormTemplateDialog({
               }
               startIcon={
                 saving ? (
-                  <CircularProgress size={16} color="inherit" />
+                  <AppLoadingSpinner size={16} color="inherit" />
                 ) : undefined
               }
             >
@@ -305,7 +306,7 @@ export function DraftFormTemplateDialog({
                 justifyContent: 'center',
               }}
             >
-              <CircularProgress aria-label="본문 불러오는 중" />
+              <AppLoadingSpinner size={40} aria-label="본문 불러오는 중" />
             </Box>
           ) : template ? (
             <Box

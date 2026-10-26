@@ -68,6 +68,59 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 
 ## 추가 반영 기능 요약 (2026-09-01 기준)
 
+### 선택·편집 렌더 성능 (2026-10-23)
+
+- 고정열 위치는 객체 참조가 아니라 방향·오프셋·그림자 값으로 비교한다. 동일 위치의 셀은 다른 셀을 선택해도 불필요하게 다시 표시하지 않는다.
+- 편집 중 입력값은 편집 셀에만 전달한다. 100행 목록에서 한 셀을 입력할 때 다른 표시 셀을 모두 다시 렌더링하지 않는다.
+- 열 가상화에서 표시할 열 인덱스가 같으면 동일한 집합을 재사용하고, 일반 행의 선택·편집 변화는 영향을 받는 행만 갱신한다. 병합 그룹의 포커스 처리는 유지한다.
+- 드래그 중 행 높이 조절 비활성화는 부모 상태/CSS로 전달한다. 단순 클릭만으로 모든 행의 조절 버튼을 다시 만들지 않는다.
+- 편집 문자열 변경으로 헤더를 다시 만들지 않으며, 비체크박스 열에서는 헤더 전체 선택 상태를 계산하지 않는다.
+- 표시를 memo로 생략해도 이벤트는 최신 편집·선택 상태를 사용한다. Enter/Tab 확정, Escape 취소 및 셀 이동 계약은 유지한다.
+- 품목·거래처 페이지는 저장 성공 응답의 해당 행만 `acceptSavedRows`로 확정한다. 저장 후 목록/옵션 재조회나 그리드 초기화 없이 서버의 최종값·실제 ID·자동 코드를 반영한다.
+- 이 개선은 프론트엔드 렌더 비용에 대한 것이며, 저장 API/DB의 응답시간을 보장하지 않는다.
+
+### 편집 확정 행 렌더 격리 (2026-10-26)
+
+- 병합 열이 없는 그리드는 값 확정 후 전체 목록/dirty 맵 참조가 바뀌어도 무관한 행 본문을 다시 실행하지 않는다. 현재 행의 컬럼별 dirty 표시와 행 인덱스·목록 길이 등 실제 표시 영향을 비교한다.
+- Enter/Tab/다른 셀 클릭 확정, 원래 값으로 복구할 때의 dirty 제거 및 생략된 행의 최신 이벤트 처리를 유지한다.
+- 정렬에 따른 행 번호 변경, 필터·행 추가에 따른 마지막 행 경계는 갱신한다. 병합 열이 있는 경우 전체 목록/병합 정보 변경 감지를 그대로 유지해 병합 그룹 분리와 경계를 보존한다.
+- 합성 100행 × 2열에서 편집 확정 후 비수정 행의 셀 계산은 198회에서 0회로 줄었다. 개발 브라우저 5회 React 렌더 시간은 약 59~96ms에서 약 20~26ms로 감소했다. 운영 화면/서버 지연 보장값은 아니다.
+- 재현 조건·회귀 검증·스크린샷은 [결과 문서](../../../../docs/result/20261026/f1grid-edit-commit/20261026_001_f1grid_edit_commit_result.md)에 기록한다.
+
+### 페이지 저장 중 편집 잠금 (2026-10-23)
+
+기안양식관리, 공통코드, 권한관리, 메뉴관리, 모듈관리, 창고관리는 저장 요청부터 저장 후 조용한 재조회가 완료되거나 실패할 때까지 페이지/패널의 저장 상태로 변경을 잠근다. 화면은 이 상태를 컬럼 편집 가능 여부, `beforeEdit`, 행 폼/컨텍스트 메뉴, 검색·조회 및 대상 전환에 적용한다. Grid의 `loading`에는 일반 조회 상태만 전달해 저장 후 재조회 중 기존 행과 화면을 유지하고 전체 로딩 오버레이를 표시하지 않는다. 이 동작은 화면별 책임이며 공통 F1-Grid/F1-Tree의 전역 동작을 바꾸지 않는다.
+
+### 저장 결과 행 확정 API (2026-10-23)
+
+`F1GridRef<T>.acceptSavedRows(savedRows: F1GridSavedRow<T>[]): T[]`는 서버 저장 성공 이후 호출하는 공통 API다. `setCellValue`와 달리 새 dirty 변경을 만들지 않는다.
+
+```ts
+type F1GridSavedRow<T extends object> = {
+  previousRowId: string | number;
+  row: T;
+};
+
+// 이름이나 응답 순서가 아니라 서버의 명시적 ID 매핑으로 연결한다.
+const savedRows = resolveSavedGridRows(
+  [...changes.insertedRows, ...changes.updatedRows],
+  response.materials,
+  response.rowIdMappings,
+  'materialId',
+);
+const currentRows = grid.acceptSavedRows(savedRows);
+```
+
+- 변경된 행만 서버 최종 객체로 교체하고 해당 행의 dirty/original/patch/new 상태를 해제한다. 나머지 행 객체와 미저장 변경은 유지한다.
+- 신규행의 임시 ID는 실제 ID로 바뀌며 체크 선택·포커스·셀/복사 범위·행 높이의 ID도 전환한다. 부모가 반환된 현재 행 배열을 `rows`에 반영해도 선택을 초기화하지 않는다.
+- 반환값은 **현재 전체 행 스냅샷**이다. 부분 저장으로 남은 dirty 행이 있는 경우 이 배열을 모두 서버 기준값으로 간주하여 변경 폐기에 사용하면 안 된다. 현재 거래처·품목은 편집을 잠근 상태에서 전체 변경 집합을 저장하므로 반환 배열을 새 기준 목록으로 보관할 수 있다.
+- 모든 매핑은 상태 변경 전에 검증한다. 없는 원본, 삭제 행, 중복 원본/대상 또는 다른 행과 충돌하는 ID는 예외를 발생시키며 일부만 적용하지 않는다. 인라인/행 폼 편집 중 호출도 거부한다.
+- `resolveSavedGridRows`는 양수 안전 정수 서버 ID를 쓰는 배치 API용 검증이다. 요청/응답/매핑의 행 집합이 정확히 일치해야 하며 누락·중복·추가 응답에 순서 기반 대체 처리를 하지 않는다.
+- 거래처·품목 응답은 기존 `customers`/`materials` 목록과 함께 `rowIdMappings: { "new-...": 201, "12": 12 }`를 반환한다. 다른 화면의 저장 흐름은 바꾸지 않는다.
+- 저장 실패 시 입력을 유지한다. 서버 성공 후 매핑/화면 반영 실패는 별도 메시지를 표시하고 재저장을 막는다. 사용자가 조회를 성공시킨 뒤 다시 저장할 수 있다.
+- 두 화면의 서버 검색 조건은 다음 조회 때 다시 적용한다. 저장한 행은 검색 조건에서 벗어나도 자동 제거하지 않는다. Grid 자체의 로컬 정렬/필터 규칙은 기존대로 적용하므로 표시 위치/가시성은 그 규칙의 영향을 받을 수 있다.
+- 서버 페이징의 전체 건수나 서버 집계를 이 API가 보정하지는 않는다. 해당 화면은 별도의 조회 정책을 설계해야 한다. `F1TreeRef`도 메서드를 전달하지만 트리 저장 화면에는 이번 작업에서 적용하지 않는다.
+
 현재 구현된 `F1Grid`/`F1Tree`는 아래 기능을 실제로 지원한다.
 
 - 헤더 메뉴에서 컬럼 정렬, 필터, 고정, 숨김/표시를 조작할 수 있다.
@@ -80,7 +133,8 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - `columnLine` 기본값은 `true`이며, 컬럼 사이 세로 구분선을 표시한다.
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
-- `loading` 상태를 사용해 그리드 전체 영역에 로딩 스피너를 표시하고, `minHeight`를 넘겨 부모 영역에서 내부 스크롤이 유지되도록 할 수 있다.
+- `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. 스피너는 MUI 기본 indeterminate 애니메이션을 사용해 원호 길이가 변하면서 회전한다. F1Grid/F1Tree와 다른 기본 로딩 화면은 같은 2.4px 기본 두께를 사용한다. 앱 첫 접속 로더만 기존 외형 보존을 위해 3.6px를 명시한다. F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
@@ -91,9 +145,9 @@ Grid의 핵심 렌더링 및 상태 관리는 직접 구현한다.
 - 값이 변경된 셀은 `data-dirty-cell="true"`와 함께 좌측 상단에 빨간 삼각형 코너 마크가 표시되며, 편집 중인 셀에서는 마크가 숨겨진다. 고정(pinned) 컬럼뿐 아니라 일반 컬럼에서도 동일하게 표시되어야 한다.
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - `type: 'select'`의 표시 label은 저장값과 `options[].value`가 같은 타입과 값으로 일치할 때 매핑된다. 숫자 ID는 행과 옵션 양쪽에서 같은 숫자 타입으로 정규화한다. null 같은 실제 저장값의 표시 문구가 옵션 값과 다르면 `renderCell`에서만 placeholder를 표현하고 저장값은 변경하지 않는다.
-- select 편집이 포커스 이탈로 commit될 때는 draft 문자열을 `options[].value`의 원래 타입으로 복원하고 `column.onValueChange`를 적용한다. 저장된 숫자 ID select를 바꾸지 않고 편집만 종료하면 dirty가 생기지 않으며, 실제 선택 변경은 기존 타입과 patch 계약을 따른다.
+- 인라인 셀 편집은 commit 시 모든 편집기 타입에서 `column.onValueChange`가 있으면 반환 patch를 적용하고, 없으면 편집한 `column.field` 값만 갱신한다. select 편집은 draft 문자열을 `options[].value`의 원래 타입으로 복원한 뒤 callback을 호출한다. 같은 값을 commit하면 dirty가 생기지 않는다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
-- 저장 뒤 현재 행을 유지하며 목록을 재조회하는 페이지는 저장 상태와 Grid `loading`을 분리할 수 있다. 저장 액션에 비차단 진행 표시를 두고 재조회에서 Grid 전체 오버레이를 숨기되, 초기 진입과 사용자가 직접 실행한 조회에는 기존 `loading` 표시를 유지한다.
+- 저장 뒤 목록을 재조회하는 기존 페이지는 저장 상태와 Grid `loading`을 분리한다. 품목관리와 거래처관리는 저장 후 재조회 자체를 하지 않는다. 두 화면 모두 저장 진행 아이콘·중복 저장 방지·편집 잠금을 유지하고, 최초/사용자 조회에만 Grid 로딩을 표시한다.
 - 인라인 편집 중 같은 Grid의 다른 셀 또는 툴바/액션으로 이동하면 edit를 commit하고 dirty 변경 집합에 반영한다. Grid가 중첩 MUI Dialog/Modal 안에 있어도 조상 모달의 이벤트를 editor popup으로 오인하지 않는다. 실제 editor popup으로 포인터/포커스가 이동할 때만 commit을 보류한다. 따라서 폼 바깥의 저장 버튼도 편집 commit으로 갱신된 dirty 상태를 기준으로 동작한다.
 - 컨텍스트 메뉴 등으로 추가한 신규 행을 저장 전에 삭제하면 해당 행은 `deleted` 변경으로 남지 않는다. 행과 원본·dirty 상태를 함께 제거하므로 `getChanges()`의 inserted/updated/deleted 목록에서 모두 제외되며, 변경이 없으면 페이지 저장 액션도 비활성화할 수 있다.
 - dirty 표시는 컬럼 타입에 관계없이 동일하게 적용된다(텍스트, 숫자, 체크박스, 날짜, 시간 등). 컬럼 타입별 렌더링 분기와 무관하게 셀 루트에서 공통으로 마크를 그리기 때문이다.
@@ -288,6 +342,7 @@ interface F1GridColumn<T> {
   type?: F1GridEditorType;
   options?: { value: string | number | boolean; label: string }[];
   required?: boolean;
+  validation?: { unique?: boolean | 'digits' };
   min?: number;
   max?: number;
   validate?: (value: T[keyof T], row: T) => string | boolean;
@@ -476,6 +531,20 @@ const columns: F1GridColumn<Item>[] = [
 지원 토큰은 `yyyy`/`YYYY`(4자리 연도), `yy`/`YY`(2자리 연도), `mm`/`MM`(2자리 월), `m`/`M`(월), `dd`/`DD`(2자리 일), `d`/`D`(일)이다. 구분자와 한글을 조합할 수 있으며, `[문자열]`은 토큰 치환 없이 표시한다. ISO 날짜/timestamp, 8자리 `yyyymmdd`, 유효한 `Date` 객체를 지원한다. Timestamp 문자열은 시간대 변환 없이 명시된 날짜를 사용한다.
 
 빈 값은 빈 셀, 잘못된 날짜는 원문으로 표시한다. 표시 포맷은 원본 데이터, 날짜 편집기의 `YYYY-MM-DD` 값, 검색/정렬/필터 값을 변경하지 않는다. 사용자 `renderCell`이 있으면 기존처럼 우선 적용된다. 공통 표시 함수를 사용하는 자동 너비 계산과 Excel 텍스트 출력에도 같은 형식이 적용된다. 기존 숫자 `format`과 `datetime`/`time` 동작은 유지한다.
+
+## number/decimal 컬럼 소수점 표시
+
+`F1GridColumn.decimalPlaces`로 숫자 컬럼의 소수점 자릿수를 지정한다. `number`와 `decimal` 컬럼에서 생략하면 화면 및 Excel에서 소수점 이하 최대 5자리까지 표시하며 끝의 0과 불필요한 소수점은 생략한다. 예를 들어 `1`은 `1`, `1.2`는 `1.2`, `1.234567`은 `1.23457`로 표시한다.
+
+`decimalPlaces`를 지정하면 기존처럼 표시 소수점 자릿수를 고정한다. 예를 들어 `decimalPlaces: 2`는 `1.2`를 `1.20`으로 표시한다. 이 옵션은 편집 입력 정규화에도 사용되며, 옵션을 생략해도 편집 입력을 5자리로 제한하지 않는다.
+
+```typescript
+{ field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략
+{ field: 'unitPrice', headerName: '단가', type: 'number', decimalPlaces: 2 } // 1.2 -> 1.20
+{ field: 'price', headerName: '가격', type: 'currency', format: 'currency' } // KRW, 기본 소수점 0자리
+```
+
+`format: 'currency'`의 기본 0자리 KRW 표시와 명시적 `decimalPlaces` 동작은 유지한다. Excel 숫자 서식도 일반 숫자는 `#,##0.#####`, 명시 자릿수는 고정 서식으로 적용한다.
 
 ## PageSearchArea 상세 검색 연결
 
@@ -688,6 +757,19 @@ Escape
 
 코드 선택(`type: 'code'`) 컬럼은 편집 모드에서 버튼이 셀 너비를 꽉 채우도록 렌더된다. 선택 버튼은 셀 높이와 너비를 유지하면서, 다른 에디터와 동일한 여백/테두리 규칙을 따른다.
 
+### 수주등록 상세 적용 예
+
+[수주등록 상세 그리드](../sales/order/create/components/SalesOrderDetailGrid.tsx)는
+품목코드에 `type: 'code'`와 `onOpenCodePicker`를 사용한다. 공통 품목 선택기에서
+선택한 ID·코드·명을 `applyPatch`로 같은 행에 반영하며, 행 추가/삭제는
+`F1GridRef.addRow()`와 `deleteSelectedRows()`를 사용한다.
+
+주문수량 또는 단가가 바뀌면 공급가와 VAT 10%를 소수 둘째 자리까지 다시
+계산한다. VAT 셀을 직접 수정하면 해당 행의 총액만 갱신하고, 이후 수량이나
+단가가 변경될 때 VAT를 기본 10%로 재계산한다. 출하수량과 라인상태는 신규
+수주 작성 단계에서 읽기 전용으로 둔다. 이 값 계산은 화면 입력 상태에만
+적용되며 저장 API나 DB 동작을 추가하지 않는다.
+
 ## 행 폼 모달 플러그인
 
 `rowFormPlugin`은 많은 컬럼을 가로 셀 편집 대신 폼으로 등록·수정해야 하는 화면에서 선택적으로 사용한다. 활성 상태는 prop이 있고 `enabled !== false`인 경우이며, 이때 Grid 마지막에 폭 `48px`의 우측 고정 `상세` 열이 자동 추가된다. `상세` 열은 사용자가 해제할 수 없는 폼 플러그인 전용 우측 pin 1번 영역으로 동작하고, 사용자가 다른 컬럼을 오른쪽 고정하면 해당 컬럼은 `상세` 열 왼쪽의 2번 이후 고정 영역에 배치된다. 합성 액션 열은 컬럼 배열, 행 데이터, Excel 내보내기, 클립보드, 셀 선택 및 검증 대상에는 포함되지 않는다.
@@ -702,7 +784,8 @@ type F1GridFormMode = 'create' | 'edit';
 type F1GridColumnFormOptions<T extends object> = {
   hidden?: boolean;
   readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
-  label?: string;
+  label?: string | ((row: T) => string);
+  disabled?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
@@ -736,7 +819,8 @@ interface F1GridProps<T extends object> {
 
 - `headerName`은 기본 필드 라벨이고 `headerGroup`은 기본 폼 섹션이다.
 - 그룹은 `form.group` → `headerGroup` → `기본 정보` 순으로 결정한다.
-- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다.
+- 라벨은 `form.label` → `headerName`, 순서는 `form.order` → 컬럼 선언 순서로 결정한다. `form.label`은 현재 row를 받아 동적으로 표시할 수 있고 row가 없으면 `headerName`을 사용한다.
+- `form.disabled`는 boolean 또는 `(row, mode)` 콜백으로 입력을 비활성화한다. 비활성 필드도 폼에 남으며 셀 편집 가능 여부와 `form.readOnly` 판정에는 영향을 주지 않는다.
 - 읽기 전용은 `form.readOnly` → `editable` 함수의 반대값 → `editable` 값의 반대값 순으로 판정한다.
 - `form.span`은 데스크톱 3열 기준 점유 폭이며 기본값은 `1`이다.
 - `type: 'select'`에서 `form.multiple: true`를 지정하면 row form은 선택값 배열을 보존한다. Grid 표시용 `getValue`가 요약 문자열을 반환해도 form 입력은 원본 row 배열을 사용한다.
@@ -748,14 +832,55 @@ interface F1GridProps<T extends object> {
 
 - 수정 모달은 원본 행의 얕은 복사본을 draft로 사용한다. 입력 중에는 Grid 행과 변경 상태를 건드리지 않고, 적용 시 달라진 필드만 기존 dirty/updated 상태에 반영한다.
 - 활성 플러그인에서 `addRow(partial?)`는 `createRow()`와 partial을 합친 신규 draft를 연다. 적용 시에만 inserted 행을 생성하고 취소 시 빈 행이나 변경 이력을 남기지 않는다.
-- `required`, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
+- `required`, `inputFormat` 자리수 규칙, `min`, `max`, `validate`는 폼에 포함된 컬럼만 검증한다. 실패하면 모달을 유지하고 첫 오류 입력으로 포커스를 이동한다.
 - `onBeforeApply`가 `false`를 반환하면 적용을 중단하고 모달을 유지한다.
 - 취소, 닫기, `Escape`, backdrop 닫기는 모두 draft를 폐기한다.
 - 모달은 API를 호출하거나 서버에 저장하지 않는다. 최종 저장은 화면이 `getChanges()`와 기존 저장 버튼 흐름으로 수행한다.
 
-거래처 관리 화면은 `customerCode`와 `customerName` 등을 행 폼에서 등록·수정한다. 신규 `customerCode`는 비워둘 수 있고 서버가 eGov ID Generator로 생성하지만, 수정 시에는 필수이며 화면과 서버에서 함께 검증한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
+### 공통 검증 오류와 페이지 메시지 연결
 
-품목관리(`/co/master/materials`)도 같은 행 폼과 배치 저장 패턴을 사용한다. `materialCode`는 신규 미입력 시 eGov IDS 6자리 자동채번, 수정 시 필수다. `materialName`과 `materialTypeCode`는 필수이며 업무 컬럼의 길이와 중량/안전재고/소비기한 숫자 계약을 저장 전에 검증한다. 목록에서 숨기는 규격2, 바코드, 위치, 품목보고번호 등은 `form.hidden: false`로 그룹별 폼에 포함한다. 단일 키워드와 컬럼 metadata 기반 상세검색을 함께 서버에 전달한다. 품목유형/보관방법/소비기한 기준의 표시명은 인증 tenant의 활성 공통코드에서 가져온다. `POST /api/v1/co/master/materials/save-batch`로 신규·수정을 단일 트랜잭션으로 저장하며 실패 시 dirty를 보존한다. 빈 숫자는 null, 0은 0으로 유지한다. 품목 테이블에는 거래처의 `useAt` 컬럼이 없으므로 사용여부를 추가하지 않고, 삭제되지 않은 품목만 조회/수정하며 삭제 액션과 삭제 변경 요청은 허용하지 않는다.
+`F1Grid.onValidationErrors`는 `validate()`와 행 폼 적용 검증에서 호출되는 선택적 콜백이다. 오류는 `{ rowId, field, message }[]`이며 검증 성공 시 빈 배열을 전달한다. `validate(): boolean` 반환 계약은 유지한다. 콜백을 지정하지 않은 화면에는 변경이 없다. F1Tree도 같은 prop을 전달할 수 있다.
+
+```tsx
+<F1Grid
+  rows={rows}
+  columns={columns}
+  rowKey="id"
+  onValidationErrors={(errors) =>
+    setError([...new Set(errors.map((error) => error.message))].join('\n'))
+  }
+/>
+```
+
+거래처명과 사업자번호는 컬럼 `required: true`로 헤더·폼 필수 표시와 공통 검증을 통일한다. 저장 훅에서 거래처명 필수 검사를 반복하지 않는다. 사업자번호 등 번호 자리수는 `inputFormat.validDigitCounts`와 국내 전화 규칙을 기존 `validateGridRow`에서 검사한다. 거래처 페이지는 폼 적용·최종 저장의 실제 오류를 상단 `PageMessageArea`에 전달한다. 폼은 빨간 입력 테두리와 하단 설명, 그리드는 오류 셀의 빨간 강조와 툴팁을 유지한다. 오류 셀에 포커스가 남아 있어도 선택 테두리는 파란색 대신 오류 빨간색을 우선한다. 모달이 열린 동안 페이지 메시지는 배경에 있으며 폼 내부 오류로 즉시 확인한다. 검증에 성공하면 상단 메시지를 비운다.
+
+### 컬럼 고유값 검증
+
+```typescript
+{
+  field: 'customerName',
+  headerName: '거래처명',
+  editable: true,
+  required: true,
+  validation: { unique: true },
+}
+```
+
+`validation.unique`는 폼 적용과 `validate()`에서 같은 공통 중복 검증을 실행한다. 비교 대상은 삭제되지 않은 전체 로드 행과 신규/수정 행이며 그리드 필터·정렬·가상화로 숨겨진 행도 포함한다. 문자열은 앞뒤 공백을 제거하고 대소문자를 구분한다. 빈 값은 고유성 검사에서 제외해 `required`가 처리하고, 숫자 0과 boolean false는 비교한다. 수정 중인 자기 행은 `rowKey`로 제외한다. 실패 시 `거래처명 값이 중복되었습니다.`를 기존 오류 콜백·상단 메시지·빨간 표시로 전달한다.
+
+여러 행을 검사할 때 `createGridValidationContext(rows, columns, rowKey)`로 고유값 인덱스를 한 번 생성한 후 `validateGridRow(row, columns, context)`에 전달한다. 단독 `F1GridFormModal` 사용자는 `validationRows`로 비교할 행을 전달한다. 기본 F1Grid는 활성 행을 자동 연결한다. 서버 검색으로 로드되지 않은 데이터와 동시 저장은 클라이언트 검증 범위가 아니므로 서버의 검증이 반드시 필요하다.
+
+사업자번호처럼 표시 구분자를 무시해야 하는 컬럼은 `validation: { unique: 'digits' }`를 선언한다. ASCII 숫자만 비교하므로 `012-34-56789`, `0123456789`, `012 34 56789`는 같은 값이다. 앞자리 0은 유지하고 입력/저장 표기는 변경하지 않는다. 숫자가 없는 값은 중복 비교에서 제외하며 필수/자리수 검증은 기존대로 우선한다. 거래처 사업자번호는 폼 적용과 최종 저장에서 `사업자번호 값이 중복되었습니다.`를 공통 오류 경로로 표시한다.
+
+거래처 서버도 같은 tenant의 사용/미사용 사업자번호를 숫자로 비교하고 수정 자기 ID를 제외한다. `uq_tb_customer_info_tenant_business_no` 인덱스는 빈 숫자키를 제외한 동일 규칙으로 동시 저장을 방어한다. [사업자번호 DB 변경 이력](../../../../docs/database/20261023/20261023_002_change_customer_business_no_unique.md)의 스크립트는 별도 배포 대상이며 실제 DB에는 적용하지 않았다.
+
+거래처관리 백엔드는 같은 tenant의 사용/미사용 이름을 trim 후 검사하고 수정 자기 ID를 제외한다. 신규 `uq_tb_customer_info_tenant_name` 인덱스를 적용하면 동시 저장도 DB에서 차단한다. 기존 거래처코드 중복 방지와는 별도 규칙이다. 인덱스 스크립트는 [20261023 DB 변경 이력](../../../../docs/database/20261023/20261023_001_change_customer_name_unique.md)을 참고하며 실제 적용은 별도 운영 절차다.
+
+거래처 관리 화면은 `customerCode`를 목록에 표시하되 행 폼과 셀 편집에서는 제외하며, 신규 저장 시 서버의 eGov ID Generator가 코드를 생성하고 요청 코드 값은 무시한다. 수정 요청의 코드 값도 무시하여 기존 코드를 유지한다. `customerName` 등 나머지 업무 필드는 기존 행 폼에서 등록·수정한다. `juridNo`, `postCode`, `facsimileNo`, `custMemo`처럼 목록에서 숨기는 업무 필드는 `form.hidden: false`를 지정해 행 폼에는 포함한다. `F1GridColumn.sanitizeInput`은 기존 사용자 정의 입력 정규화로 사용할 수 있다. `inputFormat`을 지정하면 공통 formatter가 인라인 텍스트 입력, 행 폼, TSV 붙여넣기, 검색 metadata에 연결된 상세검색에 동일 적용한다. 거래처 화면은 사업자번호 `000-00-00000`(10자리), 법인등록번호 `000000-0000000`(13자리), 우편번호 5자리, 국내 전화·팩스(`02` 9·10자리, 그 외 10·11자리) 규칙을 입력 상한과 저장 검증에 함께 사용한다. 저장은 페이지의 `getChanges()` 결과를 공통코드와 같은 변경 집합 구조로 묶어 `POST /api/v1/co/master/customers/save-batch`에 한 번 전달한다. 신규·수정은 하나의 트랜잭션으로 저장하며 실패 시 변경 상태를 유지한다. 저장 완료 후 재조회만 실패하면 중복 등록을 막도록 변경 상태를 해제하고 조회 재시도를 안내한다. 저장 중에는 중복 저장·편집·조회 요청을 막는다. 삭제 대신 `useAt`의 `'Y'`/`'N'`으로 사용 상태를 관리하고 삭제 변경은 거부한다.
+
+품목관리(`/co/master/materials`)도 같은 행 폼과 배치 저장 패턴을 사용한다. `materialCode`는 목록에 표시하되 행 폼과 셀 편집에서는 제외하며, 신규 저장 시 서버의 eGov IDS 6자리 채번 결과를 사용하고 요청 코드 값은 무시한다. 수정 요청의 코드 값도 무시하여 기존 코드를 유지한다. `materialName`과 `materialTypeCode`는 필수이며 업무 컬럼의 길이와 중량/안전재고/소비기한 숫자 계약을 저장 전에 검증한다. 목록에서 숨기는 규격2, 바코드, 위치, 품목보고번호 등은 `form.hidden: false`로 그룹별 폼에 포함한다. 단일 키워드와 컬럼 metadata 기반 상세검색을 함께 서버에 전달한다. 품목유형/보관방법/소비기한 기준의 표시명은 인증 tenant의 활성 공통코드에서 가져온다. `expiryedCount`는 소비기한 기준 옆에 배치하고 `DAY`/`MONTH`/`YEAR` 선택에 따라 `일`/`개월`/`년` 단위 label을 표시한다. `NONE`에서는 숫자를 NULL로 비우고 입력을 비활성화하며, 활성 기준은 1~2147483647 양의 정수를 요구한다. 활성 기준끼리는 숫자를 유지하고 단위 label만 바뀐다. 공통코드 그룹·상세 seed는 [tenant 지정 SQL](../../../../docs/database/20261023/20261023_004_seed_material_common_codes.sql)에 보관하며 기존 자연 키 정의를 덮어쓰지 않는다. `POST /api/v1/co/master/materials/save-batch`로 신규·수정을 단일 트랜잭션으로 저장하며 실패 시 dirty를 보존한다. 빈 숫자는 null, 0은 0으로 유지한다. 품목 테이블에는 거래처의 `useAt` 컬럼이 없으므로 사용여부를 추가하지 않고, 삭제되지 않은 품목만 조회/수정하며 삭제 액션과 삭제 변경 요청은 허용하지 않는다.
+
+품목관리의 기본 업무 컬럼은 품목계정코드 → 품목코드 → 품목명 순서이며 No와 함께 왼쪽 고정한다. 품목계정코드(`ITEM_TYPE`), 단위(`ITEM_UNIT`), 품목유형(`MATERIAL_TYPE`), 보관방법(`STORE_METHOD`), 소비기한기준(`EXPIRY_STATUS`)은 공통코드 select로 연결한다. 품목분류(`matCataType`)는 목록·행 폼·상세검색에서 제외하지만 기존 저장값과 API 필드는 보존한다. 품목코드·품목유형·보관방법·소비기한기준은 가운데, 안전재고는 오른쪽 정렬한다. 소비기한 새 선택지는 공통코드에 등록된 `NONE/DAY/MONTH/YEAR`로 제한하고 기존 행의 미등록 허용 코드는 코드명 그대로 보존한다. 이전 사용자 컬럼 설정이 변경된 기본 순서와 고정을 덮어쓰지 않도록 품목 전용 저장 키를 `co-master-material-grid-v2`로 변경하여 컬럼 설정을 한 번 초기화한다.
 
 ### F1-Tree와 반응형 UI
 
@@ -1613,7 +1738,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 동작 요약:
 
-- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식은 Excel number format으로 반영한다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자는 그룹 구분자를 적용하고 기본 소수점은 최대 5자리 선택 표시(`#,##0.#####`), 명시한 `decimalPlaces`는 고정 자릿수로 내보낸다. `format: 'currency'`는 KRW 서식을 적용하며 기본 소수점은 0자리다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
 - **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
 - **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
 - **행 추가**: 일반 F1Grid에서는 데이터 순서의 맨 아래에 새 행을 추가한다. F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가) 기존 트리 동작을 유지한다.
@@ -1656,15 +1781,15 @@ Selected Row
 
 ## 편집 가능 컬럼 헤더 표시
 
-편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다.
+편집 가능 여부에 따른 헤더 강조선은 표시하지 않는다. 상단/하단 강조선, 별도 아이콘이나 배경색은 추가하지 않으며 기존 셀 편집 테두리는 유지한다.
 
-판정 조건(모두 만족해야 표시):
+편집 가능 헤더 속성의 판정 조건(모두 만족해야 적용):
 
 1. 그리드에 활성화된 editor plugin이 하나 이상 존재한다.
 2. 화면에 보이는 행(`visibleRows`) 중 하나 이상에서 `isCellEditable(column, row)`이 참이다. 즉 컬럼의 `editable: true` 선언만으로는 표시되지 않는다.
 3. 활성 editor plugin에 `canEdit(context)`가 정의되어 있다면 그 조건도 함께 만족해야 한다.
 
-실제 구현은 `editableColumnFields` 집합을 계산할 때 위 조건을 모두 통과한 컬럼만 `data-editable-column="true"`로 헤더에 반영한다. 헤더 하단 border 표시는 정렬 인디케이터, 필터 표시, 컬럼 고정, 드래그앤드롭 드롭 위치 표시와 공존한다.
+실제 구현은 `editableColumnFields` 집합을 계산할 때 위 조건을 모두 통과한 컬럼만 `data-editable-column="true"`로 헤더에 반영한다. 이 속성은 테스트/디버깅용이며 시각적 강조를 추가하지 않는다. 정렬 인디케이터, 필터 표시, 고정 컬럼과 드롭 대상의 기존 그림자, 그룹 헤더 구분선은 유지한다.
 
 ---
 

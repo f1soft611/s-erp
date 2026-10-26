@@ -100,6 +100,28 @@
         LIMIT 1
     </select>
 
+    <select id="selectCustomerIdByName" parameterType="map" resultType="long">
+        SELECT customer_id
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId}
+          AND btrim(customer_name) = #{customerName}
+        <if test="excludeCustomerId != null">
+            AND customer_id != #{excludeCustomerId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="selectCustomerIdByBusinessNo" parameterType="map" resultType="long">
+        SELECT customer_id
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId}
+          AND regexp_replace(business_no, '[^0-9]', '', 'g') = #{businessNo}
+        <if test="excludeCustomerId != null">
+            AND customer_id != #{excludeCustomerId}
+        </if>
+        LIMIT 1
+    </select>
+
     <select id="insertCustomer" parameterType="map" resultType="long">
         INSERT INTO tb_customer_info (
             tenant_id,
@@ -143,8 +165,7 @@
 
     <update id="updateCustomer" parameterType="map">
         UPDATE tb_customer_info
-        SET customer_code = #{customerCode},
-            customer_name = #{customerName},
+        SET customer_name = #{customerName},
             cust_name_abbr = #{custNameAbbr},
             president_name = #{presidentName},
             business_no = #{businessNo},

@@ -4,6 +4,7 @@ import {
   type F1GridChanges,
   type F1GridColumn,
   type F1GridRef,
+  type F1GridValidationError,
 } from '../../../../../shared/components/f1-grid';
 import type { CustomerRow } from '../types/customerManagement.types';
 import { sanitizeCustomerNumberInput } from '../utils/customerNumberInput';
@@ -18,6 +19,7 @@ export type CustomerGridProps = {
   gridKey: number;
   gridRef: RefObject<F1GridRef<CustomerRow> | null>;
   onChangesChange: (changes: F1GridChanges<CustomerRow>) => void;
+  onValidationErrors: (errors: F1GridValidationError[]) => void;
 };
 
 export function createCustomerRow(): CustomerRow {
@@ -50,6 +52,7 @@ export function createCustomerColumns(
       type: 'rownumber',
       width: 56,
       align: 'center',
+      pinned: 'left',
       search: { hidden: true },
       form: { hidden: true },
     },
@@ -58,8 +61,9 @@ export function createCustomerColumns(
       headerName: '거래처코드',
       width: 110,
       align: 'center',
-      editable: canEdit,
-      form: { group: '기본정보', order: 1 },
+      editable: false,
+      pinned: 'left',
+      form: { hidden: true },
       search: { hidden: true },
     },
     {
@@ -68,6 +72,8 @@ export function createCustomerColumns(
       width: 180,
       editable: canEdit,
       required: true,
+      pinned: 'left',
+      validation: { unique: true },
       form: { group: '기본정보', order: 2 },
       search: { hidden: true },
     },
@@ -90,7 +96,10 @@ export function createCustomerColumns(
     {
       field: 'businessNo',
       headerName: '사업자번호',
-      width: 130,
+      required: true,
+      validation: { unique: 'digits' },
+      width: 100,
+      align: 'center',
       editable: canEdit,
       inputFormat: {
         type: 'digits',
@@ -121,8 +130,9 @@ export function createCustomerColumns(
     {
       field: 'telephoneNo',
       headerName: '전화번호',
-      width: 130,
+      width: 100,
       editable: canEdit,
+      align: 'center',
       inputFormat: { type: 'korean-phone', maxDigits: 11 },
       sanitizeInput: sanitizeCustomerNumberInput,
       form: { group: '연락처', order: 1 },
@@ -246,6 +256,7 @@ export function CustomerGrid({
   gridKey,
   gridRef,
   onChangesChange,
+  onValidationErrors,
 }: CustomerGridProps) {
   const rowFormPlugin = useMemo(() => {
     if (!canCreate && !canUpdate) return { enabled: false };
@@ -269,6 +280,7 @@ export function CustomerGrid({
       rowFormPlugin={rowFormPlugin}
       createRow={createCustomerRow}
       onChangesChange={onChangesChange}
+      onValidationErrors={onValidationErrors}
       loading={loading}
       height="100%"
       showCheckbox={false}

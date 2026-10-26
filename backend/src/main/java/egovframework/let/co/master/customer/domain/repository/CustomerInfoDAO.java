@@ -29,6 +29,14 @@ public class CustomerInfoDAO extends EgovAbstractMapper {
         return selectOne("CustomerInfoDAO.selectCustomerIdByCode", params);
     }
 
+    public Long selectCustomerIdByName(Map<String, Object> params) throws Exception {
+        return selectOne("CustomerInfoDAO.selectCustomerIdByName", params);
+    }
+
+    public Long selectCustomerIdByBusinessNo(Map<String, Object> params) throws Exception {
+        return selectOne("CustomerInfoDAO.selectCustomerIdByBusinessNo", params);
+    }
+
     public Long insertCustomer(Map<String, Object> params) throws Exception {
         return selectOne("CustomerInfoDAO.insertCustomer", params);
     }

@@ -112,7 +112,11 @@ export const f1GridDocs: F1GridDoc[] = [
             '컬럼 레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
           ],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
-          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'loading',
+            'boolean',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께로 표시. MUI indeterminate 원호 애니메이션 사용',
+          ],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
           [
             'onChangesChange',
@@ -153,8 +157,13 @@ export const f1GridDocs: F1GridDoc[] = [
           ],
           ['options', 'F1GridOption[]', 'select/autocomplete 선택 목록'],
           ['format', 'number | decimal | currency', '숫자 컬럼 표시 형식'],
-          ['decimalPlaces', 'number', '숫자 표시 소수점 자릿수'],
+          [
+            'decimalPlaces',
+            'number',
+            'number/decimal 기본 최대 5자리(끝의 0 생략), 지정 시 고정 표시',
+          ],
           ['required / min / max', 'boolean / number', '기본 검증 규칙'],
+          ['validation.unique', "boolean | 'digits'", "전체 활성 행의 고유값 검사. true는 문자열 trim, 'digits'는 숫자만 비교. 자기 행·빈 비교키 제외"],
           ['validate', '(value, row) => string | boolean', '값 검증 규칙'],
           [
             'selectOnFocus',
@@ -215,13 +224,13 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Editable header indicator',
-        body: '편집 가능한 컬럼은 헤더 하단에 강조 색상(primary.main) border로 표시된다. 판정은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족해야 한다.',
+        body: '편집 가능 여부에 따른 헤더 강조선은 표시하지 않는다. 별도 아이콘이나 배경색은 추가하지 않으며 기존 셀 편집 테두리, 고정 컬럼 및 드롭 대상 그림자와 그룹 헤더 구분선은 유지된다. 테스트/디버깅용 data-editable-column 속성은 visibleRows에서 isCellEditable(column, row)와 활성 editor plugin의 canEdit(context) 조건을 모두 만족할 때 적용된다.',
       },
       { type: 'code', heading: 'Editable column', code },
       {
         type: 'code',
         heading: 'Number format column',
-        code: "{ field: 'amount', headerName: '금액', type: 'number', format: 'currency', decimalPlaces: 2 }",
+        code: "{ field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략\n{ field: 'unitPrice', headerName: '단가', type: 'number', decimalPlaces: 2 } // 1.2 -> 1.20\n{ field: 'price', headerName: '가격', type: 'currency', format: 'currency' } // KRW, 기본 0자리",
       },
       {
         type: 'prose',
@@ -285,7 +294,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'prose',
         heading: 'Automatic mapping and validation',
-        body: 'headerName은 기본 라벨, headerGroup은 자동 섹션이 되고 text, number, decimal, currency, checkbox, date, datetime, time, select, autocomplete, code 타입은 대응 입력으로 변환됩니다. 숨김·행번호·합성 열은 기본 제외되며 required, min, max, validate는 폼 포함 컬럼에만 적용됩니다. 읽기 전용은 form.readOnly, editable 함수, editable 값 순으로 판정합니다.',
+        body: 'headerName은 기본 라벨, headerGroup은 자동 섹션이 되고 text, number, decimal, currency, checkbox, date, datetime, time, select, autocomplete, code 타입은 대응 입력으로 변환됩니다. 숨김·행번호·합성 열은 기본 제외되며 required, inputFormat 자리수, min, max, validation.unique, validate는 폼 포함 컬럼에 적용됩니다. unique는 전체 활성 행을 비교하고 자기 행은 제외합니다. 폼 적용과 validate()의 실제 오류는 onValidationErrors 콜백으로 페이지 메시지에 연결할 수 있습니다. 읽기 전용은 form.readOnly, editable 함수, editable 값 순으로 판정합니다.',
       },
       {
         type: 'api',
@@ -937,7 +946,11 @@ const detailValues = {
             '우클릭 행 삭제 메뉴 표시 여부',
           ],
           ['createDuplicate', '(row) => T', '복사용 신규 행 생성 로직'],
-          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'loading',
+            'boolean',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께로 표시. MUI indeterminate 원호 애니메이션 사용',
+          ],
           ['minHeight', 'number | string', '그리드 최소 높이 제어'],
           [
             'treeContextMenu',

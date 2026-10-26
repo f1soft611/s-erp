@@ -95,7 +95,9 @@ export function ModuleManagementPage({
         }
       } catch (requestError) {
         if (requestId === moduleRequestIdRef.current) {
-          setModules([]);
+          if (showSkeleton) {
+            setModules([]);
+          }
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -123,7 +125,7 @@ export function ModuleManagementPage({
   }, [loadModules]);
 
   const handleSaveChanges = useCallback(async () => {
-    if (!modulePanelRef.current) return;
+    if (!modulePanelRef.current || saving) return;
     setSaving(true);
     try {
       await modulePanelRef.current.saveCurrentChanges();
@@ -136,22 +138,24 @@ export function ModuleManagementPage({
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [saving]);
 
   const requestModuleRefresh = useCallback(() => {
+    if (saving) return;
     if (panelDirty) {
       setRefreshConfirmOpen(true);
       return;
     }
     void loadModules({ showSkeleton: true });
-  }, [loadModules, panelDirty]);
+  }, [loadModules, panelDirty, saving]);
 
   const confirmModuleRefresh = useCallback(() => {
+    if (saving) return;
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
     setModuleGridKey((current) => current + 1);
     void loadModules({ showSkeleton: true });
-  }, [loadModules]);
+  }, [loadModules, saving]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -161,7 +165,7 @@ export function ModuleManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pageActionPermissions.read,
-          disabled: false,
+          disabled: saving,
           onClick: requestModuleRefresh,
         },
       ],
@@ -204,6 +208,7 @@ export function ModuleManagementPage({
       />
       <PageSearchArea>
         <TextField
+          disabled={saving}
           size="small"
           margin="none"
           placeholder="모듈 코드/명/경로/아이콘 검색"
@@ -216,6 +221,7 @@ export function ModuleManagementPage({
                 <IconButton
                   size="small"
                   aria-label="검색어 초기화"
+                  disabled={saving}
                   onClick={() => setSearchQuery('')}
                   edge="end"
                   sx={{ mr: 0.5, color: 'text.secondary' }}
@@ -255,6 +261,7 @@ export function ModuleManagementPage({
         onError={setError}
         moduleGridKey={moduleGridKey}
         moduleGridLoading={pageLoading}
+        saving={saving}
       />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}

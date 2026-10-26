@@ -701,6 +701,21 @@
 
 `tb_customer_info_customer_id_seq`는 기존 customer ID 기본값이며 그대로 유지한다. 거래처 코드는 기존 전자정부 ID Generator의 `public.ids` 카운터 중 `table_name = 'tb_customer_info'` 행을 사용한다. `20261022_005` migration은 기존 1~6자리 숫자 거래처 코드의 최댓값보다 큰 `next_id`를 설정하고, 기존 카운터가 더 크면 그 값을 보존한다. 앱의 `customerCodeIdGnrService`는 `IDS` 테이블/`tb_customer_info` 키, 6자리 zero-padding, block size 1을 사용한다. 신규 테이블이나 시퀀스는 만들지 않는다. migration은 작성 완료 상태이며 실제 DB에는 적용하지 않았다. 상세 스크립트는 [backend/DATABASE/20261022](../../backend/DATABASE/20261022) 및 [docs/database/20261022](20261022) 참고.
 
+#### 거래처명 고유성 추가 (2026-10-23, 적용 예정)
+
+- `20261023_001`은 `uq_tb_customer_info_tenant_name` unique index on `(tenant_id, btrim(customer_name))`를 정의한다. 사용/미사용을 모두 포함하고 대소문자는 구분한다. 기존 NULL 허용 계약은 바꾸지 않으며 저장 API의 이름 필수 검사를 유지한다.
+- 기본 DB `s-erp-postgresql-readonly`의 테이블/컬럼/인덱스 metadata 확인 결과 이름 unique index는 없고 코드 unique index는 `uq_tb_customer_info_factory_customer_code`였다. 이 DB의 `customer_name`은 nullable이다. 위 2026-10-22 tenant 전용 DB 정보와 구분하며 현재 DB 계약을 동일하다고 간주하지 않는다.
+- 실제 DB 미적용. 현재 이름 중복 데이터 유무는 업무 행을 조회하지 않아 미확인이다. 중복이 있으면 migration은 명시적 오류로 중단하고 데이터는 자동 변경하지 않는다.
+- [변경 이력 및 배포/롤백 절차](20261023/20261023_001_change_customer_name_unique.md), [backend 사본](../../backend/DATABASE/20261023) 참고.
+
+### 2026-10-23 사업자번호 고유 인덱스 추가 계획 (미적용)
+
+- `20261023_002`는 `uq_tb_customer_info_tenant_business_no` on `(tenant_id, regexp_replace(business_no, '[^0-9]', '', 'g'))`를 정의한다. 같은 tenant의 사용/미사용 번호를 숫자로 비교하고 앞자리 0을 유지한다.
+- 숫자 정규화 결과가 빈 문자열인 행과 NULL은 부분 인덱스에서 제외한다. 기존 nullable 계약과 저장 표기는 바꾸지 않는다.
+- 기본 DB MCP metadata에서 사업자번호 고유 인덱스가 없는 것을 확인했다. 업무 행은 조회하지 않아 현재 중복 여부는 미확인이다. migration은 잠금 후 기존 중복이 있으면 데이터 변경 없이 중단한다.
+- 실제 DB에 적용하지 않았다. 인덱스 적용 전에는 서버 사전 조회만으로 동시 중복을 완전히 방어할 수 없다.
+- [변경 이력 및 배포/롤백 절차](20261023/20261023_002_change_customer_business_no_unique.md), [backend 사본](../../backend/DATABASE/20261023) 참고.
+
 ### tb_material_info (MCP 확인: 2026-10-22)
 
 기존 테이블을 변경하지 않고 품목관리 API를 연결한다. 다음은 지정 tenant MCP의 컬럼·주석·제약 메타데이터 확인 결과이며 업무 데이터 행은 조회하지 않았다.
@@ -737,6 +752,7 @@
 | expiryed_status | varchar(10) | NOT NULL, NONE | NONE/DAY/MONTH/YEAR CHECK |
 | expiryed_count | integer | NULL | NULL 또는 양수 CHECK |
 
+- 추가 CHECK `ck_tb_material_info_expiryed_pair`: `NONE`이면 `expiryed_count IS NULL`, `DAY`/`MONTH`/`YEAR`이면 양수여야 한다. 기존 기준/숫자 CHECK를 보완한다. [변경 이력과 적용/롤백 SQL](20261023/20261023_004_change_material_expiry_count.md)은 작성했으며 실제 DB에는 적용하지 않았다.
 - PK: `material_id`; unique: `(material_id, tenant_id)`, `(tenant_id, material_code)`; FK: `tenant_id → tb_tenant`.
 - 별도 B-tree 인덱스: `ix_tb_material_info_material_name (material_name)`, `ix_tb_material_info_tenant_id (tenant_id)`. 기본 시퀀스는 BIGSERIAL 소유 `tb_material_info_material_id_seq`다.
 - 조회/수정은 인증 tenant 및 `delete_status = 'N' AND deleted_at IS NULL` 조건으로 제한한다. 코드 중복 검사는 삭제 행을 포함한다.
@@ -755,9 +771,47 @@
 - eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
 - 테이블과 스키마는 기존 것을 사용하며 거래처/품목별 generator row만 추가/상향한다.
 
+### tb_sales_order_hd / tb_sales_order_dt (신규 환경용, 미적용)
+
+`20261026_008` 신규 환경용 DDL을 정의했으며 실제 DB에는 적용하지 않았다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+| --- | --- | --- | --- | --- |
+| `tb_sales_order_hd` | `sales_order_id` | `bigserial` | NOT NULL | 헤더 PK |
+|  | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+|  | `order_no` | `varchar(30)` | NOT NULL | tenant별 고유 수주번호 |
+|  | `order_dt` | `date` | NOT NULL | 수주일자 |
+|  | `customer_id` | `bigint` | NOT NULL | 거래처 FK |
+|  | `quot_no` | `varchar(30)` | NULL | 견적번호; 현 DB에 견적 테이블이 없어 FK 없음 |
+|  | `delivery_dt` | `date` | NULL | 헤더 납기일자 |
+|  | `delivery_place` | `varchar(200)` | NULL | 납품장소 |
+|  | `delivery_method` | `varchar(50)` | NULL | 배송방법 |
+|  | `status` | `varchar(20)` | NOT NULL, `수주등록` | 수주상태 |
+|  | `total_amt` | `numeric(15,2)` | NULL, `0` | 수주 총금액 |
+|  | `remark` | `varchar(500)` | NULL | 비고 |
+|  | `use_at` | `char(1)` | NOT NULL, `Y` | 사용 여부 (`Y`/`N`) |
+|  | `created_by`, `updated_by` | `varchar(10)` | NULL | 생성/수정 사용자 |
+|  | `created_at` | `timestamp without time zone` | NOT NULL, `CURRENT_TIMESTAMP` | 생성 일시 |
+|  | `updated_at` | `timestamp without time zone` | NULL | 수정 일시 |
+| `tb_sales_order_dt` | `sales_order_detail_id` | `bigserial` | NOT NULL | 상세 PK |
+|  | `sales_order_id` | `bigint` | NOT NULL | 헤더 FK |
+|  | `tenant_id` | `bigint` | NOT NULL | 헤더와 동일 tenant인지 복합 FK로 보장 |
+|  | `line_no` | `int` | NOT NULL | 수주 라인 번호 |
+|  | `material_id` | `bigint` | NOT NULL | 품목 FK |
+|  | `order_qty`, `unit_price`, `supply_amt`, `vat_amt`, `total_amt`, `shipped_qty` | `numeric(15,2)` | 주문/금액 NOT NULL, VAT/출하수량 NULL 기본 `0` | 수량 및 금액 |
+|  | `delivery_dt` | `date` | NULL | 라인 납기일자 |
+|  | `line_status` | `varchar(20)` | NULL, `대기` | 라인 상태 |
+
+- 헤더는 `sales_order_id` 단일 PK이며 `(tenant_id, order_no)`를 unique로 제한한다. 상세도 독립된 `sales_order_detail_id` PK를 사용하고 `(sales_order_id, line_no)`를 unique로 제한한다.
+- 거래처와 품목 FK는 각각 `(customer_id, tenant_id)` 및 `(material_id, tenant_id)`이며, 상세-헤더 FK `(sales_order_id, tenant_id)`가 tenant 경계를 보장한다. 헤더 삭제 시 상세는 cascade 삭제된다.
+- 수주상태 허용값은 `수주등록`, `생산대기`, `생산중`, `출하완료`, `취소`이며 `use_at`은 `Y`/`N`이다.
+- [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
+
 ---
 
 ## 변경 이력
+
+- 2026-10-26: 수주 헤더/상세 신규 테이블 DDL 초안 `20261026_008`을 정의했다. 테넌트 범위 FK와 별도 상세 ID, guarded rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261026](../../backend/DATABASE/20261026) 및 [docs/database/20261026](20261026) 참고.
 
 - 2026-10-22: 품목 테이블이 없는 환경의 DDL 누락을 보완했다. tenant MCP로 37개 컬럼과 기본값/주석/제약/인덱스를 재확인하고 `20261022_010_create_material_schema.sql`과 빈 신규 테이블 전용 롤백을 두 DB 이력 폴더에 추가했다. 기존 테이블 수정 및 실제 DB 적용은 수행하지 않았다.
 

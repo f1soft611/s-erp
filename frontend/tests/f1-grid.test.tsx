@@ -1,4 +1,6 @@
-﻿import { createRef, useState } from 'react';
+import { createRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import {
   act,
   fireEvent,
@@ -288,15 +290,100 @@ describe('F1-GRID size props', () => {
 });
 
 describe('F1-GRID loading overlay', () => {
-  it('shows a refresh-style spinner overlay without rendering skeleton rows while loading', () => {
-    render(
-      <F1Grid
-        rows={rows}
-        columns={columns}
-        rowKey="id"
-        ariaLabel="grid loading overlay"
-        loading
-      />,
+  it('commits fetched and empty rows before loading-complete updates return', () => {
+    const fetchedRows = [{ id: 'fetched', code: 'FETCHED' }];
+    const fetchedColumns: F1GridColumn<(typeof fetchedRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const reactActEnvironment = globalThis as typeof globalThis & {
+      IS_REACT_ACT_ENVIRONMENT?: boolean;
+    };
+    const previousActEnvironment = reactActEnvironment.IS_REACT_ACT_ENVIRONMENT;
+    reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+
+    try {
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={[]}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading
+            />,
+          );
+        });
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={fetchedRows}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading={false}
+            />,
+          );
+        });
+        expect(container.querySelector('[role="gridcell"]')?.textContent).toBe(
+          'FETCHED',
+        );
+        expect(
+          container.querySelector('[data-testid="f1-grid-loading-overlay"]'),
+        ).toBeNull();
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={fetchedRows}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading
+            />,
+          );
+        });
+      });
+      act(() => {
+        flushSync(() => {
+          root.render(
+            <F1Grid
+              rows={[]}
+              columns={fetchedColumns}
+              rowKey="id"
+              loading={false}
+            />,
+          );
+        });
+        expect(container.querySelector('[role="gridcell"]')).toBeNull();
+        expect(
+          container.querySelector('[data-testid="f1-grid-loading-overlay"]'),
+        ).toBeNull();
+      });
+    } finally {
+      act(() => {
+        flushSync(() => root.unmount());
+      });
+      reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+      container.remove();
+    }
+  });
+
+  it('matches the shared app spinner and restores grid editing after loading', () => {
+    const theme = createAppTheme('light');
+    const { rerender } = render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="grid loading overlay"
+          loading
+        />
+      </ThemeProvider>,
     );
 
     expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
@@ -306,8 +393,34 @@ describe('F1-GRID loading overlay', () => {
     expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
       0,
     );
-    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    const overlay = screen.getByTestId('f1-grid-loading-overlay');
+    const progress = screen.getByRole('progressbar');
+    const progressCircle = progress.querySelector('circle');
+
+    expect(progress).toHaveStyle({ width: '34px', height: '34px' });
+    expect(progressCircle).not.toBeNull();
+    expect(progressCircle).toHaveAttribute('stroke-width', '2.4');
+    expect(getComputedStyle(overlay).backgroundColor).toBe(
+      'rgba(244, 247, 251, 0.84)',
+    );
+
+    rerender(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="grid loading overlay"
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('grid')).not.toHaveAttribute('aria-busy');
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    expect(codeCell).toBeInTheDocument();
+    fireEvent.doubleClick(codeCell);
+    expect(screen.getByDisplayValue('DASH')).toBeInTheDocument();
   });
 
   it('renders only the visible window for large row sets to keep the grid responsive', () => {
@@ -1336,6 +1449,80 @@ describe('F1-GRID clipboard', () => {
 });
 
 describe('F1-GRID custom cell rendering', () => {
+  it('preserves drop target shadows without an editable header indicator', () => {
+    const theme = createAppTheme();
+    render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={[
+            { field: 'code', headerName: 'Source' },
+            { field: 'status', headerName: 'Target', editable: true },
+          ]}
+          rowKey="id"
+          showCheckbox={false}
+          editorPlugins={[{}]}
+        />
+      </ThemeProvider>,
+    );
+    const source = screen.getByRole('columnheader', { name: 'Source' });
+    const target = screen.getByRole('columnheader', { name: 'Target' });
+    const dataTransfer = { setData: vi.fn(), effectAllowed: 'move' };
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+
+    expect(target).toHaveAttribute('data-drop-target', 'true');
+    const dropShadow = getComputedStyle(target).boxShadow;
+    expect(dropShadow).not.toContain('inset 0 2px');
+    expect(dropShadow).toContain('inset 0 0 0 1px rgba(25, 118, 210, 0.35)');
+    expect(dropShadow).toContain('0 0 0 1px rgba(25, 118, 210, 0.15)');
+    fireEvent.dragEnd(source);
+    expect(getComputedStyle(target).boxShadow).toBe('');
+  });
+
+  it.each([
+    { mode: 'light', pinned: undefined, headerGroup: undefined },
+    { mode: 'dark', pinned: undefined, headerGroup: 'Details' },
+    { mode: 'light', pinned: 'left', headerGroup: undefined },
+    { mode: 'dark', pinned: 'right', headerGroup: undefined },
+  ] as const)('does not highlight editable headers while preserving existing dividers and shadows: %j', ({
+    mode,
+    pinned,
+    headerGroup,
+  }) => {
+    const theme = createAppTheme(mode);
+    render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={[
+            { field: 'code', headerName: 'Editable', editable: true, pinned, headerGroup },
+            { field: 'status', headerName: 'Read only' },
+          ]}
+          rowKey="id"
+          showCheckbox={false}
+          editorPlugins={[{}]}
+        />
+      </ThemeProvider>,
+    );
+
+    const header = screen.getByRole('columnheader', { name: 'Editable' });
+    const style = getComputedStyle(header);
+    expect(header).toHaveAttribute('data-editable-column', 'true');
+    expect(style.boxShadow).not.toContain('inset 0 2px');
+    if (!pinned) expect(style.boxShadow).toBe('');
+    expect(style.borderBottomWidth).not.toBe('2px');
+    expect(style.borderTopWidth).toBe(headerGroup ? '1px' : '0px');
+    if (pinned) {
+      expect(style.boxShadow).toContain(
+        `${pinned === 'left' ? '2px' : '-2px'} 0 4px -2px rgba(0, 0, 0, 0.32)`,
+      );
+    }
+    const readOnlyHeader = screen.getByRole('columnheader', { name: 'Read only' });
+    expect(readOnlyHeader).not.toHaveAttribute('data-editable-column');
+    expect(getComputedStyle(readOnlyHeader).boxShadow).not.toContain('inset 0 2px');
+  });
+
   it('renders custom cell markup and applies dynamic styling and properties', () => {
     const customColumns: F1GridColumn<MenuRow>[] = [
       {

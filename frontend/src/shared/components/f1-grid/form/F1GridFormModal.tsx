@@ -6,11 +6,17 @@ import type {
   F1GridColumn,
   F1GridFormMode,
   F1GridRowFormPlugin,
+  F1GridValidationError,
 } from '../types/grid.types';
-import { validateGridRow } from '../validation/GridValidation';
+import { getGridRowId } from '../utils/grid.utils';
+import {
+  createGridValidationContext,
+  validateGridRow,
+} from '../validation/GridValidation';
 import { GridFormField } from './GridFormField';
 import {
   buildGridFormSections,
+  isGridFormFieldDisabled,
   isGridFormFieldReadOnly,
 } from './GridFormModel';
 
@@ -21,11 +27,13 @@ export type F1GridFormModalProps<T extends object> = {
   originalRow?: T;
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
+  validationRows?: T[];
   plugin: F1GridRowFormPlugin<T>;
   externalErrors?: Record<string, string>;
   onCancel: () => void;
   onApply: (draftRow: T) => void;
   onDraftChange?: (fields: string[]) => void;
+  onValidationErrors?: (errors: F1GridValidationError[]) => void;
 };
 
 export function F1GridFormModal<T extends object>({
@@ -35,11 +43,13 @@ export function F1GridFormModal<T extends object>({
   originalRow,
   columns,
   rowKey,
+  validationRows = [],
   plugin,
   externalErrors = {},
   onCancel,
   onApply,
   onDraftChange,
+  onValidationErrors,
 }: F1GridFormModalProps<T>) {
   const fieldRefs = useRef(new Map<string, HTMLDivElement>());
   const [draftRow, setDraftRow] = useState<T>(() => ({ ...row }));
@@ -104,13 +114,29 @@ export function F1GridFormModal<T extends object>({
   };
 
   const applyDraft = () => {
-    const nextValidationErrors = validateGridRow(draftRow, includedColumns);
+    const validationContext = createGridValidationContext(
+      validationRows,
+      includedColumns,
+      rowKey,
+    );
+    const nextValidationErrors = validateGridRow(
+      draftRow,
+      includedColumns,
+      validationContext,
+    );
     const nextErrors = { ...nextValidationErrors, ...externalErrors };
     const firstInvalidField = includedColumns
       .map((column) => String(column.field))
       .find((field) => Boolean(nextErrors[field]));
 
     setValidationErrors(nextValidationErrors);
+    onValidationErrors?.(
+      Object.entries(nextErrors).map(([field, message]) => ({
+        rowId: getGridRowId(draftRow, rowKey),
+        field,
+        message,
+      })),
+    );
     if (firstInvalidField) {
       setFocusRequest({ field: firstInvalidField });
       return;
@@ -275,6 +301,11 @@ export function F1GridFormModal<T extends object>({
                       mode={mode}
                       value={draftRow[field.field]}
                       readOnly={isGridFormFieldReadOnly(
+                        field.column,
+                        draftRow,
+                        mode,
+                      )}
+                      disabled={isGridFormFieldDisabled(
                         field.column,
                         draftRow,
                         mode,

@@ -1,6 +1,9 @@
 package egovframework.let.co.master.material.service.impl;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Stream;
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +12,7 @@ import egovframework.let.co.master.material.domain.model.MaterialInfoBatchChange
 import egovframework.let.co.master.material.domain.model.MaterialInfoBatchSaveRequestVO;
 import egovframework.let.co.master.material.domain.model.MaterialInfoBatchSaveResultVO;
 import egovframework.let.co.master.material.domain.model.MaterialInfoChangeVO;
+import egovframework.let.co.master.material.domain.model.MaterialInfoVO;
 import egovframework.let.co.master.material.service.MaterialInfoService;
 import egovframework.let.co.master.material.service.MaterialInfoBatchService;
 
@@ -28,12 +32,22 @@ public class MaterialInfoBatchServiceImpl extends EgovAbstractServiceImpl implem
         if (!changes.getDeletedRows().isEmpty()) throw new IllegalArgumentException("품목 삭제는 지원하지 않습니다.");
         validateRows(changes.getInsertedRows(), false);
         validateRows(changes.getUpdatedRows(), true);
+        Set<String> requestIds = new HashSet<>();
+        Stream.concat(changes.getInsertedRows().stream(), changes.getUpdatedRows().stream()).forEach(row -> {
+            if (StringUtils.hasText(row.getMaterialId()) && !requestIds.add(row.getMaterialId())) {
+                throw new IllegalArgumentException("품목 요청 행 ID가 중복되었습니다.");
+            }
+        });
         MaterialInfoBatchSaveResultVO result = new MaterialInfoBatchSaveResultVO();
         for (MaterialInfoChangeVO row : changes.getInsertedRows()) {
-            result.getMaterials().add(service.createMaterial(tenantId, actor, row));
+            MaterialInfoVO saved = service.createMaterial(tenantId, actor, row);
+            result.getMaterials().add(saved);
+            if (StringUtils.hasText(row.getMaterialId())) result.getRowIdMappings().put(row.getMaterialId(), saved.getMaterialId());
         }
         for (MaterialInfoChangeVO row : changes.getUpdatedRows()) {
-            result.getMaterials().add(service.updateMaterial(tenantId, actor, requireId(row.getMaterialId()), row));
+            MaterialInfoVO saved = service.updateMaterial(tenantId, actor, requireId(row.getMaterialId()), row);
+            result.getMaterials().add(saved);
+            result.getRowIdMappings().put(row.getMaterialId(), saved.getMaterialId());
         }
         return result;
     }

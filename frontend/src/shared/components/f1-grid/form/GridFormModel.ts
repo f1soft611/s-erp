@@ -32,6 +32,15 @@ export function isGridFormFieldReadOnly<T extends object>(
   return !isCellEditable(column, row);
 }
 
+export function isGridFormFieldDisabled<T extends object>(
+  column: F1GridColumn<T>,
+  row: T,
+  mode: F1GridFormMode,
+): boolean {
+  const disabled = column.form?.disabled;
+  return typeof disabled === 'function' ? disabled(row, mode) : disabled ?? false;
+}
+
 export function buildGridFormSections<T extends object>(
   columns: F1GridColumn<T>[],
   row?: T,
@@ -41,7 +50,12 @@ export function buildGridFormSections<T extends object>(
       column,
       sourceIndex,
       field: column.field,
-      label: column.form?.label ?? column.headerName,
+      label:
+        typeof column.form?.label === 'function'
+          ? row
+            ? column.form.label(row)
+            : column.headerName
+          : column.form?.label ?? column.headerName,
       group: column.form?.group ?? column.headerGroup ?? '기본 정보',
       order: column.form?.order ?? sourceIndex,
       span: column.form?.span ?? 1,

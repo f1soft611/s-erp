@@ -1,4 +1,5 @@
 import {
+  useCallback,
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -13,7 +14,9 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
+import { Box, Divider, Menu, MenuItem } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import { AppLoadingSpinner } from '../../AppLoadingSpinner';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
@@ -22,6 +25,7 @@ import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
   areGridValuesEqual,
+  acceptSavedGridRows,
   createGridData,
   duplicateGridRows,
   getGridChanges,
@@ -43,7 +47,9 @@ import type {
   F1GridProps,
   F1GridRef,
   F1GridRowId,
+  F1GridSavedRow,
   F1GridSort,
+  F1GridValidationError,
 } from '../types/grid.types';
 import { findNextEditableCell } from '../keyboard/GridKeyboard';
 import {
@@ -72,7 +78,10 @@ import {
   parseGridTsv,
   toGridTsv,
 } from '../clipboard/GridClipboard';
-import { validateGridRow } from '../validation/GridValidation';
+import {
+  createGridValidationContext,
+  validateGridRow,
+} from '../validation/GridValidation';
 import { clampGridRowHeight } from '../layout/GridRowHeight';
 import {
   canHideGridColumn,
@@ -161,6 +170,7 @@ function F1GridInner<T extends object>(
     afterEdit,
     onChangesChange,
     onSelectionChange,
+    onValidationErrors,
     initialSelectedRowIds,
     rowProjection,
     cellAdornment,
@@ -193,6 +203,7 @@ function F1GridInner<T extends object>(
     createGridData(rows, rowKey),
   );
   const lastRowsPropRef = useRef<T[]>(rows);
+  const acceptedRowsRef = useRef<T[] | undefined>(undefined);
   const rowsHaveEquivalentValues = (left: T[], right: T[]) => {
     if (left.length !== right.length) return false;
     return left.every((row, index) => areGridValuesEqual(row, right[index]));
@@ -912,6 +923,11 @@ function F1GridInner<T extends object>(
         .slice(showCheckbox ? 1 : 0),
     [dataColumnTracks, showCheckbox],
   );
+  const allColumnIndexes = useMemo(
+    () => new Set(visibleColumns.map((_, index) => index)),
+    [visibleColumns],
+  );
+  const previousVirtualColumnIndexesRef = useRef(new Set<number>());
   const renderedColumnIndexes = useMemo(() => {
     const viewportWidth =
       bodyScrollMetrics.viewportWidth || gridContainerWidth || 800;
@@ -924,7 +940,7 @@ function F1GridInner<T extends object>(
       (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
         totalWidth > viewportWidth);
     if (!virtualizationActive) {
-      return new Set(visibleColumns.map((_, index) => index));
+      return allColumnIndexes;
     }
 
     const pinnedIndexes = visibleColumns
@@ -941,8 +957,7 @@ function F1GridInner<T extends object>(
       copiedCellRange?.focus.columnIndex,
     ].filter((index): index is number => index !== undefined);
 
-    return new Set(
-      getVirtualColumnIndexes({
+    const nextIndexes = getVirtualColumnIndexes({
         widths: resolvedColumnWidths,
         scrollLeft: Math.max(
           0,
@@ -957,9 +972,17 @@ function F1GridInner<T extends object>(
         overscan: columnOverscan,
         pinnedIndexes,
         protectedIndexes,
-      }),
-    );
+      });
+    const previous = previousVirtualColumnIndexesRef.current;
+    if (previous.size === nextIndexes.length &&
+      nextIndexes.every((index) => previous.has(index))) {
+      return previous;
+    }
+    const next = new Set(nextIndexes);
+    previousVirtualColumnIndexesRef.current = next;
+    return next;
   }, [
+    allColumnIndexes,
     bodyScrollMetrics.scrollLeft,
     bodyScrollMetrics.viewportWidth,
     cellSelection,
@@ -1117,9 +1140,9 @@ function F1GridInner<T extends object>(
     }));
   }
 
-  function getPinOffset(
+  const getPinOffset = useCallback((
     column: F1GridColumn<T>,
-  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined {
+  ): { side: 'left' | 'right'; offset: number; shadow?: boolean } | undefined => {
     const side = getGridColumnPinSide(pinnedFields, column);
     if (!side) return undefined;
     const offset =
@@ -1133,11 +1156,22 @@ function F1GridInner<T extends object>(
       offset,
       shadow: side === 'right' ? offset === rightPinnedBoundaryOffset : true,
     };
-  }
+  }, [leftOffsets, pinnedFields, rightOffsets]);
 
-  useEffect(() => {
+  const getCellError = useCallback(
+    (rowId: F1GridRowId, field: keyof T) =>
+      cellErrors[getErrorKey(rowId, field)],
+    [cellErrors],
+  );
+
+  useLayoutEffect(() => {
     if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
     lastRowsPropRef.current = rows;
+    if (acceptedRowsRef.current && rowsHaveEquivalentValues(acceptedRowsRef.current, rows)) {
+      acceptedRowsRef.current = undefined;
+      return;
+    }
+    acceptedRowsRef.current = undefined;
     const changes = getGridChanges(data);
     if (
       changes.insertedRows.length === 0 &&
@@ -1281,15 +1315,19 @@ function F1GridInner<T extends object>(
 
   function validate(): boolean {
     const nextErrors: Record<string, string> = {};
+    const validationErrors: F1GridValidationError[] = [];
+    const context = createGridValidationContext(activeRows, columns, rowKey);
     visibleRows.forEach((row) => {
       const rowId = getGridRowId(row, rowKey);
-      Object.entries(validateGridRow(row, columns)).forEach(
+      Object.entries(validateGridRow(row, columns, context)).forEach(
         ([field, message]) => {
           nextErrors[`${String(rowId)}:${field}`] = message;
+          validationErrors.push({ rowId, field, message });
         },
       );
     });
     setCellErrors(nextErrors);
+    onValidationErrors?.(validationErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
@@ -1551,12 +1589,9 @@ function F1GridInner<T extends object>(
         column.type !== 'currency') ||
         !Number.isNaN(value))
     ) {
-      const changes =
-        column.type === 'select' || column.type === 'user'
-          ? (column.onValueChange?.(row, value) ?? {
-              [column.field]: value,
-            })
-          : { [column.field]: value };
+      const changes = column.onValueChange?.(row, value) ?? {
+        [column.field]: value,
+      };
       const hasChanges = Object.entries(changes).some(
         ([field, nextValue]) =>
           !areGridValuesEqual(row[field as keyof T], nextValue),
@@ -2488,6 +2523,49 @@ function F1GridInner<T extends object>(
     getChanges() {
       return getGridChanges(data);
     },
+    acceptSavedRows(savedRows: F1GridSavedRow<T>[]) {
+      if (editingCell || rowFormSession) throw new Error('편집을 완료한 뒤 저장 결과를 반영해 주세요.');
+      if (!savedRows.length) return data.rows;
+      const next = acceptSavedGridRows(data, rowKey, savedRows);
+      const mappings = new Map(savedRows.map(({ previousRowId, row }) =>
+        [String(previousRowId), getGridRowId(row, rowKey)]));
+      const remap = (id: F1GridRowId) => mappings.get(String(id)) ?? id;
+      const remapCell = (cell: F1GridCellPosition | undefined) =>
+        cell ? { ...cell, rowId: remap(cell.rowId) } : undefined;
+      const remapRange = (range: F1GridCellRange | undefined) => range ? {
+        anchor: { ...range.anchor, rowId: remap(range.anchor.rowId) },
+        focus: { ...range.focus, rowId: remap(range.focus.rowId) },
+      } : undefined;
+      acceptedRowsRef.current = next.rows;
+      setData(next);
+      setRowSelection((current) => ({
+        ...current,
+        includedIds: new Set([...current.includedIds].map(remap)),
+        excludedIds: new Set([...current.excludedIds].map(remap)),
+      }));
+      setLastSelectedRowId((id) => id === undefined ? id : remap(id));
+      setPendingInsertedRowId((id) => id === undefined ? id : remap(id));
+      setFocusedCell(remapCell);
+      setCellSelection(remapRange);
+      setCopiedCellRange(remapRange);
+      cellSelectionRef.current = remapRange(cellSelectionRef.current);
+      copiedCellRangeRef.current = remapRange(copiedCellRangeRef.current);
+      cellRangeDragRef.current = cellRangeDragRef.current
+        ? remapRange(cellRangeDragRef.current) ?? null : null;
+      const previousCell = dragSelectionStateRef.current.previousCell;
+      if (previousCell) dragSelectionStateRef.current.previousCell = remapCell(previousCell) ?? null;
+      setRowHeights((current) => Object.fromEntries(
+        Object.entries(current).map(([id, height]) => [String(remap(id)), height]),
+      ));
+      setCellErrors((current) => {
+        const nextErrors = { ...current };
+        savedRows.forEach(({ previousRowId }) => {
+          columns.forEach((column) => { delete nextErrors[getErrorKey(previousRowId, column.field)]; });
+        });
+        return nextErrors;
+      });
+      return next.rows;
+    },
     validate,
     startEdit(rowId: F1GridRowId, field: keyof T) {
       const colIndex = visibleColumns.findIndex((col) => col.field === field);
@@ -2851,9 +2929,7 @@ function F1GridInner<T extends object>(
                 updateGridRow(current, rowKey, rowId, changes),
               );
             }}
-            getCellError={(rowId, field) =>
-              cellErrors[getErrorKey(rowId, field)]
-            }
+            getCellError={getCellError}
             onStopEdit={stopEdit}
             onCellRef={(rowId, columnIndex, node) => {
               const key = `${String(rowId)}:${columnIndex}`;
@@ -2910,12 +2986,12 @@ function F1GridInner<T extends object>(
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.08)',
+            backgroundColor: (theme) => alpha(theme.palette.background.default, 0.84),
             pointerEvents: 'auto',
           }}
           aria-live="polite"
         >
-          <CircularProgress size={34} thickness={4} />
+          <AppLoadingSpinner thickness={2.4} />
         </Box>
       ) : null}
       <Menu
@@ -3020,8 +3096,10 @@ function F1GridInner<T extends object>(
           originalRow={rowFormSession.originalRow}
           columns={columns}
           rowKey={rowKey}
+          validationRows={activeRows}
           plugin={rowFormPlugin}
           externalErrors={rowFormErrors}
+          onValidationErrors={onValidationErrors}
           onCancel={closeRowForm}
           onApply={applyRowForm}
           onDraftChange={(fields) => {

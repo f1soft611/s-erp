@@ -3,13 +3,17 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, CircularProgress, IconButton, TextField } from '@mui/material';
+import { Box, IconButton, TextField } from '@mui/material';
+import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import { type F1GridRef } from '../../../../shared/components/f1-grid';
+import {
+  type F1GridRef,
+  type F1GridValidationError,
+} from '../../../../shared/components/f1-grid';
 import {
   toPageSearchFields,
   type PageSearchFieldValue,
@@ -36,7 +40,7 @@ type CustomerManagementPageProps = {
 };
 
 function CustomerSaveProgressIcon() {
-  return <CircularProgress size={16} color="inherit" aria-label="거래처 저장 중" />;
+  return <AppLoadingSpinner size={16} color="inherit" aria-label="거래처 저장 중" />;
 }
 
 export function CustomerManagementPage({
@@ -109,11 +113,14 @@ export function CustomerManagementPage({
   const handleGridSave = () => {
     const grid = gridRef.current;
     if (!grid) return;
-    if (!grid.validate()) {
-      management.setError('필수 입력 항목을 확인해 주세요.');
-      return;
-    }
-    void management.saveChanges(grid.getChanges());
+    if (!grid.validate()) return;
+    void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
+  };
+
+  const handleValidationErrors = (errors: F1GridValidationError[]) => {
+    management.setError(
+      [...new Set(errors.map((error) => error.message))].join('\n'),
+    );
   };
 
   const cancelPendingSearch = () => {
@@ -245,10 +252,11 @@ export function CustomerManagementPage({
           canCreate={pagePermissions.create && !management.saving}
           canUpdate={pagePermissions.update && !management.saving}
           canExportExcel={pagePermissions.excel}
-          loading={management.loading || management.saving}
+          loading={management.loading}
           gridKey={management.gridKey}
           gridRef={gridRef}
           onChangesChange={management.handleChangesChange}
+          onValidationErrors={handleValidationErrors}
         />
       </Box>
       <UnsavedChangesConfirmDialog

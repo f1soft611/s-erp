@@ -76,7 +76,7 @@ function getNumericFormat<T extends object>(
     decimalPlaces === undefined
       ? column.format === 'currency'
         ? ''
-        : '###'
+        : '#####'
       : '0'.repeat(decimalPlaces);
   const numberFormat = digits ? `#,##0.${digits}` : '#,##0';
 

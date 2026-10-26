@@ -93,6 +93,12 @@ type GridRowProps<T extends object> = {
   showFormAction?: boolean;
   formActionPinnedShadow?: boolean;
   onOpenRowForm?: (row: T) => void;
+  latestPropsRef?: {
+    current: {
+      selectedCellRange?: F1GridCellRange;
+      isCellSelectionDragging?: boolean;
+    };
+  };
 };
 
 function getStateKey(rowId: F1GridRowId): string {
@@ -171,6 +177,30 @@ const areGridRowPropsEqual = <T extends object>(
   prev: Readonly<GridRowProps<T>>,
   next: Readonly<GridRowProps<T>>,
 ): boolean => {
+  const hasMergedColumns = next.columns.some((column) => column.mergeRows);
+  const relevantCell = (cell: GridRowProps<T>['focusedCell']) =>
+    hasMergedColumns || cell?.rowId === next.rowId ? cell : undefined;
+  const rangeState = (props: Readonly<GridRowProps<T>>) => {
+    const bounds = props.selectedCellRangeBounds;
+    const inRange = bounds &&
+      props.rowIndex >= bounds.minRowIndex &&
+      props.rowIndex <= bounds.maxRowIndex;
+    const range = props.selectedCellRange;
+    const copied = props.copiedCellRange;
+    return [
+      !!range && (range.anchor.rowId !== range.focus.rowId ||
+        range.anchor.columnIndex !== range.focus.columnIndex),
+      inRange ? bounds.minColumnIndex : -1,
+      inRange ? bounds.maxColumnIndex : -1,
+      range?.anchor.rowId === props.rowId ? range.anchor.columnIndex : -1,
+      !!copied && (copied.anchor.rowId !== copied.focus.rowId ||
+        copied.anchor.columnIndex !== copied.focus.columnIndex),
+      copied?.anchor.rowId === props.rowId ? copied.anchor.columnIndex : -1,
+    ];
+  };
+  const previousRange = rangeState(prev);
+  const nextRange = rangeState(next);
+
   return (
     prev.row === next.row &&
     prev.rowId === next.rowId &&
@@ -186,21 +216,24 @@ const areGridRowPropsEqual = <T extends object>(
     prev.minRowHeight === next.minRowHeight &&
     prev.maxRowHeight === next.maxRowHeight &&
     prev.resizableRows === next.resizableRows &&
-    Object.is(prev.focusedCell, next.focusedCell) &&
-    Object.is(prev.editingCell, next.editingCell) &&
-    Object.is(prev.selectedCellRange, next.selectedCellRange) &&
-    Object.is(prev.selectedCellRangeBounds, next.selectedCellRangeBounds) &&
-    prev.isCellSelectionDragging === next.isCellSelectionDragging &&
-    Object.is(prev.copiedCellRange, next.copiedCellRange) &&
-    prev.draftValue === next.draftValue &&
-    prev.dirtyCellMap === next.dirtyCellMap &&
-    prev.mergeInfoByColumn === next.mergeInfoByColumn &&
-    prev.visibleRows === next.visibleRows &&
-    prev.selectedIds === next.selectedIds &&
+    Object.is(relevantCell(prev.focusedCell), relevantCell(next.focusedCell)) &&
+    Object.is(relevantCell(prev.editingCell), relevantCell(next.editingCell)) &&
+    previousRange.every((value, index) => value === nextRange[index]) &&
+    (prev.editingCell?.rowId !== prev.rowId ||
+      next.editingCell?.rowId !== next.rowId ||
+      prev.draftValue === next.draftValue) &&
+    (prev.dirtyCellMap === next.dirtyCellMap ||
+      next.columns.every((column) => {
+        const key = `${String(next.rowId)}:${String(column.field)}`;
+        return Boolean(prev.dirtyCellMap?.[key]) === Boolean(next.dirtyCellMap?.[key]);
+      })) &&
+    // Only merged cells depend on other rows' values; ordinary rows need the last-row boundary.
+    (hasMergedColumns
+      ? prev.mergeInfoByColumn === next.mergeInfoByColumn &&
+        prev.visibleRows === next.visibleRows
+      : prev.visibleRows.length === next.visibleRows.length) &&
     prev.rowKey === next.rowKey &&
     Object.is(prev.getCellError, next.getCellError) &&
-    prev.getMergeEditing === next.getMergeEditing &&
-    prev.getMerged === next.getMerged &&
     Object.is(prev.getPinOffset, next.getPinOffset) &&
     Object.is(prev.cellAdornment, next.cellAdornment) &&
     prev.showCheckbox === next.showCheckbox &&
@@ -262,6 +295,7 @@ const GridRowInner = <T extends object>({
   showFormAction = false,
   formActionPinnedShadow = true,
   onOpenRowForm,
+  latestPropsRef,
 }: GridRowProps<T>) => {
   const resizeStateRef = useRef<{
     startY: number;
@@ -319,15 +353,6 @@ const GridRowInner = <T extends object>({
       }
       if (event.button !== 0) return;
 
-      const previousCell = previousDragCellRef.current;
-      const isSameDragCell =
-        previousCell?.rowId === cell.rowId &&
-        previousCell?.columnIndex === cell.columnIndex;
-
-      if (isSameDragCell && !selectedCellRange) {
-        return;
-      }
-
       dragSelectionStateRef.current = {
         active: true,
         previousCell: cell,
@@ -342,6 +367,7 @@ const GridRowInner = <T extends object>({
       onSetFocusedCell,
       rowId,
       selectedCellRange,
+      latestPropsRef,
     ],
   );
 
@@ -349,7 +375,8 @@ const GridRowInner = <T extends object>({
     (cell: { rowId: F1GridRowId; columnIndex: number }) => {
       const dragState = dragSelectionStateRef.current;
       const dragAlreadyActive =
-        isCellSelectionDragging || dragState.active || !!selectedCellRange;
+        latestPropsRef?.current.isCellSelectionDragging ||
+        dragState.active || !!latestPropsRef?.current.selectedCellRange;
 
       if (!dragAlreadyActive) return;
 
@@ -370,6 +397,7 @@ const GridRowInner = <T extends object>({
       isCellSelectionDragging,
       onCellSelectionDrag,
       selectedCellRange,
+      latestPropsRef,
     ],
   );
 
@@ -543,7 +571,7 @@ const GridRowInner = <T extends object>({
             rowIndex={rowIndex}
             renderRowIndex={renderIndex}
             isLastRow={isLastRow}
-            draftValue={draftValue}
+            draftValue={editing ? draftValue : ''}
             dirtyCell={Boolean(
               dirtyCellMap[`${String(rowId)}:${String(column.field)}`],
             )}
@@ -630,7 +658,7 @@ const GridRowInner = <T extends object>({
           aria-valuenow={rowHeight}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => {
-            if (isCellSelectionDragging) {
+            if (latestPropsRef?.current.isCellSelectionDragging) {
               event.preventDefault();
               event.stopPropagation();
               return;
@@ -660,8 +688,12 @@ const GridRowInner = <T extends object>({
             p: 0,
             border: 0,
             bgcolor: 'transparent',
-            cursor: isCellSelectionDragging ? 'default' : 'row-resize',
-            pointerEvents: isCellSelectionDragging ? 'none' : 'auto',
+            cursor: 'row-resize',
+            pointerEvents: 'auto',
+            '[data-f1-grid-selecting="true"] &': {
+              cursor: 'default',
+              pointerEvents: 'none',
+            },
             zIndex: 2,
             '&:focus-visible': {
               outline: '2px solid',
@@ -674,9 +706,32 @@ const GridRowInner = <T extends object>({
   );
 };
 
-export const GridRow = memo(GridRowInner as any, (prev: any, next: any) =>
-  areGridRowPropsEqual(
-    prev as GridRowProps<object>,
-    next as GridRowProps<object>,
-  ),
-) as any;
+const MemoizedGridRow = memo(GridRowInner, areGridRowPropsEqual) as typeof GridRowInner;
+
+export function GridRow<T extends object>(props: GridRowProps<T>) {
+  const latestProps = useRef(props);
+  latestProps.current = props;
+
+  const handlers = useMemo(() => ({
+    onSelectRow: (...args: Parameters<GridRowProps<T>['onSelectRow']>) => latestProps.current.onSelectRow(...args),
+    onSetRowSelection: (...args: Parameters<GridRowProps<T>['onSetRowSelection']>) => latestProps.current.onSetRowSelection(...args),
+    onSetFocusedCell: (...args: Parameters<GridRowProps<T>['onSetFocusedCell']>) => latestProps.current.onSetFocusedCell(...args),
+    onCellSelectionStart: (...args: Parameters<GridRowProps<T>['onCellSelectionStart']>) => latestProps.current.onCellSelectionStart(...args),
+    onCellSelectionDrag: (...args: Parameters<GridRowProps<T>['onCellSelectionDrag']>) => latestProps.current.onCellSelectionDrag(...args),
+    onCellSelectionEnd: () => latestProps.current.onCellSelectionEnd(),
+    onCommitEdit: () => latestProps.current.onCommitEdit(),
+    onStartEdit: (...args: Parameters<GridRowProps<T>['onStartEdit']>) => latestProps.current.onStartEdit(...args),
+    onDraftChange: (...args: Parameters<GridRowProps<T>['onDraftChange']>) => latestProps.current.onDraftChange(...args),
+    onKeyDown: (...args: Parameters<GridRowProps<T>['onKeyDown']>) => latestProps.current.onKeyDown(...args),
+    onUpdateCell: (...args: Parameters<GridRowProps<T>['onUpdateCell']>) => latestProps.current.onUpdateCell(...args),
+    onUpdateRow: (...args: Parameters<GridRowProps<T>['onUpdateRow']>) => latestProps.current.onUpdateRow(...args),
+    onStopEdit: () => latestProps.current.onStopEdit(),
+    onCellRef: (...args: Parameters<GridRowProps<T>['onCellRef']>) => latestProps.current.onCellRef(...args),
+    onEditingCellRef: (...args: Parameters<GridRowProps<T>['onEditingCellRef']>) => latestProps.current.onEditingCellRef(...args),
+    onUpdateRowHeight: (...args: Parameters<GridRowProps<T>['onUpdateRowHeight']>) => latestProps.current.onUpdateRowHeight(...args),
+    onOpenRowForm: (row: T) => latestProps.current.onOpenRowForm?.(row),
+  }), []);
+
+  return <MemoizedGridRow {...props} {...handlers} latestPropsRef={latestProps}
+    onOpenRowForm={props.onOpenRowForm ? handlers.onOpenRowForm : undefined} />;
+}

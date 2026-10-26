@@ -3,6 +3,8 @@ package egovframework.let.co.master.customer.domain.model;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
@@ -17,4 +19,6 @@ public class CustomerInfoBatchSaveResultVO implements Serializable {
 
     @Schema(description = "등록 또는 수정된 거래처 목록. 추가 행 다음에 수정 행 순서로 반환")
     private List<CustomerInfoVO> customers = new ArrayList<>();
+    @Schema(description = "요청 행 ID와 저장된 실제 ID 매핑")
+    private Map<String, Long> rowIdMappings = new LinkedHashMap<>();
 }

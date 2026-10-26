@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import dayjs from 'dayjs';
 import { fetchArchiveFiles } from '../services/archiveBoardService';
 import type {
   ArchiveFileRow,
@@ -7,12 +6,11 @@ import type {
 } from '../types/archive.types';
 
 function createInitialFilters(): ArchiveFileSearchFilters {
-  const today = dayjs();
   return {
     keyword: '',
     folderCode: '',
-    uploadedFrom: today.subtract(1, 'year').format('YYYY-MM-DD'),
-    uploadedTo: today.format('YYYY-MM-DD'),
+    uploadedFrom: '',
+    uploadedTo: '',
     fileType: 'ALL',
   };
 }
@@ -21,16 +19,18 @@ function asError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value));
 }
 
-export function useArchiveList() {
+export function useArchiveList(enabled: boolean) {
   const [filters, setFilters] =
     useState<ArchiveFileSearchFilters>(createInitialFilters);
   const [rows, setRows] = useState<ArchiveFileRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const requestSequence = useRef(0);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const currentRequest = ++requestSequence.current;
     const controller = new AbortController();
     setIsLoading(true);
@@ -56,7 +56,7 @@ export function useArchiveList() {
       });
 
     return () => controller.abort();
-  }, [filters, retryToken]);
+  }, [enabled, filters, retryToken]);
 
   const retry = useCallback(() => {
     setRetryToken((current) => current + 1);

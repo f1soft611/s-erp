@@ -226,6 +226,7 @@ export function GridBody<T extends object>({
 
   return (
     <Box
+      data-f1-grid-selecting={String(isCellSelectionDragging)}
       sx={{
         display: 'grid',
         gridTemplateColumns: columnTracks,

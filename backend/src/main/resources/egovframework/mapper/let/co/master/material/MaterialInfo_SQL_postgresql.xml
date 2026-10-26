@@ -120,7 +120,7 @@
     </select>
     <update id="updateMaterial" parameterType="map">
         UPDATE tb_material_info SET
-            material_code = #{materialCode}, material_name = #{materialName},
+            material_name = #{materialName},
             material_eng_name = #{materialEngName}, material_model_name = #{materialModelName},
             material_spec = #{materialSpec}, material_weight = #{materialWeight,jdbcType=BIGINT},
             unit = #{unit}, material_type_code = #{materialTypeCode}, customer_code = #{customerCode},
@@ -141,7 +141,7 @@
         FROM tb_common_code_group g
         JOIN tb_common_code_item i ON i.group_id = g.common_code_group_id AND i.tenant_id = g.tenant_id
         WHERE g.tenant_id = #{tenantId} AND g.use_at = 'Y' AND i.use_at = 'Y'
-          AND g.group_code IN ('MATERIAL_TYPE', 'STORE_METHOD', 'EXPIRY_STATUS')
+          AND g.group_code IN ('ITEM_TYPE', 'ITEM_UNIT', 'MATERIAL_TYPE', 'STORE_METHOD', 'EXPIRY_STATUS')
         ORDER BY g.sort_order, g.group_code, i.sort_order, i.item_code
     </select>
 </mapper>

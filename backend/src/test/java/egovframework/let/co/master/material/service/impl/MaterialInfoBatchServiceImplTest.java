@@ -38,9 +38,15 @@ class MaterialInfoBatchServiceImplTest {
     }
 
     @Test void delegatesAllChangesToTenantScopedService() throws Exception {
-        when(materials.createMaterial(eq(9L), eq("101"), any())).thenReturn(new MaterialInfoVO());
-        when(materials.updateMaterial(eq(9L), eq("101"), eq(12L), any())).thenReturn(new MaterialInfoVO());
-        assertThat(service.saveBatch(9L, "101", batch()).getMaterials()).hasSize(2);
+        MaterialInfoVO created = new MaterialInfoVO();
+        created.setMaterialId(31L);
+        MaterialInfoVO updated = new MaterialInfoVO();
+        updated.setMaterialId(12L);
+        when(materials.createMaterial(eq(9L), eq("101"), any())).thenReturn(created);
+        when(materials.updateMaterial(eq(9L), eq("101"), eq(12L), any())).thenReturn(updated);
+        MaterialInfoBatchSaveResultVO result = service.saveBatch(9L, "101", batch());
+        assertThat(result.getMaterials()).containsExactly(created, updated);
+        assertThat(result.getRowIdMappings()).containsEntry("new-material", 31L).containsEntry("12", 12L);
     }
 
     @Test void rejectsDeletesNullRowsAndInvalidIdsBeforeWriting() {
@@ -52,6 +58,13 @@ class MaterialInfoBatchServiceImplTest {
         assertThatThrownBy(() -> service.saveBatch(9L, "101", request)).isInstanceOf(IllegalArgumentException.class);
         request.getMaterials().setInsertedRows(Collections.singletonList(null));
         assertThatThrownBy(() -> service.saveBatch(9L, "101", request)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(materials);
+    }
+
+    @Test void rejectsDuplicateRequestIdsBeforeWriting() {
+        MaterialInfoBatchSaveRequestVO request = batch();
+        request.getMaterials().getInsertedRows().get(0).setMaterialId("12");
+        assertThatThrownBy(() -> service.saveBatch(9L, "101", request)).hasMessageContaining("중복");
         verifyNoInteractions(materials);
     }
 

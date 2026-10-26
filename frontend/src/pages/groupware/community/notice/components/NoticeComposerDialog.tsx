@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
-  CircularProgress,
   Checkbox,
   FormControlLabel,
   IconButton,
@@ -20,6 +19,7 @@ import {
   richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { useRichTextEditorSaveLifecycle } from '../../../../../shared/components/rich-text-editor/useRichTextEditorSaveLifecycle';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { apiGetBlob } from '../../../../../shared/services/apiClient';
 import {
   deleteNoticeEmbeddedImage,
@@ -462,7 +462,7 @@ export function NoticeComposerDialog({
         }
         startIcon={
           saving ? (
-            <CircularProgress
+            <AppLoadingSpinner
               size={16}
               color="inherit"
               aria-label="공지 저장 중"

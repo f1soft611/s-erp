@@ -21,6 +21,7 @@ type ExportRow = {
   invalidCheckbox: string;
   invalidCreatedAt: string;
   emptyDate: string | null;
+  defaultAmount: number;
 };
 
 const columns: F1GridColumn<ExportRow>[] = [
@@ -71,6 +72,11 @@ const columns: F1GridColumn<ExportRow>[] = [
     type: 'datetime',
   },
   { field: 'emptyDate', headerName: 'Empty date', type: 'date' },
+  {
+    field: 'defaultAmount',
+    headerName: 'Default amount',
+    type: 'number',
+  },
 ];
 
 async function readExportedWorkbook(
@@ -145,6 +151,7 @@ describe('F1-Grid Excel export cell types', () => {
       invalidCheckbox: 'unknown',
       invalidCreatedAt: '2026-02-29T09:21:00',
       emptyDate: null,
+      defaultAmount: 1.234567,
     };
     const workbook = await readExportedWorkbook([row]);
     const sheet = workbook.getWorksheet('Sheet1');
@@ -193,6 +200,8 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('O2').value).toBe('2026-02-29T09:21:00');
     expect(sheet?.getCell('P2').value).toBeNull();
     expect(sheet?.getCell('P2').alignment?.horizontal).toBe('left');
+    expect(sheet?.getCell('Q2').value).toBe(1.234567);
+    expect(sheet?.getCell('Q2').numFmt).toBe('#,##0.#####');
     expect(row.date).toBe('2026-10-20T00:30:00+14:00');
   });
 });

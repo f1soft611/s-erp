@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import dayjs from 'dayjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
 
 const archiveServices = vi.hoisted(() => ({
+  getSystemDate: vi.fn(),
   fetchArchiveFiles: vi.fn(),
   uploadArchiveFile: vi.fn(),
   updateArchiveFile: vi.fn(),
@@ -15,6 +15,13 @@ const archiveServices = vi.hoisted(() => ({
   fetchCommonCodeItems: vi.fn(),
   createCommonCodeItem: vi.fn(),
   updateCommonCodeItem: vi.fn(),
+}));
+
+vi.mock('../src/shared/services/systemDateService', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../src/shared/services/systemDateService')
+  >()),
+  getSystemDate: archiveServices.getSystemDate,
 }));
 
 vi.mock(
@@ -87,6 +94,7 @@ function renderArchive(
 describe('Archive dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    archiveServices.getSystemDate.mockResolvedValue('2024-02-29');
     archiveServices.fetchArchiveFiles.mockImplementation(async (filters) => ({
       resultList:
         filters.folderCode === 'OLD'
@@ -145,6 +153,7 @@ describe('Archive dashboard page', () => {
   it('renders the folder and file sections with folder navigation', async () => {
     renderArchive();
     expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
+    expect(await screen.findByText('업무 가이드.pdf')).toBeInTheDocument();
     expect(screen.getByText('폴더')).toBeInTheDocument();
     expect(screen.getByText('파일')).toBeInTheDocument();
     expect(
@@ -170,8 +179,19 @@ describe('Archive dashboard page', () => {
     );
   }, 15000);
 
+  it('uses a flex column to pass remaining height to the file tree', async () => {
+    renderArchive();
+    await screen.findByRole('grid', { name: '자료실' });
+
+    const gridContainer = screen.getByTestId('archive-grid-container');
+
+    expect(getComputedStyle(gridContainer).display).toBe('flex');
+    expect(getComputedStyle(gridContainer).flexDirection).toBe('column');
+  });
+
   it('shows Excel export without root-add in the archive tree context menu', async () => {
     renderArchive();
+    await screen.findByText('업무 가이드.pdf');
     const grid = await screen.findByRole('grid', { name: '자료실' });
 
     fireEvent.contextMenu(grid);
@@ -186,6 +206,7 @@ describe('Archive dashboard page', () => {
 
   it('hides Excel export when the archive menu does not grant Excel permission', async () => {
     renderArchive({ ...adminPermissions, excel: false });
+    await screen.findByText('업무 가이드.pdf');
     const grid = await screen.findByRole('grid', { name: '자료실' });
 
     fireEvent.contextMenu(grid);
@@ -211,15 +232,180 @@ describe('Archive dashboard page', () => {
 
   it('initializes detailed date controls and summary to the recent year', async () => {
     renderArchive();
-    const today = dayjs().format('YYYY-MM-DD');
-    const lastYear = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
     expect(
       await screen.findByLabelText('적용된 날짜: 최근 1년'),
     ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uploadedFrom: '2023-02-28',
+          uploadedTo: '2024-02-29',
+          fileType: 'ALL',
+        }),
+        expect.any(AbortSignal),
+      ),
+    );
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
 
-    expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue(lastYear);
-    expect(screen.getByLabelText('올린 날짜 종료일')).toHaveValue(today);
+    expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue('2023-02-28');
+    expect(screen.getByLabelText('올린 날짜 종료일')).toHaveValue('2024-02-29');
+  });
+
+  it('does not request archive files until the server date is resolved', async () => {
+    let resolveSystemDate!: (date: string) => void;
+    archiveServices.getSystemDate.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveSystemDate = resolve;
+        }),
+    );
+
+    renderArchive();
+    await waitFor(() =>
+      expect(archiveServices.getSystemDate).toHaveBeenCalledOnce(),
+    );
+    expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.getByLabelText('적용된 날짜: —')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
+
+    resolveSystemDate('2024-02-29');
+
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uploadedFrom: '2023-02-28',
+          uploadedTo: '2024-02-29',
+        }),
+        expect.any(AbortSignal),
+      ),
+    );
+  });
+
+  it('keeps only the grid spinner visible until categories finish loading', async () => {
+    let resolveCategories!: (items: []) => void;
+    archiveServices.fetchCommonCodeItems.mockImplementation(
+      () => new Promise<[]>((resolve) => { resolveCategories = resolve; }),
+    );
+    archiveServices.fetchArchiveFiles.mockResolvedValue({ resultList: [], resultCnt: 0 });
+
+    renderArchive();
+    await waitFor(() => {
+      expect(archiveServices.fetchCommonCodeItems).toHaveBeenCalled();
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalled();
+      expect(screen.getByLabelText('적용된 날짜: 최근 1년')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
+
+    resolveCategories([]);
+
+    expect(await screen.findByText('조건에 맞는 파일이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: '자료실' })).not.toHaveAttribute('aria-busy');
+  });
+
+  it('keeps only the grid spinner visible until files finish loading', async () => {
+    let resolveFiles!: (result: { resultList: []; resultCnt: number }) => void;
+    archiveServices.fetchArchiveFiles.mockImplementation(
+      () => new Promise<{ resultList: []; resultCnt: number }>((resolve) => { resolveFiles = resolve; }),
+    );
+
+    renderArchive();
+    await screen.findByText('업무양식');
+    await waitFor(() => expect(archiveServices.fetchArchiveFiles).toHaveBeenCalled());
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
+
+    resolveFiles({ resultList: [], resultCnt: 0 });
+
+    expect(await screen.findByText('조건에 맞는 파일이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+  });
+
+  it('shows a retry action when server date loading fails and starts after retry', async () => {
+    archiveServices.getSystemDate
+      .mockRejectedValueOnce(new Error('System date unavailable'))
+      .mockResolvedValueOnce('2024-02-29');
+
+    renderArchive();
+
+    expect(await screen.findByText('System date unavailable')).toBeInTheDocument();
+    expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uploadedFrom: '2023-02-28',
+          uploadedTo: '2024-02-29',
+        }),
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(archiveServices.getSystemDate).toHaveBeenCalledTimes(2);
+  });
+
+  it('reapplies the recent-year defaults on detailed-search reset', async () => {
+    renderArchive();
+
+    fireEvent.click(await screen.findByRole('button', { name: '업무양식' }));
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ folderCode: 'GUIDE' }),
+        expect.any(AbortSignal),
+      ),
+    );
+
+    const quickSearch = screen.getByRole('textbox', { name: '자료 검색' });
+    fireEvent.change(quickSearch, { target: { value: '홍길동' } });
+    fireEvent.keyDown(quickSearch, { key: 'Enter' });
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          keyword: '홍길동',
+          folderCode: 'GUIDE',
+        }),
+        expect.any(AbortSignal),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(screen.getByLabelText('올린 날짜 시작일'), {
+      target: { value: '2024-01-01' },
+    });
+    fireEvent.change(screen.getByLabelText('올린 날짜 종료일'), {
+      target: { value: '2024-01-31' },
+    });
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '유형' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+
+    expect(quickSearch).toHaveValue('');
+    expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue('2023-02-28');
+    expect(screen.getByLabelText('올린 날짜 종료일')).toHaveValue('2024-02-29');
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          keyword: '',
+          folderCode: 'GUIDE',
+          uploadedFrom: '2023-02-28',
+          uploadedTo: '2024-02-29',
+          fileType: 'ALL',
+        }),
+        expect.any(AbortSignal),
+      ),
+    );
   });
 
   it('submits date and file type filters from detailed search', async () => {
@@ -278,6 +464,7 @@ describe('Archive dashboard page', () => {
 
   it('shows edit and delete actions only for the corresponding permissions', async () => {
     renderArchive({ read: true, create: true, update: false, delete: false });
+    expect(await screen.findByText('업무 가이드.pdf')).toBeInTheDocument();
     expect(await screen.findByRole('grid', { name: '자료실' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '파일 정보 수정' })).toBeNull();
     expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
@@ -285,6 +472,7 @@ describe('Archive dashboard page', () => {
 
   it('opens the edit dialog and updates the file name and folder', async () => {
     renderArchive();
+    await screen.findByText('업무 가이드.pdf');
     fireEvent.click(await screen.findByRole('button', { name: '파일 정보 수정' }));
     fireEvent.change(screen.getByRole('textbox', { name: '파일명' }), {
       target: { value: '새 이름.pdf' },
@@ -313,6 +501,7 @@ describe('Archive dashboard page', () => {
 
   it('confirms a file deletion before sending the request', async () => {
     renderArchive();
+    await screen.findByText('업무 가이드.pdf');
     fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
     expect(
       await screen.findByRole('dialog', { name: '자료 삭제 확인' }),
@@ -348,4 +537,13 @@ describe('Archive dashboard page', () => {
       undefined,
     );
   });
+});
+
+it('shows all three breadcrumb levels for the archive page', async () => {
+  renderArchive();
+
+  expect(
+    screen.getByText('그룹웨어 > 커뮤니티 > 자료실'),
+  ).toBeInTheDocument();
+  await screen.findByText('업무 가이드.pdf');
 });

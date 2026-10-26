@@ -142,6 +142,15 @@ describe('document status page', () => {
     });
   });
 
+  it('shows all three breadcrumb levels for document status', async () => {
+    renderDocumentStatusPage('read');
+
+    expect(
+      screen.getByText('그룹웨어 > 문서관리 > 문서현황'),
+    ).toBeInTheDocument();
+    await screen.findByRole('grid', { name: '문서현황' });
+  });
+
   it('shows the header read action only with menu read permission', async () => {
     const view = renderDocumentStatusPage('documents', true);
     expect(screen.getByRole('button', { name: '조회' })).toBeInTheDocument();

@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type SyntheticEvent,
 } from 'react';
 import {
   Box,
@@ -22,6 +23,7 @@ import {
 import {
   buildCommonCodeBatchPayload,
   fetchCommonCodeItems,
+  normalizeBatchSaveResponse,
   saveCommonCodeBatch,
 } from '../services/commonCodeManagement.service';
 import Splitter from '../../../../../shared/components/Splitter';
@@ -49,6 +51,7 @@ type CommonCodeManagementPanelProps = {
   onError?: (message: string) => void;
   commonCodeGridKey?: number;
   groupsLoading?: boolean;
+  saving?: boolean;
   initialSelectedGroupId?: string;
   onSelectedGroupChange?: (groupId: string) => void;
   initialSelectedGroupRowIds?: string[];
@@ -71,6 +74,24 @@ const emptyChanges = <T extends object>(): F1GridChanges<T> => ({
   updatedRows: [],
   deletedRows: [],
 });
+
+function reconcileSavedRows<T extends { id: string }>(
+  rows: T[],
+  changes: F1GridChanges<T>,
+  savedRows: T[],
+): T[] {
+  const insertedIds = new Map(
+    changes.insertedRows.map((row, index) => [row.id, index]),
+  );
+  return rows.map((row) => {
+    const insertedIndex = insertedIds.get(row.id);
+    const savedRow =
+      insertedIndex === undefined
+        ? savedRows.find((saved) => saved.id === row.id)
+        : savedRows[insertedIndex];
+    return savedRow ? { ...row, ...savedRow } : row;
+  });
+}
 
 function normalizeRowId(value: unknown): string {
   return String(value ?? '').trim();
@@ -320,6 +341,7 @@ export const CommonCodeManagementPanel = forwardRef<
     onError,
     commonCodeGridKey = 0,
     groupsLoading = false,
+    saving = false,
     initialSelectedGroupId = '',
     onSelectedGroupChange,
     initialSelectedGroupRowIds = [],
@@ -338,6 +360,11 @@ export const CommonCodeManagementPanel = forwardRef<
   const [itemLoading, setItemLoading] = useState(false);
   const [itemError, setItemError] = useState('');
   const [itemGridKey, setItemGridKey] = useState(0);
+  const [savedGroupBaseline, setSavedGroupBaseline] = useState<{
+    source: CommonCodeGroupRow[];
+    rows: CommonCodeGroupRow[];
+  }>();
+  const [groupBaselineKey, setGroupBaselineKey] = useState(0);
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [parentPickerOptions, setParentPickerOptions] = useState<
     CommonCodeItemRow[]
@@ -346,7 +373,6 @@ export const CommonCodeManagementPanel = forwardRef<
   const [itemGridDirty, setItemGridDirty] = useState(false);
   const [pendingGroupId, setPendingGroupId] = useState<string>();
   const [groupSwitchDialogOpen, setGroupSwitchDialogOpen] = useState(false);
-  const [_saving, setSaving] = useState(false);
 
   const treeRef = useRef<F1TreeRef<CommonCodeGroupRow>>(null);
   const gridRef = useRef<F1GridRef<CommonCodeItemRow>>(null);
@@ -366,7 +392,7 @@ export const CommonCodeManagementPanel = forwardRef<
 
   useEffect(() => {
     groupSelectionRestoredRef.current = false;
-  }, [commonCodeGridKey]);
+  }, [commonCodeGridKey, groupBaselineKey]);
 
   useEffect(() => {
     selectedGroupIdRef.current = selectedGroupId;
@@ -374,8 +400,10 @@ export const CommonCodeManagementPanel = forwardRef<
   }, [onSelectedGroupChange, selectedGroupId]);
 
   const filteredGroups = useMemo(() => {
-    return groups;
-  }, [groups, searchQuery]);
+    return savedGroupBaseline?.source === groups
+      ? savedGroupBaseline.rows
+      : groups;
+  }, [groups, savedGroupBaseline, searchQuery]);
 
   useEffect(() => {
     if (!groupSelectionRestoredRef.current) {
@@ -450,9 +478,12 @@ export const CommonCodeManagementPanel = forwardRef<
           error instanceof Error
             ? error.message
             : '공통코드 상세 목록을 불러오지 못했습니다.';
-        setItemRows([]);
-        setItemError(message);
+        if (!options.silent) {
+          setItemRows([]);
+          setItemError(message);
+        }
         onError?.(message);
+        if (options.silent) throw error;
       } finally {
         if (requestId === itemRequestIdRef.current && !options.silent) {
           setItemLoading(false);
@@ -487,10 +518,13 @@ export const CommonCodeManagementPanel = forwardRef<
   );
 
   useEffect(() => {
-    void loadItemRows(selectedGroupId);
+    void loadItemRows(selectedGroupId, {
+      silent: Boolean(saveInFlightRef.current),
+    }).catch(() => undefined);
   }, [loadItemRows, selectedGroupId]);
 
   const handleGroupSelection = useCallback((rowIds: Array<string | number>) => {
+    if (saving || saveInFlightRef.current) return;
     const nextGroupId = rowIds[0] == null ? '' : String(rowIds[0]);
     if (!nextGroupId || nextGroupId === selectedGroupIdRef.current) return;
     if (itemGridDirtyRef.current) {
@@ -499,7 +533,7 @@ export const CommonCodeManagementPanel = forwardRef<
       return;
     }
     setSelectedGroupId(nextGroupId);
-  }, []);
+  }, [saving]);
 
   const handleGroupGridChanges = useCallback(
     (changes: F1GridChanges<CommonCodeGroupRow>) => {
@@ -542,6 +576,7 @@ export const CommonCodeManagementPanel = forwardRef<
       row: CommonCodeItemRow,
       applyPatch: (changes: Partial<CommonCodeItemRow>) => void,
     ) => {
+      if (saving || saveInFlightRef.current) return;
       if (!parentGroup) {
         setParentPickerOpen(false);
         return;
@@ -550,6 +585,7 @@ export const CommonCodeManagementPanel = forwardRef<
       parentPickerApplyRef.current = applyPatch;
       try {
         const parentItems = await fetchCommonCodeItems(String(parentGroup.id));
+        if (saveInFlightRef.current) return;
         setParentPickerOptions(
           parentItems.filter(
             (item) => normalizeRowId(item.id) !== normalizeRowId(row.id),
@@ -560,11 +596,18 @@ export const CommonCodeManagementPanel = forwardRef<
         onError?.('상위 그룹의 상세코드를 불러오지 못했습니다.');
       }
     },
-    [onError, parentGroup],
+    [onError, parentGroup, saving],
   );
 
   const itemGridColumns = itemColumns(
-    parentGroup ? openParentPicker : undefined,
+    parentGroup && !saving ? openParentPicker : undefined,
+  ).map((column) => (saving ? { ...column, editable: false } : column));
+  const groupGridColumns = useMemo(
+    () =>
+      groupColumns.map((column) =>
+        saving ? { ...column, editable: false } : column,
+      ),
+    [saving],
   );
 
   const checkGroupDeleteBlockedMessage = useCallback(
@@ -621,7 +664,6 @@ export const CommonCodeManagementPanel = forwardRef<
     if (saveInFlightRef.current) return saveInFlightRef.current;
 
     const savePromise = (async () => {
-      setSaving(true);
       const groupChanges =
         treeRef.current?.getChanges() ?? emptyChanges<CommonCodeGroupRow>();
       const groupId = selectedGroupIdRef.current;
@@ -702,12 +744,41 @@ export const CommonCodeManagementPanel = forwardRef<
         });
 
         const response = await saveCommonCodeBatch(batchPayload);
+        const savedRows = normalizeBatchSaveResponse(response);
         const createdGroupIdMap = resolveCreatedGroupIdMap(
           response,
           groupChanges.insertedRows.map((row) => row.id),
         );
         const persistedGroupId =
           (groupId && createdGroupIdMap.get(String(groupId))) ?? groupId;
+
+        // The write is committed even if the following reads fail. Remount
+        // against the saved rows so the grids cannot submit that write again.
+        setSavedGroupBaseline({
+          source: groups,
+          rows: reconcileSavedRows(
+            treeRef.current?.getActiveRows() ?? filteredGroups,
+            groupChanges,
+            savedRows.groups,
+          ).map((row) => ({
+            ...row,
+            parentGroupId: row.parentGroupId
+              ? createdGroupIdMap.get(row.parentGroupId) ?? row.parentGroupId
+              : null,
+          })),
+        });
+        setGroupBaselineKey((current) => current + 1);
+        setItemRows(
+          reconcileSavedRows(
+            gridRef.current?.getActiveRows() ?? itemRows,
+            itemChanges,
+            savedRows.items,
+          ).map((row) => ({
+            ...row,
+            groupId: createdGroupIdMap.get(row.groupId) ?? row.groupId,
+          })),
+        );
+        setItemGridKey((current) => current + 1);
 
         // Clear dirty state before switching the selected group ID so that
         // the group-refresh side effects below can't be misread as an
@@ -741,8 +812,6 @@ export const CommonCodeManagementPanel = forwardRef<
             : '공통코드 저장에 실패했습니다.';
         onError?.(message);
         throw error;
-      } finally {
-        setSaving(false);
       }
     })();
 
@@ -762,6 +831,7 @@ export const CommonCodeManagementPanel = forwardRef<
     return savePromise;
   }, [
     filteredGroups,
+    groups,
     itemRows,
     loadItemRows,
     onError,
@@ -776,6 +846,7 @@ export const CommonCodeManagementPanel = forwardRef<
   }, []);
 
   const discardItemsAndMove = useCallback(() => {
+    if (saving || saveInFlightRef.current) return;
     if (!pendingGroupId) return;
     ++itemRequestIdRef.current;
     itemGridDirtyRef.current = false;
@@ -786,7 +857,7 @@ export const CommonCodeManagementPanel = forwardRef<
     closeGroupSwitchDialog();
     selectedGroupIdRef.current = nextGroupId;
     setSelectedGroupId(nextGroupId);
-  }, [closeGroupSwitchDialog, pendingGroupId]);
+  }, [closeGroupSwitchDialog, pendingGroupId, saving]);
 
   const exportCurrentRows = useCallback(() => {
     const rows = gridRef.current?.getActiveRows() ?? [];
@@ -821,16 +892,30 @@ export const CommonCodeManagementPanel = forwardRef<
     () => ({
       saveCurrentChanges,
       deleteSelectedRows: () => {
+        if (saving || saveInFlightRef.current) return;
         gridRef.current?.deleteSelectedRows();
       },
       exportCurrentRows,
       getDirtyState: () => groupGridDirty || itemGridDirty,
     }),
-    [exportCurrentRows, groupGridDirty, itemGridDirty, saveCurrentChanges],
+    [exportCurrentRows, groupGridDirty, itemGridDirty, saveCurrentChanges, saving],
   );
+
+  const blockWhileSaving = (event: SyntheticEvent) => {
+    if (!saving && !saveInFlightRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <Box
+      onClickCapture={blockWhileSaving}
+      onDoubleClickCapture={blockWhileSaving}
+      onMouseDownCapture={blockWhileSaving}
+      onPointerDownCapture={blockWhileSaving}
+      onFocusCapture={blockWhileSaving}
+      onContextMenuCapture={blockWhileSaving}
+      onKeyDownCapture={blockWhileSaving}
       sx={{
         minWidth: 0,
         minHeight: 0,
@@ -891,10 +976,10 @@ export const CommonCodeManagementPanel = forwardRef<
             </Box>
             <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
               <F1Tree
-                key={commonCodeGridKey}
+                key={`${commonCodeGridKey}-${groupBaselineKey}`}
                 ref={treeRef}
                 rows={filteredGroups}
-                columns={groupColumns}
+                columns={groupGridColumns}
                 rowKey="id"
                 parentKey="parentGroupId"
                 treeColumn="groupNm"
@@ -902,15 +987,18 @@ export const CommonCodeManagementPanel = forwardRef<
                 storageKey="menu-com-common-code-tree"
                 defaultExpandAll
                 showCheckbox={false}
-                createRow={createGroupRow}
+                createRow={saving ? undefined : createGroupRow}
+                onBeforeEdit={() => !saving && !saveInFlightRef.current}
                 loading={groupsLoading}
-                allowAddRootInContextMenu={true}
-                allowAddRowInContextMenu={true}
+                allowAddRootInContextMenu={!saving}
+                allowAddRowInContextMenu={!saving}
                 allowDuplicateRowInContextMenu={false}
-                allowDeleteRowInContextMenu={true}
-                deleteMenuDisabled={Boolean(
-                  selectedGroup && isGroupDeleteDisabled(selectedGroup),
-                )}
+                allowDeleteRowInContextMenu={!saving}
+                disableContextMenu={saving}
+                deleteMenuDisabled={
+                  saving ||
+                  Boolean(selectedGroup && isGroupDeleteDisabled(selectedGroup))
+                }
                 ariaLabel="공통코드 그룹 트리"
                 initialSelectedRowIds={
                   initialSelectedGroupRowIds.length > 0
@@ -920,6 +1008,7 @@ export const CommonCodeManagementPanel = forwardRef<
                       : []
                 }
                 onSelectionChange={(rowIds) => {
+                  if (saving || saveInFlightRef.current) return;
                   handleGroupSelection(rowIds);
                   if (groupSelectionRestoredRef.current && rowIds.length > 0) {
                     onGroupRowSelectionChange?.(rowIds);
@@ -1011,14 +1100,19 @@ export const CommonCodeManagementPanel = forwardRef<
                   storageKey="menu-com-common-code-grid"
                   canExportExcel={canExportExcel}
                   showCheckbox={false}
-                  createRow={() => createItemRow(selectedGroupId)}
+                  createRow={
+                    saving ? undefined : () => createItemRow(selectedGroupId)
+                  }
+                  onBeforeEdit={() => !saving && !saveInFlightRef.current}
                   initialSelectedRowIds={initialSelectedItemRowIds}
                   loading={itemLoading}
-                  allowAddRowInContextMenu={true}
-                  allowDeleteRowInContextMenu={true}
+                  allowAddRowInContextMenu={!saving}
+                  allowDeleteRowInContextMenu={!saving}
                   allowDuplicateRowInContextMenu={false}
+                  disableContextMenu={saving}
                   onChangesChange={handleItemGridChanges}
                   onSelectionChange={(rowIds) => {
+                    if (saving || saveInFlightRef.current) return;
                     if (itemSelectionRestoredRef.current) {
                       onItemRowSelectionChange?.(rowIds);
                     }
@@ -1039,7 +1133,9 @@ export const CommonCodeManagementPanel = forwardRef<
                     parentPickerOptions.map((item) => (
                       <ListItemButton
                         key={item.id}
+                        disabled={saving}
                         onClick={() => {
+                          if (saving || saveInFlightRef.current) return;
                           parentPickerApplyRef.current?.({
                             parentItemId: item.id,
                             parentItemNm: item.itemNm,

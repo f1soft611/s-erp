@@ -1,4 +1,4 @@
-import { type ChangeEvent, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import CreateNewFolderOutlined from '@mui/icons-material/CreateNewFolderOutlined';
 import {
@@ -14,19 +14,17 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import dayjs from 'dayjs';
 import { CommonCodeItemHelpDialog } from '../../../../shared/components/common-code/CommonCodeItemHelpDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
+import { usePageSearchDefaults } from '../../../../shared/hooks/usePageSearchDefaults';
 import {
   createCommonCodeItem,
   updateCommonCodeItem,
 } from '../../../co/master/common-code/services/commonCodeManagement.service';
 import type { PageSearchField } from '../../../../shared/components/page-search/searchFields';
-import type {
-  PageSearchFieldValue,
-} from '../../../../shared/components/page-search/searchFields';
+import type { PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
 import type {
   MenuPermission,
   ModuleItem,
@@ -64,7 +62,16 @@ const FILE_TYPE_VALUES: ArchiveFileType[] = [
 ];
 
 const DETAIL_FIELDS: PageSearchField[] = [
-  { field: 'uploadedAt', label: '올린 날짜', type: 'date', searchSpan: 2 },
+  {
+    field: 'uploadedAt',
+    label: '올린 날짜',
+    type: 'date',
+    searchSpan: 2,
+    defaultValue: {
+      from: { type: 'systemDate', offset: { years: -1 } },
+      to: { type: 'systemDate' },
+    },
+  },
   {
     field: 'fileType',
     label: '유형',
@@ -87,10 +94,19 @@ function getDateRange(value: PageSearchFieldValue | undefined) {
   return { from: value.from ?? '', to: value.to ?? '' };
 }
 
-function getDateSummary(from: string, to: string) {
-  const today = dayjs().format('YYYY-MM-DD');
-  const lastYear = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
-  if (from === lastYear && to === today) return '최근 1년';
+function getDateSummary(
+  from: string,
+  to: string,
+  defaultRange: { from: string; to: string },
+) {
+  if (
+    defaultRange.from &&
+    defaultRange.to &&
+    from === defaultRange.from &&
+    to === defaultRange.to
+  ) {
+    return '최근 1년';
+  }
   if (!from && !to) return '전체 기간';
   return `${from || '시작 제한 없음'} ~ ${to || '종료 제한 없음'}`;
 }
@@ -183,20 +199,18 @@ export function ArchiveBoardPage({
   isTenantAdmin = false,
 }: ArchiveBoardPageProps) {
   const { showError, showSuccess } = useNotification();
+  const {
+    values: defaultValues,
+    loading: defaultsLoading,
+    error: defaultsError,
+    retry: retryDefaults,
+  } = usePageSearchDefaults(DETAIL_FIELDS);
   const [searchDraft, setSearchDraft] = useState('');
   const [currentFolderCode, setCurrentFolderCode] = useState('');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >(() => {
-    const today = dayjs();
-    return {
-      uploadedAt: {
-        from: today.subtract(1, 'year').format('YYYY-MM-DD'),
-        to: today.format('YYYY-MM-DD'),
-      },
-      fileType: '',
-    };
-  });
+  >({});
+  const [defaultsInitialized, setDefaultsInitialized] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingFile, setEditingFile] = useState<ArchiveFileRow | null>(null);
   const [deletingFile, setDeletingFile] = useState<ArchiveFileRow | null>(null);
@@ -207,11 +221,36 @@ export function ArchiveBoardPage({
   const canDelete = isTenantAdmin && Boolean(selectedMenuPermissions?.delete);
   const canEditCategories = Boolean(
     isTenantAdmin &&
-      (selectedMenuPermissions?.create || selectedMenuPermissions?.update),
+    (selectedMenuPermissions?.create || selectedMenuPermissions?.update),
   );
 
   const categories = useArchiveCategories();
-  const archiveList = useArchiveList();
+  const archiveList = useArchiveList(defaultsInitialized);
+  const isQueryLoading =
+    categories.isLoading ||
+    archiveList.isLoading ||
+    defaultsLoading ||
+    (!defaultsInitialized && !defaultsError);
+  useEffect(() => {
+    if (!defaultValues || defaultsInitialized) return;
+
+    const dateRange = getDateRange(defaultValues.uploadedAt);
+    setDetailValues(defaultValues);
+    archiveList.setFilters((currentFilters) => ({
+      ...currentFilters,
+      keyword: '',
+      folderCode: currentFolderCode,
+      uploadedFrom: dateRange.from,
+      uploadedTo: dateRange.to,
+      fileType: 'ALL',
+    }));
+    setDefaultsInitialized(true);
+  }, [
+    archiveList.setFilters,
+    currentFolderCode,
+    defaultValues,
+    defaultsInitialized,
+  ]);
   const reloadList = async () => {
     archiveList.retry();
   };
@@ -225,6 +264,16 @@ export function ArchiveBoardPage({
     (item) => item.code === currentFolderCode,
   );
   const currentFolderName = currentFolder?.name ?? currentFolderCode;
+  const defaultDateRange = getDateRange(defaultValues?.uploadedAt);
+  const dateSummary = defaultsError
+    ? '날짜 기본값 오류'
+    : defaultsLoading || !defaultsInitialized
+      ? '—'
+      : getDateSummary(
+          archiveList.filters.uploadedFrom,
+          archiveList.filters.uploadedTo,
+          defaultDateRange,
+        );
   const rows = useMemo(
     () =>
       buildBrowserRows(
@@ -241,10 +290,6 @@ export function ArchiveBoardPage({
     ],
   );
   const fileCount = archiveList.rows.length;
-  const dateSummary = getDateSummary(
-    archiveList.filters.uploadedFrom,
-    archiveList.filters.uploadedTo,
-  );
 
   const applySearch = (filters: {
     uploadedFrom: string;
@@ -260,6 +305,7 @@ export function ArchiveBoardPage({
   };
 
   const handleDefaultSearch = () => {
+    if (!defaultsInitialized) return;
     archiveList.setFilters({
       ...archiveList.filters,
       keyword: searchDraft.trim(),
@@ -267,9 +313,7 @@ export function ArchiveBoardPage({
     });
   };
 
-  const handleDetailSearch = (
-    values: Record<string, PageSearchFieldValue>,
-  ) => {
+  const handleDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
     const range = getDateRange(values.uploadedAt);
     if (range.from && range.to && range.from > range.to) {
       showError('시작일은 종료일보다 늦을 수 없습니다.');
@@ -335,7 +379,7 @@ export function ArchiveBoardPage({
       }}
     >
       <PageHeader
-        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        breadcrumbItems={[selectedModule.name, '커뮤니티', currentMenuName]}
         description={content.description}
         actionGroups={[
           ...(canCreate
@@ -386,6 +430,7 @@ export function ArchiveBoardPage({
             placeholder="파일명 또는 소유자 검색"
             value={searchDraft}
             onChange={(event) => setSearchDraft(event.target.value)}
+            disabled={!defaultsInitialized}
             slotProps={{
               htmlInput: { 'aria-label': '자료 검색' },
             }}
@@ -395,9 +440,25 @@ export function ArchiveBoardPage({
         onDefaultSearch={handleDefaultSearch}
         detailFields={DETAIL_FIELDS}
         detailValues={detailValues}
+        defaultValues={defaultValues ?? {}}
         onDetailValuesChange={setDetailValues}
         onDetailSearch={handleDetailSearch}
-        detailLoading={archiveList.isLoading}
+        onDetailReset={(values) => {
+          const range = getDateRange(values.uploadedAt);
+          setDetailValues(values);
+          setSearchDraft('');
+          archiveList.setFilters({
+            ...archiveList.filters,
+            keyword: '',
+            folderCode: currentFolderCode,
+            uploadedFrom: range.from,
+            uploadedTo: range.to,
+            fileType: getFileType(values.fileType),
+          });
+        }}
+        detailLoading={
+          archiveList.isLoading || defaultsLoading || !defaultsInitialized
+        }
       >
         <Chip
           size="small"
@@ -408,14 +469,36 @@ export function ArchiveBoardPage({
       </PageSearchArea>
 
       <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1.5, pb: 1 }}>
+        {defaultsError && (
+          <Alert
+            severity="error"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={retryDefaults}
+              >
+                재시도
+              </Button>
+            }
+          >
+            {defaultsError}
+          </Alert>
+        )}
         {showReadDenied && (
-          <Alert severity="warning">조회 권한이 없어 자료실을 볼 수 없습니다.</Alert>
+          <Alert severity="warning">
+            조회 권한이 없어 자료실을 볼 수 없습니다.
+          </Alert>
         )}
         {categories.error && (
           <Alert
             severity="error"
             action={
-              <Button color="inherit" size="small" onClick={() => void categories.loadCategories()}>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => void categories.loadCategories()}
+              >
                 재시도
               </Button>
             }
@@ -463,29 +546,39 @@ export function ArchiveBoardPage({
         </Stack>
       </Box>
 
-      {!archiveList.isLoading && !archiveList.error && fileCount === 0 && (
+      {defaultsInitialized &&
+        !isQueryLoading &&
+        !archiveList.error &&
+        fileCount === 0 && (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
           <Alert severity="info">조건에 맞는 파일이 없습니다.</Alert>
         </Box>
-      )}
+        )}
 
-      {(categories.isLoading ||
-        mutations.isUploading ||
+      {(mutations.isUploading ||
         mutations.isDeleting ||
         mutations.isUpdating) && (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
-          <Alert severity="info">
-            {categories.isLoading
-              ? '분류 정보를 불러오는 중입니다.'
-              : '요청 처리 중입니다.'}
-          </Alert>
+          <Alert severity="info">요청 처리 중입니다.</Alert>
         </Box>
       )}
 
-      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, px: { xs: 1, sm: 2 }, pb: 2 }}>
+      <Box
+        data-testid="archive-grid-container"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          px: { xs: 1, sm: 2 },
+          pb: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
         <ArchiveFileGrid
           rows={rows}
-          loading={archiveList.isLoading}
+          loading={isQueryLoading}
           onFolderOpen={handleFolderChange}
           onDownload={(row) => void handleDownload(row)}
           onEdit={setEditingFile}
@@ -541,9 +634,6 @@ export function ArchiveBoardPage({
           {deletingFile?.fileName} 파일을 삭제하시겠습니까?
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeletingFile(null)} disabled={mutations.isDeleting}>
-            취소
-          </Button>
           <Button
             color="error"
             variant="contained"
@@ -551,6 +641,12 @@ export function ArchiveBoardPage({
             disabled={mutations.isDeleting}
           >
             삭제 확인
+          </Button>
+          <Button
+            onClick={() => setDeletingFile(null)}
+            disabled={mutations.isDeleting}
+          >
+            취소
           </Button>
         </DialogActions>
       </Dialog>

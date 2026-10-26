@@ -338,6 +338,10 @@ function F1TreeInner<T extends object>(
     duplicateSelectedRows: () => gridRef.current?.duplicateSelectedRows(),
     getRows: () => gridRef.current?.getRows() ?? [],
     getActiveRows: () => gridRef.current?.getActiveRows() ?? [],
+    acceptSavedRows: (savedRows) => {
+      if (!gridRef.current) throw new Error('그리드가 준비되지 않았습니다.');
+      return gridRef.current.acceptSavedRows(savedRows);
+    },
     getChanges: () =>
       gridRef.current?.getChanges() ?? {
         insertedRows: [],

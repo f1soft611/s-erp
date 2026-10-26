@@ -340,7 +340,7 @@ describe('F1-Grid docs portal', () => {
     expect(screen.getByText('getCellStyle')).toBeInTheDocument();
     expect(screen.getByText('getCellProps')).toBeInTheDocument();
     expect(
-      screen.getByText(/편집 가능한 컬럼은 헤더 하단에 강조 색상/),
+      screen.getByText(/편집 가능 여부에 따른 헤더 강조선은 표시하지 않는다/),
     ).toBeInTheDocument();
   });
 

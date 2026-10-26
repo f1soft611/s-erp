@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, Typography, useTheme } from '@mui/material';
+import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, Typography, useTheme } from '@mui/material';
 import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import { alpha } from '@mui/material/styles';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
 import { getStoredAuth, subscribeAuthChange } from '../../../../../shared/services/authService';
 import { ApiResponseError } from '../../../../../shared/services/apiClient';
@@ -167,7 +168,7 @@ function LoginPopupQueue({ storageKey }: { storageKey: string }) {
   >
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error.message}</Alert>}
     {!post && !error && <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-      <CircularProgress aria-label="공지 내용 불러오는 중" /></Box>}
+      <AppLoadingSpinner size={40} aria-label="공지 내용 불러오는 중" /></Box>}
     {post && <>
       <Typography component="h3" sx={{ fontSize: '1.25rem', fontWeight: 700, overflowWrap: 'anywhere', mt: 1 }}>{post.title}</Typography>
       <NoticePopupBody post={post} />

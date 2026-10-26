@@ -2,7 +2,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  CircularProgress,
   IconButton,
   ListItemIcon,
   Menu,
@@ -612,19 +611,7 @@ function DashboardPage() {
         color: theme.palette.text.primary,
       }}
     >
-      {menusLoading ? (
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-          }}
-        >
-          <CircularProgress size={34} />
-        </Box>
-      ) : (
+      {!menusLoading && (
         <>
           <DashboardSidebar
             moduleItems={moduleItems}

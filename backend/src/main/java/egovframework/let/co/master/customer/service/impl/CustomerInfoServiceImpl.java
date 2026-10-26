@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.egovframe.rte.fdl.idgnr.EgovIdGnrService;
+import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -78,7 +79,9 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         validatePayload(payload);
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), true);
-        String customerCode = resolveCustomerCode(tenantId, payload.getCustomerCode(), null);
+        ensureCustomerNameAvailable(tenantId, customerName, null);
+        ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), null);
+        String customerCode = resolveCustomerCode(tenantId);
 
         Map<String, Object> params = buildSaveParams(
                 tenantId, currentUserId, customerCode, customerName, useAt, payload);
@@ -86,7 +89,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         try {
             customerId = customerInfoDAO.insertCustomer(params);
         } catch (DuplicateKeyException ex) {
-            throw duplicateCodeError();
+            throw duplicateSaveError(ex);
         }
         if (customerId == null) {
             throw new IllegalStateException("거래처 등록 결과를 확인할 수 없습니다.");
@@ -109,17 +112,16 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         findByIdOrThrow(tenantId, customerId);
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), false);
-        String customerCode = resolveCustomerCode(
-                tenantId, payload.getCustomerCode(), customerId);
-
+        ensureCustomerNameAvailable(tenantId, customerName, customerId);
+        ensureBusinessNoAvailable(tenantId, payload.getBusinessNo(), customerId);
         Map<String, Object> params = buildSaveParams(
-                tenantId, currentUserId, customerCode, customerName, useAt, payload);
+                tenantId, currentUserId, null, customerName, useAt, payload);
         params.put("customerId", customerId);
         int updatedRows;
         try {
             updatedRows = customerInfoDAO.updateCustomer(params);
         } catch (DuplicateKeyException ex) {
-            throw duplicateCodeError();
+            throw duplicateSaveError(ex);
         }
         if (updatedRows == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다.");
@@ -136,7 +138,9 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
             CustomerInfoSaveRequestVO payload) {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
-        params.put("customerCode", customerCode);
+        if (customerCode != null) {
+            params.put("customerCode", customerCode);
+        }
         params.put("customerName", customerName);
         params.put("custNameAbbr", normalizeText(payload.getCustNameAbbr()));
         params.put("presidentName", normalizeText(payload.getPresidentName()));
@@ -155,16 +159,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         return params;
     }
 
-    private String resolveCustomerCode(Long tenantId, String rawCode, Long excludeCustomerId) throws Exception {
-        if (StringUtils.hasText(rawCode)) {
-            String code = rawCode.trim();
-            ensureCustomerCodeAvailable(tenantId, code, excludeCustomerId);
-            return code;
-        }
-        if (excludeCustomerId != null) {
-            throw new IllegalArgumentException("거래처 코드는 필수입니다.");
-        }
-
+    private String resolveCustomerCode(Long tenantId) throws Exception {
         for (int attempt = 0; attempt < MAX_GENERATED_CODE_ATTEMPTS; attempt++) {
             String generatedCode = customerCodeIdGnrService.getNextStringId();
             validateGeneratedCode(generatedCode);
@@ -185,12 +180,36 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         }
     }
 
-    private void ensureCustomerCodeAvailable(
+    private void ensureCustomerNameAvailable(
             Long tenantId,
-            String customerCode,
+            String customerName,
             Long excludeCustomerId) throws Exception {
-        if (findCustomerIdByCode(tenantId, customerCode, excludeCustomerId) != null) {
-            throw duplicateCodeError();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("customerName", customerName);
+        params.put("excludeCustomerId", excludeCustomerId);
+        if (customerInfoDAO.selectCustomerIdByName(params) != null) {
+            throw new IllegalArgumentException("이미 사용 중인 거래처명입니다.");
+        }
+    }
+
+    private void ensureBusinessNoAvailable(
+            Long tenantId,
+            String businessNo,
+            Long excludeCustomerId) throws Exception {
+        if (businessNo == null) {
+            return;
+        }
+        String digits = businessNo.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) {
+            return;
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("businessNo", digits);
+        params.put("excludeCustomerId", excludeCustomerId);
+        if (customerInfoDAO.selectCustomerIdByBusinessNo(params) != null) {
+            throw new IllegalArgumentException("이미 사용 중인 사업자번호입니다.");
         }
     }
 
@@ -266,5 +285,25 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
 
     private IllegalArgumentException duplicateCodeError() {
         return new IllegalArgumentException("이미 사용 중인 거래처 코드입니다.");
+    }
+
+    private IllegalArgumentException duplicateSaveError(DuplicateKeyException error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (!(cause instanceof PSQLException)) {
+                continue;
+            }
+            PSQLException postgresError = (PSQLException) cause;
+            if (postgresError.getServerErrorMessage() == null) {
+                continue;
+            }
+            String constraint = postgresError.getServerErrorMessage().getConstraint();
+            if ("uq_tb_customer_info_tenant_name".equals(constraint)) {
+                return new IllegalArgumentException("이미 사용 중인 거래처명입니다.", error);
+            }
+            if ("uq_tb_customer_info_tenant_business_no".equals(constraint)) {
+                return new IllegalArgumentException("이미 사용 중인 사업자번호입니다.", error);
+            }
+        }
+        return duplicateCodeError();
     }
 }

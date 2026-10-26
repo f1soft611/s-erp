@@ -2,6 +2,11 @@ import type { CSSProperties, ReactNode } from 'react';
 
 export type F1GridRowId = string | number;
 
+export type F1GridSavedRow<T extends object> = {
+  previousRowId: F1GridRowId;
+  row: T;
+};
+
 export type F1GridRowState = 'normal' | 'inserted' | 'updated' | 'deleted';
 
 export type F1GridEditorType =
@@ -63,7 +68,8 @@ export type F1GridDateRangeDefault = {
 export type F1GridColumnFormOptions<T extends object> = {
   hidden?: boolean;
   readOnly?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
-  label?: string;
+  label?: string | ((row: T) => string);
+  disabled?: boolean | ((row: T, mode: F1GridFormMode) => boolean);
   group?: string;
   order?: number;
   span?: 1 | 2 | 3;
@@ -158,6 +164,7 @@ export type F1GridColumn<T extends object> = {
   userOptions?: F1GridUserOption[];
   selectOptionIcon?: (option: F1GridOption) => ReactNode;
   required?: boolean;
+  validation?: { unique?: boolean | 'digits' };
   inputFormat?: F1GridInputFormat;
   sanitizeInput?: (value: string) => string;
   min?: number;
@@ -249,6 +256,12 @@ export type F1GridContextMenuTreeConfig = {
   onAddChild: (targetRowId?: F1GridRowId) => void;
 };
 
+export type F1GridValidationError = {
+  rowId: F1GridRowId;
+  field: string;
+  message: string;
+};
+
 export type F1GridProps<T extends object> = {
   rows?: T[];
   dataSource?: F1GridDataSource<T>;
@@ -287,6 +300,7 @@ export type F1GridProps<T extends object> = {
   afterEdit?: F1GridEditLifecycle<T>;
   onChangesChange?: (changes: F1GridChanges<T>) => void;
   onSelectionChange?: (rowIds: F1GridRowId[]) => void;
+  onValidationErrors?: (errors: F1GridValidationError[]) => void;
   initialSelectedRowIds?: F1GridRowId[];
   rowProjection?: (rows: T[]) => F1GridRowProjection<T>;
   cellAdornment?: (row: T, column: F1GridColumn<T>) => ReactNode;
@@ -317,6 +331,7 @@ export type F1GridRef<T extends object> = {
   getRows(): T[];
   getActiveRows(): T[];
   getChanges(): F1GridChanges<T>;
+  acceptSavedRows(savedRows: F1GridSavedRow<T>[]): T[];
   validate(): boolean;
   startEdit(rowId: F1GridRowId, field: keyof T): void;
   stopEdit(): void;

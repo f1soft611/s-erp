@@ -11,7 +11,7 @@ import lombok.Setter;
 @Schema(description = "품목 저장 요청. 테넌트, 감사 및 삭제 상태는 서버에서 결정")
 public class MaterialInfoSaveRequestVO implements Serializable {
     private static final long serialVersionUID = 1L;
-    @Schema(description = "품목코드. 신규 미입력 시 eGov IDS 6자리 채번, 수정 시 필수")
+    @Schema(description = "품목코드. 서버에서 신규 저장 시 eGov IDS 6자리로 자동 채번하며 요청값은 무시되고, 수정 시 기존 코드가 유지됩니다.")
     private String materialCode;
     @Schema(description = "품목명", required = true)
     private String materialName;

@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   IconButton,
   Tab,
   Tabs,
@@ -19,6 +18,7 @@ import {
   richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
@@ -275,7 +275,7 @@ export function DocumentComposerDialog({
                 justifyContent: 'center',
               }}
             >
-              <CircularProgress aria-label="문서 정보 불러오는 중" />
+              <AppLoadingSpinner size={40} aria-label="문서 정보 불러오는 중" />
             </Box>
           )}
           <Box sx={{ display: isComposerLoading ? 'none' : 'contents' }}>

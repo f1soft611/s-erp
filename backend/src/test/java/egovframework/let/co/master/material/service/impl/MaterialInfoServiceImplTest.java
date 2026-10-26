@@ -39,6 +39,13 @@ class MaterialInfoServiceImplTest {
         return p;
     }
 
+    private MaterialInfoSaveRequestVO expiryPayload(String code, String status, Integer count) {
+        MaterialInfoSaveRequestVO p = payload(code);
+        p.setExpiryedStatus(status);
+        p.setExpiryedCount(count);
+        return p;
+    }
+
     private void stubInsert() throws Exception {
         when(dao.selectMaterialIdByCode(anyMap())).thenReturn(null);
         when(dao.insertMaterial(anyMap())).thenReturn(12L);
@@ -57,10 +64,47 @@ class MaterialInfoServiceImplTest {
                 .containsEntry("expiryedStatus", "NONE").containsEntry("matCataType", "");
     }
 
-    @Test void acceptsManualCodeWithoutGenerator() throws Exception {
+    @Test void alwaysGeneratesCodeAndIgnoresEvenAnOversizedSuppliedCode() throws Exception {
         stubInsert();
-        service.createMaterial(9L, "101", payload("MANUAL"));
-        verifyNoInteractions(generator);
+        when(generator.getNextStringId()).thenReturn("000001");
+        service.createMaterial(9L, "101", payload(String.join("", java.util.Collections.nCopies(21, "x"))));
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(dao).insertMaterial(captor.capture());
+        assertThat(captor.getValue()).containsEntry("materialCode", "000001");
+        verify(generator).getNextStringId();
+    }
+
+    @Test void acceptsAllConsistentExpiryPairs() throws Exception {
+        stubInsert();
+        when(generator.getNextStringId()).thenReturn("000001", "000002", "000003", "000004");
+
+        service.createMaterial(9L, "101", expiryPayload("NONE", "NONE", null));
+        service.createMaterial(9L, "101", expiryPayload("DAY", "DAY", 1));
+        service.createMaterial(9L, "101", expiryPayload("MONTH", "MONTH", 30));
+        service.createMaterial(9L, "101", expiryPayload("YEAR", "YEAR", Integer.MAX_VALUE));
+
+        verify(dao, times(4)).insertMaterial(anyMap());
+    }
+
+    @Test void rejectsInconsistentExpiryPairsBeforeInsertOrUpdate() throws Exception {
+        MaterialInfoSaveRequestVO[] invalid = {
+                expiryPayload("NONE_COUNT", "NONE", 1),
+                expiryPayload("DAY_NULL", "DAY", null),
+                expiryPayload("MONTH_ZERO", "MONTH", 0),
+                expiryPayload("YEAR_NEGATIVE", "YEAR", -1)
+        };
+
+        for (MaterialInfoSaveRequestVO p : invalid) {
+            assertThatThrownBy(() -> service.createMaterial(9L, "101", p))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("소비기한");
+            assertThatThrownBy(() -> service.updateMaterial(9L, "101", 12L, p))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("소비기한");
+        }
+
+        verify(dao, never()).insertMaterial(anyMap());
+        verify(dao, never()).updateMaterial(anyMap());
     }
 
     @Test void rejectsExhaustionAndRetriesAlreadyUsedCodes() throws Exception {
@@ -76,9 +120,9 @@ class MaterialInfoServiceImplTest {
         p.setMaterialTypeCode(" ");
         assertThatThrownBy(() -> service.createMaterial(9L, "101", p)).isInstanceOf(IllegalArgumentException.class);
         p.setMaterialTypeCode("RAW");
-        p.setMaterialCode(String.join("", java.util.Collections.nCopies(21, "x")));
+        p.setMaterialName(String.join("", java.util.Collections.nCopies(201, "x")));
         assertThatThrownBy(() -> service.createMaterial(9L, "101", p)).isInstanceOf(IllegalArgumentException.class);
-        p.setMaterialCode("A");
+        p.setMaterialName("Sample");
         p.setSafeInvoice(Double.NaN);
         assertThatThrownBy(() -> service.createMaterial(9L, "101", p)).isInstanceOf(IllegalArgumentException.class);
         p.setSafeInvoice(null);
@@ -91,6 +135,7 @@ class MaterialInfoServiceImplTest {
     }
 
     @Test void reportsDuplicateCodeExplicitly() throws Exception {
+        when(generator.getNextStringId()).thenReturn("000001");
         when(dao.selectMaterialIdByCode(anyMap())).thenReturn(null);
         when(dao.insertMaterial(anyMap())).thenThrow(new DuplicateKeyException("duplicate"));
         assertThatThrownBy(() -> service.createMaterial(9L, "101", payload("A")))
@@ -112,9 +157,8 @@ class MaterialInfoServiceImplTest {
 
     @Test void updatesAllBusinessFieldsWithinAuthenticatedTenant() throws Exception {
         when(dao.selectMaterialById(anyMap())).thenReturn(new MaterialInfoVO());
-        when(dao.selectMaterialIdByCode(anyMap())).thenReturn(null);
         when(dao.updateMaterial(anyMap())).thenReturn(1);
-        MaterialInfoSaveRequestVO p = payload("000012");
+        MaterialInfoSaveRequestVO p = payload("");
         p.setMaterialSpec2("SPEC2");
         p.setSafeInvoice(0.0);
         p.setExpiryedStatus("DAY");
@@ -126,7 +170,21 @@ class MaterialInfoServiceImplTest {
         assertThat(captor.getValue()).containsEntry("tenantId", 9L).containsEntry("materialId", 12L)
                 .containsEntry("materialSpec2", "SPEC2").containsEntry("safeInvoice", 0.0)
                 .containsEntry("expiryedCount", 30).containsEntry("kfdaReportNo", "REPORT")
-                .containsEntry("updatedBy", "00101");
+                .containsEntry("updatedBy", "00101").doesNotContainKey("materialCode");
+        verify(dao, never()).selectMaterialIdByCode(anyMap());
+        verifyNoInteractions(generator);
+    }
+
+    @Test void updateIgnoresForgedCodeAndDoesNotPassCodeToUpdate() throws Exception {
+        when(dao.selectMaterialById(anyMap())).thenReturn(new MaterialInfoVO());
+        when(dao.updateMaterial(anyMap())).thenReturn(1);
+
+        service.updateMaterial(9L, "00101", 12L, payload("FORGED"));
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(dao).updateMaterial(captor.capture());
+        assertThat(captor.getValue()).doesNotContainKey("materialCode");
+        verify(dao, never()).selectMaterialIdByCode(anyMap());
         verifyNoInteractions(generator);
     }
 
@@ -157,7 +215,10 @@ class MaterialInfoServiceImplTest {
         }
         String sql = c.getMappedStatement("MaterialInfoDAO.insertMaterial").getBoundSql(params).getSql();
         assertThat(sql).contains("material_type_code", "expiryed_count", "kfda_report_no", "CURRENT_TIMESTAMP");
+        String updateSql = c.getMappedStatement("MaterialInfoDAO.updateMaterial").getBoundSql(params).getSql();
+        assertThat(updateSql).doesNotContain("material_code =");
         String options = c.getMappedStatement("MaterialInfoDAO.selectMaterialOptions").getBoundSql(params).getSql();
-        assertThat(options).contains("tenant_id", "MATERIAL_TYPE", "STORE_METHOD", "EXPIRY_STATUS");
+        assertThat(options).contains("g.tenant_id = ?", "g.use_at = 'Y'", "i.use_at = 'Y'",
+                "'ITEM_TYPE'", "'ITEM_UNIT'", "'MATERIAL_TYPE'", "'STORE_METHOD'", "'EXPIRY_STATUS'");
     }
 }

@@ -21,6 +21,7 @@ import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPa
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
+import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -153,6 +154,17 @@ export function DashboardContent({
         breadcrumbItems={breadcrumbItems}
         selectedMenuPermissions={selectedMenuPermissions}
         isTenantAdmin={isTenantAdmin}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'create') {
+    return (
+      <SalesOrderCreatePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
       />
     );
   }

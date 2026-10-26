@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { GridSaveReconciliationError, resolveSavedGridRows, type F1GridSavedRow } from '../../../../../shared/components/f1-grid';
 import type {
   CustomerBatchPayload,
   CustomerFilters,
@@ -112,6 +113,24 @@ export async function saveCustomerBatch(
     throw new Error('거래처 일괄 저장 응답을 확인할 수 없습니다.');
   }
   return customers.map(normalizeCustomerRow);
+}
+
+export async function saveCustomerRows(
+  payload: CustomerBatchPayload,
+  requested: CustomerRow[],
+): Promise<F1GridSavedRow<CustomerRow>[]> {
+  const result = await apiPost<{ item?: { customers?: unknown; rowIdMappings?: unknown } }>(
+    '/api/v1/co/master/customers/save-batch', payload,
+  );
+  try {
+    const customers = result.item?.customers;
+    if (!Array.isArray(customers) || !customers.every(isApiRow)) {
+      throw new Error('거래처 일괄 저장 응답을 확인할 수 없습니다.');
+    }
+    return resolveSavedGridRows(requested, customers.map(normalizeCustomerRow), result.item?.rowIdMappings, 'customerId');
+  } catch (cause) {
+    throw new GridSaveReconciliationError(cause);
+  }
 }
 
 export async function updateCustomer(

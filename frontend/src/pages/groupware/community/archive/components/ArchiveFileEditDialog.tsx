@@ -112,11 +112,15 @@ export function ArchiveFileEditDialog({
         </FormControl>
       </DialogContent>
       <DialogActions>
+        <Button
+          variant="contained"
+          onClick={() => void handleSave()}
+          disabled={saving}
+        >
+          저장
+        </Button>
         <Button onClick={onClose} disabled={saving}>
           취소
-        </Button>
-        <Button variant="contained" onClick={() => void handleSave()} disabled={saving}>
-          저장
         </Button>
       </DialogActions>
     </Dialog>

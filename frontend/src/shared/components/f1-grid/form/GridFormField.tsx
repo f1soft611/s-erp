@@ -31,6 +31,7 @@ export type GridFormFieldProps<T extends object> = {
   mode: F1GridFormMode;
   value: unknown;
   readOnly: boolean;
+  disabled?: boolean;
   error?: string;
   onPatch: (patch: Partial<T>) => void;
 };
@@ -58,6 +59,7 @@ export function GridFormField<T extends object>({
   row,
   value,
   readOnly,
+  disabled = false,
   error,
   onPatch,
 }: GridFormFieldProps<T>) {
@@ -98,6 +100,7 @@ export function GridFormField<T extends object>({
 
   const sharedTextFieldProps = {
     fullWidth: true,
+    disabled,
     label: renderRequiredFieldLabel(column.headerName, isRequired),
     margin: 'none' as const,
     required: false,
@@ -144,9 +147,14 @@ export function GridFormField<T extends object>({
 
   if (column.type === 'checkbox') {
     return (
-      <FormControl error={Boolean(error)} aria-required={isRequired}>
+      <FormControl
+        disabled={disabled}
+        error={Boolean(error)}
+        aria-required={isRequired}
+      >
         <FormControlLabel
           label={renderRequiredFieldLabel(column.headerName, isRequired)}
+          disabled={disabled}
           sx={{
             alignItems: 'center',
             marginLeft: -0.5,
@@ -157,6 +165,7 @@ export function GridFormField<T extends object>({
           control={
             <Checkbox
               checked={isGridCheckboxChecked(displayedValue)}
+              disabled={disabled}
               size="small"
               slotProps={{
                 input: {
@@ -167,7 +176,7 @@ export function GridFormField<T extends object>({
                 },
               }}
               onChange={(event) => {
-                if (!readOnly) applyValue(event.target.checked);
+                if (!readOnly && !disabled) applyValue(event.target.checked);
               }}
             />
           }
@@ -239,6 +248,7 @@ export function GridFormField<T extends object>({
         multiple={multiple}
         label={column.headerName}
         readOnly={readOnly}
+        disabled={disabled}
         required={isRequired}
         error={Boolean(error)}
         helperText={error}
@@ -255,6 +265,7 @@ export function GridFormField<T extends object>({
     return (
       <Autocomplete
         fullWidth
+        disabled={disabled}
         readOnly={readOnly}
         size="small"
         options={options}
@@ -270,6 +281,7 @@ export function GridFormField<T extends object>({
           <TextField
             {...params}
             fullWidth
+            disabled={disabled}
             label={renderRequiredFieldLabel(column.headerName, isRequired)}
             margin="none"
             size="small"
@@ -330,7 +342,7 @@ export function GridFormField<T extends object>({
                   <span>
                     <IconButton
                       aria-label={`${column.headerName} 선택`}
-                      disabled={readOnly || !column.onOpenCodePicker}
+                      disabled={readOnly || disabled || !column.onOpenCodePicker}
                       edge="end"
                       onClick={openCodePicker}
                       size="small"

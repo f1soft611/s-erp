@@ -33,6 +33,44 @@ type MultiSelectRow = {
 };
 
 describe('F1-Grid form model', () => {
+  it('reports required and digit-count errors consistently from form apply and grid validate', () => {
+    const ref = createRef<F1GridRef<{ id: string; number: string }>>();
+    const onValidationErrors = vi.fn();
+    render(
+      <F1Grid
+        ref={ref}
+        rows={[{ id: 'row-1', number: '' }]}
+        columns={[{
+          field: 'number',
+          headerName: '번호',
+          editable: true,
+          required: true,
+          inputFormat: { type: 'digits', validDigitCounts: [10] },
+        }]}
+        rowKey="id"
+        rowFormPlugin={{}}
+        onValidationErrors={onValidationErrors}
+      />,
+    );
+    act(() => expect(ref.current?.validate()).toBe(false));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([
+      { rowId: 'row-1', field: 'number', message: '번호은(는) 필수입니다.' },
+    ]);
+    act(() => ref.current?.addRow({ id: 'row-2', number: '123' }));
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([
+      { rowId: 'row-2', field: 'number', message: '번호은(는) 10자리여야 합니다.' },
+    ]);
+    fireEvent.change(screen.getByRole('textbox', { name: '번호' }), {
+      target: { value: '1234567890' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '적용' }));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+    act(() => ref.current?.setCellValue('row-1', 'number', '1234567890'));
+    act(() => expect(ref.current?.validate()).toBe(true));
+    expect(onValidationErrors).toHaveBeenLastCalledWith([]);
+  });
+
   it('builds form sections from editable fields only by default', () => {
     const columns: F1GridColumn<FormRow>[] = [
       { field: 'id', headerName: '번호', type: 'rownumber' },
@@ -153,6 +191,30 @@ describe('F1-Grid form model', () => {
     expect(isGridFormFieldReadOnly(formReadOnlyByMode, row, 'edit')).toBe(true);
     expect(isGridFormFieldReadOnly(checkbox, row, 'edit')).toBe(false);
     expect(isGridFormFieldReadOnly(ordinary, row, 'edit')).toBe(true);
+  });
+
+  it('resolves dynamic form labels from the current row', () => {
+    const column: F1GridColumn<FormRow> = {
+      field: 'name',
+      headerName: '소비기한 숫자',
+      editable: true,
+      form: {
+        label: (currentRow) =>
+          currentRow.status ? '소비기한 숫자 (일)' : '소비기한 숫자',
+      },
+    };
+
+    expect(buildGridFormSections([column], {
+      id: '1',
+      name: '홍길동',
+      status: true,
+      department: '',
+      memo: '',
+      secret: '',
+    })[0].fields[0].label).toBe('소비기한 숫자 (일)');
+    expect(buildGridFormSections([column])[0].fields[0].label).toBe(
+      '소비기한 숫자',
+    );
   });
 });
 
@@ -584,6 +646,12 @@ type ModalRow = {
   hiddenValue: string;
 };
 
+type ExpiryFormRow = {
+  id: string;
+  expiryedStatus: 'NONE' | 'DAY';
+  expiryedCount: number | null;
+};
+
 const modalRow: ModalRow = {
   id: 'EMP-001',
   name: '홍길동',
@@ -640,6 +708,62 @@ const renderRowFormModal = (
 };
 
 describe('row form modal', () => {
+  it('updates a row-dependent unit label and disables the count for NONE', () => {
+    const columns: F1GridColumn<ExpiryFormRow>[] = [
+      {
+        field: 'expiryedCount',
+        headerName: '소비기한 숫자',
+        type: 'number',
+        editable: true,
+        form: {
+          label: (row) =>
+            row.expiryedStatus === 'NONE'
+              ? '소비기한 숫자'
+              : '소비기한 숫자 (일)',
+          disabled: (row) => row.expiryedStatus === 'NONE',
+        },
+      },
+    ];
+    const renderExpiryModal = (row: ExpiryFormRow) => (
+      <F1GridFormModal
+        open
+        mode="edit"
+        row={row}
+        originalRow={row}
+        columns={columns}
+        rowKey="id"
+        plugin={{}}
+        onCancel={vi.fn()}
+        onApply={vi.fn()}
+      />
+    );
+    const { rerender } = render(renderExpiryModal({
+      id: '1',
+      expiryedStatus: 'DAY',
+      expiryedCount: 30,
+    }));
+
+    const activeCount = screen.getByRole('spinbutton', {
+      name: '소비기한 숫자 (일)',
+    });
+    expect(activeCount).toHaveValue(30);
+    expect(activeCount).toBeEnabled();
+
+    rerender(
+      renderExpiryModal({
+        id: '1',
+        expiryedStatus: 'NONE',
+        expiryedCount: null,
+      }),
+    );
+
+    const disabledCount = screen.getByRole('spinbutton', {
+      name: '소비기한 숫자',
+    });
+    expect(disabledCount).toHaveValue(null);
+    expect(disabledCount).toBeDisabled();
+  });
+
   it('renders an accessible dialog with default edit title and row description', () => {
     renderRowFormModal();
 
@@ -919,7 +1043,7 @@ describe('row form modal', () => {
     renderRowFormModal();
 
     expect(screen.getByRole('dialog')).toHaveStyle({
-      maxWidth: '960px',
+      maxWidth: '990px',
       maxHeight: '85vh',
     });
     expect(

@@ -175,9 +175,9 @@ export function MenuManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pageActionPermissions.read,
-          disabled: false,
+          disabled: saving,
           onClick: () => {
-            if (!selectedModuleId) return;
+            if (saving || !selectedModuleId) return;
             void requestRefresh(selectedModuleId, false, true);
           },
         },
@@ -322,7 +322,7 @@ export function MenuManagementPage({
   );
 
   function requestModuleChange(moduleId: number) {
-    if (loading || moduleId === selectedModuleId) return;
+    if (loading || saving || moduleId === selectedModuleId) return;
     if (dirty) {
       setPendingModuleId(moduleId);
       setPendingRoleId(selectedRoleId);
@@ -348,7 +348,14 @@ export function MenuManagementPage({
   }
 
   function requestRoleChange(roleId: string) {
-    if (loading || roleId === selectedRoleId || !selectedModuleId) return;
+    if (
+      loading ||
+      saving ||
+      roleId === selectedRoleId ||
+      !selectedModuleId
+    ) {
+      return;
+    }
     if (dirty) {
       setPendingModuleId(selectedModuleId);
       setPendingRoleId(roleId);
@@ -377,29 +384,31 @@ export function MenuManagementPage({
     moduleId: number,
     bypassDirtyConfirmation = false,
     showSkeleton = false,
-  ) {
-    if (loading && showSkeleton) return Promise.resolve();
+  ): Promise<boolean> {
+    if (saving || (loading && showSkeleton)) return Promise.resolve(false);
     if (!selectedModuleId || !selectedRoleId) {
       setMenus([]);
       setError('');
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
     if (dirty && !bypassDirtyConfirmation) {
       setPendingModuleId(moduleId);
       setPendingPermissionReload(false);
       setConfirmOpen(true);
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
     return loadMenus(moduleId, false, false, selectedRoleId, showSkeleton).then(
       (didLoad) => {
         if (didLoad) {
           setReloadToken((current) => current + 1);
         }
+        return didLoad;
       },
     );
   }
 
   function confirmDiscardChanges() {
+    if (saving) return;
     const nextModuleId = pendingModuleId;
     const nextRoleId = pendingRoleId ?? selectedRoleId;
     const reloadPermissions = pendingPermissionReload;
@@ -458,7 +467,9 @@ export function MenuManagementPage({
             margin="none"
             placeholder="메뉴명/코드 검색"
             value={searchQuery}
+            disabled={saving}
             onChange={(event) => {
+              if (saving) return;
               const nextSearchQuery = event.target.value;
               setSearchQuery(nextSearchQuery);
               setPageSession((current) => ({
@@ -467,7 +478,7 @@ export function MenuManagementPage({
               }));
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && selectedModuleId) {
+              if (event.key === 'Enter' && selectedModuleId && !saving) {
                 event.preventDefault();
                 void requestRefresh(selectedModuleId, false, true);
               }
@@ -479,7 +490,11 @@ export function MenuManagementPage({
                   <IconButton
                     size="small"
                     aria-label="검색어 초기화"
-                    onClick={() => setSearchQuery('')}
+                    disabled={saving}
+                    onClick={() => {
+                      if (saving) return;
+                      setSearchQuery('');
+                    }}
                     edge="end"
                     sx={{ mr: 0.5, color: 'text.secondary' }}
                   >

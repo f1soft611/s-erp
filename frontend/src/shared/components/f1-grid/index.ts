@@ -2,6 +2,7 @@ export { F1Grid } from './core/F1Grid';
 export { F1Tree } from './tree/F1Tree';
 export * from './types/grid.types';
 export * from './state/GridState';
+export * from './state/GridSavedRows';
 export * from './merge/GridRowMerge';
 export * from './utils/grid.utils';
 export * from './keyboard/GridKeyboard';

@@ -147,6 +147,12 @@ const sections: DocSection[] = [
         '미지정',
       ),
       api(
+        'onValidationErrors',
+        '(errors: F1GridValidationError[]) => void',
+        '폼 적용과 validate()의 { rowId, field, message } 오류 목록. 성공은 빈 배열. 페이지 메시지 연결에 사용.',
+        '미지정',
+      ),
+      api(
         'initialSelectedRowIds',
         'F1GridRowId[]',
         '초기 선택할 행 ID 목록.',
@@ -209,7 +215,12 @@ const sections: DocSection[] = [
         '컨텍스트 메뉴의 삭제 액션을 비활성화.',
         'false',
       ),
-      api('loading', 'boolean', '그리드 영역에 로딩 상태를 표시.', 'false'),
+      api(
+        'loading',
+        'boolean',
+        '그리드 전체 입력을 차단하고 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 2.4px 두께/테마 기본 색상으로 표시. MUI indeterminate 원호 애니메이션을 사용.',
+        'false',
+      ),
       api(
         'treeContextMenu',
         'F1GridContextMenuTreeConfig',
@@ -265,7 +276,12 @@ const sections: DocSection[] = [
         '숫자 계열의 표시 포맷. 통화 기호를 표시하려면 currency를 명시.',
         '미지정',
       ),
-      api('decimalPlaces', 'number', '숫자 표시 소수 자릿수.', '미지정'),
+      api(
+        'decimalPlaces',
+        'number',
+        '숫자 표시/입력 소수 자릿수. number/decimal은 미지정 시 최대 5자리(끝의 0 생략), 지정 시 고정 표시.',
+        '미지정 (number/decimal: 최대 5자리, currency format: 0자리)',
+      ),
       api('options', 'F1GridOption[]', 'select/autocomplete 편집기의 값·레이블 목록.', '미지정'),
       api('userOptions', 'F1GridUserOption[]', 'user 편집기의 사용자 선택 목록.', '미지정'),
       api(
@@ -275,6 +291,12 @@ const sections: DocSection[] = [
         '미지정',
       ),
       api('required', 'boolean', '값 입력을 필수로 검증.', 'false'),
+      api(
+        'validation',
+        "{ unique?: boolean | 'digits' }",
+        "unique: true는 문자열 trim 비교, 'digits'는 ASCII 숫자만 비교(앞자리 0 유지). 전체 활성 행 대상, 자기 행·빈 비교키 제외. 폼 적용과 validate() 공통 적용.",
+        '미지정',
+      ),
       api('min', 'number', '숫자 편집 값의 최소 허용치.', '미지정'),
       api('max', 'number', '숫자 편집 값의 최대 허용치.', '미지정'),
       api(

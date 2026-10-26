@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -20,6 +19,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { AttachmentList } from '../../../../../shared/components/feed/AttachmentList';
+import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { CommentThread } from '../../../../../shared/components/feed/CommentThread';
 import type { FeedCommentItem } from '../../../../../shared/components/feed/CommentThread';
 import { FeedBodyContent } from '../../../../../shared/components/feed/FeedBodyContent';
@@ -1119,7 +1119,7 @@ export function DocumentApprovalDetailFeed(
           spacing={1}
           sx={{ alignItems: 'center', py: 1 }}
         >
-          <CircularProgress size={18} />
+          <AppLoadingSpinner size={18} />
           <Typography variant="caption">문서 상세 불러오는 중</Typography>
         </Stack>
       )}
@@ -1884,7 +1884,7 @@ export function DocumentApprovalDetailFeed(
                     aria-label="댓글 불러오는 중"
                     sx={{ py: 2 }}
                   >
-                    <CircularProgress size={20} />
+                    <AppLoadingSpinner size={20} />
                   </Box>
                 ) : null}
                 <CommentThread
@@ -1925,7 +1925,7 @@ export function DocumentApprovalDetailFeed(
               {actionError && !reasonAction && (
                 <Alert severity="error">{actionError}</Alert>
               )}
-              {isActing && <CircularProgress size={24} />}
+              {isActing && <AppLoadingSpinner size={24} />}
             </>
           )}
         </>

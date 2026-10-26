@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
-import { Alert, Box, Button, CircularProgress, Stack } from '@mui/material';
+import { Alert, Box, Button, Stack } from '@mui/material';
+import { AppLoadingSpinner } from '../AppLoadingSpinner';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
 import { CommonDialog } from '../CommonDialog';
 import { useNotification } from '../../context/NotificationContext';
@@ -213,7 +214,7 @@ export function CommonCodeItemHelpDialog({
                 variant="contained"
                 startIcon={
                   saving ? (
-                    <CircularProgress size={16} color="inherit" />
+                    <AppLoadingSpinner size={16} color="inherit" />
                   ) : undefined
                 }
                 sx={{

@@ -3,7 +3,8 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, CircularProgress, IconButton, TextField } from '@mui/material';
+import { Box, IconButton, TextField } from '@mui/material';
+import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -26,7 +27,7 @@ type Props = {
 };
 
 function SaveProgressIcon() {
-  return <CircularProgress size={16} color="inherit" aria-label="품목 저장 중" />;
+  return <AppLoadingSpinner size={16} color="inherit" aria-label="품목 저장 중" />;
 }
 
 export function MaterialManagementPage({ selectedModule, currentMenuName, content,
@@ -69,7 +70,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         const grid = gridRef.current;
         if (!grid) return;
         if (!grid.validate()) { management.setError('필수 입력 항목을 확인해 주세요.'); return; }
-        void management.saveChanges(grid.getChanges());
+        void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
       } }] },
   ];
   return <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>
@@ -96,7 +97,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         canCreate={canCreate && !management.loading && !management.saving}
         canUpdate={canUpdate && !management.loading && !management.saving}
         canExportExcel={Boolean(selectedMenuPermissions?.excel)}
-        loading={management.loading || management.saving} gridKey={management.gridKey}
+        loading={management.loading} gridKey={management.gridKey}
         gridRef={gridRef} onChangesChange={management.handleChangesChange} />
     </Box>
     <UnsavedChangesConfirmDialog open={pendingFilters !== null} title="저장하지 않은 변경사항"
