@@ -8,6 +8,22 @@ const options: MasterPickerOption[] = [
 ];
 
 describe('MasterPicker', () => {
+  it('matches the adjacent picker button height to the small input height', () => {
+    render(
+      <MasterPicker
+        label="거래처"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '거래처 선택' })).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
+  });
+
   it('searches on Enter and returns the selected typed option', async () => {
     const search = vi.fn(async () => options);
     const onChange = vi.fn();
