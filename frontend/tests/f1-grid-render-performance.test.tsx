@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../src/shared/components/f1-grid';
 
@@ -26,6 +26,113 @@ function renderGrid() {
 }
 
 describe('F1Grid interaction render isolation', () => {
+  it.each(['Enter', 'Tab', 'click'] as const)(
+    'does not visit unrelated rows when committing a changed value with %s',
+    (action) => {
+      const { renderCell, cellAdornment, ref } = renderGrid();
+      fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Committed item' } });
+      renderCell.mockClear();
+      cellAdornment.mockClear();
+      if (action === 'click') {
+        const neighbor = screen.getByRole('gridcell', { name: 'Code 1', exact: true });
+        fireEvent.mouseDown(neighbor, { button: 0 });
+        fireEvent.mouseUp(neighbor);
+        fireEvent.click(neighbor);
+      } else {
+        fireEvent.keyDown(input, { key: action });
+      }
+      expect(ref.current?.getChanges().updatedRows).toEqual([
+        expect.objectContaining({ id: '1', name: 'Committed item' }),
+      ]);
+      expect(renderCell.mock.calls.filter(([context]) => context.row.id !== '1')).toHaveLength(0);
+      expect(cellAdornment.mock.calls.filter(([row]) => row.id !== '1')).toHaveLength(0);
+    },
+  );
+
+  it('clears the dirty marker when restoring a value without visiting other rows', () => {
+    const { cellAdornment, ref } = renderGrid();
+    for (const value of ['Changed', 'Item 1']) {
+      const current = screen.getByRole('gridcell', { name: value === 'Changed' ? 'Item 1' : 'Changed', exact: true });
+      fireEvent.doubleClick(current);
+      fireEvent.change(screen.getByRole('textbox'), { target: { value } });
+      cellAdornment.mockClear();
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+      expect(screen.getByRole('gridcell', { name: value, exact: true }))
+        .toHaveAttribute('data-dirty-cell', String(value === 'Changed'));
+      expect(cellAdornment.mock.calls.filter(([row]) => row.id !== '1')).toHaveLength(0);
+    }
+    expect(ref.current?.getChanges().updatedRows).toEqual([]);
+  });
+
+  it('keeps the latest edit callbacks on a row skipped during another row commit', () => {
+    const { ref } = renderGrid();
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'First committed' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Item 2', exact: true }));
+    expect(screen.getByRole('textbox')).toHaveValue('Item 2');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Second committed' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(ref.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ id: '1', name: 'First committed' }),
+      expect.objectContaining({ id: '2', name: 'Second committed' }),
+    ]);
+  });
+
+  it('updates the previous last row boundary after appending a row', () => {
+    const { ref } = renderGrid();
+    const last = screen.getByRole('gridcell', { name: 'Code 100', exact: true });
+    expect(getComputedStyle(last).borderBottomWidth).toBe('1px');
+    act(() => ref.current?.addRow({ id: '101', name: 'Item 101', code: 'Code 101' }));
+    expect(getComputedStyle(screen.getByRole('gridcell', { name: 'Code 100', exact: true })).borderBottomWidth)
+      .not.toBe('1px');
+    expect(getComputedStyle(screen.getByRole('gridcell', { name: 'Code 101', exact: true })).borderBottomWidth)
+      .toBe('1px');
+  });
+
+  it('renumbers unchanged rows when a committed value changes the sort order', () => {
+    const rows: Row[] = [
+      { id: '1', name: 'Alpha', code: '' },
+      { id: '2', name: 'Beta', code: '' },
+    ];
+    const columns: F1GridColumn<Row>[] = [
+      { field: 'code', headerName: 'No.', type: 'rownumber' },
+      { field: 'name', headerName: 'Name', editable: true },
+    ];
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Name 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '오름차순 정렬' }));
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Alpha', exact: true }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Zulu' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    const cells = screen.getAllByRole('gridcell');
+    expect(cells.map((cell) => cell.textContent)).toEqual(['1', 'Beta', '2', 'Zulu']);
+  });
+
+  it('updates the remaining last row boundary when a commit filters out a row', () => {
+    const rows: Row[] = [
+      { id: '1', name: 'Keep A', code: '' },
+      { id: '2', name: 'Keep B', code: '' },
+    ];
+    const columns: F1GridColumn<Row>[] = [
+      { field: 'name', headerName: 'Name', editable: true },
+    ];
+    render(<F1Grid rows={rows} columns={columns} rowKey="id" showCheckbox={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Name 컬럼 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '필터', exact: true }));
+    fireEvent.change(screen.getByLabelText('Name 필터 값'), { target: { value: 'Keep' } });
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    const remaining = screen.getByRole('gridcell', { name: 'Keep A', exact: true });
+    expect(getComputedStyle(remaining).borderBottomWidth).not.toBe('1px');
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'Keep B', exact: true }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hidden' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(screen.queryByRole('gridcell', { name: 'Hidden', exact: true })).not.toBeInTheDocument();
+    expect(getComputedStyle(remaining).borderBottomWidth).toBe('1px');
+  });
+
   it('does not rerender other rows when selecting a pinned cell in 100 rows', () => {
     const { renderCell } = renderGrid();
     fireEvent.click(screen.getByRole('gridcell', { name: 'Item 1', exact: true }));

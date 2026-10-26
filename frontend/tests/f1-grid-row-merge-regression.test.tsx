@@ -11,6 +11,26 @@ type MergeRow = {
 };
 
 describe('F1-Grid row merge regression', () => {
+  it('updates an unchanged merge start when editing a later row splits the group', () => {
+    const rows: MergeRow[] = [
+      { id: '1', itemName: 'Group A', category: 'Raw', quantity: 1 },
+      { id: '2', itemName: 'Group A', category: 'Raw', quantity: 2 },
+      { id: '3', itemName: 'Group B', category: 'Finished', quantity: 3 },
+    ];
+    render(<F1Grid rows={rows} columns={[
+      { field: 'itemName', headerName: 'Item', mergeRows: true, editable: true },
+      { field: 'quantity', headerName: 'Quantity' },
+    ]} rowKey="id" showCheckbox={false} />);
+    const first = screen.getByRole('gridcell', { name: 'Group A', exact: true });
+    expect(getComputedStyle(first).gridRow).toContain('span 2');
+    const cells = screen.getAllByRole('gridcell');
+    fireEvent.doubleClick(cells[2]);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Split group' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(screen.getByRole('gridcell', { name: 'Split group', exact: true })).toBeInTheDocument();
+    expect(getComputedStyle(first).gridRow).not.toContain('span 2');
+  });
+
   it('does not add a second bottom border to a hidden merged cell on the last grid row', () => {
     expect(getGridCellBottomBorder(true, true, false)).toBe(0);
     expect(getGridCellBottomBorder(false, false, true, 2)).toBe(0);

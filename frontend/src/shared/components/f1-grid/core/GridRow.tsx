@@ -222,9 +222,16 @@ const areGridRowPropsEqual = <T extends object>(
     (prev.editingCell?.rowId !== prev.rowId ||
       next.editingCell?.rowId !== next.rowId ||
       prev.draftValue === next.draftValue) &&
-    prev.dirtyCellMap === next.dirtyCellMap &&
-    prev.mergeInfoByColumn === next.mergeInfoByColumn &&
-    prev.visibleRows === next.visibleRows &&
+    (prev.dirtyCellMap === next.dirtyCellMap ||
+      next.columns.every((column) => {
+        const key = `${String(next.rowId)}:${String(column.field)}`;
+        return Boolean(prev.dirtyCellMap?.[key]) === Boolean(next.dirtyCellMap?.[key]);
+      })) &&
+    // Only merged cells depend on other rows' values; ordinary rows need the last-row boundary.
+    (hasMergedColumns
+      ? prev.mergeInfoByColumn === next.mergeInfoByColumn &&
+        prev.visibleRows === next.visibleRows
+      : prev.visibleRows.length === next.visibleRows.length) &&
     prev.rowKey === next.rowKey &&
     Object.is(prev.getCellError, next.getCellError) &&
     Object.is(prev.getPinOffset, next.getPinOffset) &&
