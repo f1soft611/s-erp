@@ -2,6 +2,11 @@ import type { CSSProperties, ReactNode } from 'react';
 
 export type F1GridRowId = string | number;
 
+export type F1GridSavedRow<T extends object> = {
+  previousRowId: F1GridRowId;
+  row: T;
+};
+
 export type F1GridRowState = 'normal' | 'inserted' | 'updated' | 'deleted';
 
 export type F1GridEditorType =
@@ -326,6 +331,7 @@ export type F1GridRef<T extends object> = {
   getRows(): T[];
   getActiveRows(): T[];
   getChanges(): F1GridChanges<T>;
+  acceptSavedRows(savedRows: F1GridSavedRow<T>[]): T[];
   validate(): boolean;
   startEdit(rowId: F1GridRowId, field: keyof T): void;
   stopEdit(): void;

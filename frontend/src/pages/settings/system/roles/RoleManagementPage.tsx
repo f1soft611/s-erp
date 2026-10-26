@@ -52,6 +52,7 @@ export function RoleManagementPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [panelDirty, setPanelDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [roleGridKey, setRoleGridKey] = useState(0);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
@@ -70,7 +71,13 @@ export function RoleManagementPage({
   }, [selectedMenuPermissions]);
 
   const loadRoles = useCallback(
-    async ({ showSkeleton = false }: { showSkeleton?: boolean } = {}) => {
+    async ({
+      showSkeleton = false,
+      preserveOnError = false,
+    }: {
+      showSkeleton?: boolean;
+      preserveOnError?: boolean;
+    } = {}): Promise<'applied' | 'stale'> => {
       const requestId = ++roleRequestIdRef.current;
       setError('');
       if (showSkeleton) {
@@ -78,12 +85,13 @@ export function RoleManagementPage({
       }
       try {
         const result = await fetchRoleRows();
-        if (requestId === roleRequestIdRef.current) {
-          setRoles(result);
-        }
+        // A superseded request must not be reported as an applied refresh.
+        if (requestId !== roleRequestIdRef.current) return 'stale';
+        setRoles(result);
+        return 'applied';
       } catch (requestError) {
         if (requestId === roleRequestIdRef.current) {
-          setRoles([]);
+          if (!preserveOnError) setRoles([]);
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -114,15 +122,15 @@ export function RoleManagementPage({
 
   const handleRolesSaved = useCallback(
     async (_options?: { silent?: boolean }) => {
-      await loadRoles();
-      setPanelDirty(false);
-      setRoleGridKey((current) => current + 1);
+      const status = await loadRoles({ preserveOnError: true });
+      if (status === 'applied') setRoleGridKey((current) => current + 1);
+      return status;
     },
     [loadRoles],
   );
 
   const handleSaveChanges = useCallback(async () => {
-    if (saving || !rolePanelRef.current) return;
+    if (saving || reloading || !rolePanelRef.current) return;
     try {
       await rolePanelRef.current.saveCurrentChanges();
     } catch (requestError) {
@@ -132,24 +140,34 @@ export function RoleManagementPage({
           : '역할 저장에 실패했습니다.',
       );
     }
-  }, [saving]);
+  }, [reloading, saving]);
 
   const requestRoleRefresh = useCallback(() => {
-    if (saving) return;
+    if (saving || reloading) return;
     if (panelDirty) {
       setRefreshConfirmOpen(true);
       return;
     }
-    void loadRoles({ showSkeleton: true });
-  }, [loadRoles, panelDirty, saving]);
+    // loadRoles already surfaces the error in the page message area.
+    setReloading(true);
+    void loadRoles({ showSkeleton: true })
+      .catch(() => undefined)
+      .finally(() => setReloading(false));
+  }, [loadRoles, panelDirty, reloading, saving]);
 
   const confirmRoleRefresh = useCallback(() => {
-    if (saving) return;
+    if (saving || reloading) return;
     setRefreshConfirmOpen(false);
     setPanelDirty(false);
     setRoleGridKey((current) => current + 1);
-    void loadRoles({ showSkeleton: true });
-  }, [loadRoles, saving]);
+    const reloadRoles = () => loadRoles({ showSkeleton: true });
+    setReloading(true);
+    void (
+      rolePanelRef.current?.discardPendingChanges(reloadRoles) ?? reloadRoles()
+    )
+      .catch(() => undefined)
+      .finally(() => setReloading(false));
+  }, [loadRoles, reloading, saving]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -159,7 +177,7 @@ export function RoleManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pageActionPermissions.read,
-          disabled: saving,
+          disabled: saving || reloading,
           onClick: requestRoleRefresh,
         },
       ],
@@ -171,7 +189,7 @@ export function RoleManagementPage({
           label: '저장',
           icon: SaveIcon,
           visible: pageActionPermissions.write,
-          disabled: !panelDirty || saving,
+          disabled: !panelDirty || saving || reloading,
           onClick: () => {
             void handleSaveChanges();
           },

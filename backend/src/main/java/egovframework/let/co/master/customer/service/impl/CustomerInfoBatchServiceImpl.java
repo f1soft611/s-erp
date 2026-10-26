@@ -2,6 +2,9 @@ package egovframework.let.co.master.customer.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.stereotype.Service;
@@ -45,16 +48,26 @@ public class CustomerInfoBatchServiceImpl extends EgovAbstractServiceImpl implem
             requireCustomerId(row.getCustomerId());
         }
 
+        Set<String> requestIds = new HashSet<>();
+        Stream.concat(changes.getInsertedRows().stream(), changes.getUpdatedRows().stream()).forEach(row -> {
+            if (StringUtils.hasText(row.getCustomerId()) && !requestIds.add(row.getCustomerId())) {
+                throw new IllegalArgumentException("거래처 요청 행 ID가 중복되었습니다.");
+            }
+        });
+        CustomerInfoBatchSaveResultVO result = new CustomerInfoBatchSaveResultVO();
         List<CustomerInfoVO> savedCustomers = new ArrayList<>();
         for (CustomerInfoChangeVO row : changes.getInsertedRows()) {
-            savedCustomers.add(customerInfoService.createCustomer(tenantId, currentUserId, row));
+            CustomerInfoVO saved = customerInfoService.createCustomer(tenantId, currentUserId, row);
+            savedCustomers.add(saved);
+            if (StringUtils.hasText(row.getCustomerId())) result.getRowIdMappings().put(row.getCustomerId(), saved.getCustomerId());
         }
         for (CustomerInfoChangeVO row : changes.getUpdatedRows()) {
-            savedCustomers.add(customerInfoService.updateCustomer(
-                    tenantId, currentUserId, requireCustomerId(row.getCustomerId()), row));
+            CustomerInfoVO saved = customerInfoService.updateCustomer(
+                    tenantId, currentUserId, requireCustomerId(row.getCustomerId()), row);
+            savedCustomers.add(saved);
+            result.getRowIdMappings().put(row.getCustomerId(), saved.getCustomerId());
         }
 
-        CustomerInfoBatchSaveResultVO result = new CustomerInfoBatchSaveResultVO();
         result.setCustomers(savedCustomers);
         return result;
     }

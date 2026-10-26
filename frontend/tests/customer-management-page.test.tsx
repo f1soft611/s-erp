@@ -10,6 +10,7 @@ import {
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PropsWithChildren } from 'react';
+import type { F1GridSavedRow } from '../src/shared/components/f1-grid';
 import {
   createCustomerColumns,
   createCustomerRow,
@@ -47,6 +48,7 @@ const customer = {
   custMemo: '메모',
   useAt: 'Y',
 };
+const acceptRows = <T extends object,>(saved: F1GridSavedRow<T>[]) => saved.map(({ row }) => row);
 
 function renderCustomerPage(isTenantAdmin = true) {
   return render(
@@ -241,7 +243,7 @@ describe('customer management page', () => {
     });
   });
 
-  it('does not leave saved inserts dirty when the subsequent reload fails', async () => {
+  it('requires an explicit query after saving succeeds but acknowledgement is invalid', async () => {
     apiMocks.apiPost.mockResolvedValue({ item: { customers: [customer] } });
     const { result } = renderHook(() => useCustomerManagement(), {
       wrapper: ({ children }: PropsWithChildren) => (
@@ -249,18 +251,20 @@ describe('customer management page', () => {
       ),
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    apiMocks.apiGet.mockRejectedValueOnce(new Error('목록 연결 실패'));
     const changes = {
       insertedRows: [{ ...createCustomerRow(), customerName: 'New customer' }],
       updatedRows: [],
       deletedRows: [],
     };
     act(() => result.current.handleChangesChange(changes));
-    await act(async () => result.current.saveChanges(changes));
-    expect(result.current.hasChanges).toBe(false);
+    await act(async () => result.current.saveChanges(changes, acceptRows));
+    expect(result.current.hasChanges).toBe(true);
     expect(result.current.error).toBe(
-      '저장은 완료했지만 목록을 다시 불러오지 못했습니다. 조회를 다시 실행해 주세요.',
+      '저장은 완료했지만 화면 반영에 실패했습니다. 조회를 다시 실행해 주세요.',
     );
+    await act(async () => result.current.saveChanges(changes, acceptRows));
+    expect(apiMocks.apiPost).toHaveBeenCalledTimes(1);
+    expect(apiMocks.apiGet).toHaveBeenCalledTimes(1);
   });
 
   it('retains update-code and deletion business rules before submitting a batch', async () => {
@@ -276,20 +280,19 @@ describe('customer management page', () => {
       deletedRows: [],
     };
     act(() => result.current.handleChangesChange(changes));
-    await act(async () => result.current.saveChanges(changes));
+    await act(async () => result.current.saveChanges(changes, acceptRows));
     expect(result.current.error).toBe('수정 시 거래처코드를 입력해 주세요.');
     expect(result.current.hasChanges).toBe(true);
     await act(async () => result.current.saveChanges({
       insertedRows: [],
       updatedRows: [],
       deletedRows: [normalizeCustomerRow(customer)],
-    }));
+    }, acceptRows));
     expect(result.current.error).toContain('거래처는 삭제할 수 없습니다.');
     expect(apiMocks.apiPost).not.toHaveBeenCalled();
   });
 
-  it('saves all dirty rows in a single batch and reloads the active filters', async () => {
-    apiMocks.apiPost.mockResolvedValue({ item: { customers: [customer] } });
+  it('saves all dirty rows in one batch without reapplying active filters', async () => {
     const { result } = renderHook(() => useCustomerManagement(), {
       wrapper: ({ children }: PropsWithChildren) => (
         <NotificationProvider>{children}</NotificationProvider>
@@ -303,8 +306,12 @@ describe('customer management page', () => {
       updatedRows: [normalizeCustomerRow(customer)],
       deletedRows: [],
     };
+    apiMocks.apiPost.mockResolvedValue({ item: {
+      customers: [customer, { ...customer, customerId: 31, customerName: 'New customer' }],
+      rowIdMappings: { [String(changes.insertedRows[0].customerId)]: 31, '12': 12 },
+    } });
     act(() => result.current.handleChangesChange(changes));
-    await act(async () => result.current.saveChanges(changes));
+    await act(async () => result.current.saveChanges(changes, acceptRows));
 
     expect(apiMocks.apiPost).toHaveBeenCalledExactlyOnceWith(
       '/api/v1/co/master/customers/save-batch',
@@ -324,6 +331,8 @@ describe('customer management page', () => {
       '/api/v1/co/master/customers?keyword=Acme',
     );
     expect(result.current.hasChanges).toBe(false);
+    expect(apiMocks.apiGet).toHaveBeenCalledTimes(2);
+    expect(result.current.gridKey).toBe(0);
   });
 
   it('keeps grid changes on batch failure and blocks concurrent saves', async () => {
@@ -345,8 +354,8 @@ describe('customer management page', () => {
     act(() => result.current.handleChangesChange(changes));
     let saving!: Promise<void>;
     act(() => {
-      saving = result.current.saveChanges(changes);
-      void result.current.saveChanges(changes);
+      saving = result.current.saveChanges(changes, acceptRows);
+      void result.current.saveChanges(changes, acceptRows);
     });
     expect(apiMocks.apiPost).toHaveBeenCalledTimes(1);
     await act(async () => {
@@ -434,16 +443,15 @@ describe('customer management page', () => {
     );
   });
 
-  it('keeps the customer grid visible during save and its quiet reload', async () => {
+  it('accepts canonical customer rows without a reload or grid recreation', async () => {
     let finishSave!: (value: unknown) => void;
-    let finishReload!: (value: unknown) => void;
     let listRequests = 0;
     apiMocks.apiGet.mockImplementation((url: string) => {
       if (url !== '/api/v1/co/master/customers') return Promise.resolve({});
       listRequests += 1;
       return listRequests === 1
         ? Promise.resolve({ resultList: [customer] })
-        : new Promise((resolve) => { finishReload = resolve; });
+        : Promise.reject(new Error('Unexpected reload'));
     });
     apiMocks.apiPost.mockImplementation(
       () => new Promise((resolve) => { finishSave = resolve; }),
@@ -463,16 +471,16 @@ describe('customer management page', () => {
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
 
-    await act(async () => finishSave({ item: { customers: [customer] } }));
-    await waitFor(() => expect(listRequests).toBe(2));
-    expect(screen.getByRole('progressbar', { name: '거래처 저장 중' })).toBeVisible();
+    await act(async () => finishSave({ item: {
+      customers: [{ ...customer, customerName: 'Canonical Acme' }], rowIdMappings: { '12': 12 },
+    } }));
+    expect(listRequests).toBe(1);
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('grid', { name: '거래처 목록' })).toBe(originalGrid);
-    expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
-
-    await act(async () => finishReload({ resultList: [{ ...customer, customerName: 'Updated Acme' }] }));
     await waitFor(() => expect(screen.queryByRole('progressbar', { name: '거래처 저장 중' })).not.toBeInTheDocument());
-    expect(screen.getByRole('gridcell', { name: 'Updated Acme' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Canonical Acme' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(apiMocks.apiPost).toHaveBeenCalledTimes(1);
   });
 
   it('applies basic and detailed search values in one list request', async () => {

@@ -23,6 +23,7 @@ import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
   addGridRow,
   areGridValuesEqual,
+  acceptSavedGridRows,
   createGridData,
   duplicateGridRows,
   getGridChanges,
@@ -44,6 +45,7 @@ import type {
   F1GridProps,
   F1GridRef,
   F1GridRowId,
+  F1GridSavedRow,
   F1GridSort,
   F1GridValidationError,
 } from '../types/grid.types';
@@ -199,6 +201,7 @@ function F1GridInner<T extends object>(
     createGridData(rows, rowKey),
   );
   const lastRowsPropRef = useRef<T[]>(rows);
+  const acceptedRowsRef = useRef<T[] | undefined>(undefined);
   const rowsHaveEquivalentValues = (left: T[], right: T[]) => {
     if (left.length !== right.length) return false;
     return left.every((row, index) => areGridValuesEqual(row, right[index]));
@@ -1162,6 +1165,11 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     if (rowsHaveEquivalentValues(lastRowsPropRef.current, rows)) return;
     lastRowsPropRef.current = rows;
+    if (acceptedRowsRef.current && rowsHaveEquivalentValues(acceptedRowsRef.current, rows)) {
+      acceptedRowsRef.current = undefined;
+      return;
+    }
+    acceptedRowsRef.current = undefined;
     const changes = getGridChanges(data);
     if (
       changes.insertedRows.length === 0 &&
@@ -2515,6 +2523,49 @@ function F1GridInner<T extends object>(
     },
     getChanges() {
       return getGridChanges(data);
+    },
+    acceptSavedRows(savedRows: F1GridSavedRow<T>[]) {
+      if (editingCell || rowFormSession) throw new Error('편집을 완료한 뒤 저장 결과를 반영해 주세요.');
+      if (!savedRows.length) return data.rows;
+      const next = acceptSavedGridRows(data, rowKey, savedRows);
+      const mappings = new Map(savedRows.map(({ previousRowId, row }) =>
+        [String(previousRowId), getGridRowId(row, rowKey)]));
+      const remap = (id: F1GridRowId) => mappings.get(String(id)) ?? id;
+      const remapCell = (cell: F1GridCellPosition | undefined) =>
+        cell ? { ...cell, rowId: remap(cell.rowId) } : undefined;
+      const remapRange = (range: F1GridCellRange | undefined) => range ? {
+        anchor: { ...range.anchor, rowId: remap(range.anchor.rowId) },
+        focus: { ...range.focus, rowId: remap(range.focus.rowId) },
+      } : undefined;
+      acceptedRowsRef.current = next.rows;
+      setData(next);
+      setRowSelection((current) => ({
+        ...current,
+        includedIds: new Set([...current.includedIds].map(remap)),
+        excludedIds: new Set([...current.excludedIds].map(remap)),
+      }));
+      setLastSelectedRowId((id) => id === undefined ? id : remap(id));
+      setPendingInsertedRowId((id) => id === undefined ? id : remap(id));
+      setFocusedCell(remapCell);
+      setCellSelection(remapRange);
+      setCopiedCellRange(remapRange);
+      cellSelectionRef.current = remapRange(cellSelectionRef.current);
+      copiedCellRangeRef.current = remapRange(copiedCellRangeRef.current);
+      cellRangeDragRef.current = cellRangeDragRef.current
+        ? remapRange(cellRangeDragRef.current) ?? null : null;
+      const previousCell = dragSelectionStateRef.current.previousCell;
+      if (previousCell) dragSelectionStateRef.current.previousCell = remapCell(previousCell) ?? null;
+      setRowHeights((current) => Object.fromEntries(
+        Object.entries(current).map(([id, height]) => [String(remap(id)), height]),
+      ));
+      setCellErrors((current) => {
+        const nextErrors = { ...current };
+        savedRows.forEach(({ previousRowId }) => {
+          columns.forEach((column) => { delete nextErrors[getErrorKey(previousRowId, column.field)]; });
+        });
+        return nextErrors;
+      });
+      return next.rows;
     },
     validate,
     startEdit(rowId: F1GridRowId, field: keyof T) {

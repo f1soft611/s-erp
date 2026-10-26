@@ -69,7 +69,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         const grid = gridRef.current;
         if (!grid) return;
         if (!grid.validate()) { management.setError('필수 입력 항목을 확인해 주세요.'); return; }
-        void management.saveChanges(grid.getChanges());
+        void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
       } }] },
   ];
   return <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>

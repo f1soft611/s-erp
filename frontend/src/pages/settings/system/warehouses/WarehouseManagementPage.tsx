@@ -87,7 +87,9 @@ export function WarehouseManagementPage({
         }
       } catch (requestError) {
         if (requestId === warehouseRequestIdRef.current) {
-          setWarehouses([]);
+          if (showSkeleton) {
+            setWarehouses([]);
+          }
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -114,7 +116,7 @@ export function WarehouseManagementPage({
   }, [loadWarehouses]);
 
   const handleSaveChanges = useCallback(async () => {
-    if (!warehousePanelRef.current) return;
+    if (!warehousePanelRef.current || saving) return;
     setSaving(true);
     try {
       await warehousePanelRef.current.saveCurrentChanges();
@@ -127,7 +129,7 @@ export function WarehouseManagementPage({
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [saving]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
@@ -137,8 +139,9 @@ export function WarehouseManagementPage({
           label: '조회',
           icon: SearchIcon,
           visible: pageActionPermissions.read,
-          disabled: false,
+          disabled: saving,
           onClick: () => {
+            if (saving) return;
             void loadWarehouses({ showSkeleton: true });
           },
         },
@@ -181,6 +184,7 @@ export function WarehouseManagementPage({
       />
       <PageSearchArea>
         <TextField
+          disabled={saving}
           size="small"
           margin="none"
           placeholder="창고명 검색"
@@ -219,6 +223,7 @@ export function WarehouseManagementPage({
         onError={setError}
         warehouseGridKey={warehouseGridKey}
         warehouseGridLoading={pageLoading}
+        saving={saving}
       />
     </Box>
   );

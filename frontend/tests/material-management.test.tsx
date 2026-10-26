@@ -2,6 +2,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PropsWithChildren } from 'react';
+import type { F1GridSavedRow } from '../src/shared/components/f1-grid';
 import { createMaterialColumns, createMaterialRow } from '../src/pages/co/master/materials/components/MaterialGrid';
 import { fetchMaterials, normalizeMaterialRow, toMaterialPayload } from '../src/pages/co/master/materials/services/materialManagement.service';
 import { useMaterialManagement } from '../src/pages/co/master/materials/hooks/useMaterialManagement';
@@ -22,6 +23,7 @@ const material = {
 const wrapper = ({ children }: PropsWithChildren) => (
   <NotificationProvider>{children}</NotificationProvider>
 );
+const acceptRows = <T extends object,>(saved: F1GridSavedRow<T>[]) => saved.map(({ row }) => row);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -328,7 +330,7 @@ describe('material workflow', () => {
     expect(result.current.rows[0].materialName).toBe('Latest');
   });
 
-  it('blocks concurrent saves and clears saved inserts even when reload fails', async () => {
+  it('blocks concurrent saves and requires an explicit query after an invalid saved response', async () => {
     let finishSave!: (value: unknown) => void;
     api.apiPost.mockImplementation(() => new Promise((resolve) => { finishSave = resolve; }));
     const { result } = renderHook(() => useMaterialManagement(), { wrapper });
@@ -337,12 +339,22 @@ describe('material workflow', () => {
       updatedRows: [], deletedRows: [] };
     act(() => result.current.handleChangesChange(changes));
     let pending!: Promise<void>;
-    act(() => { pending = result.current.saveChanges(changes); void result.current.saveChanges(changes); });
+    act(() => { pending = result.current.saveChanges(changes, acceptRows); void result.current.saveChanges(changes, acceptRows); });
     expect(api.apiPost).toHaveBeenCalledTimes(1);
-    api.apiGet.mockRejectedValueOnce(new Error('Reload failed'));
     await act(async () => { finishSave({ item: { materials: [material] } }); await pending; });
-    expect(result.current.hasChanges).toBe(false);
+    expect(result.current.hasChanges).toBe(true);
     expect(result.current.error).toContain('저장은 완료');
+    await act(async () => result.current.saveChanges(changes, acceptRows));
+    expect(api.apiPost).toHaveBeenCalledTimes(1);
+    expect(api.apiGet).toHaveBeenCalledTimes(2);
+    act(() => result.current.applyFilters({}));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    api.apiPost.mockResolvedValue({ item: {
+      materials: [material], rowIdMappings: { [String(changes.insertedRows[0].materialId)]: 12 },
+    } });
+    await act(async () => result.current.saveChanges(changes, acceptRows));
+    expect(api.apiPost).toHaveBeenCalledTimes(2);
+    expect(result.current.hasChanges).toBe(false);
   });
 
   it('saves a single batch and preserves dirty rows after an error', async () => {
@@ -354,11 +366,14 @@ describe('material workflow', () => {
     };
     act(() => result.current.handleChangesChange(changes));
     api.apiPost.mockRejectedValueOnce(new Error('중복 품목코드'));
-    await act(async () => result.current.saveChanges(changes));
+    await act(async () => result.current.saveChanges(changes, acceptRows));
     expect(result.current.hasChanges).toBe(true);
     expect(result.current.error).toContain('중복');
-    api.apiPost.mockResolvedValueOnce({ item: { materials: [material] } });
-    await act(async () => result.current.saveChanges(changes));
+    api.apiPost.mockResolvedValueOnce({ item: {
+      materials: [material, { ...material, materialId: 31, materialName: 'New' }],
+      rowIdMappings: { [String(changes.insertedRows[0].materialId)]: 31, '12': 12 },
+    } });
+    await act(async () => result.current.saveChanges(changes, acceptRows));
     expect(api.apiPost).toHaveBeenLastCalledWith(
       '/api/v1/co/master/materials/save-batch',
       { materials: {
@@ -374,9 +389,24 @@ describe('material workflow', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => result.current.saveChanges({
       insertedRows: [], updatedRows: [], deletedRows: [normalizeMaterialRow(material)],
-    }));
+    }, acceptRows));
     expect(result.current.error).toContain('삭제');
     expect(api.apiPost).not.toHaveBeenCalled();
+  });
+
+  it('blocks resubmission when the server saved but grid acknowledgement throws', async () => {
+    const { result } = renderHook(() => useMaterialManagement(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const changes = { insertedRows: [], updatedRows: [normalizeMaterialRow(material)], deletedRows: [] };
+    act(() => result.current.handleChangesChange(changes));
+    api.apiPost.mockResolvedValue({ item: { materials: [material], rowIdMappings: { '12': 12 } } });
+    await act(async () => result.current.saveChanges(changes, () => { throw new Error('Grid unavailable'); }));
+    expect(result.current.error).toContain('저장은 완료했지만 화면 반영에 실패');
+    expect(result.current.hasChanges).toBe(true);
+    act(() => result.current.setError(''));
+    await act(async () => result.current.saveChanges(changes, acceptRows));
+    expect(result.current.error).toContain('조회');
+    expect(api.apiPost).toHaveBeenCalledTimes(1);
   });
 
   it('routes to the actual materials grid and searches through the common page header', async () => {
@@ -408,16 +438,15 @@ describe('material workflow', () => {
     expect(await screen.findByRole('dialog', { name: '품목 등록' })).toBeInTheDocument();
   }, 15000);
 
-  it('keeps the material grid visible during save and its quiet reload', async () => {
+  it('accepts canonical rows without list/options reload or grid recreation', async () => {
     let finishSave!: (value: unknown) => void;
-    let finishReload!: (value: unknown) => void;
     let listRequests = 0;
     api.apiGet.mockImplementation((url: string) => {
       if (url.endsWith('/options')) return Promise.resolve({ resultList: [] });
       listRequests += 1;
       return listRequests === 1
         ? Promise.resolve({ resultList: [material] })
-        : new Promise((resolve) => { finishReload = resolve; });
+        : Promise.reject(new Error('Unexpected reload'));
     });
     api.apiPost.mockImplementation(
       () => new Promise((resolve) => { finishSave = resolve; }),
@@ -446,16 +475,17 @@ describe('material workflow', () => {
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
 
-    await act(async () => finishSave({ item: { materials: [material] } }));
-    await waitFor(() => expect(listRequests).toBe(2));
-    expect(screen.getByRole('progressbar', { name: '품목 저장 중' })).toBeVisible();
+    await act(async () => finishSave({ item: {
+      materials: [{ ...material, materialName: 'Server canonical' }], rowIdMappings: { '12': 12 },
+    } }));
+    expect(listRequests).toBe(1);
+    expect(api.apiGet).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('grid', { name: '품목 목록' })).toBe(originalGrid);
-    expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
-
-    await act(async () => finishReload({ resultList: [{ ...material, materialName: 'Updated Sample' }] }));
     await waitFor(() => expect(screen.queryByRole('progressbar', { name: '품목 저장 중' })).not.toBeInTheDocument());
-    expect(screen.getByRole('gridcell', { name: 'Updated Sample' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Server canonical' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(api.apiPost).toHaveBeenCalledTimes(1);
   });
 
   it('does not expose write actions to a non-admin user', async () => {

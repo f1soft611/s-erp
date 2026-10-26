@@ -66,6 +66,8 @@ class CustomerInfoBatchServiceImplTest {
         CustomerInfoBatchSaveResultVO result = service.saveBatch(9L, 101L, batch());
 
         assertThat(result.getCustomers()).containsExactly(created, updated);
+        assertThat(result.getRowIdMappings()).containsEntry("12", 12L);
+        assertThat(result.getRowIdMappings()).containsValue(31L);
         verify(customerInfoService).createCustomer(eq(9L), eq(101L),
                 org.mockito.ArgumentMatchers.argThat(row -> "".equals(row.getCustomerCode())));
         verify(customerInfoService).updateCustomer(eq(9L), eq(101L), eq(12L),
@@ -79,6 +81,14 @@ class CustomerInfoBatchServiceImplTest {
 
         assertThatThrownBy(() -> service.saveBatch(9L, 101L, payload))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("삭제");
+        verifyNoInteractions(customerInfoService);
+    }
+
+    @Test
+    void rejectsDuplicateRequestIdsBeforeWriting() {
+        CustomerInfoBatchSaveRequestVO request = batch();
+        request.getCustomers().getInsertedRows().get(0).setCustomerId("12");
+        assertThatThrownBy(() -> service.saveBatch(9L, 101L, request)).hasMessageContaining("중복");
         verifyNoInteractions(customerInfoService);
     }
 

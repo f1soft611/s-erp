@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
+import { GridSaveReconciliationError, resolveSavedGridRows, type F1GridSavedRow } from '../../../../../shared/components/f1-grid';
 import {
   emptyMaterialPayload, expiryStatuses, materialTextFields,
   type ExpiryStatus, type MaterialBatchPayload, type MaterialFilters,
@@ -116,4 +117,18 @@ export async function saveMaterialBatch(payload: MaterialBatchPayload): Promise<
     '/api/v1/co/master/materials/save-batch', payload,
   );
   return rowsFromResponse(result.item?.materials);
+}
+
+export async function saveMaterialRows(
+  payload: MaterialBatchPayload,
+  requested: MaterialRow[],
+): Promise<F1GridSavedRow<MaterialRow>[]> {
+  const result = await apiPost<{ item?: { materials?: unknown; rowIdMappings?: unknown } }>(
+    '/api/v1/co/master/materials/save-batch', payload,
+  );
+  try {
+    return resolveSavedGridRows(requested, rowsFromResponse(result.item?.materials), result.item?.rowIdMappings, 'materialId');
+  } catch (cause) {
+    throw new GridSaveReconciliationError(cause);
+  }
 }

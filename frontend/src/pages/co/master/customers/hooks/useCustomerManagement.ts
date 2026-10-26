@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { F1GridChanges } from '../../../../../shared/components/f1-grid';
+import { GridSaveReconciliationError, type F1GridChanges, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import {
   fetchCustomers,
-  saveCustomerBatch,
+  saveCustomerRows,
 } from '../services/customerManagement.service';
 import type {
   CustomerFilters,
@@ -46,6 +46,7 @@ export function useCustomerManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const reconciliationRequired = useRef(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<CustomerFilters>({});
@@ -53,12 +54,12 @@ export function useCustomerManagement() {
   const loadRows = useCallback(
     async (
       filters: CustomerFilters = {},
-      options: { quiet?: boolean } = {},
     ) => {
-      if (!options.quiet) setLoading(true);
+      setLoading(true);
       setError('');
       try {
         setRows(await fetchCustomers(filters));
+        reconciliationRequired.current = false;
         return true;
       } catch (loadError) {
         setError(
@@ -68,7 +69,7 @@ export function useCustomerManagement() {
         );
         return false;
       } finally {
-        if (!options.quiet) setLoading(false);
+        setLoading(false);
       }
     },
     [],
@@ -103,7 +104,14 @@ export function useCustomerManagement() {
   );
 
   const saveChanges = useCallback(
-    async (changes: F1GridChanges<CustomerRow>) => {
+    async (
+      changes: F1GridChanges<CustomerRow>,
+      acceptSavedRows: F1GridRef<CustomerRow>['acceptSavedRows'],
+    ) => {
+      if (reconciliationRequired.current) {
+        setError(new GridSaveReconciliationError(undefined).message);
+        return;
+      }
       if (savingRef.current) return;
       if (
         !changes.insertedRows.length &&
@@ -130,18 +138,18 @@ export function useCustomerManagement() {
           }
           return { ...toPayload(row, false), customerId: String(customerId) };
         });
-        await saveCustomerBatch({
+        const savedRows = await saveCustomerRows({
           customers: { insertedRows, updatedRows, deletedRows: [] },
-        });
-        const refreshed = await loadRows(appliedFilters, { quiet: true });
-        setHasChanges(false);
-        setGridKey((current) => current + 1);
-        if (!refreshed) {
-          setError('저장은 완료했지만 목록을 다시 불러오지 못했습니다. 조회를 다시 실행해 주세요.');
-          return;
+        }, [...changes.insertedRows, ...changes.updatedRows]);
+        try {
+          setRows(acceptSavedRows(savedRows));
+        } catch (cause) {
+          throw new GridSaveReconciliationError(cause);
         }
+        setHasChanges(false);
         showSuccess('거래처를 저장했습니다.');
       } catch (saveError) {
+        if (saveError instanceof GridSaveReconciliationError) reconciliationRequired.current = true;
         setError(
           saveError instanceof Error
             ? saveError.message
@@ -152,7 +160,7 @@ export function useCustomerManagement() {
         setSaving(false);
       }
     },
-    [appliedFilters, loadRows, showSuccess],
+    [showSuccess],
   );
 
   return {

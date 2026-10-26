@@ -2,6 +2,7 @@ import type {
   F1GridChanges,
   F1GridRowId,
   F1GridRowState,
+  F1GridSavedRow,
 } from '../types/grid.types';
 import { getGridRowId, getStateKey, hasGridRowId } from '../utils/grid.utils';
 
@@ -127,6 +128,50 @@ export function rebaseGridData<T extends object>(
     rebased.changedIds.add(stateKey);
   });
   return rebased;
+}
+
+export function acceptSavedGridRows<T extends object>(
+  data: F1GridData<T>,
+  rowKey: keyof T,
+  savedRows: F1GridSavedRow<T>[],
+): F1GridData<T> {
+  if (!savedRows.length) return data;
+  const sources = new Set<string>();
+  const targets = new Set<string>();
+  savedRows.forEach(({ previousRowId, row }) => {
+    const source = getStateKey(previousRowId);
+    const target = getStateKey(getGridRowId(row, rowKey));
+    if (!data.rowById.has(source) || data.stateById[source] === 'deleted' ||
+        sources.has(source) || targets.has(target) ||
+        (target !== source && data.rowById.has(target))) {
+      throw new Error('저장 행의 ID가 없거나 중복되었습니다.');
+    }
+    sources.add(source);
+    targets.add(target);
+  });
+  const rows = [...data.rows];
+  const stateById = { ...data.stateById };
+  const previousStateById = { ...data.previousStateById };
+  const dirtyFieldsById = { ...data.dirtyFieldsById };
+  const originalValuesById = { ...data.originalValuesById };
+  const patchesById = { ...data.patchesById };
+  const changedIds = new Set(data.changedIds);
+  savedRows.forEach(({ previousRowId, row }) => {
+    const source = getStateKey(previousRowId);
+    const target = getStateKey(getGridRowId(row, rowKey));
+    rows[data.rowIndexById.get(source)!] = row;
+    delete stateById[source];
+    delete previousStateById[source];
+    delete dirtyFieldsById[source];
+    delete originalValuesById[source];
+    delete patchesById[source];
+    changedIds.delete(source);
+    stateById[target] = 'normal';
+  });
+  return {
+    rows, ...buildRowIndexes(rows, rowKey), stateById, previousStateById,
+    dirtyFieldsById, originalValuesById, patchesById, changedIds,
+  };
 }
 
 export function insertGridRow<T extends object>(

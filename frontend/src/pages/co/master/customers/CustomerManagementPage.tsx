@@ -113,7 +113,7 @@ export function CustomerManagementPage({
     const grid = gridRef.current;
     if (!grid) return;
     if (!grid.validate()) return;
-    void management.saveChanges(grid.getChanges());
+    void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
   };
 
   const handleValidationErrors = (errors: F1GridValidationError[]) => {
