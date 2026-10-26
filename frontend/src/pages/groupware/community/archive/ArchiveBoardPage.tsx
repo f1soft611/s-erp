@@ -226,6 +226,11 @@ export function ArchiveBoardPage({
 
   const categories = useArchiveCategories();
   const archiveList = useArchiveList(defaultsInitialized);
+  const isQueryLoading =
+    categories.isLoading ||
+    archiveList.isLoading ||
+    defaultsLoading ||
+    (!defaultsInitialized && !defaultsError);
   useEffect(() => {
     if (!defaultValues || defaultsInitialized) return;
 
@@ -263,7 +268,7 @@ export function ArchiveBoardPage({
   const dateSummary = defaultsError
     ? '날짜 기본값 오류'
     : defaultsLoading || !defaultsInitialized
-      ? '불러오는 중'
+      ? '—'
       : getDateSummary(
           archiveList.filters.uploadedFrom,
           archiveList.filters.uploadedTo,
@@ -542,7 +547,7 @@ export function ArchiveBoardPage({
       </Box>
 
       {defaultsInitialized &&
-        !archiveList.isLoading &&
+        !isQueryLoading &&
         !archiveList.error &&
         fileCount === 0 && (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
@@ -550,16 +555,11 @@ export function ArchiveBoardPage({
         </Box>
         )}
 
-      {(categories.isLoading ||
-        mutations.isUploading ||
+      {(mutations.isUploading ||
         mutations.isDeleting ||
         mutations.isUpdating) && (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
-          <Alert severity="info">
-            {categories.isLoading
-              ? '분류 정보를 불러오는 중입니다.'
-              : '요청 처리 중입니다.'}
-          </Alert>
+          <Alert severity="info">요청 처리 중입니다.</Alert>
         </Box>
       )}
 
@@ -568,10 +568,7 @@ export function ArchiveBoardPage({
       >
         <ArchiveFileGrid
           rows={rows}
-          loading={
-            archiveList.isLoading ||
-            (defaultsLoading && !defaultsInitialized)
-          }
+          loading={isQueryLoading}
           onFolderOpen={handleFolderChange}
           onDownload={(row) => void handleDownload(row)}
           onEdit={setEditingFile}

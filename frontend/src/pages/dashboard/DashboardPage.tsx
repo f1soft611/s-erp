@@ -2,7 +2,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  CircularProgress,
   IconButton,
   ListItemIcon,
   Menu,
@@ -24,6 +23,7 @@ import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AppLoadingSpinner } from '../../shared/components/AppLoadingSpinner';
 import { useAppSettings } from '../../shared/context/AppSettingsContext';
 import { logout } from '../../shared/services/authService';
 import {
@@ -622,7 +622,7 @@ function DashboardPage() {
             minHeight: '100vh',
           }}
         >
-          <CircularProgress size={34} />
+          <AppLoadingSpinner />
         </Box>
       ) : (
         <>

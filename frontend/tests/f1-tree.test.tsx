@@ -86,6 +86,30 @@ describe('F1Tree interaction', () => {
     { field: 'name' as const, headerName: '메뉴명', editable: true },
   ];
 
+  it('uses the same loading spinner as F1Grid', () => {
+    render(
+      <F1Tree
+        rows={rows}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        ariaLabel="loading tree"
+        loading
+      />,
+    );
+
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
+    const overlay = screen.getByTestId('f1-grid-loading-overlay');
+    const progress = screen.getByRole('progressbar');
+    const circle = progress.querySelector('circle');
+
+    expect(overlay).toBeInTheDocument();
+    expect(progress).toHaveStyle({ width: '34px', height: '34px' });
+    expect(circle).not.toBeNull();
+    expect(circle).toHaveAttribute('stroke-width', '1.8');
+  });
+
   it('uses fixed-width tracks for pinned flex columns inherited from F1Grid', () => {
     render(
       <F1Tree

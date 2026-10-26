@@ -14,7 +14,9 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box, CircularProgress, Divider, Menu, MenuItem } from '@mui/material';
+import { Box, Divider, Menu, MenuItem } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import { AppLoadingSpinner } from '../../AppLoadingSpinner';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
@@ -2987,12 +2989,12 @@ function F1GridInner<T extends object>(
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.08)',
+            backgroundColor: (theme) => alpha(theme.palette.background.default, 0.84),
             pointerEvents: 'auto',
           }}
           aria-live="polite"
         >
-          <CircularProgress size={34} thickness={4} />
+          <AppLoadingSpinner thickness={1.8} />
         </Box>
       ) : null}
       <Menu

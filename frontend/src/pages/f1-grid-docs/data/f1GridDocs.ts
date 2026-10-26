@@ -112,7 +112,11 @@ export const f1GridDocs: F1GridDoc[] = [
             '컬럼 레이아웃 저장 키 (그리드마다 고유한 값, 미지정 시 저장하지 않음)',
           ],
           ['showCheckbox', 'boolean', '행 선택 체크박스 표시 여부'],
-          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'loading',
+            'boolean',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 1.8px 두께로 표시',
+          ],
           ['onSelectionChange', '(ids) => void', '선택 상태 변경 콜백'],
           [
             'onChangesChange',
@@ -938,7 +942,11 @@ const detailValues = {
             '우클릭 행 삭제 메뉴 표시 여부',
           ],
           ['createDuplicate', '(row) => T', '복사용 신규 행 생성 로직'],
-          ['loading', 'boolean', '그리드 전체 로딩 스피너 표시'],
+          [
+            'loading',
+            'boolean',
+            '전체 입력을 막는 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 1.8px 두께로 표시',
+          ],
           ['minHeight', 'number | string', '그리드 최소 높이 제어'],
           [
             'treeContextMenu',

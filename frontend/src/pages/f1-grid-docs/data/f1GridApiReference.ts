@@ -215,7 +215,12 @@ const sections: DocSection[] = [
         '컨텍스트 메뉴의 삭제 액션을 비활성화.',
         'false',
       ),
-      api('loading', 'boolean', '그리드 영역에 로딩 상태를 표시.', 'false'),
+      api(
+        'loading',
+        'boolean',
+        '그리드 전체 입력을 차단하고 테마 배경 오버레이 중앙에 34px 공통 AppLoadingSpinner를 1.8px 두께/테마 기본 색상으로 표시.',
+        'false',
+      ),
       api(
         'treeContextMenu',
         'F1GridContextMenuTreeConfig',

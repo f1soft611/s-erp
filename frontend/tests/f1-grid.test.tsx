@@ -288,15 +288,18 @@ describe('F1-GRID size props', () => {
 });
 
 describe('F1-GRID loading overlay', () => {
-  it('shows a refresh-style spinner overlay without rendering skeleton rows while loading', () => {
-    render(
-      <F1Grid
-        rows={rows}
-        columns={columns}
-        rowKey="id"
-        ariaLabel="grid loading overlay"
-        loading
-      />,
+  it('uses the thinner shared spinner and restores grid editing after loading', () => {
+    const theme = createAppTheme('light');
+    const { rerender } = render(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="grid loading overlay"
+          loading
+        />
+      </ThemeProvider>,
     );
 
     expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
@@ -306,8 +309,34 @@ describe('F1-GRID loading overlay', () => {
     expect(screen.queryAllByTestId('grid-loading-row-skeleton')).toHaveLength(
       0,
     );
-    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    const overlay = screen.getByTestId('f1-grid-loading-overlay');
+    const progress = screen.getByRole('progressbar');
+    const progressCircle = progress.querySelector('circle');
+
+    expect(progress).toHaveStyle({ width: '34px', height: '34px' });
+    expect(progressCircle).not.toBeNull();
+    expect(progressCircle).toHaveAttribute('stroke-width', '1.8');
+    expect(getComputedStyle(overlay).backgroundColor).toBe(
+      'rgba(244, 247, 251, 0.84)',
+    );
+
+    rerender(
+      <ThemeProvider theme={theme}>
+        <F1Grid
+          rows={rows}
+          columns={columns}
+          rowKey="id"
+          ariaLabel="grid loading overlay"
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('grid')).not.toHaveAttribute('aria-busy');
+    const codeCell = screen.getByRole('gridcell', { name: 'DASH' });
+    expect(codeCell).toBeInTheDocument();
+    fireEvent.doubleClick(codeCell);
+    expect(screen.getByDisplayValue('DASH')).toBeInTheDocument();
   });
 
   it('renders only the visible window for large row sets to keep the grid responsive', () => {

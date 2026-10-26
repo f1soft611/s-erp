@@ -255,6 +255,11 @@ describe('Archive dashboard page', () => {
       expect(archiveServices.getSystemDate).toHaveBeenCalledOnce(),
     );
     expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.getByLabelText('적용된 날짜: —')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
 
     resolveSystemDate('2024-02-29');
 
@@ -269,6 +274,51 @@ describe('Archive dashboard page', () => {
     );
   });
 
+  it('keeps only the grid spinner visible until categories finish loading', async () => {
+    let resolveCategories!: (items: []) => void;
+    archiveServices.fetchCommonCodeItems.mockImplementation(
+      () => new Promise<[]>((resolve) => { resolveCategories = resolve; }),
+    );
+    archiveServices.fetchArchiveFiles.mockResolvedValue({ resultList: [], resultCnt: 0 });
+
+    renderArchive();
+    await waitFor(() => {
+      expect(archiveServices.fetchCommonCodeItems).toHaveBeenCalled();
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalled();
+      expect(screen.getByLabelText('적용된 날짜: 최근 1년')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
+
+    resolveCategories([]);
+
+    expect(await screen.findByText('조건에 맞는 파일이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: '자료실' })).not.toHaveAttribute('aria-busy');
+  });
+
+  it('keeps only the grid spinner visible until files finish loading', async () => {
+    let resolveFiles!: (result: { resultList: []; resultCnt: number }) => void;
+    archiveServices.fetchArchiveFiles.mockImplementation(
+      () => new Promise<{ resultList: []; resultCnt: number }>((resolve) => { resolveFiles = resolve; }),
+    );
+
+    renderArchive();
+    await screen.findByText('업무양식');
+    await waitFor(() => expect(archiveServices.fetchArchiveFiles).toHaveBeenCalled());
+    expect(screen.getByRole('grid', { name: '자료실' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('f1-grid-loading-overlay')).toBeInTheDocument();
+    expect(screen.queryByText('분류 정보를 불러오는 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('조건에 맞는 파일이 없습니다.')).not.toBeInTheDocument();
+
+    resolveFiles({ resultList: [], resultCnt: 0 });
+
+    expect(await screen.findByText('조건에 맞는 파일이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
+  });
+
   it('shows a retry action when server date loading fails and starts after retry', async () => {
     archiveServices.getSystemDate
       .mockRejectedValueOnce(new Error('System date unavailable'))
@@ -278,6 +328,9 @@ describe('Archive dashboard page', () => {
 
     expect(await screen.findByText('System date unavailable')).toBeInTheDocument();
     expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '재시도' }));
 
