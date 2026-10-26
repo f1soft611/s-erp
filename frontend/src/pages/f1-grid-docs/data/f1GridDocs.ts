@@ -157,7 +157,11 @@ export const f1GridDocs: F1GridDoc[] = [
           ],
           ['options', 'F1GridOption[]', 'select/autocomplete 선택 목록'],
           ['format', 'number | decimal | currency', '숫자 컬럼 표시 형식'],
-          ['decimalPlaces', 'number', '숫자 표시 소수점 자릿수'],
+          [
+            'decimalPlaces',
+            'number',
+            'number/decimal 기본 최대 5자리(끝의 0 생략), 지정 시 고정 표시',
+          ],
           ['required / min / max', 'boolean / number', '기본 검증 규칙'],
           ['validation.unique', "boolean | 'digits'", "전체 활성 행의 고유값 검사. true는 문자열 trim, 'digits'는 숫자만 비교. 자기 행·빈 비교키 제외"],
           ['validate', '(value, row) => string | boolean', '값 검증 규칙'],
@@ -226,7 +230,7 @@ export const f1GridDocs: F1GridDoc[] = [
       {
         type: 'code',
         heading: 'Number format column',
-        code: "{ field: 'amount', headerName: '금액', type: 'number', format: 'currency', decimalPlaces: 2 }",
+        code: "{ field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략\n{ field: 'unitPrice', headerName: '단가', type: 'number', decimalPlaces: 2 } // 1.2 -> 1.20\n{ field: 'price', headerName: '가격', type: 'currency', format: 'currency' } // KRW, 기본 0자리",
       },
       {
         type: 'prose',

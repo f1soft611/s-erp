@@ -57,7 +57,7 @@ export function DocumentStatusPage({
       }}
     >
       <PageHeader
-        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        breadcrumbItems={[selectedModule.name, '문서관리', currentMenuName]}
         description={content.description}
         actionGroups={pageActionGroups}
       />

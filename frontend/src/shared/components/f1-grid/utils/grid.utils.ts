@@ -203,13 +203,13 @@ function formatNumericValue(
   if (resolvedFormat === 'number' || resolvedFormat === 'decimal') {
     return new Intl.NumberFormat('ko-KR', {
       minimumFractionDigits: decimalPlaces ?? 0,
-      maximumFractionDigits: decimalPlaces ?? 3,
+      maximumFractionDigits: decimalPlaces ?? 5,
     }).format(numericValue);
   }
 
   return new Intl.NumberFormat('ko-KR', {
     minimumFractionDigits: decimalPlaces ?? 0,
-    maximumFractionDigits: decimalPlaces ?? 3,
+    maximumFractionDigits: decimalPlaces ?? 5,
   }).format(numericValue);
 }
 

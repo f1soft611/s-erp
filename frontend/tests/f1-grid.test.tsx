@@ -372,7 +372,7 @@ describe('F1-GRID loading overlay', () => {
     }
   });
 
-  it('uses the visible shared spinner and restores grid editing after loading', () => {
+  it('matches the shared app spinner and restores grid editing after loading', () => {
     const theme = createAppTheme('light');
     const { rerender } = render(
       <ThemeProvider theme={theme}>

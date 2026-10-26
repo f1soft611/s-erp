@@ -379,7 +379,7 @@ export function ArchiveBoardPage({
       }}
     >
       <PageHeader
-        breadcrumbItems={[selectedModule.name, currentMenuName]}
+        breadcrumbItems={[selectedModule.name, '커뮤니티', currentMenuName]}
         description={content.description}
         actionGroups={[
           ...(canCreate

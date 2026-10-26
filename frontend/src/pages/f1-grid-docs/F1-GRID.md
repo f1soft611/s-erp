@@ -133,7 +133,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - `columnLine` 기본값은 `true`이며, 컬럼 사이 세로 구분선을 표시한다.
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
-- `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. F1Grid와 F1Tree는 동일한 공통 오버레이와 스피너 두께를 사용하며, F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. 앱 첫 접속 로더와 같은 컴포넌트를 사용하지만 그리드와 트리에서만 선을 얇게 표시한다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. F1Grid/F1Tree와 다른 기본 로딩 화면은 같은 2.4px 기본 두께를 사용한다. 앱 첫 접속 로더만 기존 외형 보존을 위해 3.6px를 명시한다. F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
 - 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
@@ -531,6 +531,20 @@ const columns: F1GridColumn<Item>[] = [
 지원 토큰은 `yyyy`/`YYYY`(4자리 연도), `yy`/`YY`(2자리 연도), `mm`/`MM`(2자리 월), `m`/`M`(월), `dd`/`DD`(2자리 일), `d`/`D`(일)이다. 구분자와 한글을 조합할 수 있으며, `[문자열]`은 토큰 치환 없이 표시한다. ISO 날짜/timestamp, 8자리 `yyyymmdd`, 유효한 `Date` 객체를 지원한다. Timestamp 문자열은 시간대 변환 없이 명시된 날짜를 사용한다.
 
 빈 값은 빈 셀, 잘못된 날짜는 원문으로 표시한다. 표시 포맷은 원본 데이터, 날짜 편집기의 `YYYY-MM-DD` 값, 검색/정렬/필터 값을 변경하지 않는다. 사용자 `renderCell`이 있으면 기존처럼 우선 적용된다. 공통 표시 함수를 사용하는 자동 너비 계산과 Excel 텍스트 출력에도 같은 형식이 적용된다. 기존 숫자 `format`과 `datetime`/`time` 동작은 유지한다.
+
+## number/decimal 컬럼 소수점 표시
+
+`F1GridColumn.decimalPlaces`로 숫자 컬럼의 소수점 자릿수를 지정한다. `number`와 `decimal` 컬럼에서 생략하면 화면 및 Excel에서 소수점 이하 최대 5자리까지 표시하며 끝의 0과 불필요한 소수점은 생략한다. 예를 들어 `1`은 `1`, `1.2`는 `1.2`, `1.234567`은 `1.23457`로 표시한다.
+
+`decimalPlaces`를 지정하면 기존처럼 표시 소수점 자릿수를 고정한다. 예를 들어 `decimalPlaces: 2`는 `1.2`를 `1.20`으로 표시한다. 이 옵션은 편집 입력 정규화에도 사용되며, 옵션을 생략해도 편집 입력을 5자리로 제한하지 않는다.
+
+```typescript
+{ field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략
+{ field: 'unitPrice', headerName: '단가', type: 'number', decimalPlaces: 2 } // 1.2 -> 1.20
+{ field: 'price', headerName: '가격', type: 'currency', format: 'currency' } // KRW, 기본 소수점 0자리
+```
+
+`format: 'currency'`의 기본 0자리 KRW 표시와 명시적 `decimalPlaces` 동작은 유지한다. Excel 숫자 서식도 일반 숫자는 `#,##0.#####`, 명시 자릿수는 고정 서식으로 적용한다.
 
 ## PageSearchArea 상세 검색 연결
 
@@ -1711,7 +1725,7 @@ F1Tree는 `루트 추가` 항목이 `컬럼 길이 자동 조정` 아래, `행 �
 
 동작 요약:
 
-- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자의 그룹/자릿수 및 KRW 통화 서식은 Excel number format으로 반영한다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
+- **엑셀 내보내기**: 화면에 보이는 컬럼/행(필터·정렬·숨김·순서 반영) 기준으로 `.xlsx` 파일을 생성한다. `exceljs`를 클릭 시점에 동적 로딩(`await import('exceljs')`)해 초기 번들 크기에 영향을 주지 않는다. `number`/`decimal`/`currency`는 숫자 셀, `date`는 Grid `format`이 적용된 텍스트 셀, `datetime`은 Excel 날짜·시간 셀, `time`은 시간 서식이 적용된 Excel 숫자 serial, `checkbox`는 Boolean 셀로 기록한다. 숫자는 그룹 구분자를 적용하고 기본 소수점은 최대 5자리 선택 표시(`#,##0.#####`), 명시한 `decimalPlaces`는 고정 자릿수로 내보낸다. `format: 'currency'`는 KRW 서식을 적용하며 기본 소수점은 0자리다. Excel 헤더와 데이터 셀은 각각 Grid의 `headerAlign`과 `align`을 따르며, 미지정 시 헤더는 가운데, 본문은 `number`/`rownumber` 오른쪽 및 그 외 왼쪽 정렬이다. `date`는 Grid 화면과 동일한 문자열 표현을 우선하므로 Excel 날짜 계산/정렬용 날짜 값으로 저장하지 않는다. select/autocomplete/user/code 등은 기존 화면 표시 텍스트(label 포함)를 유지한다. `null`/`undefined`/빈 문자열은 빈 셀, 변환할 수 없는 비어 있지 않은 typed 값은 원문 텍스트로 보존한다. date-only 문자열과 offset이 포함된 timestamp는 그리드 표시와 동일하게 문자열에 적힌 날짜 부분을 사용해 timezone에 의해 날짜가 바뀌지 않는다. npm에 공개된 `xlsx`(SheetJS) 패키지는 미패치 상태의 High 심각도 취약점(Prototype Pollution, ReDoS)이 있어 채택하지 않았다.
 - **컬럼 길이 자동 조정**: 현재 표시된 컬럼 전체에 `getAutoFitColumnWidth`를 적용해 폭을 일괄 재계산한다.
 - **루트 추가**(F1Tree 전용): 우클릭 위치와 무관하게 최상위 루트 행을 추가한다.
 - **행 추가**: 일반 F1Grid에서는 데이터 순서의 맨 아래에 새 행을 추가한다. F1Tree에서는 우클릭한 행의 자식으로 추가하고(대상이 없으면 루트로 추가) 기존 트리 동작을 유지한다.

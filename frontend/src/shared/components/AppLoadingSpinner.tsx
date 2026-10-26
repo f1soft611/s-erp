@@ -10,7 +10,7 @@ type AppLoadingSpinnerProps = Omit<CircularProgressProps, 'size' | 'thickness'> 
 
 export function AppLoadingSpinner({
   size = 34,
-  thickness = 3.6,
+  thickness = 2.4,
   ...props
 }: AppLoadingSpinnerProps) {
   return <CircularProgress {...props} size={size} thickness={thickness} />;

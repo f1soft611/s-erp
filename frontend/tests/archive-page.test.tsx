@@ -538,3 +538,12 @@ describe('Archive dashboard page', () => {
     );
   });
 });
+
+it('shows all three breadcrumb levels for the archive page', async () => {
+  renderArchive();
+
+  expect(
+    screen.getByText('그룹웨어 > 커뮤니티 > 자료실'),
+  ).toBeInTheDocument();
+  await screen.findByText('업무 가이드.pdf');
+});

@@ -622,7 +622,7 @@ function DashboardPage() {
             minHeight: '100vh',
           }}
         >
-          <AppLoadingSpinner />
+          <AppLoadingSpinner thickness={3.6} />
         </Box>
       ) : (
         <>

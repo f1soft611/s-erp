@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { AppLoadingSpinner } from '../src/shared/components/AppLoadingSpinner';
 
 describe('AppLoadingSpinner', () => {
-  it('uses the 34px size with a 3.6px default and supports a thinner override', () => {
+  it('uses the 34px size with a 2.4px default and supports a custom thickness', () => {
     render(
       <>
         <AppLoadingSpinner />
-        <AppLoadingSpinner thickness={1.8} />
+        <AppLoadingSpinner thickness={3.6} />
       </>,
     );
 
@@ -20,8 +20,8 @@ describe('AppLoadingSpinner', () => {
     const overrideCircle = progressbars[1].querySelector('circle');
     expect(defaultCircle).not.toBeNull();
     expect(overrideCircle).not.toBeNull();
-    expect(defaultCircle).toHaveAttribute('stroke-width', '3.6');
-    expect(overrideCircle).toHaveAttribute('stroke-width', '1.8');
+    expect(defaultCircle).toHaveAttribute('stroke-width', '2.4');
+    expect(overrideCircle).toHaveAttribute('stroke-width', '3.6');
   });
 
   it('forwards contextual size, color, and accessibility props', () => {

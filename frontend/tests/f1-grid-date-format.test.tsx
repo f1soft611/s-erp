@@ -11,11 +11,17 @@ import { createDocumentStatusColumns } from '../src/pages/groupware/documents/st
 import { getGridDateValue } from '../src/shared/components/f1-grid/utils/grid.utils';
 
 type Row = { id: string; date: string | Date | null | undefined };
+type NumericRow = { id: string; amount: number };
 
 const column: F1GridColumn<Row> = {
   field: 'date',
   headerName: 'Date',
   type: 'date',
+};
+const numberColumn: F1GridColumn<NumericRow> = {
+  field: 'amount',
+  headerName: 'Amount',
+  type: 'number',
 };
 
 describe('F1-GRID date formatting', () => {
@@ -147,5 +153,40 @@ describe('F1-GRID date formatting', () => {
     expect(
       getCellDisplayValue({ ...column, type: 'time' }, '09:21'),
     ).toBe('09:21');
+  });
+
+  it('shows up to five optional fractional digits for number and decimal columns', () => {
+    expect(
+      [1, 1.2, 1.2345, 1.234567].map((value) =>
+        getCellDisplayValue(numberColumn, value),
+      ),
+    ).toEqual(['1', '1.2', '1.2345', '1.23457']);
+    expect(
+      getCellDisplayValue({ ...numberColumn, type: 'decimal' }, 1.234567),
+    ).toBe('1.23457');
+  });
+
+  it('keeps explicitly configured decimal places fixed', () => {
+    expect(
+      getCellDisplayValue({ ...numberColumn, decimalPlaces: 2 }, 1.2),
+    ).toBe('1.20');
+  });
+
+  it('renders numeric cells with five optional decimal places', () => {
+    render(
+      <F1Grid
+        rowKey="id"
+        rows={[
+          { id: 'integer', amount: 1 },
+          { id: 'fractional', amount: 1.234567 },
+        ]}
+        columns={[numberColumn]}
+      />,
+    );
+
+    expect(screen.getByRole('gridcell', { name: '1' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('gridcell', { name: '1.23457' }),
+    ).toBeInTheDocument();
   });
 });

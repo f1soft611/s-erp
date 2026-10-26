@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Route every indeterminate application loading spinner through `AppLoadingSpinner` while preserving each use site's size, color, label, layout, and loading lifecycle, and improve Grid/Tree visibility with a 2.4px stroke.
+**Goal:** Route every indeterminate application loading spinner through `AppLoadingSpinner` while preserving each use site's size, color, label, layout, and loading lifecycle; keep Grid/Tree at the agreed 2.4px thickness.
 
-**Architecture:** Extend the existing shared wrapper around MUI `CircularProgress` to forward compatible spinner props, with defaults of 34px and 3.6px. Replace direct application-source usages with the wrapper and pass existing MUI default dimensions explicitly where necessary; F1Grid/F1Tree retain their shared overlay with a 2.4px override.
+**Architecture:** Extend the existing shared wrapper around MUI `CircularProgress` to forward compatible spinner props, with defaults of 34px and 2.4px. Replace direct application-source usages with the wrapper and pass existing MUI default dimensions explicitly where necessary; F1Grid/F1Tree use 34px/2.4px and DashboardPage explicitly preserves its 3.6px first-access spinner.
 
 **Tech Stack:** React, TypeScript, MUI, Vitest, Vite, Playwright/browser validation.
 
@@ -12,9 +12,9 @@
 
 ## File Map
 
-- `frontend/src/shared/components/AppLoadingSpinner.tsx`: Add typed forwarding for MUI `CircularProgress` props and keep 34px/3.6px defaults.
+- `frontend/src/shared/components/AppLoadingSpinner.tsx`: Add typed forwarding for MUI `CircularProgress` props and use 34px/2.4px defaults.
 - `frontend/tests/app-loading-spinner.test.tsx`: Verify defaults and forwarding of contextual size, thickness, color, and accessibility label.
-- `frontend/src/shared/components/f1-grid/core/F1Grid.tsx`: Set the shared Grid/Tree spinner to a 2.4px stroke without changing the overlay.
+- `frontend/src/shared/components/f1-grid/core/F1Grid.tsx`: Keep the shared overlay and set its spinner thickness to 2.4px.
 - `frontend/tests/f1-grid.test.tsx`, `frontend/tests/f1-tree.test.tsx`: Assert the 34px/2.4px shared overlay contract.
 - Replace direct `CircularProgress` usage in:
   - `frontend/src/pages/co/master/materials/MaterialManagementPage.tsx`
@@ -42,17 +42,17 @@
 - Modify: `docs/plan/20261026/20261026_002_f1-grid_spinner_visibility_계획서.md`
 - Modify: `docs/spec/20261026/20261026_002_f1-grid_spinner_visibility_상세사양서.md`
 
-- [ ] **Step 1: Expand the work direction**
+- [x] **Step 1: Expand the work direction**
 
-Update the request/background/scope to cover every application `CircularProgress` call site through `AppLoadingSpinner`, preserving contextual dimensions and color. Record the approved Grid/Tree stroke as 2.4px, preserve the existing overlay alpha and loading lifecycle, and keep backend/API/DB out of scope.
+Update the request/background/scope to cover every application `CircularProgress` call site through `AppLoadingSpinner`, preserving contextual dimensions and color. Record Grid/Tree's shared 2.4px stroke, preserve the existing overlay alpha and loading lifecycle, and keep backend/API/DB out of scope.
 
-- [ ] **Step 2: Expand the dated implementation plan**
+- [x] **Step 2: Expand the dated implementation plan**
 
 Add the common wrapper prop forwarding, all call-site replacements, Grid/Tree visibility update, focused tests, direct-use source audit, and actual browser validation at 375px, 768px, and 1280px. Require these dated docs to be updated before source implementation.
 
-- [ ] **Step 3: Expand the detailed specification**
+- [x] **Step 3: Expand the detailed specification**
 
-Specify the wrapper defaults (34px/3.6px), contextual size/color and accessible-label preservation, Grid/Tree override (34px/2.4px), and unchanged layout/loading behavior. Record concrete test and browser acceptance criteria.
+Specify the wrapper defaults (34px/2.4px), contextual size/color and accessible-label preservation, DashboardPage's explicit 3.6px exception, and unchanged layout/loading behavior. Record concrete test and browser acceptance criteria.
 
 ## Task 2: Expand the shared spinner contract
 
@@ -60,7 +60,7 @@ Specify the wrapper defaults (34px/3.6px), contextual size/color and accessible-
 - Modify: `frontend/tests/app-loading-spinner.test.tsx`
 - Modify: `frontend/src/shared/components/AppLoadingSpinner.tsx`
 
-- [ ] **Step 1: Add a failing forwarding test**
+- [x] **Step 1: Add a failing forwarding test**
 
 Extend the current test to render the shared spinner with a compact contextual configuration and an accessible label:
 
@@ -73,9 +73,9 @@ Extend the current test to render the shared spinner with a compact contextual c
 />
 ```
 
-Assert the resulting progressbar has 16px width and height, its SVG circle has `stroke-width="2.4"`, its SVG has the accessible name `저장 중`, and the root has the inherited color class/style expected from MUI. Keep the existing assertions that the default is 34px/3.6px.
+Assert the resulting progressbar has 16px width and height, its SVG circle has `stroke-width="2.4"`, its SVG has the accessible name `저장 중`, and the root has the inherited color class/style expected from MUI. Assert that the default is 34px/2.4px and an explicit 3.6px override is preserved.
 
-- [ ] **Step 2: Run the focused test and confirm it fails for unsupported props**
+- [x] **Step 2: Run the focused test and confirm it fails for unsupported props**
 
 From `frontend`, run:
 
@@ -85,7 +85,7 @@ npm run test -- tests/app-loading-spinner.test.tsx
 
 Expected: TypeScript/Vitest reports that `size`, `color`, or `aria-label` is not accepted by the current wrapper.
 
-- [ ] **Step 3: Forward typed MUI props while retaining defaults**
+- [x] **Step 3: Forward typed MUI props while retaining defaults**
 
 Use `CircularProgressProps` from MUI as the wrapper prop type and destructure only the defaulted `size` and `thickness`:
 
@@ -102,14 +102,14 @@ type AppLoadingSpinnerProps = Omit<CircularProgressProps, 'size' | 'thickness'> 
 
 export function AppLoadingSpinner({
   size = 34,
-  thickness = 3.6,
+  thickness = 2.4,
   ...props
 }: AppLoadingSpinnerProps) {
   return <CircularProgress {...props} size={size} thickness={thickness} />;
 }
 ```
 
-- [ ] **Step 4: Run the shared component regression**
+- [x] **Step 4: Run the shared component regression**
 
 From `frontend`, run:
 
@@ -125,7 +125,7 @@ Expected: all default and forwarded-property assertions pass.
 - Modify every direct-use file listed in the File Map.
 - Modify: `frontend/src/shared/components/f1-grid/core/F1Grid.tsx`
 
-- [ ] **Step 1: Replace imports and elements without changing context**
+- [x] **Step 1: Replace imports and elements without changing context**
 
 In each listed file, replace the MUI `CircularProgress` import with the relative `AppLoadingSpinner` import. Keep all existing wrappers, conditions, labels, colors, and dimensions. For callers that relied on MUI's default 40px size, pass `size={40}` explicitly. Preserve existing `size={16}`, `18`, `20`, `22`, or `24` and `color="inherit"`/`"primary"` values.
 
@@ -137,7 +137,7 @@ Examples:
 <AppLoadingSpinner size={40} aria-label="문서 정보 불러오는 중" />
 ```
 
-- [ ] **Step 2: Run affected unit tests**
+- [x] **Step 2: Run affected unit tests**
 
 From `frontend`, run:
 
@@ -147,9 +147,9 @@ npx vitest run tests/common-code-item-help-dialog.test.tsx tests/customer-manage
 
 Expected: existing loading labels, action states, and dialog/content behavior remain unchanged.
 
-- [ ] **Step 3: Increase the Grid/Tree stroke to the approved value**
+- [x] **Step 3: Preserve the agreed Grid/Tree stroke**
 
-In `F1Grid.tsx`, change only the shared spinner override from 1.8px to 2.4px:
+In `F1Grid.tsx`, keep the shared spinner implementation and set the Grid/Tree thickness to 2.4px:
 
 ```tsx
 <AppLoadingSpinner thickness={2.4} />
@@ -157,11 +157,11 @@ In `F1Grid.tsx`, change only the shared spinner override from 1.8px to 2.4px:
 
 Do not change the 34px default size, theme overlay alpha, loading timing, aria state, or pointer-event blocking.
 
-- [ ] **Step 4: Update Grid and Tree regression expectations**
+- [x] **Step 4: Update Grid and Tree regression expectations**
 
 In `frontend/tests/f1-grid.test.tsx` and `frontend/tests/f1-tree.test.tsx`, assert `stroke-width="2.4"` while retaining the 34px dimensions, loading overlay presence, `aria-busy`, and loading completion checks.
 
-- [ ] **Step 5: Run Grid and Tree regressions**
+- [x] **Step 5: Run Grid and Tree regressions**
 
 From `frontend`, run:
 
@@ -172,7 +172,7 @@ npx vitest run tests/f1-tree.test.tsx -t "same loading spinner as F1Grid"
 
 Expected: the shared overlay and 34px/2.4px progress indicator pass for both components.
 
-- [ ] **Step 6: Audit for unwrapped application spinners**
+- [x] **Step 6: Audit for unwrapped application spinners**
 
 From the repository root, run:
 
@@ -189,9 +189,9 @@ Expected: application source contains the MUI `CircularProgress` import/use only
 - Modify: `frontend/src/pages/f1-grid-docs/data/f1GridApiReference.ts`
 - Modify: `frontend/src/pages/f1-grid-docs/data/f1GridDocs.ts`
 
-- [ ] **Step 1: Update user-facing Grid documentation**
+- [x] **Step 1: Update user-facing Grid documentation**
 
-Replace every stale Grid/Tree 1.8px description with 2.4px. Keep the explanation that Grid and Tree share one F1Grid overlay and that other application loading contexts use the same spinner component while retaining their contextual sizes.
+Update Grid/Tree loading descriptions to 2.4px. Keep the explanation that Grid and Tree share one F1Grid overlay and that other application loading contexts use the same spinner component while retaining their contextual sizes.
 
 ## Task 5: Browser verification and result report
 
@@ -199,19 +199,19 @@ Replace every stale Grid/Tree 1.8px description with 2.4px. Keep the explanation
 - Create/update screenshots under `docs/result/20261026/f1-grid-loading-spinner/screenshots/`.
 - Modify: `docs/result/20261026/f1-grid-loading-spinner/20261026_002_f1-grid_spinner_visibility_결과.md`
 
-- [ ] **Step 1: Verify the active Grid loading overlay at each required width**
+- [x] **Step 1: Verify the active Grid loading overlay at each required width**
 
 Use the local S-ERP F1-Grid Large Dataset example at `http://127.0.0.1:4173/f1-grid-docs`. At 375px, 768px, and 1280px, trigger the 10,000-row sample; for capture only, extend the demo's 250ms timer through browser instrumentation without changing repository code. Verify the visible 34px spinner, 2.4px stroke, centered position, overlay bounds, and that the page has no horizontal overflow.
 
-- [ ] **Step 2: Verify loading completion**
+- [x] **Step 2: Verify loading completion**
 
 Allow the demo timer to complete and confirm that the overlay and progressbar are removed and the data grid renders.
 
-- [ ] **Step 3: Save and inspect browser screenshots**
+- [x] **Step 3: Save and inspect browser screenshots**
 
 Save one active Grid overlay screenshot per viewport under the result screenshot directory. Inspect the images themselves; if the integrated screenshot tool captures stale or post-loading content, use a browser Playwright screenshot to a local file and inspect that file instead. Record any unresolved capture limitation instead of claiming an unverified visual result.
 
-- [ ] **Step 4: Write the result report**
+- [x] **Step 4: Write the result report**
 
 Record exact commands and pass counts, build outcome, each viewport's DOM/layout measurements, screenshot paths, and any browser-tool limitation. Do not state a viewport was visually confirmed unless its active-state screenshot or live browser rendering was inspected.
 
@@ -220,7 +220,7 @@ Record exact commands and pass counts, build outcome, each viewport's DOM/layout
 **Files:**
 - No additional implementation files.
 
-- [ ] **Step 1: Run the focused regression set**
+- [x] **Step 1: Run the focused regression set**
 
 From `frontend`, run:
 
@@ -231,7 +231,7 @@ npx vitest run tests/f1-tree.test.tsx -t "same loading spinner as F1Grid"
 
 Also run the consumer regression command from Task 2.
 
-- [ ] **Step 2: Build and check the patch**
+- [x] **Step 2: Build and check the patch**
 
 From `frontend`, run `npm run build`. From the repository root, run `git diff --check` and inspect the worktree to ensure only approved spinner, test, and documentation paths changed.
 

@@ -276,7 +276,12 @@ const sections: DocSection[] = [
         '숫자 계열의 표시 포맷. 통화 기호를 표시하려면 currency를 명시.',
         '미지정',
       ),
-      api('decimalPlaces', 'number', '숫자 표시 소수 자릿수.', '미지정'),
+      api(
+        'decimalPlaces',
+        'number',
+        '숫자 표시/입력 소수 자릿수. number/decimal은 미지정 시 최대 5자리(끝의 0 생략), 지정 시 고정 표시.',
+        '미지정 (number/decimal: 최대 5자리, currency format: 0자리)',
+      ),
       api('options', 'F1GridOption[]', 'select/autocomplete 편집기의 값·레이블 목록.', '미지정'),
       api('userOptions', 'F1GridUserOption[]', 'user 편집기의 사용자 선택 목록.', '미지정'),
       api(
