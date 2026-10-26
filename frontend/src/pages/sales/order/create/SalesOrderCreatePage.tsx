@@ -190,7 +190,10 @@ export function SalesOrderCreatePage({
                 sm: 'repeat(2, minmax(0, 1fr))',
                 lg: 'repeat(4, minmax(0, 1fr))',
               },
-              gap: 2,
+              columnGap: 2,
+              rowGap: 1,
+              '& > .MuiFormControl-root': { m: 0 },
+              '& > .MuiStack-root': { mt: 0 },
             }}
           >
             <TextField
