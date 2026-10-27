@@ -2,7 +2,7 @@
 
 ## 상태
 
-사용자가 2026-10-27 제안 모델을 승인했다. 이 문서는 DDL 작성 전에 데이터 모델과 안전한 변경 범위를 검토받기 위한 설계다. SQL 적용, 백엔드 API, 화면 구현은 포함하지 않는다.
+사용자가 2026-10-27 제안 모델을 승인했다. 날짜별 작업지시서·계획서·상세사양서와 guarded DDL/rollback 초안이 작성되었으며 central DB에는 적용하지 않았다. 백엔드 API와 화면 구현은 포함하지 않는다.
 
 ## 배경 및 근거
 
@@ -48,7 +48,8 @@
 - 부모 FK는 `(upper_*_cls_id, tenant_id)`에서 `(분류 ID, tenant_id)`로 연결해 다른 tenant의 부모를 막는다.
 - 분류 레벨 범위 및 `use_at IN ('Y','N')`를 CHECK로 제한한다.
 - tenant/부모/정렬순서 기준의 조회 인덱스를 둔다.
-- 부모-자식 레벨이 연속되는지와 순환 참조는 분류 저장 API가 검증한다. DB CHECK만으로 다른 행의 레벨 및 조상 관계를 검사하지 않는다.
+- `(partner_cls_id, upper_partner_cls_id, tenant_id)` 유니크 키를 두어 거래처 마스터의 `(business_kind2, business_kind1, tenant_id)` 복합 FK가 소분류와 지정 대분류의 직접 부모 관계를 보장하게 한다.
+- 품목 소분류 레벨, 각 분류의 부모-자식 레벨 연속성 및 순환 참조는 분류 저장 API가 검증한다. DB CHECK만으로 다른 행의 레벨 및 조상 관계를 검사하지 않는다.
 
 ### 품목 마스터 연결
 
@@ -61,8 +62,9 @@
 
 - central DB의 `tb_customer_info.business_kind1/2`를 각각 대분류 ID/소분류 ID로 사용하고, 타입을 `BIGINT NULL`로 변경한다.
 - 타입 변경 시 NULL 및 공백만 NULL로 정리한다. 비어 있지 않은 값이 있으면 임의 cast하거나 데이터를 잃지 않고 migration을 명시적으로 중단한다.
-- 두 필드는 각각 같은 tenant의 `tb_cls_partner.partner_cls_id`를 참조한다.
-- `business_kind2`가 설정되면 `business_kind1`도 필수로 하고, 두 ID가 실제 parent/child 관계인지 API에서 검증한다.
+- `business_kind1`은 `(분류 ID, tenant_id)` 복합 FK로 같은 tenant의 분류를 참조한다.
+- `business_kind2`는 `(소분류 ID, business_kind1, tenant_id)` 복합 FK로 지정한 대분류의 직접 자식임을 DB가 보장한다.
+- `business_kind2`가 설정되면 `business_kind1`도 필수로 한다. 복합 FK가 직접 부모 관계를 DB에서 보장하고 API는 레벨/활성 상태를 검증한다.
 - `business_kind3`는 현재 업무 의미가 확인되지 않았으므로 유지하고 변경하지 않는다.
 - 신규 선택은 대분류/소분류 레벨과 활성 상태를 API가 검증한다. 이미 저장된 연결값의 표시/비활성 처리 정책은 구현 사양서에 명시한다.
 
@@ -95,8 +97,8 @@
 - DDL 초안에 분류 간 tenant 경계, 자기참조, 레벨/use CHECK, 마스터 복합 FK 및 인덱스가 포함되는지 검토한다.
 - migration guard가 비어 있지 않은 `business_kind1/2` 값에 대해 안전하게 중단하고, NULL/공백 상태를 무손실로 변환하는지 확인한다.
 - rollback은 데이터/FK 의존이 있을 때 안전하게 중단하고, 빈 신규 분류 구조에 대해서만 역순으로 수행한다.
-- SQL lint/구문 검토 또는 테스트 DB 검증은 DDL 작성 단계에서 수행한다. 현재 단계에서는 SQL을 생성하거나 실행하지 않는다.
+- DDL의 transaction, precondition guard, composite FK 및 rollback 조건을 정적 검토했다. 실제 PostgreSQL 실행이나 DB 적용은 하지 않았다.
 
 ## 다음 단계
 
-이 설계 문서를 검토·승인한 뒤 날짜별 작업지시서, 계획서, 상세사양서를 작성한다. 그 사양을 기준으로 DDL/롤백 초안과 누적 스키마 문서를 갱신한다. 이후 API와 관리 UI는 별도 구현 범위로 진행한다.
+분류 CRUD API 및 관리 UI는 별도 작업지시서와 계약으로 구현한다. 실제 DB 적용은 DDL 검토/승인과 배포 절차가 별도로 완료되기 전까지 수행하지 않는다.
