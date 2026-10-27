@@ -593,6 +593,7 @@ const GridRowInner = <T extends object>({
             onMouseEnter={() => handleCellMouseEnter(cell)}
             onMouseUp={onCellSelectionEnd}
             onBlur={onCommitEdit}
+            onStopEdit={onStopEdit}
             onDoubleClick={() => onStartEdit(rowId, columnIndex)}
             onDraftChange={onDraftChange}
             onKeyDown={onKeyDown}

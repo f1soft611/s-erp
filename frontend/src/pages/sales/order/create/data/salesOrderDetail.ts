@@ -108,7 +108,10 @@ export function createSalesOrderDetailColumns(
       width: 120,
       align: 'right',
       editable: !disabled,
+      required: true,
       min: 0,
+      validate: (value) =>
+        Number(value) > 0 ? true : '주문수량은 0보다 커야 합니다.',
       onValueChange: (row, value) =>
         recalculateAmounts(numericValue(value), row.unitPrice),
     },
@@ -120,6 +123,7 @@ export function createSalesOrderDetailColumns(
       width: 130,
       align: 'right',
       editable: !disabled,
+      required: true,
       min: 0,
       onValueChange: (row, value) =>
         recalculateAmounts(row.orderQty, numericValue(value)),

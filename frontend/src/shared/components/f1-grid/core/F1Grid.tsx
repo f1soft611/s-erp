@@ -1584,6 +1584,7 @@ function F1GridInner<T extends object>(
     if (
       column &&
       row &&
+      column.type !== 'code' &&
       ((column.type !== 'number' &&
         column.type !== 'decimal' &&
         column.type !== 'currency') ||

@@ -91,6 +91,7 @@ export function SalesOrderCreatePage({
     useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
   const blockerPromptedRef = useRef(false);
+  const gridValidationActiveRef = useRef(false);
   const hasUnsavedChanges =
     savedOrder === null &&
     (customer !== null ||
@@ -156,6 +157,9 @@ export function SalesOrderCreatePage({
           changes.deletedRows.length > 0,
       );
       clearValidationErrors();
+      if (gridValidationActiveRef.current) {
+        gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
+      }
     },
     [clearValidationErrors],
   );
@@ -216,6 +220,8 @@ export function SalesOrderCreatePage({
       details: gridRef.current?.getActiveRows() ?? [],
     };
     const errors = validateSalesOrderInput(input);
+    const isGridValid = gridRef.current?.validate() ?? true;
+    gridValidationActiveRef.current = !isGridValid;
     const validationMessages = [
       errors.orderDt,
       errors.customerId,
@@ -225,7 +231,7 @@ export function SalesOrderCreatePage({
 
     setValidationErrors(validationMessages.length > 0 ? errors : null);
     setError('');
-    if (validationMessages.length > 0) {
+    if (validationMessages.length > 0 || !isGridValid) {
       return;
     }
 
@@ -294,7 +300,6 @@ export function SalesOrderCreatePage({
 
   const validationMessages = validationErrors
     ? [
-        validationErrors.customerId,
         validationErrors.details,
         ...Object.values(validationErrors.detailRows),
       ].filter((message): message is string => Boolean(message))
@@ -391,6 +396,7 @@ export function SalesOrderCreatePage({
               label="수주일자"
               type="date"
               size="small"
+              required
               value={orderDate}
               onChange={(event) => {
                 setOrderDate(event.target.value);
@@ -409,6 +415,9 @@ export function SalesOrderCreatePage({
                 clearValidationErrors();
               }}
               disabled={!isEditable}
+              required
+              error={Boolean(validationErrors?.customerId)}
+              helperText={validationErrors?.customerId}
             />
             <TextField
               label="견적번호"

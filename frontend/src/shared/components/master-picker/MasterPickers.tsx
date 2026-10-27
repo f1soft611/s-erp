@@ -2,15 +2,11 @@ import { MasterPicker } from './MasterPicker';
 import { MasterPickerDialog } from './MasterPickerDialog';
 import type {
   MasterPickerOption,
+  MasterPickerProps,
   MasterPickerSearch,
 } from './masterPicker.types';
 
-type Props = {
-  value: MasterPickerOption | null;
-  search: MasterPickerSearch;
-  onChange: (value: MasterPickerOption) => void;
-  disabled?: boolean;
-};
+type Props = Omit<MasterPickerProps, 'label'>;
 
 export function CustomerPicker(props: Props) {
   return <MasterPicker {...props} label="거래처" />;

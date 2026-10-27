@@ -53,6 +53,21 @@ class SalesOrderTenantScopeMapperTest {
                 "totalAmt", "shippedQty", "lineStatus");
     }
 
+    @Test
+    void dateColumnsCastStringParametersToPostgresDate() throws Exception {
+        Configuration configuration = parse();
+
+        String header = normalize(sql(configuration, "insertOrderHeader").getSql());
+        assertThat(header).contains("?, ?, CAST(? AS date), ?, ?, CAST(? AS date)");
+
+        String detail = normalize(sql(configuration, "insertOrderDetail").getSql());
+        assertThat(detail).contains("CAST(? AS date)");
+    }
+
+    private String normalize(String sql) {
+        return sql.replaceAll("\\s+", " ");
+    }
+
     private Configuration parse() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {

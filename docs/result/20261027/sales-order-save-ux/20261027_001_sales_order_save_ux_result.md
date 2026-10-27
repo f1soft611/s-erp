@@ -50,3 +50,34 @@ DDL 실행, DB 쓰기 또는 실제 DB 저장 통합 검증을 수행하지 않�
 - 375px 상세 입력 영역: [sales-order-entry-375-detail.png](screenshots/sales-order-entry-375-detail.png)
 - 768px: [sales-order-entry-768.png](screenshots/sales-order-entry-768.png)
 - 1280px: [sales-order-entry-1280.png](screenshots/sales-order-entry-1280.png)
+
+## 회귀 수정: 저장 시 date 형변환 오류
+
+- 재현: 수주 저장 시 `PSQLException: 열 "delivery_dt"은(는) date 자료형인데 표현식은 character varying 자료형입니다`.
+- 원인: 읽기 전용 MCP `describe_table` 확인 결과 `tb_sales_order_hd.order_dt`,
+  `tb_sales_order_hd.delivery_dt`, `tb_sales_order_dt.delivery_dt`가 `date`인데,
+  Mapper가 값을 형변환 없이 바인딩해 varchar로 전달되었다.
+- 해결: 기존 Mapper 패턴(`CAST(#{...} AS date)`)에 맞춰 세 날짜 바인딩을 형변환했다.
+- 회귀 검증: `SalesOrderTenantScopeMapperTest.dateColumnsCastStringParametersToPostgresDate`
+  추가(수정 전 실패 확인, 수정 후 `SalesOrder*` 테스트 전체 통과).
+
+## 추가 개선: 필수값 표시 및 F1-Grid 검증
+
+- 상단: `수주일자`, `거래처` 필수 표시. 공통 `MasterPicker`에 선택형
+  `required`/`error`/`helperText` prop을 추가해 거래처 미선택 시 필드 아래 오류를
+  표시한다(기존 사용처는 prop 생략 시 동작 동일).
+- 상세 그리드: `품목코드`, `주문수량`, `단가` 컬럼 `required: true`로 헤더 `*` 표시.
+  주문수량은 컬럼 `validate`로 0 초과를 검증한다.
+- 저장 시 `gridRef.validate()`를 호출해 오류 셀을 강조하고 저장 요청을 보내지 않는다.
+  검증 실패 후 셀이 변경되면 재검증해 해결된 셀 강조를 해제한다.
+- F1-Grid 코어 변경 없음(기존 `required`/`validate`/`validate()` 계약 사용).
+- 회귀 수정: `sales-order-scroll.test.tsx`가 `useBlocker`용 Data Router 없이
+  렌더링해 실패하던 문제를 `createMemoryRouter`로 감싸 해결.
+- 검증: `tests/sales-order*`, `tests/master-picker*` 33개 통과, frontend build 통과,
+  변경 파일 oxlint 통과. Playwright(`scripts/capture-sales-order-required.js`, API mock)
+  375/768/1280px에서 수평 overflow 없음, 저장 요청 0건, 런타임 오류 0건.
+- 캡처:
+  - [sales-order-required-1280.png](screenshots/sales-order-required-1280.png)
+  - [sales-order-validation-1280.png](screenshots/sales-order-validation-1280.png)
+  - [sales-order-validation-768.png](screenshots/sales-order-validation-768.png)
+  - [sales-order-validation-375.png](screenshots/sales-order-validation-375.png)

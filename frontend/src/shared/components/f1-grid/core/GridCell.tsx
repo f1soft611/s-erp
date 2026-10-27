@@ -50,6 +50,7 @@ type GridCellProps<T extends object> = {
   onMouseEnter: () => void;
   onMouseUp: () => void;
   onBlur?: () => void;
+  onStopEdit: () => void;
   onDoubleClick: () => void;
   onDraftChange: (value: F1GridDraftValue) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -146,6 +147,7 @@ const GridCellInner = <T extends object>({
   onMouseEnter,
   onMouseUp,
   onBlur,
+  onStopEdit,
   onDoubleClick,
   onDraftChange,
   onKeyDown,
@@ -392,6 +394,7 @@ const GridCellInner = <T extends object>({
           onChange={onDraftChange}
           onUserChange={onDraftChange}
           onCommitEdit={() => onBlur?.()}
+          onStopEdit={onStopEdit}
           onKeyDown={onKeyDown}
           onSelectChange={onSelectChange}
           onCodePick={onCodePick}
@@ -453,6 +456,7 @@ export function GridCell<T extends object>(props: GridCellProps<T>) {
     onMouseEnter: () => latestProps.current.onMouseEnter(),
     onMouseUp: () => latestProps.current.onMouseUp(),
     onBlur: () => latestProps.current.onBlur?.(),
+    onStopEdit: () => latestProps.current.onStopEdit(),
     onDoubleClick: () => latestProps.current.onDoubleClick(),
     onDraftChange: (value: F1GridDraftValue) => latestProps.current.onDraftChange(value),
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => latestProps.current.onKeyDown(event),

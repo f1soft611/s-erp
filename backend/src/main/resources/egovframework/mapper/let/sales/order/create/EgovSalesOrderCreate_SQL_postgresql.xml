@@ -37,10 +37,10 @@
         ) VALUES (
             #{tenantId},
             #{orderNo},
-            #{orderDt},
+            CAST(#{orderDt} AS date),
             #{customerId},
             #{quotNo},
-            #{deliveryDt},
+            CAST(#{deliveryDt} AS date),
             #{deliveryPlace},
             #{deliveryMethod},
             #{status},
@@ -75,7 +75,7 @@
             #{supplyAmt},
             #{vatAmt},
             #{totalAmt},
-            #{deliveryDt},
+            CAST(#{deliveryDt} AS date),
             #{shippedQty},
             #{lineStatus}
         )

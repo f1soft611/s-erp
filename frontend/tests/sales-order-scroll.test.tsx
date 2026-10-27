@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { expect, it } from 'vitest';
 import { SalesOrderCreatePage } from '../src/pages/sales/order/create/SalesOrderCreatePage';
 
 it('keeps order form content scrollable within the dashboard viewport', () => {
-  render(
+  const page = (
     <SalesOrderCreatePage
       selectedModule={{
         id: 'sales',
@@ -20,6 +21,13 @@ it('keeps order form content scrollable within the dashboard viewport', () => {
         cards: [],
         items: [],
       }}
+    />
+  );
+  render(
+    <RouterProvider
+      router={createMemoryRouter([{ path: '/', element: page }], {
+        initialEntries: ['/'],
+      })}
     />,
   );
 

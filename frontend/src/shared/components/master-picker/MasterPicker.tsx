@@ -13,6 +13,9 @@ export function MasterPicker({
   search,
   onChange,
   disabled = false,
+  required = false,
+  error = false,
+  helperText,
 }: MasterPickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -23,15 +26,23 @@ export function MasterPicker({
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ minWidth: 0, mt: 2 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'flex-start', minWidth: 0, mt: 2 }}
+      >
         <TextField
           label={label}
           size="small"
           fullWidth
+          required={required}
+          error={error}
+          helperText={helperText}
           value={value ? `${value.code} · ${value.name}` : ''}
           slotProps={{ input: { readOnly: true } }}
           sx={{
             '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 },
+            '& .MuiFormHelperText-root': { whiteSpace: 'nowrap' },
           }}
         />
         <Button

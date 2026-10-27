@@ -118,20 +118,75 @@ describe('sales order entry page', () => {
     );
   });
 
+  it('marks required header fields and detail grid columns', () => {
+    renderSalesOrderPage();
+
+    expect(screen.getByLabelText(/수주일자/)).toBeRequired();
+    expect(screen.getByLabelText(/거래처/, { selector: 'input' })).toBeRequired();
+    expect(screen.getByLabelText(/견적번호/)).not.toBeRequired();
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
+    const grid = screen.getByRole('grid', { name: '수주 상세 목록' });
+    expect(within(grid).getByLabelText('품목코드 필수')).toBeInTheDocument();
+    expect(within(grid).getByLabelText('주문수량 필수')).toBeInTheDocument();
+    expect(within(grid).getByLabelText('단가 필수')).toBeInTheDocument();
+    expect(within(grid).queryByLabelText('납기 필수')).not.toBeInTheDocument();
+  });
+
+  it('highlights invalid detail cells with F1-Grid validation and clears them after correction', async () => {
+    renderSalesOrderPage();
+    await selectCustomer();
+    fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(createSalesOrderMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/거래처/, { selector: 'input' })).not.toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    const grid = screen.getByRole('grid', { name: '수주 상세 목록' });
+    expect(
+      grid.querySelector('[data-grid-error="품목코드은(는) 필수입니다."]'),
+    ).not.toBeNull();
+    expect(
+      grid.querySelector('[data-grid-error="주문수량은 0보다 커야 합니다."]'),
+    ).not.toBeNull();
+
+    const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
+    fireEvent.doubleClick(within(row).getAllByRole('gridcell')[3]);
+    const editor = screen.getByRole('spinbutton');
+    fireEvent.change(editor, { target: { value: '2' } });
+    fireEvent.keyDown(editor, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(
+        grid.querySelector('[data-grid-error="주문수량은 0보다 커야 합니다."]'),
+      ).toBeNull();
+    });
+    expect(
+      grid.querySelector('[data-grid-error="품목코드은(는) 필수입니다."]'),
+    ).not.toBeNull();
+  });
+
   it('shows required-field feedback without sending an invalid order', async () => {
     renderSalesOrderPage();
-    fireEvent.change(screen.getByLabelText('수주일자'), {
+    fireEvent.change(screen.getByLabelText(/수주일자/), {
       target: { value: '' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
-    expect(screen.getByLabelText('수주일자')).toHaveAttribute(
+    expect(screen.getByLabelText(/수주일자/)).toHaveAttribute(
       'aria-invalid',
       'true',
     );
     expect(screen.getByText('수주일자를 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.getByText('거래처를 선택해 주세요.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/거래처/, { selector: 'input' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getAllByText('거래처를 선택해 주세요.').length).toBeGreaterThan(0);
     expect(
       screen.getByText('품목 상세를 1건 이상 입력해 주세요.'),
     ).toBeInTheDocument();
@@ -215,7 +270,7 @@ describe('sales order entry page', () => {
       'C-10 · 거래처 10',
     );
     expect(screen.getByLabelText('견적번호')).toHaveValue('');
-    expect(screen.getByLabelText('수주일자')).toHaveValue('2026-10-27');
+    expect(screen.getByLabelText(/수주일자/)).toHaveValue('2026-10-27');
     const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
     expect(within(row).getByRole('gridcell', { name: 'M-20' })).toBeInTheDocument();
     expect(within(row).getByRole('gridcell', { name: '2.00' })).toBeInTheDocument();
