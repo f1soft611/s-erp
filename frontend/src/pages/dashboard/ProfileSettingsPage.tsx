@@ -21,6 +21,9 @@ import {
   updateMyProfile,
 } from './services/profileSettings.service';
 import type { MyProfile } from './types/profileSettings';
+import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
+import { AppSaveButton } from '../../shared/components/AppSaveButton';
+import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
 
 const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_IMAGE_SIZE = 512;
@@ -142,23 +145,33 @@ function ProfileSettingsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   useEffect(() => {
+    let active = true;
+    start();
+    setError('');
     fetchMyProfile()
       .then((nextProfile) => {
+        if (!active) return;
         setProfile(nextProfile);
         setEmail(nextProfile.email ?? '');
         setProfileImage(nextProfile.profileImage ?? null);
         setStampImage(nextProfile.stampImage ?? null);
+        succeed();
       })
       .catch((requestError: unknown) => {
+        if (!active) return;
+        fail(requestError);
         setError(
           requestError instanceof Error
             ? requestError.message
             : '프로필을 조회하지 못했습니다.',
         );
       });
-  }, []);
+    return () => { active = false; };
+  }, [retryToken, start, succeed, fail]);
 
   const handleSave = async () => {
     if (!email.trim()) {
@@ -208,6 +221,8 @@ function ProfileSettingsPage() {
             </Typography>
           </Box>
         </Stack>
+        <PageLoadBoundary {...initialLoad} label="내 정보"
+          onRetry={() => setRetryToken((current) => current + 1)}>
         {error ? <Alert severity="error">{error}</Alert> : null}
         {notice ? <Alert severity="success">{notice}</Alert> : null}
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
@@ -279,18 +294,21 @@ function ProfileSettingsPage() {
           </Stack>
         </Paper>
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          <Button
+          <AppSaveButton
             variant="contained"
             startIcon={<SaveOutlined />}
+            saving={saving}
+            savingLabel="저장 중..."
             onClick={handleSave}
             disabled={saving || !profile}
           >
-            {saving ? '저장 중...' : '저장'}
-          </Button>
+            저장
+          </AppSaveButton>
           <Button variant="outlined" onClick={() => navigate(-1)}>
             취소
           </Button>
         </Stack>
+        </PageLoadBoundary>
       </Stack>
     </Container>
   );

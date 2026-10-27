@@ -1861,8 +1861,10 @@ describe('RoleManagementPage notifications', () => {
     renderPage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      '역할 목록 조회 실패',
+      '정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
     );
+    expect(screen.getByRole('button', { name: '역할 목록 다시 불러오기' })).toBeEnabled();
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 
   it('keeps the grid header visible while only the body rows skeletonize during the real first fetch', async () => {

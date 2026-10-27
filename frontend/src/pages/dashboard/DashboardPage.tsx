@@ -17,6 +17,8 @@ import MenuOutlined from '@mui/icons-material/MenuOutlined';
 import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
 import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
+import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
 import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
@@ -178,7 +180,7 @@ function DashboardPage() {
     emptyUserMenuResponse.user,
   );
   const [menusLoading, setMenusLoading] = useState(true);
-  const [menusError, setMenusError] = useState(false);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
   const [menusReloadToken, setMenusReloadToken] = useState(0);
   const lastRecordedMenuRef = useRef('');
   const {
@@ -207,7 +209,7 @@ function DashboardPage() {
     const loadOnce = () => Promise.all([fetchMyMenus(), fetchModuleRows()]);
 
     setMenusLoading(true);
-    setMenusError(false);
+    start();
 
     loadOnce()
       .catch(async (error) => {
@@ -227,10 +229,11 @@ function DashboardPage() {
         setModuleItems(
           buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
         );
+        succeed();
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (!cancelled) {
-          setMenusError(true);
+          fail(cause);
         }
       })
       .finally(() => {
@@ -242,7 +245,7 @@ function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [menusReloadToken]);
+  }, [menusReloadToken, start, succeed, fail]);
   const location = useLocation();
   const effectivePath = resolveLegacyRoutePath(location.pathname);
   const theme = useTheme();
@@ -567,11 +570,11 @@ function DashboardPage() {
     normalizeRoutePath(effectivePath) === '/' ||
     normalizeRoutePath(effectivePath) === '/dashboard';
 
-  if (!menusLoading && !isValidDashboardRoute && !isRootDashboardAlias) {
+  if (!initialLoad.error && !menusLoading && !isValidDashboardRoute && !isRootDashboardAlias) {
     return <NotFoundPage />;
   }
 
-  if (menusError) {
+  if (initialLoad.error) {
     return (
       <Box
         sx={{
@@ -585,16 +588,8 @@ function DashboardPage() {
           color: theme.palette.text.primary,
         }}
       >
-        <Typography variant="body1">
-          메뉴 정보를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해
-          주세요.
-        </Typography>
-        <IconButton
-          aria-label="메뉴 다시 불러오기"
-          onClick={() => setMenusReloadToken((token) => token + 1)}
-        >
-          <ReplayOutlined />
-        </IconButton>
+        <PageLoadBoundary {...initialLoad} label="메뉴"
+          onRetry={() => setMenusReloadToken((token) => token + 1)} />
       </Box>
     );
   }

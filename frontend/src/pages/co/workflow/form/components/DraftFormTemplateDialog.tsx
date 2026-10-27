@@ -4,8 +4,10 @@ import type { JSONContent } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import {
   RichTextEditor,
   RichTextEditorToolbar,
@@ -41,6 +43,7 @@ export function DraftFormTemplateDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  useUnsavedChangesBeforeUnload(open && hasChanges);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const initialHtml = useRef('<p></p>');
   const objectUrls = useRef(new Map<string, string>());
@@ -260,8 +263,9 @@ export function DraftFormTemplateDialog({
         }
         actions={
           <>
-            <Button
+            <AppSaveButton
               variant="contained"
+              saving={saving}
               onClick={() => void handleSave()}
               disabled={
                 loading ||
@@ -269,14 +273,9 @@ export function DraftFormTemplateDialog({
                 saving ||
                 editorSaveLifecycle.uploadingCount > 0
               }
-              startIcon={
-                saving ? (
-                  <AppLoadingSpinner size={16} color="inherit" />
-                ) : undefined
-              }
             >
               저장
-            </Button>
+            </AppSaveButton>
             <Button
               variant="text"
               onClick={handleCloseRequest}

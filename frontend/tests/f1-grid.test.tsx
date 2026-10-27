@@ -1984,6 +1984,145 @@ describe('F1-GRID extended editors', () => {
     });
   });
 
+  it.each([
+    ['code', 'another cell'],
+    ['code', 'outside the grid'],
+    ['select', 'another cell'],
+    ['select', 'outside the grid'],
+  ] as const)(
+    'dismisses an unselected %s editor on clicking %s without changing the value',
+    (type, target) => {
+      type PickerRow = { id: string; code: number; name: string };
+      const gridRef = createRef<F1GridRef<PickerRow>>();
+      const onOpenCodePicker = vi.fn();
+      const onValueChange = vi.fn();
+      render(
+        <F1Grid
+          ref={gridRef}
+          rows={[{ id: 'line-1', code: 101, name: 'Original item' }]}
+          columns={[
+            {
+              field: 'code',
+              headerName: 'Code',
+              type,
+              editable: true,
+              options: [{ value: 101, label: '101' }],
+              onOpenCodePicker,
+              onValueChange,
+            },
+            { field: 'name', headerName: 'Name' },
+          ]}
+          rowKey="id"
+        />,
+      );
+      fireEvent.doubleClick(screen.getByRole('gridcell', { name: '101' }));
+      expect(
+        screen.getByRole(type === 'code' ? 'button' : 'combobox', {
+          ...(type === 'code' ? { name: '코드 선택' } : {}),
+        }),
+      ).toBeInTheDocument();
+
+      const clickTarget =
+        target === 'another cell'
+          ? screen.getByRole('gridcell', { name: 'Original item' })
+          : document.body;
+      fireEvent.mouseDown(clickTarget);
+      fireEvent.mouseUp(clickTarget);
+      fireEvent.click(clickTarget);
+
+      expect(screen.queryByRole('button', { name: '코드 선택' })).toBeNull();
+      expect(screen.queryByRole('combobox')).toBeNull();
+      expect(screen.getByRole('gridcell', { name: '101' })).toBeVisible();
+      expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+      expect(onOpenCodePicker).not.toHaveBeenCalled();
+      if (type === 'code') expect(onValueChange).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['backdrop', 'Escape'] as const)(
+    'exits a select editor without changes when its menu closes via %s',
+    (dismissal) => {
+      type PickerRow = { id: string; code: number };
+      const gridRef = createRef<F1GridRef<PickerRow>>();
+      render(
+        <F1Grid
+          ref={gridRef}
+          rows={[{ id: 'line-1', code: 101 }]}
+          columns={[
+            {
+              field: 'code',
+              headerName: 'Code',
+              type: 'select',
+              editable: true,
+              options: [
+                { value: 101, label: 'Original code' },
+                { value: 102, label: 'Another code' },
+              ],
+            },
+          ]}
+          rowKey="id"
+        />,
+      );
+      fireEvent.doubleClick(
+        screen.getByRole('gridcell', { name: 'Original code' }),
+      );
+      fireEvent.mouseDown(screen.getByRole('combobox'));
+      expect(screen.getByRole('listbox')).toBeVisible();
+
+      if (dismissal === 'backdrop') {
+        const backdrop = document.querySelector('.MuiBackdrop-root')!;
+        fireEvent.mouseDown(backdrop);
+        fireEvent.mouseUp(backdrop);
+        fireEvent.click(backdrop);
+      } else {
+        fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+      }
+
+      expect(screen.queryByRole('combobox')).toBeNull();
+      expect(screen.getByRole('gridcell', { name: 'Original code' })).toBeVisible();
+      expect(gridRef.current?.getChanges().updatedRows).toEqual([]);
+    },
+  );
+
+  it('keeps a selected numeric code when the select menu closes', () => {
+    type PickerRow = { id: string; code: number };
+    const gridRef = createRef<F1GridRef<PickerRow>>();
+    const endEdit = vi.fn();
+    render(
+      <F1Grid
+        ref={gridRef}
+        rows={[{ id: 'line-1', code: 101 }]}
+        columns={[
+          {
+            field: 'code',
+            headerName: 'Code',
+            type: 'select',
+            editable: true,
+            options: [
+              { value: 101, label: 'Original code' },
+              { value: 102, label: 'Another code' },
+            ],
+          },
+        ]}
+        rowKey="id"
+        editorPlugins={[{ endEdit }]}
+      />,
+    );
+    fireEvent.doubleClick(
+      screen.getByRole('gridcell', { name: 'Original code' }),
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Another code' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Another code' }));
+
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByRole('gridcell', { name: 'Another code' })).toBeVisible();
+    expect(gridRef.current?.getChanges().updatedRows).toEqual([
+      expect.objectContaining({ code: 102 }),
+    ]);
+    expect(endEdit).toHaveBeenCalledTimes(1);
+  });
+
   it('stores autocomplete, decimal, datetime, and time editor values', () => {
     type ExtendedRow = {
       id: string;

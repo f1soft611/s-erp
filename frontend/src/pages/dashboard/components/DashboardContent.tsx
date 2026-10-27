@@ -22,6 +22,7 @@ import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCode
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
+import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -158,6 +159,18 @@ export function DashboardContent({
     );
   }
 
+  if (selectedModule.id === 'sales' && currentPageKey === 'status') {
+    return (
+      <SalesOrderStatusPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
   if (selectedModule.id === 'sales' && currentPageKey === 'create') {
     return (
       <SalesOrderCreatePage
@@ -165,6 +178,7 @@ export function DashboardContent({
         currentMenuName={currentMenuName}
         content={content}
         breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }

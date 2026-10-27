@@ -22,14 +22,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.co.master.material.domain.model.*;
 import egovframework.let.co.master.material.domain.repository.MaterialInfoDAO;
+import egovframework.let.co.master.classification.domain.model.ClassificationKind;
+import egovframework.let.co.master.classification.domain.model.ClassificationVO;
+import egovframework.let.co.master.classification.domain.repository.ClassificationDAO;
+import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
 
 @ExtendWith(MockitoExtension.class)
 class MaterialInfoServiceImplTest {
     @Mock MaterialInfoDAO dao;
     @Mock EgovIdGnrService generator;
+    @Mock ClassificationDAO classificationDao;
     MaterialInfoServiceImpl service;
 
-    @BeforeEach void setup() { service = new MaterialInfoServiceImpl(dao, generator); }
+    @BeforeEach void setup() {
+        service = new MaterialInfoServiceImpl(dao, generator, new ClassificationSelectionValidator(classificationDao));
+    }
 
     private MaterialInfoSaveRequestVO payload(String code) {
         MaterialInfoSaveRequestVO p = new MaterialInfoSaveRequestVO();
@@ -50,6 +57,46 @@ class MaterialInfoServiceImplTest {
         when(dao.selectMaterialIdByCode(anyMap())).thenReturn(null);
         when(dao.insertMaterial(anyMap())).thenReturn(12L);
         when(dao.selectMaterialById(anyMap())).thenReturn(new MaterialInfoVO());
+    }
+
+    @Test void preservesOmittedClassificationAndExplicitlyClearsIt() throws Exception {
+        MaterialInfoVO existing = new MaterialInfoVO();
+        existing.setItemClsId(8L);
+        when(dao.selectMaterialById(anyMap())).thenReturn(existing);
+        when(dao.updateMaterial(anyMap())).thenReturn(1);
+        service.updateMaterial(9L, "101", 12L, payload(""));
+        MaterialInfoSaveRequestVO clear = payload("");
+        clear.setItemClsId(null);
+        service.updateMaterial(9L, "101", 12L, clear);
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(dao, times(2)).updateMaterial(captured.capture());
+        assertThat(captured.getAllValues().get(0)).containsEntry("itemClsId", 8L);
+        assertThat(captured.getAllValues().get(1)).containsEntry("itemClsId", null);
+    }
+
+    @Test void savesSelectedClassificationWithoutReplacingLegacyCategory() throws Exception {
+        ClassificationVO root = new ClassificationVO();
+        root.setId(8L); root.setLevel(1); root.setUseAt("Y");
+        when(classificationDao.selectById(ClassificationKind.ITEM, 9L, 8L)).thenReturn(root);
+        stubInsert();
+        when(generator.getNextStringId()).thenReturn("000001");
+        MaterialInfoSaveRequestVO request = payload("");
+        request.setItemClsId(8L);
+        request.setMatCataType("LEGACY");
+        service.createMaterial(9L, "101", request);
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(dao).insertMaterial(captured.capture());
+        assertThat(captured.getValue()).containsEntry("itemClsId", 8L).containsEntry("matCataType", "LEGACY");
+    }
+
+    @Test void rejectsUnavailableClassificationBeforeWriting() throws Exception {
+        MaterialInfoSaveRequestVO request = payload("");
+        request.setItemClsId(999L);
+        assertThatThrownBy(() -> service.createMaterial(9L, "101", request)).isInstanceOf(IllegalArgumentException.class);
+        when(dao.selectMaterialById(anyMap())).thenReturn(new MaterialInfoVO());
+        assertThatThrownBy(() -> service.updateMaterial(9L, "101", 12L, request)).isInstanceOf(IllegalArgumentException.class);
+        verify(dao, never()).insertMaterial(anyMap());
+        verify(dao, never()).updateMaterial(anyMap());
     }
 
     @Test void generatesSixDigitCodeAndSetsTenantAndStringAudit() throws Exception {

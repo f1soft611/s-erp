@@ -807,10 +807,38 @@
 - 수주상태 허용값은 `수주등록`, `생산대기`, `생산중`, `출하완료`, `취소`이며 `use_at`은 `Y`/`N`이다.
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
 
+### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
+
+`20261027_002` 설계 초안이며 현재 central DB에 적용되지 않았다. 실제 현행 스키마로 오인하지 않도록 아래 정의는 제안 상태로만 기록한다.
+
+| 테이블/컬럼 | 타입 | NULL/기본값 | 제안 의미 |
+| --- | --- | --- | --- |
+| `tb_cls_item.item_cls_id` | `bigserial` | NOT NULL | 품목분류 내부 PK |
+| `tb_cls_item.tenant_id` | `bigint` | NOT NULL | 분류 소유 tenant |
+| `tb_cls_item.item_cls_nm` | `varchar(50)` | NOT NULL | 품목분류명 |
+| `tb_cls_item.item_cls_lvl` | `smallint` | NOT NULL | 대/중/소 레벨 1~3 |
+| `tb_cls_item.upper_item_cls_id` | `bigint` | NULL | 같은 tenant 상위 분류 ID |
+| `tb_cls_item.sort_seq`, `use_at` | `int`, `char(1)` | `0`, `Y` | 정렬순서 및 사용여부 |
+| `tb_cls_partner.partner_cls_id` | `bigserial` | NOT NULL | 거래처분류 내부 PK |
+| `tb_cls_partner.tenant_id` | `bigint` | NOT NULL | 분류 소유 tenant |
+| `tb_cls_partner.partner_cls_nm` | `varchar(50)` | NOT NULL | 거래처분류명 |
+| `tb_cls_partner.partner_cls_lvl` | `smallint` | NOT NULL | 대/소 레벨 1~2 |
+| `tb_cls_partner.upper_partner_cls_id` | `bigint` | NULL | 같은 tenant 상위 분류 ID |
+| `tb_cls_partner.sort_seq`, `use_at` | `int`, `char(1)` | `0`, `Y` | 정렬순서 및 사용여부 |
+| 두 분류 테이블 감사 컬럼 | `varchar(10)`, `timestamp` | created_at은 current timestamp | created_by/created_at/updated_by/updated_at |
+| `tb_material_info.item_cls_id` | `bigint` | NULL | 품목 소분류 내부 ID, tenant 복합 FK |
+| `tb_customer_info.business_kind1` | `bigint` | NULL | 기존 central 컬럼을 전환할 거래처 대분류 ID |
+| `tb_customer_info.business_kind2` | `bigint` | NULL | 기존 central 컬럼을 전환할 거래처 소분류 ID |
+
+- 분류 ID와 tenant 복합 unique/FK로 parent 및 마스터 tenant 경계를 제한한다. 거래처 소분류 FK는 `(business_kind2, business_kind1, tenant_id)`를 자식 키의 `(partner_cls_id, upper_partner_cls_id, tenant_id)`에 연결한다.
+- `tb_material_info.mat_cata_type` 및 `tb_customer_info.business_kind3`는 변경/이관하지 않는다. `business_kind1/2`에 공백 외 데이터가 있으면 migration guard가 중단한다.
+- [설계](../superpowers/specs/2026-10-27-item-partner-classification-schema-design.md), [DDL](20261027/20261027_002_create_item_partner_classification_schema.sql), [rollback](20261027/20261027_002_rollback_item_partner_classification_schema.sql), [변경 이력](20261027/20261027_002_change_item_partner_classification_schema.md), [backend 사본](../../backend/DATABASE/20261027) 참고. DDL/rollback 모두 미적용.
+
 ---
 
 ## 변경 이력
 
+- 2026-10-27: 품목·거래처 분류 tenant schema DDL 초안 `20261027_002`를 정의했다. central DB `business_kind1/2` nonblank guard, tenant 복합 FK, 소분류-부모 일치 FK 및 데이터 존재 시 중단하는 rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261027](../../backend/DATABASE/20261027) 및 [docs/database/20261027](20261027) 참고.
 - 2026-10-26: 수주 헤더/상세 신규 테이블 DDL 초안 `20261026_008`을 정의했다. 테넌트 범위 FK와 별도 상세 ID, guarded rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261026](../../backend/DATABASE/20261026) 및 [docs/database/20261026](20261026) 참고.
 
 - 2026-10-22: 품목 테이블이 없는 환경의 DDL 누락을 보완했다. tenant MCP로 37개 컬럼과 기본값/주석/제약/인덱스를 재확인하고 `20261022_010_create_material_schema.sql`과 빈 신규 테이블 전용 롤백을 두 DB 이력 폴더에 추가했다. 기존 테이블 수정 및 실제 DB 적용은 수행하지 않았다.

@@ -27,6 +27,7 @@ export function useDocumentStatusSearch() {
     loading: defaultsLoading,
     error: defaultsError,
     retry: retryDefaults,
+    initialLoad: defaultsInitialLoad,
   } = usePageSearchDefaults(detailFields);
   const { state: searchSession, setState: setSearchSession } =
     usePageSessionState<DocumentStatusSearchSession | null>(
@@ -111,6 +112,7 @@ export function useDocumentStatusSearch() {
     defaultsInitialized,
     defaultsLoading,
     defaultsError,
+    defaultsInitialLoad,
     retryDefaults,
     searchAreaDefaultValues: searchSession === null ? (defaultValues ?? {}) : {},
     applySearch,

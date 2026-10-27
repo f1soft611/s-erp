@@ -711,8 +711,6 @@ export const RoleManagementPanel = forwardRef<
       if (saveInFlightRef.current || reloadInFlightRef.current) return;
       reloadInFlightRef.current = true;
       const targetRoleId = selectedRoleIdRef.current;
-      setFailedSaveView(undefined);
-      setRoleGridDirty(false);
       userGridDirtyRef.current = false;
       setUserGridDirty(false);
       setUserGridKey((current) => current + 1);
@@ -722,6 +720,13 @@ export const RoleManagementPanel = forwardRef<
       ]).finally(() => {
         reloadInFlightRef.current = false;
       });
+      const rolesApplied =
+        rolesResult.status === 'fulfilled' &&
+        rolesResult.value !== 'stale';
+      if (rolesApplied) {
+        setFailedSaveView(undefined);
+        setRoleGridDirty(false);
+      }
       // Mapping records for the applied role were cleared by loadUserRows; other
       // roles keep theirs until their own mappings are fetched.
       const reconciled =
@@ -737,9 +742,11 @@ export const RoleManagementPanel = forwardRef<
       }
       const pending = hasPendingMarkers();
       setPendingSync(pending);
-      onDirtyChange?.(pending || userGridDirtyRef.current);
+      onDirtyChange?.(
+        pending || userGridDirtyRef.current || (!rolesApplied && roleGridDirty),
+      );
     },
-    [hasPendingMarkers, loadUserRows, onDirtyChange],
+    [hasPendingMarkers, loadUserRows, onDirtyChange, roleGridDirty],
   );
 
   const closeRoleSwitchDialog = useCallback(() => {

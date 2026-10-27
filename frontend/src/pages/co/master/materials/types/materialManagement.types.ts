@@ -139,12 +139,14 @@ export const expiryStatuses = ['NONE', 'DAY', 'MONTH', 'YEAR'] as const;
 export type ExpiryStatus = (typeof expiryStatuses)[number];
 export type MaterialTextField = (typeof materialTextFields)[number]['field'];
 export type MaterialPayload = Record<MaterialTextField, string> & {
+  itemClsId?: number | null;
   materialWeight: number | null;
   safeInvoice: number | null;
   expiryedStatus: ExpiryStatus;
   expiryedCount: number | null;
 };
 export type MaterialRow = MaterialPayload & {
+  itemClsPath?: string;
   materialId: string | number;
   tenantId?: number;
   createdBy?: string;
@@ -197,6 +199,7 @@ export function emptyMaterialPayload(): MaterialPayload {
     partNo: '',
     manufactory: '',
     matCataType: '',
+    itemClsId: null,
     location: '',
     itemType: '',
     searchItemName: '',

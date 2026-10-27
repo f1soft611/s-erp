@@ -4,7 +4,9 @@
 
 - Design approved in conversation on 2026-10-26.
 - Scope: tenant-aware sales-order header/detail DDL and the first frontend registration screen.
-- The sales-order search/save API and backend implementation are explicitly deferred.
+- The original design deferred the sales-order API. The authorized scope
+  extension and create-only API contract are documented in
+  [2026-10-27-sales-order-save-and-ux-design.md](2026-10-27-sales-order-save-and-ux-design.md).
 
 ## Context and evidence
 
@@ -182,10 +184,11 @@ SQL/document copies must match. Do not execute the DDL against a database.
 
 ## Out of scope
 
-- Sales-order list/search, save/update, cancellation, and backend API.
+- Sales-order list/search, update, and cancellation. The create API is in scope
+  only as defined by the 2026-10-27 addendum.
 - Quote conversion and a quotation table.
 - Creating or changing the existing sales menu/module configuration.
 - Applying SQL to the database.
-- Automatic order-number format or sequence. The number field remains
-  read-only until that contract is decided with the order API.
+- The automatic order-number format or sequence was deferred by this original
+  design; the 2026-10-27 addendum defines it for the create API.
 - Tax category/rate storage or a configurable VAT calculation.

@@ -1467,6 +1467,9 @@ describe('MenuManagementPage module selection', () => {
 
   it('aligns the module selector and search field on the same baseline', async () => {
     apiMocks.apiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/system/roles') {
+        return Promise.resolve({ resultList: [] });
+      }
       if (path === '/api/v1/system/modules') {
         return Promise.resolve({
           resultList: modules.map((module) => ({

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesOrderStatusDAO">
+
+    <select id="selectOrderStatusList" parameterType="map" resultType="egovframework.let.sales.order.status.domain.model.SalesOrderStatusVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               d.sales_order_detail_id AS salesOrderDetailId,
+               h.order_no AS orderNo,
+               h.order_dt AS orderDt,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.quot_no AS quotNo,
+               h.status AS status,
+               h.delivery_dt AS headerDeliveryDt,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               h.remark AS remark,
+               d.line_no AS lineNo,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               d.order_qty AS orderQty,
+               d.unit_price AS unitPrice,
+               d.supply_amt AS supplyAmt,
+               d.vat_amt AS vatAmt,
+               d.total_amt AS totalAmt,
+               COALESCE(d.delivery_dt, h.delivery_dt) AS deliveryDt,
+               d.shipped_qty AS shippedQty,
+               d.line_status AS lineStatus
+        FROM tb_sales_order_hd h
+        JOIN tb_sales_order_dt d
+          ON d.sales_order_id = h.sales_order_id
+         AND d.tenant_id = h.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        WHERE h.tenant_id = #{tenantId}
+          AND h.use_at = 'Y'
+        <if test="keyword != null">
+          AND (h.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_code ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%'
+               OR h.quot_no ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="orderNo != null">
+          AND h.order_no ILIKE '%' || #{orderNo} || '%'
+        </if>
+        <if test="orderDtFrom != null">
+          AND h.order_dt &gt;= CAST(#{orderDtFrom} AS date)
+        </if>
+        <if test="orderDtTo != null">
+          AND h.order_dt &lt;= CAST(#{orderDtTo} AS date)
+        </if>
+        <if test="customerKeyword != null">
+          AND (c.customer_code ILIKE '%' || #{customerKeyword} || '%'
+               OR c.customer_name ILIKE '%' || #{customerKeyword} || '%')
+        </if>
+        <if test="quotNo != null">
+          AND h.quot_no ILIKE '%' || #{quotNo} || '%'
+        </if>
+        <if test="status != null">
+          AND h.status = #{status}
+        </if>
+        <if test="deliveryDtFrom != null">
+          AND COALESCE(d.delivery_dt, h.delivery_dt) &gt;= CAST(#{deliveryDtFrom} AS date)
+        </if>
+        <if test="deliveryDtTo != null">
+          AND COALESCE(d.delivery_dt, h.delivery_dt) &lt;= CAST(#{deliveryDtTo} AS date)
+        </if>
+        <if test="materialKeyword != null">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="lineStatus != null">
+          AND d.line_status = #{lineStatus}
+        </if>
+        ORDER BY h.order_dt DESC, h.order_no DESC, d.line_no
+    </select>
+</mapper>

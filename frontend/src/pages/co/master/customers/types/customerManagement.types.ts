@@ -9,6 +9,10 @@ export type CustomerRow = {
   juridNo: string;
   businessStatus1: string;
   businessItem1: string;
+  businessKind1?: number | null;
+  businessKind2?: number | null;
+  businessKind1Name?: string;
+  businessKind2Name?: string;
   postCode: string;
   address: string;
   telephoneNo: string;
@@ -51,6 +55,8 @@ export type CustomerPayload = Pick<
   | 'juridNo'
   | 'businessStatus1'
   | 'businessItem1'
+  | 'businessKind1'
+  | 'businessKind2'
   | 'postCode'
   | 'address'
   | 'telephoneNo'

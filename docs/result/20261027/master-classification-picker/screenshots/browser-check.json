@@ -1,0 +1,92 @@
+[
+  {
+    "kind": "item",
+    "width": 375,
+    "geometry": {
+      "width": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "saves": 2,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  },
+  {
+    "kind": "item",
+    "width": 768,
+    "geometry": {
+      "width": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "contentWidth": 702,
+      "contentScrollWidth": 702
+    },
+    "saves": 2,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  },
+  {
+    "kind": "item",
+    "width": 1280,
+    "geometry": {
+      "width": 1280,
+      "documentWidth": 1280,
+      "x": 229,
+      "right": 1051,
+      "contentWidth": 820,
+      "contentScrollWidth": 820
+    },
+    "saves": 3,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  },
+  {
+    "kind": "partner",
+    "width": 375,
+    "geometry": {
+      "width": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "saves": 2,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  },
+  {
+    "kind": "partner",
+    "width": 768,
+    "geometry": {
+      "width": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "contentWidth": 702,
+      "contentScrollWidth": 702
+    },
+    "saves": 2,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  },
+  {
+    "kind": "partner",
+    "width": 1280,
+    "geometry": {
+      "width": 1280,
+      "documentWidth": 1280,
+      "x": 229,
+      "right": 1051,
+      "contentWidth": 820,
+      "contentScrollWidth": 820
+    },
+    "saves": 3,
+    "pageErrors": [],
+    "checks": "lazy-load, inactive-ancestor-block, readonly-tree, asynchronous-form-selection, parent-auto-fill, save-reload, cancel, retry, clear-save"
+  }
+]

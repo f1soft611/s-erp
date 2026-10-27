@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesOrderDAO">
+
+    <select id="existsCustomer" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_customer_info
+            WHERE customer_id = #{id}
+              AND tenant_id = #{tenantId}
+        )
+    </select>
+
+    <select id="existsMaterial" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_material_info
+            WHERE material_id = #{id}
+              AND tenant_id = #{tenantId}
+        )
+    </select>
+
+    <select id="insertOrderHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_order_hd (
+            tenant_id,
+            order_no,
+            order_dt,
+            customer_id,
+            quot_no,
+            delivery_dt,
+            delivery_place,
+            delivery_method,
+            status,
+            total_amt,
+            remark,
+            created_by
+        ) VALUES (
+            #{tenantId},
+            #{orderNo},
+            CAST(#{orderDt} AS date),
+            #{customerId},
+            #{quotNo},
+            CAST(#{deliveryDt} AS date),
+            #{deliveryPlace},
+            #{deliveryMethod},
+            #{status},
+            #{totalAmt},
+            #{remark},
+            #{createdBy}
+        )
+        RETURNING sales_order_id
+    </select>
+
+    <select id="insertOrderDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_order_dt (
+            sales_order_id,
+            tenant_id,
+            line_no,
+            material_id,
+            order_qty,
+            unit_price,
+            supply_amt,
+            vat_amt,
+            total_amt,
+            delivery_dt,
+            shipped_qty,
+            line_status
+        ) VALUES (
+            #{salesOrderId},
+            #{tenantId},
+            #{lineNo},
+            #{materialId},
+            #{orderQty},
+            #{unitPrice},
+            #{supplyAmt},
+            #{vatAmt},
+            #{totalAmt},
+            CAST(#{deliveryDt} AS date),
+            #{shippedQty},
+            #{lineStatus}
+        )
+        RETURNING sales_order_detail_id
+    </select>
+
+    <select id="selectOrder" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               h.tenant_id AS tenantId,
+               h.order_no AS orderNo,
+               h.order_dt AS orderDt,
+               h.customer_id AS customerId,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.quot_no AS quotNo,
+               h.delivery_dt AS deliveryDt,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               h.status AS status,
+               h.total_amt AS totalAmt,
+               h.remark AS remark,
+                      h.created_by AS createdBy,
+                      u.user_nm AS createdByName,
+                      la.profile_image AS createdByProfileImage,
+                      to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt
+               FROM tb_sales_order_hd h
+               LEFT JOIN tb_customer_info c
+                 ON c.customer_id = h.customer_id
+                AND c.tenant_id = h.tenant_id
+               LEFT JOIN tb_login_account la
+                 ON la.login_code = h.created_by
+                AND la.tenant_id = h.tenant_id
+               LEFT JOIN tb_user u
+                 ON u.login_id = la.login_id
+                AND u.tenant_id = la.tenant_id
+               WHERE h.sales_order_id = #{salesOrderId}
+          AND h.tenant_id = #{tenantId}
+          AND h.use_at = 'Y'
+    </select>
+
+    <select id="selectOrderDetails" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO">
+        SELECT d.sales_order_detail_id AS salesOrderDetailId,
+               d.sales_order_id AS salesOrderId,
+               d.tenant_id AS tenantId,
+               d.line_no AS lineNo,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               d.order_qty AS orderQty,
+               d.unit_price AS unitPrice,
+               d.supply_amt AS supplyAmt,
+               d.vat_amt AS vatAmt,
+               d.total_amt AS totalAmt,
+               d.delivery_dt AS deliveryDt,
+               d.shipped_qty AS shippedQty,
+               d.line_status AS lineStatus
+        FROM tb_sales_order_dt d
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        WHERE d.sales_order_id = #{salesOrderId}
+          AND d.tenant_id = #{tenantId}
+        ORDER BY d.line_no
+    </select>
+
+    <select id="countShippedDetails" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_order_dt
+        WHERE sales_order_id = #{salesOrderId}
+          AND tenant_id = #{tenantId}
+          AND COALESCE(shipped_qty, 0) &gt; 0
+    </select>
+
+    <update id="updateOrderHeader" parameterType="map">
+        UPDATE tb_sales_order_hd
+        SET order_dt = CAST(#{orderDt} AS date),
+            customer_id = #{customerId},
+            quot_no = #{quotNo},
+            delivery_dt = CAST(#{deliveryDt} AS date),
+            delivery_place = #{deliveryPlace},
+            delivery_method = #{deliveryMethod},
+            total_amt = #{totalAmt},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE sales_order_id = #{salesOrderId}
+          AND tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </update>
+
+    <delete id="deleteOrderDetails" parameterType="map">
+        DELETE FROM tb_sales_order_dt
+        WHERE sales_order_id = #{salesOrderId}
+          AND tenant_id = #{tenantId}
+    </delete>
+
+    <update id="softDeleteOrderHeader" parameterType="map">
+        UPDATE tb_sales_order_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE sales_order_id = #{salesOrderId}
+          AND tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </update>
+</mapper>

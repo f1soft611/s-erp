@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from '../../../../../shared/services/apiClient';
+import { normalizeClassificationId } from '../../classification/services/classification.service';
 import { GridSaveReconciliationError, resolveSavedGridRows, type F1GridSavedRow } from '../../../../../shared/components/f1-grid';
 import {
   emptyMaterialPayload, expiryStatuses, materialTextFields,
@@ -42,6 +43,7 @@ export function toMaterialPayload(row: MaterialPayload, isNew: boolean): Materia
   if (!payload.materialTypeCode) throw new Error('품목계정코드는 필수입니다.');
   if (!isNew && !payload.materialCode) throw new Error('수정 시 품목코드를 입력해 주세요.');
   payload.materialWeight = numeric(row.materialWeight, '중량', true);
+  payload.itemClsId = normalizeClassificationId(row.itemClsId);
   payload.safeInvoice = numeric(row.safeInvoice, '안전재고');
   payload.expiryedStatus = requireExpiryStatus(row.expiryedStatus);
   payload.expiryedCount = numeric(row.expiryedCount, '소비기한 숫자', true);
@@ -74,6 +76,11 @@ export function normalizeMaterialRow(source: Record<string, unknown>): MaterialR
     row[field] = value ?? '';
   }
   row.materialWeight = numeric(source.materialWeight, '중량', true);
+  row.itemClsId = normalizeClassificationId(source.itemClsId);
+  if (source.itemClsPath != null && typeof source.itemClsPath !== 'string') {
+    throw new Error('품목분류 경로 응답을 확인할 수 없습니다.');
+  }
+  row.itemClsPath = source.itemClsPath ?? '';
   row.safeInvoice = numeric(source.safeInvoice, '안전재고');
   row.expiryedCount = numeric(source.expiryedCount, '소비기한계산숫자', true);
   row.expiryedStatus = requireExpiryStatus(source.expiryedStatus);

@@ -1,6 +1,7 @@
 import { Box, Button } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { DocumentStatusDetail } from './components/DocumentStatusDetail';
@@ -61,6 +62,8 @@ export function DocumentStatusPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...search.defaultsInitialLoad} label="검색 기본값" onRetry={search.retryDefaults}>
+      <PageLoadBoundary {...list.initialLoad} label="문서현황" onRetry={list.retry}>
       <DocumentStatusSearchArea
         keyword={search.keyword}
         onKeywordChange={search.setKeyword}
@@ -108,7 +111,7 @@ export function DocumentStatusPage({
               rows={list.rows}
               loading={list.loading}
               canExportExcel={selectedMenuPermissions?.excel ?? false}
-              onSelectionChange={detail.handleSelectionChange}
+              onOpenDocument={detail.handleOpenDocument}
             />
           </Box>
         ) : null}
@@ -116,6 +119,8 @@ export function DocumentStatusPage({
           <EmptyDocumentStatus onReset={search.resetSearch} />
         ) : null}
       </Box>
+      </PageLoadBoundary>
+      </PageLoadBoundary>
       <DocumentStatusDetail
         selectedDocumentId={detail.selectedDocumentId}
         editingDocument={detail.editingDocument}

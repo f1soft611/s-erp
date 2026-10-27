@@ -1,0 +1,74 @@
+[
+  {
+    "kind": "item",
+    "width": 375,
+    "writes": 1,
+    "geometry": {
+      "x": 0,
+      "right": 375,
+      "documentWidth": 375
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  },
+  {
+    "kind": "item",
+    "width": 768,
+    "writes": 1,
+    "geometry": {
+      "x": 32,
+      "right": 736,
+      "documentWidth": 768
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  },
+  {
+    "kind": "item",
+    "width": 1280,
+    "writes": 1,
+    "geometry": {
+      "x": 229,
+      "right": 1051,
+      "documentWidth": 1280
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  },
+  {
+    "kind": "partner",
+    "width": 375,
+    "writes": 1,
+    "geometry": {
+      "x": 0,
+      "right": 375,
+      "documentWidth": 375
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  },
+  {
+    "kind": "partner",
+    "width": 768,
+    "writes": 1,
+    "geometry": {
+      "x": 32,
+      "right": 736,
+      "documentWidth": 768
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  },
+  {
+    "kind": "partner",
+    "width": 1280,
+    "writes": 1,
+    "geometry": {
+      "x": 229,
+      "right": 1051,
+      "documentWidth": 1280
+    },
+    "pageErrors": [],
+    "checks": "initial-disabled, unchanged-editor-disabled, draft-enabled, modified-enabled, reverted-disabled, saved-disabled, added-enabled"
+  }
+]

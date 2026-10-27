@@ -35,6 +35,34 @@ beforeEach(() => {
 });
 
 describe('material management contract', () => {
+  it.each([
+    [true, false], [false, true], [false, false],
+  ])('classification settings follow menu create=%s update=%s without admin role', async (create, update) => {
+    api.apiGet.mockImplementation(async (url: string) => ({
+      resultList: url.includes('/classifications/') || url.endsWith('/options') ? [] : [material],
+    }));
+    render(<ThemeProvider theme={createTheme()}><NotificationProvider>
+      <DashboardContent
+        selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
+        currentMenuName="품목관리" currentPageKey="materials"
+        content={{ title: '품목관리', description: '품목', cards: [], items: [] }}
+        selectedMenuPermissions={{ read: true, create, update, delete: false, excel: false }}
+        isTenantAdmin={false}
+      />
+    </NotificationProvider></ThemeProvider>);
+    await screen.findByText('Sample');
+    const action = screen.queryByRole('button', { name: /품목분류\s*설정/ });
+    if (!create && !update) {
+      expect(action).not.toBeInTheDocument();
+      return;
+    }
+    expect(action).toBeInTheDocument();
+    fireEvent.click(action!);
+    expect(await screen.findByRole('dialog', { name: /품목분류\s*설정/ })).toBeInTheDocument();
+    await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith('/api/v1/co/master/classifications/items'));
+    expect(Boolean(screen.queryByRole('button', { name: '최상위 추가' }))).toBe(create);
+  });
+
   it('places and pins the account, code and name before other business columns', () => {
     const columns = createMaterialColumns(true);
     expect(columns.slice(0, 4).map((column) => column.field)).toEqual([

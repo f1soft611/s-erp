@@ -32,6 +32,7 @@ export function createMaterialColumns(
   canEdit: boolean | ((row: MaterialRow) => boolean),
   options: MaterialOption[] = [],
   rows: MaterialRow[] = [],
+  onOpenClassification?: F1GridColumn<MaterialRow>['onOpenCodePicker'],
 ): F1GridColumn<MaterialRow>[] {
   const columns: F1GridColumn<MaterialRow>[] = [
     {
@@ -95,6 +96,13 @@ export function createMaterialColumns(
           },
       search: 'search' in definition ? { order: index } : { hidden: true },
     });
+  });
+  columns.splice(4, 0, {
+    field: 'itemClsId', headerName: '품목분류', type: 'code', width: 220,
+    editable: canEdit, getValue: (row) => row.itemClsPath ?? '',
+    onOpenCodePicker: onOpenClassification,
+    onValueChange: () => { throw new Error('코드 선택으로 품목분류를 선택해 주세요.'); },
+    form: { group: '규격·분류', order: 8, span: 2 }, search: { hidden: true },
   });
   const expiryOptions = options
     .filter((item) => item.groupCode === 'EXPIRY_STATUS' &&

@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { CommonCodeItemHelpDialog } from '../../../../shared/components/common-code/CommonCodeItemHelpDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import { usePageSearchDefaults } from '../../../../shared/hooks/usePageSearchDefaults';
@@ -204,6 +205,7 @@ export function ArchiveBoardPage({
     loading: defaultsLoading,
     error: defaultsError,
     retry: retryDefaults,
+    initialLoad: defaultsInitialLoad,
   } = usePageSearchDefaults(DETAIL_FIELDS);
   const [searchDraft, setSearchDraft] = useState('');
   const [currentFolderCode, setCurrentFolderCode] = useState('');
@@ -388,16 +390,16 @@ export function ArchiveBoardPage({
                   key: 'archive-create',
                   actions: [
                     {
-                      key: 'upload-archive',
-                      label: '파일 업로드',
-                      icon: AddOutlined,
-                      onClick: handleUploadClick,
-                    },
-                    {
                       key: 'create-archive-folder',
                       label: '새 폴더',
                       icon: CreateNewFolderOutlined,
                       onClick: () => setCategoryDialogOpen(true),
+                    },
+                    {
+                      key: 'upload-archive',
+                      label: '파일 업로드',
+                      icon: AddOutlined,
+                      onClick: handleUploadClick,
                     },
                   ],
                 },
@@ -421,6 +423,10 @@ export function ArchiveBoardPage({
         ]}
       />
 
+      <PageLoadBoundary {...defaultsInitialLoad} label="검색 기본값" onRetry={retryDefaults}>
+      <PageLoadBoundary {...categories.initialLoad} label="자료실 분류"
+        onRetry={() => { void categories.loadCategories(); }}>
+      <PageLoadBoundary {...archiveList.initialLoad} label="자료실 목록" onRetry={archiveList.retry}>
       <PageSearchArea
         searchField={
           <TextField
@@ -589,6 +595,9 @@ export function ArchiveBoardPage({
         />
       </Box>
 
+      </PageLoadBoundary>
+      </PageLoadBoundary>
+      </PageLoadBoundary>
       <input
         ref={fileInputRef}
         type="file"

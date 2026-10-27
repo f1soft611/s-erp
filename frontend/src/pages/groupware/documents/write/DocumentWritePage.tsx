@@ -3,6 +3,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
 import { useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { ContentSplitLayout } from '../../../../shared/components/view-mode/ContentSplitLayout';
@@ -50,6 +51,7 @@ export function DocumentWritePage({
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const { showError } = useNotification();
   const {
+    initialLoad,
     files,
     viewMode,
     setViewMode,
@@ -146,6 +148,7 @@ export function DocumentWritePage({
         actionGroups={pageActionGroups}
       />
 
+      <PageLoadBoundary {...initialLoad} label="전자결재 목록" onRetry={retry}>
       <Box ref={setScrollRoot} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <Container
           maxWidth="xl"
@@ -346,6 +349,7 @@ export function DocumentWritePage({
           />
         </Container>
       </Box>
+      </PageLoadBoundary>
 
       <DocumentComposerDialog
         open={isComposerOpen}

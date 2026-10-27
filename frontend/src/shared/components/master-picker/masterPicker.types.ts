@@ -14,6 +14,9 @@ export type MasterPickerProps = {
   search: MasterPickerSearch;
   onChange: (value: MasterPickerOption) => void;
   disabled?: boolean;
+  required?: boolean;
+  error?: boolean;
+  helperText?: string;
 };
 
 export type MasterPickerDialogProps = {

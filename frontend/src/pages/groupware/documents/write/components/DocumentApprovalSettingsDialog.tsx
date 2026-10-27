@@ -15,8 +15,9 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
-import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
+import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { F1Grid } from '../../../../../shared/components/f1-grid';
 import {
   UserSelectEditor,
@@ -221,6 +222,7 @@ export function DocumentApprovalSettingsDialog({
   const [templateListError, setTemplateListError] = useState('');
   const [templateGridKey, setTemplateGridKey] = useState(0);
   const [hasTemplateNameChanges, setHasTemplateNameChanges] = useState(false);
+  useUnsavedChangesBeforeUnload(open && managerOpen && hasTemplateNameChanges);
   const [pendingManagerAction, setPendingManagerAction] =
     useState<ApprovalLineTemplateManagerAction | null>(null);
   const [discardTemplateChangesOpen, setDiscardTemplateChangesOpen] =
@@ -1281,20 +1283,15 @@ export function DocumentApprovalSettingsDialog({
         fullScreenOnMobile
         actions={
           <>
-            <Button
+            <AppSaveButton
               variant="contained"
               onClick={() => void saveTemplate()}
+              saving={favoriteOperation === 'save'}
+              savingLabel="저장 중..."
               disabled={favoriteOperation !== null}
             >
-              {favoriteOperation === 'save' ? (
-                <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                  <AppLoadingSpinner size={18} color="inherit" />
-                  저장 중...
-                </Box>
-              ) : (
-                '저장'
-              )}
-            </Button>
+              저장
+            </AppSaveButton>
             <Button
               onClick={() => setSaveDialogOpen(false)}
               disabled={favoriteOperation !== null}
@@ -1331,20 +1328,15 @@ export function DocumentApprovalSettingsDialog({
         fullScreenOnMobile
         actions={
           <>
-            <Button
+            <AppSaveButton
               variant="contained"
               onClick={() => void saveTemplateRenames()}
+              saving={favoriteOperation === 'rename'}
+              savingLabel="저장 중..."
               disabled={!hasTemplateNameChanges || favoriteOperation !== null}
             >
-              {favoriteOperation === 'rename' ? (
-                <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
-                  <AppLoadingSpinner size={18} color="inherit" />
-                  저장 중...
-                </Box>
-              ) : (
-                '저장'
-              )}
-            </Button>
+              저장
+            </AppSaveButton>
             <Button
               onClick={() => requestManagerAction({ type: 'close' })}
               disabled={favoriteOperation !== null}

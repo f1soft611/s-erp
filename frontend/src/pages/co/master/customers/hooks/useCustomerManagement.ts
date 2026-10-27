@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GridSaveReconciliationError, type F1GridChanges, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
+import { normalizeClassificationId } from '../../classification/services/classification.service';
 import {
   fetchCustomers,
   saveCustomerRows,
@@ -30,6 +32,8 @@ function toPayload(row: CustomerRow, isNew: boolean): CustomerPayload {
     juridNo: row.juridNo.trim(),
     businessStatus1: row.businessStatus1.trim(),
     businessItem1: row.businessItem1.trim(),
+    businessKind1: normalizeClassificationId(row.businessKind1),
+    businessKind2: normalizeClassificationId(row.businessKind2),
     postCode: row.postCode.trim(),
     address: row.address.trim(),
     telephoneNo: row.telephoneNo.trim(),
@@ -47,21 +51,30 @@ export function useCustomerManagement() {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const reconciliationRequired = useRef(false);
+  const loadVersion = useRef(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<CustomerFilters>({});
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   const loadRows = useCallback(
     async (
       filters: CustomerFilters = {},
     ) => {
+      const version = ++loadVersion.current;
       setLoading(true);
+      start();
       setError('');
       try {
-        setRows(await fetchCustomers(filters));
+        const nextRows = await fetchCustomers(filters);
+        if (version !== loadVersion.current) return false;
+        setRows(nextRows);
+        succeed();
         reconciliationRequired.current = false;
         return true;
       } catch (loadError) {
+        if (version !== loadVersion.current) return false;
+        fail(loadError);
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -69,14 +82,15 @@ export function useCustomerManagement() {
         );
         return false;
       } finally {
-        setLoading(false);
+        if (version === loadVersion.current) setLoading(false);
       }
     },
-    [],
+    [start, succeed, fail],
   );
 
   useEffect(() => {
     void loadRows({});
+    return () => { ++loadVersion.current; };
   }, [loadRows]);
 
   const applyFilters = useCallback(
@@ -164,6 +178,7 @@ export function useCustomerManagement() {
   );
 
   return {
+    initialLoad,
     rows,
     error,
     setError,

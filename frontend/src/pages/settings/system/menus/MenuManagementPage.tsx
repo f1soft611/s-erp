@@ -14,11 +14,14 @@ import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type {
   MenuPermission,
   MenuTreeNode,
@@ -80,6 +83,7 @@ export function MenuManagementPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
+  useUnsavedChangesBeforeUnload(dirty);
   const hasRequiredSelection =
     Boolean(selectedModuleId) && Boolean(selectedRoleId);
   const filteredMenus = useMemo(() => {
@@ -99,6 +103,8 @@ export function MenuManagementPage({
   const [pendingPermissionReload, setPendingPermissionReload] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const menuLoadRequestIdRef = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
+  const [initializeRetry, setInitializeRetry] = useState(0);
   const menuPanelRef = useRef<{
     saveCurrentChanges: () => Promise<void>;
     deleteSelectedRows: () => void;
@@ -189,6 +195,7 @@ export function MenuManagementPage({
         {
           label: '저장',
           icon: SaveIcon,
+          saving,
           visible: pageActionPermissions.write,
           disabled: !dirty || saving,
           onClick: async () => {
@@ -229,6 +236,7 @@ export function MenuManagementPage({
     }
 
     const requestId = ++menuLoadRequestIdRef.current;
+    start();
     if (showSkeleton) {
       setLoading(true);
     }
@@ -243,11 +251,13 @@ export function MenuManagementPage({
       ]);
       if (requestId !== menuLoadRequestIdRef.current) return false;
       setMenus(nextMenus);
+      succeed();
       if (nextPermissions) setPermissions(nextPermissions);
       setDirty(false);
       return true;
     } catch (requestError) {
       if (requestId !== menuLoadRequestIdRef.current) return false;
+      fail(requestError);
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -262,19 +272,17 @@ export function MenuManagementPage({
   }
 
   useEffect(() => {
+    let active = true;
     async function initialize() {
+      start();
       setError('');
       try {
-        const [modulesResult, permissionsResult] = await Promise.all([
+        const [modulesResult, permissionsResult, nextRoles] = await Promise.all([
           fetchModules(),
           fetchActivePermissions(),
+          fetchRoleRows(),
         ]);
-        let nextRoles: RoleManagementRow[] = [];
-        try {
-          nextRoles = await fetchRoleRows();
-        } catch {
-          nextRoles = [];
-        }
+        if (!active) return;
 
         setModules(modulesResult);
         setPermissions(permissionsResult);
@@ -303,9 +311,11 @@ export function MenuManagementPage({
           await loadMenus(initialModule.moduleId, false, true, initialRoleId);
         } else {
           setMenus([]);
+          succeed();
         }
       } catch (requestError) {
-        setMenus([]);
+        if (!active) return;
+        fail(requestError);
         setError(
           requestError instanceof Error
             ? requestError.message
@@ -315,7 +325,13 @@ export function MenuManagementPage({
     }
 
     void initialize();
-  }, []);
+    return () => {
+      active = false;
+      ++menuLoadRequestIdRef.current;
+    };
+  // Initialization uses the session snapshot; selection changes load menus separately.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initializeRetry, start, succeed, fail]);
 
   const selectedModule = modules.find(
     (module) => module.moduleId === selectedModuleId,
@@ -460,6 +476,8 @@ export function MenuManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...initialLoad} label="메뉴 관리 정보"
+        onRetry={() => setInitializeRetry((current) => current + 1)}>
       <PageSearchArea
         searchField={
           <TextField
@@ -664,6 +682,7 @@ export function MenuManagementPage({
         onCancel={() => setConfirmOpen(false)}
         onContinue={confirmDiscardChanges}
       />
+      </PageLoadBoundary>
     </Box>
   );
 }

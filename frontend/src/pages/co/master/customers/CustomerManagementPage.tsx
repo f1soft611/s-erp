@@ -3,12 +3,14 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
-import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import {
   type F1GridRef,
@@ -25,6 +27,8 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { CustomerGrid, createCustomerColumns } from './components/CustomerGrid';
 import { useCustomerManagement } from './hooks/useCustomerManagement';
+import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
+import { ClassificationPickerDialog } from '../classification/components/ClassificationPickerDialog';
 import type {
   CustomerFilters,
   CustomerRow,
@@ -39,10 +43,6 @@ type CustomerManagementPageProps = {
   isTenantAdmin?: boolean;
 };
 
-function CustomerSaveProgressIcon() {
-  return <AppLoadingSpinner size={16} color="inherit" aria-label="거래처 저장 중" />;
-}
-
 export function CustomerManagementPage({
   selectedModule,
   currentMenuName,
@@ -52,12 +52,21 @@ export function CustomerManagementPage({
   isTenantAdmin = false,
 }: CustomerManagementPageProps) {
   const management = useCustomerManagement();
+  useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<CustomerRow>>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
   >({});
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(false);
+  const [classificationPicker, setClassificationPicker] = useState<{
+    apply: (patch: Partial<CustomerRow>) => void;
+    row: CustomerRow;
+    level: 1 | 2;
+  } | null>(null);
+  const canCreateClassification = Boolean(selectedMenuPermissions?.create);
+  const canUpdateClassification = Boolean(selectedMenuPermissions?.update);
   const [pendingFilters, setPendingFilters] = useState<CustomerFilters | null>(
     null,
   );
@@ -70,7 +79,8 @@ export function CustomerManagementPage({
   };
   const canWrite = pagePermissions.create || pagePermissions.update;
   const columns = useMemo(
-    () => createCustomerColumns(canWrite && !management.saving),
+    () => createCustomerColumns(canWrite && !management.saving,
+      (row, apply, level) => setClassificationPicker({ row, apply, level })),
     [canWrite, management.saving],
   );
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
@@ -140,6 +150,16 @@ export function CustomerManagementPage({
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'write',
+      actions: [{
+        label: '거래처분류 설정',
+        icon: SettingsIcon,
+        visible: canCreateClassification || canUpdateClassification,
+        disabled: management.saving,
+        onClick: () => setClassificationOpen(true),
+      }],
+    },
+    {
+      key: 'write',
       actions: [
         {
           label: '거래처 추가',
@@ -167,7 +187,9 @@ export function CustomerManagementPage({
       actions: [
         {
           label: '저장',
-          icon: management.saving ? CustomerSaveProgressIcon : SaveIcon,
+          icon: SaveIcon,
+          saving: management.saving,
+          savingAriaLabel: '거래처 저장 중',
           visible: canWrite,
           disabled: !management.hasChanges || management.saving,
           onClick: handleGridSave,
@@ -195,6 +217,8 @@ export function CustomerManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...management.initialLoad} label="거래처 목록"
+        onRetry={() => management.applyFilters(management.appliedFilters)}>
       <PageSearchArea
         searchField={
           <TextField
@@ -259,6 +283,32 @@ export function CustomerManagementPage({
           onValidationErrors={handleValidationErrors}
         />
       </Box>
+      <ClassificationSettingsDialog open={classificationOpen} kind="partner"
+        canCreate={canCreateClassification} canUpdate={canUpdateClassification}
+        onClose={() => setClassificationOpen(false)} />
+      <ClassificationPickerDialog open={classificationPicker !== null} kind="partner"
+        level={classificationPicker?.level}
+        parentId={classificationPicker?.level === 2 ? classificationPicker.row.businessKind1 : undefined}
+        onClose={() => setClassificationPicker(null)}
+        onSelect={(selection) => {
+          if (!classificationPicker) return;
+          if (classificationPicker.level === 1) {
+            const changed = (classificationPicker.row.businessKind1 ?? null) !== (selection?.row.id ?? null);
+            classificationPicker.apply({
+              businessKind1: selection?.row.id ?? null,
+              businessKind1Name: selection?.row.name ?? '',
+              ...(changed || !selection ? { businessKind2: null, businessKind2Name: '' } : {}),
+            });
+          } else {
+            classificationPicker.apply({
+              businessKind2: selection?.row.id ?? null, businessKind2Name: selection?.row.name ?? '',
+              ...(selection?.parent ? {
+                businessKind1: selection.parent.id, businessKind1Name: selection.parent.name,
+              } : {}),
+            });
+          }
+          setClassificationPicker(null);
+        }} />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}
         title="저장하지 않은 변경사항"
@@ -268,6 +318,7 @@ export function CustomerManagementPage({
         onCancel={cancelPendingSearch}
         onContinue={confirmPendingSearch}
       />
+      </PageLoadBoundary>
     </Box>
   );
 }

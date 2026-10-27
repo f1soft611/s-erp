@@ -11,6 +11,7 @@ public class MaterialInfoVO extends MaterialInfoSaveRequestVO {
     private static final long serialVersionUID = 1L;
     @Schema(description = "품목 ID. DB 기본 시퀀스 생성")
     private Long materialId;
+    private String itemClsPath;
     @Schema(description = "인증 테넌트 ID")
     private Long tenantId;
     @Schema(description = "삭제여부. 이 화면은 N인 품목만 조회")

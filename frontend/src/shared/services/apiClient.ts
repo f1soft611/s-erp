@@ -6,6 +6,8 @@ import {
   refreshAccessToken,
   resolveApiBaseUrl,
 } from './authService';
+import { ApiNetworkError, ApiResponseError, isRequestAborted } from './apiErrors';
+export { ApiNetworkError, ApiResponseError } from './apiErrors';
 
 const API_BASE_URL = resolveApiBaseUrl();
 
@@ -17,13 +19,12 @@ interface ApiEnvelope<T> {
   code?: number | string;
 }
 
-export class ApiResponseError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'ApiResponseError';
-    this.status = status;
+async function receive<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (cause) {
+    if (isRequestAborted(cause)) throw cause;
+    throw new ApiNetworkError();
   }
 }
 
@@ -61,7 +62,7 @@ async function getAuthorizedAuth() {
 
   if (!auth) {
     logout();
-    throw new Error('로그인이 필요합니다. 다시 로그인해주세요.');
+    throw new ApiResponseError('로그인이 필요합니다. 다시 로그인해주세요.', 401);
   }
 
   if (isTokenExpired(auth)) {
@@ -70,7 +71,7 @@ async function getAuthorizedAuth() {
 
     if (!auth) {
       logout();
-      throw new Error('로그인이 만료되었습니다. 다시 로그인해주세요.');
+      throw new ApiResponseError('로그인이 만료되었습니다. 다시 로그인해주세요.', 401);
     }
   } else if (isAccessTokenExpiringSoon(auth)) {
     const refreshedAuth = await refreshAccessToken();
@@ -78,7 +79,7 @@ async function getAuthorizedAuth() {
 
     if (!auth) {
       logout();
-      throw new Error('세션을 갱신할 수 없어 로그아웃됩니다.');
+      throw new ApiResponseError('세션을 갱신할 수 없어 로그아웃됩니다.', 401);
     }
   }
 
@@ -100,15 +101,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.Authorization = `Bearer ${auth.accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await receive(() => fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
-  });
+  }));
 
-  const rawText = await response.text();
-  const body = rawText
-    ? ((JSON.parse(rawText) as ApiEnvelope<T>) ?? {})
-    : ({} as ApiEnvelope<T>);
+  const rawText = await receive(() => response.text());
+  let body: ApiEnvelope<T> = {};
+  try {
+    body = rawText ? ((JSON.parse(rawText) as ApiEnvelope<T>) ?? {}) : {};
+  } catch (cause) {
+    if (response.ok) throw cause;
+    throw new ApiResponseError('요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', response.status);
+  }
 
   const resultCode = body.resultCode ?? body.code ?? '200';
   const resultMessage =

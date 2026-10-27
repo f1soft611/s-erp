@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
@@ -336,13 +336,14 @@ describe('Archive dashboard page', () => {
 
     renderArchive();
 
-    expect(await screen.findByText('System date unavailable')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요.');
+    expect(screen.queryByTestId('archive-grid-container')).not.toBeInTheDocument();
     expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색 기본값 다시 불러오기' }));
 
     await waitFor(() =>
       expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(
@@ -471,6 +472,12 @@ describe('Archive dashboard page', () => {
   });
 
   it('opens the edit dialog and updates the file name and folder', async () => {
+    let finish!: () => void;
+    archiveServices.updateArchiveFile.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = () => resolve({
+        boardFileId: 31, postId: 12, fileName: '새 이름.pdf', categoryCode: 'MANUAL',
+      });
+    }));
     renderArchive();
     await screen.findByText('업무 가이드.pdf');
     fireEvent.click(await screen.findByRole('button', { name: '파일 정보 수정' }));
@@ -487,6 +494,15 @@ describe('Archive dashboard page', () => {
         { postId: 12, fileName: '새 이름.pdf', folderCode: 'MANUAL' },
       ),
     );
+    expect(screen.getByRole('progressbar', { name: '저장 중' }))
+      .toHaveStyle({ width: '16px', height: '16px' });
+    const saveButton = screen.getByRole('button', { name: '저장', exact: true });
+    expect(saveButton).toBeDisabled();
+    fireEvent.click(saveButton);
+    expect(archiveServices.updateArchiveFile).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '파일 정보 수정' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('progressbar', { name: '저장 중' })).not.toBeInTheDocument();
   }, 15000);
 
   it('keeps files in inactive folders downloadable and read-only', async () => {

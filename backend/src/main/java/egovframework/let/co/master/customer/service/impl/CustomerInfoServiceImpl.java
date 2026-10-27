@@ -21,6 +21,7 @@ import egovframework.let.co.master.customer.domain.model.CustomerInfoSearchCondi
 import egovframework.let.co.master.customer.domain.model.CustomerInfoVO;
 import egovframework.let.co.master.customer.domain.repository.CustomerInfoDAO;
 import egovframework.let.co.master.customer.service.CustomerInfoService;
+import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
 
 @Service("customerInfoService")
 public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements CustomerInfoService {
@@ -30,12 +31,15 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
 
     private final CustomerInfoDAO customerInfoDAO;
     private final EgovIdGnrService customerCodeIdGnrService;
+    private final ClassificationSelectionValidator classifications;
 
     public CustomerInfoServiceImpl(
             CustomerInfoDAO customerInfoDAO,
-            @Qualifier("customerCodeIdGnrService") EgovIdGnrService customerCodeIdGnrService) {
+            @Qualifier("customerCodeIdGnrService") EgovIdGnrService customerCodeIdGnrService,
+            ClassificationSelectionValidator classifications) {
         this.customerInfoDAO = customerInfoDAO;
         this.customerCodeIdGnrService = customerCodeIdGnrService;
+        this.classifications = classifications;
     }
 
     @Override
@@ -77,6 +81,7 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
             CustomerInfoSaveRequestVO payload) throws Exception {
         validateTenantId(tenantId);
         validatePayload(payload);
+        classifications.partner(tenantId, payload.getBusinessKind1(), payload.getBusinessKind2(), null, null);
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), true);
         ensureCustomerNameAvailable(tenantId, customerName, null);
@@ -85,6 +90,8 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
 
         Map<String, Object> params = buildSaveParams(
                 tenantId, currentUserId, customerCode, customerName, useAt, payload);
+        params.put("businessKind1", payload.getBusinessKind1());
+        params.put("businessKind2", payload.getBusinessKind2());
         Long customerId;
         try {
             customerId = customerInfoDAO.insertCustomer(params);
@@ -109,7 +116,10 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
             throw new IllegalArgumentException("거래처 ID가 필요합니다.");
         }
         validatePayload(payload);
-        findByIdOrThrow(tenantId, customerId);
+        CustomerInfoVO existing = findByIdOrThrow(tenantId, customerId);
+        Long first = payload.isBusinessKind1Provided() ? payload.getBusinessKind1() : existing.getBusinessKind1();
+        Long second = payload.isBusinessKind2Provided() ? payload.getBusinessKind2() : existing.getBusinessKind2();
+        classifications.partner(tenantId, first, second, existing.getBusinessKind1(), existing.getBusinessKind2());
         String customerName = requireCustomerName(payload.getCustomerName());
         String useAt = normalizeUseAt(payload.getUseAt(), false);
         ensureCustomerNameAvailable(tenantId, customerName, customerId);
@@ -117,6 +127,8 @@ public class CustomerInfoServiceImpl extends EgovAbstractServiceImpl implements 
         Map<String, Object> params = buildSaveParams(
                 tenantId, currentUserId, null, customerName, useAt, payload);
         params.put("customerId", customerId);
+        params.put("businessKind1", first);
+        params.put("businessKind2", second);
         int updatedRows;
         try {
             updatedRows = customerInfoDAO.updateCustomer(params);

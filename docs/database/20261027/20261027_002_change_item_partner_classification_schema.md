@@ -1,0 +1,26 @@
+# 20261027_002 품목·거래처 분류 스키마 변경 이력
+
+- 날짜: 2026-10-27
+- 상태: DDL 초안 작성, 실제 DB 미적용
+- 대상 DB: `.mcp.json`의 기본 `s-erp-postgresql-readonly` central DB, `public` schema
+- 변경 내용:
+  - tenant 단위 `tb_cls_item`, `tb_cls_partner` 분류 테이블 생성
+  - `tb_material_info.item_cls_id BIGINT` 및 tenant 복합 FK 추가
+  - `tb_customer_info.business_kind1/2`를 nullable BIGINT 대/소분류 ID로 전환
+  - 분류 parent 자기참조, tenant FK, master FK, 사용/레벨/pair CHECK, 인덱스 및 COMMENT 추가
+- 영향 범위:
+  - central DB의 품목 및 거래처 마스터에 분류 ID를 연결할 기반을 준비한다.
+  - `business_kind1/2`에 NULL/공백 외 값이 있으면 DDL guard가 전체 migration을 중단한다.
+  - `mat_cata_type`과 `business_kind3`는 보존하며 데이터 backfill은 하지 않는다.
+  - 분류 CRUD/API/UI 및 tenant 전용 DB는 범위 밖이다.
+- MCP 근거:
+  - `s-erp-postgresql-readonly`에서 `list_tables`, `describe_table(tb_tenant/tb_material_info/tb_customer_info)`, 관련 PK/unique metadata를 확인했다.
+  - `business_kind1/2`의 비공백 존재 여부는 제한 집계로만 확인했으며 조회 시점 결과는 0건이다. 개별 업무 행은 읽거나 기록하지 않았다.
+  - tenant 전용 MCP는 central DB와 컬럼 구성이 다르므로 이번 central DDL 근거로 사용하지 않았다.
+- 롤백:
+  - 날짜별 rollback SQL은 신규 분류 row 또는 master 참조가 하나라도 있으면 중단한다.
+  - 비어 있는 상태에서만 business_kind를 varchar로 복구하고 신규 연결 컬럼/테이블을 제거한다.
+  - `CASCADE`를 사용하지 않는다. 외부 의존 객체가 있으면 PostgreSQL 오류로 중단한다.
+- 적용/롤백 실행: 수행하지 않음
+- 스키마 설계: [설계 문서](../../superpowers/specs/2026-10-27-item-partner-classification-schema-design.md)
+- 작업 절차: [작업지시서](../../directions/20261027/20261027_002_품목_거래처_분류스키마_작업지시서.md), [계획서](../../plan/20261027/20261027_002_품목_거래처_분류스키마_계획서.md), [상세사양서](../../spec/20261027/20261027_002_품목_거래처_분류스키마_상세사양서.md)

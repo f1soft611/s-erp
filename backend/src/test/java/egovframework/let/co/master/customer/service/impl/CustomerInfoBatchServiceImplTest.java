@@ -153,7 +153,9 @@ class CustomerInfoBatchServiceImplTest {
         when(dao.insertCustomer(anyMap())).thenReturn(31L);
         when(dao.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
         when(generator.getNextStringId()).thenReturn("000031");
-        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator));
+        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator,
+                new egovframework.let.co.master.classification.service.ClassificationSelectionValidator(
+                        org.mockito.Mockito.mock(egovframework.let.co.master.classification.domain.repository.ClassificationDAO.class))));
         CustomerInfoBatchSaveRequestVO payload = batch();
         payload.getCustomers().setInsertedRows(Arrays.asList(
                 row("new-1", ""), row("new-2", "")));
@@ -179,7 +181,9 @@ class CustomerInfoBatchServiceImplTest {
         when(dao.insertCustomer(anyMap())).thenReturn(31L);
         when(dao.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
         when(generator.getNextStringId()).thenReturn("000031");
-        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator));
+        service = new CustomerInfoBatchServiceImpl(new CustomerInfoServiceImpl(dao, generator,
+                new egovframework.let.co.master.classification.service.ClassificationSelectionValidator(
+                        org.mockito.Mockito.mock(egovframework.let.co.master.classification.domain.repository.ClassificationDAO.class))));
         CustomerInfoChangeVO first = row("new-1", "");
         first.setCustomerName("First");
         first.setBusinessNo("012-34-56789");

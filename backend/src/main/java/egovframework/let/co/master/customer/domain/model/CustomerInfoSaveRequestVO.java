@@ -1,6 +1,9 @@
 package egovframework.let.co.master.customer.domain.model;
 
 import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import egovframework.let.co.master.classification.domain.model.ClassificationIdDeserializer;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
@@ -36,6 +39,27 @@ public class CustomerInfoSaveRequestVO implements Serializable {
 
     @Schema(description = "종목")
     private String businessItem1;
+
+    @Schema(description = "거래처 대분류 ID. null은 해제, 수정 시 미전송은 기존 값 유지")
+    @JsonDeserialize(using = ClassificationIdDeserializer.class)
+    private Long businessKind1;
+    @Schema(description = "거래처 소분류 ID. null은 해제, 수정 시 미전송은 기존 값 유지")
+    @JsonDeserialize(using = ClassificationIdDeserializer.class)
+    private Long businessKind2;
+    @JsonIgnore
+    private boolean businessKind1Provided;
+    @JsonIgnore
+    private boolean businessKind2Provided;
+
+    public void setBusinessKind1(Long value) {
+        businessKind1 = value;
+        businessKind1Provided = true;
+    }
+
+    public void setBusinessKind2(Long value) {
+        businessKind2 = value;
+        businessKind2Provided = true;
+    }
 
     @Schema(description = "우편번호")
     private String postCode;
