@@ -58,6 +58,30 @@ function InfoItem({ label, children, wide = false }: { label: string; children: 
   );
 }
 
+function InfoGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Box
+      role="group"
+      aria-label={title}
+      sx={{
+        minWidth: 0,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        p: { xs: 1.5, sm: 2 },
+        bgcolor: 'background.paper',
+      }}
+    >
+      <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+        {title}
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 export function SalesOrderStatusDetailPanel({
   order,
   loading,
@@ -116,39 +140,93 @@ export function SalesOrderStatusDetailPanel({
             </Stack>
 
             <Box
-              aria-label="수주 기본정보"
+              aria-label="수주 요약"
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 1fr))' },
-                gap: 1.5,
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' },
+                alignItems: 'center',
+                gap: { xs: 1.5, sm: 2 },
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 2,
-                p: { xs: 1.5, sm: 2 },
-                bgcolor: 'background.default',
+                p: { xs: 2, sm: 2.5 },
+                bgcolor: 'action.hover',
               }}
             >
-              <InfoItem label="수주일자">{order.orderDt}</InfoItem>
-              <InfoItem label="거래처">{order.customerName ?? '-'}</InfoItem>
-              <InfoItem label="견적번호">{order.quotNo || '-'}</InfoItem>
-              <InfoItem label="납기일자">{order.deliveryDt || '-'}</InfoItem>
-              <InfoItem label="납품장소">{order.deliveryPlace || '-'}</InfoItem>
-              <InfoItem label="배송방법">{order.deliveryMethod || '-'}</InfoItem>
-              <InfoItem label="총 합계">{formatAmount(order.totalAmt)}</InfoItem>
-              <InfoItem label="품목 수">{order.details.length}건</InfoItem>
-              <InfoItem label="비고" wide>
-                {order.remark || '-'}
-              </InfoItem>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" component="div">
+                  거래처
+                </Typography>
+                <Typography
+                  variant="h6"
+                  component="div"
+                  sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}
+                >
+                  {order.customerName || '-'}
+                </Typography>
+                <Stack direction="row" spacing={2} useFlexGap sx={{ mt: 1, flexWrap: 'wrap' }}>
+                  <InfoItem label="수주일자">{order.orderDt || '-'}</InfoItem>
+                  <InfoItem label="납기일자">{order.deliveryDt || '-'}</InfoItem>
+                </Stack>
+              </Box>
+              <Box sx={{ minWidth: { sm: 150 }, textAlign: { sm: 'right' } }}>
+                <Typography variant="caption" color="text.secondary" component="div">
+                  총 합계
+                </Typography>
+                <Typography
+                  variant="h5"
+                  component="div"
+                  sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {formatAmount(order.totalAmt)}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              aria-label="수주 기본정보"
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' },
+                gap: 1.5,
+              }}
+            >
+              <InfoGroup title="수주 정보">
+                <InfoItem label="견적번호">{order.quotNo || '-'}</InfoItem>
+                <InfoItem label="배송방법">{order.deliveryMethod || '-'}</InfoItem>
+              </InfoGroup>
+              <InfoGroup title="납품 정보">
+                <InfoItem label="납품장소" wide>{order.deliveryPlace || '-'}</InfoItem>
+                <InfoItem label="비고" wide>{order.remark || '-'}</InfoItem>
+              </InfoGroup>
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                수주 품목
-              </Typography>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+                <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  수주 품목
+                </Typography>
+                <Chip size="small" variant="outlined" label={`${order.details.length}건`} />
+              </Stack>
               <TableContainer
                 sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflowX: 'auto' }}
               >
-                <Table size="small" aria-label="수주 품목 목록" sx={{ minWidth: 560 }}>
+                <Table
+                  size="small"
+                  aria-label="수주 품목 목록"
+                  sx={{
+                    minWidth: 560,
+                    '& .MuiTableCell-head': {
+                      bgcolor: 'action.hover',
+                      color: 'text.secondary',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                    },
+                    '& .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root': {
+                      borderBottom: 0,
+                    },
+                  }}
+                >
                   <TableHead>
                     <TableRow>
                       <TableCell align="center">행</TableCell>
@@ -162,18 +240,39 @@ export function SalesOrderStatusDetailPanel({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {order.details.map((detail) => (
-                      <TableRow key={detail.salesOrderDetailId}>
-                        <TableCell align="center">{detail.lineNo}</TableCell>
-                        <TableCell>{detail.materialCode ?? '-'}</TableCell>
-                        <TableCell>{detail.materialName ?? '-'}</TableCell>
-                        <TableCell align="right">{formatAmount(detail.orderQty)}</TableCell>
-                        <TableCell align="right">{formatAmount(detail.unitPrice)}</TableCell>
-                        <TableCell align="right">{formatAmount(detail.totalAmt)}</TableCell>
-                        <TableCell align="center">{detail.deliveryDt || '-'}</TableCell>
-                        <TableCell align="center">{detail.lineStatus || '-'}</TableCell>
+                    {order.details.length ? (
+                      order.details.map((detail) => (
+                        <TableRow
+                          key={detail.salesOrderDetailId}
+                          sx={{ '&:nth-of-type(even)': { bgcolor: 'action.hover' } }}
+                        >
+                          <TableCell align="center">{detail.lineNo}</TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              {detail.materialCode ?? '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 120 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
+                              {detail.materialName ?? '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">{formatAmount(detail.orderQty)}</TableCell>
+                          <TableCell align="right">{formatAmount(detail.unitPrice)}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>
+                            {formatAmount(detail.totalAmt)}
+                          </TableCell>
+                          <TableCell align="center">{detail.deliveryDt || '-'}</TableCell>
+                          <TableCell align="center">{detail.lineStatus || '-'}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                          등록된 수주 품목이 없습니다.
+                        </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>

@@ -209,6 +209,31 @@ describe('sales order status page', () => {
     });
   });
 
+  it('groups the order information and makes the order summary and item table easier to scan', async () => {
+    renderStatusPage();
+    const panel = await openOrderDetailPanel();
+
+    expect(within(panel).getByText('거래처 10')).toBeInTheDocument();
+    expect(within(panel).getByText('총 합계')).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: '수주 정보' })).toBeInTheDocument();
+    expect(within(panel).getByText('Q-1')).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: '납품 정보' })).toBeInTheDocument();
+    expect(within(panel).getByText('본사 창고')).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: '수주 품목' })).toBeInTheDocument();
+    expect(within(panel).getByRole('table', { name: '수주 품목 목록' })).toBeInTheDocument();
+    expect(within(panel).getByText('품목 20')).toBeInTheDocument();
+    expect(within(panel).getByText('M-20')).toBeInTheDocument();
+  });
+
+  it('shows an explicit empty state when an order has no detail lines', async () => {
+    orderItem = createOrderItem({ details: [], deliveryPlace: '', remark: '' });
+    renderStatusPage();
+    const panel = await openOrderDetailPanel();
+
+    expect(within(panel).getByText('0건')).toBeInTheDocument();
+    expect(within(panel).getByText('등록된 수주 품목이 없습니다.')).toBeInTheDocument();
+  });
+
   it('offers only 자세히보기 for orders written by someone else', async () => {
     renderStatusPage();
     const panel = await openOrderDetailPanel();
