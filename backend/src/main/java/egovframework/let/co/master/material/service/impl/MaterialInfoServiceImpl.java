@@ -22,6 +22,7 @@ import egovframework.let.co.master.material.domain.model.MaterialInfoSaveRequest
 import egovframework.let.co.master.material.domain.model.MaterialInfoSearchCondition;
 import egovframework.let.co.master.material.domain.repository.MaterialInfoDAO;
 import egovframework.let.co.master.material.service.MaterialInfoService;
+import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
 
 @Service("materialInfoService")
 public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements MaterialInfoService {
@@ -29,11 +30,14 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
             new HashSet<>(Arrays.asList("NONE", "DAY", "MONTH", "YEAR")));
     private final MaterialInfoDAO dao;
     private final EgovIdGnrService generator;
+    private final ClassificationSelectionValidator classifications;
 
     public MaterialInfoServiceImpl(MaterialInfoDAO dao,
-            @Qualifier("materialCodeIdGnrService") EgovIdGnrService generator) {
+            @Qualifier("materialCodeIdGnrService") EgovIdGnrService generator,
+            ClassificationSelectionValidator classifications) {
         this.dao = dao;
         this.generator = generator;
+        this.classifications = classifications;
     }
 
     private Map<String, Object> tenantParams(Long tenantId) {
@@ -76,6 +80,8 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
     @Transactional(rollbackFor = Exception.class)
     public MaterialInfoVO createMaterial(Long tenantId, String actor, MaterialInfoSaveRequestVO payload) throws Exception {
         Map<String, Object> params = saveParams(tenantId, actor, payload);
+        classifications.item(tenantId, payload.getItemClsId(), null);
+        params.put("itemClsId", payload.getItemClsId());
         params.put("materialCode", resolveCode(tenantId));
         Long id;
         try {
@@ -92,7 +98,10 @@ public class MaterialInfoServiceImpl extends EgovAbstractServiceImpl implements 
     public MaterialInfoVO updateMaterial(Long tenantId, String actor, Long id, MaterialInfoSaveRequestVO payload) throws Exception {
         Map<String, Object> params = saveParams(tenantId, actor, payload);
         if (id == null || id <= 0) throw new IllegalArgumentException("올바른 품목 ID가 필요합니다.");
-        findById(tenantId, id);
+        MaterialInfoVO existing = findById(tenantId, id);
+        Long itemClsId = payload.isItemClsIdProvided() ? payload.getItemClsId() : existing.getItemClsId();
+        classifications.item(tenantId, itemClsId, existing.getItemClsId());
+        params.put("itemClsId", itemClsId);
         params.put("materialId", id);
         try {
             if (dao.updateMaterial(params) == 0) throw notFound();

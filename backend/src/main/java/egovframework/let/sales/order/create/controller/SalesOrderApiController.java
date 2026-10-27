@@ -90,7 +90,7 @@ public class SalesOrderApiController {
      * @throws Exception 조회 중 발생한 예외
      */
     @Operation(summary = "수주 조회",
-            description = "로그인 사용자의 테넌트 기준으로 수주 헤더와 상세(거래처/품목 코드와 명 포함)를 조회한다",
+            description = "로그인 사용자의 테넌트 기준으로 수주 헤더와 상세(거래처/품목 코드와 명, 작성자 정보 포함)를 조회한다",
             security = { @SecurityRequirement(name = "Authorization") },
             tags = { "SalesOrderApiController" })
     @ApiResponses(value = {
@@ -105,7 +105,7 @@ public class SalesOrderApiController {
             @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
         requireAuthenticated(user);
         Map<String, Object> values = new HashMap<>();
-        values.put("item", salesOrderService.getOrder(user.getTenantId(), salesOrderId));
+        values.put("item", salesOrderService.getOrder(user.getTenantId(), user.getId(), salesOrderId));
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 

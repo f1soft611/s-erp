@@ -456,10 +456,10 @@ describe('sales order entry page', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
   }, 15000);
 
-  it('deletes the loaded order after confirmation and resets to a new order', async () => {
+  it('deletes the loaded order after confirmation in the common dialog and resets to a new order', async () => {
     createSalesOrderMock.mockResolvedValue(createdOrder());
     deleteSalesOrderMock.mockResolvedValue(undefined);
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const confirm = vi.spyOn(window, 'confirm');
     renderSalesOrderPage();
     await selectCustomer();
     await addAndCompleteDetail();
@@ -467,11 +467,17 @@ describe('sales order entry page', () => {
     expect(await screen.findByLabelText('수주번호')).toHaveValue('SO-20261027-0001');
 
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('SO-20261027-0001'));
+    let confirmDialog = await screen.findByRole('dialog', { name: '수주 삭제' });
+    expect(confirmDialog).toHaveTextContent('SO-20261027-0001');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '수주 삭제' })).not.toBeInTheDocument(),
+    );
     expect(deleteSalesOrderMock).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    confirmDialog = await screen.findByRole('dialog', { name: '수주 삭제' });
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '삭제' }));
 
     await waitFor(() => expect(deleteSalesOrderMock).toHaveBeenCalledWith(300));
     expect(await screen.findByText(/수주가 삭제되었습니다/)).toBeInTheDocument();
@@ -479,6 +485,7 @@ describe('sales order entry page', () => {
     expect(screen.getByLabelText('견적번호')).toHaveValue('');
     expect(screen.queryAllByRole('row', { name: /order-line-.*행 선택/ })).toHaveLength(0);
     expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled();
+    expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
   }, 15000);
 

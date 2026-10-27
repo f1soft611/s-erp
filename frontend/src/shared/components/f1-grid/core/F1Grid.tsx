@@ -160,6 +160,8 @@ function F1GridInner<T extends object>(
     queryWorkerThreshold = 10000,
     disableQueryWorker = false,
     showCheckbox = true,
+    selectionMode = 'cell',
+    multiSelect = false,
     createRow,
     createDuplicate,
     editorPlugins,
@@ -211,7 +213,7 @@ function F1GridInner<T extends object>(
   const onChangesChangeRef = useRef(onChangesChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const restoredSelectionKeyRef = useRef<string | undefined>(undefined);
-  const [rowSelection, setRowSelection] = useState<F1GridRowSelection>(
+  const [rowSelectionState, setRowSelection] = useState<F1GridRowSelection>(
     createGridRowSelection,
   );
   const [lastSelectedRowId, setLastSelectedRowId] = useState<F1GridRowId>();
@@ -661,6 +663,22 @@ function F1GridInner<T extends object>(
     () => visibleRows.map((row) => getGridRowId(row, rowKey)),
     [rowKey, visibleRows],
   );
+  const rowSelection = useMemo(() => {
+    if (
+      multiSelect ||
+      (!rowSelectionState.allSelected && rowSelectionState.includedIds.size <= 1)
+    ) return rowSelectionState;
+    const firstId = visibleRowIds.find((rowId) =>
+      isGridRowSelected(rowSelectionState, rowId),
+    );
+    return {
+      allSelected: false,
+      includedIds: new Set(firstId === undefined ? [] : [firstId]),
+      excludedIds: new Set<F1GridRowId>(),
+    };
+  }, [multiSelect, rowSelectionState, visibleRowIds]);
+  // Discard extra rows before children and selection callbacks observe the change.
+  if (rowSelection !== rowSelectionState) setRowSelection(rowSelection);
   const selectedIds = useMemo(
     () => materializeGridRowSelection(rowSelection, visibleRowIds),
     [rowSelection, visibleRowIds],
@@ -1232,11 +1250,11 @@ function F1GridInner<T extends object>(
     if (nextIds.length === 0) return;
     setRowSelection({
       allSelected: false,
-      includedIds: new Set(nextIds),
+      includedIds: new Set(multiSelect ? nextIds : nextIds.slice(0, 1)),
       excludedIds: new Set(),
     });
     restoredSelectionKeyRef.current = selectionKey;
-  }, [initialSelectedRowIds, visibleRowIds]);
+  }, [initialSelectedRowIds, multiSelect, visibleRowIds]);
 
   useEffect(() => {
     cellSelectionRef.current = cellSelection;
@@ -1245,6 +1263,16 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     copiedCellRangeRef.current = copiedCellRange;
   }, [copiedCellRange]);
+
+  useEffect(() => {
+    setCellSelection(undefined);
+    cellSelectionRef.current = undefined;
+    setCopiedCellRange(undefined);
+    copiedCellRangeRef.current = undefined;
+    cellRangeDragRef.current = null;
+    dragSelectionStateRef.current = { active: false, previousCell: null };
+    setIsCellSelectionDragging(false);
+  }, [selectionMode]);
 
   useEffect(() => {
     if (!isCellSelectionDragging) return;
@@ -1333,8 +1361,10 @@ function F1GridInner<T extends object>(
 
   function handleCopy(event: ClipboardEvent<HTMLElement>) {
     const range =
-      cellSelectionRef.current ??
-      (focusedCell ? createGridCellRange(focusedCell) : undefined);
+      selectionMode === 'cell'
+        ? cellSelectionRef.current ??
+          (focusedCell ? createGridCellRange(focusedCell) : undefined)
+        : undefined;
     if (range) {
       const startRowIndex = visibleRows.findIndex(
         (row) => getGridRowId(row, rowKey) === range.anchor.rowId,
@@ -1379,7 +1409,7 @@ function F1GridInner<T extends object>(
     const rowValue =
       selectedRows.length > 0
         ? toGridTsv(selectedRows, visibleColumns)
-        : focusedCell
+        : selectionMode === 'cell' && focusedCell
           ? String(
               visibleRows.find(
                 (row) => getGridRowId(row, rowKey) === focusedCell.rowId,
@@ -1389,9 +1419,11 @@ function F1GridInner<T extends object>(
     if (!rowValue) return;
     event.preventDefault();
     event.clipboardData.setData('text/plain', rowValue);
-    setCopiedCellRange(
-      focusedCell ? createGridCellRange(focusedCell) : copiedCellRange,
-    );
+    if (selectionMode === 'cell') {
+      setCopiedCellRange(
+        focusedCell ? createGridCellRange(focusedCell) : copiedCellRange,
+      );
+    }
   }
 
   function handlePaste(event: ClipboardEvent<HTMLElement>) {
@@ -1448,14 +1480,17 @@ function F1GridInner<T extends object>(
     });
   }
 
-  function selectRow(rowId: F1GridRowId, event?: MouseEvent<HTMLElement>) {
+  function selectRow(
+    rowId: F1GridRowId,
+    event?: { button?: number; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  ) {
     if (event?.button === 2 && !selectRowOnContextMenu) return;
 
     const rowIndex = visibleRows.findIndex(
       (row) => getGridRowId(row, rowKey) === rowId,
     );
 
-    if (event?.shiftKey && lastSelectedRowId !== undefined) {
+    if (multiSelect && event?.shiftKey && lastSelectedRowId !== undefined) {
       const lastIndex = visibleRows.findIndex(
         (row) => getGridRowId(row, rowKey) === lastSelectedRowId,
       );
@@ -1467,7 +1502,7 @@ function F1GridInner<T extends object>(
         includedIds: new Set(range),
         excludedIds: new Set(),
       });
-    } else if (event?.ctrlKey || event?.metaKey) {
+    } else if (multiSelect && (event?.ctrlKey || event?.metaKey)) {
       setRowSelection((current) =>
         setGridRowSelected(current, rowId, !isGridRowSelected(current, rowId)),
       );
@@ -1479,11 +1514,19 @@ function F1GridInner<T extends object>(
       });
     }
 
-    setLastSelectedRowId(rowId);
+    if (!multiSelect || selectionMode === 'cell' || !event?.shiftKey) {
+      setLastSelectedRowId(rowId);
+    }
   }
 
   function setSingleRowSelection(rowId: F1GridRowId, checked: boolean) {
-    setRowSelection((current) => setGridRowSelected(current, rowId, checked));
+    setRowSelection((current) =>
+      setGridRowSelected(
+        !multiSelect && checked ? createGridRowSelection() : current,
+        rowId,
+        checked,
+      ),
+    );
     setLastSelectedRowId(rowId);
   }
 
@@ -1804,6 +1847,9 @@ function F1GridInner<T extends object>(
       } else {
         setFocusedCell(nextCell);
       }
+      if (selectionMode === 'row' && nextCell.rowId !== focusedCell.rowId) {
+        selectRow(nextCell.rowId);
+      }
       return;
     }
 
@@ -1833,6 +1879,9 @@ function F1GridInner<T extends object>(
       if (!nextRow) return;
       const nextCell = getCell(getGridRowId(nextRow, rowKey), nextColIndex);
       setFocusedCell(nextCell);
+      if (selectionMode === 'row' && nextCell.rowId !== focusedCell.rowId) {
+        selectRow(nextCell.rowId, { shiftKey: event.shiftKey });
+      }
     }
   }
 
@@ -2315,7 +2364,9 @@ function F1GridInner<T extends object>(
       }
       if (clickedCell) {
         setFocusedCell(clickedCell);
-        setCellSelectionRange(clickedCell, clickedCell);
+        if (selectionMode === 'cell') {
+          setCellSelectionRange(clickedCell, clickedCell);
+        }
         if (selectRowOnContextMenu) {
           setRowSelection(
             targetRowId !== undefined
@@ -2495,11 +2546,10 @@ function F1GridInner<T extends object>(
     },
     setSelectedRowIds(rowIds) {
       const selectedKeys = new Set(rowIds.map((rowId) => String(rowId)));
+      const nextIds = visibleRowIds.filter((rowId) => selectedKeys.has(String(rowId)));
       setRowSelection({
         allSelected: false,
-        includedIds: new Set(
-          visibleRowIds.filter((rowId) => selectedKeys.has(String(rowId))),
-        ),
+        includedIds: new Set(multiSelect ? nextIds : nextIds.slice(0, 1)),
         excludedIds: new Set(),
       });
     },
@@ -2801,10 +2851,11 @@ function F1GridInner<T extends object>(
           resizableColumns={resizableColumns}
           minColumnWidth={minColumnWidth}
           showCheckbox={showCheckbox}
+          multiSelect={multiSelect}
           onResizeColumn={handleResizeColumn}
           getColumnCheckboxState={getColumnCheckboxState}
           onToggleAllRows={() => {
-            setRowSelection(selectAllGridRows(!selectedAll));
+            if (multiSelect) setRowSelection(selectAllGridRows(!selectedAll));
           }}
           onToggleColumnCheckbox={toggleColumnCheckbox}
           onToggleColumnVisibility={toggleColumnVisibility}
@@ -2876,6 +2927,7 @@ function F1GridInner<T extends object>(
             }
             selectedIds={selectedIds}
             rowSelection={rowSelection}
+            selectionMode={selectionMode}
             focusedCell={focusedCell}
             editingCell={editingCell}
             selectedCellRange={cellSelection}
@@ -2894,7 +2946,9 @@ function F1GridInner<T extends object>(
             onSetFocusedCell={(cell) => {
               setFocusedCell(cell);
               setCopiedCellRange(undefined);
-              setCellSelectionRange(cell, cell);
+              if (selectionMode === 'cell') {
+                setCellSelectionRange(cell, cell);
+              }
             }}
             onStartEdit={startEdit}
             onCellSelectionStart={(cell) => {

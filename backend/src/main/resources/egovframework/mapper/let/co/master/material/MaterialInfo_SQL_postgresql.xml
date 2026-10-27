@@ -21,6 +21,8 @@
         <result property="partNo" column="part_no"/>
         <result property="manufactory" column="manufactory"/>
         <result property="matCataType" column="mat_cata_type"/>
+        <result property="itemClsId" column="item_cls_id"/>
+        <result property="itemClsPath" column="item_cls_path"/>
         <result property="location" column="location"/>
         <result property="materialSpec2" column="material_spec2"/>
         <result property="itemType" column="item_type"/>
@@ -47,7 +49,15 @@
         part_no, manufactory, mat_cata_type, location, material_spec2, item_type,
         search_item_name, material_quality, item_barcode, material_no, delete_status,
         deleted_at, created_by, created_at, updated_by, updated_at,
-        material_kind, store_method, expiryed_status, expiryed_count, kfda_report_no
+        material_kind, store_method, expiryed_status, expiryed_count, kfda_report_no, item_cls_id,
+        (SELECT concat_ws(' > ', grandparent.item_cls_nm, parent.item_cls_nm, selected.item_cls_nm)
+         FROM tb_cls_item selected
+         LEFT JOIN tb_cls_item parent ON parent.tenant_id = selected.tenant_id
+             AND parent.item_cls_id = selected.upper_item_cls_id
+         LEFT JOIN tb_cls_item grandparent ON grandparent.tenant_id = parent.tenant_id
+             AND grandparent.item_cls_id = parent.upper_item_cls_id
+         WHERE selected.tenant_id = tb_material_info.tenant_id
+             AND selected.item_cls_id = tb_material_info.item_cls_id) AS item_cls_path
     </sql>
     <sql id="activeTenant">
         tenant_id = #{tenantId} AND delete_status = 'N' AND deleted_at IS NULL
@@ -108,14 +118,14 @@
             safe_invoice, accounting_code, warehouse_code, drawing, etc, part_no, manufactory,
             mat_cata_type, location, material_spec2, item_type, search_item_name, material_quality,
             item_barcode, material_no, material_kind, store_method, expiryed_status, expiryed_count,
-            kfda_report_no, delete_status, created_by, created_at, updated_by, updated_at
+            kfda_report_no, item_cls_id, delete_status, created_by, created_at, updated_by, updated_at
         ) VALUES (
             #{tenantId}, #{materialCode}, #{materialName}, #{materialEngName}, #{materialModelName},
             #{materialSpec}, #{materialWeight,jdbcType=BIGINT}, #{unit}, #{materialTypeCode}, #{customerCode},
             #{safeInvoice,jdbcType=DOUBLE}, #{accountingCode}, #{warehouseCode}, #{drawing}, #{etc}, #{partNo}, #{manufactory},
             #{matCataType}, #{location}, #{materialSpec2}, #{itemType}, #{searchItemName}, #{materialQuality},
             #{itemBarcode}, #{materialNo}, #{materialKind}, #{storeMethod}, #{expiryedStatus}, #{expiryedCount,jdbcType=INTEGER},
-            #{kfdaReportNo}, 'N', #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
+            #{kfdaReportNo}, #{itemClsId,jdbcType=BIGINT}, 'N', #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
         ) RETURNING material_id
     </select>
     <update id="updateMaterial" parameterType="map">
@@ -132,7 +142,8 @@
             item_barcode = #{itemBarcode}, material_no = #{materialNo},
             material_kind = #{materialKind}, store_method = #{storeMethod},
             expiryed_status = #{expiryedStatus}, expiryed_count = #{expiryedCount,jdbcType=INTEGER},
-            kfda_report_no = #{kfdaReportNo}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+            kfda_report_no = #{kfdaReportNo}, item_cls_id = #{itemClsId,jdbcType=BIGINT},
+            updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
         WHERE material_id = #{materialId} AND <include refid="activeTenant"/>
     </update>
     <select id="selectMaterialOptions" parameterType="map"

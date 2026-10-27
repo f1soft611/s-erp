@@ -1,7 +1,9 @@
 package egovframework.let.co.master.material.domain.model;
 
 import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import egovframework.let.co.master.classification.domain.model.ClassificationIdDeserializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
@@ -46,6 +48,16 @@ public class MaterialInfoSaveRequestVO implements Serializable {
     private String manufactory;
     @Schema(description = "품목분류. 빈 문자열 허용")
     private String matCataType;
+    @Schema(description = "품목분류 ID. null은 해제, 수정 시 미전송은 기존 값 유지")
+    @JsonDeserialize(using = ClassificationIdDeserializer.class)
+    private Long itemClsId;
+    @JsonIgnore
+    private boolean itemClsIdProvided;
+
+    public void setItemClsId(Long itemClsId) {
+        this.itemClsId = itemClsId;
+        this.itemClsIdProvided = true;
+    }
     @Schema(description = "위치정보")
     private String location;
     @Schema(description = "품목규격2")

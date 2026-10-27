@@ -99,14 +99,14 @@ describe('customer management page', () => {
     }));
     renderCustomerPage(false, create, update);
     await screen.findByText('Acme');
-    const action = screen.queryByRole('button', { name: '거래처분류설정' });
+    const action = screen.queryByRole('button', { name: /거래처분류\s*설정/ });
     if (!create && !update) {
       expect(action).not.toBeInTheDocument();
       return;
     }
     expect(action).toBeInTheDocument();
     fireEvent.click(action!);
-    expect(await screen.findByRole('dialog', { name: '거래처분류설정' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /거래처분류\s*설정/ })).toBeInTheDocument();
     await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledWith('/api/v1/co/master/classifications/partners'));
     expect(Boolean(screen.queryByRole('button', { name: '최상위 추가' }))).toBe(create);
   });

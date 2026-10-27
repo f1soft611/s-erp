@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { normalizeClassificationId } from '../../classification/services/classification.service';
 import { GridSaveReconciliationError, resolveSavedGridRows, type F1GridSavedRow } from '../../../../../shared/components/f1-grid';
 import type {
   CustomerBatchPayload,
@@ -42,6 +43,10 @@ export function normalizeCustomerRow(source: ApiRow): CustomerRow {
     juridNo: toText(source.juridNo),
     businessStatus1: toText(source.businessStatus1),
     businessItem1: toText(source.businessItem1),
+    businessKind1: normalizeClassificationId(source.businessKind1),
+    businessKind2: normalizeClassificationId(source.businessKind2),
+    businessKind1Name: toText(source.businessKind1Name),
+    businessKind2Name: toText(source.businessKind2Name),
     postCode: toText(source.postCode),
     address: toText(source.address),
     telephoneNo: toText(source.telephoneNo),

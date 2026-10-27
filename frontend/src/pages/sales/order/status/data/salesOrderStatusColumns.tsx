@@ -1,5 +1,10 @@
+import { Link } from '@mui/material';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { SalesOrderStatusRow } from '../types/salesOrderStatus.types';
+
+export type SalesOrderStatusColumnOptions = {
+  onOpenOrder?: (row: SalesOrderStatusRow) => void;
+};
 
 // db-schema.md tb_sales_order_hd.status CHECK 허용값
 export const SALES_ORDER_STATUS_OPTIONS = ['수주등록', '생산대기', '생산중', '출하완료', '취소'].map(
@@ -22,22 +27,66 @@ const amountColumn = (
   search: { hidden: true },
 });
 
-export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRow>[] {
+export function createSalesOrderStatusColumns({
+  onOpenOrder,
+}: SalesOrderStatusColumnOptions = {}): F1GridColumn<SalesOrderStatusRow>[] {
   return [
     {
+      field: 'salesOrderDetailId',
+      headerName: 'No',
+      type: 'rownumber',
+      width: 56,
+      align: 'center',
+      pinned: 'left',
+      search: { hidden: true },
+      form: { hidden: true },
+    },
+    {
+      type: 'text',
       field: 'orderNo',
       headerName: '수주번호',
-      width: 170,
+      width: 140,
       editable: false,
+      mergeRows: true,
+      align: 'center',
       search: { label: '수주번호', order: 2, span: 2, group: '수주정보' },
+      renderCell: onOpenOrder
+        ? ({ row }) => (
+            <Link
+              component="button"
+              type="button"
+              underline="hover"
+              aria-label={`${row.orderNo} 상세 보기`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenOrder(row);
+              }}
+              // 병합 영역에서는 투명한 후속 행 셀이 위에 겹치므로 링크만 위로 올려 클릭을 받는다.
+              sx={{
+                position: 'relative',
+                zIndex: 1,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontWeight: 600,
+                fontSize: 'inherit',
+                verticalAlign: 'baseline',
+              }}
+            >
+              {row.orderNo}
+            </Link>
+          )
+        : undefined,
     },
     {
       field: 'orderDt',
       headerName: '수주일자',
       type: 'date',
-      width: 110,
+      width: 80,
       align: 'center',
       editable: false,
+      mergeRows: true,
       search: {
         label: '수주일자',
         order: 1,
@@ -52,8 +101,10 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
     {
       field: 'customerCode',
       headerName: '거래처코드',
-      width: 110,
+      width: 80,
+      align: 'center',
       editable: false,
+      mergeRows: true,
       search: { hidden: true },
     },
     {
@@ -61,6 +112,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       headerName: '거래처명',
       width: 160,
       editable: false,
+      mergeRows: true,
       search: { label: '거래처', order: 3, span: 2, group: '수주정보' },
     },
     {
@@ -68,6 +120,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       headerName: '견적번호',
       width: 140,
       editable: false,
+      mergeRows: true,
       search: { label: '견적번호', order: 4, span: 2, group: '수주정보' },
     },
     {
@@ -75,9 +128,10 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       headerName: '수주상태',
       type: 'select',
       options: SALES_ORDER_STATUS_OPTIONS,
-      width: 100,
+      width: 80,
       align: 'center',
       editable: false,
+      mergeRows: true,
       search: { label: '수주상태', order: 5, span: 2, group: '수주정보' },
     },
     {
@@ -85,6 +139,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       headerName: '납품장소',
       width: 150,
       editable: false,
+      mergeRows: true,
       search: { hidden: true },
     },
     {
@@ -92,6 +147,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       headerName: '배송방법',
       width: 110,
       editable: false,
+      mergeRows: true,
       search: { hidden: true },
     },
     {
@@ -106,7 +162,9 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
     {
       field: 'materialCode',
       headerName: '품목코드',
-      width: 130,
+      type: 'text',
+      width: 80,
+      align: 'center',
       editable: false,
       search: { hidden: true },
     },
@@ -134,7 +192,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
       field: 'deliveryDt',
       headerName: '납기일자',
       type: 'date',
-      width: 110,
+      width: 80,
       align: 'center',
       editable: false,
       search: { label: '납기일자', order: 7, span: 4, group: '품목정보' },
@@ -143,7 +201,7 @@ export function createSalesOrderStatusColumns(): F1GridColumn<SalesOrderStatusRo
     {
       field: 'lineStatus',
       headerName: '행상태',
-      width: 90,
+      width: 80,
       align: 'center',
       editable: false,
       search: { label: '행상태', order: 8, span: 2, group: '품목정보' },

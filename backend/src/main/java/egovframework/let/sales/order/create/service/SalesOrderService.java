@@ -24,14 +24,15 @@ public interface SalesOrderService {
     SalesOrderVO createOrder(Long tenantId, String userId, SalesOrderCreateRequestVO payload) throws Exception;
 
     /**
-     * 테넌트 범위의 수주 헤더와 상세를 조회한다.
+     * 테넌트 범위의 수주 헤더와 상세를 조회하고 로그인 사용자의 작성자 여부를 설정한다.
      *
      * @param tenantId 인증된 사용자의 테넌트 ID
+     * @param userId 인증된 사용자의 ID (작성자 여부 판단)
      * @param salesOrderId 수주 ID
-     * @return 수주 정보 (거래처/품목 코드와 명 포함)
+     * @return 수주 정보 (거래처/품목 코드와 명, 작성자 정보 포함)
      * @throws Exception 조회 중 발생한 예외 (없으면 404)
      */
-    SalesOrderVO getOrder(Long tenantId, Long salesOrderId) throws Exception;
+    SalesOrderVO getOrder(Long tenantId, String userId, Long salesOrderId) throws Exception;
 
     /**
      * 수정 가능한 수주의 헤더를 갱신하고 상세를 요청 내용으로 재등록한다.

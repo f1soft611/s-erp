@@ -1,0 +1,119 @@
+[
+  {
+    "kind": "item",
+    "level": 1,
+    "width": 375,
+    "geometry": {
+      "selectLeft": 223,
+      "cancelLeft": 295,
+      "cancelRight": 359,
+      "viewport": 375,
+      "documentWidth": 375
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "item",
+    "level": 1,
+    "width": 768,
+    "geometry": {
+      "selectLeft": 575,
+      "cancelLeft": 647,
+      "cancelRight": 711,
+      "viewport": 768,
+      "documentWidth": 768
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "item",
+    "level": 1,
+    "width": 1280,
+    "geometry": {
+      "selectLeft": 890,
+      "cancelLeft": 962,
+      "cancelRight": 1026,
+      "viewport": 1280,
+      "documentWidth": 1280
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 1,
+    "width": 375,
+    "geometry": {
+      "selectLeft": 223,
+      "cancelLeft": 295,
+      "cancelRight": 359,
+      "viewport": 375,
+      "documentWidth": 375
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 1,
+    "width": 768,
+    "geometry": {
+      "selectLeft": 575,
+      "cancelLeft": 647,
+      "cancelRight": 711,
+      "viewport": 768,
+      "documentWidth": 768
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 1,
+    "width": 1280,
+    "geometry": {
+      "selectLeft": 890,
+      "cancelLeft": 962,
+      "cancelRight": 1026,
+      "viewport": 1280,
+      "documentWidth": 1280
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 2,
+    "width": 375,
+    "geometry": {
+      "selectLeft": 223,
+      "cancelLeft": 295,
+      "cancelRight": 359,
+      "viewport": 375,
+      "documentWidth": 375
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 2,
+    "width": 768,
+    "geometry": {
+      "selectLeft": 575,
+      "cancelLeft": 647,
+      "cancelRight": 711,
+      "viewport": 768,
+      "documentWidth": 768
+    },
+    "pageErrors": []
+  },
+  {
+    "kind": "partner",
+    "level": 2,
+    "width": 1280,
+    "geometry": {
+      "selectLeft": 890,
+      "cancelLeft": 962,
+      "cancelRight": 1026,
+      "viewport": 1280,
+      "documentWidth": 1280
+    },
+    "pageErrors": []
+  }
+]

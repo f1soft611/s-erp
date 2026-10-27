@@ -85,7 +85,10 @@ class SalesOrderTenantScopeMapperTest {
         Configuration configuration = parse();
 
         String header = normalize(sql(configuration, "selectOrder").getSql());
-        assertThat(header).contains("tb_customer_info", "customer_code", "customer_name");
+        assertThat(header).contains("tb_customer_info", "customer_code", "customer_name",
+                "h.created_by AS createdBy", "AS createdByName", "la.profile_image AS createdByProfileImage", "AS createdAt",
+                "tb_login_account la", "la.login_code = h.created_by", "la.tenant_id = h.tenant_id",
+                "tb_user u", "u.login_id = la.login_id", "u.tenant_id = la.tenant_id");
 
         String details = normalize(sql(configuration, "selectOrderDetails").getSql());
         assertThat(details).contains("tb_material_info", "material_code", "material_name",

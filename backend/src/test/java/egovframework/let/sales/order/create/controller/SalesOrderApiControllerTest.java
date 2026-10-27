@@ -131,15 +131,21 @@ class SalesOrderApiControllerTest {
         stored.setSalesOrderId(300L);
         stored.setOrderNo("SO-20261027-0001");
         stored.setCustomerCode("C-10");
+        stored.setCreatedByName("홍길동");
+        stored.setCreatedByProfileImage("/profile/user01.png");
+        stored.setWriter(Boolean.TRUE);
         stored.setDetails(Collections.emptyList());
-        when(service.getOrder(71L, 300L)).thenReturn(stored);
+        when(service.getOrder(71L, "user01", 300L)).thenReturn(stored);
         when(service.updateOrder(eq(71L), eq("user01"), eq(300L), any(SalesOrderCreateRequestVO.class)))
                 .thenReturn(stored);
 
         mvc.perform(get(ROOT + "/300"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.item.orderNo").value("SO-20261027-0001"))
-                .andExpect(jsonPath("$.result.item.customerCode").value("C-10"));
+                .andExpect(jsonPath("$.result.item.customerCode").value("C-10"))
+                .andExpect(jsonPath("$.result.item.createdByName").value("홍길동"))
+                .andExpect(jsonPath("$.result.item.createdByProfileImage").value("/profile/user01.png"))
+                .andExpect(jsonPath("$.result.item.writer").value(true));
 
         mvc.perform(put(ROOT + "/300")
                         .contentType(MediaType.APPLICATION_JSON)

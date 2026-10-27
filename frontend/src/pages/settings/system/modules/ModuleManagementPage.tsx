@@ -181,6 +181,7 @@ export function ModuleManagementPage({
         {
           label: '저장',
           icon: SaveIcon,
+          saving,
           visible: pageActionPermissions.write,
           disabled: !panelDirty || saving,
           onClick: () => {

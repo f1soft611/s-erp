@@ -1,18 +1,49 @@
 import { Box } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { useCallback } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import type {
   MenuPermission,
+  MenuTreeNode,
   ModuleItem,
   PageContent,
 } from '../../../dashboard/types/dashboard';
+import type { SalesOrderItem } from '../create/types/salesOrder.types';
+import { SalesOrderEditorDialog } from './components/SalesOrderEditorDialog';
+import { SalesOrderStatusDetailPanel } from './components/SalesOrderStatusDetailPanel';
 import { SalesOrderStatusGrid } from './components/SalesOrderStatusGrid';
 import { SalesOrderStatusSearchArea } from './components/SalesOrderStatusSearchArea';
+import { useSalesOrderStatusDetail } from './hooks/useSalesOrderStatusDetail';
 import { useSalesOrderStatusList } from './hooks/useSalesOrderStatusList';
 import { useSalesOrderStatusSearch } from './hooks/useSalesOrderStatusSearch';
+import type { SalesOrderStatusRow } from './types/salesOrderStatus.types';
+
+const SALES_ORDER_CREATE_PAGE_KEY = 'create';
+const EDITABLE_ORDER_STATUS = '수주등록';
+
+function findMenuPermissions(
+  nodes: MenuTreeNode[],
+  pageKey: string,
+): MenuPermission | undefined {
+  for (const node of nodes) {
+    if (!node.children?.length && node.pageKey === pageKey) return node.permissions;
+    const found = node.children ? findMenuPermissions(node.children, pageKey) : undefined;
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function canEditOrder(order: SalesOrderItem | null, permissions?: MenuPermission) {
+  return Boolean(
+    order?.writer &&
+      permissions?.update &&
+      order.status === EDITABLE_ORDER_STATUS &&
+      order.details.every((detail) => Number(detail.shippedQty ?? 0) <= 0),
+  );
+}
 
 type SalesOrderStatusPageProps = {
   selectedModule: ModuleItem;
@@ -23,6 +54,7 @@ type SalesOrderStatusPageProps = {
 };
 
 export function SalesOrderStatusPage({
+  selectedModule,
   currentMenuName,
   content,
   breadcrumbItems,
@@ -30,6 +62,30 @@ export function SalesOrderStatusPage({
 }: SalesOrderStatusPageProps) {
   const search = useSalesOrderStatusSearch();
   const list = useSalesOrderStatusList(search.appliedFilters);
+  const detail = useSalesOrderStatusDetail();
+  const createPermissions = findMenuPermissions(
+    selectedModule.tree,
+    SALES_ORDER_CREATE_PAGE_KEY,
+  );
+  const { openDetail, closeDetail, closeEditor, refreshDetail } = detail;
+  const { refreshQuietly: refreshListQuietly } = list;
+  const handleOpenOrder = useCallback(
+    (row: SalesOrderStatusRow) => openDetail(row.salesOrderId),
+    [openDetail],
+  );
+  const handleOrderSaved = useCallback(() => {
+    closeEditor();
+    refreshDetail();
+    refreshListQuietly();
+  }, [closeEditor, refreshDetail, refreshListQuietly]);
+  const handleOrderDeleted = useCallback(() => {
+    closeEditor();
+    closeDetail();
+    refreshListQuietly();
+  }, [closeDetail, closeEditor, refreshListQuietly]);
+  const handleDetailClose = useCallback(() => {
+    if (detail.editorMode === null) closeDetail();
+  }, [closeDetail, detail.editorMode]);
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'read',
@@ -73,7 +129,7 @@ export function SalesOrderStatusPage({
           onKeywordChange={search.setKeyword}
           detailFields={search.detailFields}
           detailValues={search.detailValues}
-          defaultValues={search.defaultValues}
+          defaultValues={search.searchAreaDefaultValues}
           onDetailValuesChange={search.setDetailValues}
           onSearch={search.applySearch}
           onReset={search.resetSearch}
@@ -101,11 +157,32 @@ export function SalesOrderStatusPage({
               rows={list.rows}
               loading={list.loading}
               canExportExcel={selectedMenuPermissions?.excel ?? false}
+              onOpenOrder={handleOpenOrder}
             />
           </Box>
         </Box>
         </PageLoadBoundary>
       </PageLoadBoundary>
+      {detail.selectedOrderId !== null ? (
+        <SalesOrderStatusDetailPanel
+          order={detail.order}
+          loading={detail.loading}
+          error={detail.error}
+          canEdit={canEditOrder(detail.order, createPermissions)}
+          onClose={handleDetailClose}
+          onView={() => detail.openEditor('view')}
+          onEdit={() => detail.openEditor('edit')}
+        />
+      ) : null}
+      <SalesOrderEditorDialog
+        mode={detail.editorMode}
+        salesOrderId={detail.selectedOrderId}
+        selectedModule={selectedModule}
+        permissions={createPermissions}
+        onClose={closeEditor}
+        onSaved={handleOrderSaved}
+        onDeleted={handleOrderDeleted}
+      />
     </Box>
   );
 }

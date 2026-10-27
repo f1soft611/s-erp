@@ -96,12 +96,22 @@
                h.delivery_method AS deliveryMethod,
                h.status AS status,
                h.total_amt AS totalAmt,
-               h.remark AS remark
-        FROM tb_sales_order_hd h
-        LEFT JOIN tb_customer_info c
-          ON c.customer_id = h.customer_id
-         AND c.tenant_id = h.tenant_id
-        WHERE h.sales_order_id = #{salesOrderId}
+               h.remark AS remark,
+                      h.created_by AS createdBy,
+                      u.user_nm AS createdByName,
+                      la.profile_image AS createdByProfileImage,
+                      to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt
+               FROM tb_sales_order_hd h
+               LEFT JOIN tb_customer_info c
+                 ON c.customer_id = h.customer_id
+                AND c.tenant_id = h.tenant_id
+               LEFT JOIN tb_login_account la
+                 ON la.login_code = h.created_by
+                AND la.tenant_id = h.tenant_id
+               LEFT JOIN tb_user u
+                 ON u.login_id = la.login_id
+                AND u.tenant_id = la.tenant_id
+               WHERE h.sales_order_id = #{salesOrderId}
           AND h.tenant_id = #{tenantId}
           AND h.use_at = 'Y'
     </select>

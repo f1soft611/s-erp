@@ -4,6 +4,7 @@ import {
   Alert, Box, Button, Stack, useMediaQuery,
 } from '@mui/material';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { F1Tree, type F1GridColumn, type F1TreeRef } from '../../../../../shared/components/f1-grid';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
@@ -193,8 +194,10 @@ function SettingsContent({ kind, canCreate, canUpdate, onClose }: Omit<Props, 'o
     <CommonDialog open title={title} onClose={requestClose} fullScreenOnMobile
       description={`최대 ${maxLevel}단계 · 셀을 더블클릭하여 편집한 뒤 저장하세요. 삭제 대신 사용여부를 해제하세요.`}
       actions={<>
-        <Button variant="contained" onClick={() => void save()}
-          disabled={(!canCreate && !canUpdate) || busy || Boolean(loadError)}>{saving ? '저장 중…' : '저장'}</Button>
+        <AppSaveButton variant="contained" onPointerDown={() => { commitEditor(); flushSync(syncChanges); }}
+          onClick={() => void save()}
+          saving={saving} progressLabel="분류 저장 중"
+          disabled={(!canCreate && !canUpdate) || (!dirty && !editorDirty) || busy || Boolean(loadError)}>저장</AppSaveButton>
         <Button onClick={requestClose} disabled={saving}>닫기</Button>
       </>}>
       <Box sx={{ minWidth: 0, overflowX: 'hidden' }}>
@@ -223,7 +226,7 @@ function SettingsContent({ kind, canCreate, canUpdate, onClose }: Omit<Props, 'o
           <F1Tree key={treeKey} ref={treeRef} rows={rows} columns={columns}
             rowKey="id" parentKey="parentId" treeColumn="name" ariaLabel="분류 트리"
             height={mobile ? 360 : 440} minHeight={200} showCheckbox={false} defaultExpandAll
-            getRowOrder={(row) => row.sortSeq} loading={busy}
+            getRowOrder={(row) => row.sortSeq} loading={loading && !saving}
             onBeforeEdit={() => !savingRef.current && !loading && !loadError}
             editorPlugins={[{ id: 'classification-draft', endEdit: () => setEditorDirty(false) }]}
             initialSelectedRowIds={selectedId === undefined ? [] : [selectedId]}

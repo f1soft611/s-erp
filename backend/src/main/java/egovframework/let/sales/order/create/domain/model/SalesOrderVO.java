@@ -65,6 +65,21 @@ public class SalesOrderVO implements Serializable {
     @Schema(description = "비고")
     private String remark;
 
+    @Schema(description = "작성자 로그인 코드 (조회 응답)", example = "user01")
+    private String createdBy;
+
+    @Schema(description = "작성자명 (조회 응답)", example = "홍길동")
+    private String createdByName;
+
+    @Schema(description = "작성자 프로필 이미지 (조회 응답, tb_login_account.profile_image)", example = "data:image/png;base64,...")
+    private String createdByProfileImage;
+
+    @Schema(description = "등록일시 (조회 응답, yyyy-MM-dd HH:mm)", example = "2026-10-27 13:38")
+    private String createdAt;
+
+    @Schema(description = "로그인 사용자가 작성자인지 여부 (조회 응답)", example = "true")
+    private Boolean writer;
+
     @Schema(description = "저장된 수주 상세 목록")
     private List<SalesOrderDetailVO> details;
 }

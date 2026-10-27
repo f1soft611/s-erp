@@ -35,6 +35,10 @@ import egovframework.let.co.master.customer.domain.model.CustomerInfoSaveRequest
 import egovframework.let.co.master.customer.domain.model.CustomerInfoSearchCondition;
 import egovframework.let.co.master.customer.domain.model.CustomerInfoVO;
 import egovframework.let.co.master.customer.domain.repository.CustomerInfoDAO;
+import egovframework.let.co.master.classification.domain.model.ClassificationKind;
+import egovframework.let.co.master.classification.domain.model.ClassificationVO;
+import egovframework.let.co.master.classification.domain.repository.ClassificationDAO;
+import egovframework.let.co.master.classification.service.ClassificationSelectionValidator;
 
 @ExtendWith(MockitoExtension.class)
 class CustomerInfoServiceImplTest {
@@ -44,12 +48,15 @@ class CustomerInfoServiceImplTest {
 
     @Mock
     private EgovIdGnrService customerCodeIdGnrService;
+    @Mock
+    private ClassificationDAO classificationDao;
 
     private CustomerInfoServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new CustomerInfoServiceImpl(customerInfoDAO, customerCodeIdGnrService);
+        service = new CustomerInfoServiceImpl(customerInfoDAO, customerCodeIdGnrService,
+                new ClassificationSelectionValidator(classificationDao));
         org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByName(anyMap())).thenReturn(null);
         org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByCode(anyMap())).thenReturn(null);
         org.mockito.Mockito.lenient().when(customerInfoDAO.selectCustomerIdByBusinessNo(anyMap())).thenReturn(null);
@@ -81,6 +88,54 @@ class CustomerInfoServiceImplTest {
                 .containsEntry("businessItem1", "Goods")
                 .containsEntry("useAt", "Y");
         assertThat(condition.getKeyword()).isEqualTo(" Acme ");
+    }
+
+    @Test
+    void preservesOmittedClassificationAndClearsExplicitNulls() throws Exception {
+        CustomerInfoVO existing = new CustomerInfoVO();
+        existing.setBusinessKind1(1L);
+        existing.setBusinessKind2(2L);
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(existing);
+        when(customerInfoDAO.updateCustomer(anyMap())).thenReturn(1);
+        service.updateCustomer(9L, 101L, 12L, payload("", "Acme", "Y"));
+        CustomerInfoSaveRequestVO clear = payload("", "Acme", "Y");
+        clear.setBusinessKind1(null);
+        clear.setBusinessKind2(null);
+        service.updateCustomer(9L, 101L, 12L, clear);
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO, org.mockito.Mockito.times(2)).updateCustomer(captured.capture());
+        assertThat(captured.getAllValues().get(0)).containsEntry("businessKind1", 1L).containsEntry("businessKind2", 2L);
+        assertThat(captured.getAllValues().get(1)).containsEntry("businessKind1", null).containsEntry("businessKind2", null);
+    }
+
+    @Test
+    void savesAValidatedClassificationPair() throws Exception {
+        ClassificationVO root = new ClassificationVO();
+        root.setId(1L); root.setLevel(1); root.setUseAt("Y");
+        ClassificationVO child = new ClassificationVO();
+        child.setId(2L); child.setLevel(2); child.setParentId(1L); child.setUseAt("Y");
+        when(classificationDao.selectById(ClassificationKind.PARTNER, 9L, 1L)).thenReturn(root);
+        when(classificationDao.selectById(ClassificationKind.PARTNER, 9L, 2L)).thenReturn(child);
+        when(customerCodeIdGnrService.getNextStringId()).thenReturn("000001");
+        stubInsertAndReload();
+        CustomerInfoSaveRequestVO request = payload("", "Acme", "Y");
+        request.setBusinessKind1(1L);
+        request.setBusinessKind2(2L);
+        service.createCustomer(9L, 101L, request);
+        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
+        verify(customerInfoDAO).insertCustomer(captured.capture());
+        assertThat(captured.getValue()).containsEntry("businessKind1", 1L).containsEntry("businessKind2", 2L);
+    }
+
+    @Test
+    void rejectsUnavailableClassificationBeforeWriting() throws Exception {
+        CustomerInfoSaveRequestVO request = payload("", "Acme", "Y");
+        request.setBusinessKind1(999L);
+        assertThatThrownBy(() -> service.createCustomer(9L, 101L, request)).isInstanceOf(IllegalArgumentException.class);
+        when(customerInfoDAO.selectCustomerById(anyMap())).thenReturn(new CustomerInfoVO());
+        assertThatThrownBy(() -> service.updateCustomer(9L, 101L, 12L, request)).isInstanceOf(IllegalArgumentException.class);
+        verify(customerInfoDAO, never()).insertCustomer(anyMap());
+        verify(customerInfoDAO, never()).updateCustomer(anyMap());
     }
 
     @Test

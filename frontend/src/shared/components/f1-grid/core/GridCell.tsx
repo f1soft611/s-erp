@@ -30,6 +30,7 @@ type GridCellProps<T extends object> = {
   columnLine: boolean;
   stripeRows: boolean;
   focused: boolean;
+  selectionMode?: 'cell' | 'row';
   editing: boolean;
   selected: boolean;
   selectionRangeActive?: boolean;
@@ -45,7 +46,7 @@ type GridCellProps<T extends object> = {
   isLastRow?: boolean;
   draftValue: F1GridDraftValue;
   dirtyCell?: boolean;
-  onFocus: () => void;
+  onFocus: (event: MouseEvent<HTMLElement>) => void;
   onMouseDown: (event: MouseEvent<HTMLElement>) => void;
   onMouseEnter: () => void;
   onMouseUp: () => void;
@@ -95,6 +96,7 @@ const areGridCellPropsEqual = <T extends object>(
     prev.columnLine === next.columnLine &&
     prev.stripeRows === next.stripeRows &&
     prev.focused === next.focused &&
+    prev.selectionMode === next.selectionMode &&
     prev.editing === next.editing &&
     prev.selected === next.selected &&
     prev.selectionRangeActive === next.selectionRangeActive &&
@@ -127,6 +129,7 @@ const GridCellInner = <T extends object>({
   columnLine,
   stripeRows,
   focused,
+  selectionMode = 'cell',
   editing,
   selected,
   selectionRangeActive = false,
@@ -198,6 +201,7 @@ const GridCellInner = <T extends object>({
   const hideRangeStartBorder = rangeStart && !editing;
   const activeHighlight =
     !selectionRangeActive &&
+    (selectionMode === 'cell' || editing) &&
     (focused || editing || mergeGroupActive) &&
     !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
   const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
@@ -451,7 +455,7 @@ export function GridCell<T extends object>(props: GridCellProps<T>) {
 
   // Visual memoization must not retain handlers that captured an older edit.
   const handlers = useMemo(() => ({
-    onFocus: () => latestProps.current.onFocus(),
+    onFocus: (event: MouseEvent<HTMLElement>) => latestProps.current.onFocus(event),
     onMouseDown: (event: MouseEvent<HTMLElement>) => latestProps.current.onMouseDown(event),
     onMouseEnter: () => latestProps.current.onMouseEnter(),
     onMouseUp: () => latestProps.current.onMouseUp(),

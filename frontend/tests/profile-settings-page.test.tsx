@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfileSettingsPage from '../src/pages/dashboard/ProfileSettingsPage';
@@ -53,6 +53,31 @@ describe('ProfileSettingsPage', () => {
     expect(await screen.findByText('save failed')).toBeInTheDocument();
     expect(screen.getByLabelText(/이메일/i)).toHaveValue('edited@example.com');
     expect(screen.queryByRole('button', { name: '내 정보 다시 불러오기' })).not.toBeInTheDocument();
+  });
+
+  it.each(['success', 'failure'] as const)('shows a small saving spinner until profile save %s', async (outcome) => {
+    let finish!: () => void;
+    vi.mocked(profileService.updateMyProfile).mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finish = () => {
+        if (outcome === 'failure') reject(new Error('save failed'));
+        else resolve({
+          userId: 'admin', employeeId: 42, name: '사용자명', email: 'new@example.com',
+          departmentName: '개발팀', levelName: '사원', profileImage: null, stampImage: null,
+        });
+      };
+    }));
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/이메일/i)).toHaveValue('user@example.com'));
+    fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+    const savingButton = screen.getByRole('button', { name: '저장 중...', exact: true });
+    expect(savingButton).toBeDisabled();
+    expect(screen.getByRole('progressbar', { name: '저장 중' }))
+      .toHaveStyle({ width: '16px', height: '16px' });
+    fireEvent.click(savingButton);
+    expect(profileService.updateMyProfile).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled();
   });
 
   it('loads and saves the authenticated profile email', async () => {

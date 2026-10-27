@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
@@ -56,12 +56,35 @@ import type {
   SalesOrderValidationErrors,
 } from './types/salesOrder.types';
 
+export type SalesOrderPageMode = 'create' | 'edit' | 'view';
+
 type Props = {
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
   breadcrumbItems: string[];
   selectedMenuPermissions?: MenuPermission;
+  /** 'view'는 읽기 전용, 'edit'/'create'는 권한·상태에 따라 편집 */
+  mode?: SalesOrderPageMode;
+  /** 지정 시 마운트 후 해당 수주를 불러와 상·하단을 세팅 */
+  salesOrderId?: number;
+  /** 다이얼로그 등 다른 화면 안에서 재사용할 때 페이지 헤더·신규 버튼·라우트 이탈 가드를 숨김 */
+  embedded?: boolean;
+  onSaved?: (order: SalesOrderItem) => void;
+  onDeleted?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  /** embedded 모드에서 저장·삭제 버튼을 상위(모달 하단 등)에 배치할 수 있도록 액션 상태를 전달 */
+  onEmbeddedActionsChange?: (state: SalesOrderEmbeddedActionState | null) => void;
+};
+
+export type SalesOrderEmbeddedActionState = {
+  canSave: boolean;
+  saveDisabled: boolean;
+  canDelete: boolean;
+  deleteDisabled: boolean;
+  saving: boolean;
+  save: () => void;
+  remove: () => void;
 };
 
 type HeaderSnapshot = SalesOrderHeaderValues & { customerId: number | null };
@@ -97,7 +120,15 @@ export function SalesOrderCreatePage({
   content,
   breadcrumbItems,
   selectedMenuPermissions,
+  mode = 'create',
+  salesOrderId,
+  embedded = false,
+  onSaved,
+  onDeleted,
+  onDirtyChange,
+  onEmbeddedActionsChange,
 }: Props) {
+  const isReadOnly = mode === 'view';
   const gridRef = useRef<F1GridRef<SalesOrderDetailRow>>(null);
   const savingRef = useRef(false);
   const selectedMaterialRowIdRef = useRef<string | null>(null);
@@ -126,6 +157,7 @@ export function SalesOrderCreatePage({
   const [validationErrors, setValidationErrors] =
     useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
+  const [isLoadingOrder, setIsLoadingOrder] = useState(salesOrderId != null);
   const gridValidationActiveRef = useRef(false);
 
   const canCreate = Boolean(selectedMenuPermissions?.create);
@@ -140,9 +172,18 @@ export function SalesOrderCreatePage({
       ));
   const hasPermissionForMode = loadedOrder ? canUpdate : canCreate;
   const isEditable =
-    !isSaving && !isLocked && isOrderEditableState && hasPermissionForMode;
+    !isReadOnly &&
+    !isLoadingOrder &&
+    !isSaving &&
+    !isLocked &&
+    isOrderEditableState &&
+    hasPermissionForMode;
   const isDeletable =
-    loadedOrder !== null && !isSaving && !isLocked && isOrderEditableState;
+    !isReadOnly &&
+    loadedOrder !== null &&
+    !isSaving &&
+    !isLocked &&
+    isOrderEditableState;
 
   const hasHeaderChanges =
     (customer?.id ?? null) !== baseline.customerId ||
@@ -154,8 +195,11 @@ export function SalesOrderCreatePage({
     remark.trim() !== baseline.remark.trim();
   const hasUnsavedChanges =
     !isLocked && (hasHeaderChanges || hasDetailChanges);
-  const blocker = useBlocker(hasUnsavedChanges);
   useUnsavedChangesBeforeUnload(hasUnsavedChanges);
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
 
   const clearValidationErrors = useCallback(() => {
     setValidationErrors(null);
@@ -205,6 +249,31 @@ export function SalesOrderCreatePage({
     setError('');
     applyForm(null, createEmptyHeader(), []);
   }, [applyForm]);
+
+  useEffect(() => {
+    if (salesOrderId == null) return;
+    let active = true;
+    setIsLoadingOrder(true);
+    getSalesOrder(salesOrderId)
+      .then((order) => {
+        if (active) applyLoadedOrder(order);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setIsLocked(true);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : '수주를 불러오지 못했습니다.',
+        );
+      })
+      .finally(() => {
+        if (active) setIsLoadingOrder(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyLoadedOrder, salesOrderId]);
 
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
@@ -310,6 +379,7 @@ export function SalesOrderCreatePage({
         );
         applyLoadedOrder(updated);
         setNotice(`수주가 수정되었습니다. 수주번호: ${updated.orderNo}`);
+        onSaved?.(updated);
         return;
       }
 
@@ -318,6 +388,7 @@ export function SalesOrderCreatePage({
         const reloaded = await getSalesOrder(saved.salesOrderId);
         applyLoadedOrder(reloaded);
         setNotice(`수주가 저장되었습니다. 수주번호: ${reloaded.orderNo}`);
+        onSaved?.(reloaded);
       } catch {
         setIsLocked(true);
         setError(
@@ -343,20 +414,24 @@ export function SalesOrderCreatePage({
     hasUnsavedChanges,
     isEditable,
     loadedOrder,
+    onSaved,
     orderDate,
     quotationNumber,
     remark,
   ]);
 
-  const handleDelete = useCallback(async () => {
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const handleDelete = useCallback(() => {
     if (savingRef.current || !loadedOrder || !isDeletable) {
       return;
     }
-    if (
-      !window.confirm(
-        `수주번호 ${loadedOrder.orderNo} 을(를) 삭제하시겠습니까?`,
-      )
-    ) {
+    setDeleteConfirmOpen(true);
+  }, [isDeletable, loadedOrder]);
+
+  const confirmDelete = useCallback(async () => {
+    setDeleteConfirmOpen(false);
+    if (savingRef.current || !loadedOrder || !isDeletable) {
       return;
     }
 
@@ -368,6 +443,7 @@ export function SalesOrderCreatePage({
       await deleteSalesOrder(loadedOrder.salesOrderId);
       resetToNewOrder();
       setNotice(`수주가 삭제되었습니다. 수주번호: ${loadedOrder.orderNo}`);
+      onDeleted?.();
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -378,7 +454,7 @@ export function SalesOrderCreatePage({
       savingRef.current = false;
       setIsSaving(false);
     }
-  }, [isDeletable, loadedOrder, resetToNewOrder]);
+  }, [isDeletable, loadedOrder, onDeleted, resetToNewOrder]);
 
   const handleNew = useCallback(() => {
     if (savingRef.current) {
@@ -404,14 +480,15 @@ export function SalesOrderCreatePage({
           {
             label: '신규',
             icon: NoteAddOutlinedIcon,
-            visible: canWrite,
+            visible: canWrite && !embedded && !isReadOnly,
             disabled: isSaving,
             onClick: handleNew,
           },
           {
             label: '저장',
             icon: SaveIcon,
-            visible: canWrite,
+            saving: isSaving,
+            visible: canWrite && !isReadOnly,
             disabled:
               !isEditable || (loadedOrder !== null && !hasUnsavedChanges),
             onClick: handleSave,
@@ -424,7 +501,7 @@ export function SalesOrderCreatePage({
           {
             label: '삭제',
             icon: DeleteForeverOutlinedIcon,
-            visible: canDelete,
+            visible: canDelete && !isReadOnly,
             disabled: !isDeletable,
             onClick: handleDelete,
           },
@@ -434,15 +511,54 @@ export function SalesOrderCreatePage({
     [
       canDelete,
       canWrite,
+      embedded,
       handleDelete,
       handleNew,
       handleSave,
       hasUnsavedChanges,
       isDeletable,
       isEditable,
+      isReadOnly,
       isSaving,
       loadedOrder,
     ],
+  );
+
+  const canSaveEmbedded = canWrite && !isReadOnly;
+  const saveDisabled = isSaving || !isEditable || (loadedOrder !== null && !hasUnsavedChanges);
+  const canDeleteEmbedded = canDelete && !isReadOnly;
+  const deleteDisabled = isSaving || !isDeletable;
+
+  useEffect(() => {
+    if (!embedded || !onEmbeddedActionsChange) {
+      return;
+    }
+    onEmbeddedActionsChange({
+      canSave: canSaveEmbedded,
+      saveDisabled,
+      canDelete: canDeleteEmbedded,
+      deleteDisabled,
+      saving: isSaving,
+      save: () => void handleSave(),
+      remove: handleDelete,
+    });
+  }, [
+    canDeleteEmbedded,
+    canSaveEmbedded,
+    deleteDisabled,
+    embedded,
+    handleDelete,
+    handleSave,
+    isSaving,
+    onEmbeddedActionsChange,
+    saveDisabled,
+  ]);
+
+  useEffect(
+    () => () => {
+      onEmbeddedActionsChange?.(null);
+    },
+    [onEmbeddedActionsChange],
   );
 
   const validationMessages = validationErrors
@@ -462,19 +578,21 @@ export function SalesOrderCreatePage({
         minWidth: 0,
       }}
     >
-      <PageHeader
-        breadcrumbItems={
-          breadcrumbItems.length
-            ? breadcrumbItems
-            : [selectedModule.name, currentMenuName]
-        }
-        description={content.description}
-        actionGroups={actions}
-      />
+      {embedded ? null : (
+        <PageHeader
+          breadcrumbItems={
+            breadcrumbItems.length
+              ? breadcrumbItems
+              : [selectedModule.name, currentMenuName]
+          }
+          description={content.description}
+          actionGroups={actions}
+        />
+      )}
       <Box
         role="region"
         aria-label="수주 입력 내용"
-        aria-busy={isSaving}
+        aria-busy={isSaving || isLoadingOrder}
         sx={{
           display: 'flex',
           flex: 1,
@@ -484,7 +602,7 @@ export function SalesOrderCreatePage({
           minWidth: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          p: { xs: 1.5, sm: 2, lg: 3 },
+          p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 },
         }}
       >
         {validationMessages.length > 0 && (
@@ -652,9 +770,12 @@ export function SalesOrderCreatePage({
                 수주 상세
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행 복사·삭제를 할 수 있습니다.
+                {isReadOnly
+                  ? '수주 품목 내역입니다.'
+                  : '행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행 복사·삭제를 할 수 있습니다.'}
               </Typography>
             </Box>
+            {isReadOnly ? null : (
             <Box
               data-testid="sales-order-detail-toolbar"
               sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
@@ -680,6 +801,7 @@ export function SalesOrderCreatePage({
                 품목 선택
               </Button>
             </Box>
+            )}
           </Box>
           <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, px: 1 }}>
             <SalesOrderDetailGrid
@@ -716,19 +838,39 @@ export function SalesOrderCreatePage({
         onClose={closeMaterialPicker}
         onChange={selectMaterial}
       />
+      {embedded ? null : (
+        <SalesOrderRouteLeaveGuard when={hasUnsavedChanges} />
+      )}
       <UnsavedChangesConfirmDialog
-        open={blocker.state === 'blocked'}
-        description="저장되지 않은 수주 내용이 있습니다. 이동하면 입력 내용이 사라집니다. 이동하시겠습니까?"
-        cancelLabel="계속 작성"
-        continueLabel="변경사항 버리고 이동"
-        onCancel={() => {
-          if (blocker.state === 'blocked') blocker.reset();
-        }}
-        onContinue={() => {
-          if (blocker.state === 'blocked') blocker.proceed();
-        }}
+        open={deleteConfirmOpen}
+        title="수주 삭제"
+        dialogTitleId="sales-order-delete-dialog-title"
+        description={`수주번호 ${loadedOrder?.orderNo ?? ''} 을(를) 삭제하시겠습니까? 삭제한 수주는 되돌릴 수 없습니다.`}
+        continueLabel="삭제"
+        cancelLabel="취소"
+        confirmButtonColor="error"
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onContinue={() => void confirmDelete()}
       />
     </Box>
+  );
+}
+
+function SalesOrderRouteLeaveGuard({ when }: { when: boolean }) {
+  const blocker = useBlocker(when);
+  return (
+    <UnsavedChangesConfirmDialog
+      open={blocker.state === 'blocked'}
+      description="저장되지 않은 수주 내용이 있습니다. 이동하면 입력 내용이 사라집니다. 이동하시겠습니까?"
+      cancelLabel="계속 작성"
+      continueLabel="변경사항 버리고 이동"
+      onCancel={() => {
+        if (blocker.state === 'blocked') blocker.reset();
+      }}
+      onContinue={() => {
+        if (blocker.state === 'blocked') blocker.proceed();
+      }}
+    />
   );
 }
 

@@ -1,0 +1,92 @@
+[
+  {
+    "kind": "item",
+    "width": 375,
+    "geometry": {
+      "x": 0,
+      "right": 375,
+      "documentWidth": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  },
+  {
+    "kind": "item",
+    "width": 768,
+    "geometry": {
+      "x": 32,
+      "right": 736,
+      "documentWidth": 768,
+      "contentWidth": 702,
+      "contentScrollWidth": 702
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  },
+  {
+    "kind": "item",
+    "width": 1280,
+    "geometry": {
+      "x": 229,
+      "right": 1051,
+      "documentWidth": 1280,
+      "contentWidth": 820,
+      "contentScrollWidth": 820
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  },
+  {
+    "kind": "partner",
+    "width": 375,
+    "geometry": {
+      "x": 0,
+      "right": 375,
+      "documentWidth": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  },
+  {
+    "kind": "partner",
+    "width": 768,
+    "geometry": {
+      "x": 32,
+      "right": 736,
+      "documentWidth": 768,
+      "contentWidth": 702,
+      "contentScrollWidth": 702
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  },
+  {
+    "kind": "partner",
+    "width": 1280,
+    "geometry": {
+      "x": 229,
+      "right": 1051,
+      "documentWidth": 1280,
+      "contentWidth": 820,
+      "contentScrollWidth": 820
+    },
+    "updates": 1,
+    "gets": 2,
+    "pageErrors": [],
+    "checks": "button-only-spinner, rows-retained, editing-add-save-close-blocked, post-save-reload-quiet, controls-restored"
+  }
+]

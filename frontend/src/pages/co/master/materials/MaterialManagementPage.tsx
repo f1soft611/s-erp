@@ -5,7 +5,6 @@ import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
-import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
@@ -17,6 +16,7 @@ import type { F1GridRef } from '../../../../shared/components/f1-grid';
 import { toPageSearchFields, type PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
 import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
+import { ClassificationPickerDialog } from '../classification/components/ClassificationPickerDialog';
 import { MaterialGrid, createMaterialColumns } from './components/MaterialGrid';
 import { useMaterialManagement } from './hooks/useMaterialManagement';
 import { materialSearchFields, type MaterialFilters, type MaterialRow } from './types/materialManagement.types';
@@ -30,10 +30,6 @@ type Props = {
   isTenantAdmin?: boolean;
 };
 
-function SaveProgressIcon() {
-  return <AppLoadingSpinner size={16} color="inherit" aria-label="품목 저장 중" />;
-}
-
 export function MaterialManagementPage({ selectedModule, currentMenuName, content,
   breadcrumbItems, selectedMenuPermissions, isTenantAdmin = false }: Props) {
   const management = useMaterialManagement();
@@ -43,6 +39,9 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>({});
   const [pendingFilters, setPendingFilters] = useState<MaterialFilters | null>(null);
   const [classificationOpen, setClassificationOpen] = useState(false);
+  const [classificationPicker, setClassificationPicker] = useState<{
+    apply: (patch: Partial<MaterialRow>) => void;
+  } | null>(null);
   const canCreateClassification = Boolean(selectedMenuPermissions?.create);
   const canUpdateClassification = Boolean(selectedMenuPermissions?.update);
   const canCreate = Boolean(isTenantAdmin && selectedMenuPermissions?.create);
@@ -51,6 +50,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
   const columns = useMemo(() => createMaterialColumns(
     (row) => !management.saving && (String(row.materialId).startsWith('new-material-') ? canCreate : canUpdate),
     management.options, management.rows,
+    (_row, apply) => { setClassificationPicker({ apply }); return undefined; },
   ), [canCreate, canUpdate, management.saving, management.options, management.rows]);
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
   const search = (filters: MaterialFilters) => {
@@ -75,7 +75,8 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
       disabled: management.loading || management.saving, onClick: () => gridRef.current?.addRow() }] },
     { key: 'read', actions: [{ label: '조회', icon: SearchIcon, visible: Boolean(selectedMenuPermissions?.read),
       disabled: management.saving, onClick: searchDefault }] },
-    { key: 'write', actions: [{ label: '저장', icon: management.saving ? SaveProgressIcon : SaveIcon,
+    { key: 'write', actions: [{ label: '저장', icon: SaveIcon,
+      saving: management.saving, savingAriaLabel: '품목 저장 중',
       visible: canWrite, disabled: !management.hasChanges || management.saving || management.loading,
       onClick: () => {
         const grid = gridRef.current;
@@ -116,6 +117,14 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
     <ClassificationSettingsDialog open={classificationOpen} kind="item"
       canCreate={canCreateClassification} canUpdate={canUpdateClassification}
       onClose={() => setClassificationOpen(false)} />
+    <ClassificationPickerDialog open={classificationPicker !== null} kind="item"
+      onClose={() => setClassificationPicker(null)}
+      onSelect={(selection) => {
+        classificationPicker?.apply({
+          itemClsId: selection?.row.id ?? null, itemClsPath: selection?.path ?? '',
+        });
+        setClassificationPicker(null);
+      }} />
     <UnsavedChangesConfirmDialog open={pendingFilters !== null} title="저장하지 않은 변경사항"
       description="변경사항을 버리고 품목 목록을 다시 불러오시겠습니까?" cancelLabel="취소" continueLabel="계속"
       onCancel={() => setPendingFilters(null)} onContinue={() => {

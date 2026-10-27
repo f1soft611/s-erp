@@ -51,14 +51,14 @@ describe('material management contract', () => {
       />
     </NotificationProvider></ThemeProvider>);
     await screen.findByText('Sample');
-    const action = screen.queryByRole('button', { name: '품목분류설정' });
+    const action = screen.queryByRole('button', { name: /품목분류\s*설정/ });
     if (!create && !update) {
       expect(action).not.toBeInTheDocument();
       return;
     }
     expect(action).toBeInTheDocument();
     fireEvent.click(action!);
-    expect(await screen.findByRole('dialog', { name: '품목분류설정' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /품목분류\s*설정/ })).toBeInTheDocument();
     await waitFor(() => expect(api.apiGet).toHaveBeenCalledWith('/api/v1/co/master/classifications/items'));
     expect(Boolean(screen.queryByRole('button', { name: '최상위 추가' }))).toBe(create);
   });

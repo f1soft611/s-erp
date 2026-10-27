@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import { Alert, Box, Button, Stack } from '@mui/material';
-import { AppLoadingSpinner } from '../AppLoadingSpinner';
+import { AppSaveButton } from '../AppSaveButton';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
 import { CommonDialog } from '../CommonDialog';
 import { useNotification } from '../../context/NotificationContext';
@@ -212,13 +212,9 @@ export function CommonCodeItemHelpDialog({
         actions={
           <>
             {canEdit && (
-              <Button
+              <AppSaveButton
                 variant="contained"
-                startIcon={
-                  saving ? (
-                    <AppLoadingSpinner size={16} color="inherit" />
-                  ) : undefined
-                }
+                saving={saving}
                 sx={{
                   borderRadius: 1.5,
                   fontWeight: 700,
@@ -229,7 +225,7 @@ export function CommonCodeItemHelpDialog({
                 onClick={() => void handleSave()}
               >
                 저장
-              </Button>
+              </AppSaveButton>
             )}
             <Button onClick={requestClose} disabled={saving}>
               취소

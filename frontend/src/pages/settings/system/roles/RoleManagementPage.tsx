@@ -197,6 +197,7 @@ export function RoleManagementPage({
         {
           label: '저장',
           icon: SaveIcon,
+          saving,
           visible: pageActionPermissions.write,
           disabled: !panelDirty || saving || reloading,
           onClick: () => {

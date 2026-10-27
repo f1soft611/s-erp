@@ -168,7 +168,7 @@ class SalesOrderServiceImplTest {
         when(salesOrderDAO.selectOrderDetails(anyMap()))
                 .thenReturn(Collections.singletonList(line));
 
-        SalesOrderVO loaded = service.getOrder(71L, 300L);
+        SalesOrderVO loaded = service.getOrder(71L, "user01", 300L);
 
         assertThat(loaded.getOrderNo()).isEqualTo("SO-20261027-0001");
         assertThat(loaded.getDetails()).extracting("materialCode").containsExactly("M-20");
@@ -179,10 +179,26 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void marksOrderAsWrittenByTheAuthenticatedUserOnlyWhenCreatorMatches() throws Exception {
+        SalesOrderVO mine = storedOrder("수주등록");
+        mine.setCreatedBy("user01");
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(mine);
+        when(salesOrderDAO.selectOrderDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        assertThat(service.getOrder(71L, "user01", 300L).getWriter()).isTrue();
+
+        SalesOrderVO others = storedOrder("수주등록");
+        others.setCreatedBy("user02");
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(others);
+
+        assertThat(service.getOrder(71L, "user01", 300L).getWriter()).isFalse();
+    }
+
+    @Test
     void rejectsMissingOrDeletedOrderWithNotFound() throws Exception {
         when(salesOrderDAO.selectOrder(anyMap())).thenReturn(null);
 
-        assertThatThrownBy(() -> service.getOrder(71L, 300L))
+        assertThatThrownBy(() -> service.getOrder(71L, "user01", 300L))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);

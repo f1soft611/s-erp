@@ -18,6 +18,7 @@ import {
   richTextEditorIconButtonSx,
 } from '../../../../../shared/components/rich-text-editor/RichTextEditor';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { richTextContentStyles } from '../../../../../shared/components/rich-text-editor/contentStyles';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
@@ -177,9 +178,11 @@ export function DocumentComposerDialog({
         footerStart={composerFooterStart}
         actions={
           <>
-            <Button
+            <AppSaveButton
               variant="contained"
               color="success"
+              saving={isSaving}
+              savingLabel="처리 중..."
               onClick={() => void submitDraft()}
               disabled={!canSubmitDraft}
               sx={{
@@ -190,10 +193,12 @@ export function DocumentComposerDialog({
                 boxShadow: 'none',
               }}
             >
-              {isSaving ? '처리 중...' : activeDocumentKind === '업무연락' ? '발송' : '결재신청'}
-            </Button>
-            <Button
+              {activeDocumentKind === '업무연락' ? '발송' : '결재신청'}
+            </AppSaveButton>
+            <AppSaveButton
               variant="contained"
+              saving={isSaving}
+              savingLabel="저장 중..."
               onClick={() => void saveDraft()}
               disabled={!canSaveDraft}
               sx={{
@@ -204,12 +209,10 @@ export function DocumentComposerDialog({
                 boxShadow: 'none',
               }}
             >
-              {isSaving
-                ? '저장 중...'
-                : uploadingCount > 0
-                  ? '이미지 업로드 중...'
-                  : '저장'}
-            </Button>
+              {uploadingCount > 0
+                ? '이미지 업로드 중...'
+                : '저장'}
+            </AppSaveButton>
             <Button
               variant="text"
               color="primary"

@@ -195,6 +195,7 @@ export function MenuManagementPage({
         {
           label: '저장',
           icon: SaveIcon,
+          saving,
           visible: pageActionPermissions.write,
           disabled: !dirty || saving,
           onClick: async () => {

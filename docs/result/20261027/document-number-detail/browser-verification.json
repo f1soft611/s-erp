@@ -1,0 +1,37 @@
+{
+  "syntheticDataOnly": true,
+  "reusedExistingServer": true,
+  "detailRequests": [
+    41,
+    41,
+    41,
+    41,
+    41,
+    41,
+    41,
+    41,
+    42,
+    42
+  ],
+  "metrics": [
+    {
+      "width": 375,
+      "scrollWidth": 375,
+      "ordinaryCellOpensDetail": false,
+      "keyboardSelectionOpensDetail": false
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "ordinaryCellOpensDetail": false,
+      "keyboardSelectionOpensDetail": false
+    },
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "ordinaryCellOpensDetail": false,
+      "keyboardSelectionOpensDetail": false
+    }
+  ],
+  "runtimeErrors": []
+}

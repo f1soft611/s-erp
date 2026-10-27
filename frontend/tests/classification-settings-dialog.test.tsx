@@ -36,6 +36,27 @@ beforeEach(() => {
 });
 
 describe('classification F1Tree settings', () => {
+  it.each(['item', 'partner'] as const)('enables %s saving only for modified or added rows', async (kind) => {
+    show({ kind });
+    await screen.findByText('Root', { exact: true });
+    const button = screen.getByRole('button', { name: '저장', exact: true });
+    expect(button).toBeDisabled();
+    select(2);
+    expect(button).toBeDisabled();
+    edit(1, 0, 'Changed');
+    expect(button).toBeEnabled();
+    edit(1, 0, 'Root');
+    expect(button).toBeDisabled();
+    fireEvent.doubleClick(within(rowElement(1)).getAllByRole('gridcell')[0]);
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft name' } });
+    expect(button).toBeEnabled();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Root' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(button).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '최상위 추가' }));
+    expect(button).toBeEnabled();
+  });
   it.each([['item', 3], ['partner', 2]] as const)(
     'places the %s guidance in the common dialog header and closes via X', async (kind, depth) => {
       const onClose = vi.fn();
@@ -242,7 +263,9 @@ describe('classification F1Tree settings', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     service.fetchClassifications.mockResolvedValue([root, { ...root, id: 11, name: 'Added' }]);
     fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).toBeEnabled());
+    await screen.findByText('Root', { exact: true });
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     save();
     expect(service.createClassification).toHaveBeenCalledOnce();
   });
@@ -253,6 +276,10 @@ describe('classification F1Tree settings', () => {
     fireEvent.doubleClick(within(rowElement(1)).getAllByRole('gridcell')[0]);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft name' } });
     expect(unloadIsBlocked()).toBe(true);
+    const button = screen.getByRole('button', { name: '저장', exact: true });
+    fireEvent.pointerDown(button);
+    expect(button).toBeEnabled();
+    fireEvent.mouseDown(button);
     save();
     await waitFor(() => expect(service.updateClassification).toHaveBeenCalledWith('item', 1, {
       name: 'Draft name', sortSeq: 0, useAt: 'Y',
@@ -267,11 +294,39 @@ describe('classification F1Tree settings', () => {
     await screen.findByText('Root', { exact: true });
     edit(1, 0, 'Saving');
     save();
-    await waitFor(() => expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('progressbar', { name: '분류 저장 중' })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /저장/ })).toBeDisabled();
     fireEvent.click(screen.getAllByRole('button', { name: '닫기', exact: true })[0]);
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: '저장하지 않은 변경사항' })).not.toBeInTheDocument();
     await act(async () => resolve({ ...root, name: 'Saving' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '저장', exact: true })).toBeEnabled());
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
+  });
+
+  it.each(['item', 'partner'] as const)('uses only button loading during %s save and post-save reload', async (kind) => {
+    let finishSave!: (row: typeof root) => void;
+    let finishReload!: (rows: (typeof root | typeof child)[]) => void;
+    service.updateClassification.mockReturnValueOnce(new Promise((done) => { finishSave = done; }));
+    show({ kind });
+    await screen.findByText('Root', { exact: true });
+    service.fetchClassifications.mockReturnValueOnce(new Promise((done) => { finishReload = done; }));
+    edit(1, 0, 'Quiet save');
+    save();
+    const tree = screen.getByRole('grid', { name: '분류 트리' });
+    expect(within(tree).queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '분류 저장 중' })).toBeInTheDocument();
+    expect(screen.getByText('Quiet save', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '최상위 추가' })).toBeDisabled();
+    fireEvent.doubleClick(within(rowElement(1)).getAllByRole('gridcell')[0]);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await act(async () => finishSave({ ...root, name: 'Quiet save' }));
+    await waitFor(() => expect(service.fetchClassifications).toHaveBeenCalledTimes(2));
+    expect(within(screen.getByRole('grid', { name: '분류 트리' })).queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '분류 저장 중' })).toBeInTheDocument();
+    expect(screen.getByText('Quiet save', { exact: true })).toBeInTheDocument();
+    await act(async () => finishReload([{ ...root, name: 'Quiet save' }, child]));
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '저장', exact: true })).toBeDisabled();
   });
 });

@@ -13,6 +13,10 @@
         <result property="juridNo" column="jurid_no"/>
         <result property="businessStatus1" column="business_status_1"/>
         <result property="businessItem1" column="business_item_1"/>
+        <result property="businessKind1" column="business_kind1"/>
+        <result property="businessKind2" column="business_kind2"/>
+        <result property="businessKind1Name" column="business_kind1_name"/>
+        <result property="businessKind2Name" column="business_kind2_name"/>
         <result property="postCode" column="post_code"/>
         <result property="address" column="address"/>
         <result property="telephoneNo" column="telephone_no"/>
@@ -45,7 +49,15 @@
         created_by,
         created_at,
         updated_by,
-        updated_at
+        updated_at,
+        business_kind1,
+        business_kind2,
+        (SELECT c.partner_cls_nm FROM tb_cls_partner c
+         WHERE c.tenant_id = tb_customer_info.tenant_id
+           AND c.partner_cls_id = tb_customer_info.business_kind1) AS business_kind1_name,
+        (SELECT c.partner_cls_nm FROM tb_cls_partner c
+         WHERE c.tenant_id = tb_customer_info.tenant_id
+           AND c.partner_cls_id = tb_customer_info.business_kind2) AS business_kind2_name
     </sql>
 
     <select id="selectCustomerList"
@@ -133,6 +145,8 @@
             jurid_no,
             business_status_1,
             business_item_1,
+            business_kind1,
+            business_kind2,
             post_code,
             address,
             telephone_no,
@@ -151,6 +165,8 @@
             #{juridNo},
             #{businessStatus1},
             #{businessItem1},
+            #{businessKind1,jdbcType=BIGINT},
+            #{businessKind2,jdbcType=BIGINT},
             #{postCode},
             #{address},
             #{telephoneNo},
@@ -172,6 +188,8 @@
             jurid_no = #{juridNo},
             business_status_1 = #{businessStatus1},
             business_item_1 = #{businessItem1},
+            business_kind1 = #{businessKind1,jdbcType=BIGINT},
+            business_kind2 = #{businessKind2,jdbcType=BIGINT},
             post_code = #{postCode},
             address = #{address},
             telephone_no = #{telephoneNo},

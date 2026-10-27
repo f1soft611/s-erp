@@ -5,7 +5,6 @@ import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import { Box, IconButton, TextField } from '@mui/material';
-import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
@@ -47,12 +46,6 @@ type DraftFormManagementPageProps = {
   selectedMenuPermissions?: MenuPermission;
   isTenantAdmin?: boolean;
 };
-
-function DraftFormSaveProgressIcon() {
-  return (
-    <AppLoadingSpinner size={16} color="inherit" aria-label="기안양식 저장 중" />
-  );
-}
 
 export function DraftFormManagementPage({
   selectedModule,
@@ -231,7 +224,9 @@ export function DraftFormManagementPage({
       actions: [
         {
           label: '저장',
-          icon: management.saving ? DraftFormSaveProgressIcon : SaveIcon,
+          icon: SaveIcon,
+          saving: management.saving,
+          savingAriaLabel: '기안양식 저장 중',
           visible: canWriteForms,
           disabled: !management.hasChanges || management.saving,
           onClick: handleGridSave,

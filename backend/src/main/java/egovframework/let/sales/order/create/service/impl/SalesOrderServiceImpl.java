@@ -115,17 +115,19 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     }
 
     /**
-     * 테넌트 범위에서 사용 중인 수주 헤더와 상세를 조회한다.
+     * 테넌트 범위에서 사용 중인 수주 헤더와 상세를 조회하고 작성자 여부를 설정한다.
      *
      * @param tenantId 인증된 사용자의 테넌트 ID
+     * @param userId 인증된 사용자의 ID (작성자 여부 판단)
      * @param salesOrderId 수주 ID
-     * @return 거래처/품목 코드와 명을 포함한 수주 정보
+     * @return 거래처/품목 코드와 명, 작성자 정보를 포함한 수주 정보
      * @throws Exception 조회 중 발생한 예외 (없으면 404)
      */
     @Override
-    public SalesOrderVO getOrder(Long tenantId, Long salesOrderId) throws Exception {
+    public SalesOrderVO getOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
         SalesOrderVO order = findOrder(tenantId, salesOrderId);
         order.setDetails(salesOrderDAO.selectOrderDetails(orderParams(tenantId, salesOrderId)));
+        order.setWriter(userId != null && userId.equals(order.getCreatedBy()));
         return order;
     }
 
@@ -171,7 +173,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         for (PreparedDetail prepared : preparedDetails) {
             persistDetail(salesOrderId, tenantId, lineNo++, prepared);
         }
-        return getOrder(tenantId, salesOrderId);
+        return getOrder(tenantId, userId, salesOrderId);
     }
 
     /**

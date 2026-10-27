@@ -43,6 +43,11 @@ export type SalesOrderStatusFilters = {
 
 export type SalesOrderStatusSearchValues = Record<string, PageSearchFieldValue>;
 
+export type SalesOrderStatusSearchSession = {
+  keyword: string;
+  detailValues: SalesOrderStatusSearchValues;
+};
+
 export type SalesOrderStatusListResponse = {
   resultList?: SalesOrderStatusRow[];
   resultCnt?: number;

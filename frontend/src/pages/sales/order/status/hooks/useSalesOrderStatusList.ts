@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { searchSalesOrderStatus } from '../services/salesOrderStatus.service';
 import type {
@@ -10,14 +10,18 @@ export function useSalesOrderStatusList(filters: SalesOrderStatusFilters | null)
   const [rows, setRows] = useState<SalesOrderStatusRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [retryToken, setRetryToken] = useState(0);
+  const [retryRequest, setRetryRequest] = useState({ version: 0, quiet: false });
+  const previousRetryVersion = useRef(0);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   useEffect(() => {
     if (!filters) return;
     let cancelled = false;
+    const isQuietReload =
+      retryRequest.quiet && retryRequest.version !== previousRetryVersion.current;
+    previousRetryVersion.current = retryRequest.version;
     start();
-    setLoading(true);
+    if (!isQuietReload) setLoading(true);
     setError('');
     void searchSalesOrderStatus(filters)
       .then((result) => {
@@ -39,10 +43,15 @@ export function useSalesOrderStatusList(filters: SalesOrderStatusFilters | null)
     return () => {
       cancelled = true;
     };
-  }, [filters, retryToken, start, succeed, fail]);
+  }, [filters, retryRequest, start, succeed, fail]);
 
   const clearError = useCallback(() => setError(''), []);
-  const retry = useCallback(() => setRetryToken((current) => current + 1), []);
+  const retry = useCallback(() => setRetryRequest((current) => ({ version: current.version + 1, quiet: false })), []);
+  /** 그리드 로딩 표시 없이 현재 조건으로 재조회(수정·삭제 후 갱신용) */
+  const refreshQuietly = useCallback(
+    () => setRetryRequest((current) => ({ version: current.version + 1, quiet: true })),
+    [],
+  );
 
-  return { initialLoad, rows, loading, error, clearError, retry };
+  return { initialLoad, rows, loading, error, clearError, retry, refreshQuietly };
 }

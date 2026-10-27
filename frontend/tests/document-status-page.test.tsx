@@ -151,6 +151,20 @@ describe('document status page', () => {
     await screen.findByRole('grid', { name: '문서현황' });
   });
 
+  it('selects document rows without opening detail on cell clicks or keyboard navigation', async () => {
+    renderDocumentStatusPage();
+    const cell = await screen.findByRole('gridcell', { name: 'Annual plan' });
+    fireEvent.click(cell);
+    expect(cell.closest('[role="row"]')?.querySelector('[data-row-selection-overlay]')).not.toBeNull();
+    expect(getComputedStyle(cell).outline).toBe('none');
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    fireEvent.keyDown(cell, { key: 'ArrowDown' });
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    expect(DocumentApprovalDetailFeed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('41').closest('[role="gridcell"]') as HTMLElement);
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+  });
+
   it('shows the header read action only with menu read permission', async () => {
     const view = renderDocumentStatusPage('documents', true);
     expect(screen.getByRole('button', { name: '조회' })).toBeInTheDocument();
@@ -517,7 +531,7 @@ describe('document status page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens only the read-only context menu on right-click and still opens detail on left-click', async () => {
+  it('opens only the read-only context menu on right-click and detail only from the document number', async () => {
     renderDocumentStatusPage('documents', false, true);
     const cell = await screen.findByRole('gridcell', { name: row.title });
 
@@ -554,15 +568,19 @@ describe('document status page', () => {
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
     fireEvent.click(cell);
+    expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '41 상세 보기' }));
     expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
   });
 
-  it('opens the existing approval detail overlay for the selected document and closes it', async () => {
+  it('opens the document number detail and reopens the same document after closing', async () => {
     renderDocumentStatusPage();
-    await screen.findByText('41');
-
-    const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
-    fireEvent.click(within(selectedRow).getByRole('checkbox'));
+    const link = await screen.findByRole('button', { name: '41 상세 보기' });
+    fireEvent.click(screen.getByRole('gridcell', { name: row.title }));
+    link.focus();
+    expect(fireEvent.keyDown(link, { key: 'Enter' })).toBe(true);
+    expect(fireEvent.keyDown(link, { key: ' ' })).toBe(true);
+    fireEvent.click(link);
 
     expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
     const feedCall = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1);
@@ -570,13 +588,14 @@ describe('document status page', () => {
 
     fireEvent.click(screen.getByTestId('page-area-overlay-backdrop'));
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
+    fireEvent.click(link);
+    expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
+    expect(vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1)?.[0].electronicApprovalId).toBe(41);
   });
 
   it('forwards detail actions to the existing composer and refreshes the list', async () => {
     renderDocumentStatusPage();
-    await screen.findByText('41');
-    const selectedRow = screen.getByRole('row', { name: /41 행 선택/ });
-    fireEvent.click(within(selectedRow).getByRole('checkbox'));
+    fireEvent.click(await screen.findByRole('button', { name: '41 상세 보기' }));
     await screen.findByTestId('page-area-overlay');
 
     const initialFeedCall = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1);
@@ -621,8 +640,7 @@ describe('document status page', () => {
 
   it('clears the editing document and refreshes the list when the composer closes', async () => {
     renderDocumentStatusPage();
-    const cell = await screen.findByRole('gridcell', { name: row.title });
-    fireEvent.click(cell);
+    fireEvent.click(await screen.findByRole('button', { name: '41 상세 보기' }));
     await screen.findByTestId('page-area-overlay');
     const feedProps = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1)?.[0];
     if (!feedProps) throw new Error('Detail panel props were not captured.');

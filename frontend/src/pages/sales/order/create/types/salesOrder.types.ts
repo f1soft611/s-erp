@@ -79,6 +79,11 @@ export type SalesOrderItem = {
   status: string;
   totalAmt: number | null;
   remark: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
+  writer?: boolean | null;
   details: SalesOrderDetailItem[];
 };
 

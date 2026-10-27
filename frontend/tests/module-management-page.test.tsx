@@ -545,6 +545,7 @@ describe('ModuleManagementPage', () => {
 
     await waitFor(() => expect(apiMocks.apiPut).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('gridcell', { name: '그룹웨어 수정' })).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: '저장 중' })).toHaveStyle({ width: '16px' });
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '조회' })).toBeDisabled();
@@ -559,6 +560,7 @@ describe('ModuleManagementPage', () => {
 
     saveRequest.resolve({});
     await waitFor(() => expect(getCount).toBe(2));
+    expect(screen.getByRole('progressbar', { name: '저장 중' })).toBeVisible();
     expect(screen.getByRole('gridcell', { name: '그룹웨어 수정' })).toBeVisible();
     expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '조회' })).toBeDisabled();
@@ -569,6 +571,7 @@ describe('ModuleManagementPage', () => {
       await screen.findByRole('gridcell', { name: '그룹웨어 저장됨' }),
     ).toBeVisible();
     await waitFor(() => expect(screen.getByRole('button', { name: '조회' })).toBeEnabled());
+    expect(screen.queryByRole('progressbar', { name: '저장 중' })).not.toBeInTheDocument();
     expect(await screen.findByText('모듈을 저장했습니다.')).toBeVisible();
   });
 

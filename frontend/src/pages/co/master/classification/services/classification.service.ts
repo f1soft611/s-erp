@@ -8,6 +8,17 @@ import type {
 const endpoint = (kind: ClassificationKind) =>
   `/api/v1/co/master/classifications/${kind === 'item' ? 'items' : 'partners'}`;
 
+export function normalizeClassificationId(value: unknown): number | null {
+  if (value == null) return null;
+  if ((typeof value !== 'number' && typeof value !== 'string') ||
+    (typeof value === 'string' && !/^[0-9]+$/.test(value))) {
+    throw new Error('분류 ID는 양의 안전한 정수여야 합니다.');
+  }
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error('분류 ID는 양의 안전한 정수여야 합니다.');
+  return id;
+}
+
 function normalize(row: Partial<Record<keyof Classification, unknown>>): Classification {
   const id = Number(row.id);
   const level = Number(row.level);

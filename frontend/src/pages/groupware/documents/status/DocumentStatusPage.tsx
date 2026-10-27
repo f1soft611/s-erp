@@ -111,7 +111,7 @@ export function DocumentStatusPage({
               rows={list.rows}
               loading={list.loading}
               canExportExcel={selectedMenuPermissions?.excel ?? false}
-              onSelectionChange={detail.handleSelectionChange}
+              onOpenDocument={detail.handleOpenDocument}
             />
           </Box>
         ) : null}

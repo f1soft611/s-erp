@@ -22,6 +22,7 @@ import {
 } from './services/profileSettings.service';
 import type { MyProfile } from './types/profileSettings';
 import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
+import { AppSaveButton } from '../../shared/components/AppSaveButton';
 import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
 
 const MAX_FILE_SIZE = 1024 * 1024;
@@ -293,14 +294,16 @@ function ProfileSettingsPage() {
           </Stack>
         </Paper>
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          <Button
+          <AppSaveButton
             variant="contained"
             startIcon={<SaveOutlined />}
+            saving={saving}
+            savingLabel="저장 중..."
             onClick={handleSave}
             disabled={saving || !profile}
           >
-            {saving ? '저장 중...' : '저장'}
-          </Button>
+            저장
+          </AppSaveButton>
           <Button variant="outlined" onClick={() => navigate(-1)}>
             취소
           </Button>

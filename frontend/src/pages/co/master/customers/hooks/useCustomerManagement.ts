@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GridSaveReconciliationError, type F1GridChanges, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
+import { normalizeClassificationId } from '../../classification/services/classification.service';
 import {
   fetchCustomers,
   saveCustomerRows,
@@ -31,6 +32,8 @@ function toPayload(row: CustomerRow, isNew: boolean): CustomerPayload {
     juridNo: row.juridNo.trim(),
     businessStatus1: row.businessStatus1.trim(),
     businessItem1: row.businessItem1.trim(),
+    businessKind1: normalizeClassificationId(row.businessKind1),
+    businessKind2: normalizeClassificationId(row.businessKind2),
     postCode: row.postCode.trim(),
     address: row.address.trim(),
     telephoneNo: row.telephoneNo.trim(),

@@ -33,6 +33,10 @@ export function createCustomerRow(): CustomerRow {
     juridNo: '',
     businessStatus1: '',
     businessItem1: '',
+    businessKind1: null,
+    businessKind2: null,
+    businessKind1Name: '',
+    businessKind2Name: '',
     postCode: '',
     address: '',
     telephoneNo: '',
@@ -44,6 +48,7 @@ export function createCustomerRow(): CustomerRow {
 
 export function createCustomerColumns(
   canEdit: boolean,
+  onOpenClassification?: (row: CustomerRow, applyPatch: (patch: Partial<CustomerRow>) => void, level: 1 | 2) => void,
 ): F1GridColumn<CustomerRow>[] {
   return [
     {
@@ -84,6 +89,20 @@ export function createCustomerColumns(
       editable: canEdit,
       form: { group: '기본정보', order: 3 },
       search: { hidden: true },
+    },
+    {
+      field: 'businessKind1', headerName: '거래처 대분류', type: 'code', width: 160,
+      editable: canEdit, getValue: (row) => row.businessKind1Name ?? '',
+      onOpenCodePicker: (row, applyPatch) => { onOpenClassification?.(row, applyPatch, 1); return undefined; },
+      onValueChange: () => { throw new Error('코드 선택으로 거래처 분류를 선택해 주세요.'); },
+      form: { group: '기본정보', order: 5 }, search: { hidden: true },
+    },
+    {
+      field: 'businessKind2', headerName: '거래처 소분류', type: 'code', width: 160,
+      editable: canEdit, getValue: (row) => row.businessKind2Name ?? '',
+      onOpenCodePicker: (row, applyPatch) => { onOpenClassification?.(row, applyPatch, 2); return undefined; },
+      onValueChange: () => { throw new Error('코드 선택으로 거래처 분류를 선택해 주세요.'); },
+      form: { group: '기본정보', order: 6 }, search: { hidden: true },
     },
     {
       field: 'presidentName',

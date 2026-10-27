@@ -140,6 +140,7 @@ function getTypedExcelCell<T extends object>(
     default:
       cell = { value: getCellDisplayValue(column, rawValue) };
   }
+  if (typeof cell.value === 'string') cell.numFmt ??= '@';
   return { ...cell, alignment };
 }
 
