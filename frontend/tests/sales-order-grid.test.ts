@@ -2,8 +2,64 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createSalesOrderDetailColumns,
   createSalesOrderDetailRow,
+  duplicateSalesOrderDetailRow,
+  resolveActiveSalesOrderRows,
 } from '../src/pages/sales/order/create/data/salesOrderDetail';
 import { validateGridRow } from '../src/shared/components/f1-grid/validation/GridValidation';
+
+describe('sales order detail duplicate', () => {
+  it('copies material, quantity, price and amounts with a new row id and resets shipment', () => {
+    const source = {
+      ...createSalesOrderDetailRow(),
+      rowId: 'source',
+      materialId: 20,
+      materialCode: 'M-20',
+      materialName: '품목 20',
+      orderQty: 2,
+      unitPrice: 100,
+      supplyAmount: 200,
+      vatAmount: 20,
+      totalAmount: 220,
+      deliveryDt: '2026-11-01',
+      shippedQty: 1,
+      lineStatus: '출하',
+    };
+
+    const copy = duplicateSalesOrderDetailRow(source);
+
+    expect(copy.rowId).not.toBe('source');
+    expect(copy.rowId).toMatch(/^order-line-/);
+    expect(copy).toMatchObject({
+      materialId: 20,
+      materialCode: 'M-20',
+      orderQty: 2,
+      unitPrice: 100,
+      totalAmount: 220,
+      deliveryDt: '2026-11-01',
+      shippedQty: 0,
+      lineStatus: '대기',
+    });
+  });
+});
+
+describe('sales order active detail rows', () => {
+  it('applies grid updates, deletions and insertions to the loaded rows', () => {
+    const first = { ...createSalesOrderDetailRow(), rowId: 'a', totalAmount: 10 };
+    const second = { ...createSalesOrderDetailRow(), rowId: 'b', totalAmount: 20 };
+    const inserted = { ...createSalesOrderDetailRow(), rowId: 'c', totalAmount: 30 };
+
+    const active = resolveActiveSalesOrderRows([first, second], {
+      insertedRows: [inserted],
+      updatedRows: [{ ...first, totalAmount: 11 }],
+      deletedRows: [second],
+    });
+
+    expect(active.map((row) => [row.rowId, row.totalAmount])).toEqual([
+      ['a', 11],
+      ['c', 30],
+    ]);
+  });
+});
 
 describe('sales order detail grid', () => {
   it('recalculates VAT on quantity or price changes after a manual VAT edit', () => {

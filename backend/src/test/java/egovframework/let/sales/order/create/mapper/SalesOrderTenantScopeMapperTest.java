@@ -64,6 +64,47 @@ class SalesOrderTenantScopeMapperTest {
         assertThat(detail).contains("CAST(? AS date)");
     }
 
+    @Test
+    void readAndChangeStatementsAreScopedByTenantAndActiveHeader() throws Exception {
+        Configuration configuration = parse();
+
+        for (String id : Arrays.asList(
+                "selectOrder", "selectOrderDetails", "countShippedDetails",
+                "updateOrderHeader", "deleteOrderDetails", "softDeleteOrderHeader")) {
+            BoundSql sql = sql(configuration, id);
+            assertThat(normalize(sql.getSql())).as(id).contains("tenant_id = ?");
+            assertThat(properties(sql)).as(id).contains("tenantId", "salesOrderId");
+        }
+        for (String id : Arrays.asList("selectOrder", "updateOrderHeader", "softDeleteOrderHeader")) {
+            assertThat(normalize(sql(configuration, id).getSql())).as(id).contains("use_at = 'Y'");
+        }
+    }
+
+    @Test
+    void loadJoinsMasterCodesAndOrdersDetailsByLine() throws Exception {
+        Configuration configuration = parse();
+
+        String header = normalize(sql(configuration, "selectOrder").getSql());
+        assertThat(header).contains("tb_customer_info", "customer_code", "customer_name");
+
+        String details = normalize(sql(configuration, "selectOrderDetails").getSql());
+        assertThat(details).contains("tb_material_info", "material_code", "material_name",
+                "ORDER BY d.line_no");
+    }
+
+    @Test
+    void updateKeepsOrderNumberAndCastsDatesWhileSoftDeleteMarksHeaderUnused() throws Exception {
+        Configuration configuration = parse();
+
+        String update = normalize(sql(configuration, "updateOrderHeader").getSql());
+        assertThat(update).contains("order_dt = CAST(? AS date)", "delivery_dt = CAST(? AS date)",
+                "updated_by = ?", "updated_at = now()");
+        assertThat(update).doesNotContain("order_no");
+
+        String delete = normalize(sql(configuration, "softDeleteOrderHeader").getSql());
+        assertThat(delete).contains("use_at = 'N'", "updated_by = ?");
+    }
+
     private String normalize(String sql) {
         return sql.replaceAll("\\s+", " ");
     }
@@ -95,6 +136,7 @@ class SalesOrderTenantScopeMapperTest {
         params.put("vatAmt", 1);
         params.put("shippedQty", 0);
         params.put("lineStatus", "대기");
+        params.put("updatedBy", "user02");
         return configuration.getMappedStatement("SalesOrderDAO." + id).getBoundSql(params);
     }
 

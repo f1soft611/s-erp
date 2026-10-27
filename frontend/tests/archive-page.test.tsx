@@ -336,13 +336,14 @@ describe('Archive dashboard page', () => {
 
     renderArchive();
 
-    expect(await screen.findByText('System date unavailable')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요.');
+    expect(screen.queryByTestId('archive-grid-container')).not.toBeInTheDocument();
     expect(archiveServices.fetchArchiveFiles).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.queryByTestId('f1-grid-loading-overlay')).not.toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '재시도' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색 기본값 다시 불러오기' }));
 
     await waitFor(() =>
       expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(

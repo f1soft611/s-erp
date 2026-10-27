@@ -7,9 +7,11 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
 import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import {
   type F1GridRef,
@@ -54,6 +56,7 @@ export function CustomerManagementPage({
   isTenantAdmin = false,
 }: CustomerManagementPageProps) {
   const management = useCustomerManagement();
+  useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<CustomerRow>>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [detailValues, setDetailValues] = useState<
@@ -145,6 +148,16 @@ export function CustomerManagementPage({
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'write',
+      actions: [{
+        label: '거래처분류 설정',
+        icon: SettingsIcon,
+        visible: canCreateClassification || canUpdateClassification,
+        disabled: management.saving,
+        onClick: () => setClassificationOpen(true),
+      }],
+    },
+    {
+      key: 'write',
       actions: [
         {
           label: '거래처 추가',
@@ -179,16 +192,6 @@ export function CustomerManagementPage({
         },
       ],
     },
-    {
-      key: 'write',
-      actions: [{
-        label: '거래처분류설정',
-        icon: SettingsIcon,
-        visible: canCreateClassification || canUpdateClassification,
-        disabled: management.saving,
-        onClick: () => setClassificationOpen(true),
-      }],
-    },
   ];
 
   return (
@@ -210,6 +213,8 @@ export function CustomerManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...management.initialLoad} label="거래처 목록"
+        onRetry={() => management.applyFilters(management.appliedFilters)}>
       <PageSearchArea
         searchField={
           <TextField
@@ -286,6 +291,7 @@ export function CustomerManagementPage({
         onCancel={cancelPendingSearch}
         onContinue={confirmPendingSearch}
       />
+      </PageLoadBoundary>
     </Box>
   );
 }

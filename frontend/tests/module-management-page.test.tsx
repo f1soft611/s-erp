@@ -65,6 +65,74 @@ beforeEach(() => {
 });
 
 describe('ModuleManagementPage', () => {
+  it('replaces only the initial failed body and restores a normal empty result on retry', async () => {
+    apiMocks.apiGet.mockRejectedValueOnce(new Error('initial failure'));
+    render(
+      <ModuleManagementPage selectedModule={settingsModule} currentMenuName="모듈관리"
+        content={content} selectedMenuPermissions={{ read: true, create: true, update: true, delete: true }} />,
+    );
+    const retry = await screen.findByRole('button', { name: '모듈 목록 다시 불러오기' });
+    expect(screen.queryByRole('textbox', { name: '모듈 검색' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+    apiMocks.apiGet.mockResolvedValue({ resultList: [] });
+    fireEvent.click(retry);
+    expect(await screen.findByRole('textbox', { name: '모듈 검색' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '모듈 목록 다시 불러오기' })).not.toBeInTheDocument();
+  });
+
+  it('preserves loaded rows when a later manual query fails', async () => {
+    apiMocks.apiGet.mockResolvedValueOnce(moduleList());
+    render(
+      <ModuleManagementPage selectedModule={settingsModule} currentMenuName="모듈관리"
+        content={content} selectedMenuPermissions={{ read: true, create: true, update: true, delete: true }} />,
+    );
+    await screen.findByRole('gridcell', { name: '그룹웨어' });
+    apiMocks.apiGet.mockRejectedValue(new Error('refresh failure'));
+    fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
+    expect(await screen.findByText('refresh failure')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: '그룹웨어' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '모듈 목록 다시 불러오기' })).not.toBeInTheDocument();
+  });
+
+  it('protects dirty changes across failed saves and releases unload protection after a successful save', async () => {
+    apiMocks.apiGet.mockResolvedValue(moduleList());
+    apiMocks.apiPut.mockRejectedValueOnce(new Error('Save failed'));
+    const view = render(
+      <NotificationProvider>
+        <ModuleManagementPage
+          selectedModule={settingsModule}
+          currentMenuName="모듈관리"
+          content={content}
+          selectedMenuPermissions={{ read: true, create: true, update: true, delete: true }}
+        />
+      </NotificationProvider>,
+    );
+    const unloadIsBlocked = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const nameCell = await screen.findByRole('gridcell', { name: '그룹웨어' });
+    expect(unloadIsBlocked()).toBe(false);
+    fireEvent.doubleClick(nameCell);
+    fireEvent.change(screen.getByDisplayValue('그룹웨어'), {
+      target: { value: 'Edited module' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('Edited module'), { key: 'Enter' });
+    expect(unloadIsBlocked()).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('Save failed')).toBeInTheDocument();
+    expect(unloadIsBlocked()).toBe(true);
+
+    apiMocks.apiPut.mockResolvedValue({});
+    apiMocks.apiGet.mockResolvedValue(moduleList('Edited module'));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(unloadIsBlocked()).toBe(false));
+    view.unmount();
+    expect(unloadIsBlocked()).toBe(false);
+  });
+
   it('renders module rows from the system module API', async () => {
     apiMocks.apiGet.mockResolvedValue({
       resultList: [

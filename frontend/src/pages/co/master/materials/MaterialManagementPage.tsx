@@ -7,9 +7,11 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
 import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type { F1GridRef } from '../../../../shared/components/f1-grid';
 import { toPageSearchFields, type PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
@@ -35,6 +37,7 @@ function SaveProgressIcon() {
 export function MaterialManagementPage({ selectedModule, currentMenuName, content,
   breadcrumbItems, selectedMenuPermissions, isTenantAdmin = false }: Props) {
   const management = useMaterialManagement();
+  useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<MaterialRow>>(null);
   const [keyword, setKeyword] = useState('');
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>({});
@@ -65,6 +68,9 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
     search(filters);
   };
   const actions: PermissionActionGroupDefinition[] = [
+    { key: 'write', actions: [{ label: '품목분류 설정', icon: SettingsIcon,
+      visible: canCreateClassification || canUpdateClassification,
+      disabled: management.saving, onClick: () => setClassificationOpen(true) }] },
     { key: 'write', actions: [{ label: '품목 추가', icon: AddIcon, visible: canCreate,
       disabled: management.loading || management.saving, onClick: () => gridRef.current?.addRow() }] },
     { key: 'read', actions: [{ label: '조회', icon: SearchIcon, visible: Boolean(selectedMenuPermissions?.read),
@@ -77,13 +83,12 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         if (!grid.validate()) { management.setError('필수 입력 항목을 확인해 주세요.'); return; }
         void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
       } }] },
-    { key: 'write', actions: [{ label: '품목분류설정', icon: SettingsIcon,
-      visible: canCreateClassification || canUpdateClassification,
-      disabled: management.saving, onClick: () => setClassificationOpen(true) }] },
   ];
   return <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>
     <PageHeader breadcrumbItems={breadcrumbItems?.length ? breadcrumbItems : [selectedModule.name, currentMenuName]}
       description={content.description} actionGroups={actions} />
+    <PageLoadBoundary {...management.initialLoad} label="품목 목록"
+      onRetry={() => management.applyFilters(management.appliedFilters)}>
     <PageSearchArea
       searchField={<TextField size="small" margin="none"
         placeholder="품목코드/품목명/영문명/모델명/검색명칭 검색" value={keyword}
@@ -117,5 +122,6 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         if (pendingFilters) { management.discardChanges(); management.applyFilters(pendingFilters); }
         setPendingFilters(null);
       }} />
+    </PageLoadBoundary>
   </Box>;
 }

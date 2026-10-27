@@ -1,4 +1,7 @@
-import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
+import type {
+  F1GridChanges,
+  F1GridColumn,
+} from '../../../../../shared/components/f1-grid';
 import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
 import {
   calculateSalesOrderAmounts,
@@ -39,9 +42,36 @@ export function createSalesOrderDetailRow(): SalesOrderDetailRow {
   };
 }
 
+export function duplicateSalesOrderDetailRow(
+  row: SalesOrderDetailRow,
+): SalesOrderDetailRow {
+  return {
+    ...row,
+    rowId: createSalesOrderDetailRow().rowId,
+    shippedQty: 0,
+    lineStatus: '대기',
+  };
+}
+
 function numericValue(value: unknown): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+export function resolveActiveSalesOrderRows(
+  baseRows: SalesOrderDetailRow[],
+  changes: F1GridChanges<SalesOrderDetailRow>,
+): SalesOrderDetailRow[] {
+  const deletedIds = new Set(changes.deletedRows.map((row) => row.rowId));
+  const updatedById = new Map(
+    changes.updatedRows.map((row) => [row.rowId, row]),
+  );
+  return [
+    ...baseRows
+      .filter((row) => !deletedIds.has(row.rowId))
+      .map((row) => updatedById.get(row.rowId) ?? row),
+    ...changes.insertedRows.filter((row) => !deletedIds.has(row.rowId)),
+  ];
 }
 
 export function createSalesOrderDetailColumns(

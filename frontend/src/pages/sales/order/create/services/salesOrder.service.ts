@@ -1,18 +1,28 @@
-import { apiPost } from '../../../../../shared/services/apiClient';
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+} from '../../../../../shared/services/apiClient';
 import type {
   SalesOrderCreateInput,
   SalesOrderCreatePayload,
   SalesOrderCreateResponse,
   SalesOrderCreated,
+  SalesOrderForm,
+  SalesOrderItem,
+  SalesOrderResponse,
   SalesOrderValidationErrors,
 } from '../types/salesOrder.types';
+
+const SALES_ORDER_PATH = '/api/v1/sales/orders';
 
 const MAX_NUMERIC_15_2 = 9_999_999_999_999.99;
 
 export function validateSalesOrderInput(
   input: Pick<SalesOrderCreateInput, 'orderDt' | 'customerId' | 'details'>,
 ): SalesOrderValidationErrors {
-  const errors: SalesOrderValidationErrors = { detailRows: {} };
+  const errors: SalesOrderValidationErrors = { detailRows: {}, detailMessages: [] };
 
   if (!input.orderDt.trim()) {
     errors.orderDt = '수주일자를 입력해 주세요.';
@@ -54,6 +64,11 @@ export function validateSalesOrderInput(
     }
     if (messages.length > 0) {
       errors.detailRows[row.rowId] = messages.join(' ');
+      messages.forEach((message) => {
+        if (!errors.detailMessages.includes(message)) {
+          errors.detailMessages.push(message);
+        }
+      });
     }
   }
 
@@ -95,13 +110,73 @@ export async function createSalesOrder(
   payload: SalesOrderCreatePayload,
 ): Promise<SalesOrderCreated> {
   const response = await apiPost<SalesOrderCreateResponse>(
-    '/api/v1/sales/orders',
+    SALES_ORDER_PATH,
     payload,
   );
   if (response.item == null) {
     throw new Error('수주 저장 응답에 생성된 주문이 없습니다.');
   }
   return response.item;
+}
+
+export async function getSalesOrder(salesOrderId: number): Promise<SalesOrderItem> {
+  const response = await apiGet<SalesOrderResponse>(
+    `${SALES_ORDER_PATH}/${salesOrderId}`,
+  );
+  if (response.item == null) {
+    throw new Error('수주 조회 응답에 수주 정보가 없습니다.');
+  }
+  return response.item;
+}
+
+export async function updateSalesOrder(
+  salesOrderId: number,
+  payload: SalesOrderCreatePayload,
+): Promise<SalesOrderItem> {
+  const response = await apiPut<SalesOrderResponse>(
+    `${SALES_ORDER_PATH}/${salesOrderId}`,
+    payload,
+  );
+  if (response.item == null) {
+    throw new Error('수주 수정 응답에 수주 정보가 없습니다.');
+  }
+  return response.item;
+}
+
+export async function deleteSalesOrder(salesOrderId: number): Promise<void> {
+  await apiDelete<unknown>(`${SALES_ORDER_PATH}/${salesOrderId}`);
+}
+
+export function toSalesOrderForm(order: SalesOrderItem): SalesOrderForm {
+  return {
+    customer: {
+      id: order.customerId,
+      code: order.customerCode ?? '',
+      name: order.customerName ?? '',
+    },
+    header: {
+      orderDt: order.orderDt,
+      quotNo: order.quotNo ?? '',
+      deliveryDt: order.deliveryDt ?? '',
+      deliveryPlace: order.deliveryPlace ?? '',
+      deliveryMethod: order.deliveryMethod ?? '',
+      remark: order.remark ?? '',
+    },
+    rows: order.details.map((detail) => ({
+      rowId: `order-line-${detail.salesOrderDetailId}`,
+      materialId: detail.materialId,
+      materialCode: detail.materialCode ?? '',
+      materialName: detail.materialName ?? '',
+      orderQty: Number(detail.orderQty),
+      unitPrice: Number(detail.unitPrice),
+      supplyAmount: Number(detail.supplyAmt),
+      vatAmount: Number(detail.vatAmt ?? 0),
+      totalAmount: Number(detail.totalAmt),
+      deliveryDt: detail.deliveryDt ?? '',
+      shippedQty: Number(detail.shippedQty ?? 0),
+      lineStatus: detail.lineStatus ?? '',
+    })),
+  };
 }
 
 function isNumeric15_2(value: number): boolean {

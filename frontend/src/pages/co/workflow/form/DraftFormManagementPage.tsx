@@ -7,9 +7,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Box, IconButton, TextField } from '@mui/material';
 import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { type F1GridRef } from '../../../../shared/components/f1-grid';
 import {
@@ -61,6 +63,7 @@ export function DraftFormManagementPage({
   isTenantAdmin = false,
 }: DraftFormManagementPageProps) {
   const management = useDraftFormManagement();
+  useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<DraftFormRow>>(null);
   const saveAttemptActiveRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -256,6 +259,10 @@ export function DraftFormManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...management.initialLoad} label="기안양식 목록"
+        onRetry={() => management.applyFilters(management.appliedFilters)}>
+      <PageLoadBoundary {...management.optionsInitialLoad} label="기안양식 옵션"
+        onRetry={() => { void management.loadOptions(); }}>
       <Box
         component="fieldset"
         disabled={management.saving}
@@ -421,6 +428,8 @@ export function DraftFormManagementPage({
           if (target) setTemplateTarget(target);
         }}
       />
+      </PageLoadBoundary>
+      </PageLoadBoundary>
     </Box>
   );
 }

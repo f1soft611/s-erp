@@ -37,6 +37,12 @@ public class SalesOrderDetailVO implements Serializable {
     @Schema(description = "품목 ID", example = "20")
     private Long materialId;
 
+    @Schema(description = "품목 코드 (조회 응답)", example = "M-20")
+    private String materialCode;
+
+    @Schema(description = "품목명 (조회 응답)", example = "볼트")
+    private String materialName;
+
     @Schema(description = "주문수량", example = "2.00")
     private BigDecimal orderQty;
 

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { AppLoadingSpinner } from '../../../../../shared/components/AppLoadingSpinner';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { F1Grid } from '../../../../../shared/components/f1-grid';
 import {
   UserSelectEditor,
@@ -221,6 +222,7 @@ export function DocumentApprovalSettingsDialog({
   const [templateListError, setTemplateListError] = useState('');
   const [templateGridKey, setTemplateGridKey] = useState(0);
   const [hasTemplateNameChanges, setHasTemplateNameChanges] = useState(false);
+  useUnsavedChangesBeforeUnload(open && managerOpen && hasTemplateNameChanges);
   const [pendingManagerAction, setPendingManagerAction] =
     useState<ApprovalLineTemplateManagerAction | null>(null);
   const [discardTemplateChangesOpen, setDiscardTemplateChangesOpen] =

@@ -7,8 +7,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,8 +70,8 @@ class ClassificationApiControllerTest {
     @EnumSource(ClassificationKind.class)
     void getAllowsEachRelevantReadCreateOrUpdatePermission(ClassificationKind kind) throws Exception {
         ClassificationVO row = row();
-        when(classifications.list(kind, 9L)).thenReturn(List.of(row));
-        for (MenuPermissionVO permission : List.of(
+        when(classifications.list(kind, 9L)).thenReturn(Collections.singletonList(row));
+        for (MenuPermissionVO permission : Arrays.asList(
                 new MenuPermissionVO(true, false, false, false),
                 new MenuPermissionVO(false, true, false, false),
                 new MenuPermissionVO(false, false, true, false))) {
@@ -119,7 +119,7 @@ class ClassificationApiControllerTest {
     @EnumSource(ClassificationKind.class)
     void missingPermissionDeniesAllOperationsEvenForAdminRole(ClassificationKind kind) throws Exception {
         user.setRoleCode("TENANT_ADMIN");
-        for (MenuPermissionVO permission : List.of(
+        for (MenuPermissionVO permission : Arrays.asList(
                 new MenuPermissionVO(), new MenuPermissionVO(false, false, false, true, true))) {
             allow(kind, permission);
             assertForbiddenOperations(kind);
@@ -207,7 +207,7 @@ class ClassificationApiControllerTest {
                 .thenThrow(new IllegalArgumentException("Invalid classification"));
         when(classifications.update(eq(kind), eq(9L), eq("00101"), eq(11L), any()))
                 .thenThrow(new IllegalArgumentException("Invalid classification"));
-        for (MockHttpServletRequestBuilder request : List.of(post(path(kind)), put(path(kind) + "/11"))) {
+        for (MockHttpServletRequestBuilder request : Arrays.asList(post(path(kind)), put(path(kind) + "/11"))) {
             mvc.perform(auth(request).contentType(MediaType.APPLICATION_JSON).content("{}"))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.resultCode").value(900))
                     .andExpect(jsonPath("$.resultMessage").value("Invalid classification"));
@@ -217,7 +217,7 @@ class ClassificationApiControllerTest {
     @ParameterizedTest
     @EnumSource(ClassificationKind.class)
     void malformedPayloadReturns400WithoutServiceCall(ClassificationKind kind) throws Exception {
-        for (String payload : List.of("{", "{\"sortSeq\":\"invalid\"}", "null")) {
+        for (String payload : Arrays.asList("{", "{\"sortSeq\":\"invalid\"}", "null")) {
             mvc.perform(auth(post(path(kind))).contentType(MediaType.APPLICATION_JSON).content(payload))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.resultCode").value(900));
             mvc.perform(auth(put(path(kind) + "/11")).contentType(MediaType.APPLICATION_JSON).content(payload))
@@ -262,7 +262,7 @@ class ClassificationApiControllerTest {
         when(classifications.list(kind, 9L)).thenThrow(failure);
         when(classifications.create(eq(kind), eq(9L), eq("00101"), any())).thenThrow(failure);
         when(classifications.update(eq(kind), eq(9L), eq("00101"), eq(11L), any())).thenThrow(failure);
-        for (MockHttpServletRequestBuilder request : List.of(get(path(kind)),
+        for (MockHttpServletRequestBuilder request : Arrays.asList(get(path(kind)),
                 post(path(kind)).contentType(MediaType.APPLICATION_JSON).content("{}"),
                 put(path(kind) + "/11").contentType(MediaType.APPLICATION_JSON).content("{}"))) {
             Exception ex = assertThrows(Exception.class, () -> mvc.perform(auth(request)));
@@ -291,12 +291,12 @@ class ClassificationApiControllerTest {
         leaf.setPermissions(permission);
         MenuTreeNodeVO group = new MenuTreeNodeVO();
         group.setPath("/co/master");
-        group.setChildren(List.of(leaf));
+        group.setChildren(Collections.singletonList(leaf));
         MenuTreeNodeVO module = new MenuTreeNodeVO();
         module.setPath(modulePath);
-        module.setChildren(List.of(group));
+        module.setChildren(Collections.singletonList(group));
         MyMenuResponseVO response = new MyMenuResponseVO();
-        response.setMenus(List.of(module));
+        response.setMenus(Collections.singletonList(module));
         when(menus.getMyMenuTree(eq(9L), eq("test-login"), eq(7L), any())).thenReturn(response);
     }
 

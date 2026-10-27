@@ -3,11 +3,14 @@ import { Box, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import { PageHeader } from '../../../../shared/components/PageHeader';
+import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
+import { useInitialLoadState } from '../../../../shared/hooks/useInitialLoadState';
 import { type PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useNotification } from '../../../../shared/context/NotificationContext';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import type {
   ModuleItem,
   PageContent,
@@ -51,12 +54,14 @@ export function RoleManagementPage({
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [panelDirty, setPanelDirty] = useState(false);
+  useUnsavedChangesBeforeUnload(panelDirty);
   const [saving, setSaving] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [roleGridKey, setRoleGridKey] = useState(0);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const roleRequestIdRef = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   const pageActionPermissions = useMemo(() => {
     const writeAllowed = Boolean(
@@ -73,12 +78,11 @@ export function RoleManagementPage({
   const loadRoles = useCallback(
     async ({
       showSkeleton = false,
-      preserveOnError = false,
     }: {
       showSkeleton?: boolean;
-      preserveOnError?: boolean;
     } = {}): Promise<'applied' | 'stale'> => {
       const requestId = ++roleRequestIdRef.current;
+      start();
       setError('');
       if (showSkeleton) {
         setPageLoading(true);
@@ -88,10 +92,11 @@ export function RoleManagementPage({
         // A superseded request must not be reported as an applied refresh.
         if (requestId !== roleRequestIdRef.current) return 'stale';
         setRoles(result);
+        succeed();
         return 'applied';
       } catch (requestError) {
         if (requestId === roleRequestIdRef.current) {
-          if (!preserveOnError) setRoles([]);
+          fail(requestError);
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -105,7 +110,7 @@ export function RoleManagementPage({
         }
       }
     },
-    [],
+    [start, succeed, fail],
   );
 
   useEffect(() => {
@@ -122,7 +127,7 @@ export function RoleManagementPage({
 
   const handleRolesSaved = useCallback(
     async (_options?: { silent?: boolean }) => {
-      const status = await loadRoles({ preserveOnError: true });
+      const status = await loadRoles();
       if (status === 'applied') setRoleGridKey((current) => current + 1);
       return status;
     },
@@ -158,9 +163,13 @@ export function RoleManagementPage({
   const confirmRoleRefresh = useCallback(() => {
     if (saving || reloading) return;
     setRefreshConfirmOpen(false);
-    setPanelDirty(false);
-    setRoleGridKey((current) => current + 1);
-    const reloadRoles = () => loadRoles({ showSkeleton: true });
+    const reloadRoles = async () => {
+      const status = await loadRoles({ showSkeleton: true });
+      if (status === 'applied') {
+        setRoleGridKey((current) => current + 1);
+      }
+      return status;
+    };
     setReloading(true);
     void (
       rolePanelRef.current?.discardPendingChanges(reloadRoles) ?? reloadRoles()
@@ -217,6 +226,7 @@ export function RoleManagementPage({
         description={content.description}
         actionGroups={pageActionGroups}
       />
+      <PageLoadBoundary {...initialLoad} label="역할 목록" onRetry={requestRoleRefresh}>
       <PageSearchArea>
         <TextField
           size="small"
@@ -272,6 +282,7 @@ export function RoleManagementPage({
         onCancel={() => setRefreshConfirmOpen(false)}
         onContinue={confirmRoleRefresh}
       />
+      </PageLoadBoundary>
     </Box>
   );
 }

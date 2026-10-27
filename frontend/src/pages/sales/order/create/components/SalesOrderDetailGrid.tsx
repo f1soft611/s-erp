@@ -7,12 +7,14 @@ import {
 import {
   createSalesOrderDetailColumns,
   createSalesOrderDetailRow,
+  duplicateSalesOrderDetailRow,
   type OpenMaterialPicker,
   type SalesOrderDetailRow,
 } from '../data/salesOrderDetail';
 
 type Props = {
   gridRef: RefObject<F1GridRef<SalesOrderDetailRow> | null>;
+  rows: SalesOrderDetailRow[];
   onChangesChange: (changes: F1GridChanges<SalesOrderDetailRow>) => void;
   onSelectionChange: (rowIds: (string | number)[]) => void;
   onOpenMaterialPicker: OpenMaterialPicker;
@@ -21,6 +23,7 @@ type Props = {
 
 export function SalesOrderDetailGrid({
   gridRef,
+  rows,
   onChangesChange,
   onSelectionChange,
   onOpenMaterialPicker,
@@ -36,16 +39,18 @@ export function SalesOrderDetailGrid({
       ref={gridRef}
       ariaLabel="수주 상세 목록"
       storageKey="sales-order-create-detail-grid-v1"
-      rows={[]}
+      rows={rows}
       columns={columns}
       rowKey="rowId"
       createRow={createSalesOrderDetailRow}
+      createDuplicate={duplicateSalesOrderDetailRow}
       onChangesChange={onChangesChange}
       onSelectionChange={onSelectionChange}
       showCheckbox
       height="100%"
       minHeight={260}
       allowAddRowInContextMenu={!disabled}
+      allowDuplicateRowInContextMenu={!disabled}
       allowDeleteRowInContextMenu={!disabled}
       disableContextMenu={disabled}
       canExportExcel={false}

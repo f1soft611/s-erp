@@ -34,6 +34,7 @@ import egovframework.let.common.idsequence.service.IdSequenceService;
 @Service("salesOrderService")
 public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements SalesOrderService {
     private static final String ORDER_NO_GENERATOR_KEY = "SALES_ORDER_NO";
+    private static final String EDITABLE_STATUS = "수주등록";
     private static final BigDecimal VAT_RATE = new BigDecimal("0.10");
     private static final BigDecimal ZERO = new BigDecimal("0.00");
     private static final int MAX_NUMERIC_PRECISION = 15;
@@ -62,25 +63,11 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     public SalesOrderVO createOrder(Long tenantId, String userId, SalesOrderCreateRequestVO payload)
             throws Exception {
         validatePrincipal(tenantId, userId);
-        validateHeader(payload);
-        validateText(payload.getQuotNo(), 30, "견적번호");
-        validateText(payload.getDeliveryPlace(), 200, "납품장소");
-        validateText(payload.getDeliveryMethod(), 50, "배송방법");
-        validateText(payload.getRemark(), 500, "비고");
+        validatePayload(payload);
+        validateCustomer(tenantId, payload.getCustomerId());
 
-        if (!salesOrderDAO.existsCustomer(referenceParams(tenantId, payload.getCustomerId()))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다.");
-        }
-
-        List<PreparedDetail> preparedDetails = new ArrayList<>();
-        BigDecimal headerTotal = ZERO;
-        for (SalesOrderDetailCreateRequestVO detail : payload.getDetails()) {
-            PreparedDetail prepared = prepareDetail(tenantId, detail);
-            preparedDetails.add(prepared);
-            headerTotal = headerTotal.add(prepared.totalAmt);
-        }
-        headerTotal = money(headerTotal);
-        validateNumeric(headerTotal, "수주 총액");
+        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
+        BigDecimal headerTotal = sumTotals(preparedDetails);
 
         String orderNo = generateOrderNo(tenantId, payload.getOrderDt());
         Map<String, Object> headerParams = new HashMap<>();
@@ -125,6 +112,151 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         saved.setRemark(normalize(payload.getRemark()));
         saved.setDetails(savedDetails);
         return saved;
+    }
+
+    /**
+     * 테넌트 범위에서 사용 중인 수주 헤더와 상세를 조회한다.
+     *
+     * @param tenantId 인증된 사용자의 테넌트 ID
+     * @param salesOrderId 수주 ID
+     * @return 거래처/품목 코드와 명을 포함한 수주 정보
+     * @throws Exception 조회 중 발생한 예외 (없으면 404)
+     */
+    @Override
+    public SalesOrderVO getOrder(Long tenantId, Long salesOrderId) throws Exception {
+        SalesOrderVO order = findOrder(tenantId, salesOrderId);
+        order.setDetails(salesOrderDAO.selectOrderDetails(orderParams(tenantId, salesOrderId)));
+        return order;
+    }
+
+    /**
+     * 수정 가능한 수주의 헤더를 갱신하고 상세를 요청 순서대로 재등록한다.
+     * 수주번호는 변경하지 않으며, 출하 전 수주등록 상태에서만 허용한다.
+     *
+     * @param tenantId 인증된 사용자의 테넌트 ID
+     * @param userId 인증된 사용자의 ID
+     * @param salesOrderId 수주 ID
+     * @param payload 수주 수정 요청
+     * @return 재조회한 수주 정보
+     * @throws Exception 검증 또는 저장 중 발생한 예외
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SalesOrderVO updateOrder(Long tenantId, String userId, Long salesOrderId,
+            SalesOrderCreateRequestVO payload) throws Exception {
+        validatePrincipal(tenantId, userId);
+        validatePayload(payload);
+        requireEditable(tenantId, salesOrderId);
+        validateCustomer(tenantId, payload.getCustomerId());
+
+        List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
+        BigDecimal headerTotal = sumTotals(preparedDetails);
+
+        Map<String, Object> headerParams = orderParams(tenantId, salesOrderId);
+        headerParams.put("orderDt", payload.getOrderDt());
+        headerParams.put("customerId", payload.getCustomerId());
+        headerParams.put("quotNo", normalize(payload.getQuotNo()));
+        headerParams.put("deliveryDt", payload.getDeliveryDt());
+        headerParams.put("deliveryPlace", normalize(payload.getDeliveryPlace()));
+        headerParams.put("deliveryMethod", normalize(payload.getDeliveryMethod()));
+        headerParams.put("totalAmt", headerTotal);
+        headerParams.put("remark", normalize(payload.getRemark()));
+        headerParams.put("updatedBy", userId);
+        if (salesOrderDAO.updateOrderHeader(headerParams) != 1) {
+            throw orderNotFound();
+        }
+
+        salesOrderDAO.deleteOrderDetails(orderParams(tenantId, salesOrderId));
+        int lineNo = 1;
+        for (PreparedDetail prepared : preparedDetails) {
+            persistDetail(salesOrderId, tenantId, lineNo++, prepared);
+        }
+        return getOrder(tenantId, salesOrderId);
+    }
+
+    /**
+     * 수정 가능한 수주 헤더를 미사용(use_at = 'N') 처리한다.
+     *
+     * @param tenantId 인증된 사용자의 테넌트 ID
+     * @param userId 인증된 사용자의 ID
+     * @param salesOrderId 수주 ID
+     * @throws Exception 삭제 중 발생한 예외
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
+        validatePrincipal(tenantId, userId);
+        requireEditable(tenantId, salesOrderId);
+
+        Map<String, Object> params = orderParams(tenantId, salesOrderId);
+        params.put("updatedBy", userId);
+        if (salesOrderDAO.softDeleteOrderHeader(params) != 1) {
+            throw orderNotFound();
+        }
+    }
+
+    private SalesOrderVO findOrder(Long tenantId, Long salesOrderId) throws Exception {
+        if (tenantId == null || salesOrderId == null || salesOrderId < 1L) {
+            throw orderNotFound();
+        }
+        SalesOrderVO order = salesOrderDAO.selectOrder(orderParams(tenantId, salesOrderId));
+        if (order == null) {
+            throw orderNotFound();
+        }
+        return order;
+    }
+
+    private void requireEditable(Long tenantId, Long salesOrderId) throws Exception {
+        SalesOrderVO order = findOrder(tenantId, salesOrderId);
+        if (!EDITABLE_STATUS.equals(order.getStatus())
+                || salesOrderDAO.countShippedDetails(orderParams(tenantId, salesOrderId)) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "출하가 진행되었거나 수주등록 상태가 아닌 수주는 수정/삭제할 수 없습니다.");
+        }
+    }
+
+    private void validatePayload(SalesOrderCreateRequestVO payload) {
+        validateHeader(payload);
+        validateText(payload.getQuotNo(), 30, "견적번호");
+        validateText(payload.getDeliveryPlace(), 200, "납품장소");
+        validateText(payload.getDeliveryMethod(), 50, "배송방법");
+        validateText(payload.getRemark(), 500, "비고");
+    }
+
+    private void validateCustomer(Long tenantId, Long customerId) throws Exception {
+        if (!salesOrderDAO.existsCustomer(referenceParams(tenantId, customerId))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다.");
+        }
+    }
+
+    private List<PreparedDetail> prepareDetails(Long tenantId, SalesOrderCreateRequestVO payload)
+            throws Exception {
+        List<PreparedDetail> preparedDetails = new ArrayList<>();
+        for (SalesOrderDetailCreateRequestVO detail : payload.getDetails()) {
+            preparedDetails.add(prepareDetail(tenantId, detail));
+        }
+        return preparedDetails;
+    }
+
+    private BigDecimal sumTotals(List<PreparedDetail> preparedDetails) {
+        BigDecimal total = ZERO;
+        for (PreparedDetail prepared : preparedDetails) {
+            total = total.add(prepared.totalAmt);
+        }
+        total = money(total);
+        validateNumeric(total, "수주 총액");
+        return total;
+    }
+
+    private Map<String, Object> orderParams(Long tenantId, Long salesOrderId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId);
+        params.put("salesOrderId", salesOrderId);
+        return params;
+    }
+
+    private ResponseStatusException orderNotFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다.");
     }
 
     private void validatePrincipal(Long tenantId, String userId) {

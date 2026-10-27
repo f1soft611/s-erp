@@ -137,6 +137,8 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
+- 품목·거래처 분류 설정 팝업은 `F1Tree`의 `id`/`parentId` 계층과 `name` 트리 컬럼을 사용한다. 분류명·정렬순서·사용여부를 셀에서 직접 편집하고 여러 변경 행을 저장한다. 신규 부모·자식은 부모부터 생성하고 반환된 ID로 연결하며, 기존 분류의 사용 해제는 자식부터 저장한다. 단건 API 중간 실패 시 성공한 행은 재전송하지 않고 나머지 입력을 유지한다. 추가는 화면 버튼으로만 허용하며 품목 3단계·거래처 2단계, 메뉴별 등록/수정 권한을 적용한다. 공통 F1Tree 자체의 API나 동작은 변경하지 않는다.
+- 분류 트리는 `CommonDialog` 안에 표시한다. 타이틀 아래 description에 최대 단계·셀 더블클릭 편집·사용여부 해제 안내를 표시하고, 추가 버튼은 트리 위 우측에 배치한다. 헤더 X와 하단 닫기는 같은 미저장 변경 보호를 적용하며 저장 중에는 닫히지 않는다.
 - `showCheckbox={false}`는 Row Selector 체크박스 전체 제거용이고, `column.type === 'checkbox'`의 `headerCheckbox`는 데이터 셀 편집용으로 구분된다.
 - `rowProjection`과 `cellAdornment`를 통해 Grid UI의 표시 전/후 장식을 확장할 수 있다.
 - `disableSorting`, `disableFiltering` 옵션으로 특정 화면에서 정렬/필터 기능을 비활성화할 수 있다.

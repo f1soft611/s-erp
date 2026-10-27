@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.sales.order.create.domain.model.SalesOrderCreateRequestVO;
 import egovframework.let.sales.order.create.domain.model.SalesOrderDetailCreateRequestVO;
+import egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO;
 import egovframework.let.sales.order.create.domain.model.SalesOrderVO;
 import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.common.idsequence.service.IdSequenceService;
@@ -155,6 +156,108 @@ class SalesOrderServiceImplTest {
         verify(salesOrderDAO).existsMaterial(anyMap());
         verify(salesOrderDAO, org.mockito.Mockito.never())
                 .insertOrderHeader(anyMap());
+    }
+
+    @Test
+    void loadsTenantScopedOrderWithDetailsInLineOrder() throws Exception {
+        SalesOrderVO stored = storedOrder("수주등록");
+        SalesOrderDetailVO line = new SalesOrderDetailVO();
+        line.setLineNo(1);
+        line.setMaterialCode("M-20");
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(stored);
+        when(salesOrderDAO.selectOrderDetails(anyMap()))
+                .thenReturn(Collections.singletonList(line));
+
+        SalesOrderVO loaded = service.getOrder(71L, 300L);
+
+        assertThat(loaded.getOrderNo()).isEqualTo("SO-20261027-0001");
+        assertThat(loaded.getDetails()).extracting("materialCode").containsExactly("M-20");
+        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(salesOrderDAO).selectOrder(params.capture());
+        assertThat(params.getValue()).containsEntry("tenantId", 71L)
+                .containsEntry("salesOrderId", 300L);
+    }
+
+    @Test
+    void rejectsMissingOrDeletedOrderWithNotFound() throws Exception {
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(null);
+
+        assertThatThrownBy(() -> service.getOrder(71L, 300L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void updatesHeaderAndReplacesDetailsWithoutRenumberingTheOrder() throws Exception {
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.countShippedDetails(anyMap())).thenReturn(0);
+        when(salesOrderDAO.updateOrderHeader(anyMap())).thenReturn(1);
+        when(salesOrderDAO.selectOrderDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        SalesOrderVO updated = service.updateOrder(71L, "user02", 300L, validPayload());
+
+        assertThat(updated.getSalesOrderId()).isEqualTo(300L);
+        ArgumentCaptor<Map<String, Object>> headerParams = ArgumentCaptor.forClass(Map.class);
+        verify(salesOrderDAO).updateOrderHeader(headerParams.capture());
+        assertThat(headerParams.getValue()).containsEntry("tenantId", 71L)
+                .containsEntry("salesOrderId", 300L)
+                .containsEntry("customerId", 10L)
+                .containsEntry("updatedBy", "user02")
+                .containsEntry("totalAmt", new BigDecimal("5.00"))
+                .doesNotContainKey("orderNo");
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(salesOrderDAO);
+        inOrder.verify(salesOrderDAO).deleteOrderDetails(anyMap());
+        inOrder.verify(salesOrderDAO).insertOrderDetail(argThat(params ->
+                Integer.valueOf(1).equals(params.get("lineNo"))
+                        && Long.valueOf(300L).equals(params.get("salesOrderId"))));
+        verifyNoInteractions(idSequenceService);
+    }
+
+    @Test
+    void rejectsUpdateOfShippedOrderWithConflictBeforeWriting() throws Exception {
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.countShippedDetails(anyMap())).thenReturn(1);
+
+        assertThatThrownBy(() -> service.updateOrder(71L, "user02", 300L, validPayload()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).deleteOrderDetails(anyMap());
+    }
+
+    @Test
+    void softDeletesOnlyEditableOrders() throws Exception {
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.countShippedDetails(anyMap())).thenReturn(0);
+        when(salesOrderDAO.softDeleteOrderHeader(anyMap())).thenReturn(1);
+
+        service.deleteOrder(71L, "user02", 300L);
+
+        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(salesOrderDAO).softDeleteOrderHeader(params.capture());
+        assertThat(params.getValue()).containsEntry("tenantId", 71L)
+                .containsEntry("salesOrderId", 300L)
+                .containsEntry("updatedBy", "user02");
+
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("출하완료"));
+        assertThatThrownBy(() -> service.deleteOrder(71L, "user02", 300L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    private SalesOrderVO storedOrder(String status) {
+        SalesOrderVO order = new SalesOrderVO();
+        order.setSalesOrderId(300L);
+        order.setTenantId(71L);
+        order.setOrderNo("SO-20261027-0001");
+        order.setOrderDt(LocalDate.of(2026, 10, 27));
+        order.setCustomerId(10L);
+        order.setStatus(status);
+        return order;
     }
 
     private SalesOrderCreateRequestVO validPayload() {

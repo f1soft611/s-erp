@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
+import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import {
@@ -14,6 +15,8 @@ import {
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
+import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import {
   MaterialPickerDialog,
   CustomerPicker,
@@ -21,12 +24,19 @@ import {
 import type { MasterPickerOption } from '../../../../shared/components/master-picker/masterPicker.types';
 import type { F1GridChanges, F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import type { ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
+import type {
+  MenuPermission,
+  ModuleItem,
+  PageContent,
+} from '../../../dashboard/types/dashboard';
 import { sumSalesOrderAmounts } from './data/salesOrderAmounts';
 import {
   SalesOrderDetailGrid,
 } from './components/SalesOrderDetailGrid';
-import type { SalesOrderDetailRow } from './data/salesOrderDetail';
+import {
+  resolveActiveSalesOrderRows,
+  type SalesOrderDetailRow,
+} from './data/salesOrderDetail';
 import {
   searchOrderCustomers,
   searchOrderMaterials,
@@ -34,10 +44,15 @@ import {
 import {
   buildSalesOrderCreatePayload,
   createSalesOrder,
+  deleteSalesOrder,
+  getSalesOrder,
+  toSalesOrderForm,
+  updateSalesOrder,
   validateSalesOrderInput,
 } from './services/salesOrder.service';
 import type {
-  SalesOrderCreated,
+  SalesOrderHeaderValues,
+  SalesOrderItem,
   SalesOrderValidationErrors,
 } from './types/salesOrder.types';
 
@@ -46,7 +61,13 @@ type Props = {
   currentMenuName: string;
   content: PageContent;
   breadcrumbItems: string[];
+  selectedMenuPermissions?: MenuPermission;
 };
+
+type HeaderSnapshot = SalesOrderHeaderValues & { customerId: number | null };
+
+const EDITABLE_ORDER_STATUS = '수주등록';
+const EMPTY_AMOUNTS = { supplyAmount: 0, vatAmount: 0, totalAmount: 0 };
 
 function getLocalDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -55,11 +76,27 @@ function getLocalDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function createEmptyHeader(): SalesOrderHeaderValues {
+  return {
+    orderDt: getLocalDateInputValue(new Date()),
+    quotNo: '',
+    deliveryDt: '',
+    deliveryPlace: '',
+    deliveryMethod: '',
+    remark: '',
+  };
+}
+
+function createEmptySnapshot(): HeaderSnapshot {
+  return { ...createEmptyHeader(), customerId: null };
+}
+
 export function SalesOrderCreatePage({
   selectedModule,
   currentMenuName,
   content,
   breadcrumbItems,
+  selectedMenuPermissions,
 }: Props) {
   const gridRef = useRef<F1GridRef<SalesOrderDetailRow>>(null);
   const savingRef = useRef(false);
@@ -67,11 +104,10 @@ export function SalesOrderCreatePage({
   const materialApplyPatchRef = useRef<
     ((changes: Partial<SalesOrderDetailRow>) => void) | null
   >(null);
+  const [initialSnapshot] = useState<HeaderSnapshot>(createEmptySnapshot);
+  const [baseline, setBaseline] = useState<HeaderSnapshot>(initialSnapshot);
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
-  const [initialOrderDate] = useState(() =>
-    getLocalDateInputValue(new Date()),
-  );
-  const [orderDate, setOrderDate] = useState(initialOrderDate);
+  const [orderDate, setOrderDate] = useState(initialSnapshot.orderDt);
   const [quotationNumber, setQuotationNumber] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryPlace, setDeliveryPlace] = useState('');
@@ -79,77 +115,101 @@ export function SalesOrderCreatePage({
   const [remark, setRemark] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
-  const [amounts, setAmounts] = useState({
-    supplyAmount: 0,
-    vatAmount: 0,
-    totalAmount: 0,
-  });
+  const [amounts, setAmounts] = useState(EMPTY_AMOUNTS);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedOrder, setSavedOrder] = useState<SalesOrderCreated | null>(null);
+  const [loadedOrder, setLoadedOrder] = useState<SalesOrderItem | null>(null);
+  const [gridRows, setGridRows] = useState<SalesOrderDetailRow[]>([]);
+  const [gridKey, setGridKey] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [notice, setNotice] = useState('');
   const [hasDetailChanges, setHasDetailChanges] = useState(false);
   const [validationErrors, setValidationErrors] =
     useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
-  const blockerPromptedRef = useRef(false);
   const gridValidationActiveRef = useRef(false);
+
+  const canCreate = Boolean(selectedMenuPermissions?.create);
+  const canUpdate = Boolean(selectedMenuPermissions?.update);
+  const canDelete = Boolean(selectedMenuPermissions?.delete);
+  const canWrite = canCreate || canUpdate;
+  const isOrderEditableState =
+    loadedOrder === null ||
+    (loadedOrder.status === EDITABLE_ORDER_STATUS &&
+      loadedOrder.details.every(
+        (detail) => Number(detail.shippedQty ?? 0) <= 0,
+      ));
+  const hasPermissionForMode = loadedOrder ? canUpdate : canCreate;
+  const isEditable =
+    !isSaving && !isLocked && isOrderEditableState && hasPermissionForMode;
+  const isDeletable =
+    loadedOrder !== null && !isSaving && !isLocked && isOrderEditableState;
+
+  const hasHeaderChanges =
+    (customer?.id ?? null) !== baseline.customerId ||
+    orderDate !== baseline.orderDt ||
+    quotationNumber.trim() !== baseline.quotNo.trim() ||
+    deliveryDate !== baseline.deliveryDt ||
+    deliveryPlace.trim() !== baseline.deliveryPlace.trim() ||
+    deliveryMethod.trim() !== baseline.deliveryMethod.trim() ||
+    remark.trim() !== baseline.remark.trim();
   const hasUnsavedChanges =
-    savedOrder === null &&
-    (customer !== null ||
-      orderDate !== initialOrderDate ||
-      quotationNumber.trim() !== '' ||
-      deliveryDate !== '' ||
-      deliveryPlace.trim() !== '' ||
-      deliveryMethod.trim() !== '' ||
-      remark.trim() !== '' ||
-      hasDetailChanges);
+    !isLocked && (hasHeaderChanges || hasDetailChanges);
   const blocker = useBlocker(hasUnsavedChanges);
-
-  useEffect(() => {
-    if (blocker.state !== 'blocked') {
-      blockerPromptedRef.current = false;
-      return;
-    }
-    if (blockerPromptedRef.current) {
-      return;
-    }
-
-    blockerPromptedRef.current = true;
-    const shouldLeave = window.confirm(
-      '저장되지 않은 수주 내용이 있습니다. 이동하면 입력 내용이 사라집니다. 이동하시겠습니까?',
-    );
-    if (shouldLeave) {
-      blocker.proceed();
-    } else {
-      blocker.reset();
-    }
-  }, [blocker]);
-
-  useEffect(() => {
-    if (!hasUnsavedChanges) {
-      return;
-    }
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [hasUnsavedChanges]);
+  useUnsavedChangesBeforeUnload(hasUnsavedChanges);
 
   const clearValidationErrors = useCallback(() => {
     setValidationErrors(null);
   }, []);
 
+  const applyForm = useCallback(
+    (
+      nextCustomer: MasterPickerOption | null,
+      header: SalesOrderHeaderValues,
+      rows: SalesOrderDetailRow[],
+    ) => {
+      setCustomer(nextCustomer);
+      setOrderDate(header.orderDt);
+      setQuotationNumber(header.quotNo);
+      setDeliveryDate(header.deliveryDt);
+      setDeliveryPlace(header.deliveryPlace);
+      setDeliveryMethod(header.deliveryMethod);
+      setRemark(header.remark);
+      setBaseline({ ...header, customerId: nextCustomer?.id ?? null });
+      setGridRows(rows);
+      setGridKey((key) => key + 1);
+      setAmounts(rows.length > 0 ? sumSalesOrderAmounts(rows) : EMPTY_AMOUNTS);
+      setHasDetailChanges(false);
+      setSelectedRowIds([]);
+      setValidationErrors(null);
+      gridValidationActiveRef.current = false;
+      selectedMaterialRowIdRef.current = null;
+      materialApplyPatchRef.current = null;
+      setPickerOpen(false);
+    },
+    [],
+  );
+
+  const applyLoadedOrder = useCallback(
+    (order: SalesOrderItem) => {
+      const form = toSalesOrderForm(order);
+      setLoadedOrder(order);
+      setIsLocked(false);
+      applyForm(form.customer, form.header, form.rows);
+    },
+    [applyForm],
+  );
+
+  const resetToNewOrder = useCallback(() => {
+    setLoadedOrder(null);
+    setIsLocked(false);
+    setError('');
+    applyForm(null, createEmptyHeader(), []);
+  }, [applyForm]);
+
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
       setAmounts(
-        sumSalesOrderAmounts([
-          ...changes.insertedRows,
-          ...changes.updatedRows,
-        ]),
+        sumSalesOrderAmounts(resolveActiveSalesOrderRows(gridRows, changes)),
       );
       setHasDetailChanges(
         changes.insertedRows.length > 0 ||
@@ -161,7 +221,7 @@ export function SalesOrderCreatePage({
         gridValidationActiveRef.current = !(gridRef.current?.validate() ?? true);
       }
     },
-    [clearValidationErrors],
+    [clearValidationErrors, gridRows],
   );
 
   const openMaterialPicker = useCallback(
@@ -205,7 +265,10 @@ export function SalesOrderCreatePage({
   }, [clearValidationErrors, closeMaterialPicker]);
 
   const handleSave = useCallback(async () => {
-    if (savingRef.current || savedOrder) {
+    if (savingRef.current || !isEditable) {
+      return;
+    }
+    if (loadedOrder && !hasUnsavedChanges) {
       return;
     }
 
@@ -226,7 +289,7 @@ export function SalesOrderCreatePage({
       errors.orderDt,
       errors.customerId,
       errors.details,
-      ...Object.values(errors.detailRows),
+      ...errors.detailMessages,
     ].filter((message): message is string => Boolean(message));
 
     setValidationErrors(validationMessages.length > 0 ? errors : null);
@@ -237,11 +300,30 @@ export function SalesOrderCreatePage({
 
     savingRef.current = true;
     setIsSaving(true);
+    setNotice('');
+    const payload = buildSalesOrderCreatePayload(input);
     try {
-      const saved = await createSalesOrder(
-        buildSalesOrderCreatePayload(input),
-      );
-      setSavedOrder(saved);
+      if (loadedOrder) {
+        const updated = await updateSalesOrder(
+          loadedOrder.salesOrderId,
+          payload,
+        );
+        applyLoadedOrder(updated);
+        setNotice(`수주가 수정되었습니다. 수주번호: ${updated.orderNo}`);
+        return;
+      }
+
+      const saved = await createSalesOrder(payload);
+      try {
+        const reloaded = await getSalesOrder(saved.salesOrderId);
+        applyLoadedOrder(reloaded);
+        setNotice(`수주가 저장되었습니다. 수주번호: ${reloaded.orderNo}`);
+      } catch {
+        setIsLocked(true);
+        setError(
+          `수주는 저장되었지만 다시 불러오지 못했습니다. 수주번호: ${saved.orderNo}`,
+        );
+      }
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -253,15 +335,66 @@ export function SalesOrderCreatePage({
       setIsSaving(false);
     }
   }, [
+    applyLoadedOrder,
     customer,
     deliveryDate,
     deliveryMethod,
     deliveryPlace,
+    hasUnsavedChanges,
+    isEditable,
+    loadedOrder,
     orderDate,
     quotationNumber,
     remark,
-    savedOrder,
   ]);
+
+  const handleDelete = useCallback(async () => {
+    if (savingRef.current || !loadedOrder || !isDeletable) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `수주번호 ${loadedOrder.orderNo} 을(를) 삭제하시겠습니까?`,
+      )
+    ) {
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    setNotice('');
+    setError('');
+    try {
+      await deleteSalesOrder(loadedOrder.salesOrderId);
+      resetToNewOrder();
+      setNotice(`수주가 삭제되었습니다. 수주번호: ${loadedOrder.orderNo}`);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : '수주 삭제 중 오류가 발생했습니다.',
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [isDeletable, loadedOrder, resetToNewOrder]);
+
+  const handleNew = useCallback(() => {
+    if (savingRef.current) {
+      return;
+    }
+    if (
+      hasUnsavedChanges &&
+      !window.confirm(
+        '저장되지 않은 수주 내용이 있습니다. 신규로 초기화하면 입력 내용이 사라집니다. 계속하시겠습니까?',
+      )
+    ) {
+      return;
+    }
+    resetToNewOrder();
+    setNotice('');
+  }, [hasUnsavedChanges, resetToNewOrder]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(
     () => [
@@ -269,42 +402,55 @@ export function SalesOrderCreatePage({
         key: 'write',
         actions: [
           {
-            label: '상세 행 추가',
-            icon: AddIcon,
-            disabled: isSaving || savedOrder !== null,
-            onClick: () => gridRef.current?.addRow(),
-          },
-          {
-            label: '선택 행 삭제',
-            icon: DeleteOutlineIcon,
-            disabled:
-              selectedRowIds.length === 0 || isSaving || savedOrder !== null,
-            onClick: () => gridRef.current?.deleteSelectedRows(),
+            label: '신규',
+            icon: NoteAddOutlinedIcon,
+            visible: canWrite,
+            disabled: isSaving,
+            onClick: handleNew,
           },
           {
             label: '저장',
             icon: SaveIcon,
-            disabled: isSaving || savedOrder !== null,
+            visible: canWrite,
+            disabled:
+              !isEditable || (loadedOrder !== null && !hasUnsavedChanges),
             onClick: handleSave,
+          },
+        ],
+      },
+      {
+        key: 'delete',
+        actions: [
+          {
+            label: '삭제',
+            icon: DeleteForeverOutlinedIcon,
+            visible: canDelete,
+            disabled: !isDeletable,
+            onClick: handleDelete,
           },
         ],
       },
     ],
     [
+      canDelete,
+      canWrite,
+      handleDelete,
+      handleNew,
       handleSave,
+      hasUnsavedChanges,
+      isDeletable,
+      isEditable,
       isSaving,
-      savedOrder,
-      selectedRowIds.length,
+      loadedOrder,
     ],
   );
 
   const validationMessages = validationErrors
     ? [
         validationErrors.details,
-        ...Object.values(validationErrors.detailRows),
+        ...validationErrors.detailMessages,
       ].filter((message): message is string => Boolean(message))
     : [];
-  const isEditable = !isSaving && savedOrder === null;
 
   return (
     <Box
@@ -350,11 +496,7 @@ export function SalesOrderCreatePage({
             </Box>
           </Alert>
         )}
-        {savedOrder && (
-          <Alert severity="success">
-            수주가 저장되었습니다. 수주번호: {savedOrder.orderNo}
-          </Alert>
-        )}
+        {notice && <Alert severity="success">{notice}</Alert>}
         <PageMessageArea
           message={error}
           onClose={() => setError('')}
@@ -384,7 +526,7 @@ export function SalesOrderCreatePage({
             <TextField
               label="수주번호"
               size="small"
-              value="저장 시 자동 채번"
+              value={loadedOrder?.orderNo ?? '저장 시 자동 채번'}
               slotProps={{ input: { readOnly: true } }}
               sx={{
                 '& .MuiInputBase-input': {
@@ -464,7 +606,7 @@ export function SalesOrderCreatePage({
             <TextField
               label="수주상태"
               size="small"
-              value="수주등록"
+              value={loadedOrder?.status ?? EDITABLE_ORDER_STATUS}
               slotProps={{ input: { readOnly: true } }}
             />
             <TextField
@@ -510,25 +652,40 @@ export function SalesOrderCreatePage({
                 수주 상세
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                행을 선택한 뒤 품목 선택을 눌러 도움창을 여세요.
+                행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행 복사·삭제를 할 수 있습니다.
               </Typography>
             </Box>
-            <Button
-              size="small"
-              startIcon={<SearchOutlinedIcon fontSize="small" />}
-              disabled={
-                selectedRowIds.length !== 1 ||
-                isSaving ||
-                savedOrder !== null
-              }
-              onClick={openSelectedMaterialPicker}
+            <Box
+              data-testid="sales-order-detail-toolbar"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
             >
-              품목 선택
-            </Button>
+              {canWrite ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AddIcon fontSize="small" />}
+                  disabled={!isEditable}
+                  onClick={() => gridRef.current?.addRow()}
+                >
+                  상세 행 추가
+                </Button>
+              ) : null}
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SearchOutlinedIcon fontSize="small" />}
+                disabled={selectedRowIds.length !== 1 || !isEditable}
+                onClick={openSelectedMaterialPicker}
+              >
+                품목 선택
+              </Button>
+            </Box>
           </Box>
           <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, px: 1 }}>
             <SalesOrderDetailGrid
+              key={gridKey}
               gridRef={gridRef}
+              rows={gridRows}
               onChangesChange={handleChangesChange}
               onSelectionChange={setSelectedRowIds}
               onOpenMaterialPicker={openMaterialPicker}
@@ -558,6 +715,18 @@ export function SalesOrderCreatePage({
         search={searchOrderMaterials}
         onClose={closeMaterialPicker}
         onChange={selectMaterial}
+      />
+      <UnsavedChangesConfirmDialog
+        open={blocker.state === 'blocked'}
+        description="저장되지 않은 수주 내용이 있습니다. 이동하면 입력 내용이 사라집니다. 이동하시겠습니까?"
+        cancelLabel="계속 작성"
+        continueLabel="변경사항 버리고 이동"
+        onCancel={() => {
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
+        onContinue={() => {
+          if (blocker.state === 'blocked') blocker.proceed();
+        }}
       />
     </Box>
   );

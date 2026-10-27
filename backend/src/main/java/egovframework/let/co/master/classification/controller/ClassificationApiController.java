@@ -1,9 +1,11 @@
 package egovframework.let.co.master.classification.controller;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -132,8 +134,8 @@ public class ClassificationApiController {
     }
 
     private List<String> pathSegments(String path) {
-        return path == null ? List.of()
-                : Arrays.stream(path.split("/")).filter(segment -> !segment.isEmpty()).toList();
+        return path == null ? Collections.emptyList()
+                : Arrays.stream(path.split("/")).filter(segment -> !segment.isEmpty()).collect(Collectors.toList());
     }
 
     private boolean permits(MenuPermissionVO permissions, Operation operation) {

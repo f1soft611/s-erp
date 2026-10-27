@@ -348,12 +348,12 @@ describe('document status page', () => {
 
     renderDocumentStatusPage();
 
-    expect(await screen.findByText('system date unavailable')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요.');
     expect(getListRequests()).toBe(0);
     expect(
       window.sessionStorage.getItem('s-erp:page:document-status'),
     ).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '문서현황 다시 조회' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색 기본값 다시 불러오기' }));
 
     expect(await screen.findByText('41')).toBeInTheDocument();
     expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);

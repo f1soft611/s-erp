@@ -9,7 +9,10 @@ import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -120,6 +123,54 @@ class SalesOrderApiControllerTest {
         Schema responseSchema = SalesOrderVO.class.getAnnotation(Schema.class);
         assertNotNull(responseSchema);
         assertEquals("수주 정보 응답 모델", responseSchema.description());
+    }
+
+    @Test
+    void loadsUpdatesAndDeletesOrdersWithinTheAuthenticatedTenant() throws Exception {
+        SalesOrderVO stored = new SalesOrderVO();
+        stored.setSalesOrderId(300L);
+        stored.setOrderNo("SO-20261027-0001");
+        stored.setCustomerCode("C-10");
+        stored.setDetails(Collections.emptyList());
+        when(service.getOrder(71L, 300L)).thenReturn(stored);
+        when(service.updateOrder(eq(71L), eq("user01"), eq(300L), any(SalesOrderCreateRequestVO.class)))
+                .thenReturn(stored);
+
+        mvc.perform(get(ROOT + "/300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.item.orderNo").value("SO-20261027-0001"))
+                .andExpect(jsonPath("$.result.item.customerCode").value("C-10"));
+
+        mvc.perform(put(ROOT + "/300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadWithSpoofedTenant()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.item.salesOrderId").value(300))
+                .andExpect(jsonPath("$.result.message").value("수주가 성공적으로 수정되었습니다."));
+
+        mvc.perform(delete(ROOT + "/300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.message").value("수주가 성공적으로 삭제되었습니다."));
+
+        verify(service).deleteOrder(71L, "user01", 300L);
+    }
+
+    @Test
+    void documentsLoadUpdateAndDeleteEndpoints() throws Exception {
+        Method getOrder = SalesOrderApiController.class.getMethod("getOrder", Long.class, LoginVO.class);
+        Method updateOrder = SalesOrderApiController.class.getMethod(
+                "updateOrder", Long.class, SalesOrderCreateRequestVO.class, LoginVO.class);
+        Method deleteOrder = SalesOrderApiController.class.getMethod("deleteOrder", Long.class, LoginVO.class);
+
+        assertEquals("수주 조회", getOrder.getAnnotation(Operation.class).summary());
+        assertEquals("수주 수정", updateOrder.getAnnotation(Operation.class).summary());
+        assertEquals("수주 삭제", deleteOrder.getAnnotation(Operation.class).summary());
+        for (Method method : new Method[] { getOrder, updateOrder, deleteOrder }) {
+            assertNotNull(method.getAnnotation(ApiResponses.class));
+        }
+        assertNotNull(SalesOrderVO.class.getDeclaredField("customerName").getAnnotation(Schema.class));
+        assertNotNull(egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO.class
+                .getDeclaredField("materialName").getAnnotation(Schema.class));
     }
 
     private HandlerMethodArgumentResolver loginUserResolver() {

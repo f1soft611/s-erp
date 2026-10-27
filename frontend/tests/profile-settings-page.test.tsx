@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfileSettingsPage from '../src/pages/dashboard/ProfileSettingsPage';
@@ -34,6 +34,27 @@ describe('ProfileSettingsPage', () => {
     });
   });
 
+  it('retries an initial failure without exposing the empty profile form', async () => {
+    vi.mocked(profileService.fetchMyProfile).mockRejectedValueOnce(new Error('initial failed'));
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    const retry = await screen.findByRole('button', { name: '내 정보 다시 불러오기' });
+    expect(screen.queryByLabelText(/이메일/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('이미지')).not.toBeInTheDocument();
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.getByLabelText(/이메일/i)).toHaveValue('user@example.com'));
+  });
+
+  it('retains the edited email when saving fails instead of replacing the form', async () => {
+    vi.mocked(profileService.updateMyProfile).mockRejectedValueOnce(new Error('save failed'));
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/이메일/i)).toHaveValue('user@example.com'));
+    fireEvent.change(screen.getByLabelText(/이메일/i), { target: { value: 'edited@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /저장/i }));
+    expect(await screen.findByText('save failed')).toBeInTheDocument();
+    expect(screen.getByLabelText(/이메일/i)).toHaveValue('edited@example.com');
+    expect(screen.queryByRole('button', { name: '내 정보 다시 불러오기' })).not.toBeInTheDocument();
+  });
+
   it('loads and saves the authenticated profile email', async () => {
     render(
       <MemoryRouter>
@@ -42,17 +63,18 @@ describe('ProfileSettingsPage', () => {
     );
 
     const emailInput = await screen.findByLabelText(/이메일/i);
-    expect(emailInput).toHaveValue('user@example.com');
+    await waitFor(() => expect(emailInput).toHaveValue('user@example.com'));
 
     fireEvent.change(emailInput, { target: { value: 'new@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /저장/i }));
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(profileService.updateMyProfile).toHaveBeenCalledWith({
         email: 'new@example.com',
         profileImage: null,
         stampImage: null,
       });
     });
+    expect(await screen.findByText('내 정보가 저장되었습니다.')).toBeInTheDocument();
   });
 });

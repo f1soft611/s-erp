@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GridSaveReconciliationError, type F1GridChanges, type F1GridRef } from '../../../../../shared/components/f1-grid';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
+import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
 import { fetchMaterialOptions, fetchMaterials, saveMaterialRows, toMaterialPayload } from '../services/materialManagement.service';
 import type { MaterialFilters, MaterialOption, MaterialRow } from '../types/materialManagement.types';
 
@@ -17,9 +18,11 @@ export function useMaterialManagement() {
   const savingRef = useRef(false);
   const reconciliationRequired = useRef(false);
   const loadVersion = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   const loadRows = useCallback(async (filters: MaterialFilters) => {
     const version = ++loadVersion.current;
+    start();
     setLoading(true);
     setError('');
     try {
@@ -27,15 +30,19 @@ export function useMaterialManagement() {
       if (version !== loadVersion.current) return false;
       setRows(nextRows);
       setOptions(nextOptions);
+      succeed();
       reconciliationRequired.current = false;
       return true;
     } catch (cause) {
-      if (version === loadVersion.current) setError(cause instanceof Error ? cause.message : '품목 목록을 불러오지 못했습니다.');
+      if (version === loadVersion.current) {
+        fail(cause);
+        setError(cause instanceof Error ? cause.message : '품목 목록을 불러오지 못했습니다.');
+      }
       return false;
     } finally {
       if (version === loadVersion.current) setLoading(false);
     }
-  }, []);
+  }, [start, succeed, fail]);
 
   useEffect(() => {
     void loadRows({});
@@ -93,6 +100,6 @@ export function useMaterialManagement() {
       setSaving(false);
     }
   }, [showSuccess]);
-  return { rows, options, error, setError, loading, saving, hasChanges, gridKey,
+  return { initialLoad, rows, options, error, setError, loading, saving, hasChanges, gridKey,
     appliedFilters, applyFilters, discardChanges, handleChangesChange, saveChanges };
 }

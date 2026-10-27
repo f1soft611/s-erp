@@ -5,6 +5,7 @@ import { AppLoadingSpinner } from '../AppLoadingSpinner';
 import { UnsavedChangesConfirmDialog } from '../UnsavedChangesConfirmDialog';
 import { CommonDialog } from '../CommonDialog';
 import { useNotification } from '../../context/NotificationContext';
+import { useUnsavedChangesBeforeUnload } from '../../hooks/useUnsavedChangesBeforeUnload';
 import {
   F1Grid,
   type F1GridChanges,
@@ -72,6 +73,7 @@ export function CommonCodeItemHelpDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  useUnsavedChangesBeforeUnload(open && hasChanges);
   const [gridKey, setGridKey] = useState(0);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 

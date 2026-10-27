@@ -1,0 +1,128 @@
+[
+  {
+    "kind": "item",
+    "width": 375,
+    "geometry": {
+      "viewport": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "width": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "item",
+    "width": 768,
+    "geometry": {
+      "viewport": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "width": 704,
+      "contentWidth": 702,
+      "contentScrollWidth": 702,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "item",
+    "width": 1280,
+    "geometry": {
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "x": 229,
+      "right": 1051,
+      "width": 822,
+      "contentWidth": 820,
+      "contentScrollWidth": 820,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 375,
+    "geometry": {
+      "viewport": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "width": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 768,
+    "geometry": {
+      "viewport": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "width": 704,
+      "contentWidth": 702,
+      "contentScrollWidth": 702,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 1280,
+    "geometry": {
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "x": 229,
+      "right": 1051,
+      "width": 822,
+      "contentWidth": 820,
+      "contentScrollWidth": 820,
+      "descriptionBelowTitle": true,
+      "descriptionAboveContent": true,
+      "rightAlignedButtons": true,
+      "closeInHeader": true
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "header-description, right-aligned-add-buttons, close-X, expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-X-close-cancel, reload-failure-retry"
+  }
+]

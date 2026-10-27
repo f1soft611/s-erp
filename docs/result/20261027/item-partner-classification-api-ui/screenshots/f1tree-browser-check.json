@@ -1,0 +1,104 @@
+[
+  {
+    "kind": "item",
+    "width": 375,
+    "geometry": {
+      "viewport": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "width": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "item",
+    "width": 768,
+    "geometry": {
+      "viewport": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "width": 704,
+      "contentWidth": 704,
+      "contentScrollWidth": 704
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "item",
+    "width": 1280,
+    "geometry": {
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "x": 190,
+      "right": 1090,
+      "width": 900,
+      "contentWidth": 900,
+      "contentScrollWidth": 900
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 375,
+    "geometry": {
+      "viewport": 375,
+      "documentWidth": 375,
+      "x": 0,
+      "right": 375,
+      "width": 375,
+      "contentWidth": 375,
+      "contentScrollWidth": 375
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 768,
+    "geometry": {
+      "viewport": 768,
+      "documentWidth": 768,
+      "x": 32,
+      "right": 736,
+      "width": 704,
+      "contentWidth": 704,
+      "contentScrollWidth": 704
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  },
+  {
+    "kind": "partner",
+    "width": 1280,
+    "geometry": {
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "x": 190,
+      "right": 1090,
+      "width": 900,
+      "contentWidth": 900,
+      "contentScrollWidth": 900
+    },
+    "creates": 2,
+    "updates": 3,
+    "pageErrors": [],
+    "interactions": "expand/collapse, max-depth, inactive-parent, multi-edit, parent-child-create, partial-failure-retry, dirty-close-cancel, reload-failure-retry"
+  }
+]

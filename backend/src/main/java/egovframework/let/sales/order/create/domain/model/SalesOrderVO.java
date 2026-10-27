@@ -38,6 +38,12 @@ public class SalesOrderVO implements Serializable {
     @Schema(description = "거래처 ID", example = "10")
     private Long customerId;
 
+    @Schema(description = "거래처 코드 (조회 응답)", example = "C-10")
+    private String customerCode;
+
+    @Schema(description = "거래처명 (조회 응답)", example = "에프원상사")
+    private String customerName;
+
     @Schema(description = "견적번호")
     private String quotNo;
 
