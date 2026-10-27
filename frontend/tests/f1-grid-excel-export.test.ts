@@ -23,6 +23,8 @@ type ExportRow = {
   invalidCreatedAt: string;
   emptyDate: string | null;
   defaultAmount: number;
+  defaultIntegerNumber: number;
+  defaultIntegerAmount: number | string;
 };
 
 const columns: F1GridColumn<ExportRow>[] = [
@@ -81,6 +83,16 @@ const columns: F1GridColumn<ExportRow>[] = [
   {
     field: 'defaultAmount',
     headerName: 'Default amount',
+    type: 'number',
+  },
+  {
+    field: 'defaultIntegerNumber',
+    headerName: 'Default integer number',
+    type: 'number',
+  },
+  {
+    field: 'defaultIntegerAmount',
+    headerName: 'Default integer amount',
     type: 'number',
   },
 ];
@@ -159,6 +171,8 @@ describe('F1-Grid Excel export cell types', () => {
       invalidCreatedAt: '2026-02-29T09:21:00',
       emptyDate: null,
       defaultAmount: 1.234567,
+      defaultIntegerNumber: 4,
+      defaultIntegerAmount: '4',
     };
     const workbook = await readExportedWorkbook([row]);
     const sheet = workbook.getWorksheet('Sheet1');
@@ -212,6 +226,10 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('Q2').alignment?.horizontal).toBe('left');
     expect(sheet?.getCell('R2').value).toBe(1.234567);
     expect(sheet?.getCell('R2').numFmt).toBe('#,##0.#####');
+    expect(sheet?.getCell('S2').value).toBe(4);
+    expect(sheet?.getCell('S2').numFmt).toBe('#,##0');
+    expect(sheet?.getCell('T2').value).toBe(4);
+    expect(sheet?.getCell('T2').numFmt).toBe('#,##0');
     expect(row.date).toBe('2026-10-20T00:30:00+14:00');
   });
 });

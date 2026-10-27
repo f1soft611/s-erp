@@ -1,4 +1,4 @@
-import { createRef, useState } from 'react';
+import { createRef, Profiler, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -952,6 +952,132 @@ describe('F1-GRID loading overlay', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Column 10' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('does not rerender a non-virtualized grid for horizontal scrolling', async () => {
+    const commits = vi.fn();
+    const wideRows = [{ id: 'row-1', first: 'A', second: 'B', third: 'C' }];
+    const wideColumns: F1GridColumn<(typeof wideRows)[number]>[] = [
+      { field: 'first', headerName: 'First', width: 120 },
+      { field: 'second', headerName: 'Second', width: 120 },
+      { field: 'third', headerName: 'Third', width: 120 },
+    ];
+
+    render(
+      <Profiler id="non-virtualized-scroll" onRender={commits}>
+        <F1Grid rows={wideRows} columns={wideColumns} rowKey="id" />
+      </Profiler>,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+    expect(commits).toHaveBeenCalled();
+    commits.mockClear();
+
+    bodyScroll.scrollLeft = 32;
+    fireEvent.scroll(bodyScroll);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+
+    expect(commits).not.toHaveBeenCalled();
+  });
+
+  it('updates virtualized columns only when the rendered column window changes', async () => {
+    type WideRow = { id: string } & Record<string, string>;
+    const wideRows: WideRow[] = [
+      Object.fromEntries([
+        ['id', 'row-1'],
+        ...Array.from({ length: 20 }, (_, index) => [
+          `field${index}`,
+          `value-${index}`,
+        ]),
+      ]) as WideRow,
+    ];
+    const wideColumns: F1GridColumn<WideRow>[] = Array.from(
+      { length: 20 },
+      (_, index) => ({
+        field: `field${index}`,
+        headerName: `Column ${index}`,
+        width: 120,
+        pinned: index === 0 ? 'left' : index === 19 ? 'right' : undefined,
+      }),
+    );
+    const commits = vi.fn();
+
+    render(
+      <Profiler id="virtualized-scroll" onRender={commits}>
+        <F1Grid
+          rows={wideRows}
+          columns={wideColumns}
+          rowKey="id"
+          height={240}
+          virtualizeColumns
+          columnOverscan={1}
+        />
+      </Profiler>,
+    );
+
+    const bodyScroll = screen.getByTestId('f1-grid-body-scroll');
+    Object.defineProperty(bodyScroll, 'clientWidth', {
+      configurable: true,
+      value: 360,
+    });
+    fireEvent.resize(window);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+    await waitFor(() => expect(commits).toHaveBeenCalled());
+    commits.mockClear();
+
+    bodyScroll.scrollLeft = 20;
+    fireEvent.scroll(bodyScroll);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+
+    expect(commits).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('columnheader', { name: 'Column 19' }),
+    ).toBeInTheDocument();
+
+    bodyScroll.scrollLeft = 1500;
+    fireEvent.scroll(bodyScroll);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('columnheader', { name: 'Column 12' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('columnheader', { name: 'Column 0' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('columnheader', { name: 'Column 19' }),
+      ).toBeInTheDocument();
+    });
+    expect(commits).toHaveBeenCalled();
   });
 
   it('reserves a stable scrollbar gutter when both vertical and horizontal scrolling are active', () => {
