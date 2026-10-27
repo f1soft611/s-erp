@@ -119,6 +119,15 @@ const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
 const GRID_ROW_VIRTUALIZATION_THRESHOLD = 200;
 const GRID_COLUMN_VIRTUALIZATION_THRESHOLD = 12;
 
+function hasSameColumnIndexes(
+  current: ReadonlySet<number>,
+  next: readonly number[],
+) {
+  return (
+    current.size === next.length && next.every((index) => current.has(index))
+  );
+}
+
 type F1GridRowInsertion = {
   targetRowId: F1GridRowId;
   position: 'before' | 'after';
@@ -240,6 +249,7 @@ function F1GridInner<T extends object>(
     active: false,
     previousCell: null,
   });
+  const pendingCellSelectionFrameRef = useRef<number | undefined>(undefined);
   const [draftValue, setDraftValue] = useState<F1GridDraftValue>('');
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [rowFormSession, setRowFormSession] = useState<
@@ -254,6 +264,8 @@ function F1GridInner<T extends object>(
     rows: T[];
   }>();
   const [queryLoading, setQueryLoading] = useState(false);
+  const isGridLoading = loading || queryLoading || dataSourceLoading;
+  const previousGridLoadingRef = useRef(false);
   const [queryWorkerFailed, setQueryWorkerFailed] = useState(false);
   const displayScale = useOptionalDisplayScale();
   const normalizedMinRowHeight = Math.max(1, minRowHeight * displayScale);
@@ -698,31 +710,48 @@ function F1GridInner<T extends object>(
       viewportWidth: 0,
       verticalScrollbarWidth: 0,
     });
+  const bodyScrollMetricsRef = useRef(bodyScrollMetrics);
+  bodyScrollMetricsRef.current = bodyScrollMetrics;
+  const shouldUpdateHorizontalScrollRef = useRef<
+    (bodyScroll: HTMLDivElement, scrollLeft: number) => boolean
+  >(() => true);
   const viewportSchedulerRef = useRef<
     ReturnType<typeof createGridRafScheduler<GridViewportMetrics>> | undefined
   >(undefined);
   if (!viewportSchedulerRef.current) {
     viewportSchedulerRef.current = createGridRafScheduler<GridViewportMetrics>(
       (next) => {
-        setBodyScrollMetrics((current) =>
+        const current = bodyScrollMetricsRef.current;
+        if (
           current.scrollTop === next.scrollTop &&
           current.scrollLeft === next.scrollLeft &&
           current.viewportHeight === next.viewportHeight &&
           current.viewportWidth === next.viewportWidth &&
           current.verticalScrollbarWidth === next.verticalScrollbarWidth
-            ? current
-            : next,
-        );
+        ) {
+          return;
+        }
+        setBodyScrollMetrics(next);
       },
     );
   }
 
-  function scheduleViewportMeasure(bodyScroll: HTMLDivElement) {
+  function scheduleViewportMeasure(
+    bodyScroll: HTMLDivElement,
+    measureHorizontalScroll = true,
+  ) {
     const hasVerticalOverflow =
       bodyScroll.scrollHeight > bodyScroll.clientHeight;
     viewportSchedulerRef.current?.schedule({
       scrollTop: bodyScroll.scrollTop,
-      scrollLeft: bodyScroll.scrollLeft,
+      scrollLeft:
+        measureHorizontalScroll ||
+        shouldUpdateHorizontalScrollRef.current(
+          bodyScroll,
+          bodyScroll.scrollLeft,
+        )
+          ? bodyScroll.scrollLeft
+          : bodyScrollMetricsRef.current.scrollLeft,
       viewportHeight: bodyScroll.clientHeight,
       viewportWidth: bodyScroll.clientWidth,
       verticalScrollbarWidth: hasVerticalOverflow
@@ -992,8 +1021,7 @@ function F1GridInner<T extends object>(
         protectedIndexes,
       });
     const previous = previousVirtualColumnIndexesRef.current;
-    if (previous.size === nextIndexes.length &&
-      nextIndexes.every((index) => previous.has(index))) {
+    if (hasSameColumnIndexes(previous, nextIndexes)) {
       return previous;
     }
     const next = new Set(nextIndexes);
@@ -1016,6 +1044,54 @@ function F1GridInner<T extends object>(
     virtualizeColumns,
     visibleColumns,
   ]);
+  shouldUpdateHorizontalScrollRef.current = (bodyScroll, scrollLeft) => {
+    const viewportWidth =
+      bodyScrollMetrics.viewportWidth ||
+      bodyScroll.clientWidth ||
+      gridContainerWidth ||
+      800;
+    const totalWidth = resolvedColumnWidths.reduce(
+      (sum, width) => sum + width,
+      0,
+    );
+    const virtualizationActive =
+      virtualizeColumns ??
+      (visibleColumns.length >= GRID_COLUMN_VIRTUALIZATION_THRESHOLD &&
+        totalWidth > viewportWidth);
+    if (!virtualizationActive) return false;
+
+    const pinnedIndexes = visibleColumns
+      .map((column, index) =>
+        getGridColumnPinSide(pinnedFields, column) ? index : -1,
+      )
+      .filter((index) => index >= 0);
+    const protectedIndexes = [
+      focusedCell?.columnIndex,
+      editingCell?.columnIndex,
+      cellSelection?.anchor.columnIndex,
+      cellSelection?.focus.columnIndex,
+      copiedCellRange?.anchor.columnIndex,
+      copiedCellRange?.focus.columnIndex,
+    ].filter((index): index is number => index !== undefined);
+    const nextIndexes = getVirtualColumnIndexes({
+      widths: resolvedColumnWidths,
+      scrollLeft: Math.max(0, scrollLeft - (showCheckbox ? 44 : 0)),
+      viewportWidth: Math.max(
+        0,
+        viewportWidth -
+          (showCheckbox ? 44 : 0) -
+          (rowFormActive ? GRID_ROW_FORM_ACTION_COLUMN_WIDTH : 0),
+      ),
+      overscan: columnOverscan,
+      pinnedIndexes,
+      protectedIndexes,
+    });
+
+    return !hasSameColumnIndexes(
+      previousVirtualColumnIndexesRef.current,
+      nextIndexes,
+    );
+  };
 
   const dirtyCellMap = useMemo(() => {
     const nextDirtyCellMap: Record<string, boolean> = {};
@@ -1275,9 +1351,18 @@ function F1GridInner<T extends object>(
   }, [selectionMode]);
 
   useEffect(() => {
-    if (!isCellSelectionDragging) return;
+    if (!isGridLoading) {
+      previousGridLoadingRef.current = false;
+      return;
+    }
+    if (previousGridLoadingRef.current) return;
 
-    let frameId: number | undefined;
+    previousGridLoadingRef.current = true;
+    clearCellSelectionRange();
+  }, [isGridLoading]);
+
+  useEffect(() => {
+    if (!isCellSelectionDragging) return;
 
     function handlePointerMove(event: PointerEvent) {
       const nextCell = resolvePointerCell(event.clientX, event.clientY);
@@ -1289,12 +1374,13 @@ function F1GridInner<T extends object>(
         previousCell?.columnIndex === nextCell.columnIndex;
       if (isSameCell) return;
 
-      if (frameId !== undefined) {
-        cancelAnimationFrame(frameId);
+      if (pendingCellSelectionFrameRef.current !== undefined) {
+        cancelAnimationFrame(pendingCellSelectionFrameRef.current);
       }
 
-      frameId = window.requestAnimationFrame(() => {
-        frameId = undefined;
+      pendingCellSelectionFrameRef.current = window.requestAnimationFrame(() => {
+        pendingCellSelectionFrameRef.current = undefined;
+        if (!dragSelectionStateRef.current.active) return;
         dragSelectionStateRef.current = {
           ...dragSelectionStateRef.current,
           previousCell: nextCell,
@@ -1313,11 +1399,12 @@ function F1GridInner<T extends object>(
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      if (frameId !== undefined) {
-        cancelAnimationFrame(frameId);
+      if (pendingCellSelectionFrameRef.current !== undefined) {
+        cancelAnimationFrame(pendingCellSelectionFrameRef.current);
+        pendingCellSelectionFrameRef.current = undefined;
       }
     };
-  }, [isCellSelectionDragging, visibleRows, rowKey]);
+  }, [isCellSelectionDragging, rowIndexById, rowKey, visibleRows]);
 
   function getCell(
     rowId: F1GridRowId,
@@ -1702,9 +1789,14 @@ function F1GridInner<T extends object>(
   useEffect(() => {
     commitEditRef.current = commitEdit;
   });
+  const stopEditRef = useRef(stopEdit);
+  useEffect(() => {
+    stopEditRef.current = stopEdit;
+  });
 
   useEffect(() => {
     if (!editingCell) return;
+    const editingColumnType = visibleColumns[editingCell.columnIndex]?.type;
 
     function handleOutsideMouseDown(event: globalThis.MouseEvent) {
       const node = editingCellNodeRef.current;
@@ -1725,6 +1817,10 @@ function F1GridInner<T extends object>(
       if (clickedEditorPopup) {
         return;
       }
+      if (editingColumnType === 'select') {
+        stopEditRef.current();
+        return;
+      }
       commitEditRef.current();
     }
 
@@ -1732,7 +1828,7 @@ function F1GridInner<T extends object>(
     return () => {
       document.removeEventListener('mousedown', handleOutsideMouseDown, true);
     };
-  }, [editingCell]);
+  }, [editingCell, visibleColumns]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!focusedCell) return;
@@ -2066,9 +2162,11 @@ function F1GridInner<T extends object>(
         ) as HTMLElement | null;
         const rowIdAttr = rowNode?.getAttribute('data-f1-grid-row-id');
         if (rowIdAttr && rowNode) {
-          const targetRow = visibleRows.find(
-            (row) => String(getGridRowId(row, rowKey)) === rowIdAttr,
-          );
+          const targetRowIndex = rowIndexById.get(rowIdAttr);
+          const targetRow =
+            targetRowIndex === undefined
+              ? undefined
+              : visibleRows[targetRowIndex];
           if (targetRow) {
             const rowCellNodes = rowNode.querySelectorAll('[role="gridcell"]');
             const columnIndex = Array.from(rowCellNodes).indexOf(gridCell);
@@ -2111,9 +2209,9 @@ function F1GridInner<T extends object>(
       const distance = (clientX - nearestX) ** 2 + (clientY - nearestY) ** 2;
       const [rowIdText, columnIndexText] = key.split(':');
       const columnIndex = Number.parseInt(columnIndexText, 10);
-      const targetRow = visibleRows.find(
-        (row) => String(getGridRowId(row, rowKey)) === rowIdText,
-      );
+      const targetRowIndex = rowIndexById.get(rowIdText);
+      const targetRow =
+        targetRowIndex === undefined ? undefined : visibleRows[targetRowIndex];
       if (!targetRow || Number.isNaN(columnIndex)) continue;
 
       const nextCell = {
@@ -2158,9 +2256,8 @@ function F1GridInner<T extends object>(
           pointerWithinPreviousHeight;
 
         if (isNearBottomBoundary || isNearRightBoundary) {
-          const previousRowIndex = visibleRows.findIndex(
-            (row) => getGridRowId(row, rowKey) === previousDragCell.rowId,
-          );
+          const previousRowIndex =
+            rowIndexById.get(String(previousDragCell.rowId)) ?? -1;
 
           if (previousRowIndex >= 0) {
             const rowBelow = visibleRows[previousRowIndex + 1];
@@ -2231,12 +2328,31 @@ function F1GridInner<T extends object>(
   }
 
   function finishCellSelectionRange() {
+    if (pendingCellSelectionFrameRef.current !== undefined) {
+      cancelAnimationFrame(pendingCellSelectionFrameRef.current);
+      pendingCellSelectionFrameRef.current = undefined;
+    }
     cellRangeDragRef.current = null;
     dragSelectionStateRef.current = {
       active: false,
       previousCell: null,
     };
     setIsCellSelectionDragging(false);
+  }
+
+  function clearCellSelectionRange() {
+    if (pendingCellSelectionFrameRef.current !== undefined) {
+      cancelAnimationFrame(pendingCellSelectionFrameRef.current);
+      pendingCellSelectionFrameRef.current = undefined;
+    }
+    cellRangeDragRef.current = null;
+    dragSelectionStateRef.current = { active: false, previousCell: null };
+    cellSelectionRef.current = undefined;
+    copiedCellRangeRef.current = undefined;
+    setCellSelection(undefined);
+    setCopiedCellRange(undefined);
+    setIsCellSelectionDragging(false);
+    setRangeOverlay(null);
   }
 
   function handleDeleteSelectedRows() {
@@ -2679,13 +2795,9 @@ function F1GridInner<T extends object>(
       return;
     }
 
-    const startRowIndex = visibleRows.findIndex(
-      (row) => getGridRowId(row, rowKey) === range.anchor.rowId,
-    );
-    const endRowIndex = visibleRows.findIndex(
-      (row) => getGridRowId(row, rowKey) === range.focus.rowId,
-    );
-    if (startRowIndex < 0 || endRowIndex < 0) {
+    const startRowIndex = rowIndexById.get(String(range.anchor.rowId));
+    const endRowIndex = rowIndexById.get(String(range.focus.rowId));
+    if (startRowIndex === undefined || endRowIndex === undefined) {
       setRangeOverlay((current) => (current ? null : current));
       return;
     }
@@ -2751,7 +2863,7 @@ function F1GridInner<T extends object>(
       return;
     }
     updateRangeOverlay();
-  }, [copiedCellRange, cellSelection, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
 
   useEffect(() => {
     const bodyScroll = bodyScrollRef.current;
@@ -2767,7 +2879,7 @@ function F1GridInner<T extends object>(
       bodyScroll.removeEventListener('scroll', handleScrollOrResize);
       window.removeEventListener('resize', handleScrollOrResize);
     };
-  }, [copiedCellRange, cellSelection, rowKey]);
+  }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
 
   useEffect(() => {
     const headerScroll = headerScrollRef.current;
@@ -2800,7 +2912,7 @@ function F1GridInner<T extends object>(
       ref={gridContainerRef}
       role="grid"
       aria-label={ariaLabel}
-      aria-busy={loading || queryLoading || dataSourceLoading || undefined}
+      aria-busy={isGridLoading || undefined}
       aria-rowcount={dataSource ? serverTotalRowCount : visibleRows.length}
       onCopy={handleCopy}
       onPaste={handlePaste}
@@ -2885,7 +2997,7 @@ function F1GridInner<T extends object>(
         data-testid="f1-grid-body-scroll"
         onScroll={(event) => {
           const bodyScroll = event.currentTarget;
-          scheduleViewportMeasure(bodyScroll);
+          scheduleViewportMeasure(bodyScroll, false);
           if (
             dataSource &&
             serverRows.length < serverTotalRowCount &&
@@ -3031,7 +3143,7 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
-      {loading || queryLoading || dataSourceLoading ? (
+      {isGridLoading ? (
         <Box
           data-testid="f1-grid-loading-overlay"
           sx={{

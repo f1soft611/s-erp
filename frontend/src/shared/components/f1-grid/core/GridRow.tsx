@@ -356,6 +356,11 @@ const GridRowInner = <T extends object>({
         onSelectRow(rowId, event);
       }
       if (event.button !== 0) return;
+      if (
+        editingCell &&
+        columns[editingCell.columnIndex]?.type === 'select'
+      )
+        return;
       if (selectionMode === 'row') {
         onSetFocusedCell(cell);
         onSelectRow(rowId, event);
@@ -371,6 +376,8 @@ const GridRowInner = <T extends object>({
     },
     [
       dragSelectionStateRef,
+      editingCell,
+      columns,
       onCellSelectionStart,
       onSelectRow,
       onSetFocusedCell,

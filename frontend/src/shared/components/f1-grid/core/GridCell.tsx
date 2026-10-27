@@ -205,6 +205,14 @@ const GridCellInner = <T extends object>({
     (focused || editing || mergeGroupActive) &&
     !(selected && !editing && !mergeGroupActive && (rangeStart || !focused));
   const mergedCellHidden = Boolean(merged && !mergeInfo?.isStart);
+  const pinnedMergeContent = Boolean(
+    pinOffset &&
+      mergeInfo?.isStart &&
+      mergeInfo.span > 1 &&
+      column.renderCell &&
+      column.type !== 'checkbox' &&
+      !editing,
+  );
   const cellClassName = useMemo(
     () => [customCellProps.className].filter(Boolean).join(' ') || undefined,
     [customCellProps.className],
@@ -310,12 +318,24 @@ const GridCellInner = <T extends object>({
         borderColor:
           hideRangeStartBorder || activeHighlight ? 'transparent' : 'divider',
         opacity: mergedCellHidden ? 0 : 1,
-        pointerEvents: 'auto',
+        pointerEvents: pinnedMergeContent ? 'none' : 'auto',
         position: pinOffset ? 'sticky' : 'relative',
         left: pinOffset?.side === 'left' ? pinOffset.offset : undefined,
         right: pinOffset?.side === 'right' ? pinOffset.offset : undefined,
-        zIndex: pinOffset ? 2 : undefined,
+        zIndex: pinOffset ? (pinnedMergeContent ? 3 : 2) : undefined,
         isolation: pinOffset ? 'isolate' : undefined,
+        // Keep later physical rows clickable beneath the raised merged content.
+        '&::before': pinnedMergeContent
+          ? {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: rowHeight,
+              pointerEvents: 'auto',
+            }
+          : undefined,
         bgcolor: errorMessage ? 'error.lighter' : undefined,
         boxShadow: pinOffset
           ? pinOffset.shadow === false
@@ -404,10 +424,17 @@ const GridCellInner = <T extends object>({
           onCodePick={onCodePick}
         />
       ) : column.renderCell ? (
-        <>
-          {adornment}
-          {column.renderCell(cellRenderContext)}
-        </>
+        pinnedMergeContent ? (
+          <Box component="span" sx={{ display: 'contents', pointerEvents: 'auto' }}>
+            {adornment}
+            {column.renderCell(cellRenderContext)}
+          </Box>
+        ) : (
+          <>
+            {adornment}
+            {column.renderCell(cellRenderContext)}
+          </>
+        )
       ) : (
         <>
           {adornment}
