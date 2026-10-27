@@ -18,6 +18,11 @@ describe('MasterPicker', () => {
       />,
     );
 
+    expect(
+      screen
+        .getByRole('textbox', { name: '거래처' })
+        .closest('.MuiInputBase-root'),
+    ).toHaveStyle({ height: '40px' });
     expect(screen.getByRole('button', { name: '거래처 선택' })).toHaveStyle({
       height: '40px',
       minHeight: '40px',
@@ -52,6 +57,21 @@ describe('MasterPicker', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    expect(
+      screen.getByRole('dialog', { name: '거래처 선택' }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('textbox', { name: '거래처 검색' })
+        .closest('.MuiInputBase-root'),
+    ).toHaveStyle({ height: '40px' });
+    expect(
+      screen.getByRole('textbox', { name: '거래처 검색' }).closest('form'),
+    ).toHaveStyle({ alignItems: 'center' });
+    expect(screen.getByRole('button', { name: '검색' })).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
     fireEvent.change(screen.getByRole('textbox', { name: '거래처 검색' }), {
       target: { value: '테스트' },
     });
