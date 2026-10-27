@@ -1,4 +1,5 @@
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid';
+import type { MasterPickerOption } from '../../../../../shared/components/master-picker/masterPicker.types';
 import {
   calculateSalesOrderAmounts,
   roundSalesOrderAmount,
@@ -45,6 +46,7 @@ function numericValue(value: unknown): number {
 
 export function createSalesOrderDetailColumns(
   onOpenMaterialPicker: OpenMaterialPicker,
+  disabled = false,
 ): F1GridColumn<SalesOrderDetailRow>[] {
   const recalculateAmounts = (quantity: number, unitPrice: number) => ({
     orderQty: quantity,
@@ -69,14 +71,26 @@ export function createSalesOrderDetailColumns(
       type: 'code',
       width: 140,
       pinned: 'left',
-      editable: true,
+      editable: !disabled,
       required: true,
       validate: (_value, row) =>
         Number.isSafeInteger(row.materialId) && Number(row.materialId) > 0
           ? true
           : '품목을 선택해 주세요.',
+      onValueChange: (_row, value) => {
+        if (!isMasterPickerOption(value)) {
+          throw new Error('품목 선택 항목을 확인해 주세요.');
+        }
+        return {
+          materialId: value.id,
+          materialCode: value.code,
+          materialName: value.name,
+        };
+      },
       onOpenCodePicker: (_row, applyPatch) => {
-        onOpenMaterialPicker(applyPatch);
+        if (!disabled) {
+          onOpenMaterialPicker(applyPatch);
+        }
       },
     },
     {
@@ -93,7 +107,7 @@ export function createSalesOrderDetailColumns(
       decimalPlaces: 2,
       width: 120,
       align: 'right',
-      editable: true,
+      editable: !disabled,
       min: 0,
       onValueChange: (row, value) =>
         recalculateAmounts(numericValue(value), row.unitPrice),
@@ -105,7 +119,7 @@ export function createSalesOrderDetailColumns(
       decimalPlaces: 2,
       width: 130,
       align: 'right',
-      editable: true,
+      editable: !disabled,
       min: 0,
       onValueChange: (row, value) =>
         recalculateAmounts(row.orderQty, numericValue(value)),
@@ -126,7 +140,7 @@ export function createSalesOrderDetailColumns(
       decimalPlaces: 2,
       width: 130,
       align: 'right',
-      editable: true,
+      editable: !disabled,
       min: 0,
       onValueChange: (row, value) => {
         const vatAmount = roundSalesOrderAmount(numericValue(value));
@@ -150,7 +164,7 @@ export function createSalesOrderDetailColumns(
       headerName: '납기',
       type: 'date',
       width: 130,
-      editable: true,
+      editable: !disabled,
     },
     {
       field: 'shippedQty',
@@ -170,4 +184,19 @@ export function createSalesOrderDetailColumns(
       editable: false,
     },
   ];
+}
+
+function isMasterPickerOption(value: unknown): value is MasterPickerOption {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'number' &&
+    Number.isSafeInteger(value.id) &&
+    value.id > 0 &&
+    'code' in value &&
+    typeof value.code === 'string' &&
+    'name' in value &&
+    typeof value.name === 'string'
+  );
 }

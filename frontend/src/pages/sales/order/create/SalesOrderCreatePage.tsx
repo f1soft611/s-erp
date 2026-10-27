@@ -1,10 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useBlocker } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import {
   Alert,
   Box,
+  Button,
   Paper,
   TextField,
   Typography,
@@ -28,6 +31,15 @@ import {
   searchOrderCustomers,
   searchOrderMaterials,
 } from './services/salesOrderMaster.service';
+import {
+  buildSalesOrderCreatePayload,
+  createSalesOrder,
+  validateSalesOrderInput,
+} from './services/salesOrder.service';
+import type {
+  SalesOrderCreated,
+  SalesOrderValidationErrors,
+} from './types/salesOrder.types';
 
 type Props = {
   selectedModule: ModuleItem;
@@ -50,13 +62,16 @@ export function SalesOrderCreatePage({
   breadcrumbItems,
 }: Props) {
   const gridRef = useRef<F1GridRef<SalesOrderDetailRow>>(null);
+  const savingRef = useRef(false);
+  const selectedMaterialRowIdRef = useRef<string | null>(null);
   const materialApplyPatchRef = useRef<
     ((changes: Partial<SalesOrderDetailRow>) => void) | null
   >(null);
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
-  const [orderDate, setOrderDate] = useState(() =>
+  const [initialOrderDate] = useState(() =>
     getLocalDateInputValue(new Date()),
   );
+  const [orderDate, setOrderDate] = useState(initialOrderDate);
   const [quotationNumber, setQuotationNumber] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryPlace, setDeliveryPlace] = useState('');
@@ -69,7 +84,63 @@ export function SalesOrderCreatePage({
     vatAmount: 0,
     totalAmount: 0,
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedOrder, setSavedOrder] = useState<SalesOrderCreated | null>(null);
+  const [hasDetailChanges, setHasDetailChanges] = useState(false);
+  const [validationErrors, setValidationErrors] =
+    useState<SalesOrderValidationErrors | null>(null);
   const [error, setError] = useState('');
+  const blockerPromptedRef = useRef(false);
+  const hasUnsavedChanges =
+    savedOrder === null &&
+    (customer !== null ||
+      orderDate !== initialOrderDate ||
+      quotationNumber.trim() !== '' ||
+      deliveryDate !== '' ||
+      deliveryPlace.trim() !== '' ||
+      deliveryMethod.trim() !== '' ||
+      remark.trim() !== '' ||
+      hasDetailChanges);
+  const blocker = useBlocker(hasUnsavedChanges);
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      blockerPromptedRef.current = false;
+      return;
+    }
+    if (blockerPromptedRef.current) {
+      return;
+    }
+
+    blockerPromptedRef.current = true;
+    const shouldLeave = window.confirm(
+      '저장되지 않은 수주 내용이 있습니다. 이동하면 입력 내용이 사라집니다. 이동하시겠습니까?',
+    );
+    if (shouldLeave) {
+      blocker.proceed();
+    } else {
+      blocker.reset();
+    }
+  }, [blocker]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  const clearValidationErrors = useCallback(() => {
+    setValidationErrors(null);
+  }, []);
 
   const handleChangesChange = useCallback(
     (changes: F1GridChanges<SalesOrderDetailRow>) => {
@@ -79,12 +150,19 @@ export function SalesOrderCreatePage({
           ...changes.updatedRows,
         ]),
       );
+      setHasDetailChanges(
+        changes.insertedRows.length > 0 ||
+          changes.updatedRows.length > 0 ||
+          changes.deletedRows.length > 0,
+      );
+      clearValidationErrors();
     },
-    [],
+    [clearValidationErrors],
   );
 
   const openMaterialPicker = useCallback(
     (applyPatch: (changes: Partial<SalesOrderDetailRow>) => void) => {
+      selectedMaterialRowIdRef.current = null;
       materialApplyPatchRef.current = applyPatch;
       setPickerOpen(true);
     },
@@ -92,18 +170,92 @@ export function SalesOrderCreatePage({
   );
 
   const closeMaterialPicker = useCallback(() => {
+    selectedMaterialRowIdRef.current = null;
     materialApplyPatchRef.current = null;
     setPickerOpen(false);
   }, []);
 
+  const openSelectedMaterialPicker = useCallback(() => {
+    const [selectedRow] = gridRef.current?.getSelectedRows() ?? [];
+    if (!selectedRow) {
+      return;
+    }
+
+    selectedMaterialRowIdRef.current = selectedRow.rowId;
+    setPickerOpen(true);
+  }, []);
+
   const selectMaterial = useCallback((option: MasterPickerOption) => {
-    materialApplyPatchRef.current?.({
-      materialId: option.id,
-      materialCode: option.code,
-      materialName: option.name,
-    });
+    const selectedRowId = selectedMaterialRowIdRef.current;
+    if (selectedRowId !== null) {
+      gridRef.current?.setCellValue(selectedRowId, 'materialCode', option);
+    } else {
+      materialApplyPatchRef.current?.({
+        materialId: option.id,
+        materialCode: option.code,
+        materialName: option.name,
+      });
+    }
     closeMaterialPicker();
-  }, [closeMaterialPicker]);
+    clearValidationErrors();
+  }, [clearValidationErrors, closeMaterialPicker]);
+
+  const handleSave = useCallback(async () => {
+    if (savingRef.current || savedOrder) {
+      return;
+    }
+
+    const input = {
+      orderDt: orderDate,
+      customerId: customer?.id ?? null,
+      quotNo: quotationNumber,
+      deliveryDt: deliveryDate,
+      deliveryPlace,
+      deliveryMethod,
+      remark,
+      details: gridRef.current?.getActiveRows() ?? [],
+    };
+    const errors = validateSalesOrderInput(input);
+    const validationMessages = [
+      errors.orderDt,
+      errors.customerId,
+      errors.details,
+      ...Object.values(errors.detailRows),
+    ].filter((message): message is string => Boolean(message));
+
+    setValidationErrors(validationMessages.length > 0 ? errors : null);
+    setError('');
+    if (validationMessages.length > 0) {
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      const saved = await createSalesOrder(
+        buildSalesOrderCreatePayload(input),
+      );
+      setSavedOrder(saved);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : '수주 저장 중 오류가 발생했습니다.',
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [
+    customer,
+    deliveryDate,
+    deliveryMethod,
+    deliveryPlace,
+    orderDate,
+    quotationNumber,
+    remark,
+    savedOrder,
+  ]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(
     () => [
@@ -113,24 +265,41 @@ export function SalesOrderCreatePage({
           {
             label: '상세 행 추가',
             icon: AddIcon,
+            disabled: isSaving || savedOrder !== null,
             onClick: () => gridRef.current?.addRow(),
           },
           {
             label: '선택 행 삭제',
             icon: DeleteOutlineIcon,
-            disabled: selectedRowIds.length === 0,
+            disabled:
+              selectedRowIds.length === 0 || isSaving || savedOrder !== null,
             onClick: () => gridRef.current?.deleteSelectedRows(),
           },
           {
             label: '저장',
             icon: SaveIcon,
-            disabled: true,
+            disabled: isSaving || savedOrder !== null,
+            onClick: handleSave,
           },
         ],
       },
     ],
-    [selectedRowIds.length],
+    [
+      handleSave,
+      isSaving,
+      savedOrder,
+      selectedRowIds.length,
+    ],
   );
+
+  const validationMessages = validationErrors
+    ? [
+        validationErrors.customerId,
+        validationErrors.details,
+        ...Object.values(validationErrors.detailRows),
+      ].filter((message): message is string => Boolean(message))
+    : [];
+  const isEditable = !isSaving && savedOrder === null;
 
   return (
     <Box
@@ -154,6 +323,7 @@ export function SalesOrderCreatePage({
       <Box
         role="region"
         aria-label="수주 입력 내용"
+        aria-busy={isSaving}
         sx={{
           display: 'flex',
           flex: 1,
@@ -166,10 +336,20 @@ export function SalesOrderCreatePage({
           p: { xs: 1.5, sm: 2, lg: 3 },
         }}
       >
-        <Alert severity="info">
-          저장 API는 아직 연결되지 않았습니다. 입력한 내용은 현재 화면에서만
-          유지됩니다.
-        </Alert>
+        {validationMessages.length > 0 && (
+          <Alert severity="error">
+            <Box component="ul" sx={{ my: 0, pl: 2 }}>
+              {validationMessages.map((message, index) => (
+                <li key={`${index}-${message}`}>{message}</li>
+              ))}
+            </Box>
+          </Alert>
+        )}
+        {savedOrder && (
+          <Alert severity="success">
+            수주가 저장되었습니다. 수주번호: {savedOrder.orderNo}
+          </Alert>
+        )}
         <PageMessageArea
           message={error}
           onClose={() => setError('')}
@@ -199,7 +379,7 @@ export function SalesOrderCreatePage({
             <TextField
               label="수주번호"
               size="small"
-              value="저장 연동 단계에서 채번 기준 확정"
+              value="저장 시 자동 채번"
               slotProps={{ input: { readOnly: true } }}
               sx={{
                 '& .MuiInputBase-input': {
@@ -212,39 +392,65 @@ export function SalesOrderCreatePage({
               type="date"
               size="small"
               value={orderDate}
-              onChange={(event) => setOrderDate(event.target.value)}
+              onChange={(event) => {
+                setOrderDate(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
+              error={Boolean(validationErrors?.orderDt)}
+              helperText={validationErrors?.orderDt}
               slotProps={{ inputLabel: { shrink: true } }}
             />
             <CustomerPicker
               value={customer}
               search={searchOrderCustomers}
-              onChange={setCustomer}
+              onChange={(value) => {
+                setCustomer(value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
             />
             <TextField
               label="견적번호"
               size="small"
               value={quotationNumber}
-              onChange={(event) => setQuotationNumber(event.target.value)}
+              onChange={(event) => {
+                setQuotationNumber(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
             />
             <TextField
               label="납기일자"
               type="date"
               size="small"
               value={deliveryDate}
-              onChange={(event) => setDeliveryDate(event.target.value)}
+              onChange={(event) => {
+                setDeliveryDate(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
               slotProps={{ inputLabel: { shrink: true } }}
             />
             <TextField
               label="납품장소"
               size="small"
               value={deliveryPlace}
-              onChange={(event) => setDeliveryPlace(event.target.value)}
+              onChange={(event) => {
+                setDeliveryPlace(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
             />
             <TextField
               label="배송방법"
               size="small"
               value={deliveryMethod}
-              onChange={(event) => setDeliveryMethod(event.target.value)}
+              onChange={(event) => {
+                setDeliveryMethod(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
             />
             <TextField
               label="수주상태"
@@ -258,7 +464,11 @@ export function SalesOrderCreatePage({
               multiline
               minRows={2}
               value={remark}
-              onChange={(event) => setRemark(event.target.value)}
+              onChange={(event) => {
+                setRemark(event.target.value);
+                clearValidationErrors();
+              }}
+              disabled={!isEditable}
               sx={{ gridColumn: { xs: 'auto', sm: '1 / -1' } }}
             />
           </Box>
@@ -275,10 +485,37 @@ export function SalesOrderCreatePage({
             borderRadius: 2,
           }}
         >
-          <Box sx={{ p: { xs: 1.5, sm: 2 }, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              수주 상세
-            </Typography>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1,
+              p: { xs: 1.5, sm: 2 },
+              pb: 1,
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                수주 상세
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                행을 선택한 뒤 품목 선택을 눌러 도움창을 여세요.
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<SearchOutlinedIcon fontSize="small" />}
+              disabled={
+                selectedRowIds.length !== 1 ||
+                isSaving ||
+                savedOrder !== null
+              }
+              onClick={openSelectedMaterialPicker}
+            >
+              품목 선택
+            </Button>
           </Box>
           <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, px: 1 }}>
             <SalesOrderDetailGrid
@@ -286,6 +523,7 @@ export function SalesOrderCreatePage({
               onChangesChange={handleChangesChange}
               onSelectionChange={setSelectedRowIds}
               onOpenMaterialPicker={openMaterialPicker}
+              disabled={!isEditable}
             />
           </Box>
           <Box
@@ -307,7 +545,7 @@ export function SalesOrderCreatePage({
         </Paper>
       </Box>
       <MaterialPickerDialog
-        open={pickerOpen}
+        open={pickerOpen && isEditable}
         search={searchOrderMaterials}
         onClose={closeMaterialPicker}
         onChange={selectMaterial}

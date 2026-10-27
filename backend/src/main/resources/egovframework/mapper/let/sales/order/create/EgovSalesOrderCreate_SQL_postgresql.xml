@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesOrderDAO">
+
+    <select id="existsCustomer" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_customer_info
+            WHERE customer_id = #{id}
+              AND tenant_id = #{tenantId}
+        )
+    </select>
+
+    <select id="existsMaterial" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_material_info
+            WHERE material_id = #{id}
+              AND tenant_id = #{tenantId}
+        )
+    </select>
+
+    <select id="insertOrderHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_order_hd (
+            tenant_id,
+            order_no,
+            order_dt,
+            customer_id,
+            quot_no,
+            delivery_dt,
+            delivery_place,
+            delivery_method,
+            status,
+            total_amt,
+            remark,
+            created_by
+        ) VALUES (
+            #{tenantId},
+            #{orderNo},
+            #{orderDt},
+            #{customerId},
+            #{quotNo},
+            #{deliveryDt},
+            #{deliveryPlace},
+            #{deliveryMethod},
+            #{status},
+            #{totalAmt},
+            #{remark},
+            #{createdBy}
+        )
+        RETURNING sales_order_id
+    </select>
+
+    <select id="insertOrderDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_order_dt (
+            sales_order_id,
+            tenant_id,
+            line_no,
+            material_id,
+            order_qty,
+            unit_price,
+            supply_amt,
+            vat_amt,
+            total_amt,
+            delivery_dt,
+            shipped_qty,
+            line_status
+        ) VALUES (
+            #{salesOrderId},
+            #{tenantId},
+            #{lineNo},
+            #{materialId},
+            #{orderQty},
+            #{unitPrice},
+            #{supplyAmt},
+            #{vatAmt},
+            #{totalAmt},
+            #{deliveryDt},
+            #{shippedQty},
+            #{lineStatus}
+        )
+        RETURNING sales_order_detail_id
+    </select>
+</mapper>

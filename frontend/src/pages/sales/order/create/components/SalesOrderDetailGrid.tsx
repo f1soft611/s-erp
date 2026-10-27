@@ -16,6 +16,7 @@ type Props = {
   onChangesChange: (changes: F1GridChanges<SalesOrderDetailRow>) => void;
   onSelectionChange: (rowIds: (string | number)[]) => void;
   onOpenMaterialPicker: OpenMaterialPicker;
+  disabled?: boolean;
 };
 
 export function SalesOrderDetailGrid({
@@ -23,10 +24,11 @@ export function SalesOrderDetailGrid({
   onChangesChange,
   onSelectionChange,
   onOpenMaterialPicker,
+  disabled = false,
 }: Props) {
   const columns = useMemo(
-    () => createSalesOrderDetailColumns(onOpenMaterialPicker),
-    [onOpenMaterialPicker],
+    () => createSalesOrderDetailColumns(onOpenMaterialPicker, disabled),
+    [disabled, onOpenMaterialPicker],
   );
 
   return (
@@ -43,8 +45,9 @@ export function SalesOrderDetailGrid({
       showCheckbox
       height="100%"
       minHeight={260}
-      allowAddRowInContextMenu
-      allowDeleteRowInContextMenu
+      allowAddRowInContextMenu={!disabled}
+      allowDeleteRowInContextMenu={!disabled}
+      disableContextMenu={disabled}
       canExportExcel={false}
     />
   );

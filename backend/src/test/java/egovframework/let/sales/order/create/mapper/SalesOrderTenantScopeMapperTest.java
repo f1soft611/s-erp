@@ -1,0 +1,91 @@
+package egovframework.let.sales.order.create.mapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.session.Configuration;
+import org.junit.jupiter.api.Test;
+
+class SalesOrderTenantScopeMapperTest {
+    private static final String RESOURCE =
+            "egovframework/mapper/let/sales/order/create/EgovSalesOrderCreate_SQL_postgresql.xml";
+
+    @Test
+    void masterValidationStatementsRequireBothRecordIdAndAuthenticatedTenant() throws Exception {
+        Configuration configuration = parse();
+
+        for (String id : Arrays.asList("existsCustomer", "existsMaterial")) {
+            BoundSql sql = sql(configuration, id);
+            assertThat(sql.getSql()).contains("tenant_id = ?", " = ?");
+            assertThat(properties(sql)).contains("tenantId", "id");
+        }
+    }
+
+    @Test
+    void insertsOnlyApprovedColumnsAndBindTenantAndCalculatedValues() throws Exception {
+        Configuration configuration = parse();
+        BoundSql header = sql(configuration, "insertOrderHeader");
+        assertThat(header.getSql()).contains(
+                "tenant_id", "order_no", "order_dt", "customer_id",
+                "status", "total_amt", "created_by", "RETURNING sales_order_id");
+        assertThat(properties(header)).contains(
+                "tenantId", "orderNo", "orderDt", "customerId",
+                "status", "totalAmt", "createdBy");
+
+        BoundSql detail = sql(configuration, "insertOrderDetail");
+        assertThat(detail.getSql()).contains(
+                "sales_order_id", "tenant_id", "line_no", "material_id",
+                "order_qty", "unit_price", "supply_amt", "vat_amt",
+                "total_amt", "shipped_qty", "line_status",
+                "RETURNING sales_order_detail_id");
+        assertThat(properties(detail)).contains(
+                "salesOrderId", "tenantId", "lineNo", "materialId",
+                "orderQty", "unitPrice", "supplyAmt", "vatAmt",
+                "totalAmt", "shippedQty", "lineStatus");
+    }
+
+    private Configuration parse() throws Exception {
+        Configuration configuration = new Configuration();
+        try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
+            new XMLMapperBuilder(input, configuration, RESOURCE, configuration.getSqlFragments()).parse();
+        }
+        return configuration;
+    }
+
+    private BoundSql sql(Configuration configuration, String id) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 71L);
+        params.put("id", 1L);
+        params.put("orderNo", "SO-20261027-0001");
+        params.put("orderDt", "2026-10-27");
+        params.put("customerId", 10L);
+        params.put("status", "수주등록");
+        params.put("totalAmt", 11.17);
+        params.put("createdBy", "user01");
+        params.put("salesOrderId", 300L);
+        params.put("lineNo", 1);
+        params.put("materialId", 20L);
+        params.put("orderQty", 2);
+        params.put("unitPrice", 2);
+        params.put("supplyAmt", 4);
+        params.put("vatAmt", 1);
+        params.put("shippedQty", 0);
+        params.put("lineStatus", "대기");
+        return configuration.getMappedStatement("SalesOrderDAO." + id).getBoundSql(params);
+    }
+
+    private List<String> properties(BoundSql sql) {
+        return sql.getParameterMappings().stream()
+                .map(item -> item.getProperty())
+                .collect(Collectors.toList());
+    }
+}

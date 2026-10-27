@@ -1,6 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Box } from '@mui/material';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  createMemoryRouter,
+  RouterProvider,
+} from 'react-router-dom';
 import AppRouter from './routes/AppRouter';
 import { AppSettingsProvider } from './shared/context/AppSettingsContext';
 import { NotificationProvider } from './shared/context/NotificationContext';
@@ -12,7 +16,27 @@ const NoticeLoginPopupHost = lazy(() =>
 );
 
 function App() {
-  const Router = import.meta.env.MODE === 'test' ? MemoryRouter : BrowserRouter;
+  const router = useMemo(() => {
+    const routes = [
+      {
+        path: '*',
+        element: (
+          <>
+            <AppRouter />
+            <Suspense fallback={null}>
+              <NoticeLoginPopupHost />
+            </Suspense>
+          </>
+        ),
+      },
+    ];
+
+    return import.meta.env.MODE === 'test'
+      ? createMemoryRouter(routes, {
+          initialEntries: [window.location.pathname || '/login'],
+        })
+      : createBrowserRouter(routes);
+  }, []);
 
   return (
     <AppSettingsProvider>
@@ -28,12 +52,7 @@ function App() {
             color: 'text.primary',
           }}
         >
-          <Router initialEntries={[window.location.pathname || '/login']}>
-            <AppRouter />
-            <Suspense fallback={null}>
-              <NoticeLoginPopupHost />
-            </Suspense>
-          </Router>
+          <RouterProvider router={router} />
         </Box>
       </NotificationProvider>
     </AppSettingsProvider>
