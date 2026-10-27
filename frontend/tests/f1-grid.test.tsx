@@ -1889,6 +1889,303 @@ describe('F1-GRID column management', () => {
 });
 
 describe('F1-GRID cell range selection', () => {
+  it('clears cell range and drag state when loading starts', () => {
+    const gridRef = createRef<F1GridRef<{ id: string; code: string }>>();
+    const rangeRows = [
+      { id: 'dashboard', code: 'DASH' },
+      { id: 'settings', code: 'SET' },
+    ];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code', editable: true },
+    ];
+    const { rerender } = render(
+      <F1Grid
+        ref={gridRef}
+        rows={rangeRows}
+        columns={rangeColumns}
+        rowKey="id"
+        initialSelectedRowIds={['dashboard']}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByRole('gridcell', { name: 'DASH' }));
+    fireEvent.change(screen.getByDisplayValue('DASH'), {
+      target: { value: 'DASH-UPDATED' },
+    });
+    fireEvent.keyDown(screen.getByDisplayValue('DASH-UPDATED'), {
+      key: 'Enter',
+    });
+    const changesBeforeLoading = gridRef.current?.getChanges();
+    expect(changesBeforeLoading?.updatedRows).toEqual([
+      { id: 'dashboard', code: 'DASH-UPDATED' },
+    ]);
+
+    const startCell = screen.getByRole('gridcell', { name: 'DASH-UPDATED' });
+    const endCell = screen.getByRole('gridcell', { name: 'SET' });
+    fireEvent.mouseDown(startCell);
+    fireEvent.mouseEnter(endCell);
+    fireEvent.mouseUp(endCell);
+
+    expect(document.querySelector('[data-range-overlay="drag"]')).toBeInTheDocument();
+
+    rerender(
+      <F1Grid
+        ref={gridRef}
+        rows={rangeRows}
+        columns={rangeColumns}
+        rowKey="id"
+        initialSelectedRowIds={['dashboard']}
+        loading
+      />,
+    );
+
+    expect(document.querySelector('[data-range-overlay]')).not.toBeInTheDocument();
+    expect(gridRef.current?.getSelectedRowIds()).toEqual(['dashboard']);
+    expect(gridRef.current?.getChanges()).toEqual(changesBeforeLoading);
+
+    rerender(
+      <F1Grid
+        ref={gridRef}
+        rows={rangeRows}
+        columns={rangeColumns}
+        rowKey="id"
+        initialSelectedRowIds={['dashboard']}
+      />,
+    );
+
+    expect(document.querySelector('[data-range-overlay]')).not.toBeInTheDocument();
+    expect(
+      document.querySelector<HTMLInputElement>(
+        '[data-f1-grid-row-id="dashboard"] input[type="checkbox"]',
+      ),
+    ).toBeChecked();
+    expect(
+      screen.getByRole('gridcell', { name: 'DASH-UPDATED' }),
+    ).toBeInTheDocument();
+  });
+
+  it('clears a copied range when loading starts', () => {
+    const rangeRows = [
+      { id: 'one', code: 'A' },
+      { id: 'two', code: 'B' },
+    ];
+    const rangeColumns: F1GridColumn<(typeof rangeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const { rerender } = render(
+      <F1Grid rows={rangeRows} columns={rangeColumns} rowKey="id" />,
+    );
+
+    const startCell = screen.getByRole('gridcell', { name: 'A' });
+    const endCell = screen.getByRole('gridcell', { name: 'B' });
+    fireEvent.mouseDown(startCell);
+    fireEvent.mouseEnter(endCell);
+    fireEvent.mouseUp(endCell);
+    fireEvent.copy(screen.getByRole('grid', { name: 'F1-GRID' }), {
+      clipboardData: {
+        getData: vi.fn(() => 'A\nB'),
+        setData: vi.fn(),
+      },
+    });
+
+    expect(
+      document.querySelector('[data-range-overlay="copy"]'),
+    ).toBeInTheDocument();
+
+    rerender(
+      <F1Grid
+        rows={rangeRows}
+        columns={rangeColumns}
+        rowKey="id"
+        loading
+      />,
+    );
+
+    expect(document.querySelector('[data-range-overlay]')).not.toBeInTheDocument();
+  });
+
+  it('does not apply a pending pointer move after loading resets a drag', () => {
+    const rows = [
+      { id: 'one', code: 'A' },
+      { id: 'two', code: 'B' },
+      { id: 'three', code: 'C' },
+    ];
+    const columns: F1GridColumn<(typeof rows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const frameCallbacks = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 1;
+    const requestFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        const frameId = nextFrameId++;
+        frameCallbacks.set(frameId, callback);
+        return frameId;
+      });
+    const cancelFrame = vi
+      .spyOn(window, 'cancelAnimationFrame')
+      .mockImplementation((frameId) => {
+        frameCallbacks.delete(frameId);
+      });
+    const elementsFromPointDescriptor = Object.getOwnPropertyDescriptor(
+      document,
+      'elementsFromPoint',
+    );
+
+    try {
+      const { rerender } = render(
+        <F1Grid rows={rows} columns={columns} rowKey="id" />,
+      );
+      const firstCell = screen.getByRole('gridcell', { name: 'A' });
+      const thirdCell = screen.getByRole('gridcell', { name: 'C' });
+      frameCallbacks.clear();
+      Object.defineProperty(document, 'elementsFromPoint', {
+        configurable: true,
+        value: () => [thirdCell],
+      });
+
+      fireEvent.mouseDown(firstCell);
+      fireEvent.pointerMove(window, { clientX: 10, clientY: 10 });
+      expect(frameCallbacks.size).toBe(1);
+
+      rerender(
+        <F1Grid rows={rows} columns={columns} rowKey="id" loading />,
+      );
+      rerender(<F1Grid rows={rows} columns={columns} rowKey="id" />);
+
+      const secondCellAfterLoading = screen.getByRole('gridcell', {
+        name: 'B',
+      });
+      const thirdCellAfterLoading = screen.getByRole('gridcell', {
+        name: 'C',
+      });
+      Object.defineProperty(document, 'elementsFromPoint', {
+        configurable: true,
+        value: () => [thirdCellAfterLoading],
+      });
+      fireEvent.mouseDown(secondCellAfterLoading);
+      act(() => {
+        frameCallbacks.forEach((callback) => callback(16));
+      });
+
+      expect(secondCellAfterLoading).toHaveAttribute(
+        'data-grid-selected',
+        'true',
+      );
+      expect(thirdCellAfterLoading).not.toHaveAttribute(
+        'data-grid-selected',
+        'true',
+      );
+      expect(document.querySelector('[data-range-overlay="drag"]')).not.toBeInTheDocument();
+    } finally {
+      requestFrame.mockRestore();
+      cancelFrame.mockRestore();
+      if (elementsFromPointDescriptor) {
+        Object.defineProperty(
+          document,
+          'elementsFromPoint',
+          elementsFromPointDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(document, 'elementsFromPoint');
+      }
+    }
+  });
+
+  it('does not scan all rows during cell range drag', async () => {
+    let rowIdReads = 0;
+    const largeRows = Array.from({ length: 10_000 }, (_, index) => {
+      const row = { id: `row-${index}`, code: `CODE-${index}` };
+      Object.defineProperty(row, 'id', {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          rowIdReads += 1;
+          return `row-${index}`;
+        },
+      });
+      return row;
+    });
+    const largeColumns: F1GridColumn<(typeof largeRows)[number]>[] = [
+      { field: 'code', headerName: 'Code' },
+    ];
+    const { container } = render(
+      <F1Grid
+        rows={largeRows}
+        columns={largeColumns}
+        rowKey="id"
+        showCheckbox={false}
+        virtualizeRows
+        height={240}
+        rowHeight={32}
+      />,
+    );
+    const bodyScroll = container.querySelector<HTMLElement>(
+      '[data-testid="f1-grid-body-scroll"]',
+    );
+    if (!bodyScroll) throw new Error('Expected the grid body to be rendered.');
+    Object.defineProperty(bodyScroll, 'scrollTop', {
+      configurable: true,
+      value: 320_000,
+      writable: true,
+    });
+    Object.defineProperty(bodyScroll, 'clientHeight', {
+      configurable: true,
+      value: 240,
+    });
+    fireEvent.scroll(bodyScroll);
+    await waitFor(() => {
+      const renderedRows = container.querySelectorAll('[data-f1-grid-row-id]');
+      const lastRenderedRow = renderedRows.item(renderedRows.length - 1);
+      expect(
+        Number(lastRenderedRow?.getAttribute('data-f1-grid-row-id')?.slice(4)),
+      ).toBeGreaterThan(9_000);
+    });
+    const renderedRows = container.querySelectorAll('[data-f1-grid-row-id]');
+    const startCell = renderedRows
+      .item(0)
+      .querySelector<HTMLElement>('[role="gridcell"]');
+    const targetCell = renderedRows
+      .item(renderedRows.length - 1)
+      .querySelector<HTMLElement>('[role="gridcell"]');
+    if (!startCell || !targetCell) {
+      throw new Error('Expected virtualized grid cells to be rendered.');
+    }
+    const elementsFromPointDescriptor = Object.getOwnPropertyDescriptor(
+      document,
+      'elementsFromPoint',
+    );
+
+    try {
+      Object.defineProperty(document, 'elementsFromPoint', {
+        configurable: true,
+        value: () => [targetCell],
+      });
+
+      fireEvent.mouseDown(startCell);
+      rowIdReads = 0;
+      fireEvent.pointerMove(window, { clientX: 10, clientY: 10 });
+
+      await waitFor(() => {
+        expect(
+          document.querySelector('[data-range-overlay="drag"]'),
+        ).toBeInTheDocument();
+      });
+
+      expect(rowIdReads).toBeLessThan(100);
+    } finally {
+      if (elementsFromPointDescriptor) {
+        Object.defineProperty(
+          document,
+          'elementsFromPoint',
+          elementsFromPointDescriptor,
+        );
+      } else {
+        Reflect.deleteProperty(document, 'elementsFromPoint');
+      }
+    }
+  });
+
   it('keeps the drag overlay within the selected cell bounds', async () => {
     const { container } = render(
       <ThemeProvider theme={createAppTheme()}>

@@ -172,6 +172,7 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - `stripeRows` 기본값은 `true`이며, 홀수 행에 스트라이프 배경을 적용해 가독성을 높인다. 고정(pinned) 컬럼에서도 동일한 규칙을 유지하며, sticky 레이어가 다른 셀과 겹치지 않도록 별도 stacking context를 유지한다.
 - `rowHeight`, `minRowHeight`, `maxRowHeight`, `resizableRows`를 통해 Grid 인스턴스 단위의 행 높이를 제어한다.
 - `loading` 상태에서는 그리드 전체 입력을 막는 오버레이의 중앙에 공통 `AppLoadingSpinner`를 34px·2.4px 두께로 표시한다. 색상은 테마 기본값을 사용하고, 오버레이는 테마 `background.default`를 84% 불투명도로 적용한다. 스피너는 MUI 기본 indeterminate 애니메이션을 사용해 원호 길이가 변하면서 회전한다. F1Grid/F1Tree와 다른 기본 로딩 화면은 같은 2.4px 기본 두께를 사용한다. 앱 첫 접속 로더만 기존 외형 보존을 위해 3.6px를 명시한다. F1Tree의 `loading`도 내부 F1Grid로 전달된다. 화면별 loading 정책은 변경하지 않는다. `minHeight`를 넘겨 부모 영역에서 내부 스크롤을 유지할 수 있다.
+- 외부 `loading`, 내부 조회 또는 data-source loading이 시작되면 셀 범위 선택·복사 표시와 진행 중 포인터 드래그를 초기화한다. 행 checkbox 선택, 행 데이터와 편집 변경은 유지한다. 포인터가 가리키는 행과 선택 오버레이의 행 위치는 기존 `rowIndexById` 인덱스로 조회해 드래그마다 전체 행을 선형 탐색하지 않는다.
 - 부모의 조회 결과 `rows`는 내부 그리드 편집 모델에 브라우저 페인트 전에 반영한다. 조회 로딩이 종료되는 화면 프레임에 이전 빈 상태가 먼저 노출되지 않으며, API 요청과 페이지별 `loading` 상태 계약은 유지한다.
 - `F1GridColumn.pinned` 옵션으로 초기 좌/우 고정 컬럼을 지정할 수 있다.
 - `F1Tree.defaultExpandAll` 옵션으로 최초 렌더링 시 전체 트리를 펼친 상태로 시작할 수 있다.
@@ -2206,6 +2207,7 @@ F1-Grid는 전체 데이터/선택/편집 상태와 실제 DOM 렌더 범위를 
 - 일반 행 선택은 `Set`, 전체 선택은 `allSelected + excludedIds`로 보관한다. 배열은 callback/Ref 호출처럼 실제 ID 목록이 필요할 때만 만든다.
 - Tab 이동은 전체 `행 × 컬럼` 편집 가능 행렬을 만들지 않고 현재 위치부터 다음 편집 가능 셀까지만 검사한다.
 - 10,000행 이상 로컬 데이터에 정렬/필터가 적용되면 Web Worker query를 사용한다. Worker를 사용할 수 없거나 `getValue` 컬럼이 있으면 동기 query로 fallback한다.
+- 셀 드래그 포인터 hit 테스트와 범위 오버레이 좌표 계산은 `rowIndexById`를 재사용해 행 수에 비례하는 반복 ID 검색을 피한다.
 - F1Tree는 구조 index를 재사용하며 expand/collapse 시 visible row sequence만 다시 계산한다.
 
 ### Server-side data source
