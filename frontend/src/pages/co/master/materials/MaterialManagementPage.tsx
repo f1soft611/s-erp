@@ -3,6 +3,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
 import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -13,6 +14,7 @@ import type { PermissionActionGroupDefinition } from '../../../../shared/compone
 import type { F1GridRef } from '../../../../shared/components/f1-grid';
 import { toPageSearchFields, type PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
+import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
 import { MaterialGrid, createMaterialColumns } from './components/MaterialGrid';
 import { useMaterialManagement } from './hooks/useMaterialManagement';
 import { materialSearchFields, type MaterialFilters, type MaterialRow } from './types/materialManagement.types';
@@ -37,6 +39,9 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
   const [keyword, setKeyword] = useState('');
   const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>({});
   const [pendingFilters, setPendingFilters] = useState<MaterialFilters | null>(null);
+  const [classificationOpen, setClassificationOpen] = useState(false);
+  const canCreateClassification = Boolean(selectedMenuPermissions?.create);
+  const canUpdateClassification = Boolean(selectedMenuPermissions?.update);
   const canCreate = Boolean(isTenantAdmin && selectedMenuPermissions?.create);
   const canUpdate = Boolean(isTenantAdmin && selectedMenuPermissions?.update);
   const canWrite = canCreate || canUpdate;
@@ -72,6 +77,9 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         if (!grid.validate()) { management.setError('필수 입력 항목을 확인해 주세요.'); return; }
         void management.saveChanges(grid.getChanges(), (savedRows) => grid.acceptSavedRows(savedRows));
       } }] },
+    { key: 'write', actions: [{ label: '품목분류설정', icon: SettingsIcon,
+      visible: canCreateClassification || canUpdateClassification,
+      disabled: management.saving, onClick: () => setClassificationOpen(true) }] },
   ];
   return <Box sx={{ display: 'flex', flex: 1, flexDirection: 'column', minHeight: 0, minWidth: 0, height: '100%' }}>
     <PageHeader breadcrumbItems={breadcrumbItems?.length ? breadcrumbItems : [selectedModule.name, currentMenuName]}
@@ -100,6 +108,9 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         loading={management.loading} gridKey={management.gridKey}
         gridRef={gridRef} onChangesChange={management.handleChangesChange} />
     </Box>
+    <ClassificationSettingsDialog open={classificationOpen} kind="item"
+      canCreate={canCreateClassification} canUpdate={canUpdateClassification}
+      onClose={() => setClassificationOpen(false)} />
     <UnsavedChangesConfirmDialog open={pendingFilters !== null} title="저장하지 않은 변경사항"
       description="변경사항을 버리고 품목 목록을 다시 불러오시겠습니까?" cancelLabel="취소" continueLabel="계속"
       onCancel={() => setPendingFilters(null)} onContinue={() => {

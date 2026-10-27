@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ClassificationDAO">
+    <resultMap id="classificationMap" type="egovframework.let.co.master.classification.domain.model.ClassificationVO">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="level" column="level"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="sortSeq" column="sort_seq"/>
+        <result property="useAt" column="use_at"/>
+    </resultMap>
+
+    <sql id="itemColumns">
+        item_cls_id AS id, item_cls_nm AS name, item_cls_lvl AS level,
+        upper_item_cls_id AS parent_id, sort_seq, use_at
+    </sql>
+    <sql id="partnerColumns">
+        partner_cls_id AS id, partner_cls_nm AS name, partner_cls_lvl AS level,
+        upper_partner_cls_id AS parent_id, sort_seq, use_at
+    </sql>
+
+    <select id="Item_selectList" parameterType="map" resultMap="classificationMap">
+        SELECT <include refid="itemColumns"/> FROM tb_cls_item
+        WHERE tenant_id = #{tenantId}
+        ORDER BY upper_item_cls_id NULLS FIRST, sort_seq, item_cls_id
+    </select>
+    <select id="Partner_selectList" parameterType="map" resultMap="classificationMap">
+        SELECT <include refid="partnerColumns"/> FROM tb_cls_partner
+        WHERE tenant_id = #{tenantId}
+        ORDER BY upper_partner_cls_id NULLS FIRST, sort_seq, partner_cls_id
+    </select>
+
+    <select id="Item_selectById" parameterType="map" resultMap="classificationMap">
+        SELECT <include refid="itemColumns"/> FROM tb_cls_item
+        WHERE tenant_id = #{tenantId} AND item_cls_id = #{id}
+    </select>
+    <select id="Partner_selectById" parameterType="map" resultMap="classificationMap">
+        SELECT <include refid="partnerColumns"/> FROM tb_cls_partner
+        WHERE tenant_id = #{tenantId} AND partner_cls_id = #{id}
+    </select>
+    <select id="Item_selectForUpdate" parameterType="map" resultMap="classificationMap" flushCache="true" useCache="false">
+        SELECT <include refid="itemColumns"/> FROM tb_cls_item
+        WHERE tenant_id = #{tenantId} AND item_cls_id = #{id}
+        FOR UPDATE
+    </select>
+    <select id="Partner_selectForUpdate" parameterType="map" resultMap="classificationMap" flushCache="true" useCache="false">
+        SELECT <include refid="partnerColumns"/> FROM tb_cls_partner
+        WHERE tenant_id = #{tenantId} AND partner_cls_id = #{id}
+        FOR UPDATE
+    </select>
+
+    <select id="Item_countActiveChildren" parameterType="map" resultType="int">
+        SELECT COUNT(*) FROM tb_cls_item
+        WHERE tenant_id = #{tenantId} AND upper_item_cls_id = #{id} AND use_at = 'Y'
+    </select>
+    <select id="Partner_countActiveChildren" parameterType="map" resultType="int">
+        SELECT COUNT(*) FROM tb_cls_partner
+        WHERE tenant_id = #{tenantId} AND upper_partner_cls_id = #{id} AND use_at = 'Y'
+    </select>
+
+    <select id="Item_insert" parameterType="map" resultType="long" flushCache="true" useCache="false">
+        INSERT INTO tb_cls_item (
+            tenant_id, item_cls_nm, item_cls_lvl, upper_item_cls_id, sort_seq, use_at,
+            created_by, created_at
+        ) VALUES (
+            #{tenantId}, #{name}, #{level}, #{parentId, jdbcType=BIGINT}, #{sortSeq}, #{useAt},
+            #{actorId, jdbcType=VARCHAR}, CURRENT_TIMESTAMP
+        )
+        RETURNING item_cls_id
+    </select>
+    <select id="Partner_insert" parameterType="map" resultType="long" flushCache="true" useCache="false">
+        INSERT INTO tb_cls_partner (
+            tenant_id, partner_cls_nm, partner_cls_lvl, upper_partner_cls_id, sort_seq, use_at,
+            created_by, created_at
+        ) VALUES (
+            #{tenantId}, #{name}, #{level}, #{parentId, jdbcType=BIGINT}, #{sortSeq}, #{useAt},
+            #{actorId, jdbcType=VARCHAR}, CURRENT_TIMESTAMP
+        )
+        RETURNING partner_cls_id
+    </select>
+
+    <update id="Item_update" parameterType="map">
+        UPDATE tb_cls_item
+        SET item_cls_nm = #{name}, sort_seq = #{sortSeq}, use_at = #{useAt},
+            updated_by = #{actorId, jdbcType=VARCHAR}, updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND item_cls_id = #{id}
+    </update>
+    <update id="Partner_update" parameterType="map">
+        UPDATE tb_cls_partner
+        SET partner_cls_nm = #{name}, sort_seq = #{sortSeq}, use_at = #{useAt},
+            updated_by = #{actorId, jdbcType=VARCHAR}, updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND partner_cls_id = #{id}
+    </update>
+</mapper>

@@ -3,6 +3,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, IconButton, TextField } from '@mui/material';
 import { AppLoadingSpinner } from '../../../../shared/components/AppLoadingSpinner';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -25,6 +26,7 @@ import type {
 } from '../../../dashboard/types/dashboard';
 import { CustomerGrid, createCustomerColumns } from './components/CustomerGrid';
 import { useCustomerManagement } from './hooks/useCustomerManagement';
+import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
 import type {
   CustomerFilters,
   CustomerRow,
@@ -58,6 +60,9 @@ export function CustomerManagementPage({
     Record<string, PageSearchFieldValue>
   >({});
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(false);
+  const canCreateClassification = Boolean(selectedMenuPermissions?.create);
+  const canUpdateClassification = Boolean(selectedMenuPermissions?.update);
   const [pendingFilters, setPendingFilters] = useState<CustomerFilters | null>(
     null,
   );
@@ -174,6 +179,16 @@ export function CustomerManagementPage({
         },
       ],
     },
+    {
+      key: 'write',
+      actions: [{
+        label: '거래처분류설정',
+        icon: SettingsIcon,
+        visible: canCreateClassification || canUpdateClassification,
+        disabled: management.saving,
+        onClick: () => setClassificationOpen(true),
+      }],
+    },
   ];
 
   return (
@@ -259,6 +274,9 @@ export function CustomerManagementPage({
           onValidationErrors={handleValidationErrors}
         />
       </Box>
+      <ClassificationSettingsDialog open={classificationOpen} kind="partner"
+        canCreate={canCreateClassification} canUpdate={canUpdateClassification}
+        onClose={() => setClassificationOpen(false)} />
       <UnsavedChangesConfirmDialog
         open={refreshConfirmOpen}
         title="저장하지 않은 변경사항"

@@ -50,7 +50,7 @@ const customer = {
 };
 const acceptRows = <T extends object,>(saved: F1GridSavedRow<T>[]) => saved.map(({ row }) => row);
 
-function renderCustomerPage(isTenantAdmin = true) {
+function renderCustomerPage(isTenantAdmin = true, create = true, update = true) {
   return render(
     <ThemeProvider theme={createTheme()}>
       <NotificationProvider>
@@ -73,8 +73,8 @@ function renderCustomerPage(isTenantAdmin = true) {
           }}
           selectedMenuPermissions={{
             read: true,
-            create: true,
-            update: true,
+            create,
+            update,
             delete: false,
             excel: false,
           }}
@@ -91,6 +91,26 @@ beforeEach(() => {
 });
 
 describe('customer management page', () => {
+  it.each([
+    [true, false], [false, true], [false, false],
+  ])('classification settings follow menu create=%s update=%s without admin role', async (create, update) => {
+    apiMocks.apiGet.mockImplementation(async (url: string) => ({
+      resultList: url.includes('/classifications/') ? [] : [customer],
+    }));
+    renderCustomerPage(false, create, update);
+    await screen.findByText('Acme');
+    const action = screen.queryByRole('button', { name: '거래처분류설정' });
+    if (!create && !update) {
+      expect(action).not.toBeInTheDocument();
+      return;
+    }
+    expect(action).toBeInTheDocument();
+    fireEvent.click(action!);
+    expect(await screen.findByRole('dialog', { name: '거래처분류설정' })).toBeInTheDocument();
+    await waitFor(() => expect(apiMocks.apiGet).toHaveBeenCalledWith('/api/v1/co/master/classifications/partners'));
+    expect(Boolean(screen.queryByRole('button', { name: '최상위 추가' }))).toBe(create);
+  });
+
   it('rejects a trimmed duplicate customer name in the form and on final save', async () => {
     expect(createCustomerColumns(true).find((column) => column.field === 'customerName')?.validation)
       .toEqual({ unique: true });
