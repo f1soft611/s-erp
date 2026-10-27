@@ -8,6 +8,42 @@ const options: MasterPickerOption[] = [
 ];
 
 describe('MasterPicker', () => {
+  it('matches the adjacent picker button height to the small input height', () => {
+    render(
+      <MasterPicker
+        label="거래처"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole('textbox', { name: '거래처' })
+        .closest('.MuiInputBase-root'),
+    ).toHaveStyle({ height: '40px' });
+    expect(screen.getByRole('button', { name: '거래처 선택' })).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
+  });
+
+  it('aligns the picker field with neighboring normal-margin fields', () => {
+    render(
+      <MasterPicker
+        label="거래처"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '거래처 선택' }).parentElement,
+    ).toHaveStyle({ marginTop: '16px' });
+  });
+
   it('searches on Enter and returns the selected typed option', async () => {
     const search = vi.fn(async () => options);
     const onChange = vi.fn();
@@ -21,6 +57,21 @@ describe('MasterPicker', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    expect(
+      screen.getByRole('dialog', { name: '거래처 선택' }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('textbox', { name: '거래처 검색' })
+        .closest('.MuiInputBase-root'),
+    ).toHaveStyle({ height: '40px' });
+    expect(
+      screen.getByRole('textbox', { name: '거래처 검색' }).closest('form'),
+    ).toHaveStyle({ alignItems: 'center' });
+    expect(screen.getByRole('button', { name: '검색' })).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
     fireEvent.change(screen.getByRole('textbox', { name: '거래처 검색' }), {
       target: { value: '테스트' },
     });

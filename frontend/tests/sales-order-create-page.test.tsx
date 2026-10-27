@@ -24,6 +24,14 @@ describe('sales order entry page', () => {
       />,
     );
 
+    const formGrid = screen.getByLabelText('수주번호')
+      .closest('.MuiFormControl-root')
+      ?.parentElement;
+
+    expect(formGrid).toHaveStyle({ columnGap: '16px', rowGap: '8px' });
+    expect(
+      screen.getByRole('button', { name: '거래처 선택' }).parentElement,
+    ).toHaveStyle({ marginTop: '0px' });
     expect(screen.getByLabelText('수주번호')).toHaveValue(
       '저장 연동 단계에서 채번 기준 확정',
     );

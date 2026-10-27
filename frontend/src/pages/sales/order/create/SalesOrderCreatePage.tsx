@@ -188,9 +188,12 @@ export function SalesOrderCreatePage({
               gridTemplateColumns: {
                 xs: 'minmax(0, 1fr)',
                 sm: 'repeat(2, minmax(0, 1fr))',
-                xl: 'repeat(4, minmax(0, 1fr))',
+                lg: 'repeat(4, minmax(0, 1fr))',
               },
-              gap: 2,
+              columnGap: 2,
+              rowGap: 1,
+              '& > .MuiFormControl-root': { m: 0 },
+              '& > .MuiStack-root': { mt: 0 },
             }}
           >
             <TextField
@@ -198,6 +201,11 @@ export function SalesOrderCreatePage({
               size="small"
               value="저장 연동 단계에서 채번 기준 확정"
               slotProps={{ input: { readOnly: true } }}
+              sx={{
+                '& .MuiInputBase-input': {
+                  fontSize: { xs: '0.75rem', sm: '1rem' },
+                },
+              }}
             />
             <TextField
               label="수주일자"

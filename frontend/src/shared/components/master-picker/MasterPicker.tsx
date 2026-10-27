@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
 import { Button, Stack, TextField } from '@mui/material';
 import { MasterPickerDialog } from './MasterPickerDialog';
 import type {
@@ -22,21 +23,33 @@ export function MasterPicker({
 
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
+      <Stack direction="row" spacing={1} sx={{ minWidth: 0, mt: 2 }}>
         <TextField
           label={label}
           size="small"
           fullWidth
           value={value ? `${value.code} · ${value.name}` : ''}
           slotProps={{ input: { readOnly: true } }}
+          sx={{
+            '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 },
+          }}
         />
         <Button
           type="button"
-          variant="outlined"
+          variant="contained"
+          disableElevation
           disabled={disabled}
           onClick={() => setOpen(true)}
           aria-label={`${label} 선택`}
-          sx={{ flexShrink: 0, minWidth: 76 }}
+          startIcon={<SearchIcon fontSize="small" />}
+          sx={{
+            flexShrink: 0,
+            minWidth: 76,
+            height: 40,
+            minHeight: 40,
+            borderRadius: 1.5,
+            fontWeight: 700,
+          }}
         >
           선택
         </Button>

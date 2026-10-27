@@ -4,17 +4,15 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   List,
   ListItemButton,
   ListItemText,
   Stack,
   TextField,
 } from '@mui/material';
+import { CommonDialog } from '../CommonDialog';
 import type {
   MasterPickerDialogProps,
   MasterPickerOption,
@@ -81,30 +79,48 @@ export function MasterPickerDialog({
   };
 
   return (
-    <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
-      <DialogTitle>{label} 선택</DialogTitle>
-      <DialogContent>
+    <CommonDialog
+      open={open}
+      onClose={close}
+      title={`${label} 선택`}
+      description={`${label} 코드 또는 이름으로 검색한 뒤 항목을 선택하세요.`}
+      size="xs"
+      fullScreenOnMobile
+    >
+      <Box>
         <Box
           component="form"
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             void handleSearch(event);
           }}
-          sx={{ display: 'flex', gap: 1, pt: 1 }}
+          sx={{ alignItems: 'center', display: 'flex', gap: 1 }}
         >
           <TextField
             autoFocus
+            margin="none"
             size="small"
             fullWidth
             label={`${label} 검색`}
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             onKeyDown={handleSearchKeyDown}
+            sx={{
+              '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 },
+            }}
           />
           <Button
             type="submit"
             variant="contained"
+            disableElevation
             startIcon={<SearchIcon />}
             aria-label="검색"
+            sx={{
+              flexShrink: 0,
+              height: 40,
+              minHeight: 40,
+              borderRadius: 1.5,
+              fontWeight: 700,
+            }}
           >
             검색
           </Button>
@@ -135,11 +151,28 @@ export function MasterPickerDialog({
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 1,
+                    borderRadius: 1.5,
+                    gap: 1.5,
                     mb: 1,
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: 'action.hover',
+                    },
                   }}
                 >
-                  <ListItemText primary={option.name} secondary={option.code} />
+                  <Chip
+                    label={option.code}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ flexShrink: 0, fontWeight: 600 }}
+                  />
+                  <ListItemText
+                    primary={option.name}
+                    slotProps={{
+                      primary: { noWrap: true, sx: { fontWeight: 600 } },
+                    }}
+                  />
                 </ListItemButton>
               ))}
             </List>
@@ -148,10 +181,7 @@ export function MasterPickerDialog({
             <Alert severity="info">검색어를 입력한 뒤 검색해 주세요.</Alert>
           )}
         </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={close}>닫기</Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </CommonDialog>
   );
 }
