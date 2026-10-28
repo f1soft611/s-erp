@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Box, Button, ButtonBase, Chip, Container, Stack, Typography, alpha,
+  Box, Button, Chip, Container, Stack, Typography, alpha,
 } from '@mui/material';
 import RefreshRounded from '@mui/icons-material/RefreshRounded';
 import ArrowOutwardRounded from '@mui/icons-material/ArrowOutwardRounded';
@@ -9,13 +9,13 @@ import EditNoteRounded from '@mui/icons-material/EditNoteRounded';
 import RateReviewOutlined from '@mui/icons-material/RateReviewOutlined';
 import NotificationsNoneRounded from '@mui/icons-material/NotificationsNoneRounded';
 import AssignmentOutlined from '@mui/icons-material/AssignmentOutlined';
-import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import CalendarTodayOutlined from '@mui/icons-material/CalendarTodayOutlined';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../shared/components/PageHeader';
 import type { ModuleItem, PageContent } from '../dashboard/types/dashboard';
 import { useOverviewData } from '../dashboard/overview/hooks/useOverviewData';
-import { MetricCard, OverviewEmpty, OverviewError, OverviewPanel, OverviewSkeleton } from '../dashboard/overview/components/OverviewWidgets';
+import { MetricCard, OverviewEmpty, OverviewError, OverviewListRow, OverviewPanel, OverviewSkeleton } from '../dashboard/overview/components/OverviewWidgets';
 import { SalesOverview } from '../dashboard/overview/components/SalesOverview';
 import { DocumentStatusDetail } from './documents/status/components/DocumentStatusDetail';
 import type { DocumentApprovalDetail } from './documents/write/types/documentWrite.types';
@@ -25,13 +25,6 @@ type OverviewPageProps = {
   currentMenuName: string;
   content: PageContent;
 };
-
-const rowStyle = {
-  display: 'flex', width: '100%', textAlign: 'left', minWidth: 0,
-  gap: 1.25, px: 1, py: 1.5, borderRadius: 2,
-  '&:hover': { bgcolor: 'action.hover' },
-  '&.Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main' },
-} as const;
 
 export function OverviewPage({ selectedModule, currentMenuName }: OverviewPageProps) {
   const navigate = useNavigate();
@@ -127,44 +120,48 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                 xs: '1fr', md: overview.canReadApprovals && overview.canReadNotices ? '1fr 1fr' : '1fr',
               }, gap: 2.5 }}>
                 {overview.canReadApprovals && overview.approvalStatus === 'ready' && approval && (
-                  <OverviewPanel title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순"
+                  <OverviewPanel focus title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순"
                     icon={<AssignmentOutlined fontSize="small" />}
-                    action={<Button size="small" onClick={() => navigate(approvalPath)}>문서 업무 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} /></Button>}>
+                    footer={<><Typography>내 처리·보완 업무</Typography><Button size="small" onClick={() => navigate(approvalPath)}>문서 업무 보기 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} /></Button></>}>
                     {approval.notices.length === 0 ? <OverviewEmpty>처리할 업무가 없습니다.</OverviewEmpty> : (
-                      <Stack spacing={0.5}>
+                      <Stack spacing={1}>
                         {approval.notices.map((item) => (
-                          <ButtonBase key={item.electronicApprovalId} onClick={() => setDocumentId(item.electronicApprovalId)} sx={rowStyle}>
+                          <OverviewListRow key={item.electronicApprovalId} onClick={() => setDocumentId(item.electronicApprovalId)}>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Chip size="small" variant="outlined" color={item.noticeType === 'REVISION_REQUESTED' ? 'warning' : 'primary'}
-                                label={item.noticeType === 'REVISION_REQUESTED' ? '보완요청' : '결재대기'} sx={{ mb: 0.9, fontSize: '0.65rem', height: 22 }} />
+                              <Chip size="small" label={item.noticeType === 'REVISION_REQUESTED' ? '보완요청' : '결재대기'}
+                                sx={(theme) => ({
+                                  mb: 0.9, fontSize: '0.65rem', height: 22, borderRadius: 1, fontWeight: 700,
+                                  color: theme.palette[item.noticeType === 'REVISION_REQUESTED' ? 'warning' : 'primary'].main,
+                                  bgcolor: alpha(theme.palette[item.noticeType === 'REVISION_REQUESTED' ? 'warning' : 'primary'].main, 0.1),
+                                })} />
                               <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, overflowWrap: 'anywhere' }}>{item.title}</Typography>
                             </Box>
-                            <ArrowOutwardRounded sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
-                          </ButtonBase>
+                          </OverviewListRow>
                         ))}
                       </Stack>
                     )}
                   </OverviewPanel>
                 )}
                 {overview.canReadNotices && (
-                  <OverviewPanel title="최근 공지" caption="상단 고정 공지 우선 · 최근 등록 순"
+                  <OverviewPanel focus title="최근 공지" caption="상단 고정 공지 우선 · 최근 등록 순"
                     icon={<NotificationsNoneRounded fontSize="small" />}
-                    action={<Button size="small" onClick={() => navigate('/groupware/community/notice')}>전체 보기 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} /></Button>}>
+                    footer={<><Typography>최근 공지 최대 5건</Typography><Button size="small" onClick={() => navigate('/groupware/community/notice')}>공지 전체 보기 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} /></Button></>}>
                     {overview.noticeStatus === 'error' ? <OverviewError label="최근 공지" onRetry={data.refresh} />
                       : overview.notices.length === 0 ? <OverviewEmpty>등록된 공지가 없습니다.</OverviewEmpty> : (
-                        <Stack spacing={0.5}>
+                        <Stack spacing={1}>
                           {overview.notices.map((item) => (
-                            <ButtonBase key={item.postId}
-                              onClick={() => navigate(`/groupware/community/notice?dashboardPostId=${item.postId}`)} sx={rowStyle}>
+                            <OverviewListRow key={item.postId} notice pinned={item.isPinned === 'Y'}
+                              onClick={() => navigate(`/groupware/community/notice?dashboardPostId=${item.postId}`)}>
                               <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 0.75 }}>
-                                  {item.isPinned === 'Y' && <PushPinOutlined sx={{ fontSize: 15, mt: 0.25, color: 'primary.main', flexShrink: 0 }} />}
-                                  <Typography sx={{ fontSize: '0.83rem', fontWeight: 650, overflowWrap: 'anywhere' }}>{item.title}</Typography>
-                                </Stack>
+                                {item.isPinned === 'Y' && <Chip size="small" icon={<PushPinOutlined />} label="고정 공지" sx={(theme) => ({
+                                  height: 22, mb: 0.9, borderRadius: 1, fontSize: '0.65rem', fontWeight: 700,
+                                  color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                  '& .MuiChip-icon': { fontSize: 13, color: 'inherit' },
+                                })} />}
+                                <Typography sx={{ fontSize: '0.83rem', fontWeight: 650, overflowWrap: 'anywhere' }}>{item.title}</Typography>
                                 <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mt: 0.65 }}>{item.createdAt.slice(0, 10)}</Typography>
                               </Box>
-                              <ArrowOutwardRounded sx={{ color: 'text.secondary', fontSize: 16, flexShrink: 0 }} />
-                            </ButtonBase>
+                            </OverviewListRow>
                           ))}
                         </Stack>
                       )}

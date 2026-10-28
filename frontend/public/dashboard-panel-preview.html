@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-ERP · 대시보드 패널 디자인 미리보기</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: light; --bg:#f4f6fb; --surface:#fff; --text:#192338; --muted:#758095; --line:#e7ebf2; --soft:#f7f9fc; --blue:#385bea; --blue-soft:#edf1ff; --amber:#ad690e; --amber-soft:#fff5e3; --shadow:0 6px 24px #172b4d04; }
+    :root[data-theme="dark"] { color-scheme:dark; --bg:#0c1322; --surface:#131e30; --text:#e7edf8; --muted:#93a3ba; --line:#263348; --soft:#19263a; --blue:#8daaff; --blue-soft:#243454; --amber:#f0bb6b; --amber-soft:#352c21; --shadow:none; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif; font-size:14px; line-height:1.55; }
+    button { font:inherit; cursor:pointer; }
+    button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+    .wrap { max-width:1376px; margin:auto; padding:36px 36px 56px; }
+    .eyebrow { color:var(--blue); font-size:10px; font-weight:800; letter-spacing:2.4px; }
+    h1 { font-size:27px; letter-spacing:-1px; margin:9px 0; }
+    .intro { color:var(--muted); margin:0; font-size:13px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:center; margin:26px 0 24px; }
+    .switch { display:flex; gap:4px; background:var(--surface); padding:5px; border:1px solid var(--line); border-radius:11px; }
+    .switch button { border:0; border-radius:7px; background:transparent; color:var(--muted); padding:8px 14px; font-size:12px; font-weight:650; }
+    .switch button[aria-pressed="true"] { background:var(--blue-soft); color:var(--blue); }
+    .theme { border:1px solid var(--line); background:var(--surface); color:var(--text); padding:10px 15px; border-radius:9px; font-size:12px; }
+    .direction { margin-bottom:22px; display:flex; gap:12px; align-items:baseline; }
+    .direction strong { font-size:14px; white-space:nowrap; }
+    .direction span { font-size:12px; color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:stretch; }
+    .panel { background:var(--surface); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; min-width:0; display:flex; flex-direction:column; }
+    .heading { padding:24px 23px 20px; display:flex; gap:11px; align-items:center; }
+    .icon { width:37px; height:37px; border-radius:11px; background:var(--blue-soft); color:var(--blue); display:grid; place-items:center; flex-shrink:0; }
+    svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.65; stroke-linecap:round; stroke-linejoin:round; }
+    .heading h2 { margin:0; font-size:15px; font-weight:750; letter-spacing:-.4px; }
+    .heading p { color:var(--muted); margin:4px 0 0; font-size:10px; }
+    .heading>div:nth-child(2) { flex:1; min-width:0; }
+    .count { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .rows { padding:0 14px 14px; display:grid; gap:8px; flex:1; align-content:start; }
+    .row { appearance:none; width:100%; border:1px solid var(--line); border-radius:11px; padding:16px 14px; display:flex; align-items:center; gap:12px; text-align:left; background:var(--surface); color:var(--text); transition:background .15s,border-color .15s; }
+    .row:hover { background:var(--soft); border-color:var(--blue); }
+    .body { flex:1; min-width:0; }
+    .title { font-size:12px; font-weight:650; line-height:1.65; overflow-wrap:anywhere; }
+    .sub { font-size:10px; color:var(--muted); margin-top:5px; }
+    .pill { font-size:9px; padding:3px 7px; border-radius:5px; display:inline-flex; background:var(--blue-soft); color:var(--blue); font-weight:700; margin-bottom:7px; }
+    .pill.amber { color:var(--amber); background:var(--amber-soft); }
+    .arrow { color:var(--muted); font-size:17px; flex-shrink:0; }
+    .row:hover .arrow { color:var(--blue); }
+    .notice { border-color:transparent; border-radius:9px; }
+    .notice+.notice { border-top-color:var(--line); border-top-left-radius:0; border-top-right-radius:0; }
+    .notice.pinned { background:var(--soft); border-color:var(--line); }
+    .tagline { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+    .tagline .pill { margin:0; }
+    .dot { width:4px; height:4px; border-radius:50%; background:var(--muted); }
+    .date { width:46px; border-radius:9px; overflow:hidden; text-align:center; background:var(--soft); border:1px solid var(--line); flex-shrink:0; }
+    .date small { display:block; font-size:9px; color:var(--muted); padding:3px 0; border-bottom:1px solid var(--line); }
+    .date strong { display:block; font-size:22px; line-height:1; padding:7px 0 8px; letter-spacing:-1px; }
+    .today .date { background:var(--blue-soft); border-color:transparent; color:var(--blue); }
+    .today .date small { color:var(--blue); border-color:var(--line); }
+    .due-label { font-size:9px; color:var(--muted); display:block; margin-bottom:5px; }
+    .today .due-label { color:var(--blue); font-weight:750; }
+    .footer { margin-top:auto; padding:13px 22px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:10px; gap:12px; min-height:48px; }
+    .footer button { border:0; padding:3px 0; background:none; color:var(--blue); font-size:11px; font-weight:700; white-space:nowrap; }
+    .note { margin:24px 0 0; color:var(--muted); font-size:11px; line-height:1.9; }
+    #feedback { min-height:24px; color:var(--blue); font-size:12px; margin-top:16px; }
+    body[data-style="compact"] .panel { border-radius:12px; box-shadow:none; }
+    body[data-style="compact"] .row { border-color:transparent; border-radius:0; padding:13px 7px; }
+    body[data-style="compact"] .row+.row { border-top:1px solid var(--line); }
+    body[data-style="compact"] .rows { gap:0; }
+    body[data-style="compact"] .notice.pinned { background:transparent; }
+    body[data-style="compact"] .icon { background:transparent; width:24px; }
+    body[data-style="compact"] .heading { padding-bottom:12px; }
+    @media(max-width:1050px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .panel:last-child { grid-column:1/-1; } .panel:last-child .rows { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:650px) { .wrap { padding:24px 16px; } h1 { font-size:22px; } .grid { grid-template-columns:minmax(0,1fr); gap:16px; } .panel:last-child { grid-column:auto; } .panel:last-child .rows { grid-template-columns:1fr; } .direction { display:block; } .direction span { display:block; margin-top:6px; } .heading { padding:20px; } }
+    @media(prefers-reduced-motion:reduce) { * { transition:none!important; } }
+  </style>
+</head>
+<body data-style="focus">
+  <main class="wrap">
+    <div class="eyebrow">S-ERP / DESIGN PREVIEW</div>
+    <h1>목록보다 명확하게, 업무에 집중하도록.</h1>
+    <p class="intro">세 가지 패널의 개선안입니다. 실제 대시보드는 변경하지 않았으며, 모든 내용은 디자인 확인용 합성 데이터입니다.</p>
+    <div class="toolbar">
+      <div class="switch" aria-label="디자인 시안">
+        <button type="button" data-option="focus" aria-pressed="true">A · 포커스 카드형 (추천)</button>
+        <button type="button" data-option="compact" aria-pressed="false">B · 컴팩트 리스트형</button>
+      </div>
+      <button type="button" class="theme" id="theme" aria-pressed="false">◐ 다크 테마 보기</button>
+    </div>
+    <div class="direction"><strong id="style-title">A. 포커스 카드형</strong><span id="style-description">업무별 경계와 상태를 분명하게 구분하고, 여백으로 시선을 정리합니다.</span></div>
+    <div class="grid">
+      <section class="panel" aria-labelledby="work">
+        <header class="heading">
+          <div class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M9 11h6M9 15h4"/></svg></div>
+          <div><h2 id="work">지금 확인할 업무</h2><p>결재 대기 및 보완요청 · 최근 변경 순</p></div>
+          <span class="count">최근 3건</span>
+        </header>
+        <div class="rows">
+          <button type="button" class="row"><div class="body"><span class="pill">결재대기</span><div class="title">11월 운영 계획 검토 요청</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row"><div class="body"><span class="pill">결재대기</span><div class="title">신규 프로젝트 자재 구매 기안</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row"><div class="body"><span class="pill amber">보완요청</span><div class="title">출장 경비 정산 내역 보완</div></div><span class="arrow" aria-hidden="true">›</span></button>
+        </div>
+        <footer class="footer"><span>내 처리·보완 업무</span><button type="button">문서 업무 보기 ↗</button></footer>
+      </section>
+      <section class="panel" aria-labelledby="notice">
+        <header class="heading">
+          <div class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v5h4l10 4V5L8 10H4ZM8 15l2 5M21 9v6"/></svg></div>
+          <div><h2 id="notice">최근 공지</h2><p>고정 공지 우선 · 최근 등록 순</p></div>
+        </header>
+        <div class="rows">
+          <button type="button" class="row notice pinned"><div class="body"><div class="tagline"><span class="pill">고정 공지</span><span class="sub" style="margin:0">2026.10.28</span></div><div class="title">2026년 하반기 업무 운영 안내</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row notice"><div class="body"><div class="title">월말 마감 일정 및 부서별 제출 자료 안내</div><div class="sub">2026.10.27</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row notice"><div class="body"><div class="title">사내 시스템 정기 점검 안내</div><div class="sub">2026.10.26</div></div><span class="arrow" aria-hidden="true">›</span></button>
+        </div>
+        <footer class="footer"><span>최근 공지 최대 5건</span><button type="button">공지 전체 보기 ↗</button></footer>
+      </section>
+      <section class="panel" aria-labelledby="due">
+        <header class="heading">
+          <div class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18M8 16l2 2 5-4"/></svg></div>
+          <div><h2 id="due">다가오는 납기</h2><p>오늘부터 7일 · 등록 기준 / 출하 미반영</p></div>
+          <span class="count">전체 8건</span>
+        </header>
+        <div class="rows">
+          <button type="button" class="row today"><div class="date"><small>10월</small><strong>28</strong></div><div class="body"><span class="due-label">오늘 납기</span><div class="title">SO-20261027-0001</div><div class="sub">검증용 거래처 A</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row"><div class="date"><small>10월</small><strong>29</strong></div><div class="body"><span class="due-label">내일 · D-1</span><div class="title">SO-20261026-0003</div><div class="sub">검증용 거래처 B</div></div><span class="arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="row"><div class="date"><small>10월</small><strong>30</strong></div><div class="body"><span class="due-label">D-2</span><div class="title">SO-20261024-0002</div><div class="sub">검증용 거래처 C</div></div><span class="arrow" aria-hidden="true">›</span></button>
+        </div>
+        <footer class="footer"><span>가까운 납기 3건 표시</span><button type="button">8건 전체 보기 ↗</button></footer>
+      </section>
+    </div>
+    <p class="note">A는 업무별 구분과 시각적 완성도, B는 단정함과 정보 밀도에 집중합니다.<br>실제 반영 시 기존 패널 위치와 조회·상세 이동을 유지하고 스켈레톤도 함께 맞춥니다. ‘오늘/D-n’은 서버 기준일과 납기일로 계산 가능한 표현이며 출하 상태를 의미하지 않습니다.</p>
+    <p id="feedback" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    document.querySelectorAll('[data-option]').forEach(button => button.addEventListener('click', () => {
+      const compact = button.dataset.option === 'compact';
+      document.body.dataset.style = button.dataset.option;
+      document.querySelectorAll('[data-option]').forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+      document.getElementById('style-title').textContent = compact ? 'B. 컴팩트 리스트형' : 'A. 포커스 카드형';
+      document.getElementById('style-description').textContent = compact ? '구분선과 간결한 행 구성으로 한 번에 더 많은 정보를 읽습니다.' : '업무별 경계와 상태를 분명하게 구분하고, 여백으로 시선을 정리합니다.';
+    }));
+    document.getElementById('theme').addEventListener('click', event => {
+      const dark = document.documentElement.dataset.theme !== 'dark';
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      event.currentTarget.setAttribute('aria-pressed', String(dark));
+      event.currentTarget.textContent = dark ? '☀ 밝은 테마 보기' : '◐ 다크 테마 보기';
+    });
+    document.querySelectorAll('.row, .footer button').forEach(button => button.addEventListener('click', () => {
+      document.getElementById('feedback').textContent = '디자인 미리보기입니다. 실제 문서나 수주로 이동하지 않습니다.';
+    }));
+  </script>
+</body>
+</html>

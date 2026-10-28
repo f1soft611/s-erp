@@ -5,8 +5,9 @@ import { chromium } from 'playwright';
 
 const baseUrl = 'http://127.0.0.1:4173';
 const skeletonMode = process.argv.includes('--skeleton');
+const focusMode = process.argv.includes('--focus');
 const output = path.resolve(import.meta.dirname, '..', '..', 'docs', 'result', '20261028',
-  skeletonMode ? 'dashboard-skeleton' : 'erp-dashboard', 'screenshots');
+  focusMode ? 'dashboard-focus-panels' : skeletonMode ? 'dashboard-skeleton' : 'erp-dashboard', 'screenshots');
 const cors = {
   'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, content-type',

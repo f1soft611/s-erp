@@ -8,7 +8,7 @@ import ArrowOutwardRounded from '@mui/icons-material/ArrowOutwardRounded';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardSales } from '../types/overview';
 import { formatNumber, isDashboardMonth, salesDuePath, salesMonthPath } from '../services/overview.service';
-import { MetricCard, OverviewEmpty, OverviewError, OverviewPanel, SalesOverviewSkeleton } from './OverviewWidgets';
+import { MetricCard, OverviewEmpty, OverviewError, OverviewListRow, OverviewPanel, SalesOverviewSkeleton } from './OverviewWidgets';
 
 function compactMoney(value: number) {
   if (value >= 100000000) return `${formatNumber(Math.round(value / 10000000) / 10)}억`;
@@ -103,41 +103,43 @@ export function SalesOverview({ month, onMonthChange, data, loading, error, onRe
                 월별 막대를 선택하면 해당 기간의 수주현황으로 이동합니다.
               </Typography>
             </OverviewPanel>
-            <OverviewPanel title="다가오는 납기" caption="오늘부터 7일 · 등록 기준 / 출하 미반영"
+            <OverviewPanel focus title="다가오는 납기" caption="오늘부터 7일 · 등록 기준 / 출하 미반영"
               icon={<EventAvailableOutlined fontSize="small" />}
-              action={<Button size="small" onClick={() => navigate(salesDuePath(data.asOfDate))} aria-label="납기 예정 수주 전체 보기">
-                {formatNumber(data.upcomingCount)}건 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} />
-              </Button>}>
+              action={<Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', whiteSpace: 'nowrap' }}>전체 {formatNumber(data.upcomingCount)}건</Typography>}
+              footer={<><Typography>가까운 납기 {data.upcoming.length}건 표시</Typography>
+                <Button size="small" onClick={() => navigate(salesDuePath(data.asOfDate))} aria-label="납기 예정 수주 전체 보기">
+                {formatNumber(data.upcomingCount)}건 전체 보기 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} />
+                </Button></>}>
               {data.upcoming.length === 0 ? <OverviewEmpty>예정된 납기가 없습니다.</OverviewEmpty> : (
-                <Stack spacing={0.5}>
-                  {data.upcoming.map((item) => (
-                    <ButtonBase key={item.salesOrderId}
+                <Stack spacing={1}>
+                  {data.upcoming.map((item) => {
+                    const days = Math.round((Date.parse(`${item.deliveryDt}T00:00:00Z`) - Date.parse(`${data.asOfDate}T00:00:00Z`)) / 86400000);
+                    return (
+                    <OverviewListRow key={item.salesOrderId}
                       onClick={() => navigate(salesDuePath(data.asOfDate, item.orderNo))}
-                      aria-label={`${item.orderNo} 납기 예정 수주 보기`}
-                      sx={(theme) => ({
-                        width: '100%', display: 'flex', gap: 1.5, textAlign: 'left', py: 1.35, px: 1, borderRadius: 2,
-                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                        '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.primary.main}` },
+                      label={`${item.orderNo} 납기 예정 수주 보기`}>
+                      <Box sx={(theme) => ({
+                        flexShrink: 0, width: 46, borderRadius: 2, overflow: 'hidden', border: '1px solid',
+                        borderColor: 'divider', textAlign: 'center',
+                        bgcolor: days === 0 ? alpha(theme.palette.primary.main, 0.09) : 'action.hover',
+                        color: days === 0 ? 'primary.main' : 'text.primary',
                       })}>
-                      <Box sx={(theme) => ({ flexShrink: 0, p: 1, minWidth: 50, borderRadius: 2,
-                        textAlign: 'center', bgcolor: alpha(theme.palette.primary.main, 0.08), color: 'primary.main' })}>
-                        <Typography sx={{ fontSize: '0.67rem' }}>{Number(item.deliveryDt.slice(5, 7))}월</Typography>
-                        <Typography sx={{ fontSize: '1.1rem', fontWeight: 800 }}>{Number(item.deliveryDt.slice(8))}</Typography>
+                        <Typography sx={{ fontSize: '0.62rem', py: 0.4, borderBottom: '1px solid', borderColor: 'divider', color: days === 0 ? 'primary.main' : 'text.secondary' }}>{Number(item.deliveryDt.slice(5, 7))}월</Typography>
+                        <Typography sx={{ fontSize: '1.35rem', fontWeight: 750, lineHeight: 1, py: 0.9 }}>{Number(item.deliveryDt.slice(8))}</Typography>
                       </Box>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ mb: 0.5, fontSize: '0.65rem', fontWeight: days === 0 ? 700 : 400, color: days === 0 ? 'primary.main' : 'text.secondary' }}>
+                          {days === 0 ? '오늘 납기' : days === 1 ? '내일 · D-1' : days > 1 ? `D-${days}` : item.deliveryDt}
+                        </Typography>
                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, overflowWrap: 'anywhere' }}>{item.orderNo}</Typography>
                         <Typography sx={{ fontSize: '0.73rem', color: 'text.secondary', mt: 0.4, overflowWrap: 'anywhere' }}>
                           {item.customerName || '거래처 정보 없음'}
                         </Typography>
                       </Box>
-                      <ArrowOutwardRounded sx={{ color: 'text.secondary', fontSize: 16, flexShrink: 0 }} />
-                    </ButtonBase>
-                  ))}
+                    </OverviewListRow>
+                  ); })}
                 </Stack>
               )}
-              {data.upcomingCount > data.upcoming.length && <Typography sx={{ mt: 1, fontSize: '0.7rem', color: 'text.secondary' }}>
-                가까운 납기 {data.upcoming.length}건 표시 · 전체 {formatNumber(data.upcomingCount)}건
-              </Typography>}
             </OverviewPanel>
           </Box>
           <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', textAlign: 'right' }}>

@@ -53,6 +53,30 @@ describe('real-data overview', () => {
     get.mockImplementation(async (path) => ({ item: path.includes('/sales') ? sales : overview }));
   });
 
+  it('labels pinned notices and keeps the footer navigation to the notice list', async () => {
+    mount();
+    const notice = await screen.findByRole('region', { name: '최근 공지' });
+    expect(await within(notice).findByText('고정 공지')).toBeInTheDocument();
+    fireEvent.click(within(notice).getByRole('button', { name: '공지 전체 보기' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/groupware/community/notice');
+  });
+
+  it('uses the server date across a month boundary for due labels and preserves due drilldown', async () => {
+    get.mockImplementation(async (path) => ({ item: path.endsWith('/overview') ? overview : {
+      ...sales, asOfDate: '2026-10-31', upcomingCount: 3,
+      upcoming: ['2026-10-31', '2026-11-01', '2026-11-02'].map((deliveryDt, index) => ({
+        salesOrderId: index + 1, orderNo: `SO-${index}`, customerName: '검증용 거래처', deliveryDt,
+      })),
+    } }));
+    mount();
+    const due = await screen.findByRole('region', { name: '다가오는 납기' });
+    expect(within(due).getByText('오늘 납기')).toBeInTheDocument();
+    expect(within(due).getByText('내일 · D-1')).toBeInTheDocument();
+    expect(within(due).getByText('D-2')).toBeInTheDocument();
+    fireEvent.click(within(due).getByRole('button', { name: 'SO-1 납기 예정 수주 보기' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('dashboardDueFrom=2026-10-31&dashboardDueTo=2026-11-06&dashboardOrderNo=SO-1');
+  });
+
   it('reserves the personal cards and separate task/notice panels before overview arrives', () => {
     get.mockImplementation(() => new Promise(() => {}));
     mount();

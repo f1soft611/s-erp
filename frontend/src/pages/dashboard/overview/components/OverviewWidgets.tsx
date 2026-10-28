@@ -2,23 +2,28 @@ import type { ReactNode } from 'react';
 import { Alert, Box, Button, ButtonBase, Paper, Skeleton, Stack, Typography, alpha } from '@mui/material';
 import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded';
+import ChevronRightRounded from '@mui/icons-material/ChevronRightRounded';
 import { formatNumber } from '../services/overview.service';
 
 function SkeletonText({ children, width }: { children: ReactNode; width?: string }) {
   return <Skeleton width={width}><span>{children}</span></Skeleton>;
 }
 
-export function OverviewPanel({ title, caption, icon, action, children, loading = false }: {
+export function OverviewPanel({ title, caption, icon, action, children, loading = false, focus = false, footer }: {
   title: string; caption?: string; icon: ReactNode; action?: ReactNode; children: ReactNode;
   loading?: boolean;
+  focus?: boolean; footer?: ReactNode;
 }) {
   return (
     <Paper component="section" aria-label={title} elevation={0} sx={{
       minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 3,
-      overflow: 'hidden', bgcolor: 'background.paper', height: '100%',
+      overflow: 'hidden', bgcolor: 'background.paper', height: '100%', display: 'flex', flexDirection: 'column',
     }}>
       <Stack direction="row" sx={{ px: { xs: 2, sm: 2.5 }, pt: 2.5, pb: 2, gap: 1.25, alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', color: 'primary.main', flexShrink: 0 }}>
+        <Box sx={(theme) => ({
+          display: 'flex', color: 'primary.main', flexShrink: 0,
+          ...(focus && { p: 1.1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.09) }),
+        })}>
           {loading ? <Skeleton variant="rounded" width={20} height={20} /> : icon}
         </Box>
         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -31,8 +36,33 @@ export function OverviewPanel({ title, caption, icon, action, children, loading 
         </Box>
         {action}
       </Stack>
-      <Box sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>{children}</Box>
+      <Box sx={{ px: focus ? 1.75 : { xs: 2, sm: 2.5 }, pb: focus ? 1.75 : 2.5, flex: 1 }}>{children}</Box>
+      {footer && <Stack direction="row" sx={{
+        px: { xs: 2, sm: 2.5 }, py: 1.25, borderTop: '1px solid', borderColor: 'divider',
+        justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+        '& > .MuiTypography-root': { fontSize: '0.68rem', color: 'text.secondary' },
+      }}>{footer}</Stack>}
     </Paper>
+  );
+}
+
+export function OverviewListRow({ children, onClick, label, notice = false, pinned = false, loading = false }: {
+  children: ReactNode; onClick?: () => void; label?: string; notice?: boolean; pinned?: boolean; loading?: boolean;
+}) {
+  return (
+    <ButtonBase onClick={onClick} aria-label={label} disabled={loading} sx={(theme) => ({
+      width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.5, textAlign: 'left',
+      p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, border: '1px solid',
+      borderColor: notice && !pinned ? 'transparent' : 'divider',
+      bgcolor: pinned ? 'action.hover' : 'background.paper',
+      ...(notice && !pinned && { '& + &': { borderTopColor: 'divider' } }),
+      '&:hover': { bgcolor: 'action.hover', borderColor: theme.palette.primary.main },
+      '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: -2 },
+    })}>
+      {children}
+      {loading ? <Skeleton variant="circular" width={18} height={18} sx={{ flexShrink: 0 }} />
+        : <ChevronRightRounded sx={{ fontSize: 20, color: 'text.secondary', flexShrink: 0 }} />}
+    </ButtonBase>
   );
 }
 
@@ -123,14 +153,14 @@ export function OverviewSkeleton() {
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
           <Box data-testid="work-skeleton">
-            <OverviewPanel loading title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순" icon={null}
-              action={<Skeleton width={64} height={30} />}>
+            <OverviewPanel loading focus title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순" icon={null}
+              footer={<><Skeleton width={90} height={18} /><Skeleton width={90} height={28} /></>}>
               <SkeletonList kind="work" />
             </OverviewPanel>
           </Box>
           <Box data-testid="notice-skeleton">
-            <OverviewPanel loading title="최근 공지" caption="상단 고정 공지 우선 · 최근 등록 순" icon={null}
-              action={<Skeleton width={64} height={30} />}>
+            <OverviewPanel loading focus title="최근 공지" caption="상단 고정 공지 우선 · 최근 등록 순" icon={null}
+              footer={<><Skeleton width={90} height={18} /><Skeleton width={90} height={28} /></>}>
               <SkeletonList kind="notice" />
             </OverviewPanel>
           </Box>
@@ -142,14 +172,13 @@ export function OverviewSkeleton() {
 
 function SkeletonList({ kind }: { kind: 'work' | 'notice' | 'due' }) {
   return (
-    <Stack spacing={0.5}>
+    <Stack spacing={1}>
       {[0, 1, 2].map((row) => (
-        <Stack key={row} direction="row" sx={{
-          alignItems: 'center', gap: kind === 'due' ? 1.5 : 1.25, px: 1, py: kind === 'due' ? 1.35 : 1.5,
-        }}>
-          {kind === 'due' && <Skeleton variant="rounded" width={50} height={60} sx={{ flexShrink: 0, borderRadius: 2 }} />}
+        <OverviewListRow key={row} loading notice={kind === 'notice'} pinned={kind === 'notice' && row === 0}>
+          {kind === 'due' && <Skeleton variant="rounded" width={46} height={61} sx={{ flexShrink: 0, borderRadius: 2 }} />}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {kind === 'work' && <Skeleton variant="rounded" width={54} height={22} sx={{ mb: 0.9, borderRadius: 3 }} />}
+            {(kind === 'work' || (kind === 'notice' && row === 0)) && <Skeleton variant="rounded" width={54} height={22} sx={{ mb: 0.9, borderRadius: 1 }} />}
+            {kind === 'due' && <Skeleton width={58} height={16} sx={{ mb: 0.5 }} />}
             <Typography sx={{ fontSize: kind === 'work' ? '0.85rem' : '0.83rem', fontWeight: 650 }}>
               <SkeletonText width={`${[85, 95, 70][row]}%`}>업무 제목</SkeletonText>
             </Typography>
@@ -157,8 +186,7 @@ function SkeletonList({ kind }: { kind: 'work' | 'notice' | 'due' }) {
               <SkeletonText width="45%">보조 정보</SkeletonText>
             </Typography>}
           </Box>
-          <Skeleton variant="circular" width={16} height={16} sx={{ flexShrink: 0 }} />
-        </Stack>
+        </OverviewListRow>
       ))}
     </Stack>
   );
@@ -198,10 +226,10 @@ export function SalesOverviewSkeleton() {
             </OverviewPanel>
           </Box>
           <Box data-testid="due-skeleton">
-            <OverviewPanel loading title="다가오는 납기" caption="오늘부터 7일 · 등록 기준 / 출하 미반영" icon={null}
-              action={<Skeleton width={48} height={30} />}>
+            <OverviewPanel loading focus title="다가오는 납기" caption="오늘부터 7일 · 등록 기준 / 출하 미반영" icon={null}
+              action={<Skeleton width={48} height={22} />}
+              footer={<><Skeleton width={110} height={18} /><Skeleton width={80} height={28} /></>}>
               <SkeletonList kind="due" />
-              <Typography sx={{ mt: 1, fontSize: '0.7rem' }}><SkeletonText width="80%">가까운 납기 표시 · 전체 건수</SkeletonText></Typography>
             </OverviewPanel>
           </Box>
         </Box>
