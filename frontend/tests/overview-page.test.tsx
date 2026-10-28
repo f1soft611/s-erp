@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material';
@@ -51,6 +51,36 @@ describe('real-data overview', () => {
   beforeEach(() => {
     get.mockReset();
     get.mockImplementation(async (path) => ({ item: path.includes('/sales') ? sales : overview }));
+  });
+
+  it('reserves the personal cards and separate task/notice panels before overview arrives', () => {
+    get.mockImplementation(() => new Promise(() => {}));
+    mount();
+    const loading = screen.getByRole('status', { name: '종합현황 불러오는 중' });
+    expect(within(loading).getAllByTestId('metric-skeleton')).toHaveLength(3);
+    expect(within(loading).getByTestId('work-skeleton')).toBeInTheDocument();
+    expect(within(loading).getByTestId('notice-skeleton')).toBeInTheDocument();
+    expect(within(loading).queryByRole('button')).not.toBeInTheDocument();
+    within(loading).getAllByRole('button', { hidden: true }).forEach((card) => {
+      expect(card).toBeDisabled();
+      expect(card).toHaveAttribute('tabindex', '-1');
+    });
+    expect(screen.queryByRole('region', { name: '영업 현황' })).not.toBeInTheDocument();
+  });
+
+  it('uses a sales-specific chart and due-list skeleton without replacing loaded personal widgets', async () => {
+    get.mockImplementation((path) => path.endsWith('/overview')
+      ? Promise.resolve({ item: overview }) : new Promise(() => {}));
+    mount();
+    await screen.findByText('검증용 운영 공지');
+    const loading = screen.getByRole('status', { name: '수주 현황 불러오는 중' });
+    expect(within(loading).getAllByTestId('metric-skeleton')).toHaveLength(3);
+    expect(within(loading).getByTestId('trend-skeleton')).toBeInTheDocument();
+    expect(within(loading).getByTestId('due-skeleton')).toBeInTheDocument();
+    expect(within(loading).queryByTestId('work-skeleton')).not.toBeInTheDocument();
+    expect(within(loading).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('수주 조회 월')).toBeEnabled();
+    expect(screen.getByRole('button', { name: '내가 처리할 결재 3건' })).toBeInTheDocument();
   });
 
   it.each(['light', 'dark'] as const)('renders actual widgets without samples in %s theme', async (mode) => {

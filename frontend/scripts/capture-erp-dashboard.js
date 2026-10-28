@@ -4,7 +4,9 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = 'http://127.0.0.1:4173';
-const output = path.resolve(import.meta.dirname, '..', '..', 'docs', 'result', '20261028', 'erp-dashboard', 'screenshots');
+const skeletonMode = process.argv.includes('--skeleton');
+const output = path.resolve(import.meta.dirname, '..', '..', 'docs', 'result', '20261028',
+  skeletonMode ? 'dashboard-skeleton' : 'erp-dashboard', 'screenshots');
 const cors = {
   'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, content-type',
@@ -79,6 +81,8 @@ try {
   for (const mode of ['light', 'dark']) {
     let salesFailure = false;
     let hiddenSales = false;
+    let overviewGate = Promise.resolve();
+    let salesGate = Promise.resolve();
     const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
     await context.addInitScript((theme) => {
       localStorage.setItem('erp-theme', theme);
@@ -100,8 +104,12 @@ try {
       if (url.pathname === '/api/v1/menus/my') result = menuResult;
       else if (url.pathname === '/api/v1/system/modules') result = { resultList: [] };
       else if (url.pathname === '/api/v1/common/system-date') result = { today: '2026-10-28' };
-      else if (url.pathname === '/api/v1/dashboard/overview') result = { item: { ...overview, canReadSales: !hiddenSales } };
+      else if (url.pathname === '/api/v1/dashboard/overview') {
+        await overviewGate;
+        result = { item: { ...overview, canReadSales: !hiddenSales } };
+      }
       else if (url.pathname === '/api/v1/dashboard/sales') {
+        await salesGate;
         requests.push({ mode, month: url.searchParams.get('month') });
         if (salesFailure) {
           await route.fulfill({ status: 503, headers: cors, json: { resultCode: '503', resultMessage: 'Fixture unavailable' } });
@@ -119,6 +127,76 @@ try {
       }
       await route.fulfill({ headers: cors, json: { resultCode: '200', resultMessage: 'Fixture only', result } });
     });
+    if (skeletonMode) {
+      for (const width of [375, 768, 1280]) {
+        let releaseOverview;
+        let releaseSales;
+        overviewGate = new Promise((resolve) => { releaseOverview = resolve; });
+        salesGate = new Promise((resolve) => { releaseSales = resolve; });
+        await page.setViewportSize({ width, height: 1000 });
+        await page.goto(`${baseUrl}/groupware/overview`);
+        const personal = page.getByRole('status', { name: '종합현황 불러오는 중' });
+        await personal.waitFor();
+        const personalCards = await personal.getByTestId('metric-skeleton').evaluateAll((cards) =>
+          cards.map((card) => ({
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            x: card.getBoundingClientRect().x - card.parentElement.getBoundingClientRect().x,
+            y: card.getBoundingClientRect().y - card.parentElement.getBoundingClientRect().y,
+          })));
+        assert.ok(await personal.locator('.MuiSkeleton-root > span').evaluateAll((children) =>
+          children.length > 0 && children.every((child) => getComputedStyle(child).visibility === 'hidden')),
+        'Skeleton measurement text must not be visible');
+        await page.screenshot({ path: path.join(output, `${mode}-${width}-personal-loading.png`) });
+        await personal.getByTestId('work-skeleton').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `${mode}-${width}-lists-loading.png`) });
+        releaseOverview();
+        const salesLoading = page.getByRole('status', { name: '수주 현황 불러오는 중' });
+        await salesLoading.waitFor();
+        const salesCards = await salesLoading.getByTestId('metric-skeleton').evaluateAll((cards) =>
+          cards.map((card) => ({
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            x: card.getBoundingClientRect().x - card.parentElement.getBoundingClientRect().x,
+            y: card.getBoundingClientRect().y - card.parentElement.getBoundingClientRect().y,
+          })));
+        const livePersonal = await page.getByRole('region', { name: '내 업무' }).getByRole('button').evaluateAll((cards) =>
+          cards.map((card) => ({
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            x: card.getBoundingClientRect().x - card.parentElement.getBoundingClientRect().x,
+            y: card.getBoundingClientRect().y - card.parentElement.getBoundingClientRect().y,
+          })));
+        await page.getByRole('region', { name: '영업 현황' }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `${mode}-${width}-sales-loading.png`) });
+        await salesLoading.getByTestId('trend-skeleton').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `${mode}-${width}-chart-loading.png`) });
+        const overflow = await page.getByTestId('overview-scroll').evaluate((element) => element.scrollWidth > element.clientWidth);
+        assert.equal(overflow, false, `Skeleton overflow ${mode}/${width}`);
+        assert.equal(await salesLoading.getByRole('button').count(), 0);
+        releaseSales();
+        await page.getByRole('button', { name: /선택 월 수주 33건/ }).waitFor();
+        const liveSales = await page.getByRole('button', { name: /^(선택 월 수주|수주 공급가액|수주 총액) / }).evaluateAll((cards) =>
+          cards.map((card) => ({
+            width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height,
+            x: card.getBoundingClientRect().x - card.parentElement.getBoundingClientRect().x,
+            y: card.getBoundingClientRect().y - card.parentElement.getBoundingClientRect().y,
+          })));
+        for (const [section, loading, loaded] of [['personal', personalCards, livePersonal], ['sales', salesCards, liveSales]]) {
+          assert.equal(loading.length, 3);
+          assert.equal(loaded.length, 3);
+          loading.forEach((card, index) => {
+            assert.ok(Math.abs(card.width - loaded[index].width) < 1, `Card width mismatch ${mode}/${width}`);
+            assert.ok(Math.abs(card.height - loaded[index].height) < 2,
+              `Card height mismatch ${section}/${index}/${mode}/${width}: ${card.height} vs ${loaded[index].height}`);
+            assert.ok(Math.abs(card.x - loaded[index].x) < 1 && Math.abs(card.y - loaded[index].y) < 2,
+              `Card position mismatch ${section}/${index}/${mode}/${width}`);
+          });
+        }
+        await page.getByRole('region', { name: '수주 흐름' }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `${mode}-${width}-chart-loaded.png`) });
+        metrics.push({ mode, width, personalCards, salesCards, horizontalOverflow: overflow });
+      }
+      await context.close();
+      continue;
+    }
     await page.goto(`${baseUrl}/groupware/overview`);
     await page.getByRole('button', { name: /선택 월 수주 33건/ }).waitFor();
     for (const width of [375, 768, 1280]) {
@@ -176,7 +254,8 @@ try {
   }
   assert.equal(errors.length, 0, errors.join('\n'));
   console.log(JSON.stringify({ fixtureOnly: true, viewportMetrics: metrics, runtimeErrors: errors.length,
-    checks: ['month-drilldown', 'notice-detail-by-id', 'partial-failure-retry', 'permission-hidden-sales'] }, null, 2));
+    checks: skeletonMode ? ['personal-loading-layout', 'sales-loading-layout', 'matching-card-dimensions', 'noninteractive-placeholders']
+      : ['month-drilldown', 'notice-detail-by-id', 'partial-failure-retry', 'permission-hidden-sales'] }, null, 2));
 } finally {
   await browser.close();
 }

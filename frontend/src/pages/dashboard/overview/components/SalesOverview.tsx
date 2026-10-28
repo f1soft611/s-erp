@@ -8,7 +8,7 @@ import ArrowOutwardRounded from '@mui/icons-material/ArrowOutwardRounded';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardSales } from '../types/overview';
 import { formatNumber, isDashboardMonth, salesDuePath, salesMonthPath } from '../services/overview.service';
-import { MetricCard, OverviewEmpty, OverviewError, OverviewPanel, OverviewSkeleton } from './OverviewWidgets';
+import { MetricCard, OverviewEmpty, OverviewError, OverviewPanel, SalesOverviewSkeleton } from './OverviewWidgets';
 
 function compactMoney(value: number) {
   if (value >= 100000000) return `${formatNumber(Math.round(value / 10000000) / 10)}억`;
@@ -84,7 +84,7 @@ export function SalesOverview({ month, onMonthChange, data, loading, error, onRe
           slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: '1900-01', max: '9998-12' } }}
           sx={{ width: { xs: '100%', sm: 176 }, '& .MuiOutlinedInput-root': { bgcolor: 'background.paper', borderRadius: 2 } }} />
       </Stack>
-      {error ? <OverviewError label="수주 현황" onRetry={onRetry} /> : loading || !data ? <OverviewSkeleton /> : (
+      {error ? <OverviewError label="수주 현황" onRetry={onRetry} /> : loading || !data ? <SalesOverviewSkeleton /> : (
         <Stack spacing={2.5}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>
             <MetricCard label="선택 월 수주" value={data.orderCount} unit="건" hint={`${data.from} ~ ${data.to}`}

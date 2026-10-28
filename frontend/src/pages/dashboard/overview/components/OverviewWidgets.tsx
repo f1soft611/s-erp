@@ -4,8 +4,13 @@ import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded';
 import { formatNumber } from '../services/overview.service';
 
-export function OverviewPanel({ title, caption, icon, action, children }: {
+function SkeletonText({ children, width }: { children: ReactNode; width?: string }) {
+  return <Skeleton width={width}><span>{children}</span></Skeleton>;
+}
+
+export function OverviewPanel({ title, caption, icon, action, children, loading = false }: {
   title: string; caption?: string; icon: ReactNode; action?: ReactNode; children: ReactNode;
+  loading?: boolean;
 }) {
   return (
     <Paper component="section" aria-label={title} elevation={0} sx={{
@@ -13,10 +18,16 @@ export function OverviewPanel({ title, caption, icon, action, children }: {
       overflow: 'hidden', bgcolor: 'background.paper', height: '100%',
     }}>
       <Stack direction="row" sx={{ px: { xs: 2, sm: 2.5 }, pt: 2.5, pb: 2, gap: 1.25, alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', color: 'primary.main', flexShrink: 0 }}>{icon}</Box>
+        <Box sx={{ display: 'flex', color: 'primary.main', flexShrink: 0 }}>
+          {loading ? <Skeleton variant="rounded" width={20} height={20} /> : icon}
+        </Box>
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography component="h2" sx={{ fontWeight: 750, fontSize: '0.95rem' }}>{title}</Typography>
-          {caption && <Typography sx={{ mt: 0.4, fontSize: '0.73rem', color: 'text.secondary' }}>{caption}</Typography>}
+          <Typography component="h2" sx={{ fontWeight: 750, fontSize: '0.95rem' }}>
+            {loading ? <SkeletonText width="75%">{title}</SkeletonText> : title}
+          </Typography>
+          {caption && <Typography sx={{ mt: 0.4, fontSize: '0.73rem', color: 'text.secondary' }}>
+            {loading ? <SkeletonText>{caption}</SkeletonText> : caption}
+          </Typography>}
         </Box>
         {action}
       </Stack>
@@ -25,12 +36,14 @@ export function OverviewPanel({ title, caption, icon, action, children }: {
   );
 }
 
-export function MetricCard({ label, value, unit, hint, icon, tone = 'primary', onClick }: {
+export function MetricCard({ label, value, unit, hint, icon, tone = 'primary', onClick, loading = false }: {
   label: string; value: number; unit: string; hint: string; icon: ReactNode;
   tone?: 'primary' | 'success' | 'warning'; onClick: () => void;
+  loading?: boolean;
 }) {
   return (
-    <ButtonBase onClick={onClick} aria-label={`${label} ${formatNumber(value)}${unit}`} sx={(theme) => ({
+    <ButtonBase onClick={onClick} disabled={loading} data-testid={loading ? 'metric-skeleton' : undefined}
+      aria-label={loading ? undefined : `${label} ${formatNumber(value)}${unit}`} sx={(theme) => ({
       display: 'flex', flexDirection: 'column', alignItems: 'stretch', textAlign: 'left',
       minWidth: 0, width: '100%', p: { xs: 2, sm: 2.5 }, borderRadius: 3,
       border: '1px solid', borderColor: theme.palette.divider, bgcolor: 'background.paper',
@@ -40,22 +53,34 @@ export function MetricCard({ label, value, unit, hint, icon, tone = 'primary', o
       '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
     })}>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <Typography sx={{ fontSize: '0.81rem', fontWeight: 650, color: 'text.secondary' }}>{label}</Typography>
+        <Typography sx={{ fontSize: '0.81rem', fontWeight: 650, color: 'text.secondary' }}>
+          {loading ? <SkeletonText>{label}</SkeletonText> : label}
+        </Typography>
         <Box sx={(theme) => ({
           color: theme.palette[tone].main, bgcolor: alpha(theme.palette[tone].main, 0.1),
           borderRadius: 2, p: 0.85, display: 'flex', flexShrink: 0,
-        })}>{icon}</Box>
+        })}>{loading ? <Skeleton variant="rounded" width={20} height={20} /> : icon}</Box>
       </Stack>
       <Typography component="div" sx={{
         mt: 1.5, mb: 1.5, fontSize: unit === '원' ? 'clamp(1.15rem, 1.55vw, 1.65rem)' : 'clamp(1.45rem, 2.3vw, 2rem)', fontWeight: 800,
         letterSpacing: '-0.045em', lineHeight: 1.25, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums',
       }}>
-        {formatNumber(value)}
-        <Typography component="span" sx={{ ml: 0.65, fontSize: '0.8rem', color: 'text.secondary', fontWeight: 500 }}>{unit}</Typography>
+        {loading ? <Skeleton width={unit === '원' ? '100%' : '65%'} sx={{ transform: 'none' }}>
+          <span>
+            {unit === '원' ? '000,000,000' : '0'}
+            <Typography component="span" sx={{ ml: 0.65, fontSize: '0.8rem', fontWeight: 500 }}>{unit}</Typography>
+          </span>
+        </Skeleton> : <>
+          {formatNumber(value)}
+          <Typography component="span" sx={{ ml: 0.65, fontSize: '0.8rem', color: 'text.secondary', fontWeight: 500 }}>{unit}</Typography>
+        </>}
       </Typography>
       <Stack direction="row" sx={{ alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
-        <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>{hint}</Typography>
-        <ArrowForwardRounded sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+        <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+          {loading ? <SkeletonText>{hint}</SkeletonText> : hint}
+        </Typography>
+        {loading ? <Skeleton variant="circular" width={16} height={16} sx={{ flexShrink: 0 }} />
+          : <ArrowForwardRounded sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />}
       </Stack>
     </ButtonBase>
   );
@@ -84,10 +109,104 @@ export function OverviewError({ label, onRetry }: { label: string; onRetry: () =
 export function OverviewSkeleton() {
   return (
     <Box role="status" aria-label="종합현황 불러오는 중">
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>
-        {[1, 2, 3].map((key) => <Skeleton key={key} variant="rounded" height={165} sx={{ borderRadius: 3 }} />)}
-      </Box>
-      <Skeleton variant="rounded" height={240} sx={{ mt: 2, borderRadius: 3 }} />
+      <Stack aria-hidden="true" spacing={{ xs: 3, sm: 3.5 }}>
+        <Box>
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 2 }}>
+            <Typography sx={{ fontWeight: 750, fontSize: '1.05rem' }}><SkeletonText>내 업무</SkeletonText></Typography>
+            <Typography sx={{ fontSize: '0.73rem' }}><SkeletonText>현재 처리 상태 · 기간 제한 없음</SkeletonText></Typography>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>
+            <MetricCard loading label="내가 처리할 결재" value={0} unit="건" hint="내 결재 순서에 도착한 문서" icon={null} onClick={() => {}} />
+            <MetricCard loading label="내 임시저장" value={0} unit="건" hint="이어서 작성할 기안 문서" icon={null} tone="success" onClick={() => {}} />
+            <MetricCard loading label="내 보완 필요" value={0} unit="건" hint="내가 기안한 보완요청 문서" icon={null} tone="warning" onClick={() => {}} />
+          </Box>
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
+          <Box data-testid="work-skeleton">
+            <OverviewPanel loading title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순" icon={null}
+              action={<Skeleton width={64} height={30} />}>
+              <SkeletonList kind="work" />
+            </OverviewPanel>
+          </Box>
+          <Box data-testid="notice-skeleton">
+            <OverviewPanel loading title="최근 공지" caption="상단 고정 공지 우선 · 최근 등록 순" icon={null}
+              action={<Skeleton width={64} height={30} />}>
+              <SkeletonList kind="notice" />
+            </OverviewPanel>
+          </Box>
+        </Box>
+      </Stack>
+    </Box>
+  );
+}
+
+function SkeletonList({ kind }: { kind: 'work' | 'notice' | 'due' }) {
+  return (
+    <Stack spacing={0.5}>
+      {[0, 1, 2].map((row) => (
+        <Stack key={row} direction="row" sx={{
+          alignItems: 'center', gap: kind === 'due' ? 1.5 : 1.25, px: 1, py: kind === 'due' ? 1.35 : 1.5,
+        }}>
+          {kind === 'due' && <Skeleton variant="rounded" width={50} height={60} sx={{ flexShrink: 0, borderRadius: 2 }} />}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {kind === 'work' && <Skeleton variant="rounded" width={54} height={22} sx={{ mb: 0.9, borderRadius: 3 }} />}
+            <Typography sx={{ fontSize: kind === 'work' ? '0.85rem' : '0.83rem', fontWeight: 650 }}>
+              <SkeletonText width={`${[85, 95, 70][row]}%`}>업무 제목</SkeletonText>
+            </Typography>
+            {kind !== 'work' && <Typography sx={{ fontSize: kind === 'due' ? '0.73rem' : '0.7rem', mt: kind === 'due' ? 0.4 : 0.65 }}>
+              <SkeletonText width="45%">보조 정보</SkeletonText>
+            </Typography>}
+          </Box>
+          <Skeleton variant="circular" width={16} height={16} sx={{ flexShrink: 0 }} />
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+export function SalesOverviewSkeleton() {
+  return (
+    <Box role="status" aria-label="수주 현황 불러오는 중">
+      <Stack aria-hidden="true" spacing={2.5}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>
+          <MetricCard loading label="선택 월 수주" value={0} unit="건" hint="0000-00-00 ~ 0000-00-00" icon={null} onClick={() => {}} />
+          <MetricCard loading label="수주 공급가액" value={0} unit="원" hint="부가세 제외 · 상세 공급가액 합계" icon={null} tone="success" onClick={() => {}} />
+          <MetricCard loading label="수주 총액" value={0} unit="원" hint="부가세 포함 · 매출액과 구분" icon={null} onClick={() => {}} />
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.15fr 1fr' }, gap: 2.5 }}>
+          <Box data-testid="trend-skeleton">
+            <OverviewPanel loading title="수주 흐름" caption="0000-00 — 0000-00 · 공급가액 기준" icon={null}
+              action={<Skeleton width={64} height={24} />}>
+              <Box sx={{ pt: 1 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6,minmax(0,1fr))', gap: { xs: 0.5, sm: 1.5 }, borderBottom: '1px solid', borderColor: 'divider' }}>
+                  {[48, 62, 54, 80, 72, 90].map((height, index) => (
+                    <Stack key={index} sx={{ height: 204, justifyContent: 'flex-end', alignItems: 'center', px: 0.4, pt: 1 }}>
+                      <Skeleton width="75%" height={14} sx={{ mb: 1 }} />
+                      <Skeleton variant="rounded" sx={{ height: `${height}%`, width: '66%', maxWidth: 54, borderRadius: '6px 6px 0 0' }} />
+                    </Stack>
+                  ))}
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6,minmax(0,1fr))', gap: { xs: 0.5, sm: 1.5 }, mt: 1.5 }}>
+                  {[0, 1, 2, 3, 4, 5].map((month) => (
+                    <Typography key={month} sx={{ fontSize: '0.7rem', display: 'flex', justifyContent: 'center' }}><SkeletonText width="65%">0월</SkeletonText></Typography>
+                  ))}
+                </Box>
+              </Box>
+              <Typography sx={{ mt: 2, fontSize: '0.7rem' }}>
+                <SkeletonText>월별 막대를 선택하면 해당 기간의 수주현황으로 이동합니다.</SkeletonText>
+              </Typography>
+            </OverviewPanel>
+          </Box>
+          <Box data-testid="due-skeleton">
+            <OverviewPanel loading title="다가오는 납기" caption="오늘부터 7일 · 등록 기준 / 출하 미반영" icon={null}
+              action={<Skeleton width={48} height={30} />}>
+              <SkeletonList kind="due" />
+              <Typography sx={{ mt: 1, fontSize: '0.7rem' }}><SkeletonText width="80%">가까운 납기 표시 · 전체 건수</SkeletonText></Typography>
+            </OverviewPanel>
+          </Box>
+        </Box>
+        <Typography sx={{ fontSize: '0.7rem', textAlign: 'right' }}><Skeleton width={110} sx={{ ml: 'auto' }}><span>수주 조회 시각</span></Skeleton></Typography>
+      </Stack>
     </Box>
   );
 }
