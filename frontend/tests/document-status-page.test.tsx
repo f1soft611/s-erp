@@ -91,6 +91,7 @@ function renderDocumentStatusPage(
   currentPageKey = 'documents',
   read?: boolean,
   excel = false,
+  dashboardScope?: 'MY_PENDING' | 'DRAFT' | 'REVISION_REQUESTED',
 ) {
   return render(
     <DashboardContent
@@ -103,6 +104,7 @@ function renderDocumentStatusPage(
           ? undefined
           : { read, create: false, update: false, delete: false, excel }
       }
+      dashboardScope={dashboardScope}
       content={{
         title: '문서현황',
         description: '전자결재 문서를 검색하고 확인합니다.',
@@ -149,6 +151,16 @@ describe('document status page', () => {
       screen.getByText('그룹웨어 > 문서관리 > 문서현황'),
     ).toBeInTheDocument();
     await screen.findByRole('grid', { name: '문서현황' });
+  });
+
+  it('applies and displays the requested dashboard scope on the read-only page', async () => {
+    renderDocumentStatusPage('read', true, false, 'REVISION_REQUESTED');
+
+    await waitFor(() => expect(getListRequest().get('scope')).toBe('REVISION_REQUESTED'));
+    expect(screen.getByText('#보완요청')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('CancelIcon'));
+    await waitFor(() => expect(getListRequest().get('scope')).toBe('ALL'));
+    expect(screen.queryByText('#보완요청')).not.toBeInTheDocument();
   });
 
   it('selects document rows without opening detail on cell clicks or keyboard navigation', async () => {

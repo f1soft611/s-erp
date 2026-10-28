@@ -1,6 +1,7 @@
 import type {
   ApprovalDocumentStatus,
   DocumentApprovalRecord,
+  DocumentApprovalScope,
 } from '../../write/types/documentWrite.types';
 
 export type DocumentStatusRow = Pick<
@@ -36,6 +37,7 @@ export type DocumentStatusActionStatus =
   | 'RETURNED';
 
 export type DocumentStatusFilters = {
+  scope?: DocumentApprovalScope;
   keyword?: string;
   electronicApprovalId?: string;
   title?: string;

@@ -12,6 +12,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import LoginFormField from '../../../shared/components/LoginFormField';
 import type {
   LoginFormField as LoginFieldType,
@@ -51,40 +52,39 @@ export function LoginForm({
       sx={{
         width: '100%',
         maxWidth: 450,
-        borderRadius: 2.5,
-        border: isDark
-          ? '1px solid rgba(96,165,250,0.28)'
-          : '1px solid rgba(148, 163, 184, 0.18)',
+        borderRadius: 3,
+        border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.8 : 0.7)}`,
         boxShadow: isDark
-          ? '0 16px 28px rgba(2, 6, 23, 0.62)'
-          : '0 16px 28px rgba(15, 23, 42, 0.08)',
-        background: isDark ? '#111827' : 'rgba(255,255,255,0.96)',
+          ? '0 18px 48px rgba(2, 6, 23, 0.34)'
+          : '0 20px 52px rgba(15, 23, 42, 0.08)',
+        bgcolor: 'background.paper',
       }}
     >
-      <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+      <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
         <Stack spacing={1.5} component="form" onSubmit={onSubmit} noValidate>
-          <Box sx={{ pb: 0.25 }}>
+          <Box sx={{ pb: 0.5 }}>
             <Typography
               variant="overline"
-              color={isDark ? 'primary.light' : 'primary.main'}
-              sx={{ letterSpacing: 1.5, fontWeight: 800 }}
+              color="primary.main"
+              sx={{ letterSpacing: 1.8, fontWeight: 800, lineHeight: 1.5 }}
             >
               S-ERP
             </Typography>
             <Typography
               variant="h4"
               sx={{
-                mt: 0.75,
-                fontSize: '1.7rem',
-                color: isDark ? '#e2e8f0' : '#0f172a',
+                mt: 0.5,
+                fontSize: { xs: '1.45rem', sm: '1.65rem' },
+                lineHeight: 1.35,
+                color: 'text.primary',
               }}
             >
               통합 ERP 시스템 로그인
             </Typography>
             <Typography
               variant="body2"
-              color={isDark ? 'text.secondary' : 'text.secondary'}
-              sx={{ mt: 0.75, color: isDark ? '#cbd5e1' : '#475569' }}
+              color="text.secondary"
+              sx={{ mt: 1, lineHeight: 1.65 }}
             >
               기업 운영 정보를 안전하게 관리하기 위한 로그인 페이지입니다.
             </Typography>
@@ -123,7 +123,7 @@ export function LoginForm({
                   onClick={onTogglePassword}
                   edge="end"
                   sx={{
-                    color: isDark ? '#cbd5e1' : '#475569',
+                    color: 'text.secondary',
                   }}
                 >
                   {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -144,13 +144,13 @@ export function LoginForm({
             size="large"
             disabled={submitDisabled}
             sx={{
-              minHeight: 46,
-              borderRadius: 2,
+              minHeight: 48,
+              borderRadius: 1.5,
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              boxShadow: '0 10px 18px rgba(37, 99, 235, 0.18)',
+              bgcolor: 'primary.main',
+              boxShadow: `0 8px 18px ${alpha(theme.palette.primary.main, 0.2)}`,
               '&:hover': {
-                background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                bgcolor: 'primary.dark',
               },
             }}
           >
@@ -160,31 +160,32 @@ export function LoginForm({
           {import.meta.env.DEV ? (
             <Box
               sx={{
-                p: 1.5,
+                p: 1.25,
                 borderRadius: 1.5,
-                border: isDark
-                  ? '1px solid rgba(148, 163, 184, 0.25)'
-                  : '1px solid rgba(148, 163, 184, 0.3)',
-                backgroundColor: isDark
-                  ? '#0f172a'
-                  : 'rgba(248, 250, 252, 0.9)',
+                border: `1px solid ${alpha(theme.palette.divider, 0.55)}`,
+                bgcolor: isDark
+                  ? alpha(theme.palette.background.default, 0.4)
+                  : alpha(theme.palette.background.default, 0.6),
               }}
             >
               <Typography
-                variant="body2"
+                variant="caption"
                 sx={{
                   display: 'block',
-                  color: isDark ? '#cbd5e1' : 'text.secondary',
+                  color: 'text.secondary',
                   fontWeight: 600,
+                  lineHeight: 1.5,
                 }}
               >
                 개발용 테스트 계정입니다.
               </Typography>
               <Typography
-                variant="body2"
+                variant="caption"
                 sx={{
                   display: 'block',
-                  color: isDark ? '#cbd5e1' : 'text.secondary',
+                  color: 'text.secondary',
+                  lineHeight: 1.5,
+                  overflowWrap: 'anywhere',
                 }}
               >
                 (업체코드: T1358606250 / 아이디: admin / 비밀번호: f1soft@611)
@@ -196,7 +197,8 @@ export function LoginForm({
             variant="caption"
             sx={{
               textAlign: 'center',
-              color: isDark ? '#9aa4b2' : '#9aa4b2',
+              color: 'text.secondary',
+              opacity: 0.75,
               letterSpacing: '0.02em',
               pt: 0.25,
             }}

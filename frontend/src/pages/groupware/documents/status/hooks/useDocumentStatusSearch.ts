@@ -13,11 +13,22 @@ import type {
   DocumentStatusSearchSession,
   DocumentStatusSearchValues,
 } from '../types/documentStatusSearch.types';
+import type { DocumentApprovalScope } from '../../write/types/documentWrite.types';
 
 const DOCUMENT_STATUS_SESSION_KEY = 's-erp:page:document-status';
 const DOCUMENT_STATUS_SESSION_VERSION = 1;
 
-export function useDocumentStatusSearch() {
+function withScope(
+  filters: DocumentStatusFilters,
+  scope: DocumentApprovalScope | null,
+): DocumentStatusFilters {
+  return scope ? { ...filters, scope } : filters;
+}
+
+export function useDocumentStatusSearch(
+  initialScope: DocumentApprovalScope | null = null,
+  onScopeChange?: (scope: DocumentApprovalScope | null) => void,
+) {
   const detailFields = useMemo(
     () => toPageSearchFields(createDocumentStatusColumns()),
     [],
@@ -46,11 +57,12 @@ export function useDocumentStatusSearch() {
     () => cloneDetailValues(searchSession?.detailValues ?? {}),
   );
   const [appliedFilters, setAppliedFilters] = useState<DocumentStatusFilters>(
-    () => toDocumentStatusFilters(
+    () => withScope(toDocumentStatusFilters(
       searchSession?.keyword ?? '',
       searchSession?.detailValues ?? {},
-    ),
+    ), initialScope),
   );
+  const [dashboardScope, setDashboardScope] = useState(initialScope);
 
   useEffect(() => {
     if (!defaultValues) return;
@@ -64,14 +76,14 @@ export function useDocumentStatusSearch() {
       setDetailValues(initialSnapshot.detailValues);
       setSearchSession(initialSnapshot);
       setAppliedFilters(
-        toDocumentStatusFilters(
+        withScope(toDocumentStatusFilters(
           initialSnapshot.keyword,
           initialSnapshot.detailValues,
-        ),
+        ), initialScope),
       );
     }
     setDefaultsInitialized(true);
-  }, [defaultValues, searchSession, setSearchSession]);
+  }, [defaultValues, initialScope, searchSession, setSearchSession]);
 
   const applySearch = useCallback(
     (values: DocumentStatusSearchValues = detailValues) => {
@@ -80,11 +92,12 @@ export function useDocumentStatusSearch() {
         detailValues: cloneDetailValues(values),
       };
       setSearchSession(snapshot);
-      setAppliedFilters(
+      setAppliedFilters(withScope(
         toDocumentStatusFilters(snapshot.keyword, snapshot.detailValues),
-      );
+        dashboardScope,
+      ));
     },
-    [detailValues, keyword, setSearchSession],
+    [dashboardScope, detailValues, keyword, setSearchSession],
   );
 
   const resetSearch = useCallback(() => {
@@ -96,11 +109,23 @@ export function useDocumentStatusSearch() {
     };
     setKeyword('');
     setDetailValues(resetDetailValues);
+    setDashboardScope(null);
     setSearchSession(resetSnapshot);
     setAppliedFilters(
       toDocumentStatusFilters(resetSnapshot.keyword, resetSnapshot.detailValues),
     );
-  }, [defaultValues, setSearchSession]);
+    onScopeChange?.(null);
+  }, [defaultValues, onScopeChange, setSearchSession]);
+
+  const clearDashboardScope = useCallback(() => {
+    setDashboardScope(null);
+    setAppliedFilters((current) => {
+      const next = { ...current };
+      delete next.scope;
+      return next;
+    });
+    onScopeChange?.(null);
+  }, [onScopeChange]);
 
   return {
     keyword,
@@ -117,5 +142,7 @@ export function useDocumentStatusSearch() {
     searchAreaDefaultValues: searchSession === null ? (defaultValues ?? {}) : {},
     applySearch,
     resetSearch,
+    dashboardScope,
+    clearDashboardScope,
   };
 }

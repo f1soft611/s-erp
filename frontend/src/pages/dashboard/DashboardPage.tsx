@@ -48,6 +48,8 @@ import type {
   ModuleItem,
   UserMenuResponse,
 } from './types/dashboard';
+import { parseDocumentApprovalScope } from '../groupware/documents/write/data/documentPresentation';
+import type { DocumentApprovalScope } from '../groupware/documents/write/types/documentWrite.types';
 import { NotFoundPage } from '../errors/NotFoundPage';
 import {
   clearPageSessionState,
@@ -247,6 +249,19 @@ function DashboardPage() {
     };
   }, [menusReloadToken, start, succeed, fail]);
   const location = useLocation();
+  const dashboardScope = parseDocumentApprovalScope(
+    new URLSearchParams(location.search).get('dashboardScope'),
+  );
+  const updateDashboardScope = (scope: DocumentApprovalScope | null) => {
+    const searchParams = new URLSearchParams(location.search);
+    if (scope) searchParams.set('dashboardScope', scope);
+    else searchParams.delete('dashboardScope');
+    const search = searchParams.toString();
+    navigate(
+      { pathname: location.pathname, search: search ? `?${search}` : '', hash: location.hash },
+      { replace: true },
+    );
+  };
   const effectivePath = resolveLegacyRoutePath(location.pathname);
   const theme = useTheme();
   const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
@@ -945,6 +960,8 @@ function DashboardPage() {
                   breadcrumbItems={breadcrumbItems}
                   content={content}
                   selectedMenuPermissions={currentMenu.permissions}
+                  dashboardScope={dashboardScope}
+                  onDashboardScopeChange={updateDashboardScope}
                   isTenantAdmin={[
                     'TENANT_ADMIN',
                     'PLATFORM_ADMIN',

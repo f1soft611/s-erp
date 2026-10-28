@@ -5,6 +5,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { Link } from 'react-router-dom';
 import type { ModuleItem } from '../types/dashboard';
 
 type DashboardModuleSectionProps = {
@@ -36,6 +37,8 @@ export function DashboardModuleSection({
       }}
     >
       <Typography
+        component={Link}
+        to="/groupware/overview"
         variant="caption"
         sx={{
           fontWeight: 800,
@@ -43,6 +46,7 @@ export function DashboardModuleSection({
           color: isDark ? '#cbd5e1' : '#475569',
           mb: 2,
           textAlign: 'center',
+          textDecoration: 'none',
           lineHeight: 1.2,
         }}
       >

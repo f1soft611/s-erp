@@ -138,6 +138,18 @@ describe('document status service', () => {
     expect(signal).toBe(controller.signal);
   });
 
+  it.each(['MY_PENDING', 'DRAFT', 'REVISION_REQUESTED'] as const)(
+    'sends dashboard scope %s to the existing search API',
+    async (scope) => {
+      api.get.mockResolvedValue({ resultList: [row], totalRowCount: 1 });
+
+      await searchDocumentStatus({ scope });
+
+      const [path] = api.get.mock.calls[0] as [string];
+      expect(new URL(path, 'http://localhost').searchParams.get('scope')).toBe(scope);
+    },
+  );
+
   it('accepts the drafter role returned for the current user', async () => {
     api.get.mockResolvedValue({
       resultList: [{ ...row, myParticipantType: 'DRAFTER' }],

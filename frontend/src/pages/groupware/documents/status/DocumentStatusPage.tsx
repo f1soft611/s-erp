@@ -1,4 +1,4 @@
-import { Box, Button } from '@mui/material';
+import { Box, Button, Chip } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
@@ -12,14 +12,17 @@ import { useDocumentStatusDetail } from './hooks/useDocumentStatusDetail';
 import { useDocumentStatusList } from './hooks/useDocumentStatusList';
 import { useDocumentStatusSearch } from './hooks/useDocumentStatusSearch';
 import type { DocumentStatusPageProps } from './types/documentStatusPage.types';
+import { getDocumentApprovalScopeLabel } from '../write/data/documentPresentation';
 
 export function DocumentStatusPage({
   selectedModule,
   currentMenuName,
   content,
   selectedMenuPermissions,
+  dashboardScope = null,
+  onDashboardScopeChange,
 }: DocumentStatusPageProps) {
-  const search = useDocumentStatusSearch();
+  const search = useDocumentStatusSearch(dashboardScope, onDashboardScopeChange);
   const detail = useDocumentStatusDetail();
   const list = useDocumentStatusList(
     search.appliedFilters,
@@ -64,6 +67,16 @@ export function DocumentStatusPage({
       />
       <PageLoadBoundary {...search.defaultsInitialLoad} label="검색 기본값" onRetry={search.retryDefaults}>
       <PageLoadBoundary {...list.initialLoad} label="문서현황" onRetry={list.retry}>
+      {search.dashboardScope && (
+        <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 1 }}>
+          <Chip
+            size="small"
+            label={`#${getDocumentApprovalScopeLabel(search.dashboardScope)}`}
+            onDelete={search.clearDashboardScope}
+            aria-label={`결재 범위 필터 ${getDocumentApprovalScopeLabel(search.dashboardScope)} 취소`}
+          />
+        </Box>
+      )}
       <DocumentStatusSearchArea
         keyword={search.keyword}
         onKeywordChange={search.setKeyword}
