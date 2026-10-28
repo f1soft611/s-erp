@@ -76,10 +76,19 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
               <Stack sx={{ alignItems: { xs: 'flex-start', md: 'flex-end' }, gap: 1.25, flexShrink: 0 }}>
                 <Stack direction="row" sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                   {overview && <Chip icon={<CalendarTodayOutlined />} variant="outlined" label={`기준일 ${overview.asOfDate}`}
-                    sx={{ bgcolor: 'background.paper', fontSize: '0.73rem', borderColor: 'divider' }} />}
+                    sx={{
+                      bgcolor: 'background.paper', borderColor: 'divider', borderRadius: 2,
+                      height: 34, px: 1.5, py: 0.75, fontSize: '0.8125rem', lineHeight: 1.4,
+                      '& .MuiChip-label': { p: 0 },
+                      '& .MuiChip-icon': { m: 0, mr: 1, fontSize: 20 },
+                    }} />}
                   <Button variant="outlined" startIcon={<RefreshRounded />} onClick={data.refresh}
                     disabled={data.overviewLoading} aria-label="종합현황 새로고침"
-                    sx={{ bgcolor: 'background.paper', borderColor: 'divider', borderRadius: 2 }}>
+                    sx={{
+                      bgcolor: 'background.paper', borderColor: 'divider', borderRadius: 2,
+                      height: 34, px: 1.5, py: 0.75,
+                      '& .MuiButton-startIcon': { ml: 0 },
+                    }}>
                     새로고침
                   </Button>
                 </Stack>
