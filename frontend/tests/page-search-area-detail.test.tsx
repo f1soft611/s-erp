@@ -291,7 +291,7 @@ describe('PageSearchArea 상세 검색', () => {
     expect(screen.queryByRole('button', { name: /검색 조건 제거/ })).not.toBeInTheDocument();
   });
 
-  it('적용된 상세 조건 칩을 제거하면 해당 필드만 비우고 다시 조회한다', () => {
+  it('적용된 상세 조건 칩 제거는 초안만 변경하고 명시적으로 조회하기 전까지 대기한다', () => {
     const onValuesChange = vi.fn();
     const onSearch = vi.fn();
     const appliedDetailValues = {
@@ -313,7 +313,47 @@ describe('PageSearchArea 상세 검색', () => {
 
     const nextValues = { name: '', status: 'Y' };
     expect(onValuesChange).toHaveBeenLastCalledWith(nextValues);
-    expect(onSearch).toHaveBeenCalledWith(nextValues);
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.queryByText('이름: 기존 검색어')).not.toBeInTheDocument();
+    expect(screen.getByText('상태: 사용')).toBeVisible();
+    expect(
+      screen.getByText('조건 변경 내용은 조회 버튼을 눌러 적용하세요.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: '이름 검색 조건 제거' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '상태 검색 조건 제거' }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '상태 검색 조건 제거' }));
+
+    expect(onValuesChange).toHaveBeenLastCalledWith({ name: '', status: '' });
+    expect(onSearch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({ name: '', status: '' });
+  });
+
+  it('조회 전 안내는 조건 칩 아래에 두고 작업 버튼은 맨 위 행에 유지한다', () => {
+    const appliedDetailValues = { name: '기존 검색어', status: 'Y' };
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={appliedDetailValues}
+        appliedDetailValues={appliedDetailValues}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이름 검색 조건 제거' }));
+
+    const notice = screen.getByRole('status');
+    const actions = screen.getByRole('group', { name: '상세 검색 작업' });
+    expect(notice.parentElement).toBe(actions.parentElement);
+    expect(getComputedStyle(actions.parentElement as HTMLElement).display).toBe(
+      'grid',
+    );
+    expect(getComputedStyle(actions).gridRow).toBe('1');
+    expect(getComputedStyle(actions).flexWrap).toBe('nowrap');
   });
 
   it('필수 날짜 범위의 양 끝을 입력하기 전에는 조회하지 않는다', () => {
@@ -353,7 +393,7 @@ describe('PageSearchArea 상세 검색', () => {
     });
   });
 
-  it('필수 날짜 칩을 비우면 유효한 범위를 제출할 때까지 재조회하지 않는다', () => {
+  it('필수 날짜 상세조건은 칩에서 해제할 수 없다', () => {
     const onValuesChange = vi.fn();
     const onSearch = vi.fn();
     const appliedDetailValues = {
@@ -378,25 +418,11 @@ describe('PageSearchArea 상세 검색', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
-    fireEvent.click(
+    expect(
       screen.getByRole('button', { name: '수주일자 검색 조건 제거' }),
-    );
-
-    expect(onValuesChange).toHaveBeenLastCalledWith({
-      orderDt: { from: '', to: '' },
-    });
+    ).toBeDisabled();
+    expect(onValuesChange).not.toHaveBeenCalled();
     expect(onSearch).not.toHaveBeenCalled();
-    expect(screen.getAllByText('필수 입력입니다.')).toHaveLength(2);
-    fireEvent.change(screen.getByLabelText('수주일자 시작일'), {
-      target: { value: '20261001' },
-    });
-    fireEvent.change(screen.getByLabelText('수주일자 종료일'), {
-      target: { value: '20261022' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '조회' }));
-    expect(onSearch).toHaveBeenCalledWith({
-      orderDt: { from: '2026-10-01', to: '2026-10-22' },
-    });
   });
 
   it('상세검색이 열린 동안 그리드 로딩 덮개보다 위에 표시한다', () => {

@@ -58,7 +58,15 @@ export function DocumentStatusSearchArea({
               ) : null,
             },
           }}
-          sx={{ width: '100%', height: 40 }}
+          sx={(theme) => ({
+            width: '100%',
+            height: 40,
+            '& .MuiOutlinedInput-root': {
+              height: '100%',
+              borderRadius: '0 8px 8px 0',
+              backgroundColor: theme.palette.background.paper,
+            },
+          })}
         />
       }
       onDefaultSearch={() => {

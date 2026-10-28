@@ -2006,9 +2006,6 @@ export function DocumentApprovalDetailFeed(
         size="xs"
         actions={
           <>
-            <Button onClick={closeReasonDialog} disabled={isActing}>
-              취소
-            </Button>
             <Button
               variant={reasonAction === 'REJECTED' ? 'outlined' : 'outlined'}
               color={reasonAction === 'REJECTED' ? 'error' : 'warning'}
@@ -2022,6 +2019,9 @@ export function DocumentApprovalDetailFeed(
                 : reasonAction === 'REJECTED'
                   ? '반려 확인'
                   : '보완요청 확인'}
+            </Button>
+            <Button onClick={closeReasonDialog} disabled={isActing}>
+              취소
             </Button>
           </>
         }

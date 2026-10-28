@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { normalizeDateInput } from '../../../../../shared/components/f1-grid/editing/DateEditor';
 import { toPageSearchFields } from '../../../../../shared/components/page-search/searchFields';
 import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionState';
 import { usePageSearchDefaults } from '../../../../../shared/hooks/usePageSearchDefaults';
@@ -17,6 +18,15 @@ import type { DocumentApprovalScope } from '../../write/types/documentWrite.type
 
 const DOCUMENT_STATUS_SESSION_KEY = 's-erp:page:document-status';
 const DOCUMENT_STATUS_SESSION_VERSION = 1;
+
+function getCompleteDateRange(
+  value: DocumentStatusSearchValues[string] | undefined,
+): { from: string; to: string } | null {
+  if (!value || typeof value !== 'object') return null;
+  const from = normalizeDateInput(value.from ?? '');
+  const to = normalizeDateInput(value.to ?? '');
+  return from && to ? { from, to } : null;
+}
 
 function withScope(
   filters: DocumentStatusFilters,
@@ -81,6 +91,42 @@ export function useDocumentStatusSearch(
           initialSnapshot.detailValues,
         ), initialScope),
       );
+    } else {
+      const savedDateRange = getCompleteDateRange(
+        searchSession.detailValues.submittedAt,
+      );
+      const submittedAt =
+        savedDateRange ?? getCompleteDateRange(defaultValues.submittedAt);
+      if (submittedAt) {
+        const currentDateValue = searchSession.detailValues.submittedAt;
+        const needsDateRestore =
+          !savedDateRange ||
+          !currentDateValue ||
+          typeof currentDateValue !== 'object' ||
+          currentDateValue.from !== submittedAt.from ||
+          currentDateValue.to !== submittedAt.to;
+        if (needsDateRestore) {
+          const restoredValues = {
+            ...cloneDetailValues(searchSession.detailValues),
+            submittedAt,
+          };
+          const restoredSnapshot = {
+            ...searchSession,
+            detailValues: restoredValues,
+          };
+          setDetailValues(restoredValues);
+          setSearchSession(restoredSnapshot);
+          setAppliedFilters(
+            withScope(
+              toDocumentStatusFilters(
+                restoredSnapshot.keyword,
+                restoredSnapshot.detailValues,
+              ),
+              initialScope,
+            ),
+          );
+        }
+      }
     }
     setDefaultsInitialized(true);
   }, [defaultValues, initialScope, searchSession, setSearchSession]);

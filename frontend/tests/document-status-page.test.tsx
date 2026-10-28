@@ -236,6 +236,7 @@ describe('document status page', () => {
       (searchField) => searchField.field === 'submittedAt',
     );
 
+    expect(field?.required).toBe(true);
     expect(field?.defaultValue).toEqual({
       from: { type: 'systemDate', offset: { months: -1 } },
       to: { type: 'systemDate' },
@@ -417,7 +418,7 @@ describe('document status page', () => {
     expect(request.get('submittedAtTo')).toBe('2026-10-20');
   });
 
-  it('keeps an omitted date empty when restoring an applied session', async () => {
+  it('restores a required date for a legacy session before the first query', async () => {
     window.sessionStorage.setItem(
       's-erp:page:document-status',
       JSON.stringify({
@@ -434,18 +435,22 @@ describe('document status page', () => {
     expect(await screen.findByText('41')).toBeInTheDocument();
     expect(getListRequest().get('keyword')).toBe('budget');
     expect(getListRequest().get('title')).toBe('Quarterly');
-    expect(getListRequest().has('submittedAtFrom')).toBe(false);
-    expect(getListRequest().has('submittedAtTo')).toBe(false);
+    expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
 
     fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
-    expect(screen.getByLabelText('결재신청일 시작일')).toHaveValue('');
-    expect(screen.getByLabelText('결재신청일 종료일')).toHaveValue('');
+    expect(screen.getByLabelText('결재신청일 시작일'))
+      .toHaveValue(SYSTEM_DATE_RANGE.from);
+    expect(screen.getByLabelText('결재신청일 종료일'))
+      .toHaveValue(SYSTEM_DATE_RANGE.to);
+    expect(
+      screen.getByRole('button', { name: '결재신청일 검색 조건 제거' }),
+    ).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
-    await waitFor(() => {
-      expect(getListRequest().has('submittedAtFrom')).toBe(false);
-      expect(getListRequest().has('submittedAtTo')).toBe(false);
-    });
+    await waitFor(() => expect(getListRequests()).toBe(2));
+    expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
   });
 
   it('keeps the last applied search when later inputs are not submitted', async () => {

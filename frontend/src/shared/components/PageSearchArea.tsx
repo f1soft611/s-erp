@@ -135,6 +135,18 @@ function getDateValue(value: PageSearchFieldValue, key: 'from' | 'to'): string {
   return value[key] ?? '';
 }
 
+function isFieldValueEmpty(
+  field: PageSearchField,
+  value: PageSearchFieldValue | undefined,
+): boolean {
+  if (value === undefined) return true;
+  if (field.type === 'date') {
+    return !getDateValue(value, 'from').trim() && !getDateValue(value, 'to').trim();
+  }
+  if (value === null || value === undefined) return true;
+  return typeof value === 'string' && value.trim() === '';
+}
+
 function areSearchValuesEqual(
   current: Record<string, PageSearchFieldValue>,
   next: Record<string, PageSearchFieldValue>,
@@ -181,6 +193,9 @@ export function PageSearchArea({
   const [requiredErrors, setRequiredErrors] = useState<Record<string, boolean>>(
     {},
   );
+  const [pendingRemovalFields, setPendingRemovalFields] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     const resolvedValues = mergeSearchValues(defaultValues, detailValues);
@@ -189,9 +204,32 @@ export function PageSearchArea({
     );
   }, [defaultValues, detailValues]);
 
+  useEffect(() => {
+    setPendingRemovalFields((current) => {
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([fieldName]) => {
+          const field = detailFields.find((candidate) => candidate.field === fieldName);
+          return (
+            field !== undefined &&
+            !isFieldValueEmpty(field, appliedDetailValues[fieldName])
+          );
+        }),
+      );
+      return Object.keys(next).length === Object.keys(current).length
+        ? current
+        : next;
+    });
+  }, [appliedDetailValues, detailFields]);
+
   const updateValue = (field: string, value: PageSearchFieldValue) => {
     const next = { ...draftValues, [field]: value };
     setDraftValues(next);
+    setPendingRemovalFields((current) => {
+      if (!current[field]) return current;
+      const nextPending = { ...current };
+      delete nextPending[field];
+      return nextPending;
+    });
     setRequiredErrors((current) =>
       Object.fromEntries(
         Object.entries(current).filter(
@@ -413,21 +451,26 @@ export function PageSearchArea({
     );
     return [{ field, value, displayValue: option?.label ?? displayValue }];
   });
+  const visibleDetailFilters = activeDetailFilters.filter(
+    ({ field }) => !pendingRemovalFields[field.field],
+  );
 
   const removeDetailFilter = (field: PageSearchField) => {
+    const currentValue = getFieldValue(draftValues, field, defaultValues);
+    if (field.required || isFieldValueEmpty(field, currentValue)) return;
+
     const next = {
-      ...appliedDetailValues,
+      ...draftValues,
       [field.field]: field.type === 'date' ? { from: '', to: '' } : '',
     };
     setDraftValues(next);
+    setPendingRemovalFields((current) => ({ ...current, [field.field]: true }));
     setDateErrors((current) =>
       Object.fromEntries(
         Object.entries(current).filter(([key]) => !key.startsWith(`${field.field}.`)),
       ),
     );
     onDetailValuesChange?.(next);
-    const validated = validateSearchValues(next);
-    if (validated) onDetailSearch?.(validated);
   };
 
   const handleDefaultSearchKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -694,43 +737,66 @@ export function PageSearchArea({
           />
           <Box
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 1,
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                sm: 'minmax(0, 1fr) auto',
+              },
+              gridTemplateRows: { xs: 'auto auto auto', sm: 'auto auto' },
+              alignItems: 'start',
+              columnGap: 1,
+              rowGap: 0.5,
               minWidth: 0,
             }}
           >
-            {activeDetailFilters.length > 0 && (
+            {visibleDetailFilters.length > 0 && (
               <Box
                 aria-label="적용된 상세 검색 조건"
                 sx={{
+                  gridColumn: { xs: '1 / -1', sm: 1 },
+                  gridRow: { xs: 2, sm: 1 },
                   display: 'flex',
                   alignItems: 'center',
                   flexWrap: 'wrap',
                   gap: 0.5,
-                  flex: '1 1 220px',
                   minWidth: 0,
                 }}
               >
-                {activeDetailFilters.map(({ field, displayValue }) => (
+                {visibleDetailFilters.map(({ field, displayValue }) => (
                   <Box
                     key={field.field}
-                    sx={{ display: 'inline-flex', alignItems: 'center', minWidth: 0 }}
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minWidth: 0,
+                      maxWidth: '100%',
+                    }}
                   >
                     <Chip
                       size="small"
                       variant="outlined"
                       label={`${field.label}: ${displayValue}`}
-                      sx={{ maxWidth: 'min(100%, 280px)', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+                      sx={{
+                        maxWidth: 'min(calc(100% - 24px), 280px)',
+                        '& .MuiChip-label': {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        },
+                      }}
                     />
                     <IconButton
                       type="button"
                       size="small"
                       aria-label={`${field.label} 검색 조건 제거`}
                       onClick={() => removeDetailFilter(field)}
-                      disabled={detailLoading}
+                      disabled={
+                        detailLoading ||
+                        field.required ||
+                        isFieldValueEmpty(
+                          field,
+                          getFieldValue(draftValues, field, defaultValues),
+                        )
+                      }
                       sx={{ ml: -0.5 }}
                     >
                       <CloseRoundedIcon fontSize="small" />
@@ -739,13 +805,35 @@ export function PageSearchArea({
                 ))}
               </Box>
             )}
+            {Object.keys(pendingRemovalFields).length > 0 && (
+              <FormHelperText
+                role="status"
+                sx={{
+                  gridColumn: '1 / -1',
+                  gridRow: {
+                    xs: visibleDetailFilters.length > 0 ? 3 : 2,
+                    sm: 2,
+                  },
+                  minWidth: 0,
+                  m: 0,
+                }}
+              >
+                조건 변경 내용은 조회 버튼을 눌러 적용하세요.
+              </FormHelperText>
+            )}
             <Box
+              role="group"
+              aria-label="상세 검색 작업"
               sx={{
+                gridColumn: { xs: '1 / -1', sm: 2 },
+                gridRow: 1,
                 display: 'flex',
                 justifyContent: 'flex-end',
+                justifySelf: 'end',
                 gap: 1,
                 flex: '0 0 auto',
-                ml: 'auto',
+                flexWrap: 'nowrap',
+                whiteSpace: 'nowrap',
               }}
             >
               <Button
@@ -755,6 +843,7 @@ export function PageSearchArea({
                   setDraftValues(defaultValues);
                   setDateErrors({});
                   setRequiredErrors({});
+                  setPendingRemovalFields({});
                   onDetailValuesChange?.(defaultValues);
                   onDetailReset?.(defaultValues);
                 }}

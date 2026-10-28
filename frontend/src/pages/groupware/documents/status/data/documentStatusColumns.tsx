@@ -134,6 +134,7 @@ export function createDocumentStatusColumns({
         order: 1,
         span: 4,
         group: '결재신청일',
+        required: true,
         defaultValue: {
           from: { type: 'systemDate', offset: { months: -1 } },
           to: { type: 'systemDate' },
