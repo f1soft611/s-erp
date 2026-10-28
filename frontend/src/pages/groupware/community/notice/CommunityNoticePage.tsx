@@ -65,6 +65,11 @@ export function CommunityNoticePage({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const { showError, showSuccess } = useNotification();
+  const [dashboardPostId] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('dashboardPostId'));
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  });
+  const dashboardNoticeOpened = useRef(false);
   const hasCreatePermission = true;
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [pendingPinnedNotice, setPendingPinnedNotice] =
@@ -199,6 +204,13 @@ export function CommunityNoticePage({
   useEffect(() => {
     void loadNoticePosts();
   }, [loadNoticePosts]);
+
+  useEffect(() => {
+    if (dashboardPostId === null || dashboardNoticeOpened.current || isInitialLoading || errorMessage) return;
+    dashboardNoticeOpened.current = true;
+    const exists = [...noticeItems, ...pinnedNoticeItems].some((item) => item.id === dashboardPostId);
+    void handleSelectNotice({ id: dashboardPostId, appendMissing: !exists });
+  }, [dashboardPostId, isInitialLoading, errorMessage, noticeItems, pinnedNoticeItems, handleSelectNotice]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = useMemo(
     () => [

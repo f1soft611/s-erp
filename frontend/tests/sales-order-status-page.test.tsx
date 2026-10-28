@@ -148,6 +148,7 @@ async function openOrderDetailPanel() {
 describe('sales order status page', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/');
     orderItem = createOrderItem();
     apiGetMock.mockReset();
     apiPutMock.mockReset();
@@ -163,6 +164,32 @@ describe('sales order status page', () => {
     apiPutMock.mockImplementation(() => Promise.resolve({ item: orderItem }));
   });
 
+  it('uses the dashboard month instead of an unrelated saved search', async () => {
+      window.sessionStorage.setItem('s-erp:page:sales-order-status', JSON.stringify({
+        version: 1, value: { keyword: '이전 검색', detailValues: { status: '완료' } },
+      }));
+      window.history.replaceState(null, '', '/sales/order/status?dashboardMonth=2026-02');
+      renderStatusPage();
+      await waitFor(() => {
+        const request = listRequests().at(-1)!;
+        expect(request?.get('orderDtFrom')).toBe('2026-02-01');
+        expect(request?.get('orderDtTo')).toBe('2026-02-28');
+        expect(request?.get('keyword')).toBeNull();
+        expect(request?.get('status')).toBeNull();
+      });
+    });
+
+    it('drills down to due dates without accidentally restricting order dates', async () => {
+      window.history.replaceState(null, '', '/sales/order/status?dashboardDueFrom=2026-10-28&dashboardDueTo=2026-11-03&dashboardOrderNo=SO-FIXTURE');
+      renderStatusPage();
+      await waitFor(() => {
+        const request = listRequests().at(-1)!;
+        expect(request?.get('deliveryDtFrom')).toBe('2026-10-28');
+        expect(request?.get('deliveryDtTo')).toBe('2026-11-03');
+        expect(request?.get('orderNo')).toBe('SO-FIXTURE');
+        expect(request?.get('orderDtFrom')).toBeNull();
+      });
+    });
   it('restores the last search conditions after returning to the page', async () => {
     const first = renderStatusPage();
     await screen.findByText('SO-20261027-0001');
