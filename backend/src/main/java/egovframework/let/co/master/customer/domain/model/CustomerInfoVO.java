@@ -43,9 +43,17 @@ public class CustomerInfoVO implements Serializable {
 
     @Schema(description = "종목")
     private String businessItem1;
+
+    @Schema(description = "거래처 대분류 ID")
     private Long businessKind1;
+
+    @Schema(description = "거래처 소분류 ID")
     private Long businessKind2;
+
+    @Schema(description = "거래처 대분류명")
     private String businessKind1Name;
+
+    @Schema(description = "거래처 소분류명")
     private String businessKind2Name;
 
     @Schema(description = "우편번호")

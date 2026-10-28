@@ -46,8 +46,12 @@ public class CustomerInfoSaveRequestVO implements Serializable {
     @Schema(description = "거래처 소분류 ID. null은 해제, 수정 시 미전송은 기존 값 유지")
     @JsonDeserialize(using = ClassificationIdDeserializer.class)
     private Long businessKind2;
+
+    @Schema(description = "거래처 대분류 ID 전송 여부. 서버 내부 상태", hidden = true)
     @JsonIgnore
     private boolean businessKind1Provided;
+
+    @Schema(description = "거래처 소분류 ID 전송 여부. 서버 내부 상태", hidden = true)
     @JsonIgnore
     private boolean businessKind2Provided;
 

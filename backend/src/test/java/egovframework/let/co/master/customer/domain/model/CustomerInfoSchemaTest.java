@@ -63,6 +63,29 @@ class CustomerInfoSchemaTest {
     }
 
     @Test
+    void generatedOpenApiDocumentsClassificationWithoutInternalPresenceFlags() {
+        ResolvedSchema response = ModelConverters.getInstance().resolveAsResolvedSchema(
+                new AnnotatedType(CustomerInfoVO.class));
+        io.swagger.v3.oas.models.media.Schema<?> responseSchema = response.schema;
+        for (String field : new String[] {
+                "businessKind1", "businessKind2", "businessKind1Name", "businessKind2Name" }) {
+            io.swagger.v3.oas.models.media.Schema<?> property = responseSchema.getProperties().get(field);
+            assertNotNull(property, field);
+            assertNotNull(property.getDescription(), field);
+            assertFalse(property.getDescription().trim().isEmpty(), field);
+        }
+        for (Class<?> model : new Class<?>[] {
+                CustomerInfoSaveRequestVO.class, CustomerInfoChangeVO.class }) {
+            ResolvedSchema request = ModelConverters.getInstance().resolveAsResolvedSchema(
+                    new AnnotatedType(model));
+            assertTrue(request.schema.getProperties().containsKey("businessKind1"));
+            assertTrue(request.schema.getProperties().containsKey("businessKind2"));
+            assertFalse(request.schema.getProperties().containsKey("businessKind1Provided"));
+            assertFalse(request.schema.getProperties().containsKey("businessKind2Provided"));
+        }
+    }
+
+    @Test
     void documentsRequiredNameAndUseStatusContract() throws Exception {
         Schema name = CustomerInfoSaveRequestVO.class.getDeclaredField("customerName")
                 .getAnnotation(Schema.class);
