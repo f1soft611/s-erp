@@ -468,6 +468,7 @@ export function DocumentApprovalDetailFeed(
 
     let active = true;
     setLoadError('');
+    void loadComments();
     void getDocumentApprovalDetail(electronicApprovalId)
       .then((nextDetail) => {
         if (active) setDetail(nextDetail);
@@ -485,7 +486,13 @@ export function DocumentApprovalDetailFeed(
     return () => {
       active = false;
     };
-  }, [detailRefreshToken, electronicApprovalId, isFeedPresentation, open]);
+  }, [
+    detailRefreshToken,
+    electronicApprovalId,
+    isFeedPresentation,
+    loadComments,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || electronicApprovalId === null || isFeedPresentation) return;

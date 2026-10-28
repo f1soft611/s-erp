@@ -9,6 +9,7 @@ import type {
 export function useSalesOrderStatusList(filters: SalesOrderStatusFilters | null) {
   const [rows, setRows] = useState<SalesOrderStatusRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState('');
   const [retryRequest, setRetryRequest] = useState({ version: 0, quiet: false });
   const previousRetryVersion = useRef(0);
@@ -21,12 +22,14 @@ export function useSalesOrderStatusList(filters: SalesOrderStatusFilters | null)
       retryRequest.quiet && retryRequest.version !== previousRetryVersion.current;
     previousRetryVersion.current = retryRequest.version;
     start();
+    setHasLoaded(false);
     if (!isQuietReload) setLoading(true);
     setError('');
     void searchSalesOrderStatus(filters)
       .then((result) => {
         if (!cancelled) {
           setRows(result);
+          setHasLoaded(true);
           succeed();
         }
       })
@@ -53,5 +56,5 @@ export function useSalesOrderStatusList(filters: SalesOrderStatusFilters | null)
     [],
   );
 
-  return { initialLoad, rows, loading, error, clearError, retry, refreshQuietly };
+  return { initialLoad, rows, loading, hasLoaded, error, clearError, retry, refreshQuietly };
 }

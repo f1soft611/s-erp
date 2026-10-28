@@ -826,8 +826,36 @@ describe('document status page', () => {
     );
     renderDocumentStatusPage();
 
+    const message = (
+      await screen.findByText(/조회 결과가 없습니다.*기간을 넓히거나/)
+    ).closest('[role="status"]')!;
+    expect(message).toHaveClass('MuiAlert-colorInfo');
     expect(
-      await screen.findByText(/조회 결과가 없습니다.*기간을 넓히거나/),
-    ).toBeInTheDocument();
+      message.compareDocumentPosition(screen.getByRole('grid', { name: '문서현황' }))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(message).getByRole('button', { name: '검색 조건 초기화' })).toBeInTheDocument();
+  });
+
+  it('hides the empty result message while refreshing and after rows arrive', async () => {
+    api.get.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : Promise.resolve({ resultList: [], totalRowCount: 0 }),
+    );
+    renderDocumentStatusPage('documents', true);
+    await screen.findByText(/조회 결과가 없습니다/);
+
+    let resolveList!: (value: { resultList: DocumentStatusRow[]; totalRowCount: number }) => void;
+    api.get.mockImplementation(() => new Promise((resolve) => { resolveList = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
+    await waitFor(() => expect(getListRequests()).toBe(2));
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+    expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
+    expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
+
+    await act(async () => resolveList({ resultList: [row], totalRowCount: 1 }));
+    await screen.findByRole('gridcell', { name: 'Annual plan' });
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
   });
 });

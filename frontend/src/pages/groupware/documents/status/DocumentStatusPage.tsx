@@ -4,10 +4,10 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
+import { EmptySearchResultMessage } from '../../../../shared/components/EmptySearchResultMessage';
 import { DocumentStatusDetail } from './components/DocumentStatusDetail';
 import { DocumentStatusGrid } from './components/DocumentStatusGrid';
 import { DocumentStatusSearchArea } from './components/DocumentStatusSearchArea';
-import { EmptyDocumentStatus } from './components/EmptyDocumentStatus';
 import { useDocumentStatusDetail } from './hooks/useDocumentStatusDetail';
 import { useDocumentStatusList } from './hooks/useDocumentStatusList';
 import { useDocumentStatusSearch } from './hooks/useDocumentStatusSearch';
@@ -94,6 +94,10 @@ export function DocumentStatusPage({
         message={search.defaultsError ?? list.error}
         onClose={list.clearError}
       />
+      {list.hasLoaded && !list.loading && !list.initialLoad.loading
+        && list.totalRowCount === 0 && !search.defaultsError && !list.error ? (
+        <EmptySearchResultMessage onReset={search.resetSearch} />
+      ) : null}
       {search.defaultsError || list.error ? (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
           <Button
@@ -128,9 +132,6 @@ export function DocumentStatusPage({
               onOpenDocument={detail.handleOpenDocument}
             />
           </Box>
-        ) : null}
-        {list.hasLoaded && list.totalRowCount === 0 && !list.error ? (
-          <EmptyDocumentStatus onReset={search.resetSearch} />
         ) : null}
       </Box>
       </PageLoadBoundary>

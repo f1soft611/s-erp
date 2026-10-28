@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
@@ -162,6 +162,42 @@ describe('sales order status page', () => {
       return Promise.resolve({ resultList: [statusRow], resultCnt: 1 });
     });
     apiPutMock.mockImplementation(() => Promise.resolve({ item: orderItem }));
+  });
+
+  it('shows the empty result message only after success and hides it during retry and errors', async () => {
+    let resolveList!: (value: { resultList: SalesOrderStatusRow[]; resultCnt: number }) => void;
+    let rejectList!: (reason: Error) => void;
+    apiGetMock.mockImplementation((path: string) =>
+      path.includes('/common/system-date')
+        ? Promise.resolve({ today: SYSTEM_TODAY })
+        : new Promise((resolve, reject) => {
+          resolveList = resolve;
+          rejectList = reject;
+        }),
+    );
+    renderStatusPage();
+    await waitFor(() => expect(listRequests()).toHaveLength(1));
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+
+    await act(async () => resolveList({ resultList: [], resultCnt: 0 }));
+    const message = (await screen.findByText(/조회 결과가 없습니다/)).closest('[role="status"]')!;
+    expect(message).toHaveClass('MuiAlert-colorInfo');
+    expect(
+      message.compareDocumentPosition(screen.getByRole('grid', { name: '수주현황 목록' }))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(within(message).getByRole('button', { name: '검색 조건 초기화' }));
+    await waitFor(() => expect(listRequests()).toHaveLength(2));
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+    expect(listRequests().at(-1)?.get('orderDtFrom')).toBe('2026-09-27');
+    expect(listRequests().at(-1)?.get('orderDtTo')).toBe(SYSTEM_TODAY);
+
+    await act(async () => rejectList(new Error('Fixture list unavailable')));
+    const error = await screen.findByRole('alert');
+    expect(error).toHaveTextContent('Fixture list unavailable');
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+    fireEvent.click(within(error).getByRole('button'));
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
   });
 
   it('uses the dashboard month instead of an unrelated saved search', async () => {

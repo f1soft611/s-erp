@@ -20,6 +20,16 @@
 
 ## 화면 캡처
 
+### 모든 칩 해제 후 안내 위치 보완
+
+- 재현: 마지막 조건 칩을 해제해도 안내가 두 번째 행에 남아 하단에 빈 줄이 생겼다.
+- 원인: 데스크톱 안내의 `gridRow`가 항상 2로 고정되어 있었다.
+- 해결: 남은 칩이 없을 때만 안내를 첫 행 왼쪽으로 이동하고 버튼은 첫 행 오른쪽을 유지한다. 모바일은 겹침 방지를 위해 버튼 아래에 안내를 둔다.
+- 회귀 검증: 실제 브라우저 375px / 768px / 1280px에서 마지막 칩 제거 전후의 위치와 가로 넘침 없음을 확인했다.
+- [모든 칩 해제 375px](screenshots/detail-search-empty-chips-375px.png)
+- [모든 칩 해제 768px](screenshots/detail-search-empty-chips-768px.png)
+- [모든 칩 해제 1280px](screenshots/detail-search-empty-chips-1280px.png)
+
 - [375px](screenshots/detail-search-pending-375px.png)
 - [768px](screenshots/detail-search-pending-768px.png)
 - [1280px](screenshots/detail-search-pending-1280px.png)

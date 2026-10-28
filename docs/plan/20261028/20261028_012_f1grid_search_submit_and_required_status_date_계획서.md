@@ -6,6 +6,8 @@
 
 ## 파일별 계획
 
+- 남은 칩이 없으면 `PageSearchArea` 안내의 데스크톱 행/열을 첫 행 왼쪽으로 변경하고, 마지막 칩 제거 전후의 실제 브라우저 배치를 검증한다.
+
 - `frontend/tests/page-search-area-detail.test.tsx`: 칩 제거는 검색하지 않는지, 여러 칩 제거가 누적되는지, 필수 조건 칩 해제가 차단되는지, 적용칩/조회 전 안내가 정확한지 테스트한다.
 - `frontend/src/shared/components/PageSearchArea.tsx`: 선택적 조건 제거는 `draftValues`를 기반으로 변경하고 검색 callback을 호출하지 않는다. 필수 조건 X와 이미 제거된 필드의 X는 비활성화한다.
 - 상세검색 하단은 데스크톱에서 칩과 버튼을 한 행, 안내를 다음 전체 행에 두고, 좁은 화면에서 버튼을 첫 행 우측에 두어 칩 영역이 충분한 너비를 확보하게 한다.

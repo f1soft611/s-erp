@@ -3201,6 +3201,52 @@ describe('Document write page', () => {
   }, 15000);
 
   it('opens a revision-requested draft in the composer with its persisted content and approvers', async () => {
+    mockPaginatedDocumentLists();
+    composerApi.listApprovalComments.mockReset();
+    composerApi.listApprovalComments
+      .mockResolvedValueOnce({
+        comments: [],
+        systemEvents: [
+          {
+            commentId: 40,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RETURNED',
+            content: '문서 보완이 요청되었습니다.',
+            writerName: '홍길동',
+            attachments: [],
+          },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 1,
+      })
+      .mockResolvedValueOnce({
+        comments: [],
+        systemEvents: [
+          {
+            commentId: 41,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RESUBMITTED',
+            content: '문서가 재상신되었습니다.',
+            writerName: '김민수',
+            attachments: [],
+          },
+          {
+            commentId: 40,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RETURNED',
+            content: '문서 보완이 요청되었습니다.',
+            writerName: '홍길동',
+            attachments: [],
+          },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 2,
+      });
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 4,
       eabusNo: '004',
@@ -3248,13 +3294,14 @@ describe('Document write page', () => {
     fireEvent.click(
       await within(listRegion).findByRole('button', { name: /문서 D/ }),
     );
-    await screen.findByTestId('post-detail-panel');
+    const detailPanel = await screen.findByTestId('post-detail-panel');
+    await within(detailPanel).findByText('문서 보완이 요청되었습니다.');
     fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
-    await screen.findByRole('dialog', { name: '문서 작성' });
+    const composer = await screen.findByRole('dialog', { name: '문서 작성' });
     await screen.findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
 
-    expect(screen.getByTestId('post-detail-panel')).toBeInTheDocument();
+    expect(detailPanel).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
       '보완할 기안서',
     );
@@ -3267,6 +3314,21 @@ describe('Document write page', () => {
       '결재 1 홍길동',
     );
     expect(approvalPeople[1]).toHaveAttribute('aria-label', '결재 2 김민수');
+
+    await waitFor(() =>
+      expect(within(composer).getByRole('button', { name: '결재신청' })).toBeEnabled(),
+    );
+    fireEvent.click(within(composer).getByRole('button', { name: '결재신청' }));
+    await waitFor(() =>
+      expect(composerApi.submitDocumentApproval).toHaveBeenCalled(),
+    );
+    await waitForElementToBeRemoved(composer);
+    await waitFor(() =>
+      expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2),
+    );
+    expect(
+      await within(detailPanel).findByText('문서가 재상신되었습니다.'),
+    ).toBeInTheDocument();
   }, 15000);
 
   it('shows and preserves existing attachments when editing a revision-requested document', async () => {

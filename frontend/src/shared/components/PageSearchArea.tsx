@@ -809,10 +809,13 @@ export function PageSearchArea({
               <FormHelperText
                 role="status"
                 sx={{
-                  gridColumn: '1 / -1',
+                  gridColumn: {
+                    xs: '1 / -1',
+                    sm: visibleDetailFilters.length > 0 ? '1 / -1' : 1,
+                  },
                   gridRow: {
                     xs: visibleDetailFilters.length > 0 ? 3 : 2,
-                    sm: 2,
+                    sm: visibleDetailFilters.length > 0 ? 2 : 1,
                   },
                   minWidth: 0,
                   m: 0,
