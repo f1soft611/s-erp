@@ -474,6 +474,62 @@ describe('document status page', () => {
     expect(getListRequest().get('keyword')).toBe('applied');
   });
 
+  it('keeps applied detail filters when a keyword search follows unsubmitted edits', async () => {
+    renderDocumentStatusPage('documents', true);
+    await screen.findByText('41');
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const detail = screen.getByRole('dialog', { name: '상세 검색' });
+    fireEvent.change(within(detail).getByRole('textbox', { name: '제목' }), {
+      target: { value: '적용된 제목' },
+    });
+    fireEvent.click(within(detail).getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(getListRequest().get('title')).toBe('적용된 제목'));
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(
+      within(screen.getByRole('dialog', { name: '상세 검색' })).getByRole(
+        'textbox',
+        { name: '제목' },
+      ),
+      { target: { value: '미적용 제목' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 닫기' }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '문서현황 빠른 검색' }),
+      { target: { value: 'quick' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => {
+      expect(getListRequest().get('keyword')).toBe('quick');
+      expect(getListRequest().get('title')).toBe('적용된 제목');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.change(
+      within(screen.getByRole('dialog', { name: '상세 검색' })).getByRole(
+        'textbox',
+        { name: '제목' },
+      ),
+      { target: { value: '두 번째 미적용 제목' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 닫기' }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: '문서현황 빠른 검색' }),
+      { target: { value: 'quick-enter' } },
+    );
+    fireEvent.keyDown(
+      screen.getByRole('textbox', { name: '문서현황 빠른 검색' }),
+      { key: 'Enter', code: 'Enter' },
+    );
+
+    await waitFor(() => {
+      expect(getListRequest().get('keyword')).toBe('quick-enter');
+      expect(getListRequest().get('title')).toBe('적용된 제목');
+    });
+  }, 15000);
+
   it('restores the default submitted date after resetting conditions', async () => {
     window.sessionStorage.setItem(
       's-erp:page:document-status',

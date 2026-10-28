@@ -132,6 +132,7 @@ export function useDocumentStatusSearch(
     setKeyword,
     detailFields,
     detailValues,
+    appliedDetailValues: searchSession?.detailValues ?? {},
     setDetailValues,
     appliedFilters,
     defaultsInitialized,

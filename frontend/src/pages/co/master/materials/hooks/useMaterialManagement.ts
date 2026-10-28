@@ -5,8 +5,9 @@ import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadS
 import { fetchMaterialOptions, fetchMaterials, saveMaterialRows, toMaterialPayload } from '../services/materialManagement.service';
 import type { MaterialFilters, MaterialOption, MaterialRow } from '../types/materialManagement.types';
 
-export function useMaterialManagement() {
+export function useMaterialManagement(initialFilters: MaterialFilters = {}) {
   const { showSuccess } = useNotification();
+  const initialFiltersRef = useRef(initialFilters);
   const [rows, setRows] = useState<MaterialRow[]>([]);
   const [options, setOptions] = useState<MaterialOption[]>([]);
   const [error, setError] = useState('');
@@ -14,7 +15,7 @@ export function useMaterialManagement() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
-  const [appliedFilters, setAppliedFilters] = useState<MaterialFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<MaterialFilters>(initialFilters);
   const savingRef = useRef(false);
   const reconciliationRequired = useRef(false);
   const loadVersion = useRef(0);
@@ -45,7 +46,7 @@ export function useMaterialManagement() {
   }, [start, succeed, fail]);
 
   useEffect(() => {
-    void loadRows({});
+    void loadRows(initialFiltersRef.current);
     return () => { ++loadVersion.current; };
   }, [loadRows]);
 

@@ -230,8 +230,8 @@ export function CommonCodeManagementPage({
     async (
       filters: CommonCodeGroupSearchFilters,
       mode: CommonCodeSearchMode,
-      searchQueryValue = searchQuery,
-      detailValuesValue = detailValues,
+      searchQueryValue: string,
+      detailValuesValue: Record<string, PageSearchFieldValue>,
     ) => {
       try {
         await loadGroups({ filters, showSkeleton: true });
@@ -247,28 +247,30 @@ export function CommonCodeManagementPage({
         // loadGroups already exposes the request error and keeps the old session.
       }
     },
-    [detailValues, loadGroups, searchQuery, setPageSession],
+    [loadGroups, setPageSession],
   );
 
   const requestRefresh = useCallback(
     (
       filters: CommonCodeGroupSearchFilters = { keyword: searchQuery },
       mode: CommonCodeSearchMode = 'default',
+      searchQueryValue = searchQuery,
+      detailValuesValue = pageSession.detailValues,
     ) => {
       if (savingRef.current) return;
       if (panelDirty) {
           pendingSearchRef.current = {
             filters,
             mode,
-            searchQuery,
-            detailValues,
+            searchQuery: searchQueryValue,
+            detailValues: detailValuesValue,
           };
         setRefreshConfirmOpen(true);
         return;
       }
-      void executeRefresh(filters, mode);
+      void executeRefresh(filters, mode, searchQueryValue, detailValuesValue);
     },
-    [executeRefresh, panelDirty, searchQuery],
+    [executeRefresh, pageSession.detailValues, panelDirty, searchQuery],
   );
 
   const confirmRefresh = useCallback(() => {
@@ -280,7 +282,7 @@ export function CommonCodeManagementPage({
       filters: { keyword: searchQuery },
       mode: 'default' as const,
       searchQuery,
-      detailValues,
+      detailValues: pageSession.detailValues,
     };
     pendingSearchRef.current = null;
     void executeRefresh(
@@ -289,7 +291,7 @@ export function CommonCodeManagementPage({
       pendingSearch.searchQuery,
       pendingSearch.detailValues,
     );
-  }, [executeRefresh, searchQuery, detailValues]);
+  }, [executeRefresh, pageSession.detailValues, searchQuery]);
 
   const detailFields = toPageSearchFields(groupColumns);
   const handleDetailSearch = useCallback(
@@ -305,9 +307,11 @@ export function CommonCodeManagementPage({
           groupDc: toText(values.groupDc),
         },
         'detail',
+        searchQuery,
+        values,
       );
     },
-    [requestRefresh],
+    [requestRefresh, searchQuery],
   );
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
@@ -411,6 +415,9 @@ export function CommonCodeManagementPage({
         }
         detailFields={detailFields}
         detailValues={detailValues}
+        appliedDetailValues={
+          pageSession.searchMode === 'detail' ? pageSession.detailValues : {}
+        }
         onDetailValuesChange={(values) => {
           if (!savingRef.current) setDetailValues(values);
         }}

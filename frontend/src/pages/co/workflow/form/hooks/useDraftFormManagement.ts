@@ -35,8 +35,9 @@ function toPayload(
   };
 }
 
-export function useDraftFormManagement() {
+export function useDraftFormManagement(initialFilters: DraftFormFilters = {}) {
   const { showSuccess } = useNotification();
+  const initialFiltersRef = useRef(initialFilters);
   const [rows, setRows] = useState<DraftFormRow[]>([]);
   const [categoryItems, setCategoryItems] = useState<CommonCodeItemRow[]>([]);
   const [cycleItems, setCycleItems] = useState<CommonCodeItemRow[]>([]);
@@ -49,7 +50,7 @@ export function useDraftFormManagement() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
-  const [appliedFilters, setAppliedFilters] = useState<DraftFormFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<DraftFormFilters>(initialFilters);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
   const { start: startOptions, succeed: succeedOptions, fail: failOptions, ...optionsInitialLoad } = useInitialLoadState();
   const loadVersion = useRef(0);
@@ -114,7 +115,7 @@ export function useDraftFormManagement() {
   }, [startOptions, succeedOptions, failOptions]);
 
   useEffect(() => {
-    void Promise.all([loadRows({}), loadOptions()]);
+    void Promise.all([loadRows(initialFiltersRef.current), loadOptions()]);
     return () => {
       ++loadVersion.current;
       ++optionsVersion.current;

@@ -9,6 +9,7 @@ type DocumentStatusSearchAreaProps = {
   onKeywordChange: (value: string) => void;
   detailFields: PageSearchField[];
   detailValues: DocumentStatusSearchValues;
+  appliedDetailValues: DocumentStatusSearchValues;
   defaultValues: DocumentStatusSearchValues;
   onDetailValuesChange: (values: DocumentStatusSearchValues) => void;
   onSearch: (values?: DocumentStatusSearchValues) => void;
@@ -22,6 +23,7 @@ export function DocumentStatusSearchArea({
   onKeywordChange,
   detailFields,
   detailValues,
+  appliedDetailValues,
   defaultValues,
   onDetailValuesChange,
   onSearch,
@@ -60,10 +62,11 @@ export function DocumentStatusSearchArea({
         />
       }
       onDefaultSearch={() => {
-        if (initialized) onSearch();
+        if (initialized) onSearch(appliedDetailValues);
       }}
       detailFields={detailFields}
       detailValues={detailValues}
+      appliedDetailValues={appliedDetailValues}
       defaultValues={defaultValues}
       onDetailValuesChange={onDetailValuesChange}
       onDetailSearch={onSearch}

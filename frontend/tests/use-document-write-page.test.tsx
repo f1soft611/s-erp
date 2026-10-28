@@ -153,6 +153,26 @@ describe('useDocumentWritePage date metadata', () => {
       );
     });
 
+    it('clears the dashboard scope when selecting a notice', async () => {
+      const onScopeChange = vi.fn();
+      const { result } = renderHook(() => useDocumentWritePage('DRAFT', onScopeChange));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.selectNotice(42));
+      await waitFor(() =>
+        expect(listDocumentApprovals).toHaveBeenLastCalledWith(
+          'ALL',
+          undefined,
+          42,
+          false,
+          firstPage,
+        ),
+      );
+
+      expect(result.current.scope).toBe('ALL');
+      expect(onScopeChange).toHaveBeenCalledWith(null);
+    });
+
     it.each([
       ['MY_PENDING', '#내가 처리할 결재'],
       ['IN_PROGRESS', '#결재 진행 중'],

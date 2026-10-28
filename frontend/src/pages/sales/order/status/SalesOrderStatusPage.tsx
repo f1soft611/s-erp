@@ -95,7 +95,7 @@ export function SalesOrderStatusPage({
           icon: SearchIcon,
           visible: selectedMenuPermissions?.read ?? false,
           disabled: !search.defaultsInitialized || list.loading,
-          onClick: () => search.applySearch(),
+          onClick: () => search.applySearch(search.appliedDetailValues),
         },
       ],
     },
@@ -129,6 +129,7 @@ export function SalesOrderStatusPage({
           onKeywordChange={search.setKeyword}
           detailFields={search.detailFields}
           detailValues={search.detailValues}
+          appliedDetailValues={search.appliedDetailValues}
           defaultValues={search.searchAreaDefaultValues}
           onDetailValuesChange={search.setDetailValues}
           onSearch={search.applySearch}

@@ -440,6 +440,56 @@ describe('sales order status page', () => {
     });
   });
 
+  it('keeps applied detail filters when a keyword search follows unsubmitted edits', async () => {
+    renderStatusPage();
+    await screen.findByText('SO-20261027-0001');
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const detail = screen.getByRole('dialog', { name: '상세 검색' });
+    expect(screen.getByLabelText('수주일자 시작일')).toBeRequired();
+    expect(screen.getByLabelText('수주일자 종료일')).toBeRequired();
+    fireEvent.mouseDown(within(detail).getByRole('combobox', { name: '수주상태' }));
+    fireEvent.click(await screen.findByRole('option', { name: '수주등록' }));
+    fireEvent.click(within(detail).getByRole('button', { name: '조회' }));
+
+    await waitFor(() => {
+      expect(listRequests().at(-1)?.get('status')).toBe('수주등록');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const reopenedDetail = screen.getByRole('dialog', { name: '상세 검색' });
+    fireEvent.mouseDown(
+      within(reopenedDetail).getByRole('combobox', { name: '수주상태' }),
+    );
+    fireEvent.click(await screen.findByRole('option', { name: '취소' }));
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 닫기' }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: '수주현황 빠른 검색' }), {
+      target: { value: '볼트' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => {
+      const request = listRequests().at(-1)!;
+      expect(request.get('keyword')).toBe('볼트');
+      expect(request.get('status')).toBe('수주등록');
+    });
+
+    fireEvent.change(screen.getByRole('textbox', { name: '수주현황 빠른 검색' }), {
+      target: { value: '너트' },
+    });
+    fireEvent.keyDown(
+      screen.getByRole('textbox', { name: '수주현황 빠른 검색' }),
+      { key: 'Enter', code: 'Enter' },
+    );
+
+    await waitFor(() => {
+      const request = listRequests().at(-1)!;
+      expect(request.get('keyword')).toBe('너트');
+      expect(request.get('status')).toBe('수주등록');
+    });
+  }, 15000);
+
   it('hides the 조회 action without read permission', async () => {
     renderStatusPage({ read: false, create: false, update: false, delete: false, excel: false });
 

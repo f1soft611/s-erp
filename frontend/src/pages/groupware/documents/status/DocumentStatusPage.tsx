@@ -42,7 +42,7 @@ export function DocumentStatusPage({
           icon: SearchIcon,
           visible: selectedMenuPermissions?.read ?? false,
           disabled: !search.defaultsInitialized || search.defaultsLoading,
-          onClick: () => search.applySearch(),
+          onClick: () => search.applySearch(search.appliedDetailValues),
         },
       ],
     },
@@ -82,6 +82,7 @@ export function DocumentStatusPage({
         onKeywordChange={search.setKeyword}
         detailFields={search.detailFields}
         detailValues={search.detailValues}
+        appliedDetailValues={search.appliedDetailValues}
         defaultValues={search.searchAreaDefaultValues}
         onDetailValuesChange={search.setDetailValues}
         onSearch={search.applySearch}

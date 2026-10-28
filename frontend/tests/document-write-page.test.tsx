@@ -52,6 +52,14 @@ const composerNotifications = vi.hoisted(() => ({
   showError: vi.fn(),
 }));
 
+const approvalLineTemplateApi = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+  create: vi.fn(),
+  rename: vi.fn(),
+  delete: vi.fn(),
+}));
+
 let restoreImagePreloader: (() => void) | undefined;
 
 function getButtonGeometry(button: HTMLElement) {
@@ -74,6 +82,17 @@ afterEach(() => {
 vi.mock('../src/shared/context/NotificationContext', () => ({
   useNotification: () => composerNotifications,
 }));
+
+vi.mock(
+  '../src/pages/groupware/documents/write/services/approvalLineTemplate.service',
+  () => ({
+    listApprovalLineTemplates: approvalLineTemplateApi.list,
+    getApprovalLineTemplate: approvalLineTemplateApi.get,
+    createApprovalLineTemplate: approvalLineTemplateApi.create,
+    renameApprovalLineTemplate: approvalLineTemplateApi.rename,
+    deleteApprovalLineTemplate: approvalLineTemplateApi.delete,
+  }),
+);
 
 vi.mock(
   '../src/pages/co/workflow/form/services/draftFormManagement.service',
@@ -396,6 +415,7 @@ const draftFormTemplate = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  approvalLineTemplateApi.list.mockResolvedValue([]);
   composerApi.fetchDraftFormOptions.mockResolvedValue({
     categoryGroup: null,
     categoryItems: [category],
@@ -696,6 +716,40 @@ describe('Document write page', () => {
     ));
     expect(composerNotifications.showSuccess).toHaveBeenCalledWith('업무연락이 발송되었습니다.');
   }, 60000);
+
+  it('business-contact reference settings button opens the reference-only dialog', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    const confirmation = await screen.findByRole('dialog', {
+      name: '문서 유형 변경',
+    });
+    fireEvent.click(
+      within(confirmation).getByRole('button', { name: '이동' }),
+    );
+    await waitForElementToBeRemoved(confirmation);
+
+    const referenceRow = screen.getByTestId('document-reference-row');
+    const referenceInput = within(referenceRow).getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    const referenceControl = referenceInput.closest('.MuiInputBase-root');
+    const referenceSettingsButton = within(referenceRow).getByRole('button', {
+      name: '자주 쓰는 참조자',
+    });
+    expect(referenceControl).toHaveStyle({ height: '40px' });
+    expect(referenceSettingsButton).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
+    fireEvent.click(
+      referenceSettingsButton,
+    );
+    expect(
+      await screen.findByTestId('document-approval-settings-dialog'),
+    ).toBeInTheDocument();
+  }, 30000);
 
   it('business contact tab confirmation preserves content and resets all participants only after moving', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -5092,10 +5146,14 @@ describe('Document write page', () => {
     const selectorControl = screen
       .getByRole('combobox', { name: '결재선 2 사용자 선택' })
       .closest('.MuiInputBase-root');
+    const referenceControl = screen
+      .getByRole('combobox', { name: '참조자 선택' })
+      .closest('.MuiInputBase-root');
     expect(screen.getByTestId('document-approval-grid')).toHaveStyle({
       display: 'grid',
     });
     expect(selectorControl).toHaveStyle({ height: '40px' });
+    expect(referenceControl).toHaveStyle({ height: '40px' });
     expect(screen.getByRole('button', { name: '결재 추가' })).toHaveStyle({
       height: '40px',
     });
