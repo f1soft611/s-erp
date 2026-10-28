@@ -97,7 +97,7 @@ export function SalesOrderStatusDetailPanel({
     <PageAreaOverlay onClose={onClose}>
       <PostDetailPanel
         title="수주 상세"
-        subtitle={order?.orderNo}
+        subtitle={order ? `수주번호: ${order.orderNo}` : undefined}
         onClose={onClose}
         isLoading={loading && order === null}
         loadingLabel="수주 상세를 불러오는 중입니다."

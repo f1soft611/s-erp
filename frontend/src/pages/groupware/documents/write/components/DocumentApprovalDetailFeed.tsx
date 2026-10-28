@@ -33,6 +33,8 @@ import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerD
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import { DocumentActionsMenu } from './DocumentActionsMenu';
+import { DocumentLinkPreviews } from './DocumentLinkPreviews';
+import { buildDocumentShareLink, parseDocumentShareLink, resolveDocumentShareReference } from '../data/documentShareLink';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MessageOutlinedIcon from '@mui/icons-material/MessageOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
@@ -86,6 +88,8 @@ type DocumentApprovalDetailFeedSharedProps = {
   isPinned?: boolean;
   pinPending?: boolean;
   detailRefreshToken: number;
+  onOpenDocument?: (documentId: number) => void;
+  allowDocumentChanges?: boolean;
 };
 
 type DocumentApprovalDetailFeedProps =
@@ -284,6 +288,8 @@ export function DocumentApprovalDetailFeed(
     onTogglePin,
     pinPending = false,
     detailRefreshToken,
+    onOpenDocument,
+    allowDocumentChanges = true,
   } = props;
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -935,7 +941,18 @@ export function DocumentApprovalDetailFeed(
 
   const documentMenu = detail ? (
     <DocumentActionsMenu
-      isDrafter={detail.isDrafter}
+      onShare={() => {
+        void (async () => {
+          try {
+            const link = await buildDocumentShareLink(detail.electronicApprovalId);
+            await navigator.clipboard.writeText(link);
+            showSuccess('문서 링크가 복사되었습니다.');
+          } catch {
+            showError('문서 링크를 복사하지 못했습니다. 공유 설정 또는 클립보드 권한을 확인해 주세요.');
+          }
+        })();
+      }}
+      isDrafter={detail.isDrafter && allowDocumentChanges}
       documentStatus={detail.documentStatus}
       onEdit={() => onEditDocument(detail)}
       onDelete={() => setIsDeleteDialogOpen(true)}
@@ -1810,6 +1827,16 @@ export function DocumentApprovalDetailFeed(
             isExpanded={isBodyExpanded}
             onToggleExpand={() => setIsBodyExpanded((expanded) => !expanded)}
             contentTestId="approval-document-body"
+            onContentClick={(event) => {
+              const anchor = (event.target as Element).closest('a[href]');
+              const id = anchor ? parseDocumentShareLink(anchor.getAttribute('href') ?? '') : null;
+              if (id !== null && onOpenDocument) {
+                event.preventDefault();
+                void resolveDocumentShareReference(id).then(onOpenDocument).catch(() => {
+                  showError('접근할 수 없거나 삭제된 문서입니다.');
+                });
+              }
+            }}
             richText={{
               collapsedHtml: collapsedBodyHtml,
               expandedHtml: expandedBodyHtml,
@@ -1817,6 +1844,10 @@ export function DocumentApprovalDetailFeed(
               imageError: bodyImageError || undefined,
               onOpenImage: setSelectedBodyImage,
             }}
+          />
+          <DocumentLinkPreviews
+            html={isBodyExpanded ? expandedBodyHtml : collapsedBodyHtml}
+            onOpenDocument={onOpenDocument}
           />
           <Box data-testid="approval-feed-footer">
             <Box>
@@ -1895,6 +1926,9 @@ export function DocumentApprovalDetailFeed(
                   </Box>
                 ) : null}
                 <CommentThread
+                  renderContentPreview={(html) => (
+                    <DocumentLinkPreviews html={html} onOpenDocument={onOpenDocument} />
+                  )}
                   comments={toApprovalCommentTree(
                     commentRecords,
                     commentSystemEvents,
@@ -1967,9 +2001,9 @@ export function DocumentApprovalDetailFeed(
         <PostDetailPanel
           title="문서 상세"
           subtitle={
-            electronicApprovalId === null
+            !detail?.documentNo
               ? undefined
-              : `문서 ID: ${electronicApprovalId}`
+              : `문서번호: ${detail.documentNo}`
           }
           onClose={props.onClose}
           isLoading={isLoading}

@@ -45,6 +45,8 @@ type DashboardContentProps = {
   isTenantAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
+  sharedDocumentId?: number | string | null;
+  onSharedDocumentClose?: () => void;
 };
 
 export function ComingSoonPage({
@@ -147,6 +149,8 @@ export function DashboardContent({
   isTenantAdmin = false,
   dashboardScope = null,
   onDashboardScopeChange,
+  sharedDocumentId,
+  onSharedDocumentClose,
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -217,6 +221,8 @@ export function DashboardContent({
   if (selectedModule.id === 'groupware' && currentPageKey === 'write') {
     return (
       <DocumentWritePage
+        sharedDocumentId={sharedDocumentId}
+        onSharedDocumentClose={onSharedDocumentClose}
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
