@@ -109,22 +109,9 @@ export const pageContentMap: Record<string, PageContent> = {
   overview: {
     title: '종합현황',
     description:
-      '결재, 공지, 일정 등 그룹웨어 업무 지표를 한 화면에서 확인합니다.',
-    cards: [
-      { label: '미결 결재', value: '18' },
-      { label: '오늘 일정', value: '06' },
-      { label: '신규 공지', value: '04' },
-      { label: '읽지 않은 문서', value: '12' },
-    ],
-    items: [
-      { title: '인사평가 계획안', meta: '인사팀 · 5분 전', status: '검토중' },
-      {
-        title: '재무 예산 승인서',
-        meta: '회계팀 · 1시간 전',
-        status: '결재대기',
-      },
-      { title: '월간 운영 회의 일정', meta: '총무팀 · 어제', status: '알림' },
-    ],
+      '내 업무와 주요 경영 지표를 한눈에 확인합니다.',
+    cards: [],
+    items: [],
   },
   documents: {
     title: '문서관리',

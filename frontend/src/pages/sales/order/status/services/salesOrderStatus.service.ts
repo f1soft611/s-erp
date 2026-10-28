@@ -10,6 +10,27 @@ import type {
 
 const SALES_ORDER_STATUS_PATH = '/api/v1/sales/order-status';
 
+export function readDashboardSalesSearch(search: string): SalesOrderStatusSearchSession | null {
+  const params = new URLSearchParams(search);
+  const month = params.get('dashboardMonth') ?? '';
+  if (/^(19\d{2}|[2-9]\d{3})-(0[1-9]|1[0-2])$/.test(month) && !month.startsWith('9999')) {
+    const [year, value] = month.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(year, value, 0)).getUTCDate();
+    return { keyword: '', detailValues: { orderDt: { from: `${month}-01`, to: `${month}-${lastDay}` } } };
+  }
+  const from = params.get('dashboardDueFrom') ?? '';
+  const to = params.get('dashboardDueTo') ?? '';
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (validDate(from) && validDate(to) && from <= to) {
+    return {
+      keyword: '',
+      detailValues: { deliveryDt: { from, to }, orderNo: params.get('dashboardOrderNo') ?? '' },
+    };
+  }
+  return null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

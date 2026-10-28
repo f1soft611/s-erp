@@ -6,6 +6,7 @@ import { createSalesOrderStatusColumns } from '../data/salesOrderStatusColumns';
 import {
   cloneSalesOrderStatusSearchValues,
   isSalesOrderStatusSearchSession,
+  readDashboardSalesSearch,
   toSalesOrderStatusFilters,
 } from '../services/salesOrderStatus.service';
 import type {
@@ -18,6 +19,7 @@ const SALES_ORDER_STATUS_SESSION_KEY = 's-erp:page:sales-order-status';
 const SALES_ORDER_STATUS_SESSION_VERSION = 1;
 
 export function useSalesOrderStatusSearch() {
+  const [dashboardSearch] = useState(() => readDashboardSalesSearch(window.location.search));
   const detailFields = useMemo(
     () => toPageSearchFields(createSalesOrderStatusColumns()),
     [],
@@ -32,27 +34,28 @@ export function useSalesOrderStatusSearch() {
   const { state: searchSession, setState: setSearchSession } =
     usePageSessionState<SalesOrderStatusSearchSession | null>(
       SALES_ORDER_STATUS_SESSION_KEY,
-      null,
+      dashboardSearch,
       {
         version: SALES_ORDER_STATUS_SESSION_VERSION,
         validate: (value): value is SalesOrderStatusSearchSession | null =>
-          value === null || isSalesOrderStatusSearchSession(value),
+          !dashboardSearch && (value === null || isSalesOrderStatusSearchSession(value)),
         persistWhen: (value) => value !== null,
       },
     );
-  const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
+  const initialSearch = dashboardSearch ?? searchSession;
+  const [keyword, setKeyword] = useState(initialSearch?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<SalesOrderStatusSearchValues>(
-    () => cloneSalesOrderStatusSearchValues(searchSession?.detailValues ?? {}),
+    () => cloneSalesOrderStatusSearchValues(initialSearch?.detailValues ?? {}),
   );
   const [appliedFilters, setAppliedFilters] = useState<SalesOrderStatusFilters | null>(
     () =>
-      searchSession
-        ? toSalesOrderStatusFilters(searchSession.keyword, searchSession.detailValues)
+      initialSearch
+        ? toSalesOrderStatusFilters(initialSearch.keyword, initialSearch.detailValues)
         : null,
   );
 
   useEffect(() => {
-    if (!defaultValues || searchSession !== null) return;
+    if (!defaultValues || searchSession !== null || dashboardSearch) return;
     const initialSnapshot: SalesOrderStatusSearchSession = {
       keyword: '',
       detailValues: cloneSalesOrderStatusSearchValues(defaultValues),
@@ -63,7 +66,7 @@ export function useSalesOrderStatusSearch() {
     setAppliedFilters(
       toSalesOrderStatusFilters(initialSnapshot.keyword, initialSnapshot.detailValues),
     );
-  }, [defaultValues, searchSession, setSearchSession]);
+  }, [defaultValues, searchSession, setSearchSession, dashboardSearch]);
 
   const applySearch = useCallback(
     (values: SalesOrderStatusSearchValues = detailValues) => {
