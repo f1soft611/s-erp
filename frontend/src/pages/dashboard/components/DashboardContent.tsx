@@ -33,6 +33,7 @@ import type {
   ModuleItem,
   PageContent,
 } from '../types/dashboard';
+import type { DocumentApprovalScope } from '../../groupware/documents/write/types/documentWrite.types';
 
 type DashboardContentProps = {
   selectedModule: ModuleItem;
@@ -42,6 +43,8 @@ type DashboardContentProps = {
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
   isTenantAdmin?: boolean;
+  dashboardScope?: DocumentApprovalScope | null;
+  onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
 };
 
 export function ComingSoonPage({
@@ -142,6 +145,8 @@ export function DashboardContent({
   content,
   selectedMenuPermissions,
   isTenantAdmin = false,
+  dashboardScope = null,
+  onDashboardScopeChange,
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -203,6 +208,8 @@ export function DashboardContent({
         currentMenuName={currentMenuName}
         content={content}
         selectedMenuPermissions={selectedMenuPermissions}
+        dashboardScope={dashboardScope}
+        onDashboardScopeChange={onDashboardScopeChange}
       />
     );
   }
@@ -213,6 +220,8 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+        dashboardScope={dashboardScope}
+        onDashboardScopeChange={onDashboardScopeChange}
       />
     );
   }

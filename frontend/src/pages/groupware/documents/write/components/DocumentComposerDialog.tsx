@@ -56,6 +56,9 @@ export function DocumentComposerDialog({
   const theme = useTheme();
   const [approvalSettingsOpen, setApprovalSettingsOpen] = useState(false);
   const [approvalSettingsSession, setApprovalSettingsSession] = useState(0);
+  const [approvalSettingsMode, setApprovalSettingsMode] = useState<
+    'approval' | 'reference'
+  >('approval');
   const {
     activeDocumentKind,
     requestDocumentKindChange,
@@ -120,6 +123,12 @@ export function DocumentComposerDialog({
   };
   const openApprovalSettings = () => {
     setApprovalSettingsSession((current) => current + 1);
+    setApprovalSettingsMode('approval');
+    setApprovalSettingsOpen(true);
+  };
+  const openReferenceSettings = () => {
+    setApprovalSettingsSession((current) => current + 1);
+    setApprovalSettingsMode('reference');
     setApprovalSettingsOpen(true);
   };
   const panelBorder = theme.palette.divider;
@@ -315,6 +324,8 @@ export function DocumentComposerDialog({
                 userOptions={referenceUserOptions}
                 referenceUserIds={referenceUserIds}
                 onChange={handleReferenceUserChange}
+                onOpenSettings={openReferenceSettings}
+                settingsDisabled={tabChangeDisabled}
               />
             )}
 
@@ -590,6 +601,7 @@ export function DocumentComposerDialog({
       <DocumentApprovalSettingsDialog
         key={approvalSettingsSession}
         open={approvalSettingsOpen}
+        mode={approvalSettingsMode}
         documentCode={DOCUMENT_CODE_BY_KIND[activeDocumentKind]}
         userOptions={userOptions}
         userOptionsError={

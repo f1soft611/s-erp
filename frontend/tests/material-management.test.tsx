@@ -27,6 +27,7 @@ const acceptRows = <T extends object,>(saved: F1GridSavedRow<T>[]) => saved.map(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   api.apiGet.mockImplementation(async (url: string) =>
     ({ resultList: url.endsWith('/options') ? [
       { groupCode: 'MATERIAL_TYPE', itemCode: 'FOOD', itemName: '식품' },
@@ -465,6 +466,46 @@ describe('material workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: '품목 추가' }));
     expect(await screen.findByRole('dialog', { name: '품목 등록' })).toBeInTheDocument();
   }, 15000);
+
+  it('restores the last executed keyword and detail filters from the tab session', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:material-management',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: 'Restored',
+          detailValues: { materialSpec: 'A', materialKind: 'FOOD' },
+        },
+      }),
+    );
+
+    render(<ThemeProvider theme={createTheme()}><NotificationProvider>
+      <DashboardContent
+        selectedModule={{ id: 'co', name: '기준정보', icon: null, tree: [], menus: [] }}
+        currentMenuName="품목관리" currentPageKey="materials"
+        content={{ title: '품목관리', description: '품목', cards: [], items: [] }}
+        selectedMenuPermissions={{ read: true, create: true, update: true, delete: false, excel: false }}
+        isTenantAdmin
+      />
+    </NotificationProvider></ThemeProvider>);
+
+    const keyword = await screen.findByRole('textbox', { name: '품목 검색' });
+    expect(keyword).toHaveValue('Restored');
+    await waitFor(() =>
+      expect(api.apiGet).toHaveBeenCalledWith(
+        '/api/v1/co/master/materials?keyword=Restored&materialSpec=A&materialKind=FOOD',
+      ),
+    );
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 2개');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('textbox', { name: '품목규격' })).toHaveValue('A');
+    expect(screen.getByRole('combobox', { name: '품목유형' })).toHaveTextContent('식품');
+
+    fireEvent.change(keyword, { target: { value: 'Unsubmitted' } });
+    expect(JSON.parse(window.sessionStorage.getItem('s-erp:page:material-management') ?? '{}'))
+      .toMatchObject({ value: { keyword: 'Restored' } });
+  });
 
   it('accepts canonical rows without list/options reload or grid recreation', async () => {
     let finishSave!: (value: unknown) => void;

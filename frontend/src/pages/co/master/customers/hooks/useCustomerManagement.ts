@@ -43,8 +43,9 @@ function toPayload(row: CustomerRow, isNew: boolean): CustomerPayload {
   };
 }
 
-export function useCustomerManagement() {
+export function useCustomerManagement(initialFilters: CustomerFilters = {}) {
   const { showSuccess } = useNotification();
+  const initialFiltersRef = useRef(initialFilters);
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export function useCustomerManagement() {
   const loadVersion = useRef(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [gridKey, setGridKey] = useState(0);
-  const [appliedFilters, setAppliedFilters] = useState<CustomerFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<CustomerFilters>(initialFilters);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
 
   const loadRows = useCallback(
@@ -89,7 +90,7 @@ export function useCustomerManagement() {
   );
 
   useEffect(() => {
-    void loadRows({});
+    void loadRows(initialFiltersRef.current);
     return () => { ++loadVersion.current; };
   }, [loadRows]);
 

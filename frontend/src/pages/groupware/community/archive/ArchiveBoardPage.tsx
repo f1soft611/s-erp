@@ -20,12 +20,16 @@ import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { useNotification } from '../../../../shared/context/NotificationContext';
 import { usePageSearchDefaults } from '../../../../shared/hooks/usePageSearchDefaults';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import {
   createCommonCodeItem,
   updateCommonCodeItem,
 } from '../../../co/master/common-code/services/commonCodeManagement.service';
-import type { PageSearchField } from '../../../../shared/components/page-search/searchFields';
-import type { PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
+import {
+  isPageSearchValues,
+  type PageSearchField,
+  type PageSearchFieldValue,
+} from '../../../../shared/components/page-search/searchFields';
 import type {
   MenuPermission,
   ModuleItem,
@@ -61,6 +65,8 @@ const FILE_TYPE_VALUES: ArchiveFileType[] = [
   'VIDEO',
   'ARCHIVE',
 ];
+const ARCHIVE_SEARCH_SESSION_KEY = 's-erp:page:community-archive';
+const ARCHIVE_SEARCH_SESSION_VERSION = 1;
 
 const DETAIL_FIELDS: PageSearchField[] = [
   {
@@ -115,6 +121,31 @@ function getDateSummary(
 function getFileType(value: PageSearchFieldValue | undefined): ArchiveFileType {
   if (typeof value !== 'string') return 'ALL';
   return FILE_TYPE_VALUES.find((fileType) => fileType === value) ?? 'ALL';
+}
+
+type ArchiveSearchSession = {
+  keyword: string;
+  folderCode: string;
+  detailValues: Record<string, PageSearchFieldValue>;
+};
+
+function isArchiveSearchSession(value: unknown): value is ArchiveSearchSession {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ArchiveSearchSession>;
+  if (
+    typeof candidate.keyword !== 'string' ||
+    typeof candidate.folderCode !== 'string' ||
+    !isPageSearchValues(candidate.detailValues)
+  ) {
+    return false;
+  }
+  const fileType = candidate.detailValues.fileType;
+  return (
+    fileType === undefined ||
+    fileType === '' ||
+    (typeof fileType === 'string' &&
+      FILE_TYPE_VALUES.includes(fileType as ArchiveFileType))
+  );
 }
 
 const FOLDERS_SECTION_ID = 'section:folders';
@@ -207,11 +238,23 @@ export function ArchiveBoardPage({
     retry: retryDefaults,
     initialLoad: defaultsInitialLoad,
   } = usePageSearchDefaults(DETAIL_FIELDS);
-  const [searchDraft, setSearchDraft] = useState('');
-  const [currentFolderCode, setCurrentFolderCode] = useState('');
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<ArchiveSearchSession | null>(
+      ARCHIVE_SEARCH_SESSION_KEY,
+      null,
+      {
+        version: ARCHIVE_SEARCH_SESSION_VERSION,
+        validate: (value): value is ArchiveSearchSession | null =>
+          value === null || isArchiveSearchSession(value),
+      },
+    );
+  const [searchDraft, setSearchDraft] = useState(searchSession?.keyword ?? '');
+  const [currentFolderCode, setCurrentFolderCode] = useState(
+    searchSession?.folderCode ?? '',
+  );
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >({});
+  >(searchSession?.detailValues ?? {});
   const [defaultsInitialized, setDefaultsInitialized] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingFile, setEditingFile] = useState<ArchiveFileRow | null>(null);
@@ -236,22 +279,31 @@ export function ArchiveBoardPage({
   useEffect(() => {
     if (!defaultValues || defaultsInitialized) return;
 
-    const dateRange = getDateRange(defaultValues.uploadedAt);
-    setDetailValues(defaultValues);
-    archiveList.setFilters((currentFilters) => ({
-      ...currentFilters,
+    const restoredValues = searchSession?.detailValues ?? defaultValues;
+    const dateRange = getDateRange(restoredValues.uploadedAt);
+    const initialSession: ArchiveSearchSession = searchSession ?? {
       keyword: '',
-      folderCode: currentFolderCode,
+      folderCode: '',
+      detailValues: restoredValues,
+    };
+    setDetailValues(restoredValues);
+    setSearchDraft(initialSession.keyword);
+    setCurrentFolderCode(initialSession.folderCode);
+    archiveList.setFilters({
+      keyword: initialSession.keyword,
+      folderCode: initialSession.folderCode,
       uploadedFrom: dateRange.from,
       uploadedTo: dateRange.to,
-      fileType: 'ALL',
-    }));
+      fileType: getFileType(restoredValues.fileType),
+    });
+    if (!searchSession) setSearchSession(initialSession);
     setDefaultsInitialized(true);
   }, [
     archiveList.setFilters,
-    currentFolderCode,
     defaultValues,
     defaultsInitialized,
+    searchSession,
+    setSearchSession,
   ]);
   const reloadList = async () => {
     archiveList.retry();
@@ -293,26 +345,39 @@ export function ArchiveBoardPage({
   );
   const fileCount = archiveList.rows.length;
 
-  const applySearch = (filters: {
-    uploadedFrom: string;
-    uploadedTo: string;
-    fileType: ArchiveFileType;
-  }) => {
+  const applySearch = (
+    values: Record<string, PageSearchFieldValue>,
+    session: ArchiveSearchSession,
+  ) => {
+    const dateRange = getDateRange(values.uploadedAt);
     archiveList.setFilters({
-      ...archiveList.filters,
-      keyword: searchDraft.trim(),
-      folderCode: currentFolderCode,
-      ...filters,
+      keyword: session.keyword,
+      folderCode: session.folderCode,
+      uploadedFrom: dateRange.from,
+      uploadedTo: dateRange.to,
+      fileType: getFileType(values.fileType),
     });
+    setSearchSession(session);
+    setDetailValues(values);
   };
 
   const handleDefaultSearch = () => {
     if (!defaultsInitialized) return;
-    archiveList.setFilters({
-      ...archiveList.filters,
+    const session = {
       keyword: searchDraft.trim(),
       folderCode: currentFolderCode,
+      detailValues: searchSession?.detailValues ?? detailValues,
+    };
+    const dateRange = getDateRange(session.detailValues.uploadedAt);
+    archiveList.setFilters({
+      keyword: session.keyword,
+      folderCode: session.folderCode,
+      uploadedFrom: dateRange.from,
+      uploadedTo: dateRange.to,
+      fileType: getFileType(session.detailValues.fileType),
     });
+    setSearchSession(session);
+    setDetailValues(session.detailValues);
   };
 
   const handleDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
@@ -321,15 +386,21 @@ export function ArchiveBoardPage({
       showError('시작일은 종료일보다 늦을 수 없습니다.');
       return;
     }
-    applySearch({
-      uploadedFrom: range.from,
-      uploadedTo: range.to,
-      fileType: getFileType(values.fileType),
+    applySearch(values, {
+      keyword: searchDraft.trim(),
+      folderCode: currentFolderCode,
+      detailValues: values,
     });
   };
 
   const handleFolderChange = (folderCode: string) => {
     setCurrentFolderCode(folderCode);
+    const session: ArchiveSearchSession = {
+      keyword: archiveList.filters.keyword,
+      folderCode,
+      detailValues: searchSession?.detailValues ?? detailValues,
+    };
+    setSearchSession(session);
     archiveList.setFilters({
       ...archiveList.filters,
       folderCode,
@@ -446,6 +517,7 @@ export function ArchiveBoardPage({
         onDefaultSearch={handleDefaultSearch}
         detailFields={DETAIL_FIELDS}
         detailValues={detailValues}
+        appliedDetailValues={searchSession?.detailValues ?? {}}
         defaultValues={defaultValues ?? {}}
         onDetailValuesChange={setDetailValues}
         onDetailSearch={handleDetailSearch}
@@ -453,10 +525,15 @@ export function ArchiveBoardPage({
           const range = getDateRange(values.uploadedAt);
           setDetailValues(values);
           setSearchDraft('');
-          archiveList.setFilters({
-            ...archiveList.filters,
+          const session = {
             keyword: '',
             folderCode: currentFolderCode,
+            detailValues: values,
+          };
+          setSearchSession(session);
+          archiveList.setFilters({
+            keyword: session.keyword,
+            folderCode: session.folderCode,
             uploadedFrom: range.from,
             uploadedTo: range.to,
             fileType: getFileType(values.fileType),

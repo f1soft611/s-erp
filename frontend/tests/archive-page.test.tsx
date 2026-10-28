@@ -94,6 +94,7 @@ function renderArchive(
 describe('Archive dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     archiveServices.getSystemDate.mockResolvedValue('2024-02-29');
     archiveServices.fetchArchiveFiles.mockImplementation(async (filters) => ({
       resultList:
@@ -249,6 +250,44 @@ describe('Archive dashboard page', () => {
 
     expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue('2023-02-28');
     expect(screen.getByLabelText('올린 날짜 종료일')).toHaveValue('2024-02-29');
+  });
+
+  it('restores the executed query and detailed criteria after server defaults load', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:community-archive',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: 'guide',
+          folderCode: 'GUIDE',
+          detailValues: {
+            uploadedAt: { from: '2026-01-01', to: '2026-06-30' },
+            fileType: 'PDF',
+          },
+        },
+      }),
+    );
+
+    renderArchive();
+
+    expect(await screen.findByRole('textbox', { name: '자료 검색' })).toHaveValue('guide');
+    await waitFor(() =>
+      expect(archiveServices.fetchArchiveFiles).toHaveBeenCalledWith(
+        {
+          keyword: 'guide',
+          folderCode: 'GUIDE',
+          uploadedFrom: '2026-01-01',
+          uploadedTo: '2026-06-30',
+          fileType: 'PDF',
+        },
+        expect.any(AbortSignal),
+      ),
+    );
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 2개');
+    fireEvent.click(toggle);
+    expect(screen.getByLabelText('올린 날짜 시작일')).toHaveValue('2026-01-01');
+    expect(screen.getByRole('combobox', { name: '유형' })).toHaveTextContent('PDF');
   });
 
   it('does not request archive files until the server date is resolved', async () => {

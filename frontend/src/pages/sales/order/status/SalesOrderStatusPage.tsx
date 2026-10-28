@@ -5,6 +5,7 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
+import { EmptySearchResultMessage } from '../../../../shared/components/EmptySearchResultMessage';
 import type {
   MenuPermission,
   MenuTreeNode,
@@ -95,7 +96,7 @@ export function SalesOrderStatusPage({
           icon: SearchIcon,
           visible: selectedMenuPermissions?.read ?? false,
           disabled: !search.defaultsInitialized || list.loading,
-          onClick: () => search.applySearch(),
+          onClick: () => search.applySearch(search.appliedDetailValues),
         },
       ],
     },
@@ -129,6 +130,7 @@ export function SalesOrderStatusPage({
           onKeywordChange={search.setKeyword}
           detailFields={search.detailFields}
           detailValues={search.detailValues}
+          appliedDetailValues={search.appliedDetailValues}
           defaultValues={search.searchAreaDefaultValues}
           onDetailValuesChange={search.setDetailValues}
           onSearch={search.applySearch}
@@ -140,6 +142,10 @@ export function SalesOrderStatusPage({
           message={search.defaultsError ?? list.error}
           onClose={list.clearError}
         />
+        {list.hasLoaded && !list.loading && !list.initialLoad.loading
+          && list.rows.length === 0 && !search.defaultsError && !list.error ? (
+          <EmptySearchResultMessage onReset={search.resetSearch} />
+        ) : null}
         <Box
           sx={{
             px: { xs: 1, sm: 2 },

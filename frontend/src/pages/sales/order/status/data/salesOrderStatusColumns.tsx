@@ -88,6 +88,7 @@ export function createSalesOrderStatusColumns({
       editable: false,
       mergeRows: true,
       search: {
+        required: true,
         label: '수주일자',
         order: 1,
         span: 4,

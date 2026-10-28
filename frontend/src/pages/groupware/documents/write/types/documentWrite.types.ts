@@ -91,6 +91,8 @@ export type DocumentWritePageProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
   content: PageContent;
+  dashboardScope?: DocumentApprovalScope | null;
+  onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
 };
 
 export type DocumentApprovalDraftRequest = {

@@ -85,10 +85,13 @@ function mapFeedDocument(
   };
 }
 
-export function useDocumentWritePage() {
+export function useDocumentWritePage(
+  initialScope: DocumentApprovalScope = 'ALL',
+  onScopeChange?: (scope: DocumentApprovalScope | null) => void,
+) {
   const [viewMode, setViewMode] = useState<CommonViewMode>('list');
   const [selectedKind, setSelectedKind] = useState<DocumentKind | ''>('');
-  const [scope, setScope] = useState<DocumentApprovalScope>('ALL');
+  const [scope, setScope] = useState<DocumentApprovalScope>(initialScope);
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | undefined>();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWriteItem[]>([]);
@@ -115,6 +118,7 @@ export function useDocumentWritePage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [pageError, setPageError] = useState('');
   const [detailDocumentId, setDetailDocumentId] = useState<number | null>(null);
+
   const openComposer = useCallback(() => setIsComposerOpen(true), []);
   const closeComposer = useCallback(() => setIsComposerOpen(false), []);
   const refresh = useCallback(({ quiet = false }: { quiet?: boolean } = {}) => {
@@ -390,10 +394,12 @@ export function useDocumentWritePage() {
   const selectScope = useCallback((nextScope: DocumentApprovalScope) => {
     setSelectedDocumentId(undefined);
     setScope(nextScope);
-  }, []);
+    onScopeChange?.(nextScope === 'ALL' ? null : nextScope);
+  }, [onScopeChange]);
   const clearScopeFilter = useCallback(() => {
     setScope('ALL');
-  }, []);
+    onScopeChange?.(null);
+  }, [onScopeChange]);
   const clearKindFilter = useCallback(() => {
     setSelectedKind('');
   }, []);
@@ -404,7 +410,8 @@ export function useDocumentWritePage() {
     setSelectedKind('');
     setScope('ALL');
     setSelectedDocumentId(documentId);
-  }, []);
+    onScopeChange?.(null);
+  }, [onScopeChange]);
   const retry = useCallback(() => refresh(), [refresh]);
   const isPinPending = useCallback(
     (electronicApprovalId: number) => pinPendingIds.includes(electronicApprovalId),

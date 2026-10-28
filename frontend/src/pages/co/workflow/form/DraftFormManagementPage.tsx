@@ -11,9 +11,11 @@ import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { type F1GridRef } from '../../../../shared/components/f1-grid';
 import {
+  isPageSearchValues,
   toPageSearchFields,
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
@@ -38,6 +40,43 @@ import {
 import { DraftFormTemplateDialog } from './components/DraftFormTemplateDialog';
 import { useDraftFormManagement } from './hooks/useDraftFormManagement';
 
+const DRAFT_FORM_SEARCH_SESSION_KEY = 's-erp:page:draft-form-management';
+const DRAFT_FORM_SEARCH_SESSION_VERSION = 1;
+
+type DraftFormSearchSession = {
+  keyword: string;
+  detailValues: Record<string, PageSearchFieldValue>;
+};
+
+type PendingDraftFormSearch = {
+  filters: DraftFormFilters;
+  session: DraftFormSearchSession;
+};
+
+function isDraftFormSearchSession(value: unknown): value is DraftFormSearchSession {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<DraftFormSearchSession>;
+  return typeof candidate.keyword === 'string' && isPageSearchValues(candidate.detailValues);
+}
+
+function toDraftFormSearchFilters(
+  session: DraftFormSearchSession,
+): DraftFormFilters {
+  const selected = (value: PageSearchFieldValue | undefined) =>
+    value == null || typeof value === 'object' ? '' : String(value).trim();
+  const useAt = selected(session.detailValues.useAt);
+  return {
+    keyword: session.keyword.trim() || undefined,
+    categoryItemId: selected(session.detailValues.categoryItemId)
+      ? Number(selected(session.detailValues.categoryItemId))
+      : undefined,
+    regTermId: selected(session.detailValues.regTermId)
+      ? Number(selected(session.detailValues.regTermId))
+      : undefined,
+    useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
+  };
+}
+
 type DraftFormManagementPageProps = {
   selectedModule: ModuleItem;
   currentMenuName: string;
@@ -55,14 +94,26 @@ export function DraftFormManagementPage({
   selectedMenuPermissions,
   isTenantAdmin = false,
 }: DraftFormManagementPageProps) {
-  const management = useDraftFormManagement();
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<DraftFormSearchSession | null>(
+      DRAFT_FORM_SEARCH_SESSION_KEY,
+      null,
+      {
+        version: DRAFT_FORM_SEARCH_SESSION_VERSION,
+        validate: (value): value is DraftFormSearchSession | null =>
+          value === null || isDraftFormSearchSession(value),
+      },
+    );
+  const management = useDraftFormManagement(
+    searchSession ? toDraftFormSearchFilters(searchSession) : {},
+  );
   useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<DraftFormRow>>(null);
   const saveAttemptActiveRef = useRef(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >({});
+  >(searchSession?.detailValues ?? {});
   const [helperOpen, setHelperOpen] = useState(false);
   const [templateTarget, setTemplateTarget] = useState<DraftFormRow | null>(null);
   const [pendingTemplateTarget, setPendingTemplateTarget] =
@@ -71,9 +122,8 @@ export function DraftFormManagementPage({
     useState(false);
   const [categoryNoticeDismissed, setCategoryNoticeDismissed] = useState(false);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
-  const [pendingFilters, setPendingFilters] = useState<DraftFormFilters | null>(
-    null,
-  );
+  const [pendingSearch, setPendingSearch] =
+    useState<PendingDraftFormSearch | null>(null);
 
   const pagePermissions = {
     read: Boolean(selectedMenuPermissions?.read),
@@ -120,51 +170,49 @@ export function DraftFormManagementPage({
   );
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
 
-  const requestSearch = (filters: DraftFormFilters) => {
+  const requestSearch = (
+    filters: DraftFormFilters,
+    session: DraftFormSearchSession,
+  ) => {
     if (management.saving) return;
     if (management.hasChanges) {
-      setPendingFilters(filters);
+      setPendingSearch({ filters, session });
       setRefreshConfirmOpen(true);
       return;
     }
     management.applyFilters(filters);
+    setSearchSession(session);
+    setDetailValues(session.detailValues);
   };
 
   const handleDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
-    const selected = (value: PageSearchFieldValue | undefined) =>
-      value == null || typeof value === 'object' ? '' : String(value).trim();
-    const useAt = selected(values.useAt);
-    requestSearch({
-      keyword: searchQuery.trim() || undefined,
-      categoryItemId: selected(values.categoryItemId)
-        ? Number(selected(values.categoryItemId))
-        : undefined,
-      regTermId: selected(values.regTermId)
-        ? Number(selected(values.regTermId))
-        : undefined,
-      useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
-    });
+    const session = { keyword: searchQuery.trim(), detailValues: values };
+    requestSearch(toDraftFormSearchFilters(session), session);
   };
 
   const handleDefaultSearch = () => {
-    requestSearch({
-      ...management.appliedFilters,
-      keyword: searchQuery.trim() || undefined,
-    });
+    const session = {
+      keyword: searchQuery.trim(),
+      detailValues: searchSession?.detailValues ?? {},
+    };
+    requestSearch(toDraftFormSearchFilters(session), session);
   };
 
   const cancelPendingSearch = () => {
     setRefreshConfirmOpen(false);
-    setPendingFilters(null);
+    setPendingSearch(null);
+    setDetailValues(searchSession?.detailValues ?? {});
   };
 
   const confirmPendingSearch = () => {
-    const filters = pendingFilters;
+    const pending = pendingSearch;
     setRefreshConfirmOpen(false);
-    setPendingFilters(null);
-    if (!filters) return;
+    setPendingSearch(null);
+    if (!pending) return;
     management.discardChanges();
-    management.applyFilters(filters);
+    management.applyFilters(pending.filters);
+    setSearchSession(pending.session);
+    setDetailValues(pending.session.detailValues);
   };
 
   const handleGridSave = () => {
@@ -306,6 +354,7 @@ export function DraftFormManagementPage({
           onDefaultSearch={handleDefaultSearch}
           detailFields={detailFields}
           detailValues={detailValues}
+          appliedDetailValues={searchSession?.detailValues ?? {}}
           onDetailValuesChange={setDetailValues}
           onDetailSearch={handleDetailSearch}
           detailLoading={management.loading || management.saving}

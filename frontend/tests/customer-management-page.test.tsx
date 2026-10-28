@@ -87,6 +87,7 @@ function renderCustomerPage(isTenantAdmin = true, create = true, update = true) 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   apiMocks.apiGet.mockResolvedValue({ resultList: [customer] });
 });
 
@@ -523,6 +524,33 @@ describe('customer management page', () => {
         '/api/v1/co/master/customers?keyword=Acme&presidentName=Lee',
       );
     });
+  });
+
+  it('restores the executed customer search from the tab session', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:customer-management',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: 'Acme',
+          detailValues: { presidentName: 'Lee', useAt: 'Y' },
+        },
+      }),
+    );
+
+    renderCustomerPage();
+
+    expect(await screen.findByRole('textbox', { name: '거래처 검색' })).toHaveValue('Acme');
+    await waitFor(() =>
+      expect(apiMocks.apiGet).toHaveBeenCalledWith(
+        '/api/v1/co/master/customers?keyword=Acme&presidentName=Lee&useAt=Y',
+      ),
+    );
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 2개');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('textbox', { name: '대표자' })).toHaveValue('Lee');
+    expect(screen.getByRole('combobox', { name: '사용여부' })).toHaveTextContent('사용');
   });
 
   it('does not expose create or update actions to a non-admin user', async () => {

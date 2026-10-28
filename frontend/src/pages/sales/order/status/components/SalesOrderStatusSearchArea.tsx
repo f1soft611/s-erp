@@ -9,6 +9,7 @@ type SalesOrderStatusSearchAreaProps = {
   onKeywordChange: (value: string) => void;
   detailFields: PageSearchField[];
   detailValues: SalesOrderStatusSearchValues;
+  appliedDetailValues: SalesOrderStatusSearchValues;
   defaultValues: SalesOrderStatusSearchValues;
   onDetailValuesChange: (values: SalesOrderStatusSearchValues) => void;
   onSearch: (values?: SalesOrderStatusSearchValues) => void;
@@ -22,6 +23,7 @@ export function SalesOrderStatusSearchArea({
   onKeywordChange,
   detailFields,
   detailValues,
+  appliedDetailValues,
   defaultValues,
   onDetailValuesChange,
   onSearch,
@@ -40,7 +42,9 @@ export function SalesOrderStatusSearchArea({
           disabled={!initialized}
           onChange={(event) => onKeywordChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && initialized) onSearch();
+            if (event.key === 'Enter' && initialized) {
+              onSearch(appliedDetailValues);
+            }
           }}
           slotProps={{
             htmlInput: { 'aria-label': '수주현황 빠른 검색' },
@@ -59,14 +63,23 @@ export function SalesOrderStatusSearchArea({
               ) : null,
             },
           }}
-          sx={{ width: '100%', height: 40 }}
+          sx={(theme) => ({
+            width: '100%',
+            height: 40,
+            '& .MuiOutlinedInput-root': {
+              height: '100%',
+              borderRadius: '0 8px 8px 0',
+              backgroundColor: theme.palette.background.paper,
+            },
+          })}
         />
       }
       onDefaultSearch={() => {
-        if (initialized) onSearch();
+        if (initialized) onSearch(appliedDetailValues);
       }}
       detailFields={detailFields}
       detailValues={detailValues}
+      appliedDetailValues={appliedDetailValues}
       defaultValues={defaultValues}
       onDetailValuesChange={onDetailValuesChange}
       onDetailSearch={onSearch}

@@ -771,9 +771,11 @@
 - eGov generator가 신규 키를 최초 요청에서 바로 생성하면 `0`을 반환하므로, 거래처 자동 코드는 migration에서 기존 코드 최댓값을 기준으로 미리 초기화한다.
 - 테이블과 스키마는 기존 것을 사용하며 거래처/품목별 generator row만 추가/상향한다.
 
-### tb_sales_order_hd / tb_sales_order_dt (신규 환경용, 미적용)
+### tb_sales_order_hd / tb_sales_order_dt
 
-`20261026_008` 신규 환경용 DDL을 정의했으며 실제 DB에는 적용하지 않았다.
+`20261026_008` 생성 DDL을 기준으로 한다. 2026-10-28 기본 MCP 메타데이터에서 두 테이블의 존재와 컬럼을 확인했다.
+아래 audit 타입은 `20261028_009` 변경 후 계약이며, 조회 당시 실제 DB의 `created_by`, `updated_by`는 아직 `varchar(10)`이다.
+이번 확장 SQL은 실제 DB에 적용하지 않았다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 | --- | --- | --- | --- | --- |
@@ -790,7 +792,7 @@
 |  | `total_amt` | `numeric(15,2)` | NULL, `0` | 수주 총금액 |
 |  | `remark` | `varchar(500)` | NULL | 비고 |
 |  | `use_at` | `char(1)` | NOT NULL, `Y` | 사용 여부 (`Y`/`N`) |
-|  | `created_by`, `updated_by` | `varchar(10)` | NULL | 생성/수정 사용자 |
+|  | `created_by`, `updated_by` | `varchar(100)` (변경 적용 후) | NULL | 생성/수정 로그인 코드; 원본 `tb_login_account.login_code`와 길이 일치 |
 |  | `created_at` | `timestamp without time zone` | NOT NULL, `CURRENT_TIMESTAMP` | 생성 일시 |
 |  | `updated_at` | `timestamp without time zone` | NULL | 수정 일시 |
 | `tb_sales_order_dt` | `sales_order_detail_id` | `bigserial` | NOT NULL | 상세 PK |
@@ -806,6 +808,7 @@
 - 거래처와 품목 FK는 각각 `(customer_id, tenant_id)` 및 `(material_id, tenant_id)`이며, 상세-헤더 FK `(sales_order_id, tenant_id)`가 tenant 경계를 보장한다. 헤더 삭제 시 상세는 cascade 삭제된다.
 - 수주상태 허용값은 `수주등록`, `생산대기`, `생산중`, `출하완료`, `취소`이며 `use_at`은 `Y`/`N`이다.
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
+- 감사 사용자 길이 보정: [확장 SQL](20261028/20261028_009_expand_sales_order_audit_columns.sql), [안전 롤백](20261028/20261028_009_rollback_sales_order_audit_columns.sql), [변경 이력](20261028/20261028_009_change_sales_order_audit_columns.md). 신규 환경에서도 기존 생성 DDL 후 확장 SQL을 적용한다.
 
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
 

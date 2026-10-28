@@ -11,15 +11,54 @@ import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type { F1GridRef } from '../../../../shared/components/f1-grid';
-import { toPageSearchFields, type PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
+import {
+  isPageSearchValues,
+  toPageSearchFields,
+  type PageSearchFieldValue,
+} from '../../../../shared/components/page-search/searchFields';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard/types/dashboard';
 import { ClassificationSettingsDialog } from '../classification/components/ClassificationSettingsDialog';
 import { ClassificationPickerDialog } from '../classification/components/ClassificationPickerDialog';
 import { MaterialGrid, createMaterialColumns } from './components/MaterialGrid';
 import { useMaterialManagement } from './hooks/useMaterialManagement';
 import { materialSearchFields, type MaterialFilters, type MaterialRow } from './types/materialManagement.types';
+
+const MATERIAL_SEARCH_SESSION_KEY = 's-erp:page:material-management';
+const MATERIAL_SEARCH_SESSION_VERSION = 1;
+
+type MaterialSearchSession = {
+  keyword: string;
+  detailValues: Record<string, PageSearchFieldValue>;
+};
+
+type PendingMaterialSearch = {
+  filters: MaterialFilters;
+  session: MaterialSearchSession;
+};
+
+function isMaterialSearchSession(value: unknown): value is MaterialSearchSession {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<MaterialSearchSession>;
+  return typeof candidate.keyword === 'string' && isPageSearchValues(candidate.detailValues);
+}
+
+function toMaterialSearchFilters(
+  session: MaterialSearchSession,
+): MaterialFilters {
+  const filters: MaterialFilters = {
+    keyword: session.keyword.trim() || undefined,
+  };
+  materialSearchFields.forEach((field) => {
+    const value = session.detailValues[field];
+    if (typeof value === 'string' && value.trim()) {
+      filters[field] = value.trim();
+    }
+  });
+  return filters;
+}
 
 type Props = {
   selectedModule: ModuleItem;
@@ -32,12 +71,26 @@ type Props = {
 
 export function MaterialManagementPage({ selectedModule, currentMenuName, content,
   breadcrumbItems, selectedMenuPermissions, isTenantAdmin = false }: Props) {
-  const management = useMaterialManagement();
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<MaterialSearchSession | null>(
+      MATERIAL_SEARCH_SESSION_KEY,
+      null,
+      {
+        version: MATERIAL_SEARCH_SESSION_VERSION,
+        validate: (value): value is MaterialSearchSession | null =>
+          value === null || isMaterialSearchSession(value),
+      },
+    );
+  const management = useMaterialManagement(
+    searchSession ? toMaterialSearchFilters(searchSession) : {},
+  );
   useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<MaterialRow>>(null);
-  const [keyword, setKeyword] = useState('');
-  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>({});
-  const [pendingFilters, setPendingFilters] = useState<MaterialFilters | null>(null);
+  const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
+  const [detailValues, setDetailValues] = useState<Record<string, PageSearchFieldValue>>(
+    searchSession?.detailValues ?? {},
+  );
+  const [pendingSearch, setPendingSearch] = useState<PendingMaterialSearch | null>(null);
   const [classificationOpen, setClassificationOpen] = useState(false);
   const [classificationPicker, setClassificationPicker] = useState<{
     apply: (patch: Partial<MaterialRow>) => void;
@@ -53,19 +106,23 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
     (_row, apply) => { setClassificationPicker({ apply }); return undefined; },
   ), [canCreate, canUpdate, management.saving, management.options, management.rows]);
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
-  const search = (filters: MaterialFilters) => {
+  const search = (filters: MaterialFilters, session: MaterialSearchSession) => {
     if (management.saving) return;
-    if (management.hasChanges) { setPendingFilters(filters); return; }
+    if (management.hasChanges) { setPendingSearch({ filters, session }); return; }
     management.applyFilters(filters);
+    setSearchSession(session);
+    setDetailValues(session.detailValues);
   };
-  const searchDefault = () => search({ ...management.appliedFilters, keyword: keyword.trim() || undefined });
+  const searchDefault = () => {
+    const session = {
+      keyword: keyword.trim(),
+      detailValues: searchSession?.detailValues ?? {},
+    };
+    search(toMaterialSearchFilters(session), session);
+  };
   const searchDetails = (values: Record<string, PageSearchFieldValue>) => {
-    const filters: MaterialFilters = { keyword: keyword.trim() || undefined };
-    materialSearchFields.forEach((field) => {
-      const value = values[field];
-      if (typeof value === 'string' && value.trim()) filters[field] = value.trim();
-    });
-    search(filters);
+    const session = { keyword: keyword.trim(), detailValues: values };
+    search(toMaterialSearchFilters(session), session);
   };
   const actions: PermissionActionGroupDefinition[] = [
     { key: 'write', actions: [{ label: '품목분류 설정', icon: SettingsIcon,
@@ -103,6 +160,7 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         } })}
       />}
       onDefaultSearch={searchDefault} detailFields={detailFields} detailValues={detailValues}
+      appliedDetailValues={searchSession?.detailValues ?? {}}
       onDetailValuesChange={setDetailValues} onDetailSearch={searchDetails} detailLoading={management.loading}
     />
     <PageMessageArea message={management.error} onClose={() => management.setError('')} />
@@ -125,11 +183,19 @@ export function MaterialManagementPage({ selectedModule, currentMenuName, conten
         });
         setClassificationPicker(null);
       }} />
-    <UnsavedChangesConfirmDialog open={pendingFilters !== null} title="저장하지 않은 변경사항"
+    <UnsavedChangesConfirmDialog open={pendingSearch !== null} title="저장하지 않은 변경사항"
       description="변경사항을 버리고 품목 목록을 다시 불러오시겠습니까?" cancelLabel="취소" continueLabel="계속"
-      onCancel={() => setPendingFilters(null)} onContinue={() => {
-        if (pendingFilters) { management.discardChanges(); management.applyFilters(pendingFilters); }
-        setPendingFilters(null);
+      onCancel={() => {
+        setPendingSearch(null);
+        setDetailValues(searchSession?.detailValues ?? {});
+      }} onContinue={() => {
+        if (pendingSearch) {
+          management.discardChanges();
+          management.applyFilters(pendingSearch.filters);
+          setSearchSession(pendingSearch.session);
+          setDetailValues(pendingSearch.session.detailValues);
+        }
+        setPendingSearch(null);
       }} />
     </PageLoadBoundary>
   </Box>;

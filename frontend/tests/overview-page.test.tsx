@@ -117,6 +117,33 @@ describe('real-data overview', () => {
     expect(screen.getByText(/출하 미반영/)).toBeInTheDocument();
   });
 
+  it('uses the full available width for the overview scroll area', async () => {
+    mount();
+    await screen.findByText('검증용 운영 공지');
+    expect(screen.getByTestId('overview-scroll')).not.toHaveClass('MuiContainer-maxWidthXl');
+  });
+
+  it.each([
+    ['내가 처리할 결재 3건', 'MY_PENDING'],
+    ['내 임시저장 2건', 'DRAFT'],
+    ['내 보완 필요 1건', 'REVISION_REQUESTED'],
+  ])('opens the %s card with its matching approval scope', async (label, scope) => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: label }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      `/groupware/doc/write?dashboardScope=${scope}`,
+    );
+  });
+
+  it('preserves the read-only approval path when adding a scope filter', async () => {
+    get.mockResolvedValue({ item: { ...overview, approvalPath: '/groupware/doc/read' } });
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: '내 보완 필요 1건' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/groupware/doc/read?dashboardScope=REVISION_REQUESTED',
+    );
+  });
+
   it('does not request or show sales for a user without sales read permission', async () => {
     get.mockResolvedValue({ item: { ...overview, canReadSales: false } });
     mount();

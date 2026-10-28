@@ -28,6 +28,7 @@ vi.mock('../src/shared/services/apiClient', () => apiMocks);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   apiMocks.apiGet.mockImplementation((path: string) => {
     if (path === '/api/v1/co/master/common-code/groups') {
       return Promise.resolve({
@@ -509,6 +510,62 @@ describe('Draft form management page', () => {
     expect(
       screen.getByRole('combobox', { name: '사용여부' }),
     ).toBeInTheDocument();
+  });
+
+  it('restores the executed draft-form search from the tab session', async () => {
+    window.sessionStorage.setItem(
+      's-erp:page:draft-form-management',
+      JSON.stringify({
+        version: 1,
+        value: {
+          keyword: '점검',
+          detailValues: { categoryItemId: '101', useAt: 'Y' },
+        },
+      }),
+    );
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <NotificationProvider>
+          <DashboardContent
+            selectedModule={{
+              id: 'co',
+              name: '기준정보',
+              icon: null,
+              tree: [],
+              menus: [],
+            }}
+            currentMenuName="기안양식관리"
+            currentPageKey="form"
+            breadcrumbItems={['기준정보', '전자결재관리', '기안양식관리']}
+            content={{
+              title: '기안양식관리',
+              description: '기안양식 기준정보를 관리합니다.',
+              cards: [],
+              items: [],
+            }}
+            selectedMenuPermissions={{
+              read: true,
+              create: true,
+              update: true,
+              delete: false,
+            }}
+            isTenantAdmin
+          />
+        </NotificationProvider>
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByRole('textbox', { name: '기안양식 검색' })).toHaveValue('점검');
+    await waitFor(() =>
+      expect(apiMocks.apiGet).toHaveBeenCalledWith(
+        '/api/v1/co/workflow/forms?keyword=%EC%A0%90%EA%B2%80&categoryItemId=101&useAt=Y',
+      ),
+    );
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 2개');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('combobox', { name: '분류' })).toHaveTextContent('점검');
+    expect(screen.getByRole('combobox', { name: '사용여부' })).toHaveTextContent('사용');
   });
 
   it('opens the classification helper without navigating away from the page', async () => {

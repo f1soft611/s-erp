@@ -11,12 +11,14 @@ import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
+import { usePageSessionState } from '../../../../shared/hooks/usePageSessionState';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import {
   type F1GridRef,
   type F1GridValidationError,
 } from '../../../../shared/components/f1-grid';
 import {
+  isPageSearchValues,
   toPageSearchFields,
   type PageSearchFieldValue,
 } from '../../../../shared/components/page-search/searchFields';
@@ -33,6 +35,40 @@ import type {
   CustomerFilters,
   CustomerRow,
 } from './types/customerManagement.types';
+
+const CUSTOMER_SEARCH_SESSION_KEY = 's-erp:page:customer-management';
+const CUSTOMER_SEARCH_SESSION_VERSION = 1;
+
+type CustomerSearchSession = {
+  keyword: string;
+  detailValues: Record<string, PageSearchFieldValue>;
+};
+
+type PendingCustomerSearch = {
+  filters: CustomerFilters;
+  session: CustomerSearchSession;
+};
+
+function isCustomerSearchSession(value: unknown): value is CustomerSearchSession {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<CustomerSearchSession>;
+  return typeof candidate.keyword === 'string' && isPageSearchValues(candidate.detailValues);
+}
+
+function toCustomerSearchFilters(session: CustomerSearchSession): CustomerFilters {
+  const selected = (value: PageSearchFieldValue | undefined) =>
+    value == null || typeof value === 'object' ? '' : String(value).trim();
+  const useAt = selected(session.detailValues.useAt);
+  return {
+    keyword: session.keyword.trim() || undefined,
+    presidentName: selected(session.detailValues.presidentName) || undefined,
+    businessNo: selected(session.detailValues.businessNo) || undefined,
+    juridNo: selected(session.detailValues.juridNo) || undefined,
+    businessStatus1: selected(session.detailValues.businessStatus1) || undefined,
+    businessItem1: selected(session.detailValues.businessItem1) || undefined,
+    useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
+  };
+}
 
 type CustomerManagementPageProps = {
   selectedModule: ModuleItem;
@@ -51,13 +87,25 @@ export function CustomerManagementPage({
   selectedMenuPermissions,
   isTenantAdmin = false,
 }: CustomerManagementPageProps) {
-  const management = useCustomerManagement();
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<CustomerSearchSession | null>(
+      CUSTOMER_SEARCH_SESSION_KEY,
+      null,
+      {
+        version: CUSTOMER_SEARCH_SESSION_VERSION,
+        validate: (value): value is CustomerSearchSession | null =>
+          value === null || isCustomerSearchSession(value),
+      },
+    );
+  const management = useCustomerManagement(
+    searchSession ? toCustomerSearchFilters(searchSession) : {},
+  );
   useUnsavedChangesBeforeUnload(management.hasChanges);
   const gridRef = useRef<F1GridRef<CustomerRow>>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchSession?.keyword ?? '');
   const [detailValues, setDetailValues] = useState<
     Record<string, PageSearchFieldValue>
-  >({});
+  >(searchSession?.detailValues ?? {});
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
   const [classificationPicker, setClassificationPicker] = useState<{
@@ -67,9 +115,8 @@ export function CustomerManagementPage({
   } | null>(null);
   const canCreateClassification = Boolean(selectedMenuPermissions?.create);
   const canUpdateClassification = Boolean(selectedMenuPermissions?.update);
-  const [pendingFilters, setPendingFilters] = useState<CustomerFilters | null>(
-    null,
-  );
+  const [pendingSearch, setPendingSearch] =
+    useState<PendingCustomerSearch | null>(null);
 
   const pagePermissions = {
     read: Boolean(selectedMenuPermissions?.read),
@@ -86,38 +133,31 @@ export function CustomerManagementPage({
   const detailFields = useMemo(() => toPageSearchFields(columns), [columns]);
 
   const requestSearch = useCallback(
-    (filters: CustomerFilters) => {
+    (filters: CustomerFilters, session: CustomerSearchSession) => {
       if (management.saving) return;
       if (management.hasChanges) {
-        setPendingFilters(filters);
+        setPendingSearch({ filters, session });
         setRefreshConfirmOpen(true);
         return;
       }
       management.applyFilters(filters);
+      setSearchSession(session);
+      setDetailValues(session.detailValues);
     },
-    [management],
+    [management, setSearchSession],
   );
 
   const handleDetailSearch = (values: Record<string, PageSearchFieldValue>) => {
-    const selected = (value: PageSearchFieldValue | undefined) =>
-      value == null || typeof value === 'object' ? '' : String(value).trim();
-    const useAt = selected(values.useAt);
-    requestSearch({
-      keyword: searchQuery.trim() || undefined,
-      presidentName: selected(values.presidentName) || undefined,
-      businessNo: selected(values.businessNo) || undefined,
-      juridNo: selected(values.juridNo) || undefined,
-      businessStatus1: selected(values.businessStatus1) || undefined,
-      businessItem1: selected(values.businessItem1) || undefined,
-      useAt: useAt === 'Y' || useAt === 'N' ? useAt : undefined,
-    });
+    const session = { keyword: searchQuery.trim(), detailValues: values };
+    requestSearch(toCustomerSearchFilters(session), session);
   };
 
   const handleDefaultSearch = () => {
-    requestSearch({
-      ...management.appliedFilters,
-      keyword: searchQuery.trim() || undefined,
-    });
+    const session = {
+      keyword: searchQuery.trim(),
+      detailValues: searchSession?.detailValues ?? {},
+    };
+    requestSearch(toCustomerSearchFilters(session), session);
   };
 
   const handleGridSave = () => {
@@ -135,16 +175,19 @@ export function CustomerManagementPage({
 
   const cancelPendingSearch = () => {
     setRefreshConfirmOpen(false);
-    setPendingFilters(null);
+    setPendingSearch(null);
+    setDetailValues(searchSession?.detailValues ?? {});
   };
 
   const confirmPendingSearch = () => {
-    const filters = pendingFilters;
+    const pending = pendingSearch;
     setRefreshConfirmOpen(false);
-    setPendingFilters(null);
-    if (!filters) return;
+    setPendingSearch(null);
+    if (!pending) return;
     management.discardChanges();
-    management.applyFilters(filters);
+    management.applyFilters(pending.filters);
+    setSearchSession(pending.session);
+    setDetailValues(pending.session.detailValues);
   };
 
   const pageActionGroups: PermissionActionGroupDefinition[] = [
@@ -261,6 +304,7 @@ export function CustomerManagementPage({
         onDefaultSearch={handleDefaultSearch}
         detailFields={detailFields}
         detailValues={detailValues}
+        appliedDetailValues={searchSession?.detailValues ?? {}}
         onDetailValuesChange={setDetailValues}
         onDetailSearch={handleDetailSearch}
         detailLoading={management.loading}

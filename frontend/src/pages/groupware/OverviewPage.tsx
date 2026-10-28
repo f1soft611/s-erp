@@ -35,6 +35,8 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
   const [detailVersion, setDetailVersion] = useState(0);
   const approvalPath = overview?.approvalPath ?? '/groupware/doc/read';
   const approval = overview?.approval;
+  const approvalPathForScope = (scope: 'MY_PENDING' | 'DRAFT' | 'REVISION_REQUESTED') =>
+    `${approvalPath}?${new URLSearchParams({ dashboardScope: scope })}`;
   const afterDocumentAction = () => {
     setDetailVersion((v) => v + 1);
     data.refresh();
@@ -43,7 +45,7 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
     <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <PageHeader breadcrumbItems={[selectedModule.name, currentMenuName]}
         description="내 업무와 주요 경영 지표를 한눈에 확인합니다." />
-      <Container maxWidth="xl" data-testid="overview-scroll" sx={{
+      <Container maxWidth={false} data-testid="overview-scroll" sx={{
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 },
       }}>
@@ -107,11 +109,11 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                   {overview.approvalStatus === 'error' ? <OverviewError label="결재 업무" onRetry={data.refresh} /> : approval && (
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>
                       <MetricCard label="내가 처리할 결재" value={approval.actionRequiredCount} unit="건" hint="내 결재 순서에 도착한 문서"
-                        icon={<TaskAltRounded fontSize="small" />} onClick={() => navigate(approvalPath)} />
+                        icon={<TaskAltRounded fontSize="small" />} onClick={() => navigate(approvalPathForScope('MY_PENDING'))} />
                       <MetricCard label="내 임시저장" value={approval.draftCount} unit="건" hint="이어서 작성할 기안 문서"
-                        tone="success" icon={<EditNoteRounded fontSize="small" />} onClick={() => navigate(approvalPath)} />
+                        tone="success" icon={<EditNoteRounded fontSize="small" />} onClick={() => navigate(approvalPathForScope('DRAFT'))} />
                       <MetricCard label="내 보완 필요" value={approval.revisionRequestedCount} unit="건" hint="내가 기안한 보완요청 문서"
-                        tone="warning" icon={<RateReviewOutlined fontSize="small" />} onClick={() => navigate(approvalPath)} />
+                        tone="warning" icon={<RateReviewOutlined fontSize="small" />} onClick={() => navigate(approvalPathForScope('REVISION_REQUESTED'))} />
                     </Box>
                   )}
                 </Box>

@@ -52,6 +52,14 @@ const composerNotifications = vi.hoisted(() => ({
   showError: vi.fn(),
 }));
 
+const approvalLineTemplateApi = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+  create: vi.fn(),
+  rename: vi.fn(),
+  delete: vi.fn(),
+}));
+
 let restoreImagePreloader: (() => void) | undefined;
 
 function getButtonGeometry(button: HTMLElement) {
@@ -74,6 +82,17 @@ afterEach(() => {
 vi.mock('../src/shared/context/NotificationContext', () => ({
   useNotification: () => composerNotifications,
 }));
+
+vi.mock(
+  '../src/pages/groupware/documents/write/services/approvalLineTemplate.service',
+  () => ({
+    listApprovalLineTemplates: approvalLineTemplateApi.list,
+    getApprovalLineTemplate: approvalLineTemplateApi.get,
+    createApprovalLineTemplate: approvalLineTemplateApi.create,
+    renameApprovalLineTemplate: approvalLineTemplateApi.rename,
+    deleteApprovalLineTemplate: approvalLineTemplateApi.delete,
+  }),
+);
 
 vi.mock(
   '../src/pages/co/workflow/form/services/draftFormManagement.service',
@@ -396,6 +415,7 @@ const draftFormTemplate = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  approvalLineTemplateApi.list.mockResolvedValue([]);
   composerApi.fetchDraftFormOptions.mockResolvedValue({
     categoryGroup: null,
     categoryItems: [category],
@@ -696,6 +716,40 @@ describe('Document write page', () => {
     ));
     expect(composerNotifications.showSuccess).toHaveBeenCalledWith('업무연락이 발송되었습니다.');
   }, 60000);
+
+  it('business-contact reference settings button opens the reference-only dialog', async () => {
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    const confirmation = await screen.findByRole('dialog', {
+      name: '문서 유형 변경',
+    });
+    fireEvent.click(
+      within(confirmation).getByRole('button', { name: '이동' }),
+    );
+    await waitForElementToBeRemoved(confirmation);
+
+    const referenceRow = screen.getByTestId('document-reference-row');
+    const referenceInput = within(referenceRow).getByRole('combobox', {
+      name: '참조자 선택',
+    });
+    const referenceControl = referenceInput.closest('.MuiInputBase-root');
+    const referenceSettingsButton = within(referenceRow).getByRole('button', {
+      name: '자주 쓰는 참조자',
+    });
+    expect(referenceControl).toHaveStyle({ height: '40px' });
+    expect(referenceSettingsButton).toHaveStyle({
+      height: '40px',
+      minHeight: '40px',
+    });
+    fireEvent.click(
+      referenceSettingsButton,
+    );
+    expect(
+      await screen.findByTestId('document-approval-settings-dialog'),
+    ).toBeInTheDocument();
+  }, 30000);
 
   it('business contact tab confirmation preserves content and resets all participants only after moving', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -3147,6 +3201,52 @@ describe('Document write page', () => {
   }, 15000);
 
   it('opens a revision-requested draft in the composer with its persisted content and approvers', async () => {
+    mockPaginatedDocumentLists();
+    composerApi.listApprovalComments.mockReset();
+    composerApi.listApprovalComments
+      .mockResolvedValueOnce({
+        comments: [],
+        systemEvents: [
+          {
+            commentId: 40,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RETURNED',
+            content: '문서 보완이 요청되었습니다.',
+            writerName: '홍길동',
+            attachments: [],
+          },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 1,
+      })
+      .mockResolvedValueOnce({
+        comments: [],
+        systemEvents: [
+          {
+            commentId: 41,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RESUBMITTED',
+            content: '문서가 재상신되었습니다.',
+            writerName: '김민수',
+            attachments: [],
+          },
+          {
+            commentId: 40,
+            ownerId: 4,
+            commentType: 'SYSTEM',
+            eventType: 'RETURNED',
+            content: '문서 보완이 요청되었습니다.',
+            writerName: '홍길동',
+            attachments: [],
+          },
+        ],
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+        resultCnt: 2,
+      });
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 4,
       eabusNo: '004',
@@ -3194,13 +3294,14 @@ describe('Document write page', () => {
     fireEvent.click(
       await within(listRegion).findByRole('button', { name: /문서 D/ }),
     );
-    await screen.findByTestId('post-detail-panel');
+    const detailPanel = await screen.findByTestId('post-detail-panel');
+    await within(detailPanel).findByText('문서 보완이 요청되었습니다.');
     fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: '수정 후 재상신' }));
-    await screen.findByRole('dialog', { name: '문서 작성' });
+    const composer = await screen.findByRole('dialog', { name: '문서 작성' });
     await screen.findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
 
-    expect(screen.getByTestId('post-detail-panel')).toBeInTheDocument();
+    expect(detailPanel).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '제목' })).toHaveValue(
       '보완할 기안서',
     );
@@ -3213,6 +3314,21 @@ describe('Document write page', () => {
       '결재 1 홍길동',
     );
     expect(approvalPeople[1]).toHaveAttribute('aria-label', '결재 2 김민수');
+
+    await waitFor(() =>
+      expect(within(composer).getByRole('button', { name: '결재신청' })).toBeEnabled(),
+    );
+    fireEvent.click(within(composer).getByRole('button', { name: '결재신청' }));
+    await waitFor(() =>
+      expect(composerApi.submitDocumentApproval).toHaveBeenCalled(),
+    );
+    await waitForElementToBeRemoved(composer);
+    await waitFor(() =>
+      expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2),
+    );
+    expect(
+      await within(detailPanel).findByText('문서가 재상신되었습니다.'),
+    ).toBeInTheDocument();
   }, 15000);
 
   it('shows and preserves existing attachments when editing a revision-requested document', async () => {
@@ -5092,10 +5208,14 @@ describe('Document write page', () => {
     const selectorControl = screen
       .getByRole('combobox', { name: '결재선 2 사용자 선택' })
       .closest('.MuiInputBase-root');
+    const referenceControl = screen
+      .getByRole('combobox', { name: '참조자 선택' })
+      .closest('.MuiInputBase-root');
     expect(screen.getByTestId('document-approval-grid')).toHaveStyle({
       display: 'grid',
     });
     expect(selectorControl).toHaveStyle({ height: '40px' });
+    expect(referenceControl).toHaveStyle({ height: '40px' });
     expect(screen.getByRole('button', { name: '결재 추가' })).toHaveStyle({
       height: '40px',
     });

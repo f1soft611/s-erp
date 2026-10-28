@@ -250,6 +250,196 @@ describe('PageSearchArea 상세 검색', () => {
     });
     expect(start).toHaveAttribute('aria-invalid', 'true');
   });
+
+  it('실제 적용된 상세 조건만 토글과 칩에 표시한다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ name: '입력 중', status: 'Y' }}
+        appliedDetailValues={{
+          name: '기존 검색어',
+          createdAt: { from: '2026-10-01', to: '' },
+          status: 'Y',
+        }}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: '상세 검색 열기' });
+    expect(toggle).toBeVisible();
+    expect(toggle).toHaveAttribute('aria-description', '적용된 상세 검색 조건 3개');
+    expect(screen.queryByText('이름: 입력 중')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByText('이름: 기존 검색어')).toBeVisible();
+    expect(screen.getByText('생성일: 2026-10-01')).toBeVisible();
+    expect(screen.getByText('상태: 사용')).toBeVisible();
+  });
+
+  it('미적용 입력만 있으면 상세검색 토글을 활성화하지 않는다', () => {
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={{ name: '조회 전 값' }}
+        appliedDetailValues={{}}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: '상세 검색 열기' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /검색 조건 제거/ })).not.toBeInTheDocument();
+  });
+
+  it('적용된 상세 조건 칩 제거는 초안만 변경하고 명시적으로 조회하기 전까지 대기한다', () => {
+    const onValuesChange = vi.fn();
+    const onSearch = vi.fn();
+    const appliedDetailValues = {
+      name: '기존 검색어',
+      status: 'Y',
+    };
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={appliedDetailValues}
+        appliedDetailValues={appliedDetailValues}
+        onDetailValuesChange={onValuesChange}
+        onDetailSearch={onSearch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이름 검색 조건 제거' }));
+
+    const nextValues = { name: '', status: 'Y' };
+    expect(onValuesChange).toHaveBeenLastCalledWith(nextValues);
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.queryByText('이름: 기존 검색어')).not.toBeInTheDocument();
+    expect(screen.getByText('상태: 사용')).toBeVisible();
+    expect(
+      screen.getByText('조건 변경 내용은 조회 버튼을 눌러 적용하세요.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: '이름 검색 조건 제거' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '상태 검색 조건 제거' }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '상태 검색 조건 제거' }));
+
+    expect(onValuesChange).toHaveBeenLastCalledWith({ name: '', status: '' });
+    expect(onSearch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(onSearch).toHaveBeenCalledWith({ name: '', status: '' });
+  });
+
+  it('조회 전 안내는 조건 칩 아래에 두고 작업 버튼은 맨 위 행에 유지한다', () => {
+    const appliedDetailValues = { name: '기존 검색어', status: 'Y' };
+    render(
+      <PageSearchArea
+        detailFields={fields}
+        detailValues={appliedDetailValues}
+        appliedDetailValues={appliedDetailValues}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: '이름 검색 조건 제거' }));
+
+    const notice = screen.getByRole('status');
+    const actions = screen.getByRole('group', { name: '상세 검색 작업' });
+    expect(notice.parentElement).toBe(actions.parentElement);
+    expect(getComputedStyle(actions.parentElement as HTMLElement).display).toBe(
+      'grid',
+    );
+    expect(getComputedStyle(actions).gridRow).toBe('1');
+    expect(getComputedStyle(actions).flexWrap).toBe('nowrap');
+  });
+
+  it('필수 날짜 범위의 양 끝을 입력하기 전에는 조회하지 않는다', () => {
+    const onSearch = vi.fn();
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'orderDt',
+            label: '수주일자',
+            type: 'date',
+            searchSpan: 1,
+            required: true,
+          },
+        ]}
+        onDetailSearch={onSearch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    const from = screen.getByLabelText('수주일자 시작일');
+    fireEvent.change(screen.getByLabelText('수주일자 종료일'), {
+      target: { value: '20261022' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(from).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('필수 입력입니다.')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: '상세 검색' })).toBeVisible();
+
+    fireEvent.change(from, { target: { value: '20261001' } });
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+
+    expect(onSearch).toHaveBeenCalledWith({
+      orderDt: { from: '2026-10-01', to: '2026-10-22' },
+    });
+  });
+
+  it('필수 날짜 상세조건은 칩에서 해제할 수 없다', () => {
+    const onValuesChange = vi.fn();
+    const onSearch = vi.fn();
+    const appliedDetailValues = {
+      orderDt: { from: '2026-10-01', to: '2026-10-22' },
+    };
+    render(
+      <PageSearchArea
+        detailFields={[
+          {
+            field: 'orderDt',
+            label: '수주일자',
+            type: 'date',
+            searchSpan: 1,
+            required: true,
+          },
+        ]}
+        detailValues={appliedDetailValues}
+        appliedDetailValues={appliedDetailValues}
+        onDetailValuesChange={onValuesChange}
+        onDetailSearch={onSearch}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    expect(
+      screen.getByRole('button', { name: '수주일자 검색 조건 제거' }),
+    ).toBeDisabled();
+    expect(onValuesChange).not.toHaveBeenCalled();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('상세검색이 열린 동안 그리드 로딩 덮개보다 위에 표시한다', () => {
+    render(<PageSearchArea detailFields={fields} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+
+    const detailDialog = screen.getByRole('dialog', { name: '상세 검색' });
+    const searchArea = detailDialog.parentElement;
+    expect(searchArea).not.toBeNull();
+    const searchZIndex = Number.parseInt(
+      getComputedStyle(searchArea as HTMLElement).zIndex,
+      10,
+    );
+    expect(searchZIndex).toBeGreaterThan(12);
+    expect(searchZIndex).toBeLessThan(1300);
+  });
+
   const groupedFields: PageSearchField[] = [
     {
       field: 'submittedAt',

@@ -42,7 +42,10 @@ export function DocumentWritePage({
   selectedModule,
   currentMenuName,
   content,
+  dashboardScope = null,
+  onDashboardScopeChange,
 }: DocumentWritePageProps) {
+  const initialScope = dashboardScope ?? 'ALL';
   const [editingDocument, setEditingDocument] =
     useState<DocumentApprovalDetail | null>(null);
   const [pendingPinAction, setPendingPinAction] =
@@ -87,7 +90,7 @@ export function DocumentWritePage({
     pageError,
     loadMore,
     retryLoadMore,
-  } = useDocumentWritePage();
+  } = useDocumentWritePage(initialScope, onDashboardScopeChange);
   const requestPinToggle = (
     electronicApprovalId: number,
     isPinned: boolean,

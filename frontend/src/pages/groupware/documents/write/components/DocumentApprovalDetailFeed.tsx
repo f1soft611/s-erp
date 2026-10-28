@@ -468,6 +468,7 @@ export function DocumentApprovalDetailFeed(
 
     let active = true;
     setLoadError('');
+    void loadComments();
     void getDocumentApprovalDetail(electronicApprovalId)
       .then((nextDetail) => {
         if (active) setDetail(nextDetail);
@@ -485,7 +486,13 @@ export function DocumentApprovalDetailFeed(
     return () => {
       active = false;
     };
-  }, [detailRefreshToken, electronicApprovalId, isFeedPresentation, open]);
+  }, [
+    detailRefreshToken,
+    electronicApprovalId,
+    isFeedPresentation,
+    loadComments,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || electronicApprovalId === null || isFeedPresentation) return;
@@ -2006,9 +2013,6 @@ export function DocumentApprovalDetailFeed(
         size="xs"
         actions={
           <>
-            <Button onClick={closeReasonDialog} disabled={isActing}>
-              취소
-            </Button>
             <Button
               variant={reasonAction === 'REJECTED' ? 'outlined' : 'outlined'}
               color={reasonAction === 'REJECTED' ? 'error' : 'warning'}
@@ -2022,6 +2026,9 @@ export function DocumentApprovalDetailFeed(
                 : reasonAction === 'REJECTED'
                   ? '반려 확인'
                   : '보완요청 확인'}
+            </Button>
+            <Button onClick={closeReasonDialog} disabled={isActing}>
+              취소
             </Button>
           </>
         }

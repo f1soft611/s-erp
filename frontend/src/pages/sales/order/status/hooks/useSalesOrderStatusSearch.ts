@@ -99,6 +99,7 @@ export function useSalesOrderStatusSearch() {
     setKeyword,
     detailFields,
     detailValues,
+    appliedDetailValues: searchSession?.detailValues ?? {},
     setDetailValues,
     searchAreaDefaultValues: searchSession === null ? (defaultValues ?? {}) : {},
     appliedFilters,
