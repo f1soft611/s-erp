@@ -1,6 +1,6 @@
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import { useTheme } from '@mui/material/styles';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Alert,
   Box,
@@ -33,6 +33,7 @@ import { DocumentApprovalFields } from './DocumentApprovalFields';
 import { DocumentApprovalSettingsDialog } from './DocumentApprovalSettingsDialog';
 import { DocumentMetadataFields } from './DocumentMetadataFields';
 import { DocumentReferenceField } from './DocumentReferenceField';
+import { DocumentLinkPreviews } from './DocumentLinkPreviews';
 
 const DOCUMENT_CODE_BY_KIND: Record<DocumentKind, ApprovalLineTemplateEabusNo> =
   {
@@ -46,12 +47,18 @@ type DocumentComposerDialogProps = {
   open: boolean;
   onClose: () => void;
   initialDocument?: DocumentApprovalDetail | null;
+  onOpenDocument?: (documentId: number) => void;
+  linkedDetail?: ReactNode;
+  onCloseLinkedDocument?: () => void;
 };
 
 export function DocumentComposerDialog({
   open,
   onClose,
   initialDocument = null,
+  onOpenDocument,
+  linkedDetail,
+  onCloseLinkedDocument,
 }: DocumentComposerDialogProps) {
   const theme = useTheme();
   const [approvalSettingsOpen, setApprovalSettingsOpen] = useState(false);
@@ -118,6 +125,10 @@ export function DocumentComposerDialog({
     fieldSurfaceBackground,
   } = useDocumentComposer(open, onClose, initialDocument);
   const closeComposer = () => {
+    if (linkedDetail && onCloseLinkedDocument) {
+      onCloseLinkedDocument();
+      return;
+    }
     setApprovalSettingsOpen(false);
     resetComposer();
   };
@@ -184,6 +195,7 @@ export function DocumentComposerDialog({
         }
         size="lg"
         bodyMode="fill"
+        overlay={linkedDetail}
         footerStart={composerFooterStart}
         actions={
           <>
@@ -448,6 +460,9 @@ export function DocumentComposerDialog({
                   }}
                 >
                   <RichTextEditor
+                    renderContentPreview={(html) => (
+                      <DocumentLinkPreviews html={html} onOpenDocument={onOpenDocument} />
+                    )}
                     onEditorReady={handleEditorReady}
                     className="document-composer-editor"
                     readOnly={isComposerLoading || isSaving}

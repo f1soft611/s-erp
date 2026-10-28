@@ -49,6 +49,7 @@ import type {
   UserMenuResponse,
 } from './types/dashboard';
 import { parseDocumentApprovalScope } from '../groupware/documents/write/data/documentPresentation';
+import { parseDocumentShareLink } from '../groupware/documents/write/data/documentShareLink';
 import type { DocumentApprovalScope } from '../groupware/documents/write/types/documentWrite.types';
 import { NotFoundPage } from '../errors/NotFoundPage';
 import {
@@ -954,6 +955,13 @@ function DashboardPage() {
                 </AppBar>
 
                 <DashboardContent
+                  sharedDocumentId={parseDocumentShareLink(`${window.location.origin}${location.pathname}${location.search}`)}
+                  onSharedDocumentClose={() => {
+                    const params = new URLSearchParams(location.search);
+                    params.delete('documentId');
+                    params.delete('share');
+                    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true });
+                  }}
                   selectedModule={selectedModule}
                   currentMenuName={currentMenu.name}
                   currentPageKey={currentPageKey}

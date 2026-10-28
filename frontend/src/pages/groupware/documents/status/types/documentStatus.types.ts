@@ -7,6 +7,7 @@ import type {
 export type DocumentStatusRow = Pick<
   DocumentApprovalRecord,
   | 'electronicApprovalId'
+  | 'documentNo'
   | 'title'
   | 'documentType'
   | 'documentStatus'
@@ -40,6 +41,7 @@ export type DocumentStatusFilters = {
   scope?: DocumentApprovalScope;
   keyword?: string;
   electronicApprovalId?: string;
+  documentNo?: string;
   title?: string;
   documentType?: DocumentApprovalRecord['documentType'];
   documentStatus?: ApprovalDocumentStatus;

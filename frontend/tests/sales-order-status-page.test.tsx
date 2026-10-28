@@ -260,7 +260,7 @@ describe('sales order status page', () => {
       'data:image/png;base64,cHJvZmlsZQ==',
     );
     expect(within(panel).getByText('작성자 · 등록 2026-10-27 13:38')).toBeInTheDocument();
-    expect(within(panel).getByText('SO-20261027-0001')).toBeInTheDocument();
+    expect(within(panel).getByText('수주번호: SO-20261027-0001')).toBeInTheDocument();
     expect(within(panel).getByText('거래처 10')).toBeInTheDocument();
     expect(within(panel).getByText('본사 창고')).toBeInTheDocument();
     expect(within(panel).getByText('품목 20')).toBeInTheDocument();
@@ -301,6 +301,9 @@ describe('sales order status page', () => {
     renderStatusPage();
     const panel = await openOrderDetailPanel();
     await within(panel).findByText('홍길동');
+    expect(
+      within(panel).getByText('수주번호: SO-20261027-0001'),
+    ).toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole('button', { name: '수주 더보기' }));
 

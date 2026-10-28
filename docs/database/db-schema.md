@@ -524,6 +524,7 @@
 | tenant_id | bigint | 소속 테넌트 FK |
 | drafting_work_category_id | bigint | 선택 작성 양식 FK, 선택값 |
 | document_type | varchar(40) | 문서 유형 코드 |
+| document_no | varchar(40) | 사용자용 문서번호 (`EA-YYYYMMDD-NNNN`), tenant별 유일 |
 | eabus_no | varchar(3) | 문서 유형별 번호 코드 (`DRAFTING=001`, `BUSINESS_CONTACT=008`, `EXPENSE_RESOLUTION=004`, `ATTENDANCE_APPLICATION=031`) |
 | document_status | varchar(30) | 문서 상태 코드 |
 | title | varchar(300) | 문서 제목 |
@@ -541,6 +542,7 @@
 
 - tenant와 기존 `tb_drafting_work_category` 양식을 참조한다. 양식의 tenant 일치는 서비스에서 검증한다.
 - `(tenant_id, electronic_approval_id)` 복합 unique 키로 결재선의 tenant 일치를 강제한다.
+- `(tenant_id, document_no)` unique로 tenant별 문서번호 중복을 방지한다. `ELECTRONIC_APPROVAL_NO`는 기존 `tb_id_sequence`에서 tenant/발급일별로 관리한다.
 - `document_type`: `DRAFTING`, `BUSINESS_CONTACT`, `EXPENSE_RESOLUTION`, `ATTENDANCE_APPLICATION`
 - `document_status`: `DRAFT`, `PENDING`, `IN_PROGRESS`, `REVISION_REQUESTED`, `COMPLETED`, `REJECTED`
 - 현재 MCP에서 `eabus_no` NOT NULL 및 문서 유형별 일치 CHECK, `deleted_yn`의 Y/N CHECK, `view_count >= 0` CHECK를 확인했다.
@@ -840,6 +842,8 @@
 ---
 
 ## 변경 이력
+
+- 2026-10-28: 전자결재 문서 식별을 내부 PK와 분리하기 위해 `tb_electronic_approval_main.document_no`를 추가하고 기존 행을 tenant/생성일 순서로 backfill하며 tenant별 unique와 `tb_id_sequence` 초기화를 정의했다. 기본 PostgreSQL MCP의 테이블 목록 및 컬럼 메타데이터를 확인했고 데이터 행은 조회하거나 변경하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261028](../../backend/DATABASE/20261028) 및 [docs/database/20261028](20261028) 참고.
 
 - 2026-10-27: 품목·거래처 분류 tenant schema DDL 초안 `20261027_002`를 정의했다. central DB `business_kind1/2` nonblank guard, tenant 복합 FK, 소분류-부모 일치 FK 및 데이터 존재 시 중단하는 rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261027](../../backend/DATABASE/20261027) 및 [docs/database/20261027](20261027) 참고.
 - 2026-10-26: 수주 헤더/상세 신규 테이블 DDL 초안 `20261026_008`을 정의했다. 테넌트 범위 FK와 별도 상세 ID, guarded rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261026](../../backend/DATABASE/20261026) 및 [docs/database/20261026](20261026) 참고.

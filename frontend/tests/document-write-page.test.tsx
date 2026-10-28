@@ -166,6 +166,7 @@ const muiTheme = createTheme();
 const defaultDocumentRecords: DocumentApprovalRecord[] = [
   {
     electronicApprovalId: 1,
+    documentNo: 'EA-20261012-0001',
     eabusNo: '001',
     documentType: 'DRAFTING',
     documentStatus: 'PENDING',
@@ -176,6 +177,7 @@ const defaultDocumentRecords: DocumentApprovalRecord[] = [
   },
   {
     electronicApprovalId: 2,
+    documentNo: 'EA-20261012-0002',
     eabusNo: '008',
     documentType: 'BUSINESS_CONTACT',
     documentStatus: 'IN_PROGRESS',
@@ -185,6 +187,7 @@ const defaultDocumentRecords: DocumentApprovalRecord[] = [
   },
   {
     electronicApprovalId: 3,
+    documentNo: 'EA-20261012-0003',
     eabusNo: '001',
     documentType: 'DRAFTING',
     documentStatus: 'DRAFT',
@@ -194,6 +197,7 @@ const defaultDocumentRecords: DocumentApprovalRecord[] = [
   },
   {
     electronicApprovalId: 4,
+    documentNo: 'EA-20261012-0004',
     eabusNo: '001',
     documentType: 'DRAFTING',
     documentStatus: 'REVISION_REQUESTED',
@@ -203,6 +207,7 @@ const defaultDocumentRecords: DocumentApprovalRecord[] = [
   },
   {
     electronicApprovalId: 5,
+    documentNo: 'EA-20261012-0005',
     eabusNo: '031',
     documentType: 'ATTENDANCE_APPLICATION',
     documentStatus: 'COMPLETED',
@@ -212,6 +217,7 @@ const defaultDocumentRecords: DocumentApprovalRecord[] = [
   },
   {
     electronicApprovalId: 6,
+    documentNo: 'EA-20261012-0006',
     eabusNo: '032',
     documentType: 'EXPENSE_RESOLUTION',
     documentStatus: 'PENDING',
@@ -437,10 +443,12 @@ beforeEach(() => {
   });
   composerApi.saveDocumentDraft.mockResolvedValue({
     electronicApprovalId: 77,
+    documentNo: 'EA-20261012-0077',
     documentStatus: 'DRAFT',
   });
   composerApi.submitDocumentApproval.mockResolvedValue({
     electronicApprovalId: 77,
+    documentNo: 'EA-20261012-0077',
     eabusNo: '001',
     documentStatus: 'PENDING',
     submittedAt: '2026-10-12T09:00:00Z',
@@ -478,6 +486,7 @@ beforeEach(() => {
     notices: [
       {
         electronicApprovalId: 1,
+        documentNo: 'EA-20261012-0001',
         eabusNo: '001',
         documentType: 'DRAFTING',
         documentStatus: 'PENDING',
@@ -488,6 +497,7 @@ beforeEach(() => {
       },
       {
         electronicApprovalId: 4,
+        documentNo: 'EA-20261012-0004',
         eabusNo: '001',
         documentType: 'DRAFTING',
         documentStatus: 'REVISION_REQUESTED',
@@ -500,6 +510,7 @@ beforeEach(() => {
   });
   composerApi.getDocumentApprovalDetail.mockResolvedValue({
     electronicApprovalId: 1,
+    documentNo: 'EA-20261012-0001',
     eabusNo: '001',
     documentType: 'DRAFTING',
     documentStatus: 'PENDING',
@@ -716,6 +727,60 @@ describe('Document write page', () => {
     ));
     expect(composerNotifications.showSuccess).toHaveBeenCalledWith('업무연락이 발송되었습니다.');
   }, 60000);
+
+  it('loads reference favorites after cancelling drafting favorites and switching tabs', async () => {
+    approvalLineTemplateApi.list.mockImplementation((code: string) =>
+      Promise.resolve([
+        {
+          templateId: code === '001' ? 1 : 8,
+          name: code === '001' ? '기안 즐겨찾기' : '업무 참조 즐겨찾기',
+          eabusNo: code,
+        },
+      ]),
+    );
+    render(<DocumentComposerDialog open onClose={vi.fn()} />);
+    await waitForComposerReady();
+    fireEvent.click(screen.getByRole('button', { name: '결재선 설정' }));
+    const approvalDialog = await screen.findByRole('dialog', {
+      name: '결재선 설정',
+    });
+    const approvalSelect = within(approvalDialog).getByRole('combobox', {
+      name: '자주 쓰는 결재선',
+    });
+    await waitFor(() => expect(approvalSelect).toBeEnabled());
+    fireEvent.mouseDown(approvalSelect);
+    expect(
+      await screen.findByRole('option', { name: '기안 즐겨찾기' }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('option', { name: '자주 쓰는 결재선 선택' }),
+    );
+    fireEvent.click(within(approvalDialog).getByRole('button', { name: '취소' }));
+    await waitForElementToBeRemoved(approvalDialog);
+
+    fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
+    const confirmation = await screen.findByRole('dialog', {
+      name: '문서 유형 변경',
+    });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '이동' }));
+    await waitForElementToBeRemoved(confirmation);
+    fireEvent.click(screen.getByRole('button', { name: '자주 쓰는 참조자' }));
+    const referenceDialog = await screen.findByRole('dialog', {
+      name: '참조자 설정',
+    });
+    const referenceSelect = within(referenceDialog).getByRole('combobox', {
+      name: '자주 쓰는 참조자',
+    });
+    await waitFor(() => expect(referenceSelect).toBeEnabled());
+    expect(approvalLineTemplateApi.list).toHaveBeenLastCalledWith('008');
+    fireEvent.mouseDown(referenceSelect);
+    expect(
+      await screen.findByRole('option', { name: '업무 참조 즐겨찾기' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: '기안 즐겨찾기' }),
+    ).not.toBeInTheDocument();
+  }, 30000);
 
   it('business-contact reference settings button opens the reference-only dialog', async () => {
     render(<DocumentComposerDialog open onClose={vi.fn()} />);
@@ -2682,9 +2747,30 @@ describe('Document write page', () => {
     });
   });
 
+  it('shows the document number beneath the approval detail title', async () => {
+    render(
+      <ThemeProvider theme={muiTheme}>
+        <DocumentApprovalDetailFeed
+          open
+          presentation="panel"
+          electronicApprovalId={1}
+          onActionComplete={() => undefined}
+          onEditDocument={() => undefined}
+          onClose={() => undefined}
+          detailRefreshToken={0}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByText('문서번호: EA-20261012-0001'),
+    ).toBeInTheDocument();
+  });
+
   it('opens approval detail with the body expanded', async () => {
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
+      documentNo: 'EA-20261012-0001',
       eabusNo: '001',
       documentType: 'DRAFTING',
       documentStatus: 'PENDING',
@@ -2707,6 +2793,7 @@ describe('Document write page', () => {
 
     const detailCard = await screen.findByTestId('approval-detail-card');
     expect(detailCard).toBeVisible();
+    expect(screen.getByText('문서번호: EA-20261012-0001')).toBeInTheDocument();
     expect(detailCard).toHaveClass('MuiStack-root');
     const body = screen.getByTestId('approval-document-body');
     expect(body).toHaveAttribute('data-expanded', 'true');
@@ -4426,9 +4513,9 @@ describe('Document write page', () => {
     );
 
     await screen.findByTestId('approval-detail-card');
-    expect(
-      screen.queryByRole('button', { name: '문서 더보기' }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menuitem', { name: '문서 공유하기' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '삭제' })).not.toBeInTheDocument();
   });
 
   it('keeps the document deletion menu available for a draft', async () => {

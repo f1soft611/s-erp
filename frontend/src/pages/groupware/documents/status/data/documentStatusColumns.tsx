@@ -39,10 +39,9 @@ export function createDocumentStatusColumns({
       search: { hidden: true },
     },
     {
-      field: 'electronicApprovalId',
+      field: 'documentNo',
       headerName: '문서번호',
-      // type: 'number',
-      width: 80,
+      width: 130,
       align: 'center',
       pinned: 'left',
       editable: false,
@@ -58,7 +57,7 @@ export function createDocumentStatusColumns({
               component="button"
               type="button"
               underline="hover"
-              aria-label={`${row.electronicApprovalId} 상세 보기`}
+              aria-label={`${row.documentNo} 상세 보기`}
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenDocument(row);
@@ -78,7 +77,7 @@ export function createDocumentStatusColumns({
                 verticalAlign: 'baseline',
               }}
             >
-              {row.electronicApprovalId}
+              {row.documentNo}
             </Link>
           )
         : undefined,

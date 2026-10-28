@@ -1,7 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import { Alert, Box, Button, Chip, Container, Stack } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { useNotification } from '../../../../shared/context/NotificationContext';
@@ -26,6 +26,8 @@ import { EmptyDocumentList } from './components/EmptyDocumentList';
 import { DocumentFileList } from './components/DocumentFileList';
 import { documentKinds } from './data/documentWriteData';
 import { useDocumentWritePage } from './hooks/useDocumentWritePage';
+import { parseDocumentShareLink, resolveDocumentShareReference } from './data/documentShareLink';
+import { DocumentLinkedDetailPanel } from './components/DocumentLinkedDetailPanel';
 import type {
   DocumentApprovalDetail,
   DocumentKind,
@@ -44,6 +46,8 @@ export function DocumentWritePage({
   content,
   dashboardScope = null,
   onDashboardScopeChange,
+  sharedDocumentId = null,
+  onSharedDocumentClose,
 }: DocumentWritePageProps) {
   const initialScope = dashboardScope ?? 'ALL';
   const [editingDocument, setEditingDocument] =
@@ -52,6 +56,7 @@ export function DocumentWritePage({
     useState<PendingDocumentPinAction | null>(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const [linkedDocumentId, setLinkedDocumentId] = useState<number | null>(null);
   const { showError } = useNotification();
   const {
     initialLoad,
@@ -91,6 +96,22 @@ export function DocumentWritePage({
     loadMore,
     retryLoadMore,
   } = useDocumentWritePage(initialScope, onDashboardScopeChange);
+  useEffect(() => {
+    let active = true;
+    if (sharedDocumentId !== null) {
+      void resolveDocumentShareReference(sharedDocumentId).then((id) => {
+        if (active) openDetail(id);
+      }).catch(() => {
+        if (active) showError('접근할 수 없거나 삭제된 문서입니다.');
+      });
+    }
+    return () => { active = false; };
+  }, [sharedDocumentId, openDetail, showError]);
+  const closeDocumentDetail = () => {
+    if (linkedDocumentId !== null) return;
+    closeDetail();
+    if (sharedDocumentId !== null) onSharedDocumentClose?.();
+  };
   const requestPinToggle = (
     electronicApprovalId: number,
     isPinned: boolean,
@@ -131,10 +152,38 @@ export function DocumentWritePage({
       ],
     },
   ];
+  const linkedDetail = (
+    <DocumentLinkedDetailPanel
+      documentId={linkedDocumentId}
+      onClose={() => setLinkedDocumentId(null)}
+      onOpenDocument={setLinkedDocumentId}
+      allowDocumentChanges={!isComposerOpen}
+      onActionComplete={refresh}
+      onEditDocument={(document) => {
+        setLinkedDocumentId(null);
+        setEditingDocument(document);
+        openComposer();
+      }}
+      detailRefreshToken={detailRefreshToken}
+    />
+  );
 
   return (
     <Box
       data-testid="document-write-page"
+      onClickCapture={(event) => {
+        const target = event.target as Element;
+        if (target.closest('[contenteditable="true"]')) return;
+        const anchor = target.closest('a[href]');
+        const id = anchor ? parseDocumentShareLink(anchor.getAttribute('href') ?? '') : null;
+        if (id !== null) {
+          event.preventDefault();
+          event.stopPropagation();
+          void resolveDocumentShareReference(id).then(setLinkedDocumentId).catch(() => {
+            showError('접근할 수 없거나 삭제된 문서입니다.');
+          });
+        }
+      }}
       sx={{
         flex: 1,
         position: 'relative',
@@ -298,6 +347,7 @@ export function DocumentWritePage({
                         }}
                         renderItem={(item) => (
                           <DocumentFeedItem
+                            onOpenDocument={setLinkedDocumentId}
                             key={item.id}
                             item={item}
                             employeeId={feedEmployeeId}
@@ -355,9 +405,13 @@ export function DocumentWritePage({
       </PageLoadBoundary>
 
       <DocumentComposerDialog
+        linkedDetail={isComposerOpen && linkedDocumentId !== null ? linkedDetail : null}
+        onCloseLinkedDocument={() => setLinkedDocumentId(null)}
+        onOpenDocument={setLinkedDocumentId}
         open={isComposerOpen}
         initialDocument={editingDocument}
         onClose={() => {
+          setLinkedDocumentId(null);
           closeComposer();
           setEditingDocument(null);
           refresh({ quiet: true });
@@ -365,11 +419,13 @@ export function DocumentWritePage({
         }}
       />
       {detailDocumentId !== null && (
-        <PageAreaOverlay onClose={closeDetail}>
+        <PageAreaOverlay onClose={closeDocumentDetail}>
           <DocumentApprovalDetailFeed
+            key={detailDocumentId}
+            onOpenDocument={setLinkedDocumentId}
             open
             electronicApprovalId={detailDocumentId}
-            onClose={closeDetail}
+            onClose={closeDocumentDetail}
             onActionComplete={refresh}
             onEditDocument={(document) => {
               setEditingDocument(document);
@@ -384,6 +440,7 @@ export function DocumentWritePage({
           />
         </PageAreaOverlay>
       )}
+      {!isComposerOpen && linkedDetail}
       <UnsavedChangesConfirmDialog
         open={Boolean(pendingPinAction)}
         title={

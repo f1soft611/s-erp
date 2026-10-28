@@ -93,6 +93,8 @@ export type DocumentWritePageProps = {
   content: PageContent;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
+  sharedDocumentId?: number | string | null;
+  onSharedDocumentClose?: () => void;
 };
 
 export type DocumentApprovalDraftRequest = {
@@ -140,6 +142,7 @@ export type DocumentDraftEmbeddedImageUpload = RichTextEditorImage & {
 
 export type DocumentApprovalDraftResponse = {
   electronicApprovalId: number;
+  documentNo: string;
   documentStatus: ApprovalDocumentStatus;
   eabusNo?: string;
   submittedAt?: string | null;
@@ -147,6 +150,7 @@ export type DocumentApprovalDraftResponse = {
 
 export type DocumentApprovalRecord = {
   electronicApprovalId: number;
+  documentNo: string;
   eabusNo: string;
   documentType: DocumentApprovalDraftRequest['documentType'];
   documentStatus: ApprovalDocumentStatus;

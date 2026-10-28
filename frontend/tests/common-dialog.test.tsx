@@ -29,6 +29,21 @@ const matchMobile = (matches: boolean) => {
 };
 
 describe('CommonDialog', () => {
+  it('keeps unsaved body state when showing and removing a paper-scoped overlay', () => {
+    const onClose = vi.fn();
+    const body = <input aria-label="작성 내용" defaultValue="" />;
+    const { rerender } = render(<CommonDialog open title="작성창" onClose={onClose}>{body}</CommonDialog>);
+    const input = screen.getByRole('textbox', { name: '작성 내용' });
+    fireEvent.change(input, { target: { value: '저장하지 않은 본문' } });
+    rerender(<CommonDialog open title="작성창" onClose={onClose}
+      overlay={<section aria-label="링크 상세">상세</section>}>{body}</CommonDialog>);
+    expect(screen.getByRole('region', { name: '링크 상세' }).parentElement)
+      .toBe(screen.getByRole('dialog', { name: '작성창' }));
+    rerender(<CommonDialog open title="작성창" onClose={onClose}>{body}</CommonDialog>);
+    expect(screen.getByRole('textbox', { name: '작성 내용' })).toBe(input);
+    expect(input).toHaveValue('저장하지 않은 본문');
+  });
+
   it('supports a separate title badge and rich description without changing the dialog name', () => {
     render(<CommonDialog open title="공지 모달" onClose={vi.fn()}
       titleAside={<span role="status">1 / 1</span>}
