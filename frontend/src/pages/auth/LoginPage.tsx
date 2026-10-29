@@ -19,6 +19,8 @@ function LoginPage() {
     submitStatus,
     showPassword,
     submitDisabled,
+    rememberLogin,
+    handleRememberLoginChange,
     setShowPassword,
     handleChange,
     handleSubmit,
@@ -54,6 +56,8 @@ function LoginPage() {
         submitStatus={submitStatus}
         showPassword={showPassword}
         submitDisabled={submitDisabled}
+        rememberLogin={rememberLogin}
+        onRememberLoginChange={handleRememberLoginChange}
         onChange={handleChange}
         onTogglePassword={() => setShowPassword((current) => !current)}
         onSubmit={onSubmit}

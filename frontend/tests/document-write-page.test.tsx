@@ -129,6 +129,7 @@ vi.mock(
     getDocumentApprovalSummary: composerApi.getDocumentApprovalSummary,
     confirmDocumentReference: composerApi.confirmDocumentReference,
     getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
+    getExternalLinkPreview: vi.fn(),
     listApprovalComments: composerApi.listApprovalComments,
     fetchApprovalEmbeddedImageBlob: composerApi.fetchApprovalEmbeddedImageBlob,
     fetchApprovalCommentAttachmentBlob:
@@ -3803,6 +3804,88 @@ describe('Document write page', () => {
       }
     });
   });
+
+  it.each(['feed', 'panel'] as const)(
+    'keeps comments visible with replies initially collapsed in %s presentation',
+    async (presentation) => {
+      const feedData = toFeedRecord(defaultDocumentRecords[0], {
+        comments: [
+          {
+            commentId: 1001,
+            ownerId: 1,
+            content: '<p>상위 댓글</p>',
+            commentType: 'USER',
+            writerName: '댓글 작성자',
+            attachments: [],
+          },
+          {
+            commentId: 1002,
+            ownerId: 1,
+            parentCommentId: 1001,
+            content: '<p>접을 답글</p>',
+            commentType: 'USER',
+            writerName: '답글 작성자',
+            attachments: [],
+          },
+        ],
+      });
+      composerApi.listApprovalComments.mockResolvedValue({
+        comments: feedData.comments,
+        systemEvents: [],
+        resultCnt: 1,
+        hasPrevious: false,
+        nextBeforeCommentId: null,
+      });
+      const sharedProps = {
+        open: true,
+        electronicApprovalId: 1,
+        detailRefreshToken: 0,
+        onActionComplete: () => undefined,
+        onEditDocument: () => undefined,
+      };
+      render(
+        <ThemeProvider theme={muiTheme}>
+          {presentation === 'feed' ? (
+            <DocumentApprovalDetailFeed
+              {...sharedProps}
+              presentation="feed"
+              employeeId="emp-1"
+              feedItem={{
+                id: 1,
+                title: '문서 A',
+                kind: '기안서',
+                status: '결재진행중',
+                author: '김민수',
+                date: '2026.10.29',
+                summary: '문서 요약',
+                feedData,
+              }}
+            />
+          ) : (
+            <DocumentApprovalDetailFeed
+              {...sharedProps}
+              presentation="panel"
+              onClose={() => undefined}
+            />
+          )}
+        </ThemeProvider>,
+      );
+      await waitFor(() => {
+        expect(screen.getByText('상위 댓글')).toBeInTheDocument();
+      });
+      expect(await screen.findByRole('textbox', { name: '댓글 입력' })).toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: '답글 1개' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('접을 답글')).not.toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('접을 답글')).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('접을 답글')).not.toBeInTheDocument();
+      expect(screen.getByText('상위 댓글')).toBeInTheDocument();
+    },
+  );
 
   it('renders every filtered document as a complete feed card with comments and reactions', async () => {
     composerApi.listDocumentApprovals.mockImplementation(

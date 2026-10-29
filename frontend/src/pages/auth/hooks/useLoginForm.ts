@@ -11,8 +11,52 @@ const initialValues: LoginFormValues = {
   password: '',
 };
 
+const rememberedLoginKey = 's-erp-remembered-login';
+type RememberedLogin = Pick<LoginFormValues, 'tenantCode' | 'userId'>;
+
+function readRememberedLogin(): RememberedLogin | null {
+  try {
+    const stored: unknown = JSON.parse(
+      window.localStorage.getItem(rememberedLoginKey) ?? 'null',
+    );
+    if (
+      stored &&
+      typeof stored === 'object' &&
+      'tenantCode' in stored &&
+      'userId' in stored &&
+      typeof stored.tenantCode === 'string' &&
+      typeof stored.userId === 'string' &&
+      stored.tenantCode.trim() &&
+      stored.userId.trim()
+    ) {
+      return { tenantCode: stored.tenantCode, userId: stored.userId };
+    }
+  } catch {
+    // Remembering identifiers is optional when browser storage is unavailable.
+  }
+  return null;
+}
+
+function saveRememberedLogin(identifiers: RememberedLogin | null) {
+  try {
+    if (identifiers) {
+      window.localStorage.setItem(rememberedLoginKey, JSON.stringify(identifiers));
+    } else {
+      window.localStorage.removeItem(rememberedLoginKey);
+    }
+  } catch {
+    // A preference storage failure must not block authentication.
+  }
+}
+
 export function useLoginForm() {
-  const [values, setValues] = useState<LoginFormValues>(initialValues);
+  const [values, setValues] = useState<LoginFormValues>(() => ({
+    ...initialValues,
+    ...readRememberedLogin(),
+  }));
+  const [rememberLogin, setRememberLogin] = useState(
+    () => Boolean(values.tenantCode && values.userId),
+  );
   const [errors, setErrors] = useState<Partial<Record<LoginFieldType, string>>>(
     {},
   );
@@ -22,6 +66,13 @@ export function useLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   const submitDisabled = useMemo(() => isSubmitting, [isSubmitting]);
+
+  const handleRememberLoginChange = (checked: boolean) => {
+    setRememberLogin(checked);
+    if (!checked) {
+      saveRememberedLogin(null);
+    }
+  };
 
   const validate = (nextValues: LoginFormValues) => {
     const nextErrors: Partial<Record<LoginFieldType, string>> = {};
@@ -79,6 +130,11 @@ export function useLoginForm() {
 
     try {
       await login(values);
+      saveRememberedLogin(
+        rememberLogin
+          ? { tenantCode: values.tenantCode.trim(), userId: values.userId.trim() }
+          : null,
+      );
       return { ok: true };
     } catch (error) {
       const errorMessage =
@@ -93,6 +149,7 @@ export function useLoginForm() {
 
   return {
     values,
+    rememberLogin,
     errors,
     isSubmitting,
     submitMessage,
@@ -101,6 +158,7 @@ export function useLoginForm() {
     submitDisabled,
     setShowPassword,
     handleChange,
+    handleRememberLoginChange,
     handleSubmit,
   };
 }

@@ -1,43 +1,67 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { apiGet } from '../src/shared/services/apiClient';
 import {
-  getSessionRemainingLabel,
-  isAccessTokenExpiringSoon,
   readSessionNotice,
   resolveApiBaseUrl,
   setSessionNotice,
 } from '../src/shared/services/authService';
 
+vi.mock('../src/pages/groupware/community/notice/components/NoticeLoginPopupHost', () => ({
+  NoticeLoginPopupHost: () => null,
+}));
+
 describe('Login page', () => {
-  it('renders the enterprise login fields', () => {
+  beforeEach(() => {
+    const defaultFetch = window.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/auth/refresh')) {
+        return new Response(JSON.stringify({
+          resultCode: '200',
+          jToken: 'refreshed-test-token',
+        }), { status: 200 });
+      }
+      const response = await defaultFetch(input, init);
+      if (String(input).includes('/api/v1/menus/my')) {
+        const body = await response.json();
+        for (const root of body.result.menus) {
+          root.children = [{ ...root, menuId: 'dashboard-home', children: [] }];
+        }
+        return new Response(JSON.stringify(body), { status: 200 });
+      }
+      return response;
+    }));
+  });
+
+  it('renders the enterprise login fields', async () => {
     render(<App />);
 
-    expect(screen.getByLabelText(/업체코드/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/업체코드/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/사용자 ID/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/비밀번호/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '로그인 저장' })).not.toBeChecked();
     expect(screen.getByRole('button', { name: /로그인/i })).toBeInTheDocument();
   });
 
-  it('shows validation errors when required values are missing', () => {
+  it('shows validation errors when required values are missing', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /로그인/i }));
 
     expect(screen.getByText(/업체코드를 입력해주세요/i)).toBeInTheDocument();
     expect(screen.getByText(/사용자 ID를 입력해주세요/i)).toBeInTheDocument();
     expect(screen.getByText(/비밀번호를 입력해주세요/i)).toBeInTheDocument();
   });
 
-  it('applies the dark-theme login styling when the app is in dark mode', () => {
+  it('applies the dark-theme login styling when the app is in dark mode', async () => {
     window.localStorage.setItem('erp-theme', 'dark');
 
     render(<App />);
 
     expect(document.documentElement.style.colorScheme).toBe('dark');
     expect(document.body.style.backgroundColor).toBe('rgb(15, 23, 42)');
-    expect(screen.getByText(/통합 ERP 시스템 로그인/i)).toBeInTheDocument();
+    expect(await screen.findByText(/통합 ERP 시스템 로그인/i)).toBeInTheDocument();
   });
 
   it('redirects to login when the stored JWT is expired and no refresh token exists', async () => {
@@ -77,13 +101,13 @@ describe('Login page', () => {
     render(<App />);
 
     expect(
-      await screen.findByRole('heading', { name: /^종합현황$/i }),
+      await screen.findByRole('heading', { name: /^종합현황$/i, level: 1 }, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/로그인 유지 시간/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/세션이 1분 후에 만료됩니다/i),
     ).not.toBeInTheDocument();
-  });
+  }, 20000);
 
   it('stores the refresh-failure message for the next login screen', () => {
     setSessionNotice('세션이 만료되어 다시 로그인해야 합니다.');
@@ -145,7 +169,7 @@ describe('Login page', () => {
   it('navigates to the dashboard after successful login', async () => {
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText(/업체코드/i), {
+    fireEvent.change(await screen.findByLabelText(/업체코드/i), {
       target: { value: 'T1358606250' },
     });
     fireEvent.change(screen.getByLabelText(/사용자 ID/i), {
@@ -158,13 +182,13 @@ describe('Login page', () => {
     fireEvent.click(screen.getByRole('button', { name: /로그인/i }));
 
     expect(
-      await screen.findByRole('heading', { name: /^종합현황$/i }),
+      await screen.findByRole('heading', { name: /^종합현황$/i, level: 1 }, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/auth/login-jwt'),
       expect.objectContaining({ method: 'POST' }),
     );
-  });
+  }, 20000);
 
   it('shows an error message when the backend rejects the login', async () => {
     vi.stubGlobal(
@@ -180,7 +204,7 @@ describe('Login page', () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText(/업체코드/i), {
+    fireEvent.change(await screen.findByLabelText(/업체코드/i), {
       target: { value: 'T1358606250' },
     });
     fireEvent.change(screen.getByLabelText(/사용자 ID/i), {

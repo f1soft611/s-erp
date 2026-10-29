@@ -1998,7 +1998,6 @@ export function DocumentApprovalDetailFeed(
                   onDownloadAttachment={handleDownloadCommentAttachment}
                   onDeleteAttachment={handleDeleteCommentAttachment}
                   onOpenAttachmentImage={setSelectedBodyImage}
-                  expandReplies
                 />
               </>
             </FeedCommentsSection>
