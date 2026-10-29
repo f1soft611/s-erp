@@ -6,6 +6,8 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   Stack,
@@ -27,6 +29,8 @@ type LoginFormProps = {
   submitStatus: 'error' | null;
   showPassword: boolean;
   submitDisabled: boolean;
+  rememberLogin: boolean;
+  onRememberLoginChange: (checked: boolean) => void;
   onChange: (field: LoginFieldType, value: string) => void;
   onTogglePassword: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -40,6 +44,8 @@ export function LoginForm({
   submitStatus,
   showPassword,
   submitDisabled,
+  rememberLogin,
+  onRememberLoginChange,
   onChange,
   onTogglePassword,
   onSubmit,
@@ -130,6 +136,17 @@ export function LoginForm({
                 </IconButton>
               </InputAdornment>
             }
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={rememberLogin}
+                onChange={(_, checked) => onRememberLoginChange(checked)}
+                disabled={isSubmitting}
+              />
+            }
+            label="로그인 저장"
           />
 
           {submitMessage ? (
