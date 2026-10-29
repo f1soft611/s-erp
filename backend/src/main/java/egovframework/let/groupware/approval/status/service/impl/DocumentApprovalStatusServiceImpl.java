@@ -36,7 +36,8 @@ public class DocumentApprovalStatusServiceImpl extends EgovAbstractServiceImpl
     private static final Set<String> DOCUMENT_STATUSES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "DRAFT", "PENDING", "IN_PROGRESS", "REVISION_REQUESTED", "COMPLETED", "REJECTED")));
     private static final Set<String> DOCUMENT_SCOPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED")));
+            "ALL", "MY_PENDING", "MY_REFERENCE_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED",
+            "REVISION_REQUESTED", "REJECTED")));
     private static final Set<String> DOCUMENT_SORT_FIELDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "electronicApprovalId", "documentNo", "eabusNo", "title", "documentType", "documentStatus", "submittedAt",
             "drafterName", "drafterDepartmentName", "myParticipantType", "myActionStatus",

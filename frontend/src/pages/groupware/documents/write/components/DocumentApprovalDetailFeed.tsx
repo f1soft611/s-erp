@@ -52,6 +52,7 @@ import {
   fetchApprovalCommentAttachmentBlob,
   getDocumentApprovalDetail,
   listApprovalComments,
+  confirmDocumentReference,
   processDocumentApprovalAction,
   updateApprovalComment,
   uploadApprovalCommentAttachment,
@@ -311,6 +312,7 @@ export function DocumentApprovalDetailFeed(
   const [isActing, setIsActing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [referenceActionError, setReferenceActionError] = useState('');
   const [actionComment, setActionComment] = useState('');
   const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
   const [commentRecords, setCommentRecords] = useState<
@@ -573,6 +575,22 @@ export function DocumentApprovalDetailFeed(
       ),
     [detail, employeeId],
   );
+  const canConfirmReference = useMemo(
+    () =>
+      Boolean(
+        employeeId &&
+          detail?.approvalLines.some(
+            (line) =>
+              line.participantUserId === employeeId &&
+              line.participantType === 'REFERENCE' &&
+              line.actionStatus !== 'CONFIRMED' &&
+              detail.documentStatus !== 'DRAFT' &&
+              (detail.documentType === 'DRAFTING' ||
+                detail.documentType === 'BUSINESS_CONTACT'),
+          ),
+      ),
+    [detail, employeeId],
+  );
   const canCancelSubmission = Boolean(
     detail?.isDrafter && detail.documentStatus === 'PENDING',
   );
@@ -693,6 +711,25 @@ export function DocumentApprovalDetailFeed(
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
+      );
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleReferenceConfirmation = async () => {
+    if (electronicApprovalId === null || isActing || !canConfirmReference) return;
+    setIsActing(true);
+    setReferenceActionError('');
+    try {
+      await confirmDocumentReference(electronicApprovalId);
+      showSuccess('문서 참조 확인을 완료했습니다.');
+      onActionComplete();
+      setDetailRetryToken((token) => token + 1);
+      await loadComments();
+    } catch (error: unknown) {
+      setReferenceActionError(
+        error instanceof Error ? error.message : '참조 확인 처리에 실패했습니다.',
       );
     } finally {
       setIsActing(false);
@@ -1020,6 +1057,18 @@ export function DocumentApprovalDetailFeed(
                 </Button>
               </>
             )}
+            {canConfirmReference && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                sx={approvalActionButtonSx}
+                onClick={() => void handleReferenceConfirmation()}
+                disabled={isActing}
+              >
+                확인
+              </Button>
+            )}
             {canCancelSubmission && (
               <Button
                 size="small"
@@ -1134,6 +1183,9 @@ export function DocumentApprovalDetailFeed(
         >
           {loadError}
         </Alert>
+      )}
+      {referenceActionError && (
+        <Alert severity="error">{referenceActionError}</Alert>
       )}
       {isFeedPresentation && isLoading && (
         <Stack

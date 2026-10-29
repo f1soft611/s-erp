@@ -55,7 +55,8 @@ public class DocumentApprovalWriteServiceImpl extends EgovAbstractServiceImpl
     private static final Set<String> DOCUMENT_TYPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "DRAFTING", "BUSINESS_CONTACT", "EXPENSE_RESOLUTION", "ATTENDANCE_APPLICATION")));
     private static final Set<String> DOCUMENT_SCOPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "ALL", "MY_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED", "REVISION_REQUESTED", "REJECTED")));
+            "ALL", "MY_PENDING", "MY_REFERENCE_PENDING", "IN_PROGRESS", "DRAFT", "COMPLETED",
+            "REVISION_REQUESTED", "REJECTED")));
     private final DocumentApprovalDAO documentApprovalDAO;
     private final CommonFileService commonFileService;
     private final EmbeddedImageStorageService imageStorageService;
@@ -429,6 +430,15 @@ public class DocumentApprovalWriteServiceImpl extends EgovAbstractServiceImpl
         }
         List<DocumentApprovalListItemVO> notices = documentApprovalDAO.selectApprovalNotices(params);
         summary.setNotices(notices == null ? Collections.<DocumentApprovalListItemVO>emptyList() : notices);
+        Long referenceConfirmationRequiredCount =
+                documentApprovalDAO.selectReferenceConfirmationRequiredCount(params);
+        List<DocumentApprovalListItemVO> referenceConfirmationItems =
+                documentApprovalDAO.selectReferenceConfirmationItems(params);
+        if (referenceConfirmationRequiredCount == null || referenceConfirmationItems == null) {
+            throw new IllegalStateException("참조 확인 요약을 조회할 수 없습니다.");
+        }
+        summary.setReferenceConfirmationRequiredCount(referenceConfirmationRequiredCount);
+        summary.setReferenceConfirmationItems(referenceConfirmationItems);
         return summary;
     }
 

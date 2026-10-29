@@ -47,12 +47,12 @@
 ## 데이터와 API 설계
 
 - 참조자별 상태는 기존 전자결재 참여자 행에서 관리한다. 확인된 `REFERENCE` 행은 `action_status=CONFIRMED`, `action_at`은 확인 시각으로 기록하고 `action_comment`는 비워 둔다. 미확인 참조 행은 기존 초기 상태를 유지한다.
-- 결재 처리 상태와 구별되도록 `CONFIRMED`는 `REFERENCE`에서만 유효하게 서버 검증 및 DB 제약으로 제한한다. 실제 현행 CHECK 제약 및 인덱스는 구현 전에 기본 DB MCP의 read-only metadata 조회로 확인한다.
-- SYSTEM 이벤트 허용 제약에는 `REFERENCE_CONFIRMED`를 추가한다. 신규 테이블은 만들지 않는다.
+- `s-erp-postgresql-readonly`의 `list_tables`, `describe_table` 및 제한된 `pg_constraint` 메타데이터 조회로 확인한 현재 DB 제약은 `REFERENCE`의 모든 action 필드를 NULL로 제한하고 SYSTEM 이벤트 허용 목록에서 `REFERENCE_CONFIRMED`를 제외한다. 따라서 확인 상태/이벤트를 허용하도록 두 CHECK 제약을 수정하는 migration이 필요하다.
+- 결재 처리 상태와 구별되도록 `CONFIRMED`는 `REFERENCE`에만 허용한다. 확인된 참조는 `pending_at` 및 `action_comment` NULL, `action_at` NOT NULL이어야 한다. 확인되지 않은 참조는 기존처럼 네 필드가 NULL이다. SYSTEM 이벤트 CHECK에는 `REFERENCE_CONFIRMED`를 추가한다. 신규 컬럼/테이블 및 데이터 backfill은 없다.
 - 확인 API는 문서 ID로 요청자를 식별하며, 서버가 인증 사용자·tenant·문서 참여 행·문서 상태를 검증한다. 요청에서 사용자 ID 또는 확인 시각을 받지 않는다.
 - 문서 목록은 새 조회 범위 `MY_REFERENCE_PENDING`을 지원해 로그인 사용자의 미확인 REFERENCE 행이 있는 문서만 반환한다. `DRAFT` 문서는 제외한다.
 - 결재요약 응답에는 참조 확인 대기 건수와 미확인 문서 목록을 결재 notice와 분리해 제공한다. 종합현황도 같은 사용자 범위에 한정된 대기 건수/목록을 제공한다.
-- 신규 상태 및 이벤트 제약에 migration이 필요하면 날짜별 SQL, 변경 이력, 롤백 파일을 `backend/DATABASE`와 `docs/database`에 동일하게 추가하고 `docs/database/db-schema.md`를 갱신한다. DB 변경 여부와 제약의 구체적인 전제는 MCP 메타데이터와 현재 이력 확인 뒤 확정한다.
+- 날짜별 SQL, 변경 이력, 롤백 파일을 `backend/DATABASE/20261029`와 `docs/database/20261029`에 동일하게 추가하고 `docs/database/db-schema.md`를 갱신한다. MCP는 메타데이터만 확인했으며 실제 DB에는 migration을 적용하지 않는다.
 
 ## 대안과 선택
 

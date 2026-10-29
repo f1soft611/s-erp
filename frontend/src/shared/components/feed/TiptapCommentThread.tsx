@@ -462,37 +462,39 @@ function CommentItem({
               )
             )}
             <Box sx={{ ml: 'auto' }}>
-              {!isDeleted && !isSystemEvent && (
-                <IconButton
-                  size="small"
-                  aria-label={`댓글 메뉴 ${comment.author}`}
-                  onClick={(event) => setMenuAnchor(event.currentTarget)}
-                >
-                  <MoreVertIcon fontSize="small" />
-                </IconButton>
+              {comment.isEditable === true && !isDeleted && !isSystemEvent && (
+                <>
+                  <IconButton
+                    size="small"
+                    aria-label={`댓글 메뉴 ${comment.author}`}
+                    onClick={(event) => setMenuAnchor(event.currentTarget)}
+                  >
+                    <MoreVertIcon fontSize="small" />
+                  </IconButton>
+                  <Menu
+                    anchorEl={menuAnchor}
+                    open={Boolean(menuAnchor)}
+                    onClose={() => setMenuAnchor(null)}
+                  >
+                    <MenuItem
+                      onClick={() => {
+                        setEditingCommentId(comment.id);
+                        setMenuAnchor(null);
+                      }}
+                    >
+                      수정
+                    </MenuItem>
+                    <MenuItem
+                      onClick={async () => {
+                        setMenuAnchor(null);
+                        await props.onDeleteComment?.(comment.id);
+                      }}
+                    >
+                      삭제
+                    </MenuItem>
+                  </Menu>
+                </>
               )}
-              <Menu
-                anchorEl={menuAnchor}
-                open={Boolean(menuAnchor)}
-                onClose={() => setMenuAnchor(null)}
-              >
-                <MenuItem
-                  onClick={() => {
-                    setEditingCommentId(comment.id);
-                    setMenuAnchor(null);
-                  }}
-                >
-                  수정
-                </MenuItem>
-                <MenuItem
-                  onClick={async () => {
-                    setMenuAnchor(null);
-                    await props.onDeleteComment?.(comment.id);
-                  }}
-                >
-                  삭제
-                </MenuItem>
-              </Menu>
             </Box>
           </Stack>
           {isSystemEvent ? (

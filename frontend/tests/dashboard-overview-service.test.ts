@@ -11,6 +11,8 @@ export const overviewFixture = {
   approvalPath: '/groupware/doc/write', approvalStatus: 'ready', noticeStatus: 'ready',
   approval: {
     actionRequiredCount: 3, draftCount: 2, revisionRequestedCount: 1,
+    referenceConfirmationRequiredCount: 1,
+    referenceConfirmationItems: [{ electronicApprovalId: 12, title: '검증용 참조 문서' }],
     notices: [{ electronicApprovalId: 7, title: '검증용 결재 문서', noticeType: 'ACTION_REQUIRED' }],
   },
   notices: [{ postId: 8, title: '검증용 운영 공지', isPinned: 'Y', createdAt: '2026-10-28T08:00:00' }],
@@ -41,6 +43,22 @@ describe('dashboard API contract', () => {
     await expect(fetchDashboardOverview()).rejects.toThrow('종합현황 응답');
     get.mockResolvedValue({ item: { ...salesFixture, supplyAmount: null } });
     await expect(fetchDashboardSales('2026-10')).rejects.toThrow('수주 집계 응답');
+  });
+
+  it.each([
+    ['missing count', { referenceConfirmationRequiredCount: undefined }],
+    ['negative count', { referenceConfirmationRequiredCount: -1 }],
+    ['unsafe count', { referenceConfirmationRequiredCount: Number.MAX_SAFE_INTEGER + 1 }],
+    ['malformed count', { referenceConfirmationRequiredCount: '1' }],
+    ['missing items', { referenceConfirmationItems: undefined }],
+    ['malformed items', { referenceConfirmationItems: null }],
+    ['malformed item', { referenceConfirmationItems: [{ electronicApprovalId: '12', title: '문서' }] }],
+    ['invalid title', { referenceConfirmationItems: [{ electronicApprovalId: 12, title: null }] }],
+  ])('rejects %s reference confirmation summary data', async (_label, patch) => {
+    get.mockResolvedValue({
+      item: { ...overviewFixture, approval: { ...overviewFixture.approval, ...patch } },
+    });
+    await expect(fetchDashboardOverview()).rejects.toThrow('종합현황 응답');
   });
 
   it('accepts explicit partial failure and permission-hidden sections', async () => {

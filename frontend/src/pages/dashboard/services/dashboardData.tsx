@@ -106,6 +106,12 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  'item-partner-prices': {
+    title: '품목·거래처별 단가관리',
+    description: '품목과 거래처별 매입·매출 단가와 적용기간을 관리하고 엑셀로 등록합니다.',
+    cards: [],
+    items: [],
+  },
   overview: {
     title: '종합현황',
     description:

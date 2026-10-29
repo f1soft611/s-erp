@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -22,6 +24,7 @@ import egovframework.let.dashboard.domain.model.DashboardOverviewVO;
 import egovframework.let.dashboard.domain.model.DashboardSalesVO;
 import egovframework.let.dashboard.domain.repository.DashboardDAO;
 import egovframework.let.dashboard.service.impl.DashboardServiceImpl;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalListItemVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalSummaryVO;
 import egovframework.let.groupware.approval.write.service.DocumentApprovalWriteService;
 import egovframework.let.system.menus.domain.model.MenuPermissionVO;
@@ -81,6 +84,8 @@ class DashboardServiceTest {
         DocumentApprovalSummaryVO summary = new DocumentApprovalSummaryVO();
         summary.setActionRequiredCount(3L);
         summary.setRevisionRequestedCount(99L);
+        summary.setReferenceConfirmationRequiredCount(0L);
+        summary.setReferenceConfirmationItems(Collections.emptyList());
         when(approvals.getSummary(user)).thenReturn(summary);
         when(dao.selectMyRevisionCount(any())).thenReturn(2L);
         when(dao.selectNotices(any())).thenThrow(new IllegalStateException("internal source failure"));
@@ -95,6 +100,54 @@ class DashboardServiceTest {
         ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
         verify(dao).selectMyRevisionCount(params.capture());
         assertThat(params.getValue()).containsEntry("tenantId", 71L).containsEntry("drafterId", "fixture");
+    }
+
+    @Test
+    void mapsReferenceConfirmationCountAndItemsSeparatelyFromApprovalNotices() throws Exception {
+        grant("/groupware/doc/read");
+        DocumentApprovalSummaryVO summary = new DocumentApprovalSummaryVO();
+        summary.setActionRequiredCount(3L);
+        summary.setNotices(Collections.singletonList(approvalItem(301L, "결재 확인", "APPROVAL")));
+        summary.setReferenceConfirmationRequiredCount(2L);
+        summary.setReferenceConfirmationItems(Arrays.asList(
+                approvalItem(401L, "참조 문서 1", null),
+                approvalItem(402L, "참조 문서 2", null)));
+        when(approvals.getSummary(user)).thenReturn(summary);
+        when(dao.selectMyRevisionCount(any())).thenReturn(0L);
+
+        DashboardOverviewVO result = service.overview(user);
+        JsonNode approval = new ObjectMapper().valueToTree(result.getApproval());
+
+        assertThat(result.isCanReadApprovals()).isTrue();
+        assertThat(result.getApprovalPath()).isEqualTo("/groupware/doc/read");
+        assertThat(approval.path("actionRequiredCount").asLong()).isEqualTo(3L);
+        assertThat(approval.path("referenceConfirmationRequiredCount").asLong()).isEqualTo(2L);
+        assertThat(approval.path("referenceConfirmationItems")).hasSize(2);
+        assertThat(approval.path("referenceConfirmationItems").get(0).path("electronicApprovalId").asLong())
+                .isEqualTo(401L);
+        assertThat(approval.path("referenceConfirmationItems").get(0).path("title").asText())
+                .isEqualTo("참조 문서 1");
+        assertThat(approval.path("referenceConfirmationItems").get(1).path("electronicApprovalId").asLong())
+                .isEqualTo(402L);
+        assertThat(approval.path("referenceConfirmationItems").get(1).path("title").asText())
+                .isEqualTo("참조 문서 2");
+        assertThat(approval.path("notices")).hasSize(1);
+        assertThat(approval.path("notices").get(0).path("electronicApprovalId").asLong()).isEqualTo(301L);
+        assertThat(approval.path("notices").get(0).path("title").asText()).isEqualTo("결재 확인");
+    }
+
+    @Test
+    void malformedReferenceConfirmationSummaryMarksApprovalAsUnavailable() throws Exception {
+        grant("/groupware/doc/read");
+        DocumentApprovalSummaryVO summary = new DocumentApprovalSummaryVO();
+        summary.setActionRequiredCount(3L);
+        summary.setReferenceConfirmationRequiredCount(0L);
+        when(approvals.getSummary(user)).thenReturn(summary);
+
+        DashboardOverviewVO result = service.overview(user);
+
+        assertThat(result.getApprovalStatus()).isEqualTo("error");
+        assertThat(result.getApproval()).isNull();
     }
 
     @Test
@@ -150,5 +203,13 @@ class DashboardServiceTest {
         response.setMenus(Collections.singletonList(root));
         when(menus.getMyMenuTree(user.getTenantId(), user.getId(), user.getRoleId(), user.getRoleCode()))
                 .thenReturn(response);
+    }
+
+    private DocumentApprovalListItemVO approvalItem(Long id, String title, String noticeType) {
+        DocumentApprovalListItemVO item = new DocumentApprovalListItemVO();
+        item.setElectronicApprovalId(id);
+        item.setTitle(title);
+        item.setNoticeType(noticeType);
+        return item;
     }
 }

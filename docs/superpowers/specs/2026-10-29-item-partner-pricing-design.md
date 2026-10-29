@@ -2,8 +2,7 @@
 
 ## Status
 
-- Working design based on the user's request to review the screen layout and
-  include Excel upload.
+- Approved by the user on 2026-10-29 after reviewing the design document.
 - Scope: tenant-aware item/partner price schema and a frontend-first
   maintenance screen with manual and Excel-assisted entry.
 - Database DDL is a reviewable draft only; it must not be applied through the

@@ -506,6 +506,8 @@ export function useDocumentWritePage(
     pinnedViewItems,
     listViewItems,
     summary,
+    referenceConfirmationRequiredCount:
+      summary?.referenceConfirmationRequiredCount ?? 0,
     notices: (summary?.notices ?? []).map((notice) => mapDocument(notice, false)),
     isLoading,
     loadError,

@@ -21,6 +21,7 @@ import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPa
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
+import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
@@ -158,6 +159,19 @@ export function DashboardContent({
   if (selectedModule.id === 'co' && currentPageKey === 'materials') {
     return (
       <MaterialManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'co' && currentPageKey === 'item-partner-prices') {
+    return (
+      <ItemPartnerPriceManagementPage
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}

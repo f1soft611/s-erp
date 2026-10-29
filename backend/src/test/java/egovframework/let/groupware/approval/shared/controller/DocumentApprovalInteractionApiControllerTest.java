@@ -18,9 +18,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.mockingDetails;
 import egovframework.com.cmm.LoginVO;
 import egovframework.com.common.domain.model.CommonCommentVO;
 import egovframework.com.cmm.service.ResultVO;
@@ -94,6 +98,29 @@ class DocumentApprovalInteractionApiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void referenceConfirmationPostUsesAuthenticatedPrincipalAndPathIdWithoutClientPayload() throws Exception {
+        LoginVO user = authenticatedUser();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList()));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .build();
+
+        try {
+            mockMvc.perform(post("/api/v1/groupware/approvals/77/reference-confirmation"))
+                    .andExpect(status().isOk());
+
+            assertThat(mockingDetails(interactionService).getInvocations())
+                    .anySatisfy(invocation -> {
+                        assertThat(invocation.getMethod().getName()).isEqualTo("confirmReference");
+                        assertThat(invocation.getArguments()).containsExactly(user, 77L);
+                    });
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test
