@@ -34,6 +34,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailV
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalLineVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalParticipantVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalWorkflowDocumentVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceConfirmationVO;
 import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDAO;
 import egovframework.let.groupware.approval.shared.service.DocumentApprovalInteractionService;
 import egovframework.let.groupware.approval.common.service.DocumentApprovalDraftSupportService;
@@ -262,6 +263,81 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
             draftSupportService.insertSystemEvent(user, electronicApprovalId, "COMPLETED", "문서 결재가 완료되었습니다.");
         }
         return draftSupportService.workflowResponse(electronicApprovalId, nextStatus);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentApprovalReferenceConfirmationVO confirmReference(LoginVO user, Long electronicApprovalId)
+            throws Exception {
+        documentApprovalAccessService.validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+
+        Map<String, Object> params = documentApprovalAccessService.actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "결재 문서를 찾을 수 없습니다.");
+        }
+        if ("DRAFT".equals(document.getDocumentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "임시저장 문서는 확인할 수 없습니다.");
+        }
+        if (!"DRAFTING".equals(document.getDocumentType())
+                && !"BUSINESS_CONTACT".equals(document.getDocumentType())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "참조 확인을 지원하지 않는 문서 종류입니다.");
+        }
+
+        params.put("participantUserId", user.getUniqId());
+        DocumentApprovalLineVO referenceLine =
+                documentApprovalDAO.selectUserReferenceApprovalLineForUpdate(params);
+        if (referenceLine == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "확인할 참조 문서를 찾을 수 없습니다.");
+        }
+        params.put("electronicApprovalLineId", referenceLine.getElectronicApprovalLineId());
+        if ("CONFIRMED".equals(referenceLine.getActionStatus())) {
+            return referenceConfirmationResponse(electronicApprovalId, referenceLine);
+        }
+        if (referenceLine.getActionStatus() != null
+                || referenceLine.getPendingAt() != null
+                || referenceLine.getActionAt() != null
+                || referenceLine.getActionComment() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "참조 확인 상태가 변경되어 처리할 수 없습니다.");
+        }
+
+        int updatedRows = documentApprovalDAO.confirmReferenceApprovalLine(params);
+        if (updatedRows == 0) {
+            DocumentApprovalLineVO latestLine = documentApprovalDAO.selectUserReferenceApprovalLine(params);
+            if (latestLine != null && "CONFIRMED".equals(latestLine.getActionStatus())) {
+                return referenceConfirmationResponse(electronicApprovalId, latestLine);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "참조 확인 상태가 변경되어 처리할 수 없습니다.");
+        }
+        if (updatedRows != 1) {
+            throw new IllegalStateException("참조 확인 처리 건수를 확인할 수 없습니다.");
+        }
+
+        DocumentApprovalLineVO confirmedLine = documentApprovalDAO.selectUserReferenceApprovalLine(params);
+        if (confirmedLine == null || !"CONFIRMED".equals(confirmedLine.getActionStatus())
+                || confirmedLine.getActionAt() == null) {
+            throw new IllegalStateException("참조 확인 결과를 확인할 수 없습니다.");
+        }
+        draftSupportService.insertSystemEvent(user, electronicApprovalId,
+                "REFERENCE_CONFIRMED", "문서를 확인했습니다.");
+        return referenceConfirmationResponse(electronicApprovalId, confirmedLine);
+    }
+
+    private DocumentApprovalReferenceConfirmationVO referenceConfirmationResponse(
+            Long electronicApprovalId, DocumentApprovalLineVO line) {
+        if (!"CONFIRMED".equals(line.getActionStatus()) || line.getActionAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "참조 확인 상태가 변경되어 처리할 수 없습니다.");
+        }
+        DocumentApprovalReferenceConfirmationVO response = new DocumentApprovalReferenceConfirmationVO();
+        response.setElectronicApprovalId(electronicApprovalId);
+        response.setActionStatus(line.getActionStatus());
+        response.setActionAt(line.getActionAt());
+        return response;
     }
 
     @Override

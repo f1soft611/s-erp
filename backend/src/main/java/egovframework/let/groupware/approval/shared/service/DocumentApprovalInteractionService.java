@@ -15,6 +15,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailV
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftSaveRequestVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDraftVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalFilePageVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceConfirmationVO;
 
 public interface DocumentApprovalInteractionService {
 
@@ -30,6 +31,8 @@ public interface DocumentApprovalInteractionService {
     DocumentApprovalDraftVO cancelSubmission(LoginVO user, Long electronicApprovalId) throws Exception;
 
     DocumentApprovalDraftVO cancelApproval(LoginVO user, Long electronicApprovalId) throws Exception;
+
+    DocumentApprovalReferenceConfirmationVO confirmReference(LoginVO user, Long electronicApprovalId) throws Exception;
 
     DocumentApprovalDetailVO getDetail(LoginVO user, Long electronicApprovalId) throws Exception;
 

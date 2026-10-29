@@ -316,7 +316,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`), USER에서는 NULL |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`, `REFERENCE_CONFIRMED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -330,7 +330,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 현재 PostgreSQL MCP의 `chk_tb_common_comment_event_type`은 위의 SYSTEM 이벤트 10종과 USER의 NULL `event_type` 조건을 허용한다. 결재 처리 및 임시저장/취소 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시하며 서비스/API에서 수정·삭제·답글·좋아요를 차단한다.
+- 현재 PostgreSQL MCP의 `chk_tb_common_comment_event_type`은 위의 SYSTEM 이벤트 11종과 USER의 NULL `event_type` 조건을 허용한다. 결재 처리 및 임시저장/취소/참조확인 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시하며 서비스/API에서 수정·삭제·답글·좋아요를 차단한다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -560,20 +560,21 @@
 | participant_user_id | varchar(100) | 작성 화면에서 선택한 사용자 키 |
 | participant_name | varchar(150) | 참여자 이름 스냅샷 |
 | participant_department_name | varchar(150) | 참여자 부서명 스냅샷 |
-| action_status | varchar(20) | 처리 상태; 참조 행은 NULL |
+| action_status | varchar(20) | 처리 상태; 참조 행은 미확인 NULL, 확인 완료 `CONFIRMED` |
 | pending_at | timestamp | 해당 결재 단계가 활성화된 시각; 대기 전·참조 행은 NULL |
-| action_at | timestamp | 결재 처리 시각 |
-| action_comment | text | 결재 처리 의견 |
+| action_at | timestamp | 결재 처리 또는 참조 확인 시각 |
+| action_comment | text | 결재 처리 의견; 참조 행은 NULL |
 | created_at | timestamp | 생성 시각 |
 
 제약/역할:
 
 - 결재 본문과 `(tenant_id, electronic_approval_id)` FK로 연결되며 본문 삭제 시 결재선은 cascade 삭제된다.
 - 단계/참여자 순서와 문서 내 참여자 중복을 unique로 제한한다.
-- `action_status`: `WAITING`, `PENDING`, `APPROVED`, `REJECTED`, `RETURNED`
+- `action_status`: 결재/합의 `WAITING`, `PENDING`, `APPROVED`, `REJECTED`, `RETURNED`; 참조 `CONFIRMED`
 - 현재 MCP에서 `PENDING` 행은 `pending_at` 필수, `WAITING` 및 `REFERENCE` 행은 NULL인 검사 제약을 확인했다.
-- `REFERENCE`는 처리 상태/시각/의견을 가질 수 없다.
+- `REFERENCE` 미확인 행은 처리 필드가 모두 NULL이다. 확인 완료 행은 `action_status='CONFIRMED'`, `action_at` NOT NULL이며 `pending_at`, `action_comment`는 NULL이다.
 - 승인/반려/보완요청 처리의 구조화된 값이 원본이며 공통 댓글 SYSTEM 행은 화면 타임라인 표시용이다.
+- 참조 확인은 참조 행별 `CONFIRMED`/`action_at`에 저장하고 SYSTEM 이벤트 `REFERENCE_CONFIRMED`를 타임라인에 추가한다.
 
 ### 2-26. tb_common_comment_like
 
@@ -839,10 +840,32 @@
 - `tb_material_info.mat_cata_type` 및 `tb_customer_info.business_kind3`는 변경/이관하지 않는다. `business_kind1/2`에 공백 외 데이터가 있으면 migration guard가 중단한다.
 - [설계](../superpowers/specs/2026-10-27-item-partner-classification-schema-design.md), [DDL](20261027/20261027_002_create_item_partner_classification_schema.sql), [rollback](20261027/20261027_002_rollback_item_partner_classification_schema.sql), [변경 이력](20261027/20261027_002_change_item_partner_classification_schema.md), [backend 사본](../../backend/DATABASE/20261027) 참고. DDL/rollback 모두 미적용.
 
+### 품목·거래처별 단가 (DDL 초안, 미적용)
+
+`20261029_002` 설계 초안이며 현재 DB 구조로 간주하지 않는다. central DB MCP에서 확인한 기존 품목·거래처의 `(id, tenant_id)` 복합 unique를 기반으로 테넌트 경계를 제한한다.
+
+| 컬럼 | 타입 | NULL/기본값 | 제안 의미 |
+|---|---|---|---|
+| `price_id` | `bigserial` | NOT NULL, PK | 단가 내부 ID |
+| `tenant_id` | `bigint` | NOT NULL | 소유 tenant |
+| `material_id`, `customer_id` | `bigint` | NOT NULL | 기존 품목/거래처 내부 ID, tenant 복합 FK |
+| `trade_type` | `varchar(10)` | NOT NULL | 매입/매출 |
+| `unit_price` | `numeric(15,2)` | NOT NULL | 단가 |
+| `currency` | `varchar(10)` | NOT NULL, `KRW` | 통화 코드 |
+| `start_dt`, `end_dt` | `date` | 시작일 NOT NULL, 종료일 NULL | 단가 적용기간 |
+| `moq` | `numeric(15,2)` | NULL | 최소주문수량 |
+| `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
+| audit columns | `varchar(10)`, `timestamp` | created_at은 current timestamp | S-ERP 등록/수정자 및 시각 |
+
+- tenant 업무키 `(tenant_id, material_id, customer_id, trade_type, start_dt)`는 unique다. 기존 동일키는 insert/update/import에서 충돌로 처리하고 업서트하지 않는다. 다른 시작일의 기간 중첩은 허용한다.
+- trade type, 사용여부, 비음수 단가/MOQ, 종료일-시작일 관계를 CHECK로 보장한다. 물리 삭제는 제공하지 않는다.
+- [설계](../superpowers/specs/2026-10-29-item-partner-pricing-design.md), [상세사양](../spec/20261029/20261029_002_품목_거래처별_단가관리_상세사양서.md), [날짜별 DDL/이력](20261029/20261029_002_change_item_partner_price_schema.md) 및 [backend 사본](../../backend/DATABASE/20261029) 참고. DDL/rollback 모두 미적용.
+
 ---
 
 ## 변경 이력
 
+- 2026-10-29: 참조자별 확인을 위해 `tb_electronic_approval_line_info` 참조 행의 `CONFIRMED`/`action_at` 상태와 `tb_common_comment` SYSTEM `REFERENCE_CONFIRMED` 이벤트를 허용하는 `20261029_001` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 테이블/컬럼 및 CHECK 제약 메타데이터를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261029](../../backend/DATABASE/20261029) 및 [docs/database/20261029](20261029) 참고.
 - 2026-10-28: 전자결재 문서 식별을 내부 PK와 분리하기 위해 `tb_electronic_approval_main.document_no`를 추가하고 기존 행을 tenant/생성일 순서로 backfill하며 tenant별 unique와 `tb_id_sequence` 초기화를 정의했다. 기본 PostgreSQL MCP의 테이블 목록 및 컬럼 메타데이터를 확인했고 데이터 행은 조회하거나 변경하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261028](../../backend/DATABASE/20261028) 및 [docs/database/20261028](20261028) 참고.
 
 - 2026-10-27: 품목·거래처 분류 tenant schema DDL 초안 `20261027_002`를 정의했다. central DB `business_kind1/2` nonblank guard, tenant 복합 FK, 소분류-부모 일치 FK 및 데이터 존재 시 중단하는 rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261027](../../backend/DATABASE/20261027) 및 [docs/database/20261027](20261027) 참고.

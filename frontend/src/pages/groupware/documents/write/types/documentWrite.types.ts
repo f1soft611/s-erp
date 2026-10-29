@@ -20,6 +20,7 @@ export type ApprovalDocumentStatus =
 export type DocumentApprovalScope =
   | 'ALL'
   | 'MY_PENDING'
+  | 'MY_REFERENCE_PENDING'
   | 'IN_PROGRESS'
   | 'DRAFT'
   | 'COMPLETED'
@@ -187,7 +188,9 @@ export type DocumentApprovalSummary = {
   completedCount: number;
   revisionRequestedCount: number;
   rejectedCount: number;
+  referenceConfirmationRequiredCount: number;
   notices: DocumentApprovalRecord[];
+  referenceConfirmationItems: DocumentApprovalRecord[];
 };
 
 export type DocumentApprovalLine = {

@@ -170,6 +170,32 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                   </OverviewPanel>
                 )}
               </Box>
+              {overview.canReadApprovals && overview.approvalStatus === 'ready' && approval && (
+                <Box sx={{ minWidth: 0 }}>
+                  <OverviewPanel focus title="내가 확인할 문서"
+                    caption="참조자로 지정된 문서 중 아직 확인하지 않은 문서"
+                    icon={<AssignmentOutlined fontSize="small" />}
+                    action={<Chip size="small" label={`${approval.referenceConfirmationRequiredCount.toLocaleString('ko-KR')}건`} />}>
+                    {approval.referenceConfirmationItems.length === 0
+                      ? <OverviewEmpty>확인할 문서가 없습니다.</OverviewEmpty>
+                      : (
+                        <Stack spacing={1}>
+                          {approval.referenceConfirmationItems.map((item) => (
+                            <OverviewListRow key={item.electronicApprovalId}
+                              label={`참조 확인 문서 ${item.title}`}
+                              onClick={() => setDocumentId(item.electronicApprovalId)}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, overflowWrap: 'anywhere' }}>
+                                  {item.title}
+                                </Typography>
+                              </Box>
+                            </OverviewListRow>
+                          ))}
+                        </Stack>
+                      )}
+                  </OverviewPanel>
+                </Box>
+              )}
               {!overview.canReadApprovals && !overview.canReadNotices && !overview.canReadSales && (
                 <OverviewEmpty>조회 가능한 업무가 없습니다. 메뉴 권한을 확인해 주세요.</OverviewEmpty>
               )}

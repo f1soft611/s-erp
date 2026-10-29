@@ -8,14 +8,24 @@ import { apiGet } from '../src/shared/services/apiClient';
 
 vi.mock('../src/shared/services/apiClient', () => ({ apiGet: vi.fn() }));
 vi.mock('../src/pages/groupware/documents/status/components/DocumentStatusDetail', () => ({
-  DocumentStatusDetail: () => null,
+  DocumentStatusDetail: ({ selectedDocumentId, onActionComplete }: {
+    selectedDocumentId: number;
+    onActionComplete: () => void;
+  }) => (
+    <div data-testid="document-detail-id">{selectedDocumentId}
+      <button onClick={onActionComplete}>문서 액션 완료</button>
+    </div>
+  ),
 }));
 
 const overview = {
   asOfDate: '2026-10-28', fetchedAt: '2026-10-28T09:30:00+09:00',
   canReadApprovals: true, canReadNotices: true, canReadSales: true,
   approvalPath: '/groupware/doc/write', approvalStatus: 'ready', noticeStatus: 'ready',
-  approval: { actionRequiredCount: 3, draftCount: 2, revisionRequestedCount: 1, notices: [] },
+  approval: {
+    actionRequiredCount: 3, draftCount: 2, revisionRequestedCount: 1,
+    referenceConfirmationRequiredCount: 0, referenceConfirmationItems: [], notices: [],
+  },
   notices: [{ postId: 8, title: '검증용 운영 공지', isPinned: 'Y', createdAt: '2026-10-28T08:00:00' }],
 };
 const sales = {
@@ -61,6 +71,33 @@ describe('real-data overview', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/groupware/community/notice');
   });
 
+  it('renders reference confirmations separately and opens the existing detail flow', async () => {
+    const referenceTitle = '검증용 참조 확인 문서';
+    const item = {
+      ...overview,
+      approval: {
+        ...overview.approval,
+        referenceConfirmationRequiredCount: 1,
+        referenceConfirmationItems: [{ electronicApprovalId: 22, title: referenceTitle }],
+        notices: [{ electronicApprovalId: 7, title: '검증용 결재대기 문서', noticeType: 'ACTION_REQUIRED' }],
+      },
+    };
+    get.mockImplementation(async (path) => ({ item: path.includes('/sales') ? sales : item }));
+    mount();
+
+    const work = await screen.findByRole('region', { name: '지금 확인할 업무' });
+    const references = await screen.findByRole('region', { name: '내가 확인할 문서' });
+    expect(within(work).getByText('검증용 결재대기 문서')).toBeInTheDocument();
+    expect(within(work).queryByText(referenceTitle)).not.toBeInTheDocument();
+    expect(within(references).getByText(referenceTitle)).toBeInTheDocument();
+    expect(within(references).getByText('1건')).toBeInTheDocument();
+
+    fireEvent.click(within(references).getByRole('button', { name: new RegExp(referenceTitle) }));
+    expect(screen.getByTestId('document-detail-id')).toHaveTextContent('22');
+    fireEvent.click(screen.getByRole('button', { name: '문서 액션 완료' }));
+    await waitFor(() => expect(get.mock.calls.filter(([path]) => path.endsWith('/overview'))).toHaveLength(2));
+  });
+
   it('uses the server date across a month boundary for due labels and preserves due drilldown', async () => {
     get.mockImplementation(async (path) => ({ item: path.endsWith('/overview') ? overview : {
       ...sales, asOfDate: '2026-10-31', upcomingCount: 3,
@@ -83,6 +120,7 @@ describe('real-data overview', () => {
     const loading = screen.getByRole('status', { name: '종합현황 불러오는 중' });
     expect(within(loading).getAllByTestId('metric-skeleton')).toHaveLength(3);
     expect(within(loading).getByTestId('work-skeleton')).toBeInTheDocument();
+    expect(within(loading).getByTestId('reference-skeleton')).toBeInTheDocument();
     expect(within(loading).getByTestId('notice-skeleton')).toBeInTheDocument();
     expect(within(loading).queryByRole('button')).not.toBeInTheDocument();
     within(loading).getAllByRole('button', { hidden: true }).forEach((card) => {

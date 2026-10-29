@@ -73,10 +73,22 @@ public class DashboardServiceImpl implements DashboardService {
         if (result.isCanReadApprovals()) {
             try {
                 DocumentApprovalSummaryVO summary = approvalService.getSummary(user);
+                if (summary == null || summary.getReferenceConfirmationRequiredCount() == null
+                        || summary.getReferenceConfirmationItems() == null) {
+                    throw new IllegalStateException("참조 확인 요약을 조회할 수 없습니다.");
+                }
                 DashboardOverviewVO.Approval approval = new DashboardOverviewVO.Approval();
                 approval.setActionRequiredCount(summary.getActionRequiredCount());
                 approval.setDraftCount(summary.getDraftCount());
                 approval.setRevisionRequestedCount(dao.selectMyRevisionCount(params));
+                approval.setReferenceConfirmationRequiredCount(summary.getReferenceConfirmationRequiredCount());
+                for (DocumentApprovalListItemVO source : summary.getReferenceConfirmationItems()) {
+                    DashboardOverviewVO.ReferenceConfirmationItem item =
+                            new DashboardOverviewVO.ReferenceConfirmationItem();
+                    item.setElectronicApprovalId(source.getElectronicApprovalId());
+                    item.setTitle(source.getTitle());
+                    approval.getReferenceConfirmationItems().add(item);
+                }
                 if (summary.getNotices() != null) {
                     for (DocumentApprovalListItemVO source : summary.getNotices()) {
                         DashboardOverviewVO.WorkItem item = new DashboardOverviewVO.WorkItem();

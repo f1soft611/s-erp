@@ -38,8 +38,10 @@ import { NoticeSummaryPanel } from './components/NoticeSummaryPanel';
 import { deriveNoticeSummary } from './data/noticeSummary';
 import { toNoticeViewItems } from './data/noticeViewAdapter';
 import {
+  buildNoticeShareLink,
   downloadNoticeAttachment,
   fetchNoticePostDetail,
+  getSharedNoticePreview,
 } from './services/noticeBoardService';
 import type {
   NoticeEditorDraft,
@@ -69,7 +71,14 @@ export function CommunityNoticePage({
     const value = Number(new URLSearchParams(window.location.search).get('dashboardPostId'));
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   });
+  const [noticeShareToken] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.getAll('share').length === 1 && searchParams.size === 1
+      ? searchParams.get('share')
+      : null;
+  });
   const dashboardNoticeOpened = useRef(false);
+  const sharedNoticeOpened = useRef(false);
   const hasCreatePermission = true;
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [pendingPinnedNotice, setPendingPinnedNotice] =
@@ -130,6 +139,16 @@ export function CommunityNoticePage({
     showError,
     showSuccess,
   });
+  const handleShareNotice = useCallback(async (noticeId: number) => {
+    try {
+      const link = await buildNoticeShareLink(noticeId);
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(link);
+      showSuccess('공지 공유 링크를 복사했습니다.');
+    } catch {
+      showError('공지 공유 링크를 복사하지 못했습니다.');
+    }
+  }, [showError, showSuccess]);
   const {
     handleAddComment,
     handleUpdateComment,
@@ -206,11 +225,30 @@ export function CommunityNoticePage({
   }, [loadNoticePosts]);
 
   useEffect(() => {
-    if (dashboardPostId === null || dashboardNoticeOpened.current || isInitialLoading || errorMessage) return;
+    if (noticeShareToken || dashboardPostId === null || dashboardNoticeOpened.current || isInitialLoading || errorMessage) return;
     dashboardNoticeOpened.current = true;
     const exists = [...noticeItems, ...pinnedNoticeItems].some((item) => item.id === dashboardPostId);
     void handleSelectNotice({ id: dashboardPostId, appendMissing: !exists });
-  }, [dashboardPostId, isInitialLoading, errorMessage, noticeItems, pinnedNoticeItems, handleSelectNotice]);
+  }, [noticeShareToken, dashboardPostId, isInitialLoading, errorMessage, noticeItems, pinnedNoticeItems, handleSelectNotice]);
+
+  useEffect(() => {
+    if (!noticeShareToken || sharedNoticeOpened.current || isInitialLoading || errorMessage) return;
+    sharedNoticeOpened.current = true;
+    let active = true;
+    void getSharedNoticePreview(noticeShareToken)
+      .then((post) => {
+        if (active) {
+          return handleSelectNotice({
+            id: Number(post.postId),
+            appendMissing: true,
+          });
+        }
+      })
+      .catch(() => {
+        if (active) showError('공유 공지를 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [noticeShareToken, isInitialLoading, errorMessage, handleSelectNotice, showError]);
 
   const pageActionGroups: PermissionActionGroupDefinition[] = useMemo(
     () => [
@@ -273,6 +311,8 @@ export function CommunityNoticePage({
         onDeleteCommentAttachment={handleDeleteCommentAttachment}
         serverItemRevision={serverItemRevision}
         onDelete={handleDeleteNotice}
+        onShare={handleShareNotice}
+        onOpenNotice={(id) => void handleSelectNotice({ id, appendMissing: true })}
         onTogglePinned={handleTogglePinned}
         onEdit={(item) => {
           const mappedAttachments = (item.attachmentDetails ?? []).map(
@@ -509,6 +549,8 @@ export function CommunityNoticePage({
                       onDeleteCommentAttachment={handleDeleteCommentAttachment}
                       serverItemRevision={serverItemRevision}
                       onDelete={handleDeleteNotice}
+                      onShare={handleShareNotice}
+                      onOpenNotice={(id) => void handleSelectNotice({ id, appendMissing: true })}
                       onTogglePinned={handleTogglePinned}
                       onEdit={async (item) => {
                         const mappedAttachments = (

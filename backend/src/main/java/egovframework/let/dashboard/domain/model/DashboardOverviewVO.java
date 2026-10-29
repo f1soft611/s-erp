@@ -27,6 +27,8 @@ public class DashboardOverviewVO {
         private Long draftCount;
         private Long revisionRequestedCount;
         private List<WorkItem> notices = new ArrayList<>();
+        private Long referenceConfirmationRequiredCount;
+        private List<ReferenceConfirmationItem> referenceConfirmationItems = new ArrayList<>();
     }
 
     @Getter
@@ -35,6 +37,13 @@ public class DashboardOverviewVO {
         private Long electronicApprovalId;
         private String title;
         private String noticeType;
+    }
+
+    @Getter
+    @Setter
+    public static class ReferenceConfirmationItem {
+        private Long electronicApprovalId;
+        private String title;
     }
 
     @Getter

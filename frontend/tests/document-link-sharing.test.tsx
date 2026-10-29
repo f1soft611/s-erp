@@ -6,10 +6,15 @@ import { DocumentActionsMenu } from '../src/pages/groupware/documents/write/comp
 import { DocumentLinkPreviews } from '../src/pages/groupware/documents/write/components/DocumentLinkPreviews';
 import {
   buildDocumentShareLink,
+  extractExternalLinkUrls,
   extractDocumentShareIds,
   parseDocumentShareLink,
 } from '../src/pages/groupware/documents/write/data/documentShareLink';
-import { getSharedDocumentPreview, listDocumentApprovals } from '../src/pages/groupware/documents/write/services/documentApproval.service';
+import {
+  getExternalLinkPreview,
+  getSharedDocumentPreview,
+  listDocumentApprovals,
+} from '../src/pages/groupware/documents/write/services/documentApproval.service';
 import { apiPost, ApiResponseError } from '../src/shared/services/apiClient';
 
 vi.mock('../src/shared/services/apiClient', async (importOriginal) => ({
@@ -20,6 +25,7 @@ vi.mock('../src/pages/groupware/documents/write/services/documentApproval.servic
   ...await importOriginal<object>(),
   listDocumentApprovals: vi.fn(),
   getSharedDocumentPreview: vi.fn(),
+  getExternalLinkPreview: vi.fn(),
 }));
 
 const link = (id: number) => `${window.location.origin}/groupware/doc/write?documentId=${id}`;
@@ -33,6 +39,10 @@ const record = {
 beforeEach(() => {
   vi.mocked(listDocumentApprovals).mockResolvedValue([record]);
   vi.mocked(getSharedDocumentPreview).mockResolvedValue(record);
+  vi.mocked(getExternalLinkPreview).mockResolvedValue({
+    siteName: 'Example', title: 'External page', description: 'External summary',
+    imageUrl: 'https://example.com/preview.png',
+  });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -69,6 +79,14 @@ describe('document share links', () => {
     expect(extractDocumentShareIds(`<a href="https://example.com">${link(42)}</a>`)).toEqual([]);
     expect(extractDocumentShareIds(`<a href="${link(43)}">${link(42)}</a>`)).toEqual([43]);
   });
+
+  it('extracts external absolute HTTP links without confusing internal shares or unsafe schemes', () => {
+    const external = 'https://example.com/article';
+    expect(extractExternalLinkUrls(`<p>${external}</p><a href="${external}">${link(42)}</a>
+      <a href="${link(42)}">internal</a><a href="javascript:alert(1)">unsafe</a>
+      <a href="https://user:pass@bad.example/">credentials</a>
+      <a href="http://localhost/private">localhost</a>`)).toEqual([external]);
+  });
 });
 
 describe('document sharing UI', () => {
@@ -90,6 +108,56 @@ describe('document sharing UI', () => {
     expect(getSharedDocumentPreview).toHaveBeenCalledWith(token);
     expect(onOpenDocument).toHaveBeenCalledWith(42);
     expect(listDocumentApprovals).not.toHaveBeenCalled();
+  });
+
+  it('keeps internal share links out of the external OG endpoint', async () => {
+    render(<DocumentLinkPreviews html={`${link(42)}
+      <a href="https://example.com/article">External article</a>`} onOpenDocument={vi.fn()} />);
+    expect(await screen.findByRole('link', { name: /External page/ })).toHaveAttribute(
+      'href', 'https://example.com/article',
+    );
+    expect(getExternalLinkPreview).toHaveBeenCalledOnce();
+    expect(getExternalLinkPreview).toHaveBeenCalledWith('https://example.com/article');
+    expect(listDocumentApprovals).toHaveBeenCalledWith('ALL', undefined, 42);
+  });
+
+  it('renders external OG cards distinctly and keeps the original link available on lookup failure', async () => {
+    render(<DocumentLinkPreviews html="https://example.com/article" onOpenDocument={vi.fn()} />);
+    const linkElement = await screen.findByRole('link', { name: /External page/ });
+    expect(screen.queryByText('웹 링크', { exact: true })).not.toBeInTheDocument();
+    expect(linkElement).toHaveAttribute('target', '_blank');
+    expect(linkElement).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByRole('img', { name: 'External page' })).toHaveAttribute(
+      'referrerPolicy', 'no-referrer',
+    );
+
+    vi.mocked(getExternalLinkPreview).mockRejectedValueOnce(new Error('offline'));
+    cleanup();
+    render(<DocumentLinkPreviews html="https://example.com/unavailable" onOpenDocument={vi.fn()} />);
+    expect(await screen.findByText('웹 링크 미리보기를 불러오지 못했습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /https:\/\/example.com\/unavailable/ })).toHaveAttribute(
+      'href', 'https://example.com/unavailable',
+    );
+  });
+
+  it('updates external previews after link edits and ignores stale lookup results', async () => {
+    let resolveFirst: ((value: {
+      siteName: string; title: string; description: string; imageUrl: null;
+    }) => void) | undefined;
+    const firstRequest = new Promise<{
+      siteName: string; title: string; description: string; imageUrl: null;
+    }>((resolve) => { resolveFirst = resolve; });
+    vi.mocked(getExternalLinkPreview).mockImplementation((url) => url.endsWith('/first')
+      ? firstRequest
+      : Promise.resolve({
+        siteName: 'Example', title: 'Updated page', description: 'Latest link', imageUrl: null,
+      }));
+    const { rerender } = render(<DocumentLinkPreviews html="https://example.com/first" />);
+    rerender(<DocumentLinkPreviews html="https://example.com/second" />);
+
+    expect(await screen.findByText('Updated page')).toBeInTheDocument();
+    resolveFirst?.({ siteName: 'Example', title: 'Stale page', description: 'Old link', imageUrl: null });
+    await waitFor(() => expect(screen.queryByText('Stale page')).not.toBeInTheDocument());
   });
   it('allows sharing a readable non-drafter document without exposing edit/delete', () => {
     const onShare = vi.fn();

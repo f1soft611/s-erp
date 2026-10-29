@@ -425,6 +425,45 @@
           AND action_status = 'PENDING'
     </update>
 
+    <select id="selectUserReferenceApprovalLineForUpdate" parameterType="map" resultMap="approvalLine">
+        SELECT electronic_approval_line_id, stage_order, participant_order, participant_type,
+               participant_user_id, participant_name, participant_department_name,
+               action_status, pending_at, action_at, action_comment
+        FROM public.tb_electronic_approval_line_info
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND participant_user_id = #{participantUserId}
+          AND participant_type = 'REFERENCE'
+        FOR UPDATE
+    </select>
+
+    <update id="confirmReferenceApprovalLine" parameterType="map">
+        UPDATE public.tb_electronic_approval_line_info
+        SET action_status = 'CONFIRMED',
+            action_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND participant_user_id = #{participantUserId}
+          AND electronic_approval_line_id = #{electronicApprovalLineId}
+          AND participant_type = 'REFERENCE'
+          AND action_status IS NULL
+          AND pending_at IS NULL
+          AND action_at IS NULL
+          AND action_comment IS NULL
+    </update>
+
+    <select id="selectUserReferenceApprovalLine" parameterType="map" resultMap="approvalLine">
+        SELECT electronic_approval_line_id, stage_order, participant_order, participant_type,
+               participant_user_id, participant_name, participant_department_name,
+               action_status, pending_at, action_at, action_comment
+        FROM public.tb_electronic_approval_line_info
+        WHERE tenant_id = #{tenantId}
+          AND electronic_approval_id = #{electronicApprovalId}
+          AND participant_user_id = #{participantUserId}
+          AND electronic_approval_line_id = #{electronicApprovalLineId}
+          AND participant_type = 'REFERENCE'
+    </select>
+
     <select id="selectPendingApprovalCountForStage" parameterType="map" resultType="long">
         SELECT COUNT(*)
         FROM public.tb_electronic_approval_line_info
@@ -483,6 +522,19 @@
                   AND pending_line.electronic_approval_id = m.electronic_approval_id
                   AND pending_line.participant_user_id = #{participantUserId}
                   AND pending_line.action_status = 'PENDING'
+            )
+        </if>
+        <if test="scope == 'MY_REFERENCE_PENDING'">
+            AND m.document_status != 'DRAFT'
+            AND m.document_type IN ('DRAFTING', 'BUSINESS_CONTACT')
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info l
+                WHERE l.tenant_id = m.tenant_id
+                  AND l.electronic_approval_id = m.electronic_approval_id
+                  AND l.participant_user_id = #{participantUserId}
+                  AND l.participant_type = 'REFERENCE'
+                  AND l.action_status IS NULL
             )
         </if>
         <if test="scope == 'IN_PROGRESS'">
@@ -716,6 +768,19 @@
                   AND l.action_status = 'PENDING'
             )
         </if>
+        <if test="scope == 'MY_REFERENCE_PENDING'">
+            AND m.document_status != 'DRAFT'
+            AND m.document_type IN ('DRAFTING', 'BUSINESS_CONTACT')
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info l
+                WHERE l.tenant_id = m.tenant_id
+                  AND l.electronic_approval_id = m.electronic_approval_id
+                  AND l.participant_user_id = #{participantUserId}
+                  AND l.participant_type = 'REFERENCE'
+                  AND l.action_status IS NULL
+            )
+        </if>
         <if test="scope == 'IN_PROGRESS'">
             AND m.document_status IN ('PENDING', 'IN_PROGRESS')
         </if>
@@ -747,6 +812,19 @@
                   AND l.electronic_approval_id = m.electronic_approval_id
                   AND l.participant_user_id = #{participantUserId}
                   AND l.action_status = 'PENDING'
+            )
+        </if>
+        <if test="scope == 'MY_REFERENCE_PENDING'">
+            AND m.document_status != 'DRAFT'
+            AND m.document_type IN ('DRAFTING', 'BUSINESS_CONTACT')
+            AND EXISTS (
+                SELECT 1
+                FROM public.tb_electronic_approval_line_info l
+                WHERE l.tenant_id = m.tenant_id
+                  AND l.electronic_approval_id = m.electronic_approval_id
+                  AND l.participant_user_id = #{participantUserId}
+                  AND l.participant_type = 'REFERENCE'
+                  AND l.action_status IS NULL
             )
         </if>
         <if test="scope == 'IN_PROGRESS'">
@@ -871,6 +949,48 @@
                     AND l.participant_user_id = #{participantUserId}
                     AND l.action_status = 'PENDING'
               )
+          )
+        ORDER BY m.updated_at DESC, m.electronic_approval_id DESC
+        LIMIT 3
+    </select>
+
+    <select id="selectReferenceConfirmationRequiredCount" parameterType="map" resultType="long">
+        SELECT COUNT(DISTINCT m.electronic_approval_id)
+        FROM public.tb_electronic_approval_main m
+        WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
+          AND m.document_status != 'DRAFT'
+          AND m.document_type IN ('DRAFTING', 'BUSINESS_CONTACT')
+          AND EXISTS (
+              SELECT 1
+              FROM public.tb_electronic_approval_line_info l
+              WHERE l.tenant_id = m.tenant_id
+                AND l.electronic_approval_id = m.electronic_approval_id
+                AND l.participant_user_id = #{participantUserId}
+                AND l.participant_type = 'REFERENCE'
+                AND l.action_status IS NULL
+          )
+    </select>
+
+    <select id="selectReferenceConfirmationItems" parameterType="map" resultMap="listItem">
+        SELECT m.electronic_approval_id, m.document_no, m.eabus_no, m.document_type, m.document_status,
+               m.title, m.drafter_name, m.created_at, m.updated_at, m.submitted_at,
+               LEFT(COALESCE(m.contents_text, ''), 240) AS summary,
+               NULL::varchar AS notice_type,
+               (m.drafter_id = #{drafterId}) AS is_drafter
+        FROM public.tb_electronic_approval_main m
+        WHERE m.tenant_id = #{tenantId}
+          AND m.deleted_yn = 'N'
+          AND m.document_status != 'DRAFT'
+          AND m.document_type IN ('DRAFTING', 'BUSINESS_CONTACT')
+          AND EXISTS (
+              SELECT 1
+              FROM public.tb_electronic_approval_line_info l
+              WHERE l.tenant_id = m.tenant_id
+                AND l.electronic_approval_id = m.electronic_approval_id
+                AND l.participant_user_id = #{participantUserId}
+                AND l.participant_type = 'REFERENCE'
+                AND l.action_status IS NULL
           )
         ORDER BY m.updated_at DESC, m.electronic_approval_id DESC
         LIMIT 3

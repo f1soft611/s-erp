@@ -32,6 +32,10 @@ export async function fetchDashboardOverview(signal?: AbortSignal): Promise<Dash
     || (item.approvalStatus === 'ready'
       ? !isRecord(item.approval)
         || ![item.approval.actionRequiredCount, item.approval.draftCount, item.approval.revisionRequestedCount].every(isCount)
+        || !isCount(item.approval.referenceConfirmationRequiredCount)
+        || !Array.isArray(item.approval.referenceConfirmationItems)
+        || !item.approval.referenceConfirmationItems.every((v) => isRecord(v)
+          && isCount(v.electronicApprovalId) && v.electronicApprovalId > 0 && typeof v.title === 'string')
         || !Array.isArray(item.approval.notices)
         || !item.approval.notices.every((v) => isRecord(v) && isCount(v.electronicApprovalId)
           && v.electronicApprovalId > 0 && typeof v.title === 'string' && typeof v.noticeType === 'string')

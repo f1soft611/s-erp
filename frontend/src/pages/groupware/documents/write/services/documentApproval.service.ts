@@ -31,6 +31,8 @@ import type {
   DocumentFilePage,
   DocumentFileQuery,
 } from '../types/documentWrite.types';
+export { getExternalLinkPreview } from '../../../../../shared/services/contentLinkPreview.service';
+export type { ExternalLinkPreview } from '../../../../../shared/services/contentLinkPreview.service';
 
 const APPROVAL_API = '/api/v1/groupware/approvals';
 
@@ -462,7 +464,7 @@ export async function unpinDocumentApproval(
 }
 
 export async function getDocumentApprovalSummary(): Promise<DocumentApprovalSummary> {
-  const response = await apiGet<{ item?: DocumentApprovalSummary }>(
+  const response = await apiGet<{ item?: unknown }>(
     `${APPROVAL_API}/summary`,
   );
   const item = response.item;
@@ -475,12 +477,50 @@ export async function getDocumentApprovalSummary(): Promise<DocumentApprovalSumm
       item.completedCount,
       item.revisionRequestedCount,
       item.rejectedCount,
-    ].every((count) => typeof count === 'number' && Number.isFinite(count)) ||
-    !Array.isArray(item.notices)
+      item.referenceConfirmationRequiredCount,
+    ].every(
+      (count) =>
+        typeof count === 'number' &&
+        Number.isSafeInteger(count) &&
+        count >= 0,
+    ) ||
+    !Array.isArray(item.notices) ||
+    !Array.isArray(item.referenceConfirmationItems) ||
+    !item.referenceConfirmationItems.every(isDocumentApprovalRecord)
   ) {
     throw new Error('전자결재 요약 응답을 확인할 수 없습니다.');
   }
-  return item;
+  return item as DocumentApprovalSummary;
+}
+
+export async function confirmDocumentReference(
+  electronicApprovalId: number,
+): Promise<{
+  electronicApprovalId: number;
+  actionStatus: 'CONFIRMED';
+  actionAt: string;
+}> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: unknown }>(
+    `${APPROVAL_API}/${electronicApprovalId}/reference-confirmation`,
+    {},
+  );
+  const item = response.item;
+  if (
+    !isObject(item) ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    item.actionStatus !== 'CONFIRMED' ||
+    typeof item.actionAt !== 'string' ||
+    !item.actionAt.trim() ||
+    !Number.isFinite(Date.parse(item.actionAt))
+  ) {
+    throw new Error('참조 확인 응답을 확인할 수 없습니다.');
+  }
+  return {
+    electronicApprovalId,
+    actionStatus: 'CONFIRMED',
+    actionAt: item.actionAt,
+  };
 }
 
 export async function getDocumentApprovalDetail(

@@ -29,6 +29,7 @@ import {
   getDocumentApprovalDetail,
   createDocumentShareToken,
   getSharedDocumentPreview,
+  getExternalLinkPreview,
   listApprovalComments,
   createApprovalComment,
   updateApprovalComment,
@@ -41,6 +42,7 @@ import {
   deleteApprovalCommentAttachment,
   downloadDocumentApprovalAttachment,
   getDocumentApprovalSummary,
+  confirmDocumentReference,
   listDocumentApprovals,
   listPinnedDocumentApprovals,
   pinDocumentApproval,
@@ -77,6 +79,29 @@ describe('document approval service', () => {
     expect(api.get).toHaveBeenCalledWith(`/api/v1/groupware/approvals/shared-document?token=${token}`);
     api.post.mockResolvedValueOnce({ item: { token: '41' } });
     await expect(createDocumentShareToken(41)).rejects.toThrow('문서 공유 링크를 확인할 수 없습니다.');
+  });
+
+  it('posts external URLs for sanitized OG metadata without changing internal sharing routes', async () => {
+    api.post.mockResolvedValueOnce({ item: {
+      siteName: 'Example', title: 'Article', description: 'Summary',
+      imageUrl: 'https://example.com/image.png',
+    } });
+    await expect(getExternalLinkPreview('https://example.com/article')).resolves.toEqual({
+      siteName: 'Example', title: 'Article', description: 'Summary',
+      imageUrl: 'https://example.com/image.png',
+    });
+    expect(api.post).toHaveBeenCalledWith('/api/v1/groupware/approvals/link-preview', {
+      url: 'https://example.com/article',
+    });
+
+    api.post.mockResolvedValueOnce({ item: {
+      siteName: 'Example', title: 'Article', description: 'Summary', imageUrl: 'javascript:alert(1)',
+    } });
+    await expect(getExternalLinkPreview('https://example.com/article')).resolves.toMatchObject({
+      imageUrl: null,
+    });
+    await expect(getExternalLinkPreview('http://localhost/private')).rejects.toThrow();
+    expect(api.post).toHaveBeenCalledTimes(2);
   });
 
   it('requests and validates an offset page of ordinary documents', async () => {
@@ -242,7 +267,9 @@ describe('document approval service', () => {
       completedCount: 4,
       revisionRequestedCount: 5,
       rejectedCount: 6,
+      referenceConfirmationRequiredCount: 1,
       notices: [document],
+      referenceConfirmationItems: [document],
     };
     const detail = {
       ...document,
@@ -285,6 +312,119 @@ describe('document approval service', () => {
     expect(api.post).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/41/actions',
       { action: 'APPROVED' },
+    );
+  });
+
+  it('rejects approval summaries missing reference-confirmation data', async () => {
+    api.get.mockResolvedValueOnce({
+      item: {
+        actionRequiredCount: 0,
+        inProgressCount: 0,
+        draftCount: 0,
+        completedCount: 0,
+        revisionRequestedCount: 0,
+        rejectedCount: 0,
+        notices: [],
+      },
+    });
+
+    await expect(getDocumentApprovalSummary()).rejects.toThrow(
+      '전자결재 요약 응답을 확인할 수 없습니다.',
+    );
+  });
+
+  it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects a non-safe or negative reference confirmation count: %s',
+    async (referenceConfirmationRequiredCount) => {
+      api.get.mockResolvedValueOnce({
+        item: {
+          actionRequiredCount: 0,
+          inProgressCount: 0,
+          draftCount: 0,
+          completedCount: 0,
+          revisionRequestedCount: 0,
+          rejectedCount: 0,
+          referenceConfirmationRequiredCount,
+          notices: [],
+          referenceConfirmationItems: [],
+        },
+      });
+
+      await expect(getDocumentApprovalSummary()).rejects.toThrow(
+        '전자결재 요약 응답을 확인할 수 없습니다.',
+      );
+    },
+  );
+
+  it.each([null, {}, { electronicApprovalId: 41, title: '참조 문서' }])(
+    'rejects malformed reference-confirmation summary items: %j',
+    async (referenceItem) => {
+      api.get.mockResolvedValueOnce({
+        item: {
+          actionRequiredCount: 0,
+          inProgressCount: 0,
+          draftCount: 0,
+          completedCount: 0,
+          revisionRequestedCount: 0,
+          rejectedCount: 0,
+          referenceConfirmationRequiredCount: 1,
+          notices: [],
+          referenceConfirmationItems: [referenceItem],
+        },
+      });
+
+      await expect(getDocumentApprovalSummary()).rejects.toThrow(
+        '전자결재 요약 응답을 확인할 수 없습니다.',
+      );
+    },
+  );
+
+  it('confirms a reference without sending client actor or timestamp data', async () => {
+    api.post.mockResolvedValueOnce({
+      item: {
+        electronicApprovalId: 41,
+        actionStatus: 'CONFIRMED',
+        actionAt: '2026-10-29T02:00:00Z',
+      },
+    });
+
+    await expect(confirmDocumentReference(41)).resolves.toEqual({
+      electronicApprovalId: 41,
+      actionStatus: 'CONFIRMED',
+      actionAt: '2026-10-29T02:00:00Z',
+    });
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/reference-confirmation',
+      {},
+    );
+  });
+
+  it.each([undefined, null, '', 'not-a-date'])(
+    'rejects a confirmation response without a valid persisted actionAt: %j',
+    async (actionAt) => {
+      api.post.mockResolvedValueOnce({
+        item: {
+          electronicApprovalId: 41,
+          actionStatus: 'CONFIRMED',
+          actionAt,
+        },
+      });
+
+      await expect(confirmDocumentReference(41)).rejects.toThrow(
+        '참조 확인 응답을 확인할 수 없습니다.',
+      );
+    },
+  );
+
+  it.each([
+    [{ electronicApprovalId: 42, actionStatus: 'CONFIRMED', actionAt: '2026-10-29T02:00:00Z' }],
+    [{ electronicApprovalId: 41, actionStatus: 'WAITING', actionAt: '2026-10-29T02:00:00Z' }],
+    [null],
+  ])('rejects malformed reference confirmation response %j', async (item) => {
+    api.post.mockResolvedValueOnce({ item });
+
+    await expect(confirmDocumentReference(41)).rejects.toThrow(
+      '참조 확인 응답을 확인할 수 없습니다.',
     );
   });
 

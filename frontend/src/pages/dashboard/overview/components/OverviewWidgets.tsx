@@ -165,6 +165,12 @@ export function OverviewSkeleton() {
             </OverviewPanel>
           </Box>
         </Box>
+        <Box data-testid="reference-skeleton" sx={{ minWidth: 0 }}>
+          <OverviewPanel loading focus title="내가 확인할 문서" caption="미확인 참조 문서" icon={null}
+            action={<Skeleton width={48} height={24} />}>
+            <SkeletonList kind="work" />
+          </OverviewPanel>
+        </Box>
       </Stack>
     </Box>
   );

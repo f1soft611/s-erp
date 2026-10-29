@@ -81,7 +81,10 @@ export const toNoticeCommentTree = (
           ? '[작성자에 의해 삭제 되었습니다.]'
           : (record.content ?? ''),
       isDeleted: record.deletedYn === 'Y',
-      isEditable: record.deletedYn !== 'Y',
+      isEditable:
+        record.deletedYn !== 'Y' &&
+        Boolean(record.writerId) &&
+        record.writerId === getStoredAuth()?.userId,
       attachments: (record.attachments ?? []).map((file) => ({
         id: String(file.fileId ?? file.objectKey ?? file.fileName ?? ''),
         name: file.fileName ?? '첨부파일',

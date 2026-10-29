@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -51,6 +53,35 @@ class DashboardApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.item.asOfDate").value("2026-10-28"))
                 .andExpect(jsonPath("$.result.item.approvalStatus").value("forbidden"));
+        verify(service).overview(user);
+    }
+
+    @Test
+    void serializesReferenceConfirmationSummarySeparatelyFromApprovalNotices() throws Exception {
+        String overviewJson = "{\"asOfDate\":\"2026-10-28\",\"approvalStatus\":\"ready\","
+                + "\"approval\":{\"actionRequiredCount\":3,"
+                + "\"notices\":[{\"electronicApprovalId\":301,\"title\":\"결재 확인\"}],"
+                + "\"referenceConfirmationRequiredCount\":2,"
+                + "\"referenceConfirmationItems\":["
+                + "{\"electronicApprovalId\":401,\"title\":\"참조 문서 1\"},"
+                + "{\"electronicApprovalId\":402,\"title\":\"참조 문서 2\"}]}}";
+        DashboardOverviewVO result = new ObjectMapper()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .readValue(overviewJson, DashboardOverviewVO.class);
+        when(service.overview(user)).thenReturn(result);
+
+        mvc.perform(get("/api/v1/dashboard/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.item.approval.referenceConfirmationRequiredCount").value(2))
+                .andExpect(jsonPath("$.result.item.approval.referenceConfirmationItems.length()").value(2))
+                .andExpect(jsonPath("$.result.item.approval.referenceConfirmationItems[0].electronicApprovalId")
+                        .value(401))
+                .andExpect(jsonPath("$.result.item.approval.referenceConfirmationItems[0].title")
+                        .value("참조 문서 1"))
+                .andExpect(jsonPath("$.result.item.approval.referenceConfirmationItems[0].noticeType")
+                        .doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.result.item.approval.notices.length()").value(1))
+                .andExpect(jsonPath("$.result.item.approval.notices[0].electronicApprovalId").value(301));
         verify(service).overview(user);
     }
 

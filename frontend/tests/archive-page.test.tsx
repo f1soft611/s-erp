@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createTheme } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAttachmentIconMeta } from '../src/shared/components/feed/attachmentIconMeta';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import type { MenuPermission, ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
@@ -163,6 +165,27 @@ describe('Archive dashboard page', () => {
     expect(screen.getByRole('button', { name: '파일 접기' })).toBeInTheDocument();
     expect(await screen.findByText('업무양식')).toBeInTheDocument();
     expect(screen.getByText('매뉴얼')).toBeInTheDocument();
+    const textPrimary = createTheme().palette.text.primary;
+    const folderButton = screen.getByRole('button', { name: '업무양식' });
+    const fileButton = screen.getByRole('button', { name: '업무 가이드.pdf' });
+    const folderIcon = folderButton.parentElement?.querySelector('svg');
+    expect(folderButton).toHaveStyle({
+      color: textPrimary,
+      fontWeight: '700',
+    });
+    expect(folderIcon).toHaveStyle({
+      color: createTheme().palette.text.secondary,
+    });
+    expect(fileButton).toHaveStyle({
+      color: textPrimary,
+      fontWeight: '400',
+    });
+    const attachmentIcon = getAttachmentIconMeta('업무 가이드.pdf');
+    expect(screen.getByLabelText(`${attachmentIcon.label} 파일 아이콘`).parentElement)
+      .toHaveStyle({
+        color: attachmentIcon.color,
+        backgroundColor: attachmentIcon.bg,
+      });
     fireEvent.click(screen.getByRole('button', { name: '업무양식' }));
 
     await waitFor(() =>
@@ -179,6 +202,21 @@ describe('Archive dashboard page', () => {
       ),
     );
   }, 15000);
+
+  it('downloads a file when its name is clicked', async () => {
+    renderArchive();
+    fireEvent.click(await screen.findByRole('button', { name: '업무 가이드.pdf' }));
+
+    await waitFor(() =>
+      expect(archiveServices.downloadArchiveAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          boardFileId: 31,
+          postId: 12,
+          fileName: '업무 가이드.pdf',
+        }),
+      ),
+    );
+  });
 
   it('uses a flex column to pass remaining height to the file tree', async () => {
     renderArchive();

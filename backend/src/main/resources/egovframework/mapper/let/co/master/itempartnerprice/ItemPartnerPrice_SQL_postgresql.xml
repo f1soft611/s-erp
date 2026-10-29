@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ItemPartnerPriceDAO">
+    <resultMap id="priceMap" type="egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO">
+        <id property="priceId" column="price_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="materialId" column="material_id"/>
+        <result property="materialCode" column="material_code"/>
+        <result property="materialName" column="material_name"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="tradeType" column="trade_type"/>
+        <result property="unitPrice" column="unit_price"/>
+        <result property="currency" column="currency"/>
+        <result property="startDt" column="start_dt"/>
+        <result property="endDt" column="end_dt"/>
+        <result property="moq" column="moq"/>
+        <result property="useAt" column="use_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="priceColumns">
+        p.price_id, p.tenant_id, p.material_id, m.material_code, m.material_name,
+        p.customer_id, c.customer_code, c.customer_name, p.trade_type, p.unit_price,
+        p.currency, p.start_dt, p.end_dt, p.moq, p.use_at,
+        p.created_by, p.created_at, p.updated_by, p.updated_at
+    </sql>
+
+    <select id="selectItemPartnerPriceList" parameterType="map" resultMap="priceMap">
+        SELECT <include refid="priceColumns"/>
+        FROM tb_item_partner_price p
+        LEFT JOIN tb_material_info m
+            ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
+        LEFT JOIN tb_customer_info c
+            ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        WHERE p.tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (m.material_code ILIKE '%' || #{keyword} || '%'
+                OR m.material_name ILIKE '%' || #{keyword} || '%'
+                OR c.customer_code ILIKE '%' || #{keyword} || '%'
+                OR c.customer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="tradeType != null and tradeType != ''">
+            AND p.trade_type = #{tradeType}
+        </if>
+        <if test="effectiveOn != null and effectiveOn != ''">
+            AND p.start_dt &lt;= CAST(#{effectiveOn} AS DATE)
+            AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{effectiveOn} AS DATE))
+        </if>
+        <if test="useAt != null and useAt != ''">
+            AND p.use_at = #{useAt}
+        </if>
+        ORDER BY p.trade_type, m.material_code, c.customer_code, p.start_dt DESC, p.price_id
+    </select>
+
+    <select id="resolveImportRows" parameterType="map"
+            resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceImportResolutionVO">
+        WITH source_rows AS (
+            <foreach collection="rows" item="row" separator=" UNION ALL ">
+                SELECT #{row.sourceRowNumber}::INTEGER AS source_row_number,
+                    #{row.materialCode}::VARCHAR AS material_code,
+                    #{row.customerCode}::VARCHAR AS customer_code,
+                    #{row.tradeType}::VARCHAR AS trade_type,
+                    #{row.startDt}::DATE AS start_dt
+            </foreach>
+        )
+        SELECT r.source_row_number AS "sourceRowNumber",
+            m.material_id AS "materialId",
+            m.material_code AS "materialCode",
+            m.material_name AS "materialName",
+            c.customer_id AS "customerId",
+            c.customer_code AS "customerCode",
+            c.customer_name AS "customerName",
+            existing.price_id AS "existingPriceId"
+        FROM source_rows r
+        LEFT JOIN tb_material_info m ON m.tenant_id = #{tenantId}
+            AND m.material_code = r.material_code
+            AND m.delete_status = 'N' AND m.deleted_at IS NULL
+        LEFT JOIN tb_customer_info c ON c.tenant_id = #{tenantId}
+            AND c.customer_code = r.customer_code AND c.use_at = 'Y'
+        LEFT JOIN tb_item_partner_price existing ON existing.tenant_id = #{tenantId}
+            AND existing.material_id = m.material_id
+            AND existing.customer_id = c.customer_id
+            AND existing.trade_type = r.trade_type
+            AND existing.start_dt = r.start_dt
+        ORDER BY r.source_row_number
+    </select>
+
+    <select id="selectItemPartnerPriceById" parameterType="map" resultMap="priceMap">
+        SELECT <include refid="priceColumns"/>
+        FROM tb_item_partner_price p
+        LEFT JOIN tb_material_info m
+            ON m.material_id = p.material_id AND m.tenant_id = p.tenant_id
+        LEFT JOIN tb_customer_info c
+            ON c.customer_id = p.customer_id AND c.tenant_id = p.tenant_id
+        WHERE p.tenant_id = #{tenantId} AND p.price_id = #{priceId}
+    </select>
+
+    <select id="selectActiveMaterial" parameterType="map" resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO">
+        SELECT material_id AS "materialId", material_code AS "materialCode", material_name AS "materialName"
+        FROM tb_material_info
+        WHERE tenant_id = #{tenantId} AND material_id = #{materialId}
+            AND delete_status = 'N' AND deleted_at IS NULL
+    </select>
+
+    <select id="selectActiveCustomer" parameterType="map" resultType="egovframework.let.co.master.itempartnerprice.domain.model.ItemPartnerPriceVO">
+        SELECT customer_id AS "customerId", customer_code AS "customerCode", customer_name AS "customerName"
+        FROM tb_customer_info
+        WHERE tenant_id = #{tenantId} AND customer_id = #{customerId} AND use_at = 'Y'
+    </select>
+
+    <select id="selectPriceIdByBusinessKey" parameterType="map" resultType="long">
+        SELECT price_id
+        FROM tb_item_partner_price
+        WHERE tenant_id = #{tenantId}
+            AND material_id = #{materialId}
+            AND customer_id = #{customerId}
+            AND trade_type = #{tradeType}
+            AND start_dt = CAST(#{startDt} AS DATE)
+        <if test="excludePriceId != null">
+            AND price_id != #{excludePriceId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="insertItemPartnerPrice" parameterType="map" resultType="long">
+        INSERT INTO tb_item_partner_price (
+            tenant_id, material_id, customer_id, trade_type, unit_price,
+            currency, start_dt, end_dt, moq, use_at, created_by, created_at, updated_by, updated_at
+        ) VALUES (
+            #{tenantId}, #{materialId}, #{customerId}, #{tradeType}, #{unitPrice},
+            #{currency}, CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq},
+            #{useAt}, #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
+        )
+        RETURNING price_id
+    </select>
+
+    <update id="updateItemPartnerPrice" parameterType="map">
+        UPDATE tb_item_partner_price SET
+            material_id = #{materialId},
+            customer_id = #{customerId},
+            trade_type = #{tradeType},
+            unit_price = #{unitPrice},
+            currency = #{currency},
+            start_dt = CAST(#{startDt} AS DATE),
+            end_dt = CAST(#{endDt} AS DATE),
+            moq = #{moq},
+            use_at = #{useAt},
+            updated_by = #{updatedBy},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND price_id = #{priceId}
+    </update>
+</mapper>

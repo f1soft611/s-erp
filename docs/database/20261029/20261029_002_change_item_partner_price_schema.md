@@ -1,0 +1,22 @@
+# 20261029_002 품목·거래처별 단가 스키마 변경 이력
+
+- 날짜: 2026-10-29
+- 상태: DDL/rollback 초안 작성, 실제 DB 미적용
+- 대상 DB: central PostgreSQL, `public` schema
+- 변경 내용:
+  - tenant-aware 품목·거래처 기준 단가 테이블 `tb_item_partner_price` 생성안
+  - BIGSERIAL 내부 ID, tenant 및 기존 품목/거래처 복합 FK, tenant 업무키 unique, 단가/기간/use/trade 검사 제약 추가
+  - tenant별 품목/거래처 및 거래유형/적용일 조회 인덱스 추가
+- 영향 범위:
+  - 품목-거래처-거래유형-시작일별 단가 관리 기반이다.
+  - 동일 업무키는 사용여부와 무관하게 중복 금지한다. 시작일이 다른 기간끼리 겹치는지는 제한하지 않는다.
+  - 기존 `tb_material_info`, `tb_customer_info` 데이터는 변경하지 않는다.
+- MCP 근거:
+  - 기본 `s-erp-postgresql-readonly`에서 `list_tables`, `describe_table(tb_material_info)`, `describe_table(tb_customer_info)`, `describe_table(tb_sales_order_hd)`, `describe_table(tb_sales_order_dt)`와 기존 item/customer PK/unique metadata를 확인했다.
+  - 업무 행/tenant 행은 조회하지 않았다. 현행 테이블 목록에 `tb_item_partner_price`는 없었다.
+- 롤백:
+  - `tb_item_partner_price` 행이 하나라도 있으면 중단한다.
+  - named indexes와 신규 테이블만 삭제하고 `CASCADE`는 사용하지 않는다. 외부 의존 객체가 있으면 DROP이 실패하므로 수동 검토한다.
+- 적용/롤백 실행: 수행하지 않음
+- 설계: [단가관리 설계](../../superpowers/specs/2026-10-29-item-partner-pricing-design.md)
+- 절차 문서: [작업지시서](../../directions/20261029/20261029_002_품목_거래처별_단가관리_작업지시서.md), [계획서](../../plan/20261029/20261029_002_품목_거래처별_단가관리_계획서.md), [상세사양](../../spec/20261029/20261029_002_품목_거래처별_단가관리_상세사양서.md)

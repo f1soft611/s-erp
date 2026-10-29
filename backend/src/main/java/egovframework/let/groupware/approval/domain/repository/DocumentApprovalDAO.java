@@ -118,6 +118,21 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return update("DocumentApprovalDAO.updateApprovalLineAction", params);
     }
 
+    public DocumentApprovalLineVO selectUserReferenceApprovalLineForUpdate(Map<String, Object> params)
+            throws Exception {
+        return (DocumentApprovalLineVO) selectOne(
+                "DocumentApprovalDAO.selectUserReferenceApprovalLineForUpdate", params);
+    }
+
+    public int confirmReferenceApprovalLine(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.confirmReferenceApprovalLine", params);
+    }
+
+    public DocumentApprovalLineVO selectUserReferenceApprovalLine(Map<String, Object> params) throws Exception {
+        return (DocumentApprovalLineVO) selectOne(
+                "DocumentApprovalDAO.selectUserReferenceApprovalLine", params);
+    }
+
     public Long selectPendingApprovalCountForStage(Map<String, Object> params) throws Exception {
         return (Long) selectOne("DocumentApprovalDAO.selectPendingApprovalCountForStage", params);
     }
@@ -171,6 +186,15 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public List<DocumentApprovalListItemVO> selectApprovalNotices(Map<String, Object> params) throws Exception {
         return selectList("DocumentApprovalDAO.selectApprovalNotices", params);
+    }
+
+    public Long selectReferenceConfirmationRequiredCount(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectReferenceConfirmationRequiredCount", params);
+    }
+
+    public List<DocumentApprovalListItemVO> selectReferenceConfirmationItems(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectReferenceConfirmationItems", params);
     }
 
     public DocumentApprovalDetailVO selectDocumentApprovalDetail(Map<String, Object> params) throws Exception {
