@@ -133,7 +133,7 @@
             currency, start_dt, end_dt, moq, use_at, created_by, created_at, updated_by, updated_at
         ) VALUES (
             #{tenantId}, #{materialId}, #{customerId}, #{tradeType}, #{unitPrice},
-            #{currency}, CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq},
+            #{currency}, CAST(#{startDt} AS DATE), CAST(#{endDt} AS DATE), #{moq,jdbcType=NUMERIC},
             #{useAt}, #{createdBy}, CURRENT_TIMESTAMP, #{updatedBy}, CURRENT_TIMESTAMP
         )
         RETURNING price_id
@@ -148,7 +148,7 @@
             currency = #{currency},
             start_dt = CAST(#{startDt} AS DATE),
             end_dt = CAST(#{endDt} AS DATE),
-            moq = #{moq},
+            moq = #{moq,jdbcType=NUMERIC},
             use_at = #{useAt},
             updated_by = #{updatedBy},
             updated_at = CURRENT_TIMESTAMP

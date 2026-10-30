@@ -46,6 +46,8 @@ type DashboardContentProps = {
   isTenantAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
+  requestedApprovalId?: number | null;
+  onRequestedApprovalClose?: () => void;
   sharedDocumentId?: number | string | null;
   onSharedDocumentClose?: () => void;
 };
@@ -150,6 +152,8 @@ export function DashboardContent({
   isTenantAdmin = false,
   dashboardScope = null,
   onDashboardScopeChange,
+  requestedApprovalId,
+  onRequestedApprovalClose,
   sharedDocumentId,
   onSharedDocumentClose,
 }: DashboardContentProps) {
@@ -235,6 +239,8 @@ export function DashboardContent({
   if (selectedModule.id === 'groupware' && currentPageKey === 'write') {
     return (
       <DocumentWritePage
+        requestedApprovalId={requestedApprovalId}
+        onRequestedApprovalClose={onRequestedApprovalClose}
         sharedDocumentId={sharedDocumentId}
         onSharedDocumentClose={onSharedDocumentClose}
         selectedModule={selectedModule}

@@ -37,6 +37,10 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return selectList("DocumentApprovalDAO.selectActiveParticipants", params);
     }
 
+    public List<Long> selectApprovalCommentRecipientUserIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectApprovalCommentRecipientUserIds", params);
+    }
+
     public Long insertDocumentApprovalMain(Map<String, Object> params) throws Exception {
         return (Long) selectOne("DocumentApprovalDAO.insertDocumentApprovalMain", params);
     }

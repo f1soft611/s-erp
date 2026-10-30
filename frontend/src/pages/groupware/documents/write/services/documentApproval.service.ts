@@ -17,6 +17,7 @@ import type {
   DocumentApprovalFeedRecord,
   DocumentApprovalRecord,
   DocumentApprovalPinState,
+  DocumentApprovalReferenceAddResult,
   DocumentApprovalPage,
   DocumentApprovalPageRequest,
   DocumentApprovalScope,
@@ -523,6 +524,47 @@ export async function confirmDocumentReference(
   };
 }
 
+export async function addDocumentReferences(
+  electronicApprovalId: number,
+  participantUserIds: string[],
+): Promise<DocumentApprovalReferenceAddResult> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  if (
+    !Array.isArray(participantUserIds) ||
+    participantUserIds.length === 0 ||
+    !participantUserIds.every(
+      (userId) => typeof userId === 'string' && userId.trim().length > 0,
+    )
+  ) {
+    throw new Error('추가할 참조자를 선택해 주세요.');
+  }
+  const normalizedUserIds = participantUserIds.map((userId) => userId.trim());
+  if (new Set(normalizedUserIds).size !== normalizedUserIds.length) {
+    throw new Error('중복된 참조자가 포함되어 있습니다.');
+  }
+
+  const response = await apiPost<{ item?: unknown }>(
+    `${APPROVAL_API}/${electronicApprovalId}/references`,
+    { participantUserIds: normalizedUserIds },
+  );
+  const item = response.item;
+  if (!isObject(item)) {
+    throw new Error('참조자 추가 응답을 확인할 수 없습니다.');
+  }
+  const responseId = item.electronicApprovalId;
+  const addedCount = item.addedCount;
+  if (
+    responseId !== electronicApprovalId ||
+    typeof addedCount !== 'number' ||
+    !Number.isSafeInteger(addedCount) ||
+    addedCount < 0 ||
+    addedCount > normalizedUserIds.length
+  ) {
+    throw new Error('참조자 추가 응답을 확인할 수 없습니다.');
+  }
+  return { electronicApprovalId, addedCount };
+}
+
 export async function getDocumentApprovalDetail(
   electronicApprovalId: number,
 ): Promise<DocumentApprovalDetail> {
@@ -604,16 +646,39 @@ export async function listApprovalComments(
   };
 }
 
+export async function listApprovalCommentMentionUserIds(
+  electronicApprovalId: number,
+): Promise<number[]> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiGet<{ resultList?: unknown[] }>(
+    `${APPROVAL_API}/${electronicApprovalId}/comments/mention-users`,
+  );
+  return (response.resultList ?? []).flatMap((value) => {
+    const userId = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+    return Number.isSafeInteger(userId) && userId > 0 ? [userId] : [];
+  });
+}
+
 export async function createApprovalComment(
   electronicApprovalId: number,
   content: string,
   parentCommentId?: number,
+  mentionedUserIds: number[] = [],
+  mentionAll = false,
 ): Promise<DocumentApprovalComment> {
   requireApprovalId(electronicApprovalId, '문서 ID');
   if (parentCommentId !== undefined) requireApprovalId(parentCommentId, '상위 댓글 ID');
+  if (mentionedUserIds.some((userId) => !Number.isSafeInteger(userId) || userId <= 0)) {
+    throw new Error('멘션 사용자 정보가 올바르지 않습니다.');
+  }
   const response = await apiPost<{ item?: DocumentApprovalComment }>(
     `${APPROVAL_API}/${electronicApprovalId}/comments`,
-    { content, ...(parentCommentId === undefined ? {} : { parentCommentId }) },
+    {
+      content,
+      ...(parentCommentId === undefined ? {} : { parentCommentId }),
+      mentionedUserIds,
+      mentionAll,
+    },
   );
   if (!isApprovalComment(response.item, electronicApprovalId)) {
     throw new Error('전자결재 댓글 등록 결과를 확인할 수 없습니다.');

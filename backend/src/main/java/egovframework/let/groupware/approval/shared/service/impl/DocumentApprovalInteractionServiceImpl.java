@@ -39,6 +39,7 @@ import egovframework.let.groupware.approval.domain.repository.DocumentApprovalDA
 import egovframework.let.groupware.approval.shared.service.DocumentApprovalInteractionService;
 import egovframework.let.groupware.approval.common.service.DocumentApprovalDraftSupportService;
 import egovframework.let.groupware.approval.common.service.DocumentApprovalCommentSupportService;
+import egovframework.let.groupware.notification.service.NotificationService;
 
 @Service("documentApprovalInteractionService")
 public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceImpl
@@ -59,11 +60,13 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
     private final DocumentApprovalAccessService documentApprovalAccessService;
     private final DocumentApprovalDraftSupportService draftSupportService;
     private final DocumentApprovalCommentSupportService commentSupportService;
+    private final NotificationService notificationService;
     public DocumentApprovalInteractionServiceImpl(DocumentApprovalDAO documentApprovalDAO, CommonCommentDAO commonCommentDAO,
             CommonFileService commonFileService, EmbeddedImageStorageService imageStorageService,
             DocumentApprovalAccessService documentApprovalAccessService,
             DocumentApprovalDraftSupportService draftSupportService,
-            DocumentApprovalCommentSupportService commentSupportService) {
+            DocumentApprovalCommentSupportService commentSupportService,
+            NotificationService notificationService) {
         this.documentApprovalDAO = documentApprovalDAO;
         this.commonCommentDAO = commonCommentDAO;
         this.commonFileService = commonFileService;
@@ -71,6 +74,7 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
         this.documentApprovalAccessService = documentApprovalAccessService;
         this.draftSupportService = draftSupportService;
         this.commentSupportService = commentSupportService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -342,6 +346,144 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public int addDocumentReferences(LoginVO user, Long electronicApprovalId,
+            List<String> participantUserIds) throws Exception {
+        documentApprovalAccessService.validateAuthenticatedUser(user);
+        if (electronicApprovalId == null || electronicApprovalId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서 ID가 올바르지 않습니다.");
+        }
+        if (participantUserIds == null || participantUserIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "추가할 참조자를 선택해 주세요.");
+        }
+
+        List<String> requestedUserIds = new ArrayList<>();
+        Set<String> uniqueUserIds = new HashSet<>();
+        for (String userId : participantUserIds) {
+            if (!StringUtils.hasText(userId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참조자 ID가 올바르지 않습니다.");
+            }
+            String normalizedUserId = userId.trim();
+            if (!uniqueUserIds.add(normalizedUserId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "중복된 참조자가 포함되어 있습니다.");
+            }
+            requestedUserIds.add(normalizedUserId);
+        }
+
+        documentApprovalAccessService.requireRelatedDocument(user, electronicApprovalId);
+        Map<String, Object> params = documentApprovalAccessService.actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        DocumentApprovalWorkflowDocumentVO document =
+                documentApprovalDAO.selectDocumentApprovalForUpdate(params);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "참조자를 추가할 문서를 찾을 수 없습니다.");
+        }
+        if ("DRAFT".equals(document.getDocumentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "결재신청된 문서에만 참조자를 추가할 수 있습니다.");
+        }
+
+        params.put("participantUserIds", requestedUserIds);
+        List<DocumentApprovalParticipantVO> activeParticipants =
+                documentApprovalDAO.selectActiveParticipants(params);
+        if (activeParticipants == null || activeParticipants.size() != requestedUserIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참조자로 추가할 사용자를 확인할 수 없습니다.");
+        }
+        Map<String, DocumentApprovalParticipantVO> participantsById = new HashMap<>();
+        for (DocumentApprovalParticipantVO participant : activeParticipants) {
+            if (participant == null || !StringUtils.hasText(participant.getUserId())
+                    || participantsById.put(participant.getUserId(), participant) != null) {
+                throw new IllegalStateException("활성 참조자 조회 결과가 올바르지 않습니다.");
+            }
+        }
+        if (!participantsById.keySet().containsAll(requestedUserIds)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참조자로 추가할 사용자를 확인할 수 없습니다.");
+        }
+
+        List<DocumentApprovalLineVO> approvalLines = documentApprovalDAO.selectApprovalLines(params);
+        if (approvalLines == null) {
+            throw new IllegalStateException("결재 참여자 조회 결과를 확인할 수 없습니다.");
+        }
+        Set<String> existingParticipantIds = new HashSet<>();
+        List<DocumentApprovalLineVO> referenceLines = new ArrayList<>();
+        int maximumActionStage = 0;
+        for (DocumentApprovalLineVO line : approvalLines) {
+            if (line == null) {
+                throw new IllegalStateException("결재 참여자 조회 결과가 올바르지 않습니다.");
+            }
+            if (StringUtils.hasText(line.getParticipantUserId())) {
+                existingParticipantIds.add(line.getParticipantUserId());
+            }
+            if ("REFERENCE".equals(line.getParticipantType())) {
+                referenceLines.add(line);
+            } else if ("APPROVAL".equals(line.getParticipantType())
+                    || "AGREEMENT".equals(line.getParticipantType())) {
+                if (line.getStageOrder() == null || line.getStageOrder() < 1) {
+                    throw new IllegalStateException("결재 단계 조회 결과가 올바르지 않습니다.");
+                }
+                maximumActionStage = Math.max(maximumActionStage, line.getStageOrder());
+            }
+        }
+
+        List<DocumentApprovalParticipantVO> newParticipants = new ArrayList<>();
+        for (String userId : requestedUserIds) {
+            if (!existingParticipantIds.contains(userId)) {
+                newParticipants.add(participantsById.get(userId));
+            }
+        }
+        if (newParticipants.isEmpty()) {
+            return 0;
+        }
+
+        int referenceStage;
+        int nextParticipantOrder = 1;
+        if (referenceLines.isEmpty()) {
+            if (maximumActionStage < 1) {
+                throw new IllegalStateException("참조자를 추가할 결재 단계를 확인할 수 없습니다.");
+            }
+            referenceStage = Math.addExact(maximumActionStage, 1);
+        } else {
+            Integer existingReferenceStage = referenceLines.get(0).getStageOrder();
+            if (existingReferenceStage == null || existingReferenceStage < 1) {
+                throw new IllegalStateException("참조 단계 조회 결과가 올바르지 않습니다.");
+            }
+            int maximumReferenceOrder = 0;
+            for (DocumentApprovalLineVO referenceLine : referenceLines) {
+                if (!existingReferenceStage.equals(referenceLine.getStageOrder())
+                        || referenceLine.getParticipantOrder() == null
+                        || referenceLine.getParticipantOrder() < 1) {
+                    throw new IllegalStateException("참조 순서 조회 결과가 올바르지 않습니다.");
+                }
+                maximumReferenceOrder = Math.max(maximumReferenceOrder, referenceLine.getParticipantOrder());
+            }
+            referenceStage = existingReferenceStage;
+            nextParticipantOrder = Math.addExact(maximumReferenceOrder, 1);
+        }
+
+        List<String> addedNames = new ArrayList<>();
+        for (DocumentApprovalParticipantVO participant : newParticipants) {
+            Map<String, Object> lineParams = new HashMap<>(params);
+            lineParams.put("stageOrder", referenceStage);
+            lineParams.put("participantOrder", nextParticipantOrder++);
+            lineParams.put("participantType", "REFERENCE");
+            lineParams.put("participantUserId", participant.getUserId());
+            lineParams.put("participantName", participant.getUserName());
+            lineParams.put("participantDepartmentName", participant.getDepartmentName());
+            lineParams.put("actionStatus", null);
+            lineParams.put("pendingAt", null);
+            lineParams.put("actionAt", null);
+            lineParams.put("actionComment", null);
+            if (documentApprovalDAO.insertDocumentApprovalLine(lineParams) != 1) {
+                throw new IllegalStateException("참조자 추가에 실패했습니다.");
+            }
+            addedNames.add(participant.getUserName());
+        }
+
+        String content = user.getName() + "님이 참조자(" + String.join(", ", addedNames) + ")를 추가했습니다.";
+        draftSupportService.insertSystemEvent(user, electronicApprovalId, "REFERENCE_ADDED", content);
+        return newParticipants.size();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public DocumentApprovalDraftVO cancelSubmission(LoginVO user, Long electronicApprovalId) throws Exception {
         documentApprovalAccessService.validateAuthenticatedUser(user);
         if (electronicApprovalId == null || electronicApprovalId <= 0) {
@@ -530,6 +672,14 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
     @Transactional(rollbackFor = Exception.class)
     public CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
             String content, Long parentCommentId) throws Exception {
+        return createApprovalComment(user, electronicApprovalId, content, parentCommentId,
+                Collections.emptyList(), false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
+            String content, Long parentCommentId, List<Long> mentionedUserIds, boolean mentionAll) throws Exception {
         documentApprovalAccessService.requireRelatedDocument(user, electronicApprovalId);
         String normalizedContent = normalizeApprovalCommentContent(content);
         if (parentCommentId != null) {
@@ -543,6 +693,8 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
             }
         }
 
+        List<Long> recipients = resolveApprovalCommentRecipients(
+                user, electronicApprovalId, mentionedUserIds, mentionAll);
         Map<String, Object> params = commentSupportService.approvalCommentParams(user, electronicApprovalId, null);
         params.put("parentCommentId", parentCommentId);
         params.put("content", normalizedContent);
@@ -559,7 +711,71 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
         if (created == null) {
             throw new IllegalStateException("등록된 댓글을 다시 조회할 수 없습니다.");
         }
+        String summary = org.jsoup.Jsoup.parse(normalizedContent).text();
+        if (summary.length() > 500) {
+            summary = summary.substring(0, 497) + "...";
+        }
+        for (Long recipientUserId : recipients) {
+            notificationService.createEvent(user.getTenantId(), recipientUserId,
+                    "APPROVAL_COMMENT_MENTION", "APPROVAL_COMMENT", commentId,
+                    "전자결재 댓글에 언급되었습니다.", summary.isEmpty() ? "댓글이 등록되었습니다." : summary);
+        }
         return created;
+    }
+
+    private List<Long> resolveApprovalCommentRecipients(LoginVO user, Long electronicApprovalId,
+            List<Long> mentionedUserIds, boolean mentionAll) throws Exception {
+        List<Long> requested = mentionedUserIds == null ? Collections.emptyList() : mentionedUserIds;
+        if (requested.size() > 500 || requested.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "멘션 사용자 정보가 올바르지 않습니다.");
+        }
+        if (!mentionAll && requested.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Object> params = documentApprovalAccessService.actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        List<Long> audience = documentApprovalDAO.selectApprovalCommentRecipientUserIds(params);
+        if (audience == null) {
+            throw new IllegalStateException("전자결재 댓글 멘션 대상 조회 결과가 없습니다.");
+        }
+        Set<Long> allowed = new HashSet<>(audience);
+        for (Long userId : requested) {
+            if (!allowed.contains(userId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "문서에 접근할 수 없는 사용자는 멘션할 수 없습니다.");
+            }
+        }
+        Set<Long> recipients = new java.util.LinkedHashSet<>();
+        if (mentionAll) {
+            recipients.addAll(audience);
+        }
+        recipients.addAll(requested);
+        try {
+            recipients.remove(Long.valueOf(user.getUniqId()));
+        } catch (NumberFormatException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 사용자 ID가 올바르지 않습니다.", exception);
+        }
+        return new ArrayList<>(recipients);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> listApprovalCommentMentionUserIds(LoginVO user, Long electronicApprovalId) throws Exception {
+        documentApprovalAccessService.requireRelatedDocument(user, electronicApprovalId);
+        Long authorId = documentApprovalAccessService.authenticatedUserId(user);
+        Map<String, Object> params = documentApprovalAccessService.actorParams(user);
+        params.put("electronicApprovalId", electronicApprovalId);
+        List<Long> audience = documentApprovalDAO.selectApprovalCommentRecipientUserIds(params);
+        if (audience == null) {
+            return Collections.emptyList();
+        }
+        List<Long> mentionable = new ArrayList<>();
+        for (Long userId : audience) {
+            if (userId != null && !userId.equals(authorId)) {
+                mentionable.add(userId);
+            }
+        }
+        return mentionable;
     }
 
     @Override

@@ -34,6 +34,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionR
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceConfirmationVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceAddRequestVO;
 import egovframework.let.groupware.approval.shared.service.DocumentApprovalInteractionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -93,6 +94,22 @@ public class DocumentApprovalInteractionApiController {
                 documentApprovalService.confirmReference(user, electronicApprovalId);
         resultMap.put("item", confirmation);
         resultMap.put("message", "문서를 확인했습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "전자결재 참조자 추가", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/references")
+    public ResultVO addReferences(@PathVariable Long electronicApprovalId,
+            @RequestBody DocumentApprovalReferenceAddRequestVO request,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        int addedCount = documentApprovalService.addDocumentReferences(user, electronicApprovalId,
+                request == null ? null : request.getParticipantUserIds());
+        HashMap<String, Object> item = new HashMap<>();
+        item.put("electronicApprovalId", electronicApprovalId);
+        item.put("addedCount", addedCount);
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("item", item);
+        resultMap.put("message", "참조자를 추가했습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
@@ -159,13 +176,23 @@ public class DocumentApprovalInteractionApiController {
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 
+    @Operation(summary = "전자결재 댓글 멘션 가능 사용자 조회", security = @SecurityRequirement(name = "Authorization"))
+    @GetMapping("/{electronicApprovalId}/comments/mention-users")
+    public ResultVO listApprovalCommentMentionUsers(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultList", documentApprovalService.listApprovalCommentMentionUserIds(user, electronicApprovalId));
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
     @Operation(summary = "전자결재 사용자 댓글 작성", security = @SecurityRequirement(name = "Authorization"))
     @PostMapping("/{electronicApprovalId}/comments")
     public ResponseEntity<ResultVO> createApprovalComment(@PathVariable Long electronicApprovalId,
             @RequestBody DocumentApprovalCommentRequestVO request,
             @AuthenticationPrincipal LoginVO user) throws Exception {
         CommonCommentVO created = documentApprovalService.createApprovalComment(
-                user, electronicApprovalId, request.getContent(), request.getParentCommentId());
+                user, electronicApprovalId, request.getContent(), request.getParentCommentId(),
+                request.getMentionedUserIds(), request.isMentionAll());
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("item", created);
         resultMap.put("message", "댓글이 등록되었습니다.");

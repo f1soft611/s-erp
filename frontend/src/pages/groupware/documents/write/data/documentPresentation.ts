@@ -127,6 +127,8 @@ export function getApprovalSystemEventPresentation(
       return { ...getApprovalStatusPresentation('COMPLETED'), label: '완료' };
     case 'REFERENCE_CONFIRMED':
       return { ...getApprovalStatusPresentation('COMPLETED'), label: '참조 확인' };
+    case 'REFERENCE_ADDED':
+      return { label: '참조자 추가', color: 'info', variant: 'outlined' };
     case 'RETURNED':
       return getApprovalStatusPresentation('REVISION_REQUESTED');
     default:

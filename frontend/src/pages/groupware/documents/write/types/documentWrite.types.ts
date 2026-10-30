@@ -94,6 +94,8 @@ export type DocumentWritePageProps = {
   content: PageContent;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
+  requestedApprovalId?: number | null;
+  onRequestedApprovalClose?: () => void;
   sharedDocumentId?: number | string | null;
   onSharedDocumentClose?: () => void;
 };
@@ -179,6 +181,11 @@ export type DocumentApprovalPage<T> = {
 export type DocumentApprovalPinState = {
   electronicApprovalId: number;
   pinned: boolean;
+};
+
+export type DocumentApprovalReferenceAddResult = {
+  electronicApprovalId: number;
+  addedCount: number;
 };
 
 export type DocumentApprovalSummary = {

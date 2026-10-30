@@ -99,6 +99,7 @@ export function ItemPartnerPriceGrid({
         allowDeleteRowInContextMenu={false}
       />
       <MasterPickerDialog
+        key={picker?.kind ?? 'closed'}
         open={picker !== null}
         label={picker?.kind === 'material' ? '품목' : '거래처'}
         search={picker?.kind === 'material' ? searchOrderMaterials : searchOrderCustomers}

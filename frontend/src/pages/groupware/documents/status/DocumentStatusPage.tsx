@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Box, Button, Chip } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -24,12 +25,19 @@ export function DocumentStatusPage({
 }: DocumentStatusPageProps) {
   const search = useDocumentStatusSearch(dashboardScope, onDashboardScopeChange);
   const detail = useDocumentStatusDetail();
+  const { closeDetail } = detail;
   const list = useDocumentStatusList(
     search.appliedFilters,
     search.defaultsInitialized,
-    detail.closeDetail,
   );
-  const refreshStatusList = () => {
+  useEffect(() => {
+    closeDetail();
+  }, [closeDetail, search.appliedFilters]);
+  const refreshStatusList = (options?: { quiet?: boolean }) => {
+    if (options?.quiet) {
+      list.refreshQuietly();
+      return;
+    }
     list.retry();
     detail.refreshDetail();
   };
@@ -146,6 +154,7 @@ export function DocumentStatusPage({
         onEditDocument={detail.handleEditDocument}
         onComposerClose={() => {
           detail.closeComposer();
+          detail.closeDetail();
           refreshStatusList();
         }}
       />

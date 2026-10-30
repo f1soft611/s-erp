@@ -66,6 +66,7 @@ import egovframework.let.groupware.approval.common.service.impl.DocumentApproval
 import egovframework.let.groupware.approval.common.service.impl.DocumentApprovalDraftSupportServiceImpl;
 import egovframework.let.groupware.approval.write.service.impl.DocumentApprovalWriteServiceImpl;
 import egovframework.let.groupware.approval.shared.service.impl.DocumentApprovalInteractionServiceImpl;
+import egovframework.let.groupware.notification.service.NotificationService;
 import egovframework.let.common.idsequence.service.IdSequenceService;
 
 class DocumentApprovalWriteServiceImplTest {
@@ -752,7 +753,7 @@ class DocumentApprovalWriteServiceImplTest {
     private DocumentApprovalInteractionServiceImpl sharedService(EmbeddedImageStorageService storage) {
         DocumentApprovalAccessServiceImpl access = accessService();
         return new DocumentApprovalInteractionServiceImpl(approvalDAO, commentDAO, fileService, storage, access,
-                draftSupportService(storage, access), commentSupportService());
+                draftSupportService(storage, access), commentSupportService(), mock(NotificationService.class));
     }
 
     private DocumentApprovalDetailVO detail(int viewCount) {

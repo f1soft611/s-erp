@@ -19,6 +19,9 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferen
 
 public interface DocumentApprovalInteractionService {
 
+    int addDocumentReferences(LoginVO user, Long electronicApprovalId,
+            List<String> participantUserIds) throws Exception;
+
     DocumentApprovalFilePageVO listFiles(LoginVO user, String scope, String documentType,
             Long electronicApprovalId, Long beforeFileId) throws Exception;
 
@@ -43,6 +46,11 @@ public interface DocumentApprovalInteractionService {
 
     CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
             String content, Long parentCommentId) throws Exception;
+
+    CommonCommentVO createApprovalComment(LoginVO user, Long electronicApprovalId,
+            String content, Long parentCommentId, List<Long> mentionedUserIds, boolean mentionAll) throws Exception;
+
+    List<Long> listApprovalCommentMentionUserIds(LoginVO user, Long electronicApprovalId) throws Exception;
 
     CommonCommentVO updateApprovalComment(LoginVO user, Long electronicApprovalId,
             Long commentId, String content) throws Exception;
