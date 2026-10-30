@@ -15,14 +15,14 @@
 |---|---|
 | `npm run build` | 통과 |
 | 변경 파일 `npm run lint -- src/shared/components/master-picker/masterPicker.types.ts src/shared/components/master-picker/MasterPicker.tsx src/pages/sales/order/create/SalesOrderCreatePage.tsx tests/master-picker.test.tsx tests/sales-order-create-page.test.tsx` | 종료 코드 0. `SalesOrderCreatePage.tsx:256`에 기존 set-state-in-effect 경고 1건 |
-| 관련 테스트 `npm run test -- tests/master-picker.test.tsx tests/sales-order-create-page.test.tsx` | 신규 아이콘 흐름과 공통 피커 테스트 포함 26개 통과. 기존 테스트 2개 실패 |
+| 관련 테스트 `npm run test -- tests/master-picker.test.tsx tests/sales-order-create-page.test.tsx` | 신규 아이콘 흐름과 공통 피커 테스트 포함 27개 통과. 기존 테스트 1개 실패 |
 | 전체 `npm run lint` | 기존 `tests/common-code-management-page.test.tsx:53` 조건부 Hook 사용 오류로 실패 |
 | 실제 브라우저 375px / 768px / 1280px | 각 폭에서 필드 내 돋보기, 도움폼 열기/검색/선택, 선택값 표시 및 페이지 가로 넘침 없음 확인 |
 
-기존 테스트 실패는 이번 변경 전후로 재현됐다. `sales-order-create-page.test.tsx:334`는
-오늘 날짜가 `2026-10-30`인데 `2026-10-27`을 기대하고, `:488`은 삭제 후 신규
-상태에서 삭제 버튼이 비활성일 것을 기대하지만 현재 구현은 버튼을 활성 상태로
-표시한다. 둘 다 이번 선택 트리거 변경 범위 밖이라 수정하지 않았다.
+기존 테스트 실패는 이번 변경 전후로 재현됐다. `sales-order-create-page.test.tsx:338`은
+오늘 날짜가 `2026-10-30`인데 `2026-10-27`을 기대한다. 이번 선택 트리거 변경
+범위 밖이라 수정하지 않았다. 삭제 후 상태를 검증하는 테스트는 마지막 실행에서
+통과했다.
 
 브라우저 확인은 기존 S-ERP Vite 서버(`127.0.0.1:4173`)를 재사용했고, 검색 결과는
 합성 거래처 `C-TEST · 검증 거래처`만 사용했다. 전체 viewport에서 도움폼의

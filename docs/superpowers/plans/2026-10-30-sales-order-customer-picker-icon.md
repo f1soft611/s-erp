@@ -34,7 +34,7 @@ npm run test -- tests/master-picker.test.tsx
 ```
 
 Expected: TypeScript/test failure because `triggerMode` is not yet a supported
-prop.
+prop, and the icon is absent from the input adornment.
 
 - [x] **Step 3: Add the optional trigger mode**
 
@@ -111,9 +111,9 @@ Run from `frontend`:
 npm run test -- tests/master-picker.test.tsx tests/sales-order-create-page.test.tsx
 ```
 
-Expected: icon-trigger and selection-flow tests pass. The run reports two
-pre-existing sales-order test failures (fixed-date expectation and delete
-button state), documented in the result report.
+Expected: icon-trigger and selection-flow tests pass. The run reports one
+pre-existing sales-order test failure: the fixed-date expectation documented
+in the result report.
 
 ### Task 3: Validate layout and document the result
 
