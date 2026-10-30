@@ -835,7 +835,7 @@ export function useDocumentComposer(
       const request = buildDraftRequest();
       if (!request) return;
       const saved = await saveDocumentDraft(request, draftIdRef.current);
-      imageSaveLifecycle.completeSave();
+      imageSaveLifecycle.completeSave({ keepPreviews: true });
       draftIdRef.current = saved.electronicApprovalId;
       setElectronicApprovalId(saved.electronicApprovalId);
       if (submit && saved.documentStatus !== 'DRAFT' && saved.documentStatus !== 'REVISION_REQUESTED') {

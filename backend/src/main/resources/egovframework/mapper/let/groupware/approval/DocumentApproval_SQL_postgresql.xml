@@ -1128,6 +1128,35 @@
         )
     </select>
 
+    <select id="selectApprovalCommentRecipientUserIds" parameterType="map" resultType="long">
+        SELECT DISTINCT u.user_id
+        FROM public.tb_electronic_approval_main m
+        JOIN public.tb_user u
+          ON u.tenant_id = m.tenant_id
+         AND u.use_at = 'Y'
+        JOIN public.tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+         AND la.use_at = 'Y'
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
+          AND (
+              m.drafter_id IN (la.login_code, CAST(u.user_id AS varchar))
+              OR (
+                  m.document_status != 'DRAFT'
+                  AND EXISTS (
+                      SELECT 1
+                      FROM public.tb_electronic_approval_line_info l
+                      WHERE l.tenant_id = m.tenant_id
+                        AND l.electronic_approval_id = m.electronic_approval_id
+                        AND l.participant_user_id = CAST(u.user_id AS varchar)
+                  )
+              )
+          )
+        ORDER BY u.user_id
+    </select>
+
     <select id="selectDraftDrafterId" parameterType="map" resultType="string">
         SELECT drafter_id
         FROM public.tb_electronic_approval_main

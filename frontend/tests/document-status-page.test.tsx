@@ -688,6 +688,34 @@ describe('document status page', () => {
     );
   });
 
+  it('refreshes quietly and keeps the document detail open after a detail action', async () => {
+    renderDocumentStatusPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'EA-20261010-0001 상세 보기' }));
+    await screen.findByTestId('page-area-overlay');
+
+    const feedProps = vi.mocked(DocumentApprovalDetailFeed).mock.calls.at(-1)?.[0];
+    if (!feedProps) throw new Error('Detail panel props were not captured.');
+    const previousListRequests = getListRequests();
+    let resolveRefresh!: (value: { resultList: DocumentStatusRow[]; totalRowCount: number }) => void;
+    api.get.mockImplementation((path: string) =>
+      path.includes('/documents/search?')
+        ? new Promise((resolve) => { resolveRefresh = resolve; })
+        : Promise.resolve({}),
+    );
+
+    act(() => feedProps.onActionComplete({ quiet: true }));
+
+    await waitFor(() =>
+      expect(getListRequests()).toBeGreaterThan(previousListRequests),
+    );
+    expect(screen.getByTestId('page-area-overlay')).toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: '문서현황' })).not.toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('gridcell', { name: 'Annual plan' })).toBeInTheDocument();
+
+    await act(async () => resolveRefresh({ resultList: [row], totalRowCount: 1 }));
+    expect(screen.getByRole('gridcell', { name: 'Annual plan' })).toBeInTheDocument();
+  });
+
   it('loads all matching status rows without paging parameters', async () => {
     const allRows = Array.from({ length: 205 }, (_, index) => ({
       ...row,

@@ -670,6 +670,7 @@ export function SalesOrderCreatePage({
             <CustomerPicker
               value={customer}
               search={searchOrderCustomers}
+              triggerMode="icon"
               onChange={(value) => {
                 setCustomer(value);
                 clearValidationErrors();

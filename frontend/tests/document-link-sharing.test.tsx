@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
@@ -167,6 +167,49 @@ describe('document sharing UI', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '문서 공유하기' }));
     expect(onShare).toHaveBeenCalledOnce();
     expect(screen.queryByRole('menuitem', { name: '문서 수정' })).not.toBeInTheDocument();
+  });
+
+  it('groups sharing and reference actions apart from available document management actions', () => {
+    render(<DocumentActionsMenu isDrafter documentStatus="DRAFT"
+      onShare={vi.fn()} onAddReferences={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent))
+      .toEqual(['문서 공유하기', '참조자 추가하기', '문서 수정', '삭제']);
+    const divider = within(menu).getByRole('separator');
+    const referenceItem = within(menu).getByRole('menuitem', { name: '참조자 추가하기' });
+    const editItem = within(menu).getByRole('menuitem', { name: '문서 수정' });
+    expect(Boolean(referenceItem.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING))
+      .toBe(true);
+    expect(Boolean(divider.compareDocumentPosition(editItem) & Node.DOCUMENT_POSITION_FOLLOWING))
+      .toBe(true);
+  });
+
+  it('does not render a divider when no document management actions are available', () => {
+    render(<DocumentActionsMenu isDrafter={false} documentStatus="COMPLETED"
+      onShare={vi.fn()} onAddReferences={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+
+    expect(screen.getByRole('menuitem', { name: '참조자 추가하기' })).toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('closes the menu and invokes only the selected reference action', async () => {
+    const onShare = vi.fn();
+    const onAddReferences = vi.fn();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    render(<DocumentActionsMenu isDrafter documentStatus="DRAFT"
+      onShare={onShare} onAddReferences={onAddReferences} onEdit={onEdit} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '참조자 추가하기' }));
+
+    expect(onAddReferences).toHaveBeenCalledOnce();
+    expect(onShare).not.toHaveBeenCalled();
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   });
 
   it('loads permission-filtered metadata and opens the right panel through its callback', async () => {

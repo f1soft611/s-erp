@@ -43,7 +43,7 @@ public class DocumentApprovalStatusServiceImpl extends EgovAbstractServiceImpl
             "drafterName", "drafterDepartmentName", "myParticipantType", "myActionStatus",
             "currentApprovalStep", "participantName", "approvalProgress", "updatedAt")));
     private static final Set<String> APPROVAL_LINE_ACTION_STATUSES = Collections.unmodifiableSet(
-            new HashSet<>(Arrays.asList("WAITING", "PENDING", "APPROVED", "REJECTED", "RETURNED")));
+            new HashSet<>(Arrays.asList("WAITING", "PENDING", "APPROVED", "REJECTED", "RETURNED", "CONFIRMED")));
 
     private final DocumentApprovalDAO documentApprovalDAO;
     private final DocumentApprovalAccessService documentApprovalAccessService;

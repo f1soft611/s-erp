@@ -12,6 +12,7 @@ import { resolveNoticeLinkPreview } from '../../../community/notice/services/not
 export type DocumentLinkPreviewsProps = {
   html: string;
   onOpenDocument?: (documentId: number) => void;
+  testId?: string;
 };
 
 function mapDocumentPreview(record: DocumentApprovalRecord): InternalContentPreview {
@@ -33,11 +34,15 @@ async function resolveDocumentPreview(
   return record ? mapDocumentPreview(record) : null;
 }
 
-export function DocumentLinkPreviews({ html, onOpenDocument }: DocumentLinkPreviewsProps) {
+export function DocumentLinkPreviews({
+  html,
+  onOpenDocument,
+  testId = 'document-link-previews',
+}: DocumentLinkPreviewsProps) {
   return (
     <FeedLinkPreviews
       html={html}
-      testId="document-link-previews"
+      testId={testId}
       resolveDocument={resolveDocumentPreview}
       resolveNotice={resolveNoticeLinkPreview}
       resolveExternal={getExternalLinkPreview}

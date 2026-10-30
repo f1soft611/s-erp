@@ -33,6 +33,7 @@ import { ImageViewerDialog } from '../../../../../shared/components/ImageViewerD
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useNotification } from '../../../../../shared/context/NotificationContext';
 import { DocumentActionsMenu } from './DocumentActionsMenu';
+import { DocumentReferenceAddDialog } from './DocumentReferenceAddDialog';
 import { DocumentLinkPreviews } from './DocumentLinkPreviews';
 import { buildDocumentShareLink, parseDocumentShareLink, resolveDocumentShareReference } from '../data/documentShareLink';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -40,8 +41,10 @@ import MessageOutlinedIcon from '@mui/icons-material/MessageOutlined';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { getStoredAuth } from '../../../../../shared/services/authService';
 import { fetchMyProfile } from '../../../../dashboard/services/profileSettings.service';
+import { fetchDraftFormUsers } from '../../../../co/workflow/form/services/draftFormManagement.service';
 import {
   createApprovalComment,
+  listApprovalCommentMentionUserIds,
   cancelDocumentApproval,
   cancelDocumentSubmission,
   deleteDocumentApproval,
@@ -52,6 +55,7 @@ import {
   fetchApprovalCommentAttachmentBlob,
   getDocumentApprovalDetail,
   listApprovalComments,
+  addDocumentReferences,
   confirmDocumentReference,
   processDocumentApprovalAction,
   updateApprovalComment,
@@ -75,11 +79,13 @@ import type {
   DocumentApprovalLine,
   DocumentApprovalSystemEvent,
 } from '../types/documentWrite.types';
+import type { CommentMentionOption } from '../../../../../shared/components/feed/CommentThread';
+import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
 
 type DocumentApprovalDetailFeedSharedProps = {
   open: boolean;
   electronicApprovalId: number | null;
-  onActionComplete: () => void;
+  onActionComplete: (options?: { quiet?: boolean }) => void;
   onEditDocument: (detail: DocumentApprovalDetail) => void;
   onTogglePin?: (
     electronicApprovalId: number,
@@ -313,11 +319,18 @@ export function DocumentApprovalDetailFeed(
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [referenceActionError, setReferenceActionError] = useState('');
+  const [isReferenceAddDialogOpen, setIsReferenceAddDialogOpen] = useState(false);
+  const [selectedReferenceUserIds, setSelectedReferenceUserIds] = useState<string[]>([]);
+  const [referenceAddError, setReferenceAddError] = useState('');
+  const [referenceAddInfo, setReferenceAddInfo] = useState('');
+  const [isAddingReferences, setIsAddingReferences] = useState(false);
   const [actionComment, setActionComment] = useState('');
   const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
   const [commentRecords, setCommentRecords] = useState<
     DocumentApprovalComment[]
   >(preloadedFeedData?.comments ?? []);
+  const [commentMentionOptions, setCommentMentionOptions] = useState<CommentMentionOption[]>([]);
+  const [referenceUserOptions, setReferenceUserOptions] = useState<F1GridUserOption[]>([]);
   const [commentSystemEvents, setCommentSystemEvents] = useState<
     DocumentApprovalDetail['systemEvents']
   >(preloadedFeedData?.systemEvents ?? []);
@@ -342,6 +355,61 @@ export function DocumentApprovalDetailFeed(
   const [commentImageErrors, setCommentImageErrors] = useState<
     Record<string, string>
   >({});
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    void fetchDraftFormUsers()
+      .then((users) => {
+        if (!active) return;
+        setReferenceUserOptions(users.flatMap((user) => {
+          const userId = String(user.userId ?? '').trim();
+          return userId
+            ? [{
+                value: userId,
+                label: user.userNm,
+                avatarUrl: user.profileImage,
+                departmentName: user.departmentNm,
+              }]
+            : [];
+        }));
+        setCommentMentionOptions(users.flatMap((user) => {
+          const userId = Number(user.userId);
+          return Number.isSafeInteger(userId) && userId > 0
+            ? [{
+                userId,
+                name: user.userNm,
+                departmentName: user.departmentNm,
+              }]
+            : [];
+        }));
+      })
+      .catch(() => {
+        if (active) showError('멘션 사용자 목록을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [open, showError]);
+  const [mentionableUserIds, setMentionableUserIds] = useState<Set<number> | null>(null);
+  const approvalLineKey = (detail?.approvalLines ?? [])
+    .map((line) => line.participantUserId).join(',');
+  useEffect(() => {
+    if (!open || electronicApprovalId === null) return;
+    let active = true;
+    void listApprovalCommentMentionUserIds(electronicApprovalId)
+      .then((userIds) => {
+        if (active) setMentionableUserIds(new Set(userIds));
+      })
+      .catch(() => {
+        if (active) setMentionableUserIds(null);
+      });
+    return () => { active = false; };
+  }, [open, electronicApprovalId, approvalLineKey]);
+  const documentMentionOptions = useMemo(
+    () => (mentionableUserIds
+      ? commentMentionOptions.filter((option) => mentionableUserIds.has(option.userId))
+      : []),
+    [commentMentionOptions, mentionableUserIds],
+  );
   const [reasonPopover, setReasonPopover] = useState<{
     anchorEl: HTMLElement;
     reason: string;
@@ -354,7 +422,11 @@ export function DocumentApprovalDetailFeed(
   >(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [detailRetryToken, setDetailRetryToken] = useState(0);
+  const [detailRetryRequest, setDetailRetryRequest] = useState({
+    version: 0,
+    quiet: false,
+  });
+  const previousDetailRetryVersion = useRef(0);
   const previousDetailRefreshToken = useRef(detailRefreshToken);
   const {
     bodyHtml,
@@ -368,9 +440,9 @@ export function DocumentApprovalDetailFeed(
     : '';
 
   const loadComments = useCallback(
-    async (beforeCommentId?: number, append = false) => {
+    async (beforeCommentId?: number, append = false, quiet = false) => {
       if (electronicApprovalId === null) return;
-      setIsLoadingComments(true);
+      if (!quiet) setIsLoadingComments(true);
       setCommentError('');
       setCommentRetryRequest(null);
       try {
@@ -395,7 +467,7 @@ export function DocumentApprovalDetailFeed(
             : '댓글을 불러오지 못했습니다.',
         );
       } finally {
-        setIsLoadingComments(false);
+        if (!quiet) setIsLoadingComments(false);
       }
     },
     [electronicApprovalId],
@@ -424,34 +496,46 @@ export function DocumentApprovalDetailFeed(
   useEffect(() => {
     if (!open || electronicApprovalId === null || isFeedPresentation) return;
     let active = true;
-    setIsLoading(true);
+    const isQuietReload =
+      detailRetryRequest.quiet
+      && detailRetryRequest.version !== previousDetailRetryVersion.current;
+    previousDetailRetryVersion.current = detailRetryRequest.version;
+    if (!isQuietReload) setIsLoading(true);
     setLoadError('');
-    setActionError('');
-    setActionComment('');
-    setDetail(null);
-    setIsLiked(false);
-    setIsBookmarked(false);
-    setIsBodyExpanded(true);
-    setSelectedBodyImage(null);
-    setPanelEmployeeId('');
-    void Promise.all([
-      getDocumentApprovalDetail(electronicApprovalId),
-      fetchMyProfile(),
-    ])
-      .then(([nextDetail, profile]) => {
+    if (!isQuietReload) {
+      setActionError('');
+      setActionComment('');
+      setDetail(null);
+      setIsLiked(false);
+      setIsBookmarked(false);
+      setIsBodyExpanded(true);
+      setSelectedBodyImage(null);
+      setPanelEmployeeId('');
+    }
+    const detailRequest = isQuietReload
+      ? getDocumentApprovalDetail(electronicApprovalId).then((nextDetail) => {
         if (!active) return;
         setDetail(nextDetail);
-        if (!profile) {
-          setLoadError('로그인 사용자의 사원 정보를 확인할 수 없습니다.');
-          return;
-        }
-        const nextEmployeeId = String(profile.employeeId ?? '').trim();
-        if (!nextEmployeeId) {
-          setLoadError('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
-          return;
-        }
-        setPanelEmployeeId(nextEmployeeId);
+        void loadComments(undefined, false, true);
       })
+      : Promise.all([
+          getDocumentApprovalDetail(electronicApprovalId),
+          fetchMyProfile(),
+        ]).then(([nextDetail, profile]) => {
+          if (!active) return;
+          setDetail(nextDetail);
+          if (!profile) {
+            setLoadError('로그인 사용자의 사원 정보를 확인할 수 없습니다.');
+            return;
+          }
+          const nextEmployeeId = String(profile.employeeId ?? '').trim();
+          if (!nextEmployeeId) {
+            setLoadError('로그인 사용자의 사원 ID를 확인할 수 없습니다.');
+            return;
+          }
+          setPanelEmployeeId(nextEmployeeId);
+        });
+    void detailRequest
       .catch((error: unknown) => {
         if (active) {
           setLoadError(
@@ -462,12 +546,12 @@ export function DocumentApprovalDetailFeed(
         }
       })
       .finally(() => {
-        if (active) setIsLoading(false);
+        if (active && !isQuietReload) setIsLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [detailRetryToken, electronicApprovalId, isFeedPresentation, open]);
+  }, [detailRetryRequest, electronicApprovalId, isFeedPresentation, loadComments, open]);
 
   useEffect(() => {
     if (previousDetailRefreshToken.current === detailRefreshToken) return;
@@ -476,7 +560,7 @@ export function DocumentApprovalDetailFeed(
 
     let active = true;
     setLoadError('');
-    void loadComments();
+    void loadComments(undefined, false, true);
     void getDocumentApprovalDetail(electronicApprovalId)
       .then((nextDetail) => {
         if (active) setDetail(nextDetail);
@@ -639,6 +723,14 @@ export function DocumentApprovalDetailFeed(
       ),
     };
   }, [detail?.approvalLines]);
+  const referenceAddOptions = useMemo(() => {
+    const currentParticipantIds = new Set(
+      (detail?.approvalLines ?? []).map((line) => line.participantUserId),
+    );
+    return referenceUserOptions.filter(
+      (user) => !currentParticipantIds.has(String(user.value)),
+    );
+  }, [detail?.approvalLines, referenceUserOptions]);
   const agreementStages = useMemo(() => {
     const stages = new Map<number, DocumentApprovalLine[]>();
     for (const line of approvalLineGroups.agreement) {
@@ -706,7 +798,7 @@ export function DocumentApprovalDetailFeed(
         setActionComment('');
       }
       onActionComplete();
-      setDetailRetryToken((token) => token + 1);
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
       await loadComments();
     } catch (error: unknown) {
       setActionError(
@@ -725,7 +817,7 @@ export function DocumentApprovalDetailFeed(
       await confirmDocumentReference(electronicApprovalId);
       showSuccess('문서 참조 확인을 완료했습니다.');
       onActionComplete();
-      setDetailRetryToken((token) => token + 1);
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
       await loadComments();
     } catch (error: unknown) {
       setReferenceActionError(
@@ -733,6 +825,48 @@ export function DocumentApprovalDetailFeed(
       );
     } finally {
       setIsActing(false);
+    }
+  };
+
+  const closeReferenceAddDialog = () => {
+    if (isAddingReferences) return;
+    setIsReferenceAddDialogOpen(false);
+    setSelectedReferenceUserIds([]);
+    setReferenceAddError('');
+    setReferenceAddInfo('');
+  };
+
+  const handleAddReferences = async () => {
+    if (
+      electronicApprovalId === null ||
+      isAddingReferences ||
+      selectedReferenceUserIds.length === 0
+    ) {
+      return;
+    }
+    setIsAddingReferences(true);
+    setReferenceAddError('');
+    setReferenceAddInfo('');
+    try {
+      const result = await addDocumentReferences(
+        electronicApprovalId,
+        selectedReferenceUserIds,
+      );
+      if (result.addedCount === 0) {
+        setReferenceAddInfo('선택한 사용자는 이미 문서에 참여하고 있습니다.');
+        return;
+      }
+      showSuccess('참조자를 추가했습니다.');
+      setIsReferenceAddDialogOpen(false);
+      setSelectedReferenceUserIds([]);
+      onActionComplete({ quiet: true });
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: true }));
+    } catch (error: unknown) {
+      setReferenceAddError(
+        error instanceof Error ? error.message : '참조자 추가에 실패했습니다.',
+      );
+    } finally {
+      setIsAddingReferences(false);
     }
   };
 
@@ -764,7 +898,7 @@ export function DocumentApprovalDetailFeed(
       }
       setCancelDialogType(null);
       onActionComplete();
-      setDetailRetryToken((token) => token + 1);
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
       await loadComments();
     } catch (error: unknown) {
       setActionError(
@@ -805,6 +939,8 @@ export function DocumentApprovalDetailFeed(
     content: string,
     files: File[],
     parentCommentId?: number | string,
+    mentionedUserIds: number[] = [],
+    mentionAll = false,
   ) => {
     if (electronicApprovalId === null) return;
     try {
@@ -812,6 +948,8 @@ export function DocumentApprovalDetailFeed(
         electronicApprovalId,
         content,
         parentCommentId == null ? undefined : Number(parentCommentId),
+        mentionedUserIds,
+        mentionAll,
       );
       const createdWithAttachments = {
         ...created,
@@ -991,6 +1129,12 @@ export function DocumentApprovalDetailFeed(
       }}
       isDrafter={detail.isDrafter && allowDocumentChanges}
       documentStatus={detail.documentStatus}
+      onAddReferences={detail.documentStatus === 'DRAFT' ? undefined : () => {
+        setSelectedReferenceUserIds([]);
+        setReferenceAddError('');
+        setReferenceAddInfo('');
+        setIsReferenceAddDialogOpen(true);
+      }}
       onEdit={() => onEditDocument(detail)}
       onDelete={() => setIsDeleteDialogOpen(true)}
     />
@@ -1173,7 +1317,7 @@ export function DocumentApprovalDetailFeed(
               <Button
                 color="inherit"
                 size="small"
-                onClick={() => setDetailRetryToken((token) => token + 1)}
+                onClick={() => setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }))}
                 disabled={isLoading}
               >
                 다시 시도
@@ -1987,11 +2131,13 @@ export function DocumentApprovalDetailFeed(
                     commentImageUrls,
                     commentImageErrors,
                   )}
-                  onSubmitComment={(content, files) =>
-                    handleAddComment(content, files)
+                  enableMentions
+                  mentionOptions={documentMentionOptions}
+                  onSubmitComment={(content, files, mentionedUserIds, mentionAll) =>
+                    handleAddComment(content, files, undefined, mentionedUserIds, mentionAll)
                   }
-                  onSubmitReply={(commentId, content, files) =>
-                    handleAddComment(content, files, commentId)
+                  onSubmitReply={(commentId, content, files, _rootCommentId, mentionedUserIds, mentionAll) =>
+                    handleAddComment(content, files, commentId, mentionedUserIds, mentionAll)
                   }
                   onEditComment={handleUpdateComment}
                   onDeleteComment={handleDeleteComment}
@@ -2210,6 +2356,21 @@ export function DocumentApprovalDetailFeed(
           </Button>
         </DialogActions>
       </Dialog>
+      <DocumentReferenceAddDialog
+        open={isReferenceAddDialogOpen}
+        options={referenceAddOptions}
+        selectedUserIds={selectedReferenceUserIds}
+        error={referenceAddError}
+        info={referenceAddInfo}
+        isSubmitting={isAddingReferences}
+        onSelectionChange={(userIds) => {
+          setSelectedReferenceUserIds(userIds);
+          setReferenceAddError('');
+          setReferenceAddInfo('');
+        }}
+        onClose={closeReferenceAddDialog}
+        onSubmit={() => void handleAddReferences()}
+      />
       <ImageViewerDialog
         open={Boolean(selectedBodyImage)}
         src={selectedBodyImage?.src ?? ''}

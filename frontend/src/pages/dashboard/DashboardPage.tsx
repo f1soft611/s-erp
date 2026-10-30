@@ -15,10 +15,11 @@ import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
 import MenuOutlined from '@mui/icons-material/MenuOutlined';
 import MenuOpenOutlined from '@mui/icons-material/MenuOpenOutlined';
-import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
 import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
+import { NotificationCenter } from '../../shared/components/NotificationCenter';
+import { MessageCenter } from '../../shared/components/MessageCenter';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
 import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
@@ -52,6 +53,8 @@ import { parseDocumentApprovalScope } from '../groupware/documents/write/data/do
 import { parseDocumentShareLink } from '../groupware/documents/write/data/documentShareLink';
 import type { DocumentApprovalScope } from '../groupware/documents/write/types/documentWrite.types';
 import { NotFoundPage } from '../errors/NotFoundPage';
+import { NotificationInboxPage } from '../groupware/notifications/NotificationInboxPage';
+import { MessageInboxPage } from '../groupware/messages/MessageInboxPage';
 import {
   clearPageSessionState,
   usePageSessionState,
@@ -253,6 +256,15 @@ function DashboardPage() {
   const dashboardScope = parseDocumentApprovalScope(
     new URLSearchParams(location.search).get('dashboardScope'),
   );
+  const approvalIdParam = new URLSearchParams(location.search).get('approvalId');
+  const parsedApprovalId = approvalIdParam && /^\d+$/.test(approvalIdParam)
+    ? Number(approvalIdParam)
+    : null;
+  const requestedApprovalId = parsedApprovalId !== null
+    && Number.isSafeInteger(parsedApprovalId)
+    && parsedApprovalId > 0
+    ? parsedApprovalId
+    : null;
   const updateDashboardScope = (scope: DocumentApprovalScope | null) => {
     const searchParams = new URLSearchParams(location.search);
     if (scope) searchParams.set('dashboardScope', scope);
@@ -338,7 +350,11 @@ function DashboardPage() {
       return true;
     }
 
-    const validPaths = new Set<string>(['/']);
+    const validPaths = new Set<string>([
+      '/',
+      '/groupware/notifications',
+      '/groupware/messages',
+    ]);
     moduleItems.forEach((module) => {
       validPaths.add(normalizeRoutePath(module.path ?? `/${module.id}`));
 
@@ -799,12 +815,8 @@ function DashboardPage() {
                           </MenuItem>
                         ))}
                       </Menu>
-                      <IconButton
-                        aria-label="notifications"
-                        sx={{ color: theme.palette.text.secondary }}
-                      >
-                        <NotificationsOutlined fontSize="small" />
-                      </IconButton>
+                      <NotificationCenter />
+                      <MessageCenter />
                       <IconButton
                         aria-label="프로필 메뉴 열기"
                         onClick={(event) =>
@@ -954,28 +966,44 @@ function DashboardPage() {
                   </Box>
                 </AppBar>
 
-                <DashboardContent
-                  sharedDocumentId={parseDocumentShareLink(`${window.location.origin}${location.pathname}${location.search}`)}
-                  onSharedDocumentClose={() => {
-                    const params = new URLSearchParams(location.search);
-                    params.delete('documentId');
-                    params.delete('share');
-                    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true });
-                  }}
-                  selectedModule={selectedModule}
-                  currentMenuName={currentMenu.name}
-                  currentPageKey={currentPageKey}
-                  breadcrumbItems={breadcrumbItems}
-                  content={content}
-                  selectedMenuPermissions={currentMenu.permissions}
-                  dashboardScope={dashboardScope}
-                  onDashboardScopeChange={updateDashboardScope}
-                  isTenantAdmin={[
-                    'TENANT_ADMIN',
-                    'PLATFORM_ADMIN',
-                    'ADMIN',
-                  ].includes((profile.roleName ?? '').trim().toUpperCase())}
-                />
+                {effectivePath === '/groupware/notifications' ? (
+                  <NotificationInboxPage />
+                ) : effectivePath === '/groupware/messages' ? (
+                  <MessageInboxPage />
+                ) : (
+                  <DashboardContent
+                    sharedDocumentId={parseDocumentShareLink(`${window.location.origin}${location.pathname}${location.search}`)}
+                    onSharedDocumentClose={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('documentId');
+                      params.delete('share');
+                      navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true });
+                    }}
+                    selectedModule={selectedModule}
+                    currentMenuName={currentMenu.name}
+                    currentPageKey={currentPageKey}
+                    breadcrumbItems={breadcrumbItems}
+                    content={content}
+                    selectedMenuPermissions={currentMenu.permissions}
+                    dashboardScope={dashboardScope}
+                    onDashboardScopeChange={updateDashboardScope}
+                    isTenantAdmin={[
+                      'TENANT_ADMIN',
+                      'PLATFORM_ADMIN',
+                      'ADMIN',
+                    ].includes((profile.roleName ?? '').trim().toUpperCase())}
+                    requestedApprovalId={requestedApprovalId}
+                    onRequestedApprovalClose={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('approvalId');
+                      navigate({
+                        pathname: location.pathname,
+                        search: params.toString(),
+                        hash: location.hash,
+                      }, { replace: true });
+                    }}
+                  />
+                )}
               </>
             ) : (
               <Box

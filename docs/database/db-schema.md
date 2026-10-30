@@ -316,7 +316,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`, `REFERENCE_CONFIRMED`), USER에서는 NULL |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`, `REFERENCE_CONFIRMED`, `REFERENCE_ADDED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -861,11 +861,31 @@
 - trade type, 사용여부, 비음수 단가/MOQ, 종료일-시작일 관계를 CHECK로 보장한다. 물리 삭제는 제공하지 않는다.
 - [설계](../superpowers/specs/2026-10-29-item-partner-pricing-design.md), [상세사양](../spec/20261029/20261029_002_품목_거래처별_단가관리_상세사양서.md), [날짜별 DDL/이력](20261029/20261029_002_change_item_partner_price_schema.md) 및 [backend 사본](../../backend/DATABASE/20261029) 참고. DDL/rollback 모두 미적용.
 
+### 공통 알림·1:1 쪽지 (DDL 초안, 미적용)
+
+`20261030_005`는 수신자별 공통 알림과 1:1 쪽지함을 위한 신규 저장 구조다. 알림 읽음 상태와 쪽지 읽음 상태는 별도 관리하며, 댓글 멘션/쪽지 도착만 현재 알림 이벤트로 제한한다.
+
+| 테이블 | 주요 컬럼 및 제약 |
+|---|---|
+| `tb_notification` | `notification_id` PK, `tenant_id`, `recipient_user_id`, `event_type`, polymorphic `source_type/source_id`, `title`, `summary`, nullable `read_at`, nullable `archived_at`, `created_at`; `(tenant_id, recipient_user_id, event_type, source_type, source_id)` unique |
+| `tb_direct_message_thread` | `thread_id` PK, `tenant_id`, 참여자 2명, nullable `subject`, `created_at`, `updated_at`, nullable `participant_a_hidden_at`/`participant_b_hidden_at`(20261030_009); 두 사용자 ID 오름차순 CHECK 및 `(tenant_id, thread_id)` unique |
+| `tb_direct_message` | `message_id` PK, `tenant_id`, `thread_id`, 발신/수신 사용자, plain-text `content`, `created_at`, nullable 수신자 `read_at`; `(tenant_id, thread_id)` 복합 FK 및 발신/수신자 구분 CHECK |
+
+- tenant/user FK와 사용자별 미읽음, 대화 참여자별 목록, 대화 메시지 순서 인덱스를 포함한다. tenant 소속/문서 접근 및 대화 참가자 권한은 서버 서비스에서도 검증한다.
+- `20261030_008`은 알림 수신자별 숨김을 위한 `tb_notification.archived_at`과 active page/unread partial index를 추가한다. 보관은 soft archive이며 원본 댓글/쪽지와 알림 row를 물리 삭제하지 않는다. migration 초안은 실제 DB에 적용하지 않는다.
+- `20261030_009`는 1:1 쪽지 대화방 참여자별 삭제(숨김)를 위한 `tb_direct_message_thread.participant_a_hidden_at`/`participant_b_hidden_at`을 추가한다. 숨긴 사용자에게는 숨김 시각 이후 메시지만 보이며, 상대가 새 쪽지를 보내면 대화방이 다시 나타난다. 쪽지 row는 물리 삭제하지 않는다. migration 초안은 실제 DB에 적용하지 않는다.
+- 읽기 전용 MCP에서 세 테이블의 컬럼, FK/CHECK/UNIQUE 제약 및 인덱스가 현재 존재하며 위 DDL 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 이 작업에서는 DB에 적용하지 않았다. 해당 DDL/rollback은 현재 DB에 실행하지 않는다.
+- [설계](../superpowers/specs/2026-10-30-unified-notifications-design.md), [상세사양](../spec/20261030/20261030_005_공통알림_쪽지함_통합_상세사양서.md), [DDL/rollback/변경 이력](20261030/20261030_005_change_notification_message_schema.md) 및 [backend 사본](../../backend/DATABASE/20261030) 참고. DDL/rollback 모두 미적용.
+
 ---
 
 ## 변경 이력
 
+- 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
 - 2026-10-29: 참조자별 확인을 위해 `tb_electronic_approval_line_info` 참조 행의 `CONFIRMED`/`action_at` 상태와 `tb_common_comment` SYSTEM `REFERENCE_CONFIRMED` 이벤트를 허용하는 `20261029_001` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 테이블/컬럼 및 CHECK 제약 메타데이터를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261029](../../backend/DATABASE/20261029) 및 [docs/database/20261029](20261029) 참고.
+- 2026-10-30: `tb_common_comment` SYSTEM event CHECK 허용 목록에 참조자 추가 이력 `REFERENCE_ADDED`를 추가하는 `20261030_006` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 CHECK 제약을 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
+- 2026-10-30: 알림 유형 필터와 사용자별 soft archive를 위해 `tb_notification.archived_at` 및 partial indexes를 추가하는 `20261030_008` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 `list_tables`와 `describe_table(tb_notification)`로 기존 `event_type`, `read_at`, `created_at` 및 `archived_at` 부재를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
+- 2026-10-30: 1:1 쪽지 대화방 참여자별 삭제(숨김)를 위해 `tb_direct_message_thread.participant_a_hidden_at`/`participant_b_hidden_at`을 추가하는 `20261030_009` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 `describe_table(tb_direct_message_thread)`로 현재 컬럼과 숨김 컬럼 부재를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
 - 2026-10-28: 전자결재 문서 식별을 내부 PK와 분리하기 위해 `tb_electronic_approval_main.document_no`를 추가하고 기존 행을 tenant/생성일 순서로 backfill하며 tenant별 unique와 `tb_id_sequence` 초기화를 정의했다. 기본 PostgreSQL MCP의 테이블 목록 및 컬럼 메타데이터를 확인했고 데이터 행은 조회하거나 변경하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261028](../../backend/DATABASE/20261028) 및 [docs/database/20261028](20261028) 참고.
 
 - 2026-10-27: 품목·거래처 분류 tenant schema DDL 초안 `20261027_002`를 정의했다. central DB `business_kind1/2` nonblank guard, tenant 복합 FK, 소분류-부모 일치 FK 및 데이터 존재 시 중단하는 rollback을 포함하며 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261027](../../backend/DATABASE/20261027) 및 [docs/database/20261027](20261027) 참고.

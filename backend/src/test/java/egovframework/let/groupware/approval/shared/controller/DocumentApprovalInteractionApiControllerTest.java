@@ -91,6 +91,21 @@ class DocumentApprovalInteractionApiControllerTest {
     }
 
     @Test
+    void listApprovalCommentMentionUsersReturnsAllowedUserIds() throws Exception {
+        LoginVO user = authenticatedUser();
+        when(interactionService.listApprovalCommentMentionUserIds(user, 77L))
+                .thenReturn(java.util.Arrays.asList(202L, 303L));
+
+        ResultVO response = controller.listApprovalCommentMentionUsers(77L, user);
+
+        assertThat(response.getResult()).containsEntry("resultList", java.util.Arrays.asList(202L, 303L));
+        Method method = DocumentApprovalInteractionApiController.class.getMethod(
+                "listApprovalCommentMentionUsers", Long.class, LoginVO.class);
+        assertThat(method.getAnnotation(GetMapping.class).value())
+                .containsExactly("/{electronicApprovalId}/comments/mention-users");
+    }
+
+    @Test
     void submitRouteReturnsCreatedResponse() throws Exception {
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
@@ -117,6 +132,32 @@ class DocumentApprovalInteractionApiControllerTest {
                     .anySatisfy(invocation -> {
                         assertThat(invocation.getMethod().getName()).isEqualTo("confirmReference");
                         assertThat(invocation.getArguments()).containsExactly(user, 77L);
+                    });
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void addReferencesPostBindsUserIdsAndUsesAuthenticatedPrincipal() throws Exception {
+        LoginVO user = authenticatedUser();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList()));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .build();
+
+        try {
+            mockMvc.perform(post("/api/v1/groupware/approvals/77/references")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"participantUserIds\":[\"202\",\"203\"]}"))
+                    .andExpect(status().isOk());
+
+            assertThat(mockingDetails(interactionService).getInvocations())
+                    .anySatisfy(invocation -> {
+                        assertThat(invocation.getMethod().getName()).isEqualTo("addDocumentReferences");
+                        assertThat(invocation.getArguments()).containsExactly(
+                                user, 77L, Arrays.asList("202", "203"));
                     });
         } finally {
             SecurityContextHolder.clearContext();

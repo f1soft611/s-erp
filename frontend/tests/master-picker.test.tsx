@@ -44,6 +44,54 @@ describe('MasterPicker', () => {
     ).toHaveStyle({ marginTop: '16px' });
   });
 
+  it('opens the lookup from an icon inside the field and returns the selection', async () => {
+    const onChange = vi.fn();
+    render(
+      <MasterPicker
+        label="거래처"
+        triggerMode="icon"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={onChange}
+      />,
+    );
+
+    const field = screen.getByRole('textbox', { name: '거래처' });
+    const trigger = screen.getByRole('button', { name: '거래처 선택' });
+    expect(trigger.closest('.MuiInputAdornment-root')).not.toBeNull();
+    expect(
+      screen.queryByRole('button', { name: '선택', exact: true }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog', { name: '거래처 선택' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'C-001 테스트 거래처 선택',
+    }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(options[0]));
+    expect(field).toHaveValue('');
+  });
+
+  it('disables the icon trigger when the picker is disabled', () => {
+    render(
+      <MasterPicker
+        label="거래처"
+        triggerMode="icon"
+        value={null}
+        search={vi.fn(async () => options)}
+        onChange={() => undefined}
+        disabled
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '거래처 선택' });
+    expect(trigger).toBeDisabled();
+    fireEvent.click(trigger);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('searches on Enter and returns the selected typed option', async () => {
     const search = vi.fn(async () => options);
     const onChange = vi.fn();

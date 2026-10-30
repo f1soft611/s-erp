@@ -950,6 +950,8 @@ interface F1GridProps<T extends object> {
 
 품목·거래처별 단가관리(`/co/master/item-partner-prices`)도 row form으로 단건 등록·수정한다. 품목·거래처는 공통 master picker로 내부 ID를 선택하고 코드·명을 표시하며, 거래구분·단가·통화·적용 시작/종료일·최소주문수량·사용여부를 같은 폼에서 검증한다. 삭제 대신 `useAt`을 변경한다. 엑셀 업로드는 F1-Grid 외부 미리보기에서 `.xlsx` 행을 수정하고 서버 사전검증을 거친 뒤에만 전체 행을 신규 draft로 stage한다. 오류가 한 건이라도 있으면 일부 행도 stage하지 않으며, 업로드는 기존 행을 수정하거나 upsert하지 않는다. 수기/엑셀 draft는 한 번의 `save-batch` 요청으로 저장하고, 서버 실패 시 grid dirty 상태를 보존한다. 템플릿 생성과 파싱 시 `exceljs`를 동적 import하여 초기 번들에서 분리한다.
 
+단가등록/수정의 품목·거래처 도움창은 종류와 닫힘 상태별로 인스턴스를 분리한다. 도움창을 다시 열면 검색어·목록·오류·검색 중 상태를 초기화하며, 이전 도움창의 지연 응답은 새 도움창에 표시하지 않는다. 선택한 품목/거래처 ID·코드·명과 행 폼의 나머지 입력값은 유지한다.
+
 ### F1-Tree와 반응형 UI
 
 `F1TreeRef.addRow()`는 부모 기본값을 유지한 루트 draft를 열고, `addChildRow(parentId, partial?)`는 `parentKey` 값을 보존한 하위 draft를 연다. 하위 행은 적용된 뒤에만 추가되고 부모 노드가 펼쳐지며, 취소 시 펼침 상태를 바꾸지 않는다. 트리 펼침 상태와 모달 open 상태는 독립적이다.

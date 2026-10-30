@@ -32,6 +32,7 @@ import {
   getExternalLinkPreview,
   listApprovalComments,
   createApprovalComment,
+  listApprovalCommentMentionUserIds,
   updateApprovalComment,
   deleteApprovalComment,
   listApprovalCommentAttachments,
@@ -63,6 +64,13 @@ import { ApiResponseError } from '../src/shared/services/apiClient';
 describe('document approval service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('loads mentionable user IDs for a document and drops invalid IDs', async () => {
+    api.get.mockResolvedValueOnce({ resultList: [202, '303', 0, null, 'x'] });
+
+    await expect(listApprovalCommentMentionUserIds(41)).resolves.toEqual([202, 303]);
+    expect(api.get).toHaveBeenCalledWith('/api/v1/groupware/approvals/41/comments/mention-users');
   });
 
   it('requests encrypted sharing tokens and permission-checked metadata', async () => {
@@ -397,6 +405,43 @@ describe('document approval service', () => {
       '/api/v1/groupware/approvals/41/reference-confirmation',
       {},
     );
+  });
+
+  it('adds references with the approved endpoint and validates the persisted result', async () => {
+    const module = await import('../src/pages/groupware/documents/write/services/documentApproval.service');
+    const addReferences = Reflect.get(module, 'addDocumentReferences');
+    expect(typeof addReferences).toBe('function');
+    api.post.mockResolvedValueOnce({
+      item: { electronicApprovalId: 41, addedCount: 2 },
+    });
+
+    await expect(Reflect.apply(addReferences, undefined, [41, ['42', '73']]))
+      .resolves.toEqual({ electronicApprovalId: 41, addedCount: 2 });
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/groupware/approvals/41/references',
+      { participantUserIds: ['42', '73'] },
+    );
+  });
+
+  it('rejects invalid reference IDs and malformed add responses explicitly', async () => {
+    const module = await import('../src/pages/groupware/documents/write/services/documentApproval.service');
+    const addReferences = Reflect.get(module, 'addDocumentReferences');
+    expect(typeof addReferences).toBe('function');
+
+    await expect(Reflect.apply(addReferences, undefined, [0, ['42']]))
+      .rejects.toThrow();
+    await expect(Reflect.apply(addReferences, undefined, [41, ['42', '42']]))
+      .rejects.toThrow();
+    await expect(Reflect.apply(addReferences, undefined, [41, []]))
+      .rejects.toThrow();
+    expect(api.post).not.toHaveBeenCalled();
+
+    api.post.mockResolvedValueOnce({ item: { electronicApprovalId: 41 } });
+    await expect(Reflect.apply(addReferences, undefined, [41, ['42']]))
+      .rejects.toThrow();
+    api.post.mockRejectedValueOnce(new Error('접근 권한이 없습니다.'));
+    await expect(Reflect.apply(addReferences, undefined, [41, ['42']]))
+      .rejects.toThrow('접근 권한이 없습니다.');
   });
 
   it.each([undefined, null, '', 'not-a-date'])(
@@ -779,7 +824,12 @@ describe('document approval service', () => {
     );
     expect(api.post).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/41/comments',
-      { content: '의견', parentCommentId: 30 },
+      {
+        content: '의견',
+        parentCommentId: 30,
+        mentionedUserIds: [],
+        mentionAll: false,
+      },
     );
     expect(api.put).toHaveBeenCalledWith(
       '/api/v1/groupware/approvals/41/comments/31',

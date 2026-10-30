@@ -4,8 +4,12 @@ import {
   Button,
   Chip,
   IconButton,
+  List,
+  ListItemButton,
   Menu,
   MenuItem,
+  Paper,
+  Popper,
   Stack,
   Typography,
 } from '@mui/material';
@@ -23,6 +27,14 @@ import StarterKit from '@tiptap/starter-kit';
 import { AttachmentList } from './AttachmentList';
 import { ProfileAvatar } from '../ProfileAvatar';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import {
+  commentMentionSx,
+  filterMentionCandidates,
+  resolveSubmittedMentions,
+  highlightMentionsInHtml,
+  MentionHighlight,
+  type MentionCandidate,
+} from './commentMentions';
 
 function getFileBadgeMeta(fileName: string) {
   const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
@@ -69,14 +81,26 @@ export type FeedCommentItem = {
   attachments?: FeedCommentAttachment[];
   replies?: FeedCommentItem[];
 };
+export type CommentMentionOption = {
+  userId: number;
+  name: string;
+  departmentName?: string;
+};
 export type CommentThreadProps = {
   comments?: FeedCommentItem[];
-  onSubmitComment?: (content: string, files: File[]) => Promise<void> | void;
+  onSubmitComment?: (
+    content: string,
+    files: File[],
+    mentionedUserIds?: number[],
+    mentionAll?: boolean,
+  ) => Promise<void> | void;
   onSubmitReply?: (
     commentId: string | number,
     content: string,
     files: File[],
     rootCommentId: string | number,
+    mentionedUserIds?: number[],
+    mentionAll?: boolean,
   ) => Promise<void> | void;
   onReply?: (commentId: string | number) => void;
   onEditComment?: (
@@ -102,6 +126,8 @@ export type CommentThreadProps = {
   submitLabel?: string;
   expandReplies?: boolean;
   renderContentPreview?: (html: string) => ReactNode;
+  mentionOptions?: CommentMentionOption[];
+  enableMentions?: boolean;
 };
 
 export const sanitizeCommentHtml = sanitizeHtml;
@@ -128,9 +154,16 @@ type EditorProps = {
   placeholder: string;
   submitLabel: string;
   isDark: boolean;
-  onSubmit: (content: string, files: File[]) => Promise<void> | void;
+  onSubmit: (
+    content: string,
+    files: File[],
+    mentionedUserIds?: number[],
+    mentionAll?: boolean,
+  ) => Promise<void> | void;
   onCancel?: () => void;
   renderContentPreview?: (html: string) => ReactNode;
+  mentionOptions?: CommentMentionOption[];
+  enableMentions?: boolean;
 };
 function CommentEditor({
   initialContent = '<p></p>',
@@ -142,18 +175,33 @@ function CommentEditor({
   onSubmit,
   onCancel,
   renderContentPreview,
+  mentionOptions = [],
+  enableMentions = false,
 }: EditorProps) {
+  const editorRootRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const submitRef = useRef<() => void>(() => undefined);
   const [files, setFiles] = useState<File[]>([]);
   const [previewHtml, setPreviewHtml] = useState(initialContent);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [mentionedUserIds, setMentionedUserIds] = useState<number[]>([]);
+  const [mentionAll, setMentionAll] = useState(false);
   const editor = useEditor({
-    extensions: [StarterKit, Placeholder.configure({ placeholder })],
+    extensions: [StarterKit, Placeholder.configure({ placeholder }), ...(enableMentions ? [MentionHighlight] : [])],
     content: initialContent || '<p></p>',
     immediatelyRender: false,
     onUpdate: ({ editor: updatedEditor }) => {
       if (renderContentPreview) setPreviewHtml(updatedEditor.getHTML());
+      if (enableMentions) {
+        const selection = updatedEditor.state.selection.$from;
+        const textBeforeCursor = selection.parent.textBetween(0, selection.parentOffset, '\n');
+        const match = /(?:^|\s)@([^\s@]*)$/.exec(textBeforeCursor);
+        setMentionQuery(match ? match[1] : null);
+        setMentionActiveIndex(0);
+      }
     },
+    onBlur: () => setMentionQuery(null),
     editorProps: {
       attributes: {
         role: 'textbox',
@@ -176,15 +224,43 @@ function CommentEditor({
     const content = sanitizeCommentHtml(editorHtml);
     if (!hasCommentText(content)) return;
     try {
-      await onSubmit(content, files);
+      if (enableMentions) {
+        const mentions = resolveSubmittedMentions(
+          editor.getText(), mentionedUserIds, mentionOptions, mentionAll,
+        );
+        await onSubmit(content, files, mentions.mentionedUserIds, mentions.mentionAll);
+      } else {
+        await onSubmit(content, files);
+      }
       editor.commands.clearContent();
       setFiles([]);
+      setMentionedUserIds([]);
+      setMentionAll(false);
     } catch {
       // Keep the editor content and selected files when the API rejects.
     }
   };
   submitRef.current = () => {
     void submit();
+  };
+  const mentionCandidates = enableMentions && mentionQuery !== null
+    ? filterMentionCandidates(mentionOptions, mentionQuery)
+    : [];
+  const mentionOpen = Boolean(editor) && mentionCandidates.length > 0;
+  const activeMentionIndex = Math.min(mentionActiveIndex, Math.max(mentionCandidates.length - 1, 0));
+  const selectMention = (candidate: MentionCandidate) => {
+    if (!editor || mentionQuery === null) return;
+    const cursor = editor.state.selection;
+    const start = cursor.$from.start() + cursor.$from.parentOffset - mentionQuery.length - 1;
+    const text = candidate.kind === 'all' ? '@ALL ' : `@${candidate.name} `;
+    editor.chain().focus().deleteRange({ from: start, to: cursor.from }).insertContent(text).run();
+    if (candidate.kind === 'all') {
+      setMentionAll(true);
+    } else {
+      setMentionedUserIds((current) => current.includes(candidate.userId)
+        ? current : [...current, candidate.userId]);
+    }
+    setMentionQuery(null);
   };
   return (
     <Box
@@ -196,9 +272,32 @@ function CommentEditor({
         bgcolor: isDark ? 'rgba(15,23,42,0.76)' : '#fff',
         overflow: 'hidden',
       }}
+      ref={editorRootRef}
       onKeyDownCapture={(event) => {
         if (!editor || event.target !== editor.view.dom) {
           return;
+        }
+        if (mentionOpen && !event.nativeEvent.isComposing) {
+          const lastIndex = mentionCandidates.length - 1;
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            event.stopPropagation();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            setMentionActiveIndex((activeMentionIndex + step + mentionCandidates.length) % mentionCandidates.length);
+            return;
+          }
+          if (event.key === 'Enter' || event.key === 'Tab') {
+            event.preventDefault();
+            event.stopPropagation();
+            selectMention(mentionCandidates[Math.min(activeMentionIndex, lastIndex)]);
+            return;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setMentionQuery(null);
+            return;
+          }
         }
         if (
           !isCommentSubmitKey({
@@ -220,6 +319,7 @@ function CommentEditor({
           px: 1,
           py: 1,
           '& .ProseMirror': {
+            ...commentMentionSx,
             minHeight: 28,
             outline: 'none',
             fontSize: '0.86rem',
@@ -239,6 +339,32 @@ function CommentEditor({
         <EditorContent editor={editor} />
         {renderContentPreview?.(previewHtml)}
       </Box>
+      <Popper
+        open={mentionOpen}
+        anchorEl={() => editorRootRef.current ?? document.body}
+        placement="bottom-start"
+        sx={{ zIndex: (popperTheme) => popperTheme.zIndex.modal + 1 }}
+      >
+        <Paper elevation={6} sx={{ mt: 0.5, maxHeight: 280, minWidth: 220, maxWidth: 'calc(100vw - 16px)', overflow: 'auto' }}>
+          <List dense role="listbox" aria-label="멘션 대상">
+            {mentionCandidates.map((candidate, index) => (
+              <ListItemButton
+                key={candidate.kind === 'all' ? 'all' : candidate.userId}
+                role="option"
+                aria-selected={index === activeMentionIndex}
+                selected={index === activeMentionIndex}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setMentionActiveIndex(index)}
+                onClick={() => selectMention(candidate)}
+              >
+                {candidate.kind === 'all'
+                  ? '@ALL - 문서 접근 사용자 전체'
+                  : `${candidate.name}${candidate.departmentName ? ` · ${candidate.departmentName}` : ''}`}
+              </ListItemButton>
+            ))}
+          </List>
+        </Paper>
+      </Popper>
       {files.length > 0 && (
         <Box sx={{ px: 1, pb: 0.75, display: 'grid', gap: 0.75 }}>
           {files.map((file) => {
@@ -581,9 +707,12 @@ function CommentItem({
                   overflowWrap: 'anywhere',
                   '& p': { m: 0 },
                   '& ul, & ol': { pl: 2.5, my: 0.5 },
+                  ...commentMentionSx,
                 }}
                 dangerouslySetInnerHTML={{
-                  __html: sanitizeCommentHtml(comment.content),
+                  __html: props.enableMentions
+                    ? highlightMentionsInHtml(sanitizeCommentHtml(comment.content))
+                    : sanitizeCommentHtml(comment.content),
                 }}
               />
               {props.renderContentPreview?.(comment.content)}
@@ -801,6 +930,7 @@ function CommentItem({
                 placeholder="줄바꿈 Shift+Enter, 입력 Enter"
                 submitLabel="수정"
                 isDark={isDark}
+                enableMentions={false}
                 onCancel={() => setEditingCommentId(null)}
                 onSubmit={async (content, files) => {
                   await props.onEditComment?.(comment.id, content, files);
@@ -817,14 +947,17 @@ function CommentItem({
               placeholder="줄바꿈 Shift+Enter, 입력 Enter"
               submitLabel="등록"
               isDark={isDark}
+              enableMentions={props.enableMentions}
+              mentionOptions={props.mentionOptions}
               onCancel={() => setReplyTargetId(null)}
-              onSubmit={async (content, files) => {
-                await props.onSubmitReply?.(
-                  comment.id,
-                  content,
-                  files,
-                  comment.id,
-                );
+              onSubmit={async (content, files, mentionedUserIds, mentionAll) => {
+                if (props.enableMentions) {
+                  await props.onSubmitReply?.(
+                    comment.id, content, files, comment.id, mentionedUserIds, mentionAll,
+                  );
+                } else {
+                  await props.onSubmitReply?.(comment.id, content, files, comment.id);
+                }
                 setShowReplies(true);
                 setReplyTargetId(null);
               }}
@@ -893,6 +1026,8 @@ export function TiptapCommentThread({
   submitLabel = '등록',
   expandReplies = false,
   renderContentPreview,
+  mentionOptions,
+  enableMentions,
 }: CommentThreadProps) {
   const theme = useTheme();
   const isDark = isDarkProp ?? theme.palette.mode === 'dark';
@@ -919,6 +1054,8 @@ export function TiptapCommentThread({
     submitLabel,
     expandReplies,
     renderContentPreview,
+    mentionOptions,
+    enableMentions,
   };
   return (
     <Box sx={{ minWidth: 0 }}>
@@ -984,8 +1121,14 @@ export function TiptapCommentThread({
               placeholder={placeholder}
               submitLabel={submitLabel}
               isDark={isDark}
-              onSubmit={async (content, files) => {
-                await onSubmitComment?.(content, files);
+              enableMentions={props.enableMentions}
+              mentionOptions={props.mentionOptions}
+              onSubmit={async (content, files, mentionedUserIds, mentionAll) => {
+                if (props.enableMentions) {
+                  await onSubmitComment?.(content, files, mentionedUserIds, mentionAll);
+                } else {
+                  await onSubmitComment?.(content, files);
+                }
               }}
             />
           </Box>

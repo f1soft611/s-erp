@@ -117,6 +117,28 @@ class DocumentApprovalStatusServiceImplTest {
     }
 
     @Test
+    void confirmedReferenceFilterKeepsAuthenticatedActorScope() throws Exception {
+        DocumentApprovalListQueryVO query = new DocumentApprovalListQueryVO();
+        query.setMyParticipantType("REFERENCE");
+        query.setMyActionStatus("CONFIRMED");
+        when(approvalDAO.selectRelatedDocumentPage(anyMap())).thenReturn(Collections.emptyList());
+        when(approvalDAO.countRelatedDocuments(anyMap())).thenReturn(0L);
+
+        service.searchDocuments(author, "ALL", query);
+
+        verify(approvalDAO).selectRelatedDocumentPage(argThat(params ->
+                "REFERENCE".equals(params.get("myParticipantType"))
+                        && "CONFIRMED".equals(params.get("myActionStatus"))
+                        && Long.valueOf(4L).equals(params.get("tenantId"))
+                        && "101".equals(params.get("participantUserId"))));
+        verify(approvalDAO).countRelatedDocuments(argThat(params ->
+                "REFERENCE".equals(params.get("myParticipantType"))
+                        && "CONFIRMED".equals(params.get("myActionStatus"))
+                        && Long.valueOf(4L).equals(params.get("tenantId"))
+                        && "101".equals(params.get("participantUserId"))));
+    }
+
+    @Test
     void myPendingScopeRemainsAvailable() throws Exception {
         when(approvalDAO.selectRelatedDocumentPage(anyMap())).thenReturn(Collections.emptyList());
         when(approvalDAO.countRelatedDocuments(anyMap())).thenReturn(0L);
