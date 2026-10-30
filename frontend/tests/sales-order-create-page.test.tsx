@@ -53,9 +53,14 @@ describe('sales order entry page', () => {
       ?.parentElement;
 
     expect(formGrid).toHaveStyle({ columnGap: '16px', rowGap: '8px' });
+    const customerTrigger = screen.getByRole('button', { name: '거래처 선택' });
+    expect(customerTrigger.closest('.MuiInputAdornment-root')).not.toBeNull();
+    expect(customerTrigger.closest('.MuiStack-root')).toHaveStyle({
+      marginTop: '0px',
+    });
     expect(
-      screen.getByRole('button', { name: '거래처 선택' }).parentElement,
-    ).toHaveStyle({ marginTop: '0px' });
+      screen.queryByRole('button', { name: '선택', exact: true }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('수주번호')).toHaveValue(
       '저장 시 자동 채번',
     );
@@ -578,6 +583,9 @@ async function selectCustomer() {
   );
   await waitFor(() => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue(
+      'C-10 · 거래처 10',
+    );
   });
 }
 
