@@ -10,10 +10,11 @@ vi.mock('../src/shared/services/apiClient', () => ({ apiGet: vi.fn() }));
 vi.mock('../src/pages/groupware/documents/status/components/DocumentStatusDetail', () => ({
   DocumentStatusDetail: ({ selectedDocumentId, onActionComplete }: {
     selectedDocumentId: number;
-    onActionComplete: () => void;
+    onActionComplete: (options?: { quiet?: boolean }) => void;
   }) => (
     <div data-testid="document-detail-id">{selectedDocumentId}
       <button onClick={onActionComplete}>문서 액션 완료</button>
+      <button onClick={() => onActionComplete({ quiet: true })}>조용한 문서 액션 완료</button>
     </div>
   ),
 }));
@@ -129,6 +130,57 @@ describe('real-data overview', () => {
     expect(within(screen.getByRole('region', { name: '내가 확인할 문서' })).getByText('참조 대기 문서')).toBeInTheDocument();
   });
 
+  it('keeps overview and detail visible while a quiet action refresh is pending', async () => {
+    let resolveRefresh: ((value: { item: typeof overview }) => void) | undefined;
+    let overviewRequests = 0;
+    let salesRequests = 0;
+    const pendingOverview = {
+      ...overview,
+      approval: {
+        ...overview.approval,
+        finalConfirmationRequiredCount: 1,
+        finalConfirmationItems: [{ electronicApprovalId: 23, title: '최종확인 대기 문서' }],
+      },
+    };
+    get.mockImplementation((path) => {
+      if (path.includes('/sales')) {
+        salesRequests += 1;
+        return Promise.resolve({ item: sales });
+      }
+      overviewRequests += 1;
+      if (overviewRequests === 1) return Promise.resolve({ item: pendingOverview });
+      return new Promise((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    mount();
+
+    const finals = await screen.findByRole('region', { name: '내가 최종 확인할 문서' });
+    await waitFor(() => expect(screen.queryByRole('status', { name: '수주 현황 불러오는 중' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /최종확인 문서/ }));
+    expect(screen.getByTestId('document-detail-id')).toHaveTextContent('23');
+    fireEvent.click(screen.getByRole('button', { name: '조용한 문서 액션 완료' }));
+
+    await waitFor(() => expect(overviewRequests).toBe(2));
+    expect(screen.getByRole('region', { name: '내가 최종 확인할 문서' })).toBe(finals);
+    expect(screen.getByTestId('document-detail-id')).toHaveTextContent('23');
+    expect(screen.queryByRole('status', { name: '종합현황 불러오는 중' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '수주 현황 불러오는 중' })).not.toBeInTheDocument();
+
+    resolveRefresh?.({ item: {
+      ...pendingOverview,
+      approval: {
+        ...pendingOverview.approval,
+        finalConfirmationRequiredCount: 0,
+        finalConfirmationItems: [],
+      },
+    } });
+    await waitFor(() => {
+      expect(within(screen.getByRole('region', { name: '내가 최종 확인할 문서' })).getByText('0건')).toBeInTheDocument();
+    });
+    expect(salesRequests).toBe(1);
+  });
+
   it('uses the server date across a month boundary for due labels and preserves due drilldown', async () => {
     get.mockImplementation(async (path) => ({ item: path.endsWith('/overview') ? overview : {
       ...sales, asOfDate: '2026-10-31', upcomingCount: 3,
@@ -239,6 +291,9 @@ describe('real-data overview', () => {
         : overview,
     }));
     mount();
+    await waitFor(() => expect(get).toHaveBeenCalledWith(
+      '/api/v1/dashboard/sales?month=2026-10', expect.any(AbortSignal),
+    ));
     await screen.findByRole('button', { name: /선택 월 수주.*4/ });
     fireEvent.change(screen.getByLabelText('수주 조회 월'), { target: { value: '2026-09' } });
     await waitFor(() => expect(get).toHaveBeenCalledWith(

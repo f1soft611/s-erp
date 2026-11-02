@@ -37,7 +37,11 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
   const approval = overview?.approval;
   const approvalPathForScope = (scope: 'MY_PENDING' | 'DRAFT' | 'REVISION_REQUESTED') =>
     `${approvalPath}?${new URLSearchParams({ dashboardScope: scope })}`;
-  const afterDocumentAction = () => {
+  const afterDocumentAction = (options?: { quiet?: boolean }) => {
+    if (options?.quiet) {
+      data.refreshQuietly();
+      return;
+    }
     setDetailVersion((v) => v + 1);
     data.refresh();
   };

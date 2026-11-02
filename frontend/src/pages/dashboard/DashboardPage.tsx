@@ -23,6 +23,8 @@ import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
 import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
 import { NotificationCenter } from '../../shared/components/NotificationCenter';
 import { MessageCenter } from '../../shared/components/MessageCenter';
+import { UnifiedSearch } from '../../shared/components/search/UnifiedSearch';
+import { UnifiedSearchPage } from '../search/UnifiedSearchPage';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
 import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SecurityOutlined from '@mui/icons-material/SecurityOutlined';
@@ -287,6 +289,9 @@ function DashboardPage() {
     && parsedApprovalId > 0
     ? parsedApprovalId
     : null;
+  const postIdParam = new URLSearchParams(location.search).get('dashboardPostId');
+  const parsedPostId = postIdParam && /^[1-9]\d*$/.test(postIdParam) ? Number(postIdParam) : null;
+  const requestedPostId = parsedPostId !== null && Number.isSafeInteger(parsedPostId) ? parsedPostId : null;
   const updateDashboardScope = (scope: DocumentApprovalScope | null) => {
     const searchParams = new URLSearchParams(location.search);
     if (scope) searchParams.set('dashboardScope', scope);
@@ -298,6 +303,7 @@ function DashboardPage() {
     );
   };
   const effectivePath = resolveLegacyRoutePath(location.pathname);
+  const isSearchPage = normalizeRoutePath(effectivePath) === '/search';
   const theme = useTheme();
   const [themeMenuAnchor, setThemeMenuAnchor] = useState<HTMLElement | null>(
     null,
@@ -376,6 +382,7 @@ function DashboardPage() {
       '/',
       '/groupware/notifications',
       '/groupware/messages',
+      '/search',
     ]);
     moduleItems.forEach((module) => {
       validPaths.add(normalizeRoutePath(module.path ?? `/${module.id}`));
@@ -562,6 +569,7 @@ function DashboardPage() {
   useEffect(() => {
     if (
       menusLoading ||
+      isSearchPage ||
       !hasAccessibleMenu ||
       !selectedModule.id ||
       selectedMenuId === 'empty-access'
@@ -622,6 +630,7 @@ function DashboardPage() {
   }, [
     currentMenu.id,
     currentMenu.name,
+    isSearchPage,
     hasAccessibleMenu,
     location.pathname,
     menusLoading,
@@ -697,7 +706,7 @@ function DashboardPage() {
             onFavoritesRefresh={refreshFavorites}
             onFavoritesError={setFavoritesMessage}
             expandedItemIds={expandedItemIds}
-            selectedMenuId={selectedMenuId}
+            selectedMenuId={isSearchPage ? '' : selectedMenuId}
             recentMenuItems={recentMenuState}
             onModuleChange={handleModuleChange}
             onMenuSelect={handleMenuSelect}
@@ -721,7 +730,7 @@ function DashboardPage() {
               overflow: 'hidden',
             }}
           >
-            {hasAccessibleMenu ? (
+            {hasAccessibleMenu || isSearchPage ? (
               <>
                 <AppBar
                   position="sticky"
@@ -730,14 +739,16 @@ function DashboardPage() {
                     bgcolor: theme.palette.background.paper,
                     color: theme.palette.text.primary,
                     borderBottom: `1px solid ${theme.palette.divider}`,
-                    height: 'var(--dashboard-header-height)',
+                    minHeight: 'var(--dashboard-header-height)',
+                    height: 'auto',
                     boxSizing: 'border-box',
                   }}
                 >
                   <Box
                     sx={{
                       px: { xs: 1, md: 3 },
-                      height: '100%',
+                      minHeight: 'var(--dashboard-header-height)',
+                      py: 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -793,16 +804,19 @@ function DashboardPage() {
                         component="h1"
                         sx={{ fontWeight: 700 }}
                       >
-                        {currentMenu.name}
+                        {isSearchPage ? '통합검색' : currentMenu.name}
                       </Typography>
                     </Box>
 
+                    <Box sx={{ ml: { xs: 0, sm: 'auto' }, width: { xs: '100%', sm: 'auto' }, order: { xs: 3, sm: 0 } }}>
+                      <UnifiedSearch />
+                    </Box>
                     <Box
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
-                        ml: 'auto',
+                        ml: { xs: 'auto', sm: 0 },
                         minWidth: 0,
                         flexWrap: 'wrap',
                         justifyContent: 'flex-end',
@@ -1036,7 +1050,9 @@ function DashboardPage() {
                   </Box>
                 </AppBar>
 
-                {effectivePath === '/groupware/notifications' ? (
+                {isSearchPage ? (
+                  <UnifiedSearchPage />
+                ) : effectivePath === '/groupware/notifications' ? (
                   <NotificationInboxPage />
                 ) : effectivePath === '/groupware/messages' ? (
                   <MessageInboxPage />
@@ -1063,6 +1079,12 @@ function DashboardPage() {
                       'ADMIN',
                     ].includes((profile.roleName ?? '').trim().toUpperCase())}
                     requestedApprovalId={requestedApprovalId}
+                    requestedPostId={requestedPostId}
+                    onRequestedPostClose={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('dashboardPostId');
+                      navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true });
+                    }}
                     onRequestedApprovalClose={() => {
                       const params = new URLSearchParams(location.search);
                       params.delete('approvalId');

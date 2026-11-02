@@ -4317,6 +4317,7 @@ describe('Document write page', () => {
     expect(composerApi.processDocumentApprovalAction).toHaveBeenCalledWith(1, {
       action: 'APPROVED', actionComment: '승인 의견',
     });
+    expect(onActionComplete).toHaveBeenCalledWith({ quiet: true });
     expect(screen.getByText('승인 액션 시스템 메시지')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -7170,6 +7171,7 @@ describe('Document write page', () => {
         expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledTimes(2);
         expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
         expect(onActionComplete).toHaveBeenCalledOnce();
+        expect(onActionComplete).toHaveBeenCalledWith({ quiet: true });
         expect(screen.queryByRole('button', { name: '최종확인', exact: true })).not.toBeInTheDocument();
       });
       expect(await screen.findByText('기안자가 최종 확인을 완료했습니다.')).toBeInTheDocument();
@@ -7293,6 +7295,7 @@ describe('Document write page', () => {
       expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledTimes(2);
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
       expect(onActionComplete).toHaveBeenCalledOnce();
+      expect(onActionComplete).toHaveBeenCalledWith({ quiet: true });
     });
     expect(
       screen.queryByRole('button', { name: '확인', exact: true }),

@@ -3,21 +3,22 @@ import { fetchDashboardOverview, fetchDashboardSales } from '../services/overvie
 import type { DashboardOverview, DashboardSales } from '../types/overview';
 
 export function useOverviewData() {
-  const [overviewVersion, setOverviewVersion] = useState(0);
+  const [overviewRequest, setOverviewRequest] = useState({ version: 0, quiet: false });
   const [overviewResult, setOverviewResult] = useState<{
     version: number; data: DashboardOverview | null; error: boolean;
   }>({ version: -1, data: null, error: false });
   const [month, setMonth] = useState('');
   const [salesVersion, setSalesVersion] = useState(0);
   const [salesResult, setSalesResult] = useState<{
-    source: DashboardOverview | null; month: string; version: number;
+    month: string; version: number;
     data: DashboardSales | null; error: boolean;
-  }>({ source: null, month: '', version: -1, data: null, error: false });
-  const overviewLoading = overviewResult.version !== overviewVersion;
+  }>({ month: '', version: -1, data: null, error: false });
+  const overviewLoading = overviewResult.version !== overviewRequest.version
+    && !overviewRequest.quiet;
   const overview = overviewLoading ? null : overviewResult.data;
   const overviewError = !overviewLoading && overviewResult.error;
   const selectedMonth = month || overview?.asOfDate.slice(0, 7) || '';
-  const isCurrentSales = salesResult.source === overview
+  const isCurrentSales = overview?.canReadSales === true
     && salesResult.month === selectedMonth && salesResult.version === salesVersion;
   const sales = isCurrentSales ? salesResult.data : null;
   const salesError = isCurrentSales && salesResult.error;
@@ -26,13 +27,17 @@ export function useOverviewData() {
     const request = new AbortController();
     void fetchDashboardOverview(request.signal)
       .then((result) => {
-        if (!request.signal.aborted) setOverviewResult({ version: overviewVersion, data: result, error: false });
+        if (!request.signal.aborted) setOverviewResult({
+          version: overviewRequest.version, data: result, error: false,
+        });
       })
       .catch(() => {
-        if (!request.signal.aborted) setOverviewResult({ version: overviewVersion, data: null, error: true });
+        if (!request.signal.aborted) setOverviewResult({
+          version: overviewRequest.version, data: null, error: true,
+        });
       });
     return () => request.abort();
-  }, [overviewVersion]);
+  }, [overviewRequest.version]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -42,21 +47,28 @@ export function useOverviewData() {
     void fetchDashboardSales(selectedMonth, request.signal)
       .then((result) => {
         if (!request.signal.aborted) setSalesResult({
-          source: overview, month: selectedMonth, version: salesVersion, data: result, error: false,
+          month: selectedMonth, version: salesVersion, data: result, error: false,
         });
       })
       .catch(() => {
         if (!request.signal.aborted) setSalesResult({
-          source: overview, month: selectedMonth, version: salesVersion, data: null, error: true,
+          month: selectedMonth, version: salesVersion, data: null, error: true,
         });
       });
     return () => request.abort();
-  }, [overview, selectedMonth, salesVersion]);
+  }, [overview?.canReadSales, selectedMonth, salesVersion]);
 
-  const refresh = useCallback(() => setOverviewVersion((v) => v + 1), []);
+  const refresh = useCallback(() => setOverviewRequest((current) => ({
+    version: current.version + 1,
+    quiet: false,
+  })), []);
+  const refreshQuietly = useCallback(() => setOverviewRequest((current) => ({
+    version: current.version + 1,
+    quiet: true,
+  })), []);
   const retrySales = useCallback(() => setSalesVersion((v) => v + 1), []);
   return {
-    overview, overviewLoading, overviewError, refresh,
+    overview, overviewLoading, overviewError, refresh, refreshQuietly,
     month: selectedMonth, setMonth, sales: sales?.month === selectedMonth ? sales : null,
     salesLoading: Boolean(overview?.canReadSales && !isCurrentSales),
     salesError, retrySales,

@@ -812,9 +812,9 @@ export function DocumentApprovalDetailFeed(
         setReasonAction(null);
         setActionComment('');
       }
-      onActionComplete();
-      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
-      await loadComments();
+      onActionComplete({ quiet: true });
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: true }));
+      if (isFeedPresentation) await loadComments();
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
@@ -831,9 +831,9 @@ export function DocumentApprovalDetailFeed(
     try {
       await confirmDocumentFinalConfirmation(electronicApprovalId);
       showSuccess('문서 최종확인을 완료했습니다.');
-      onActionComplete();
-      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
-      await loadComments();
+      onActionComplete({ quiet: true });
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: true }));
+      if (isFeedPresentation) await loadComments();
     } catch (error: unknown) {
       setFinalConfirmationError(
         error instanceof Error ? error.message : '최종확인 처리에 실패했습니다.',
@@ -850,9 +850,9 @@ export function DocumentApprovalDetailFeed(
     try {
       await confirmDocumentReference(electronicApprovalId);
       showSuccess('문서 참조 확인을 완료했습니다.');
-      onActionComplete();
-      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
-      await loadComments();
+      onActionComplete({ quiet: true });
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: true }));
+      if (isFeedPresentation) await loadComments();
     } catch (error: unknown) {
       setReferenceActionError(
         error instanceof Error ? error.message : '참조 확인 처리에 실패했습니다.',
