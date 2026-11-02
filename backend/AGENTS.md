@@ -29,6 +29,16 @@
 - 새로운 API는 기존 컨트롤러/서비스/매퍼 패턴과 일관되게 구성합니다.
 - 응답 구조, 파라미터명, 상태 코드, 보안 정책은 기존 API 스타일과 맞춥니다.
 
+### Java 8 호환성 (필수)
+
+- 신규·수정 Java 운영 코드는 **Java 8 문법과 표준 API**만 사용합니다. 개발·테스트 도구용 JDK 버전과 운영 코드의 호환성 기준을 구분합니다.
+- Java 9+ API인 `List.of`, `Set.of`, `Map.of`, `List.copyOf`, `String.isBlank`, `String.repeat`, `Stream.toList` 등을 사용하지 않습니다. `var`, record, text block, switch expression 등 Java 8 이후 문법도 사용하지 않습니다.
+- 컬렉션은 `Arrays.asList`, `Collections.singletonList`, `Collections.emptyList`, `Collections.unmodifiableList` 등 Java 8 API로 처리합니다. 대체 시 변경 가능 여부, null 허용, 요소 순서 등 기존 의미를 보존합니다.
+- 문자열 처리는 Java 8 API 또는 기존 호환 라이브러리를 사용합니다. `String.isBlank`를 무조건 `trim().isEmpty()`로 바꾸지 말고 null·Unicode 공백 처리 등 기존 동작을 확인합니다.
+- 의존성을 추가·업데이트할 때 Java 8 지원 여부를 확인합니다. 호환성 문제를 피하려고 운영 JDK, 배포 설정 또는 컴파일 타깃을 임의 상향하지 않습니다.
+- 현재 `pom.xml`의 `source/target=1.8`은 최신 JDK API 사용까지 차단하지 않습니다. Java 변경 시 관련 Maven 테스트 외에 JDK 9+의 `javac --release 8` 또는 JDK 8 컴파일 등으로 변경한 운영 코드의 Java 8 API 호환성을 검증합니다.
+- 최신 JDK에서 빌드·테스트가 통과했다는 이유만으로 Java 8 운영 호환성을 단정하지 않습니다. 검증 범위와 미확인 사항을 결과 문서에 기록합니다.
+
 ## DB 변경 규칙
 
 백엔드 작업에서 다음이 필요한 경우 반드시 스크립트를 생성합니다.
@@ -81,7 +91,7 @@ mvn test
 mvn spring-boot:run
 ```
 
-- 최소 Java 17 이상, Maven 3.8.x 환경을 기준으로 검증합니다.
+- 개발·테스트 도구 환경은 Java 17 이상, Maven 3.8.x를 기준으로 하되, 운영 코드는 Java 8 호환성을 유지하고 위의 별도 API 호환 검증을 수행합니다.
 - 빌드와 테스트가 정상적으로 통과해야 작업을 완료로 간주합니다.
 
 ## 금지 사항

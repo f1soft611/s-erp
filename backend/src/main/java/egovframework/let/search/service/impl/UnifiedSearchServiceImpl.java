@@ -1,6 +1,8 @@
 package egovframework.let.search.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -11,6 +13,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.cmm.LoginVO;
@@ -31,7 +34,7 @@ import egovframework.let.system.menus.service.SystemMenuService;
 public class UnifiedSearchServiceImpl implements UnifiedSearchService {
     private static final String DOCUMENT_PATH = "/groupware/doc/write";
     private static final String NOTICE_PATH = "/groupware/community/notice";
-    private static final List<String> TYPES = List.of("MENU", "DOCUMENT", "NOTICE");
+    private static final List<String> TYPES = Collections.unmodifiableList(Arrays.asList("MENU", "DOCUMENT", "NOTICE"));
     private final SystemMenuService menuService;
     private final DocumentApprovalStatusService documentService;
     private final NoticeBoardDAO noticeDAO;
@@ -49,7 +52,7 @@ public class UnifiedSearchServiceImpl implements UnifiedSearchService {
             throws Exception {
         if (user == null || user.getTenantId() == null || user.getTenantId() <= 0
                 || user.getUniqId() == null || !user.getUniqId().matches("[1-9][0-9]*")
-                || user.getId() == null || user.getId().isBlank()) {
+                || !StringUtils.hasText(user.getId())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         }
         String text = keyword == null ? "" : keyword.trim();
@@ -70,7 +73,7 @@ public class UnifiedSearchServiceImpl implements UnifiedSearchService {
         }
         Set<String> readablePaths = menus.stream().map(SearchItemVO::getPath).collect(Collectors.toSet());
         List<SearchGroupVO> groups = new ArrayList<>();
-        for (String current : "ALL".equals(type) ? TYPES : List.of(type)) {
+        for (String current : "ALL".equals(type) ? TYPES : Collections.singletonList(type)) {
             switch (current) {
                 case "MENU":
                     String lowerText = text.toLowerCase(Locale.ROOT);
@@ -156,10 +159,10 @@ public class UnifiedSearchServiceImpl implements UnifiedSearchService {
 
     private String description(String number, String author) {
         return java.util.stream.Stream.of(number, author)
-                .filter(value -> value != null && !value.isBlank()).collect(Collectors.joining(" · "));
+                .filter(StringUtils::hasText).collect(Collectors.joining(" · "));
     }
 
     private SearchGroupVO empty(String type, int offset, int limit) {
-        return new SearchGroupVO(type, List.of(), 0, offset, limit);
+        return new SearchGroupVO(type, Collections.emptyList(), 0, offset, limit);
     }
 }

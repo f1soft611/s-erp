@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiGet } from '../src/shared/services/apiClient';
+import { apiGet, apiGetEventStream } from '../src/shared/services/apiClient';
 import { ApiNetworkError, ApiResponseError } from '../src/shared/services/apiErrors';
 
 vi.mock('../src/shared/services/authService', () => ({
@@ -14,6 +14,30 @@ vi.mock('../src/shared/services/authService', () => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe('API connection failure classification', () => {
+  it('does not start a stream when its account was aborted during authorization', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const abort = new AbortController();
+    const stream = apiGetEventStream('/synthetic-stream', abort.signal);
+    abort.abort();
+    await expect(stream).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns the streaming body without consuming it', async () => {
+    const response = new Response('event: ready\ndata: {}\n\n', {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+    const fetch = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal('fetch', fetch);
+    expect(await apiGetEventStream('/synthetic-stream', new AbortController().signal)).toBe(response);
+    expect(response.bodyUsed).toBe(false);
+    expect(fetch).toHaveBeenCalledWith('/synthetic-stream', expect.objectContaining({
+      signal: expect.any(AbortSignal), cache: 'no-store',
+      headers: expect.objectContaining({ Accept: 'text/event-stream' }),
+    }));
+  });
+
   it('types fetch rejection as a connection failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     await expect(apiGet('/synthetic')).rejects.toBeInstanceOf(ApiNetworkError);

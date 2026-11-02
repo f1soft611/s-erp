@@ -16,13 +16,85 @@ import egovframework.com.cmm.LoginVO;
 import egovframework.let.groupware.message.domain.model.DirectMessageCreateRequestVO;
 import egovframework.let.groupware.message.domain.repository.DirectMessageDAO;
 import egovframework.let.groupware.notification.service.NotificationService;
+import egovframework.let.groupware.message.domain.model.DirectMessageVO;
+import egovframework.let.groupware.realtime.RealtimePublisher;
+import egovframework.let.groupware.realtime.RealtimeArea;
 
 class DirectMessageServiceImplTest {
 
     private final DirectMessageDAO messageDAO = mock(DirectMessageDAO.class);
     private final NotificationService notificationService = mock(NotificationService.class);
+    private final RealtimePublisher realtime = mock(RealtimePublisher.class);
     private final DirectMessageServiceImpl service =
-            new DirectMessageServiceImpl(messageDAO, notificationService);
+            new DirectMessageServiceImpl(messageDAO, notificationService, realtime);
+
+    @Test
+    void changedReadSignalsOwnNotificationAndBothMessageOwnersOnlyOnce() throws Exception {
+        DirectMessageVO thread = new DirectMessageVO();
+        thread.setOtherUserId(22L);
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(thread);
+        when(messageDAO.markThreadMessagesRead(anyMap())).thenReturn(2, 0);
+        when(messageDAO.markThreadNotificationsRead(anyMap())).thenReturn(2, 0);
+        service.markThreadRead(authenticatedUser(), 65L);
+        service.markThreadRead(authenticatedUser(), 65L);
+        verify(realtime).publish(4L, 11L, RealtimeArea.NOTIFICATION);
+        verify(realtime).publish(4L, 11L, RealtimeArea.MESSAGE);
+        verify(realtime).publish(4L, 22L, RealtimeArea.MESSAGE);
+    }
+
+    @Test
+    void repeatedReadWithoutChangesDoesNotSignal() throws Exception {
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(new DirectMessageVO());
+        service.markThreadRead(authenticatedUser(), 65L);
+        org.mockito.Mockito.verifyNoInteractions(realtime);
+    }
+
+    @Test
+    void notificationOnlyReadDoesNotInventMessageChanges() throws Exception {
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(new DirectMessageVO());
+        when(messageDAO.markThreadNotificationsRead(anyMap())).thenReturn(1);
+        service.markThreadRead(authenticatedUser(), 65L);
+        verify(realtime).publish(4L, 11L, RealtimeArea.NOTIFICATION);
+        verify(realtime, never()).publish(4L, 11L, RealtimeArea.MESSAGE);
+    }
+
+    @Test
+    void replySignalsSenderAndUsesNotificationForRecipientSignal() throws Exception {
+        DirectMessageVO thread = new DirectMessageVO();
+        thread.setOtherUserId(22L);
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(thread);
+        when(messageDAO.insertMessage(anyMap())).thenReturn(102L);
+        when(messageDAO.updateThreadUpdatedAt(anyMap())).thenReturn(1);
+        service.reply(authenticatedUser(), 65L, "Reply");
+        verify(realtime).publish(4L, 11L, RealtimeArea.MESSAGE);
+        verify(notificationService).createEvent(4L, 22L, "DIRECT_MESSAGE_RECEIVED",
+                "DIRECT_MESSAGE", 102L, "새 쪽지가 도착했습니다.", "Reply");
+    }
+
+    @Test
+    void failedMessageWriteDoesNotScheduleSignals() throws Exception {
+        DirectMessageVO thread = new DirectMessageVO();
+        thread.setOtherUserId(22L);
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(thread);
+        when(messageDAO.insertMessage(anyMap())).thenReturn(102L);
+        when(messageDAO.updateThreadUpdatedAt(anyMap())).thenReturn(0);
+        assertThatThrownBy(() -> service.reply(authenticatedUser(), 65L, "Reply"))
+                .isInstanceOf(IllegalStateException.class);
+        org.mockito.Mockito.verifyNoInteractions(realtime, notificationService);
+    }
+
+    @Test
+    void hideAlsoSignalsNotificationAndCounterpartWhenReadStateChanged() throws Exception {
+        DirectMessageVO thread = new DirectMessageVO();
+        thread.setOtherUserId(22L);
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(thread);
+        when(messageDAO.hideThreadForParticipant(anyMap())).thenReturn(1);
+        when(messageDAO.markThreadMessagesRead(anyMap())).thenReturn(1);
+        when(messageDAO.markThreadNotificationsRead(anyMap())).thenReturn(1);
+        service.hideThread(authenticatedUser(), 65L);
+        verify(realtime).publish(4L, 11L, RealtimeArea.NOTIFICATION);
+        verify(realtime).publish(4L, 22L, RealtimeArea.MESSAGE);
+    }
 
     @Test
     void rejectsBlankOrOverlongMessageBeforeDatabaseAccess() throws Exception {
@@ -60,6 +132,7 @@ class DirectMessageServiceImplTest {
                         && "안녕하세요".equals(params.get("content"))));
         verify(notificationService).createEvent(4L, 22L, "DIRECT_MESSAGE_RECEIVED",
                 "DIRECT_MESSAGE", 101L, "새 쪽지가 도착했습니다.", "안녕하세요");
+        verify(realtime).publish(4L, 11L, RealtimeArea.MESSAGE);
     }
 
     @Test
@@ -132,6 +205,7 @@ class DirectMessageServiceImplTest {
         when(messageDAO.hideThreadForParticipant(anyMap())).thenReturn(1);
 
         service.hideThread(authenticatedUser(), 65L);
+        verify(realtime).publish(4L, 11L, RealtimeArea.MESSAGE);
 
         verify(messageDAO).hideThreadForParticipant(argThat(params ->
                 Long.valueOf(4L).equals(params.get("tenantId"))

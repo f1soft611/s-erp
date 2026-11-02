@@ -19,16 +19,21 @@ import egovframework.let.groupware.message.domain.model.DirectMessageVO;
 import egovframework.let.groupware.message.domain.repository.DirectMessageDAO;
 import egovframework.let.groupware.message.service.DirectMessageService;
 import egovframework.let.groupware.notification.service.NotificationService;
+import egovframework.let.groupware.realtime.RealtimeArea;
+import egovframework.let.groupware.realtime.RealtimePublisher;
 
 @Service("directMessageService")
 public class DirectMessageServiceImpl implements DirectMessageService {
 
     private final DirectMessageDAO messageDAO;
     private final NotificationService notificationService;
+    private final RealtimePublisher realtime;
 
-    public DirectMessageServiceImpl(DirectMessageDAO messageDAO, NotificationService notificationService) {
+    public DirectMessageServiceImpl(DirectMessageDAO messageDAO, NotificationService notificationService,
+            RealtimePublisher realtime) {
         this.messageDAO = messageDAO;
         this.notificationService = notificationService;
+        this.realtime = realtime;
     }
 
     @Override
@@ -141,11 +146,11 @@ public class DirectMessageServiceImpl implements DirectMessageService {
     public void markThreadRead(LoginVO user, Long threadId) throws Exception {
         Map<String, Object> params = ownerParams(user);
         params.put("threadId", requireThreadId(threadId));
-        if (messageDAO.selectThreadForParticipant(params) == null) {
+        DirectMessageVO thread = messageDAO.selectThreadForParticipant(params);
+        if (thread == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "쪽지 대화를 찾을 수 없습니다.");
         }
-        messageDAO.markThreadMessagesRead(params);
-        messageDAO.markThreadNotificationsRead(params);
+        publishReadChanges(params, thread);
     }
 
     @Override
@@ -153,14 +158,15 @@ public class DirectMessageServiceImpl implements DirectMessageService {
     public void hideThread(LoginVO user, Long threadId) throws Exception {
         Map<String, Object> params = ownerParams(user);
         params.put("threadId", requireThreadId(threadId));
-        if (messageDAO.selectThreadForParticipant(params) == null) {
+        DirectMessageVO thread = messageDAO.selectThreadForParticipant(params);
+        if (thread == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "쪽지 대화를 찾을 수 없습니다.");
         }
         if (messageDAO.hideThreadForParticipant(params) != 1) {
             throw new IllegalStateException("쪽지 대화를 삭제할 수 없습니다.");
         }
-        messageDAO.markThreadMessagesRead(params);
-        messageDAO.markThreadNotificationsRead(params);
+        publishReadChanges(params, thread);
+        realtime.publish((Long) params.get("tenantId"), (Long) params.get("userId"), RealtimeArea.MESSAGE);
     }
 
     @Override
@@ -193,6 +199,7 @@ public class DirectMessageServiceImpl implements DirectMessageService {
         String summary = content.length() > 497 ? content.substring(0, 497) + "..." : content;
         notificationService.createEvent((Long) params.get("tenantId"), recipientId,
                 "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", messageId, "새 쪽지가 도착했습니다.", summary);
+        realtime.publish((Long) params.get("tenantId"), senderId, RealtimeArea.MESSAGE);
         DirectMessageVO message = new DirectMessageVO();
         message.setThreadId(threadId);
         message.setMessageId(messageId);
@@ -201,6 +208,20 @@ public class DirectMessageServiceImpl implements DirectMessageService {
         message.setSubject(subject);
         message.setContent(content);
         return message;
+    }
+
+    private void publishReadChanges(Map<String, Object> params, DirectMessageVO thread) throws Exception {
+        int messagesChanged = messageDAO.markThreadMessagesRead(params);
+        int notificationsChanged = messageDAO.markThreadNotificationsRead(params);
+        Long tenantId = (Long) params.get("tenantId");
+        Long userId = (Long) params.get("userId");
+        if (notificationsChanged > 0) {
+            realtime.publish(tenantId, userId, RealtimeArea.NOTIFICATION);
+        }
+        if (messagesChanged > 0) {
+            realtime.publish(tenantId, userId, RealtimeArea.MESSAGE);
+            realtime.publish(tenantId, thread.getOtherUserId(), RealtimeArea.MESSAGE);
+        }
     }
 
     private static String validateContent(String content) {

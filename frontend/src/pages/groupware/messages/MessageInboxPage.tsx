@@ -18,6 +18,7 @@ import { useSearchParams } from 'react-router-dom';
 import { CommonDialog } from '../../../shared/components/CommonDialog';
 import { fetchDraftFormUsers } from '../../co/workflow/form/services/draftFormManagement.service';
 import { useNotification } from '../../../shared/context/NotificationContext';
+import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {
   InboxEmptyState,
   InboxPageShell,
@@ -82,6 +83,18 @@ export function MessageInboxPage() {
   const selectedThreadIdRef = useRef<number | null>(null);
   const oldestMessageDateRef = useRef<string | null>(null);
   const quietRefreshingRef = useRef(false);
+  const quietPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const threadRequestRef = useRef(0);
+  const listRequestRef = useRef(0);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      threadRequestRef.current += 1;
+      listRequestRef.current += 1;
+    };
+  }, []);
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
     oldestMessageDateRef.current = oldestMessageDate;
@@ -99,15 +112,16 @@ export function MessageInboxPage() {
   };
 
   const loadThreads = useCallback(async (options?: { silent?: boolean }) => {
+    const request = ++listRequestRef.current;
     if (!options?.silent) setLoadingThreads(true);
     setThreadError('');
     try {
       const page = await listMessageThreads('ALL');
-      setThreads(page.resultList);
+      if (mountedRef.current && request === listRequestRef.current) setThreads(page.resultList);
     } catch {
-      setThreadError('쪽지함을 불러오지 못했습니다.');
+      if (mountedRef.current && request === listRequestRef.current) setThreadError('쪽지함을 불러오지 못했습니다.');
     } finally {
-      if (!options?.silent) setLoadingThreads(false);
+      if (mountedRef.current && request === listRequestRef.current && !options?.silent) setLoadingThreads(false);
     }
   }, []);
 
@@ -116,67 +130,101 @@ export function MessageInboxPage() {
   }, [loadThreads]);
 
   const openThread = async (threadId: number) => {
+    const request = ++threadRequestRef.current;
+    selectedThreadIdRef.current = threadId;
     setSelectedThreadId(threadId);
     setLoadingMessages(true);
     setMessageError('');
     try {
-      applyDayPage(await getThreadMessages(threadId));
+      const page = await getThreadMessages(threadId);
+      if (!mountedRef.current || request !== threadRequestRef.current) return;
+      applyDayPage(page);
       try {
         await markThreadRead(threadId);
+        if (!mountedRef.current || request !== threadRequestRef.current) return;
         setThreads((current) => current.map((thread) =>
           thread.threadId === threadId ? { ...thread, unreadCount: 0 } : thread));
         window.dispatchEvent(new Event('s-erp:message-read'));
       } catch {
+        if (!mountedRef.current || request !== threadRequestRef.current) return;
         showError('쪽지 읽음 처리에 실패했습니다.');
       }
     } catch {
+      if (!mountedRef.current || request !== threadRequestRef.current) return;
       setMessages([]);
       setOldestMessageDate(null);
       setHasPreviousMessages(false);
       setMessageError('쪽지 대화를 불러오지 못했습니다.');
     } finally {
-      setLoadingMessages(false);
+      if (mountedRef.current && request === threadRequestRef.current) setLoadingMessages(false);
     }
   };
 
   const mergeLatestThreadDay = async (threadId: number) => {
-    const latestPage = await getThreadMessages(threadId);
     if (selectedThreadIdRef.current !== threadId) return;
+    const request = ++threadRequestRef.current;
+    const latestPage = await getThreadMessages(threadId);
+    if (!mountedRef.current || request !== threadRequestRef.current || selectedThreadIdRef.current !== threadId) return;
     const oldest = oldestMessageDateRef.current;
     const keepsOlderDays = oldest !== null && latestPage.messageDate !== null
       && oldest < latestPage.messageDate;
     setMessages((current) => mergeLatestDay(current, latestPage));
+    setLoadingMessages(false);
     if (!keepsOlderDays) {
       setOldestMessageDate(latestPage.messageDate);
       setHasPreviousMessages(latestPage.hasPrevious);
     }
   };
 
-  // Mirrors the header badges: refresh without loaders when the user comes back to the page.
   const refreshQuietly = async () => {
-    if (quietRefreshingRef.current) return;
+    if (quietRefreshingRef.current) {
+      quietPendingRef.current = true;
+      return;
+    }
     quietRefreshingRef.current = true;
     try {
-      const page = await listMessageThreads('ALL');
-      const threadId = selectedThreadIdRef.current;
-      const activeThread = threadId === null ? undefined : page.resultList.find((thread) => thread.threadId === threadId);
-      let nextThreads = page.resultList;
-      if (threadId !== null && activeThread) {
-        await mergeLatestThreadDay(threadId);
-        if (activeThread.unreadCount > 0) {
-          await markThreadRead(threadId);
-          nextThreads = nextThreads.map((thread) =>
-            thread.threadId === threadId ? { ...thread, unreadCount: 0 } : thread);
-          window.dispatchEvent(new Event('s-erp:message-read'));
+      do {
+        quietPendingRef.current = false;
+        const request = ++listRequestRef.current;
+        const threadVersion = threadRequestRef.current;
+        const threadId = selectedThreadIdRef.current;
+        const page = await listMessageThreads('ALL');
+        if (!mountedRef.current || request !== listRequestRef.current) return;
+        const activeThread = page.resultList.find((thread) => thread.threadId === threadId);
+        let nextThreads = page.resultList;
+        const applyThreads = () => {
+          setThreads((current) => {
+            const selected = current.find((thread) => thread.threadId === selectedThreadIdRef.current);
+            return selected && !nextThreads.some((thread) => thread.threadId === selected.threadId)
+              ? [...nextThreads, selected] : nextThreads;
+          });
+          setLoadingThreads(false);
+        };
+        applyThreads();
+        if (threadId !== null && threadVersion === threadRequestRef.current
+          && selectedThreadIdRef.current === threadId) {
+          await mergeLatestThreadDay(threadId);
+          if (!mountedRef.current || selectedThreadIdRef.current !== threadId || request !== listRequestRef.current) return;
+          if (!activeThread || activeThread.unreadCount > 0) {
+            await markThreadRead(threadId);
+            if (!mountedRef.current || selectedThreadIdRef.current !== threadId || request !== listRequestRef.current) return;
+            nextThreads = nextThreads.map((thread) =>
+              thread.threadId === threadId ? { ...thread, unreadCount: 0 } : thread);
+            window.dispatchEvent(new Event('s-erp:message-read'));
+          }
         }
-      }
-      setThreads(nextThreads);
+        if (mountedRef.current && request === listRequestRef.current) {
+          applyThreads();
+        }
+      } while (mountedRef.current && quietPendingRef.current);
     } catch {
       // Keep the current screen on background refresh failures; explicit actions still report errors.
     } finally {
       quietRefreshingRef.current = false;
+      if (mountedRef.current && quietPendingRef.current) void refreshQuietlyRef.current();
     }
   };
+  useRealtimeRefresh('MESSAGE', refreshQuietly);
   const refreshQuietlyRef = useRef(refreshQuietly);
   useEffect(() => {
     refreshQuietlyRef.current = refreshQuietly;
@@ -202,6 +250,7 @@ export function MessageInboxPage() {
     setLoadingPreviousMessages(true);
     try {
       const page = await getThreadMessages(threadId, oldestMessageDate);
+      if (!mountedRef.current || selectedThreadIdRef.current !== threadId) return;
       if (page.messageDate) {
         setMessages((current) => [...page.resultList, ...current]);
         setOldestMessageDate(page.messageDate);
@@ -267,6 +316,9 @@ export function MessageInboxPage() {
         getThreadMessages(message.threadId),
       ]);
       setThreads(threadPage.resultList);
+      threadRequestRef.current += 1;
+      listRequestRef.current += 1;
+      selectedThreadIdRef.current = message.threadId;
       setSelectedThreadId(message.threadId);
       applyDayPage(dayPage);
     } catch (error) {
@@ -296,9 +348,14 @@ export function MessageInboxPage() {
   const confirmDeleteThread = async () => {
     if (selectedThreadId === null) return;
     const threadId = selectedThreadId;
+    threadRequestRef.current += 1;
+    listRequestRef.current += 1;
     setDeleting(true);
     try {
       await deleteThread(threadId);
+      threadRequestRef.current += 1;
+      listRequestRef.current += 1;
+      selectedThreadIdRef.current = null;
       setThreads((current) => current.filter((thread) => thread.threadId !== threadId));
       setSelectedThreadId(null);
       setMessages([]);

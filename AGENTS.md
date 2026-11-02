@@ -117,6 +117,8 @@ AI 에이전트는 작업 유형에 따라 아래 우선순위를 따라야 합�
 ## 백엔드 규칙
 
 - 서버 코드는 [backend/src/main/java](backend/src/main/java) 에 작성합니다.
+- 신규·수정 Java 운영 코드는 **Java 8 호환성**을 반드시 유지합니다. Java 8 문법·표준 API와 Java 8 지원 의존성만 사용하며, 개발 JDK가 더 높아도 이 기준을 변경하지 않습니다.
+- `List.of`, `Map.of`, `String.isBlank`, `Stream.toList`, `var`, record 등 Java 9+ API·문법은 사용하지 않습니다. 대체 방법과 호환성 검증은 [백엔드 Java 8 호환성 규칙](backend/AGENTS.md#java-8-호환성-필수)을 따릅니다.
 - Spring Boot / eGovFrame 구조를 유지하고, 레이어별 책임을 명확히 나눠야 합니다.
 - 설정값과 보안 관련 민감 정보는 하드코딩하지 않고, 환경변수 또는 설정 파일을 통한 주입을 우선합니다.
 - 새로운 API는 기존 컨트롤러/서비스/매퍼 패턴과 일관되게 구성합니다.
@@ -135,7 +137,7 @@ mvn test
 mvn spring-boot:run
 ```
 
-백엔드 구조와 실행 정보는 [backend/README.md](backend/README.md) 를 참고합니다. 최소 Java 17 이상, Maven 3.8.x 환경을 기준으로 동작합니다.
+백엔드 구조와 실행 정보는 [backend/README.md](backend/README.md) 를 참고합니다. 개발·테스트 도구 환경은 Java 17 이상, Maven 3.8.x 기준이며, 운영 코드의 호환성 기준은 Java 8입니다. 최신 JDK에서의 테스트 통과만으로 Java 8 호환성을 보증하지 않으며, Java 변경 시 별도 API 호환 검증을 수행합니다.
 
 ### DB 스키마 폴더 구조 예시
 

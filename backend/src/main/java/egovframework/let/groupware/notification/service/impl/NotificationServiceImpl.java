@@ -15,14 +15,18 @@ import egovframework.let.groupware.notification.domain.model.NotificationPageVO;
 import egovframework.let.groupware.notification.domain.model.NotificationVO;
 import egovframework.let.groupware.notification.domain.repository.NotificationDAO;
 import egovframework.let.groupware.notification.service.NotificationService;
+import egovframework.let.groupware.realtime.RealtimeArea;
+import egovframework.let.groupware.realtime.RealtimePublisher;
 
 @Service("notificationService")
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationDAO notificationDAO;
+    private final RealtimePublisher realtime;
 
-    public NotificationServiceImpl(NotificationDAO notificationDAO) {
+    public NotificationServiceImpl(NotificationDAO notificationDAO, RealtimePublisher realtime) {
         this.notificationDAO = notificationDAO;
+        this.realtime = realtime;
     }
 
     @Override
@@ -47,7 +51,12 @@ public class NotificationServiceImpl implements NotificationService {
         params.put("sourceId", sourceId);
         params.put("title", title.trim());
         params.put("summary", summary.trim());
-        notificationDAO.insertNotification(params);
+        if (notificationDAO.insertNotification(params) > 0) {
+            realtime.publish(tenantId, recipientUserId, RealtimeArea.NOTIFICATION);
+            if ("DIRECT_MESSAGE_RECEIVED".equals(eventType)) {
+                realtime.publish(tenantId, recipientUserId, RealtimeArea.MESSAGE);
+            }
+        }
     }
 
     @Override
@@ -102,6 +111,7 @@ public class NotificationServiceImpl implements NotificationService {
         if (notificationDAO.archiveNotification(params) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");
         }
+        notifyOwner(params);
     }
 
     @Override
@@ -110,7 +120,11 @@ public class NotificationServiceImpl implements NotificationService {
         validateEventType(eventType);
         Map<String, Object> params = ownerParams(user);
         params.put("eventType", eventType);
-        return notificationDAO.archiveReadNotifications(params);
+        int changed = notificationDAO.archiveReadNotifications(params);
+        if (changed > 0) {
+            notifyOwner(params);
+        }
+        return changed;
     }
 
     @Override
@@ -126,14 +140,21 @@ public class NotificationServiceImpl implements NotificationService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");
         }
         if (notification.getReadAt() == null) {
-            notificationDAO.updateNotificationReadAt(params);
+            int changed = notificationDAO.updateNotificationReadAt(params);
             NotificationVO updated = notificationDAO.selectOwnedNotification(params);
             if (updated == null) {
                 throw new IllegalStateException("읽음 처리한 알림을 다시 조회할 수 없습니다.");
             }
             notification.setReadAt(updated.getReadAt());
+            if (changed > 0) {
+                notifyOwner(params);
+            }
         }
         return notification;
+    }
+
+    private void notifyOwner(Map<String, Object> params) {
+        realtime.publish((Long) params.get("tenantId"), (Long) params.get("userId"), RealtimeArea.NOTIFICATION);
     }
 
     private Map<String, Object> ownerParams(LoginVO user) {

@@ -16,7 +16,8 @@ import {
   useTheme,
 } from '@mui/material';
 import { headerCounterBadgeSx } from './headerCounterBadgeSx';
-import { useCallback, useEffect, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
 import {
@@ -37,38 +38,54 @@ export function NotificationCenter() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const open = Boolean(anchor);
+  const summaryRequest = useRef(0);
+  const itemsRequest = useRef(0);
 
-  const refreshSummary = useCallback(async () => {
+  const refreshSummary = useCallback(async (silent = false) => {
+    const request = ++summaryRequest.current;
     try {
       const summary = await getNotificationSummary();
-      setUnreadCount(summary.unreadCount);
+      if (request === summaryRequest.current) setUnreadCount(summary.unreadCount);
     } catch {
-      showError('알림 개수를 불러오지 못했습니다.');
+      if (!silent && request === summaryRequest.current) showError('알림 개수를 불러오지 못했습니다.');
     }
   }, [showError]);
 
-  const refreshItems = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const refreshItems = useCallback(async (silent = false) => {
+    const request = ++itemsRequest.current;
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const page = await listNotifications({ limit: 5 });
-      setItems(page.resultList);
+      if (request === itemsRequest.current) {
+        setItems(page.resultList);
+        setError('');
+      }
     } catch {
-      setError('최근 알림을 불러오지 못했습니다.');
+      if (!silent && request === itemsRequest.current) setError('최근 알림을 불러오지 못했습니다.');
     } finally {
-      setLoading(false);
+      if (request === itemsRequest.current) setLoading(false);
     }
+  }, []);
+  useRealtimeRefresh('NOTIFICATION', async () => {
+    await Promise.all([refreshSummary(true), ...(open ? [refreshItems(true)] : [])]);
+  });
+  useEffect(() => () => {
+    summaryRequest.current += 1;
+    itemsRequest.current += 1;
   }, []);
 
   useEffect(() => {
     void refreshSummary();
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        void refreshSummary();
+        void refreshSummary(true);
       }
     };
-    const handleMessageRead = () => void refreshSummary();
-    const handleNotificationArchived = () => void refreshSummary();
+    const handleMessageRead = () => void refreshSummary(true);
+    const handleNotificationArchived = () => void refreshSummary(true);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('s-erp:message-read', handleMessageRead);
     window.addEventListener('s-erp:notification-archived', handleNotificationArchived);

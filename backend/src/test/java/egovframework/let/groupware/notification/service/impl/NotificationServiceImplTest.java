@@ -16,11 +16,50 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.let.groupware.notification.domain.repository.NotificationDAO;
+import egovframework.let.groupware.notification.domain.model.NotificationVO;
+import egovframework.let.groupware.realtime.RealtimePublisher;
+import egovframework.let.groupware.realtime.RealtimeArea;
 
 class NotificationServiceImplTest {
 
     private final NotificationDAO notificationDAO = mock(NotificationDAO.class);
-    private final NotificationServiceImpl service = new NotificationServiceImpl(notificationDAO);
+    private final RealtimePublisher realtime = mock(RealtimePublisher.class);
+    private final NotificationServiceImpl service = new NotificationServiceImpl(notificationDAO, realtime);
+
+    @Test
+    void onlyInsertedEventsSignalOwnerAndDirectMessageArea() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 0);
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", 72L, "Title", "Summary");
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", 72L, "Title", "Summary");
+        verify(realtime).publish(4L, 19L, RealtimeArea.NOTIFICATION);
+        verify(realtime).publish(4L, 19L, RealtimeArea.MESSAGE);
+    }
+
+    @Test
+    void readSignalsOnlyForActualRowChanges() throws Exception {
+        NotificationVO unread = new NotificationVO();
+        NotificationVO read = new NotificationVO();
+        read.setReadAt(java.time.LocalDateTime.now());
+        when(notificationDAO.selectOwnedNotification(anyMap())).thenReturn(unread, read, read);
+        when(notificationDAO.updateNotificationReadAt(anyMap())).thenReturn(1);
+        service.markRead(authenticatedUser(), 73L);
+        service.markRead(authenticatedUser(), 73L);
+        verify(realtime).publish(4L, 12L, RealtimeArea.NOTIFICATION);
+    }
+
+    @Test
+    void concurrentReadWithNoChangedRowsDoesNotSignal() throws Exception {
+        when(notificationDAO.selectOwnedNotification(anyMap())).thenReturn(new NotificationVO());
+        when(notificationDAO.updateNotificationReadAt(anyMap())).thenReturn(0);
+        service.markRead(authenticatedUser(), 73L);
+        org.mockito.Mockito.verifyNoInteractions(realtime);
+    }
+
+    @Test
+    void emptyBulkArchiveDoesNotSignal() throws Exception {
+        service.archiveReadNotifications(authenticatedUser(), null);
+        org.mockito.Mockito.verifyNoInteractions(realtime);
+    }
 
     @Test
     void createsOnlySupportedNotificationEventAndTrimsDisplayText() throws Exception {
@@ -82,6 +121,7 @@ class NotificationServiceImplTest {
         when(notificationDAO.archiveNotification(anyMap())).thenReturn(1);
 
         service.archiveNotification(authenticatedUser(), 73L);
+        verify(realtime).publish(4L, 12L, RealtimeArea.NOTIFICATION);
 
         verify(notificationDAO).archiveNotification(argThat(params ->
                 Long.valueOf(4L).equals(params.get("tenantId"))
@@ -107,6 +147,7 @@ class NotificationServiceImplTest {
                 authenticatedUser(), "APPROVAL_COMMENT_MENTION");
 
         org.assertj.core.api.Assertions.assertThat(archivedCount).isEqualTo(3);
+        verify(realtime).publish(4L, 12L, RealtimeArea.NOTIFICATION);
         verify(notificationDAO).archiveReadNotifications(argThat(params ->
                 Long.valueOf(4L).equals(params.get("tenantId"))
                         && Long.valueOf(12L).equals(params.get("userId"))

@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../../../shared/context/NotificationContext';
+import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {
   archiveNotification,
   archiveReadNotifications,
@@ -66,10 +67,12 @@ export function NotificationInboxPage() {
   const [confirmArchiveRead, setConfirmArchiveRead] = useState(false);
   const filters = useRef({ filter, typeFilter });
   const requestId = useRef(0);
+  const loadedCount = useRef(20);
 
   useLayoutEffect(() => {
     filters.current = { filter, typeFilter };
-  }, [filter, typeFilter]);
+    loadedCount.current = Math.max(20, items.length);
+  }, [filter, typeFilter, items.length]);
 
   const load = useCallback(async (beforeNotificationId?: number, append = false) => {
     const activeRequestId = ++requestId.current;
@@ -109,10 +112,46 @@ export function NotificationInboxPage() {
     };
   }, [filter, typeFilter, load]);
 
+  useRealtimeRefresh('NOTIFICATION', async () => {
+    const activeRequestId = ++requestId.current;
+    const currentFilters = filters.current;
+    const targetCount = loadedCount.current;
+    try {
+      const nextItems: NotificationItem[] = [];
+      let beforeNotificationId: number | undefined;
+      let hasNext = false;
+      let nextCursor: number | null = null;
+      do {
+        const page = await listNotifications({
+          limit: 20, beforeNotificationId,
+          unreadOnly: currentFilters.filter === 'UNREAD',
+          eventType: currentFilters.typeFilter === 'ALL' ? undefined : currentFilters.typeFilter,
+        });
+        if (activeRequestId !== requestId.current) return;
+        nextItems.push(...page.resultList);
+        hasNext = page.hasNext;
+        nextCursor = page.nextBeforeNotificationId;
+        beforeNotificationId = nextCursor ?? undefined;
+      } while (hasNext && beforeNotificationId !== undefined && nextItems.length < targetCount);
+      setItems(nextItems);
+      setHasNext(hasNext);
+      setCursor(nextCursor);
+      setError('');
+    } finally {
+      if (activeRequestId === requestId.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  });
+
   const selectItem = async (item: NotificationItem) => {
     if (item.readAt === null) {
       try {
         const updated = await markNotificationRead(item.notificationId);
+        requestId.current += 1;
+        setLoading(false);
+        setLoadingMore(false);
         setItems((current) => current.map((entry) =>
           entry.notificationId === item.notificationId ? updated : entry));
       } catch {
@@ -131,6 +170,9 @@ export function NotificationInboxPage() {
     setArchivingId(item.notificationId);
     try {
       await archiveNotification(item.notificationId);
+      requestId.current += 1;
+      setLoading(false);
+      setLoadingMore(false);
       setItems((current) => current.filter((entry) => entry.notificationId !== item.notificationId));
       showSuccess('알림을 목록에서 숨겼습니다.');
     } catch {

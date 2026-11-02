@@ -92,6 +92,33 @@ describe('NotificationInboxPage', () => {
     });
   });
 
+  it('reconciles all loaded pages on realtime signals while preserving the type filter', async () => {
+    const template = (await mocks.listNotifications()).resultList[0];
+    const page = (start: number, count = 20) => ({
+      resultList: Array.from({ length: count }, (_, index) => ({
+        ...template, notificationId: start - index, title: `알림 ${start - index}`,
+      })),
+      hasNext: true, nextBeforeNotificationId: start - count + 1,
+    });
+    mocks.listNotifications.mockReset()
+      .mockResolvedValueOnce(page(100, 1)).mockResolvedValueOnce(page(100))
+      .mockResolvedValueOnce(page(80, 1)).mockResolvedValueOnce(page(101))
+      .mockResolvedValueOnce(page(81, 1));
+    render(<MemoryRouter><NotificationInboxPage /></MemoryRouter>);
+    await screen.findByText('알림 100');
+    fireEvent.click(screen.getByRole('button', { name: '문서 멘션', exact: true }));
+    await waitFor(() => expect(mocks.listNotifications).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    await screen.findByText('알림 80');
+    fireEvent(window, new CustomEvent('s-erp:realtime', { detail: { areas: ['NOTIFICATION'] } }));
+    await screen.findByText('알림 101');
+    expect(screen.getByText('알림 81')).toBeVisible();
+    expect(mocks.listNotifications).toHaveBeenLastCalledWith({
+      limit: 20, beforeNotificationId: 82, unreadOnly: false, eventType: 'APPROVAL_COMMENT_MENTION',
+    });
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  }, 15000);
+
   it('ignores a stale response after changing notification filters', async () => {
     render(
       <MemoryRouter>
