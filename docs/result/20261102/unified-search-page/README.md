@@ -74,3 +74,13 @@ node tests\unified-search.browser.mjs
 | 1280px | [전체](screenshots/unified-search-page-1280px.png) | [공지](screenshots/unified-search-notice-1280px.png) |
 
 작업지시서 → 계획서 → 상세사양서 → 구현, 최소 변경, 기존 권한/계약 유지, 검증, 결과 문서/스크린샷, DB 변경 불필요 여부를 확인했다.
+
+## 후속: 상단 검색 검증 문구 제거
+
+근거: [006 사양](../../../spec/20261102/20261102_006_검색_빈값_표시_상세사양서.md).
+
+우측 상단 검색창에서만 검증 안내 문구를 제거했다. 빈값/공백/잘못된 길이를 제출하면 빨간 테두리와 aria-invalid는 유지하고 이동·조회를 하지 않는다. 입력하면 오류 표시를 해제한다. **결과 페이지 검색창은 기존 안내 문구를 유지한다.** 안내 문구로 헤더 높이와 줄 배치가 달라지던 원인을 header variant의 helperText만 숨겨 해결했다.
+
+변경 전 상단 안내 문구가 남는 테스트 실패 2개를 확인했다. 변경 후 검색 테스트 22개, build, 변경 파일 lint를 통과했다. 실제 앱 Chromium 375/768/1280px에서 빈 상단 필드 제출 시 빨간 테두리, 문구 부재, 헤더 높이 불변 및 결과 페이지 안내 유지, 기존 검색 흐름을 확인했다. API/DB 변경은 없다.
+
+빈값 제출 스크린샷: [375px](screenshots/unified-search-empty-header-375px.png), [768px](screenshots/unified-search-empty-header-768px.png), [1280px](screenshots/unified-search-empty-header-1280px.png).

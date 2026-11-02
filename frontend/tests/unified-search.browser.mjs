@@ -76,6 +76,18 @@ try {
 
     await page.goto('http://127.0.0.1:4173/groupware/community/notice');
     const headerField = page.getByLabel('통합검색 검색어', { exact: true });
+    await headerField.waitFor();
+    const headerHeight = await page.locator('header').evaluate((element) => element.getBoundingClientRect().height);
+    await headerField.press('Enter');
+    assert.equal(await headerField.getAttribute('aria-invalid'), 'true');
+    assert.equal(await page.getByText('검색어는 2~100자로 입력해 주세요.', { exact: true }).count(), 0);
+    assert.equal(await page.locator('header').evaluate((element) => element.getBoundingClientRect().height), headerHeight);
+    const border = await headerField.evaluate((element) => {
+      const fieldset = element.parentElement.querySelector('fieldset');
+      return getComputedStyle(fieldset).borderColor;
+    });
+    assert.equal(border, 'rgb(211, 47, 47)');
+    await page.screenshot({ path: path.join(screenshotDirectory, `unified-search-empty-header-${width}px.png`), fullPage: true });
     await headerField.fill('결재');
     await headerField.press('Enter');
     await page.getByRole('tab', { name: '전체 25', exact: true }).waitFor();
@@ -83,6 +95,11 @@ try {
     assert.equal(await page.getByRole('dialog').count(), 0);
     assert.equal(await page.getByRole('heading', { name: '통합검색', exact: true }).count(), 1);
     assert.equal(await page.locator('mark').count() > 0, true);
+    const pageField = page.getByLabel('결과 검색어', { exact: true });
+    await pageField.fill('');
+    await pageField.press('Enter');
+    await page.getByText('검색어는 2~100자로 입력해 주세요.', { exact: true }).waitFor();
+    await pageField.fill('결재');
 
     const assertLayout = async () => {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

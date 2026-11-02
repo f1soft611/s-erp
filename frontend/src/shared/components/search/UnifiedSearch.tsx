@@ -43,7 +43,7 @@ function SearchForm({ variant, initialKeyword }: UnifiedSearchProps & { initialK
         placeholder="메뉴, 문서, 공지 검색"
         value={keyword}
         error={Boolean(error)}
-        helperText={error}
+        helperText={isPage ? error : undefined}
         onChange={(event) => {
           setKeyword(event.target.value);
           if (error) setError('');

@@ -58,6 +58,26 @@ describe('unified search', () => {
     });
   });
 
+  it.each(['header', 'page'])('keeps validation text only for the %s form as appropriate', async (variant) => {
+      setup(variant === 'page' ? '/search' : '/groupware/overview');
+      const field = screen.getByLabelText(variant === 'page' ? '결과 검색어' : '통합검색 검색어');
+      const button = screen.getByRole('button', { name: variant === 'page' ? '다시 검색' : '통합검색 실행' });
+      for (const value of ['', '   ']) {
+        fireEvent.change(field, { target: { value } });
+        fireEvent.click(button);
+        expect(field).toHaveAttribute('aria-invalid', 'true');
+        if (variant === 'page') {
+          expect(screen.getByText('검색어는 2~100자로 입력해 주세요.')).toBeVisible();
+        } else {
+          expect(screen.queryByText('검색어는 2~100자로 입력해 주세요.')).not.toBeInTheDocument();
+        }
+        expect(api.apiGet).not.toHaveBeenCalled();
+      }
+      expect(screen.getByTestId('location')).toHaveTextContent(variant === 'page' ? '/search' : '/groupware/overview');
+      fireEvent.change(field, { target: { value: '검색' } });
+      expect(field).toHaveAttribute('aria-invalid', 'false');
+  });
+
   it('encodes the query and retains bounded type-specific page sizes', async () => {
     await searchUnified('한글 & 공지', 'ALL', 0);
     await searchUnified('한글', 'NOTICE', 10);
@@ -72,7 +92,8 @@ describe('unified search', () => {
     expect(screen.getByLabelText('통합검색 검색어')).toBeVisible();
     submit('a');
     expect(api.apiGet).not.toHaveBeenCalled();
-    expect(screen.getByText('검색어는 2~100자로 입력해 주세요.')).toBeVisible();
+    expect(screen.getByLabelText('통합검색 검색어')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('검색어는 2~100자로 입력해 주세요.')).not.toBeInTheDocument();
     submit(' 검색 ');
     await screen.findByRole('tab', { name: '전체 25' });
     expect(screen.getByTestId('location')).toHaveTextContent('/search?keyword=%EA%B2%80%EC%83%89&type=ALL&page=1');
