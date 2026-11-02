@@ -23,6 +23,12 @@ description: 'S-ERP 팀 개발 규칙: 문서 우선, 범위 통제, 검증, DB 
 - 프론트엔드: [frontend/AGENTS.md](../../frontend/AGENTS.md) 의 Vite + Vitest 흐름을 사용합니다.
 - 백엔드: [backend/AGENTS.md](../../backend/AGENTS.md) 의 Maven 테스트/실행 흐름을 사용합니다.
 
+## Java 8 호환 개발
+
+- 신규·수정 Java 운영 코드는 Java 8 문법·표준 API 및 Java 8 지원 의존성만 사용합니다. 개발 JDK가 Java 17 이상이어도 운영 코드의 호환성 기준은 Java 8입니다.
+- `List.of`, `Map.of`, `String.isBlank`, `Stream.toList`, `var`, record 등 Java 9+ API·문법을 사용하지 않습니다.
+- `source/target=1.8`이나 최신 JDK의 테스트 통과만으로 Java 8 API 호환성을 보증하지 않습니다. Java 변경 시 [백엔드 Java 8 호환성 규칙](../../backend/AGENTS.md#java-8-호환성-필수)에 따라 별도 검증하고 미확인 범위를 기록합니다.
+
 ## 데이터베이스 안전성
 
 - 백엔드 스키마 변경이 있으면 SQL 스크립트를 생성하고, 날짜별 스키마 폴더에 이력을 남깁니다.

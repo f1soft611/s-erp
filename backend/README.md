@@ -11,8 +11,13 @@
 
 | 프로그램 명 | 버전    |
 | :---------- | :------ |
-| Java        | 17 이상 |
+| 개발·테스트 JDK | 17 이상 |
+| 운영 코드 호환성 | Java 8 |
 | Maven       | 3.8.x   |
+
+Java 코드를 신규 작성하거나 수정할 때는 **Java 8 문법·표준 API 및 Java 8 지원 의존성**만 사용합니다. 개발 JDK 버전이 높더라도 `List.of`, `String.isBlank`, `Stream.toList` 등 Java 9+ API·문법을 사용하지 않습니다.
+
+`pom.xml`의 `source/target=1.8`만으로 최신 JDK API 사용을 막을 수 없습니다. Java 변경 시 관련 Maven 테스트와 별도로 `javac --release 8`(JDK 9+) 또는 JDK 8 컴파일 등 API 호환 검증을 수행합니다. 상세 기준은 [백엔드 에이전트 지침](AGENTS.md#java-8-호환성-필수)을 따릅니다. 이 기준은 기존 전체 코드·의존성의 Java 8 운영 검증 완료를 의미하지 않습니다.
 
 ## 현재 유지 범위
 

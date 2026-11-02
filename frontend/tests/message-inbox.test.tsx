@@ -32,6 +32,40 @@ function chatMessage(messageId: number, content: string, createdAt: string) {
 }
 
 describe('MessageInboxPage', () => {
+  it('receives realtime messages without losing the reply draft', async () => {
+    render(<MemoryRouter><MessageInboxPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: /홍길동/ }));
+    await screen.findByText('<script>alert(1)</script>');
+    const input = screen.getByRole('textbox', { name: /답장/ });
+    fireEvent.change(input, { target: { value: '작성 중인 답장' } });
+    mocks.getThreadMessages.mockResolvedValue(dayPage([
+      chatMessage(81, '기존 메시지', '2026-10-30T09:30:00'),
+      chatMessage(82, '실시간 수신 메시지', '2026-10-30T09:31:00'),
+    ]));
+    fireEvent(window, new CustomEvent('s-erp:realtime', { detail: { areas: ['MESSAGE'] } }));
+    expect(await screen.findByText('실시간 수신 메시지')).toBeVisible();
+    expect(input).toHaveValue('작성 중인 답장');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('does not replace a newly selected conversation with an older failed request', async () => {
+    const first = (await mocks.listMessageThreads()).resultList[0];
+    mocks.listMessageThreads.mockResolvedValue({
+      resultList: [first, { ...first, threadId: 32, otherUserName: '다른 사용자' }],
+    });
+    let rejectOlder!: (error: Error) => void;
+    mocks.getThreadMessages.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectOlder = reject;
+    })).mockResolvedValue(dayPage([chatMessage(90, '새로 선택한 대화', '2026-10-30T09:32:00')]));
+    render(<MemoryRouter><MessageInboxPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: /홍길동/ }));
+    fireEvent.click(screen.getByRole('button', { name: /다른 사용자/ }));
+    await screen.findByText('새로 선택한 대화');
+    await act(async () => { rejectOlder(new Error('older request failed')); });
+    expect(screen.getByText('새로 선택한 대화')).toBeVisible();
+    expect(screen.queryByText('쪽지 대화를 불러오지 못했습니다.')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.listMessageThreads.mockResolvedValue({

@@ -130,6 +130,32 @@ class UnifiedSearchServiceTest {
     }
 
     @Test
+    void rejectsUnicodeWhitespaceLoginBeforeQuerying() {
+        user.setId("\u2003\t");
+        assertEquals(HttpStatus.UNAUTHORIZED,
+                assertThrows(ResponseStatusException.class,
+                        () -> service.search(user, "검색", "ALL", 0, 5)).getStatus());
+        verifyNoInteractions(menus, documents, notices);
+    }
+
+    @Test
+    void omitsUnicodeWhitespaceFromDocumentDescription() throws Exception {
+        tree(menu(2L, "문서", "/groupware/doc/write", true));
+        DocumentApprovalStatusListItemVO item = new DocumentApprovalStatusListItemVO();
+        item.setElectronicApprovalId(18L);
+        item.setTitle("검색 문서");
+        item.setDocumentNo("\u2003");
+        item.setDrafterName("작성자");
+        DocumentApprovalListPageVO page = new DocumentApprovalListPageVO();
+        page.setResultList(List.of(item));
+        page.setTotalRowCount(1L);
+        when(documents.searchDocuments(eq(user), eq("ALL"), any())).thenReturn(page);
+
+        assertEquals("작성자", service.search(user, "검색", "DOCUMENT", 0, 5)
+                .getGroups().get(0).getItems().get(0).getDescription());
+    }
+
+    @Test
     void doesNotTurnDomainFailureIntoEmptySuccess() throws Exception {
         tree(menu(2L, "문서", "/groupware/doc/write", true));
         when(documents.searchDocuments(any(), anyString(), any())).thenThrow(new IllegalStateException("unavailable"));

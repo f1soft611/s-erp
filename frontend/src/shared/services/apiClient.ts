@@ -134,6 +134,18 @@ export const apiGet = <T>(
   signal?: AbortSignal,
 ): Promise<T> => request<T>(path, signal ? { signal } : undefined);
 
+export async function apiGetEventStream(path: string, signal: AbortSignal): Promise<Response> {
+  const auth = await getAuthorizedAuth();
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  const response = await receive(() => fetch(`${API_BASE_URL}${path}`, {
+    signal,
+    headers: { Accept: 'text/event-stream', Authorization: `Bearer ${auth.accessToken}` },
+    cache: 'no-store',
+  }));
+  if (!response.ok) throw new ApiResponseError('실시간 연결을 시작할 수 없습니다.', response.status);
+  return response;
+}
+
 export async function apiGetBlob(path: string): Promise<Blob> {
   const auth = await getAuthorizedAuth();
   const headers: Record<string, string> = {};

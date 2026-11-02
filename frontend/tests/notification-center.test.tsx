@@ -79,5 +79,23 @@ describe('NotificationCenter', () => {
         '/groupware/doc/write?approvalId=29',
       );
     });
+
+  });
+
+  it('refreshes the badge and an open popover without showing a loading spinner on a realtime signal', async () => {
+      render(<MemoryRouter><NotificationCenter /></MemoryRouter>);
+      await screen.findByText('4');
+      fireEvent.click(screen.getByRole('button', { name: 'notifications' }));
+      await screen.findByText('문서 댓글 멘션');
+      mocks.getNotificationSummary.mockResolvedValue({ unreadCount: 6 });
+      mocks.listNotifications.mockResolvedValue({ resultList: [{
+        notificationId: 9, eventType: 'APPROVAL_COMMENT_MENTION', sourceType: 'APPROVAL_COMMENT',
+        sourceId: 82, targetId: 29, title: '실시간 새 알림', summary: '새 내용',
+        createdAt: '2026-11-02T15:00:00', readAt: null,
+      }], hasNext: false, nextBeforeNotificationId: null });
+      fireEvent(window, new CustomEvent('s-erp:realtime', { detail: { areas: ['NOTIFICATION'] } }));
+      expect(await screen.findByText('실시간 새 알림')).toBeVisible();
+      expect(screen.getByText('6')).toBeVisible();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 });

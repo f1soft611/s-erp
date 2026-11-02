@@ -105,9 +105,11 @@ export function MessageChatView({
     const prependedOlderDay = previous !== null
       && previous.lastMessageId === lastMessageId
       && previous.firstMessageId !== firstMessageId;
+    const wasAtBottom = previous === null
+      || previous.scrollHeight - previous.scrollTop - element.clientHeight <= LOAD_PREVIOUS_THRESHOLD_PX;
     element.scrollTop = prependedOlderDay
       ? element.scrollHeight - previous.scrollHeight + previous.scrollTop
-      : element.scrollHeight;
+      : wasAtBottom ? element.scrollHeight : previous.scrollTop;
     snapshotRef.current = {
       firstMessageId,
       lastMessageId,

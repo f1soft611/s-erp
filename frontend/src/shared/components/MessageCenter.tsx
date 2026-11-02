@@ -1,7 +1,8 @@
 import MailOutlined from '@mui/icons-material/MailOutlined';
 import { Badge, IconButton, Tooltip, useTheme } from '@mui/material';
 import { headerCounterBadgeSx } from './headerCounterBadgeSx';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { useNavigate } from 'react-router-dom';
 import { getMessageSummary } from '../../pages/groupware/messages/services/messageService';
 import { useNotification } from '../context/NotificationContext';
@@ -11,21 +12,26 @@ export function MessageCenter() {
   const navigate = useNavigate();
   const { showError } = useNotification();
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const requestId = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
+    const request = ++requestId.current;
     try {
-      setUnreadCount(await getMessageSummary());
+      const count = await getMessageSummary();
+      if (request === requestId.current) setUnreadCount(count);
     } catch {
-      showError('읽지 않은 쪽지 개수를 불러오지 못했습니다.');
+      if (!silent && request === requestId.current) showError('읽지 않은 쪽지 개수를 불러오지 못했습니다.');
     }
   }, [showError]);
+  useRealtimeRefresh('MESSAGE', () => refresh(true));
+  useEffect(() => () => { requestId.current += 1; }, []);
 
   useEffect(() => {
     void refresh();
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void refresh();
+      if (document.visibilityState === 'visible') void refresh(true);
     };
-    const handleMessageRead = () => void refresh();
+    const handleMessageRead = () => void refresh(true);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('s-erp:message-read', handleMessageRead);
     return () => {

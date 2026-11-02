@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,35 @@ import { MessageChatView } from '../src/pages/groupware/messages/components/Mess
 const token = (letter: string) => `v1.${letter.repeat(59)}`;
 
 describe('message chat link previews', () => {
+  it('preserves scroll away from the bottom for read updates and incoming messages', () => {
+    const message = {
+      messageId: 1, threadId: 9, senderUserId: 1, senderUserName: '나',
+      recipientUserId: 2, recipientUserName: '상대방', subject: null, content: '첫 메시지',
+      readAt: null, createdAt: '2026-10-30T10:00:00',
+    };
+    const chat = (messages: (typeof message | { readAt: string } & Omit<typeof message, 'readAt'>)[]) => (
+      <MemoryRouter><MessageChatView otherUserId={2} messages={messages} /></MemoryRouter>
+    );
+    const { rerender } = render(chat([message]));
+    const scroller = screen.getByTestId('message-chat-view');
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 300 },
+    });
+    scroller.scrollTop = 150;
+    fireEvent.scroll(scroller);
+    rerender(chat([{ ...message, readAt: '2026-10-30T10:01:00' }]));
+    expect(scroller.scrollTop).toBe(150);
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1100 });
+    rerender(chat([message, { ...message, messageId: 2, content: '새 메시지' }]));
+    expect(scroller.scrollTop).toBe(150);
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1200 });
+    rerender(chat([message, { ...message, messageId: 3, content: '하단 새 메시지' }]));
+    expect(scroller.scrollTop).toBe(1200);
+  });
+
   it('linkifies urls and shows document, notice, and OG previews under the bubble', async () => {
     const documentUrl = `${window.location.origin}/groupware/doc/write?share=${token('A')}`;
     const noticeUrl = `${window.location.origin}/groupware/community/notice?share=${token('B')}`;
