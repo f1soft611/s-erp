@@ -25,6 +25,7 @@ const overview = {
   approval: {
     actionRequiredCount: 3, draftCount: 2, revisionRequestedCount: 1,
     referenceConfirmationRequiredCount: 0, referenceConfirmationItems: [], notices: [],
+    finalConfirmationRequiredCount: 0, finalConfirmationItems: [],
   },
   notices: [{ postId: 8, title: '검증용 운영 공지', isPinned: 'Y', createdAt: '2026-10-28T08:00:00' }],
 };
@@ -96,6 +97,36 @@ describe('real-data overview', () => {
     expect(screen.getByTestId('document-detail-id')).toHaveTextContent('22');
     fireEvent.click(screen.getByRole('button', { name: '문서 액션 완료' }));
     await waitFor(() => expect(get.mock.calls.filter(([path]) => path.endsWith('/overview'))).toHaveLength(2));
+  });
+
+  it('keeps final confirmations independent and refreshes the overview after detail actions', async () => {
+    let confirmed = false;
+    get.mockImplementation(async (path) => ({ item: path.includes('/sales') ? sales : {
+      ...overview,
+      approval: {
+        ...overview.approval,
+        referenceConfirmationRequiredCount: 1,
+        referenceConfirmationItems: [{ electronicApprovalId: 22, title: '참조 대기 문서' }],
+        finalConfirmationRequiredCount: confirmed ? 0 : 1,
+        finalConfirmationItems: confirmed ? [] : [{ electronicApprovalId: 23, title: '최종확인 대기 문서' }],
+      },
+    } }));
+    mount();
+    const finals = await screen.findByRole('region', { name: '내가 최종 확인할 문서' });
+    const references = screen.getByRole('region', { name: '내가 확인할 문서' });
+    expect(within(finals).getByText('최종 승인 또는 반려된 문서 중 아직 확인하지 않은 문서')).toBeInTheDocument();
+    expect(within(finals).getByText('1건')).toBeInTheDocument();
+    expect(within(references).queryByText('최종확인 대기 문서')).not.toBeInTheDocument();
+    fireEvent.click(within(finals).getByRole('button', { name: /최종확인 대기 문서/ }));
+    expect(screen.getByTestId('document-detail-id')).toHaveTextContent('23');
+    confirmed = true;
+    fireEvent.click(screen.getByRole('button', { name: '문서 액션 완료' }));
+    await waitFor(() => {
+      const refreshed = screen.getByRole('region', { name: '내가 최종 확인할 문서' });
+      expect(within(refreshed).getByText('0건')).toBeInTheDocument();
+      expect(within(refreshed).queryByText('최종확인 대기 문서')).not.toBeInTheDocument();
+    });
+    expect(within(screen.getByRole('region', { name: '내가 확인할 문서' })).getByText('참조 대기 문서')).toBeInTheDocument();
   });
 
   it('uses the server date across a month boundary for due labels and preserves due drilldown', async () => {

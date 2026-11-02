@@ -21,6 +21,7 @@ export type DocumentApprovalScope =
   | 'ALL'
   | 'MY_PENDING'
   | 'MY_REFERENCE_PENDING'
+  | 'MY_FINAL_CONFIRMATION_PENDING'
   | 'IN_PROGRESS'
   | 'DRAFT'
   | 'COMPLETED'
@@ -196,15 +197,17 @@ export type DocumentApprovalSummary = {
   revisionRequestedCount: number;
   rejectedCount: number;
   referenceConfirmationRequiredCount: number;
+  finalConfirmationRequiredCount: number;
   notices: DocumentApprovalRecord[];
   referenceConfirmationItems: DocumentApprovalRecord[];
+  finalConfirmationItems: DocumentApprovalRecord[];
 };
 
 export type DocumentApprovalLine = {
   electronicApprovalLineId: number;
   stageOrder: number;
   participantOrder: number;
-  participantType: 'APPROVAL' | 'AGREEMENT' | 'REFERENCE';
+  participantType: 'APPROVAL' | 'AGREEMENT' | 'REFERENCE' | 'FINAL_CONFIRMATION';
   participantUserId: string;
   participantName: string;
   participantDepartmentName?: string | null;

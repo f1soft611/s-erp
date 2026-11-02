@@ -74,8 +74,10 @@ public class DashboardServiceImpl implements DashboardService {
             try {
                 DocumentApprovalSummaryVO summary = approvalService.getSummary(user);
                 if (summary == null || summary.getReferenceConfirmationRequiredCount() == null
-                        || summary.getReferenceConfirmationItems() == null) {
-                    throw new IllegalStateException("참조 확인 요약을 조회할 수 없습니다.");
+                        || summary.getReferenceConfirmationItems() == null
+                        || summary.getFinalConfirmationRequiredCount() == null
+                        || summary.getFinalConfirmationItems() == null) {
+                    throw new IllegalStateException("결재 확인 요약을 조회할 수 없습니다.");
                 }
                 DashboardOverviewVO.Approval approval = new DashboardOverviewVO.Approval();
                 approval.setActionRequiredCount(summary.getActionRequiredCount());
@@ -88,6 +90,14 @@ public class DashboardServiceImpl implements DashboardService {
                     item.setElectronicApprovalId(source.getElectronicApprovalId());
                     item.setTitle(source.getTitle());
                     approval.getReferenceConfirmationItems().add(item);
+                }
+                approval.setFinalConfirmationRequiredCount(summary.getFinalConfirmationRequiredCount());
+                for (DocumentApprovalListItemVO source : summary.getFinalConfirmationItems()) {
+                    DashboardOverviewVO.ReferenceConfirmationItem item =
+                            new DashboardOverviewVO.ReferenceConfirmationItem();
+                    item.setElectronicApprovalId(source.getElectronicApprovalId());
+                    item.setTitle(source.getTitle());
+                    approval.getFinalConfirmationItems().add(item);
                 }
                 if (summary.getNotices() != null) {
                     for (DocumentApprovalListItemVO source : summary.getNotices()) {

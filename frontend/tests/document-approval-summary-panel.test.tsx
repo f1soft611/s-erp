@@ -17,8 +17,10 @@ describe('ApprovalSummaryPanel reference confirmation', () => {
       revisionRequestedCount: 0,
       rejectedCount: 0,
       referenceConfirmationRequiredCount: 2,
+      finalConfirmationRequiredCount: 5,
       notices: [],
       referenceConfirmationItems: [],
+      finalConfirmationItems: [],
     };
 
     render(
@@ -31,6 +33,8 @@ describe('ApprovalSummaryPanel reference confirmation', () => {
     fireEvent.click(screen.getByRole('button', { name: '내가 확인할 문서 2건' }));
 
     expect(onSelectScope).toHaveBeenCalledWith('MY_REFERENCE_PENDING');
+    fireEvent.click(screen.getByRole('button', { name: '내가 최종 확인할 문서 5건' }));
+    expect(onSelectScope).toHaveBeenLastCalledWith('MY_FINAL_CONFIRMATION_PENDING');
     expect(screen.getByRole('button', { name: '내가 처리할 결재 3건' })).toBeInTheDocument();
   });
 });

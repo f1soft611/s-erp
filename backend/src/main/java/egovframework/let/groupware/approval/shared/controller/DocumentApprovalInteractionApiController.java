@@ -34,6 +34,7 @@ import egovframework.let.groupware.approval.domain.model.DocumentApprovalActionR
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalCommentPageVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalDetailVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceConfirmationVO;
+import egovframework.let.groupware.approval.domain.model.DocumentApprovalFinalConfirmationVO;
 import egovframework.let.groupware.approval.domain.model.DocumentApprovalReferenceAddRequestVO;
 import egovframework.let.groupware.approval.shared.service.DocumentApprovalInteractionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -94,6 +95,18 @@ public class DocumentApprovalInteractionApiController {
                 documentApprovalService.confirmReference(user, electronicApprovalId);
         resultMap.put("item", confirmation);
         resultMap.put("message", "문서를 확인했습니다.");
+        return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
+    }
+
+    @Operation(summary = "기안자 최종 확인", security = @SecurityRequirement(name = "Authorization"))
+    @PostMapping("/{electronicApprovalId}/final-confirmation")
+    public ResultVO confirmFinalConfirmation(@PathVariable Long electronicApprovalId,
+            @AuthenticationPrincipal LoginVO user) throws Exception {
+        HashMap<String, Object> resultMap = new HashMap<>();
+        DocumentApprovalFinalConfirmationVO confirmation =
+                documentApprovalService.confirmFinalConfirmation(user, electronicApprovalId);
+        resultMap.put("item", confirmation);
+        resultMap.put("message", "최종 확인을 완료했습니다.");
         return resultVoHelper.buildFromMap(resultMap, ResponseCode.SUCCESS);
     }
 

@@ -57,6 +57,7 @@ import {
   listApprovalComments,
   addDocumentReferences,
   confirmDocumentReference,
+  confirmDocumentFinalConfirmation,
   processDocumentApprovalAction,
   updateApprovalComment,
   uploadApprovalCommentAttachment,
@@ -319,6 +320,7 @@ export function DocumentApprovalDetailFeed(
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [referenceActionError, setReferenceActionError] = useState('');
+  const [finalConfirmationError, setFinalConfirmationError] = useState('');
   const [isReferenceAddDialogOpen, setIsReferenceAddDialogOpen] = useState(false);
   const [selectedReferenceUserIds, setSelectedReferenceUserIds] = useState<string[]>([]);
   const [referenceAddError, setReferenceAddError] = useState('');
@@ -654,10 +656,23 @@ export function DocumentApprovalDetailFeed(
           (line) =>
             line.participantUserId === employeeId &&
             line.actionStatus === 'PENDING' &&
-            line.participantType !== 'REFERENCE',
+            (line.participantType === 'APPROVAL' ||
+              line.participantType === 'AGREEMENT'),
         ),
       ),
     [detail, employeeId],
+  );
+  const canConfirmFinal = Boolean(
+    employeeId &&
+      detail?.isDrafter &&
+      detail.documentType === 'DRAFTING' &&
+      (detail.documentStatus === 'COMPLETED' || detail.documentStatus === 'REJECTED') &&
+      detail.approvalLines.some(
+        (line) =>
+          line.participantUserId === employeeId &&
+          line.participantType === 'FINAL_CONFIRMATION' &&
+          line.actionStatus === 'PENDING',
+      ),
   );
   const canConfirmReference = useMemo(
     () =>
@@ -803,6 +818,25 @@ export function DocumentApprovalDetailFeed(
     } catch (error: unknown) {
       setActionError(
         error instanceof Error ? error.message : '결재 처리에 실패했습니다.',
+      );
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleFinalConfirmation = async () => {
+    if (electronicApprovalId === null || isActing || !canConfirmFinal) return;
+    setIsActing(true);
+    setFinalConfirmationError('');
+    try {
+      await confirmDocumentFinalConfirmation(electronicApprovalId);
+      showSuccess('문서 최종확인을 완료했습니다.');
+      onActionComplete();
+      setDetailRetryRequest((current) => ({ version: current.version + 1, quiet: false }));
+      await loadComments();
+    } catch (error: unknown) {
+      setFinalConfirmationError(
+        error instanceof Error ? error.message : '최종확인 처리에 실패했습니다.',
       );
     } finally {
       setIsActing(false);
@@ -1201,6 +1235,18 @@ export function DocumentApprovalDetailFeed(
                 </Button>
               </>
             )}
+            {canConfirmFinal && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                sx={approvalActionButtonSx}
+                onClick={() => void handleFinalConfirmation()}
+                disabled={isActing}
+              >
+                최종확인
+              </Button>
+            )}
             {canConfirmReference && (
               <Button
                 size="small"
@@ -1330,6 +1376,9 @@ export function DocumentApprovalDetailFeed(
       )}
       {referenceActionError && (
         <Alert severity="error">{referenceActionError}</Alert>
+      )}
+      {finalConfirmationError && (
+        <Alert severity="error">{finalConfirmationError}</Alert>
       )}
       {isFeedPresentation && isLoading && (
         <Stack

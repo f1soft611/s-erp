@@ -139,6 +139,31 @@ class DocumentApprovalInteractionApiControllerTest {
     }
 
     @Test
+    void finalConfirmationPostUsesSeparateRouteAndAuthenticatedPrincipal() throws Exception {
+        LoginVO user = authenticatedUser();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList()));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .build();
+
+        try {
+            mockMvc.perform(post("/api/v1/groupware/approvals/77/final-confirmation"))
+                    .andExpect(status().isOk());
+
+            assertThat(mockingDetails(interactionService).getInvocations())
+                    .anySatisfy(invocation -> {
+                        assertThat(invocation.getMethod().getName()).isEqualTo("confirmFinalConfirmation");
+                        assertThat(invocation.getArguments()).containsExactly(user, 77L);
+                    });
+            assertRoute("confirmFinalConfirmation", PostMapping.class,
+                    "/{electronicApprovalId}/final-confirmation");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
     void addReferencesPostBindsUserIdsAndUsesAuthenticatedPrincipal() throws Exception {
         LoginVO user = authenticatedUser();
         SecurityContextHolder.getContext().setAuthentication(

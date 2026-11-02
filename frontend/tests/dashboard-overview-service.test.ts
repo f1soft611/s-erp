@@ -13,6 +13,8 @@ export const overviewFixture = {
     actionRequiredCount: 3, draftCount: 2, revisionRequestedCount: 1,
     referenceConfirmationRequiredCount: 1,
     referenceConfirmationItems: [{ electronicApprovalId: 12, title: '검증용 참조 문서' }],
+    finalConfirmationRequiredCount: 2,
+    finalConfirmationItems: [{ electronicApprovalId: 13, title: '검증용 최종확인 문서' }],
     notices: [{ electronicApprovalId: 7, title: '검증용 결재 문서', noticeType: 'ACTION_REQUIRED' }],
   },
   notices: [{ postId: 8, title: '검증용 운영 공지', isPinned: 'Y', createdAt: '2026-10-28T08:00:00' }],
@@ -65,6 +67,23 @@ describe('dashboard API contract', () => {
     const item = { ...overviewFixture, canReadSales: false, approvalStatus: 'error', approval: null };
     get.mockResolvedValue({ item });
     expect(await fetchDashboardOverview()).toEqual(item);
+  });
+
+  it.each([
+    { finalConfirmationRequiredCount: undefined },
+    { finalConfirmationRequiredCount: -1 },
+    { finalConfirmationRequiredCount: 1.5 },
+    { finalConfirmationRequiredCount: Number.MAX_SAFE_INTEGER + 1 },
+    { finalConfirmationRequiredCount: '2' },
+    { finalConfirmationItems: undefined },
+    { finalConfirmationItems: null },
+    { finalConfirmationItems: [{ electronicApprovalId: 0, title: '문서' }] },
+    { finalConfirmationItems: [{ electronicApprovalId: 13, title: null }] },
+  ])('rejects malformed final-confirmation summary data: %j', async (patch) => {
+    get.mockResolvedValue({
+      item: { ...overviewFixture, approval: { ...overviewFixture.approval, ...patch } },
+    });
+    await expect(fetchDashboardOverview()).rejects.toThrow('종합현황 응답');
   });
 
   it('accepts the preceding-year trend for the earliest selectable month', async () => {

@@ -479,6 +479,7 @@ export async function getDocumentApprovalSummary(): Promise<DocumentApprovalSumm
       item.revisionRequestedCount,
       item.rejectedCount,
       item.referenceConfirmationRequiredCount,
+      item.finalConfirmationRequiredCount,
     ].every(
       (count) =>
         typeof count === 'number' &&
@@ -487,7 +488,9 @@ export async function getDocumentApprovalSummary(): Promise<DocumentApprovalSumm
     ) ||
     !Array.isArray(item.notices) ||
     !Array.isArray(item.referenceConfirmationItems) ||
-    !item.referenceConfirmationItems.every(isDocumentApprovalRecord)
+    !item.referenceConfirmationItems.every(isDocumentApprovalRecord) ||
+    !Array.isArray(item.finalConfirmationItems) ||
+    !item.finalConfirmationItems.every(isDocumentApprovalRecord)
   ) {
     throw new Error('전자결재 요약 응답을 확인할 수 없습니다.');
   }
@@ -516,6 +519,36 @@ export async function confirmDocumentReference(
     !Number.isFinite(Date.parse(item.actionAt))
   ) {
     throw new Error('참조 확인 응답을 확인할 수 없습니다.');
+  }
+  return {
+    electronicApprovalId,
+    actionStatus: 'CONFIRMED',
+    actionAt: item.actionAt,
+  };
+}
+
+export async function confirmDocumentFinalConfirmation(
+  electronicApprovalId: number,
+): Promise<{
+  electronicApprovalId: number;
+  actionStatus: 'CONFIRMED';
+  actionAt: string;
+}> {
+  requireApprovalId(electronicApprovalId, '문서 ID');
+  const response = await apiPost<{ item?: unknown }>(
+    `${APPROVAL_API}/${electronicApprovalId}/final-confirmation`,
+    {},
+  );
+  const item = response.item;
+  if (
+    !isObject(item) ||
+    item.electronicApprovalId !== electronicApprovalId ||
+    item.actionStatus !== 'CONFIRMED' ||
+    typeof item.actionAt !== 'string' ||
+    !item.actionAt.trim() ||
+    !Number.isFinite(Date.parse(item.actionAt))
+  ) {
+    throw new Error('최종확인 응답을 확인할 수 없습니다.');
   }
   return {
     electronicApprovalId,

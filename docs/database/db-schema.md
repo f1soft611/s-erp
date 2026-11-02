@@ -170,6 +170,45 @@
 - 메뉴명, 설명, 경로를 함께 관리해 실제 페이지 제목/설명과 대시보드 메뉴를 일관되게 표시
 - `/api/v1/menus/my` 응답의 원천 데이터, `role_code` 기준 기본 권한 정책과 결합해 대시보드 좌측 메뉴 생성
 
+### 2-10-1. tb_user_menu_favorite_folder
+
+| 컬럼               | 타입      | 설명                                      |
+| ------------------ | --------- | ----------------------------------------- |
+| favorite_folder_id | bigint    | 즐겨찾기 폴더 PK                          |
+| tenant_id          | bigint    | 소속 tenant FK                            |
+| user_id            | bigint    | 소유 사용자 FK                            |
+| folder_nm          | varchar(40) | trim 기준 1~40자 폴더명                 |
+| created_at         | timestamp | 생성 일시                                 |
+| updated_at         | timestamp | 수정 일시                                 |
+
+역할:
+
+- 사용자별 메뉴 즐겨찾기 폴더를 루트 하위 한 단계로 저장
+- `(favorite_folder_id, tenant_id, user_id)` 고유키로 즐겨찾기 폴더 참조의 소유자 일치를 보장
+- 즐겨찾기 항목이 남아 있으면 참조 FK로 폴더 삭제를 제한
+
+### 2-10-2. tb_user_menu_favorite
+
+| 컬럼               | 타입      | 설명                                        |
+| ------------------ | --------- | ------------------------------------------- |
+| favorite_id        | bigint    | 즐겨찾기 PK                                 |
+| tenant_id          | bigint    | 소속 tenant FK                              |
+| user_id            | bigint    | 소유 사용자 FK                              |
+| menu_id            | bigint    | 원본 메뉴 FK, 메뉴 삭제 시 참조 cascade 삭제 |
+| favorite_folder_id | bigint    | 폴더 FK, NULL이면 루트 배치                 |
+| favorite_nm        | varchar   | 사용자 지정 표시명, NULL이면 원본 메뉴명    |
+| created_at         | timestamp | 생성 일시                                   |
+| updated_at         | timestamp | 메뉴 위치/표시명 변경 일시                  |
+
+역할:
+
+- 메뉴 경로를 복제하지 않고 사용자별 원본 메뉴 바로가기와 위치만 저장
+- 개인 표시명은 trim 기준 1~100자이며, 기존 행의 NULL은 현재 권한 메뉴명을 사용
+- `(tenant_id, user_id, menu_id)` UNIQUE로 사용자별 메뉴 중복 등록을 방지
+- composite folder FK로 다른 사용자의 폴더를 참조하지 못하게 하며, 비어 있지 않은 폴더 삭제를 제한
+- 적용 스크립트는 [20261102_001_create_menu_favorites.sql](20261102/20261102_001_create_menu_favorites.sql), 롤백은 [20261102_001_rollback.sql](20261102/20261102_001_rollback.sql)에 기록한다. 실제 DB 반영 여부는 날짜별 변경 이력을 확인한다.
+- 표시명 추가는 [20261102_002_add_menu_favorite_name.sql](20261102/20261102_002_add_menu_favorite_name.sql), 롤백은 [20261102_002_rollback.sql](20261102/20261102_002_rollback.sql)에 기록한다. custom name이 남아 있으면 롤백이 중단된다.
+
 ### 2-11. tb_permission
 
 | 컬럼            | 타입      | 설명                       |
@@ -316,7 +355,7 @@
 | parent_comment_id     | bigint    | 상위 댓글 FK(대댓글)                        |
 | content               | text      | 댓글 내용                                   |
 | comment_type          | varchar   | 댓글 유형 (`USER`, `SYSTEM`), 기본값 `USER`  |
-| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`, `REFERENCE_CONFIRMED`, `REFERENCE_ADDED`), USER에서는 NULL |
+| event_type            | varchar   | SYSTEM 이벤트 코드(`APPROVED`, `REJECTED`, `RETURNED`, `DRAFT_SAVED`, `SUBMITTED`, `RESUBMITTED`, `COMPLETED`, `DELETED`, `SUBMISSION_CANCELED`, `APPROVAL_CANCELED`, `REFERENCE_CONFIRMED`, `REFERENCE_ADDED`, `FINAL_CONFIRMATION_CONFIRMED`), USER에서는 NULL |
 | writer_id             | varchar   | 작성자 ID                                   |
 | writer_name           | varchar   | 작성자 이름                                 |
 | deleted_yn            | char      | 삭제 여부 (`Y`/`N`)                         |
@@ -330,7 +369,7 @@
 - 댓글/답글을 범용적으로 보관하는 공통 테이블
 - 도메인별 댓글이 서로 다른 API에 묶이지 않도록 `owner_type + owner_id` 기준으로 조회
 - DB를 통해 공통 댓글 API의 목록/등록/수정/삭제를 영속화한다
-- 현재 PostgreSQL MCP의 `chk_tb_common_comment_event_type`은 위의 SYSTEM 이벤트 11종과 USER의 NULL `event_type` 조건을 허용한다. 결재 처리 및 임시저장/취소/참조확인 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시하며 서비스/API에서 수정·삭제·답글·좋아요를 차단한다.
+- 현재 PostgreSQL MCP에서 확인한 `chk_tb_common_comment_event_type`은 기존 SYSTEM 이벤트 12종과 USER의 NULL `event_type` 조건을 허용한다. 최종확인 migration `20261102_003`은 SYSTEM 이벤트 `FINAL_CONFIRMATION_CONFIRMED`를 추가한다. 결재 처리 및 임시저장/취소/참조확인/최종확인 메시지는 `owner_type='APPROVAL'`, `comment_type='SYSTEM'`으로 같은 타임라인에 표시하며 서비스/API에서 수정·삭제·답글·좋아요를 차단한다.
 - `(tenant_id, comment_id)` unique 키는 댓글 좋아요의 tenant 일치 FK를 지원한다.
 
 ### 2-18. tb_board_type
@@ -556,25 +595,26 @@
 | electronic_approval_line_id | bigserial | 결재선 행 PK |
 | tenant_id / electronic_approval_id | bigint | tenant 및 결재 문서 복합 FK |
 | stage_order / participant_order | integer | 결재 단계 및 단계 내 순서(1부터) |
-| participant_type | varchar(20) | 참여 유형 (`APPROVAL`, `AGREEMENT`, `REFERENCE`) |
+| participant_type | varchar(20) | 참여 유형 (`APPROVAL`, `AGREEMENT`, `REFERENCE`, 서버 전용 `FINAL_CONFIRMATION`) |
 | participant_user_id | varchar(100) | 작성 화면에서 선택한 사용자 키 |
 | participant_name | varchar(150) | 참여자 이름 스냅샷 |
 | participant_department_name | varchar(150) | 참여자 부서명 스냅샷 |
-| action_status | varchar(20) | 처리 상태; 참조 행은 미확인 NULL, 확인 완료 `CONFIRMED` |
-| pending_at | timestamp | 해당 결재 단계가 활성화된 시각; 대기 전·참조 행은 NULL |
-| action_at | timestamp | 결재 처리 또는 참조 확인 시각 |
-| action_comment | text | 결재 처리 의견; 참조 행은 NULL |
+| action_status | varchar(20) | 처리 상태; 참조 행은 미확인 NULL, 확인 완료 `CONFIRMED`; 최종확인은 `WAITING`, `PENDING`, `CONFIRMED` |
+| pending_at | timestamp | 해당 결재 단계가 활성화된 시각; 대기 전·참조 행은 NULL. 최종확인은 `PENDING` 및 `CONFIRMED`에서 NOT NULL |
+| action_at | timestamp | 결재 처리 또는 참조/최종 확인 시각 |
+| action_comment | text | 결재 처리 의견; 참조/최종 확인 행은 NULL |
 | created_at | timestamp | 생성 시각 |
 
 제약/역할:
 
 - 결재 본문과 `(tenant_id, electronic_approval_id)` FK로 연결되며 본문 삭제 시 결재선은 cascade 삭제된다.
-- 단계/참여자 순서와 문서 내 참여자 중복을 unique로 제한한다.
+- 단계/참여자 순서는 unique로 제한한다. 일반 결재/합의/참조 참여자는 문서별 participant user 중복을 막고, 최종확인 참여자는 문서당 한 행만 허용하는 partial unique index를 사용한다. 기안자는 일반 결재 행과 `FINAL_CONFIRMATION` 행에 함께 나타날 수 있다.
 - `action_status`: 결재/합의 `WAITING`, `PENDING`, `APPROVED`, `REJECTED`, `RETURNED`; 참조 `CONFIRMED`
-- 현재 MCP에서 `PENDING` 행은 `pending_at` 필수, `WAITING` 및 `REFERENCE` 행은 NULL인 검사 제약을 확인했다.
+- 현재 MCP에서 확인한 검사 제약은 `PENDING` 승인/합의 행의 `pending_at`을 필수로 하고, `WAITING` 및 `REFERENCE` 행의 처리 시각을 NULL로 제한한다. 날짜별 최종확인 migration은 서버 전용 행의 세 상태 조합을 추가한다.
 - `REFERENCE` 미확인 행은 처리 필드가 모두 NULL이다. 확인 완료 행은 `action_status='CONFIRMED'`, `action_at` NOT NULL이며 `pending_at`, `action_comment`는 NULL이다.
 - 승인/반려/보완요청 처리의 구조화된 값이 원본이며 공통 댓글 SYSTEM 행은 화면 타임라인 표시용이다.
 - 참조 확인은 참조 행별 `CONFIRMED`/`action_at`에 저장하고 SYSTEM 이벤트 `REFERENCE_CONFIRMED`를 타임라인에 추가한다.
+- 기안자 최종확인은 기안서의 최종 승인/반려 후 서버가 만든 `FINAL_CONFIRMATION` 행을 활성화해 대기시키며, 확인 완료를 `CONFIRMED`/`action_at`으로 저장하고 SYSTEM 이벤트 `FINAL_CONFIRMATION_CONFIRMED`를 타임라인에 추가한다. 배포 전 제출된 진행 중 기안서에 해당 행이 없으면 최종처리 트랜잭션에서 기안자 계정/문서 스냅샷으로 `PENDING` 행을 생성한다. 문서 상태는 변경하지 않는다.
 
 ### 2-26. tb_common_comment_like
 
@@ -881,6 +921,7 @@
 
 ## 변경 이력
 
+- 2026-11-02: 기안자 최종확인 도입 중 실제 결재선 participant unique 제약이 동일 기안자의 일반 결재 행/내부 최종확인 행 삽입을 막는 것을 MCP 메타데이터로 확인했다. 일반 participant 중복 제한과 문서당 최종확인 단일 행 제한으로 분리하고, 배포 전 진행 중 문서는 최종처리 시 확인 행을 생성하는 계약을 추가했다. [20261102_003 DDL/rollback/변경 이력](20261102/20261102_003_change_drafter_final_confirmation_schema.md) 참고.
 - 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
 - 2026-10-29: 참조자별 확인을 위해 `tb_electronic_approval_line_info` 참조 행의 `CONFIRMED`/`action_at` 상태와 `tb_common_comment` SYSTEM `REFERENCE_CONFIRMED` 이벤트를 허용하는 `20261029_001` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 테이블/컬럼 및 CHECK 제약 메타데이터를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261029](../../backend/DATABASE/20261029) 및 [docs/database/20261029](20261029) 참고.
 - 2026-10-30: `tb_common_comment` SYSTEM event CHECK 허용 목록에 참조자 추가 이력 `REFERENCE_ADDED`를 추가하는 `20261030_006` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP에서 기존 CHECK 제약을 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.

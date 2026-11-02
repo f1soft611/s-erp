@@ -345,6 +345,7 @@ export function useDocumentComposer(
               left.stageOrder - right.stageOrder ||
               left.participantOrder - right.participantOrder,
           )) {
+            if (line.participantType === 'FINAL_CONFIRMATION') continue;
             if (line.participantType === 'REFERENCE') {
               references.push(line.participantUserId);
               continue;

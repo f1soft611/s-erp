@@ -132,6 +132,20 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return update("DocumentApprovalDAO.confirmReferenceApprovalLine", params);
     }
 
+    public DocumentApprovalLineVO selectFinalConfirmationLineForUpdate(Map<String, Object> params)
+            throws Exception {
+        return (DocumentApprovalLineVO) selectOne(
+                "DocumentApprovalDAO.selectFinalConfirmationLineForUpdate", params);
+    }
+
+    public int confirmFinalConfirmationLine(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.confirmFinalConfirmationLine", params);
+    }
+
+    public DocumentApprovalLineVO selectFinalConfirmationLine(Map<String, Object> params) throws Exception {
+        return (DocumentApprovalLineVO) selectOne("DocumentApprovalDAO.selectFinalConfirmationLine", params);
+    }
+
     public DocumentApprovalLineVO selectUserReferenceApprovalLine(Map<String, Object> params) throws Exception {
         return (DocumentApprovalLineVO) selectOne(
                 "DocumentApprovalDAO.selectUserReferenceApprovalLine", params);
@@ -147,6 +161,14 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
 
     public int activateApprovalStage(Map<String, Object> params) throws Exception {
         return update("DocumentApprovalDAO.activateApprovalStage", params);
+    }
+
+    public int activateFinalConfirmationLine(Map<String, Object> params) throws Exception {
+        return update("DocumentApprovalDAO.activateFinalConfirmationLine", params);
+    }
+
+    public int insertFinalConfirmationLineForExistingDocument(Map<String, Object> params) throws Exception {
+        return insert("DocumentApprovalDAO.insertFinalConfirmationLineForExistingDocument", params);
     }
 
     public List<DocumentApprovalListItemVO> selectRelatedDocumentList(Map<String, Object> params) throws Exception {
@@ -199,6 +221,15 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
     public List<DocumentApprovalListItemVO> selectReferenceConfirmationItems(Map<String, Object> params)
             throws Exception {
         return selectList("DocumentApprovalDAO.selectReferenceConfirmationItems", params);
+    }
+
+    public Long selectFinalConfirmationRequiredCount(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectFinalConfirmationRequiredCount", params);
+    }
+
+    public List<DocumentApprovalListItemVO> selectFinalConfirmationItems(Map<String, Object> params)
+            throws Exception {
+        return selectList("DocumentApprovalDAO.selectFinalConfirmationItems", params);
     }
 
     public DocumentApprovalDetailVO selectDocumentApprovalDetail(Map<String, Object> params) throws Exception {

@@ -29,6 +29,7 @@ const composerApi = vi.hoisted(() => ({
   unpinDocumentApproval: vi.fn(),
   getDocumentApprovalSummary: vi.fn(),
   confirmDocumentReference: vi.fn(),
+  confirmDocumentFinalConfirmation: vi.fn(),
   addDocumentReferences: vi.fn(),
   getDocumentApprovalDetail: vi.fn(),
   listApprovalComments: vi.fn(),
@@ -131,6 +132,7 @@ vi.mock(
     unpinDocumentApproval: composerApi.unpinDocumentApproval,
     getDocumentApprovalSummary: composerApi.getDocumentApprovalSummary,
     confirmDocumentReference: composerApi.confirmDocumentReference,
+    confirmDocumentFinalConfirmation: composerApi.confirmDocumentFinalConfirmation,
     addDocumentReferences: composerApi.addDocumentReferences,
     getDocumentApprovalDetail: composerApi.getDocumentApprovalDetail,
     getExternalLinkPreview: vi.fn(),
@@ -500,6 +502,8 @@ beforeEach(() => {
     rejectedCount: 0,
     referenceConfirmationRequiredCount: 2,
     referenceConfirmationItems: defaultDocumentRecords.slice(0, 2),
+    finalConfirmationRequiredCount: 1,
+    finalConfirmationItems: defaultDocumentRecords.slice(0, 1),
     notices: [
       {
         electronicApprovalId: 1,
@@ -549,6 +553,11 @@ beforeEach(() => {
   composerApi.confirmDocumentReference.mockResolvedValue({
     electronicApprovalId: 1,
     actionStatus: 'CONFIRMED',
+  });
+  composerApi.confirmDocumentFinalConfirmation.mockReset().mockResolvedValue({
+    electronicApprovalId: 1,
+    actionStatus: 'CONFIRMED',
+    actionAt: '2026-11-02T02:00:00Z',
   });
   composerApi.addDocumentReferences.mockResolvedValue({
     electronicApprovalId: 1,
@@ -6835,6 +6844,53 @@ describe('Document write page', () => {
     });
   });
 
+  it('parses final-confirmation scope and refreshes its separate count and list', async () => {
+      expect(parseDocumentApprovalScope('MY_FINAL_CONFIRMATION_PENDING')).toBe('MY_FINAL_CONFIRMATION_PENDING');
+      mockPaginatedDocumentLists();
+      const { result } = renderHook(() => useDocumentWritePage());
+      act(() => result.current.selectScope('MY_FINAL_CONFIRMATION_PENDING'));
+      await waitFor(() => {
+        expect(composerApi.listDocumentApprovals).toHaveBeenLastCalledWith(
+          'MY_FINAL_CONFIRMATION_PENDING', undefined, undefined, false, { offset: 0, limit: 20 },
+        );
+        expect(result.current.finalConfirmationRequiredCount).toBe(1);
+        expect(result.current.referenceConfirmationRequiredCount).toBe(2);
+      });
+      const previousListCalls = composerApi.listDocumentApprovals.mock.calls.length;
+      const previousSummaryCalls = composerApi.getDocumentApprovalSummary.mock.calls.length;
+      composerApi.getDocumentApprovalSummary.mockResolvedValue({
+        ...result.current.summary, finalConfirmationRequiredCount: 0, finalConfirmationItems: [],
+      });
+      act(() => result.current.refresh());
+      await waitFor(() => {
+        expect(result.current.finalConfirmationRequiredCount).toBe(0);
+        expect(composerApi.listDocumentApprovals.mock.calls.length).toBe(previousListCalls + 1);
+        expect(composerApi.getDocumentApprovalSummary.mock.calls.length).toBe(previousSummaryCalls + 1);
+      });
+    });
+
+    it('excludes the internal final-confirmation row when restoring the editable approval line', async () => {
+      const record = defaultDocumentRecords[0]!;
+      render(<DocumentComposerDialog open onClose={vi.fn()} initialDocument={toFeedRecord(record, {
+        documentStatus: 'REVISION_REQUESTED', isDrafter: true,
+        approvalLines: [
+          { electronicApprovalLineId: 1, stageOrder: 1, participantOrder: 1, participantType: 'APPROVAL',
+            participantUserId: 'emp-1', participantName: '홍길동', actionStatus: 'APPROVED' },
+          { electronicApprovalLineId: 2, stageOrder: 2, participantOrder: 1, participantType: 'APPROVAL',
+            participantUserId: 'emp-2', participantName: '김민수', actionStatus: 'RETURNED' },
+          { electronicApprovalLineId: 3, stageOrder: 3, participantOrder: 1, participantType: 'FINAL_CONFIRMATION',
+            participantUserId: 'emp-1', participantName: '홍길동', actionStatus: 'WAITING' },
+        ],
+      })} />);
+      await screen.findByRole('textbox', { name: '기안자' });
+      await act(async () => {
+        fireEvent.click(await screen.findByRole('button', { name: '결재선 설정' }));
+      });
+      const settings = screen.getByRole('dialog', { name: '결재선 설정' });
+      expect(within(settings).queryByRole('group', { name: '결재 3 홍길동' })).not.toBeInTheDocument();
+      expect(within(settings).getByRole('group', { name: '결재 2 김민수' })).toBeInTheDocument();
+    });
+
   it('presents reference additions in the existing system timeline style', () => {
     expect(getApprovalSystemEventPresentation('REFERENCE_ADDED')).toEqual({
       label: '참조자 추가',
@@ -7069,6 +7125,107 @@ describe('Document write page', () => {
     expect(composerNotifications.showSuccess).not.toHaveBeenCalled();
     expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledOnce();
     expect(onActionComplete).not.toHaveBeenCalled();
+  });
+
+  it.each(['COMPLETED', 'REJECTED'] as const)(
+    'confirms the drafter final line on a %s document without normal approval actions',
+    async (documentStatus) => {
+      const record = defaultDocumentRecords[0]!;
+      const line = {
+        electronicApprovalLineId: 151, stageOrder: 6, participantOrder: 1,
+        participantType: 'FINAL_CONFIRMATION' as const,
+        participantUserId: 'emp-1', participantName: '내부 최종확인 참여자',
+        actionStatus: 'PENDING',
+      };
+      composerApi.getDocumentApprovalDetail.mockReset()
+        .mockResolvedValueOnce(toFeedRecord(record, { documentStatus, isDrafter: true, approvalLines: [line] }))
+        .mockResolvedValueOnce(toFeedRecord(record, {
+          documentStatus, isDrafter: true, approvalLines: [{ ...line, actionStatus: 'CONFIRMED' }],
+        }));
+      let finish!: () => void;
+      composerApi.confirmDocumentFinalConfirmation.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+      composerApi.listApprovalComments.mockResolvedValue({
+        comments: [], systemEvents: [], hasPrevious: false, nextBeforeCommentId: null, resultCnt: 0,
+      });
+      const onActionComplete = vi.fn();
+      render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
+        onClose={vi.fn()} onActionComplete={onActionComplete} onEditDocument={vi.fn()} detailRefreshToken={0} />);
+      const button = await screen.findByRole('button', { name: '최종확인', exact: true });
+      expect(screen.queryByRole('button', { name: '승인', exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '반려', exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByText('내부 최종확인 참여자')).not.toBeInTheDocument();
+      composerApi.listApprovalComments.mockResolvedValue({
+        comments: [], hasPrevious: false, nextBeforeCommentId: null, resultCnt: 0,
+        systemEvents: [{
+          commentId: 501, ownerId: record.electronicApprovalId, commentType: 'SYSTEM',
+          eventType: 'FINAL_CONFIRMATION_CONFIRMED', content: '기안자가 최종 확인을 완료했습니다.',
+          writerName: '기안자', createdAt: '2026-11-02T02:00:00Z',
+        }],
+      });
+      fireEvent.click(button);
+      expect(button).toBeDisabled();
+      await act(async () => finish());
+      await waitFor(() => {
+        expect(composerApi.confirmDocumentFinalConfirmation).toHaveBeenCalledWith(record.electronicApprovalId);
+        expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledTimes(2);
+        expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
+        expect(onActionComplete).toHaveBeenCalledOnce();
+        expect(screen.queryByRole('button', { name: '최종확인', exact: true })).not.toBeInTheDocument();
+      });
+      expect(await screen.findByText('기안자가 최종 확인을 완료했습니다.')).toBeInTheDocument();
+      expect(screen.getAllByText(documentStatus === 'COMPLETED' ? '승인' : '반려').length).toBeGreaterThan(0);
+      expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
+      expect(composerApi.confirmDocumentReference).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { isDrafter: false },
+    { participantUserId: 'emp-2' },
+    { actionStatus: 'WAITING' },
+    { actionStatus: 'CONFIRMED' },
+    { documentStatus: 'IN_PROGRESS' },
+    { documentStatus: 'REVISION_REQUESTED' },
+    { documentType: 'BUSINESS_CONTACT' },
+  ])('does not expose ineligible final-confirmation actions: %j', async (patch) => {
+    const record = defaultDocumentRecords[0]!;
+    composerApi.getDocumentApprovalDetail.mockReset().mockResolvedValueOnce(toFeedRecord(record, {
+      documentStatus: 'COMPLETED', isDrafter: true,
+      ...(patch.documentStatus ? { documentStatus: patch.documentStatus } : {}),
+      ...(patch.documentType ? { documentType: patch.documentType } : {}),
+      ...(patch.isDrafter === false ? { isDrafter: false } : {}),
+      approvalLines: [{
+        electronicApprovalLineId: 151, stageOrder: 6, participantOrder: 1,
+        participantType: 'FINAL_CONFIRMATION', participantUserId: patch.participantUserId ?? 'emp-1',
+        participantName: '내부 참여자', actionStatus: patch.actionStatus ?? 'PENDING',
+      }],
+    } as Partial<DocumentApprovalFeedRecord>));
+    render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
+      onClose={vi.fn()} onActionComplete={vi.fn()} onEditDocument={vi.fn()} detailRefreshToken={0} />);
+    await screen.findByRole('heading', { name: '문서 상세' });
+    expect(screen.queryByRole('button', { name: '최종확인', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '승인', exact: true })).not.toBeInTheDocument();
+  });
+
+  it('keeps final-confirmation failures visible without refreshing as success', async () => {
+    const record = defaultDocumentRecords[0]!;
+    composerApi.getDocumentApprovalDetail.mockReset().mockResolvedValue(toFeedRecord(record, {
+      documentStatus: 'COMPLETED', isDrafter: true,
+      approvalLines: [{
+        electronicApprovalLineId: 151, stageOrder: 6, participantOrder: 1,
+        participantType: 'FINAL_CONFIRMATION', participantUserId: 'emp-1',
+        participantName: '기안자', actionStatus: 'PENDING',
+      }],
+    }));
+    composerApi.confirmDocumentFinalConfirmation.mockRejectedValueOnce(new Error('최종확인 권한이 없습니다.'));
+    const onActionComplete = vi.fn();
+    render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
+      onClose={vi.fn()} onActionComplete={onActionComplete} onEditDocument={vi.fn()} detailRefreshToken={0} />);
+    fireEvent.click(await screen.findByRole('button', { name: '최종확인', exact: true }));
+    expect(await screen.findByText('최종확인 권한이 없습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '최종확인', exact: true })).toBeEnabled();
+    expect(onActionComplete).not.toHaveBeenCalled();
+    expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledOnce();
   });
 
   it('confirms only the authenticated employee reference and reloads detail and comments', async () => {

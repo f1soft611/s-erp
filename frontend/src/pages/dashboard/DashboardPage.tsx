@@ -2,6 +2,7 @@ import {
   AppBar,
   Avatar,
   Box,
+  Button,
   IconButton,
   ListItemIcon,
   Menu,
@@ -10,6 +11,8 @@ import {
   Tooltip,
   Typography,
   useTheme,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlined from '@mui/icons-material/LightModeOutlined';
@@ -40,6 +43,10 @@ import {
   fetchMyMenus,
   hydrateModuleDescriptors,
 } from './services/menuService';
+import {
+  fetchMenuFavorites,
+} from './services/menuFavorite.service';
+import type { MenuFavoritesResponse } from './types/menuFavorite.types';
 import { fetchModuleRows } from '../settings/system/modules/services/moduleManagement.service';
 import { DashboardSidebar } from './components/DashboardSidebar';
 import { DashboardContent } from './components/DashboardContent';
@@ -186,6 +193,12 @@ function DashboardPage() {
     emptyUserMenuResponse.user,
   );
   const [menusLoading, setMenusLoading] = useState(true);
+  const [favorites, setFavorites] = useState<MenuFavoritesResponse>({
+    folders: [],
+    favorites: [],
+  });
+  const [favoritesSelected, setFavoritesSelected] = useState(false);
+  const [favoritesMessage, setFavoritesMessage] = useState('');
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
   const [menusReloadToken, setMenusReloadToken] = useState(0);
   const lastRecordedMenuRef = useRef('');
@@ -236,6 +249,15 @@ function DashboardPage() {
           buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
         );
         succeed();
+        fetchMenuFavorites()
+          .then(setFavorites)
+          .catch((cause: unknown) => {
+            if (!cancelled) {
+              setFavoritesMessage(
+                cause instanceof Error ? cause.message : '즐겨찾기를 불러오지 못했습니다.',
+              );
+            }
+          });
       })
       .catch((cause: unknown) => {
         if (!cancelled) {
@@ -407,6 +429,7 @@ function DashboardPage() {
   const isDarkTheme = themeMode === 'dark';
 
   const handleModuleChange = (moduleId: string) => {
+    setFavoritesSelected(false);
     const nextModule =
       moduleItems.find((module) => module.id === moduleId) ?? moduleItems[0];
     if (!nextModule) {
@@ -425,6 +448,28 @@ function DashboardPage() {
   const handleMenuSelect = (menuId: string) => {
     const targetPath = getMenuRoutePath(selectedModule, menuId);
     navigate(targetPath);
+  };
+
+  const refreshFavorites = async () => {
+    const response = await fetchMenuFavorites();
+    setFavorites(response);
+    setFavoritesMessage('');
+  };
+
+  const retryFavorites = async () => {
+    try {
+      await refreshFavorites();
+    } catch (cause) {
+      setFavoritesMessage(
+        cause instanceof Error ? cause.message : '즐겨찾기를 불러오지 못했습니다.',
+      );
+    }
+  };
+
+  const handleFavoriteMenuSelect = (moduleId: string, menuId: string) => {
+    const module = moduleItems.find((item) => item.id === moduleId);
+    if (!module) return;
+    navigate(getMenuRoutePath(module, menuId));
   };
 
   const handleRecentMenuSelect = (path: string) => {
@@ -644,6 +689,13 @@ function DashboardPage() {
             moduleItems={moduleItems}
             selectedModuleId={selectedModuleId}
             selectedModule={selectedModule}
+            favorites={favorites}
+            favoritesSelected={favoritesSelected}
+            onFavoritesSelect={() => setFavoritesSelected(true)}
+            onFavoritesMore={() => setFavoritesSelected(true)}
+            onFavoriteMenuSelect={handleFavoriteMenuSelect}
+            onFavoritesRefresh={refreshFavorites}
+            onFavoritesError={setFavoritesMessage}
             expandedItemIds={expandedItemIds}
             selectedMenuId={selectedMenuId}
             recentMenuItems={recentMenuState}
@@ -718,6 +770,24 @@ function DashboardPage() {
                           <MenuOpenOutlined fontSize="small" />
                         )}
                       </IconButton>
+                      <Snackbar
+                        open={Boolean(favoritesMessage)}
+                        autoHideDuration={null}
+                        onClose={() => setFavoritesMessage('')}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                      >
+                        <Alert
+                          severity="error"
+                          onClose={() => setFavoritesMessage('')}
+                          action={
+                            <Button color="inherit" size="small" onClick={() => void retryFavorites()}>
+                              다시 시도
+                            </Button>
+                          }
+                        >
+                          {favoritesMessage}
+                        </Alert>
+                      </Snackbar>
                       <Typography
                         variant="h6"
                         component="h1"

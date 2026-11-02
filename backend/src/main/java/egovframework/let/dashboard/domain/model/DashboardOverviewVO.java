@@ -29,6 +29,8 @@ public class DashboardOverviewVO {
         private List<WorkItem> notices = new ArrayList<>();
         private Long referenceConfirmationRequiredCount;
         private List<ReferenceConfirmationItem> referenceConfirmationItems = new ArrayList<>();
+        private Long finalConfirmationRequiredCount;
+        private List<ReferenceConfirmationItem> finalConfirmationItems = new ArrayList<>();
     }
 
     @Getter

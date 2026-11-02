@@ -86,6 +86,8 @@ class DashboardServiceTest {
         summary.setRevisionRequestedCount(99L);
         summary.setReferenceConfirmationRequiredCount(0L);
         summary.setReferenceConfirmationItems(Collections.emptyList());
+        summary.setFinalConfirmationRequiredCount(0L);
+        summary.setFinalConfirmationItems(Collections.emptyList());
         when(approvals.getSummary(user)).thenReturn(summary);
         when(dao.selectMyRevisionCount(any())).thenReturn(2L);
         when(dao.selectNotices(any())).thenThrow(new IllegalStateException("internal source failure"));
@@ -112,6 +114,9 @@ class DashboardServiceTest {
         summary.setReferenceConfirmationItems(Arrays.asList(
                 approvalItem(401L, "참조 문서 1", null),
                 approvalItem(402L, "참조 문서 2", null)));
+        summary.setFinalConfirmationRequiredCount(1L);
+        summary.setFinalConfirmationItems(Collections.singletonList(
+                approvalItem(501L, "최종 확인 문서", null)));
         when(approvals.getSummary(user)).thenReturn(summary);
         when(dao.selectMyRevisionCount(any())).thenReturn(0L);
 
@@ -129,6 +134,10 @@ class DashboardServiceTest {
                 .isEqualTo("참조 문서 1");
         assertThat(approval.path("referenceConfirmationItems").get(1).path("electronicApprovalId").asLong())
                 .isEqualTo(402L);
+        assertThat(approval.path("finalConfirmationRequiredCount").asLong()).isEqualTo(1L);
+        assertThat(approval.path("finalConfirmationItems")).hasSize(1);
+        assertThat(approval.path("finalConfirmationItems").get(0).path("electronicApprovalId").asLong())
+                .isEqualTo(501L);
         assertThat(approval.path("referenceConfirmationItems").get(1).path("title").asText())
                 .isEqualTo("참조 문서 2");
         assertThat(approval.path("notices")).hasSize(1);
@@ -142,6 +151,8 @@ class DashboardServiceTest {
         DocumentApprovalSummaryVO summary = new DocumentApprovalSummaryVO();
         summary.setActionRequiredCount(3L);
         summary.setReferenceConfirmationRequiredCount(0L);
+        summary.setFinalConfirmationRequiredCount(0L);
+        summary.setFinalConfirmationItems(Collections.emptyList());
         when(approvals.getSummary(user)).thenReturn(summary);
 
         DashboardOverviewVO result = service.overview(user);

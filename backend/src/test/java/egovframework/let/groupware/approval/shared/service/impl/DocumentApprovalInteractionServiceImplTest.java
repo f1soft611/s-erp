@@ -852,18 +852,72 @@ class DocumentApprovalInteractionServiceImplTest {
         assertThat(submitted.getEabusNo()).isEqualTo("001");
         assertThat(submitted.getSubmittedAt()).isEqualTo(submittedAt);
         ArgumentCaptor<Map<String, Object>> lineParams = mapCaptor();
-        verify(approvalDAO, org.mockito.Mockito.times(2)).insertDocumentApprovalLine(lineParams.capture());
+        verify(approvalDAO, org.mockito.Mockito.times(3)).insertDocumentApprovalLine(lineParams.capture());
         assertThat(lineParams.getAllValues()).extracting(params -> params.get("actionStatus"))
-            .containsExactly("APPROVED", "PENDING");
+            .containsExactly("APPROVED", "PENDING", "WAITING");
         assertThat(lineParams.getAllValues().get(0).get("actionAt")).isNotNull();
         assertThat(lineParams.getAllValues().get(0).get("pendingAt")).isNull();
         assertThat(lineParams.getAllValues().get(1).get("pendingAt")).isNotNull();
+        assertThat(lineParams.getAllValues().get(2))
+            .containsEntry("participantType", "FINAL_CONFIRMATION")
+            .containsEntry("participantUserId", "101")
+            .containsEntry("participantName", "작성자")
+            .containsEntry("participantDepartmentName", "기획팀")
+            .containsEntry("stageOrder", 3)
+            .containsEntry("participantOrder", 1)
+            .containsEntry("pendingAt", null)
+            .containsEntry("actionAt", null)
+            .containsEntry("actionComment", null);
 
         verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
             "DRAFT".equals(params.get("expectedDocumentStatus"))
                 && "PENDING".equals(params.get("nextDocumentStatus"))));
         verify(commentDAO).insertSystemComment(argThat(params ->
             "SUBMITTED".equals(params.get("eventType")) && Long.valueOf(77L).equals(params.get("ownerId"))));
+    }
+
+    @Test
+    void submitAddsFinalConfirmationAfterReferenceStage() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setApprovalLines(Arrays.asList(
+            line(1, 1, "APPROVAL", "101"),
+            line(2, 1, "AGREEMENT", "202"),
+            line(3, 1, "REFERENCE", "303")));
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("DRAFT"));
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀"),
+            participant("303", "참조자", "기획팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(3);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("PENDING"));
+
+        sharedService().submit(author, 77L, request);
+
+        verify(approvalDAO).insertDocumentApprovalLine(argThat(params ->
+            "FINAL_CONFIRMATION".equals(params.get("participantType"))
+                && Integer.valueOf(4).equals(params.get("stageOrder"))
+                && Integer.valueOf(1).equals(params.get("participantOrder"))
+                && "101".equals(params.get("participantUserId"))
+                && "WAITING".equals(params.get("actionStatus"))));
+    }
+
+    @Test
+    void submitRejectsClientSuppliedFinalConfirmationLine() throws Exception {
+        DocumentApprovalDraftSaveRequestVO request = request();
+        request.setApprovalLines(Arrays.asList(
+            line(1, 1, "APPROVAL", "101"),
+            line(2, 1, "FINAL_CONFIRMATION", "101")));
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("DRAFT"));
+
+        assertThatThrownBy(() -> sharedService().submit(author, 77L, request))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(approvalDAO, never()).updateDocumentApprovalMain(anyMap());
+        verify(approvalDAO, never()).insertDocumentApprovalLine(anyMap());
     }
 
     @Test
@@ -892,6 +946,88 @@ class DocumentApprovalInteractionServiceImplTest {
                 && "IN_PROGRESS".equals(params.get("nextDocumentStatus"))));
         verify(commentDAO).insertSystemComment(argThat(params ->
             "APPROVED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void finalApprovalActivatesDrafterConfirmationWithoutWritingCompletedEvent() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.selectPendingApprovalCountForStage(anyMap())).thenReturn(0L);
+        when(approvalDAO.selectNextWaitingApprovalStage(anyMap())).thenReturn(null);
+        when(approvalDAO.activateFinalConfirmationLine(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("COMPLETED");
+        assertThat(org.mockito.Mockito.mockingDetails(approvalDAO).getInvocations())
+            .anyMatch(invocation -> invocation.getMethod().getName().equals("activateFinalConfirmationLine")
+                && Long.valueOf(77L).equals(((Map<?, ?>) invocation.getArgument(0)).get("electronicApprovalId")));
+        verify(commentDAO).insertSystemComment(argThat(params -> "APPROVED".equals(params.get("eventType"))));
+        verify(commentDAO, never()).insertSystemComment(argThat(params -> "COMPLETED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void finalApprovalCreatesConfirmationForLegacyInFlightDocumentWithoutOne() throws Exception {
+        DocumentApprovalDAO legacyDao = mock(DocumentApprovalDAO.class, invocation -> {
+            if ("insertFinalConfirmationLineForExistingDocument".equals(invocation.getMethod().getName())) {
+                return 1;
+            }
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        when(legacyDao.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(legacyDao.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(legacyDao.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(legacyDao.selectPendingApprovalCountForStage(anyMap())).thenReturn(0L);
+        when(legacyDao.selectNextWaitingApprovalStage(anyMap())).thenReturn(null);
+        when(legacyDao.activateFinalConfirmationLine(anyMap())).thenReturn(0);
+        when(legacyDao.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        DocumentApprovalDraftVO result = sharedService(legacyDao).processAction(approver, 77L, request);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("COMPLETED");
+        assertThat(org.mockito.Mockito.mockingDetails(legacyDao).getInvocations())
+            .anyMatch(invocation -> invocation.getMethod().getName()
+                .equals("insertFinalConfirmationLineForExistingDocument"));
+    }
+
+    @Test
+    void rejectionActivatesDrafterConfirmationAndPreservesRejectedDocumentStatus() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("REJECTED");
+        request.setActionComment("반려 사유");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(approvalDAO.activateFinalConfirmationLine(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
+
+        assertThat(result.getDocumentStatus()).isEqualTo("REJECTED");
+        verify(approvalDAO).activateFinalConfirmationLine(argThat(params ->
+            Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && Long.valueOf(4L).equals(params.get("tenantId"))));
+        verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
+            "REJECTED".equals(params.get("nextDocumentStatus"))));
+        verify(commentDAO).insertSystemComment(argThat(params -> "REJECTED".equals(params.get("eventType"))));
     }
 
     @Test
@@ -943,6 +1079,51 @@ class DocumentApprovalInteractionServiceImplTest {
             .filter(method -> method.getName().equals("confirmReference"))
             .findFirst().orElseThrow(AssertionError::new);
         assertThat(confirmationMethod.getAnnotation(Transactional.class)).isNotNull();
+    }
+
+    @Test
+    void finalConfirmationPreservesDocumentStatusAndWritesOneSystemEvent() throws Exception {
+        Date pendingAt = new Date(1_798_000_000_000L);
+        Date confirmedAt = new Date(1_798_000_100_000L);
+        DocumentApprovalLineVO pendingLine = finalConfirmationLine(51L, "PENDING", pendingAt, null);
+        DocumentApprovalLineVO confirmedLine = finalConfirmationLine(51L, "CONFIRMED", pendingAt, confirmedAt);
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("REJECTED"));
+        when(approvalDAO.selectFinalConfirmationLineForUpdate(anyMap())).thenReturn(pendingLine);
+        when(approvalDAO.confirmFinalConfirmationLine(anyMap())).thenReturn(1);
+        when(approvalDAO.selectFinalConfirmationLine(anyMap())).thenReturn(confirmedLine);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        Object result = invokeApprovalMethod("confirmFinalConfirmation",
+            new Class<?>[] {LoginVO.class, Long.class}, author, 77L);
+
+        assertThat(readProperty(result, "getElectronicApprovalId")).isEqualTo(77L);
+        assertThat(readProperty(result, "getActionStatus")).isEqualTo("CONFIRMED");
+        assertThat(readProperty(result, "getActionAt")).isEqualTo(confirmedAt);
+        verify(approvalDAO).confirmFinalConfirmationLine(argThat(params ->
+            Long.valueOf(77L).equals(params.get("electronicApprovalId"))
+                && Long.valueOf(51L).equals(params.get("electronicApprovalLineId"))
+                && "101".equals(params.get("participantUserId"))
+                && Long.valueOf(4L).equals(params.get("tenantId"))));
+        verify(approvalDAO, never()).updateDocumentApprovalStatus(anyMap());
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "FINAL_CONFIRMATION_CONFIRMED".equals(params.get("eventType"))
+                && "기안자가 최종 확인을 완료했습니다.".equals(params.get("content"))));
+    }
+
+    @Test
+    void repeatedFinalConfirmationReturnsExistingResultWithoutDuplicateEvent() throws Exception {
+        Date confirmedAt = new Date(1_798_000_100_000L);
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("COMPLETED"));
+        when(approvalDAO.selectFinalConfirmationLineForUpdate(anyMap()))
+            .thenReturn(finalConfirmationLine(51L, "CONFIRMED", new Date(1_798_000_000_000L), confirmedAt));
+
+        Object result = invokeApprovalMethod("confirmFinalConfirmation",
+            new Class<?>[] {LoginVO.class, Long.class}, author, 77L);
+
+        assertThat(readProperty(result, "getActionStatus")).isEqualTo("CONFIRMED");
+        assertThat(readProperty(result, "getActionAt")).isEqualTo(confirmedAt);
+        verify(approvalDAO, never()).confirmFinalConfirmationLine(anyMap());
+        verifyNoInteractions(commentDAO);
     }
 
     @Test
@@ -1264,8 +1445,17 @@ class DocumentApprovalInteractionServiceImplTest {
 
     private DocumentApprovalInteractionServiceImpl sharedService(
             EmbeddedImageStorageService storage, NotificationService notifications) {
+        return sharedService(approvalDAO, storage, notifications);
+    }
+
+    private DocumentApprovalInteractionServiceImpl sharedService(DocumentApprovalDAO dao) {
+        return sharedService(dao, imageStorageService, mock(NotificationService.class));
+    }
+
+    private DocumentApprovalInteractionServiceImpl sharedService(
+            DocumentApprovalDAO dao, EmbeddedImageStorageService storage, NotificationService notifications) {
         DocumentApprovalAccessServiceImpl access = accessService();
-        return new DocumentApprovalInteractionServiceImpl(approvalDAO, commentDAO, fileService, storage, access,
+        return new DocumentApprovalInteractionServiceImpl(dao, commentDAO, fileService, storage, access,
                 draftSupportService(storage, access), commentSupportService(), notifications);
     }
 
@@ -1392,6 +1582,15 @@ class DocumentApprovalInteractionServiceImplTest {
     private DocumentApprovalLineVO referenceLine(Long id, String userId, String actionStatus, Date actionAt) {
         DocumentApprovalLineVO line = pendingLine(id, 1, "REFERENCE", userId);
         line.setActionStatus(actionStatus);
+        line.setActionAt(actionAt);
+        return line;
+    }
+
+    private DocumentApprovalLineVO finalConfirmationLine(
+            Long id, String actionStatus, Date pendingAt, Date actionAt) {
+        DocumentApprovalLineVO line = pendingLine(id, 3, "FINAL_CONFIRMATION", "101");
+        line.setActionStatus(actionStatus);
+        line.setPendingAt(pendingAt);
         line.setActionAt(actionAt);
         return line;
     }
