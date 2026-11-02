@@ -37,7 +37,11 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
   const approval = overview?.approval;
   const approvalPathForScope = (scope: 'MY_PENDING' | 'DRAFT' | 'REVISION_REQUESTED') =>
     `${approvalPath}?${new URLSearchParams({ dashboardScope: scope })}`;
-  const afterDocumentAction = () => {
+  const afterDocumentAction = (options?: { quiet?: boolean }) => {
+    if (options?.quiet) {
+      data.refreshQuietly();
+      return;
+    }
     setDetailVersion((v) => v + 1);
     data.refresh();
   };
@@ -183,6 +187,32 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                           {approval.referenceConfirmationItems.map((item) => (
                             <OverviewListRow key={item.electronicApprovalId}
                               label={`참조 확인 문서 ${item.title}`}
+                              onClick={() => setDocumentId(item.electronicApprovalId)}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, overflowWrap: 'anywhere' }}>
+                                  {item.title}
+                                </Typography>
+                              </Box>
+                            </OverviewListRow>
+                          ))}
+                        </Stack>
+                      )}
+                  </OverviewPanel>
+                </Box>
+              )}
+              {overview.canReadApprovals && overview.approvalStatus === 'ready' && approval && (
+                <Box sx={{ minWidth: 0 }}>
+                  <OverviewPanel focus title="내가 최종 확인할 문서"
+                    caption="최종 승인 또는 반려된 문서 중 아직 확인하지 않은 문서"
+                    icon={<TaskAltRounded fontSize="small" />}
+                    action={<Chip size="small" label={`${approval.finalConfirmationRequiredCount.toLocaleString('ko-KR')}건`} />}>
+                    {approval.finalConfirmationItems.length === 0
+                      ? <OverviewEmpty>최종 확인할 문서가 없습니다.</OverviewEmpty>
+                      : (
+                        <Stack spacing={1}>
+                          {approval.finalConfirmationItems.map((item) => (
+                            <OverviewListRow key={item.electronicApprovalId}
+                              label={`최종확인 문서 ${item.title}`}
                               onClick={() => setDocumentId(item.electronicApprovalId)}>
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, overflowWrap: 'anywhere' }}>

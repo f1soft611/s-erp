@@ -15,6 +15,8 @@ export type DashboardOverview = {
     revisionRequestedCount: number;
     referenceConfirmationRequiredCount: number;
     referenceConfirmationItems: { electronicApprovalId: number; title: string }[];
+    finalConfirmationRequiredCount: number;
+    finalConfirmationItems: { electronicApprovalId: number; title: string }[];
     notices: { electronicApprovalId: number; title: string; noticeType: string }[];
   } | null;
   notices: { postId: number; title: string; isPinned: string; createdAt: string }[];

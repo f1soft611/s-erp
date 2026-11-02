@@ -48,6 +48,8 @@ type DashboardContentProps = {
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
   requestedApprovalId?: number | null;
   onRequestedApprovalClose?: () => void;
+  requestedPostId?: number | null;
+  onRequestedPostClose?: () => void;
   sharedDocumentId?: number | string | null;
   onSharedDocumentClose?: () => void;
 };
@@ -153,6 +155,8 @@ export function DashboardContent({
   dashboardScope = null,
   onDashboardScopeChange,
   requestedApprovalId,
+  requestedPostId,
+  onRequestedPostClose,
   onRequestedApprovalClose,
   sharedDocumentId,
   onSharedDocumentClose,
@@ -258,6 +262,8 @@ export function DashboardContent({
         selectedModule={selectedModule}
         currentMenuName={currentMenuName}
         content={content}
+        requestedPostId={requestedPostId}
+        onRequestedPostClose={onRequestedPostClose}
       />
     );
   }

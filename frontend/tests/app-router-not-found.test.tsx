@@ -53,6 +53,23 @@ afterEach(() => {
 });
 
 describe('AppRouter not found fallback', () => {
+  it.each(['/search', '/search/'])('allows the authenticated common search page without a registered database menu: %s', async (path) => {
+    window.localStorage.setItem('s-erp-auth', JSON.stringify({
+      tenantCode: 'TEST', userId: 'test', accessToken: 'token', refreshToken: '',
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }));
+    render(
+      <AppSettingsProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRouter />
+        </MemoryRouter>
+      </AppSettingsProvider>,
+    );
+    expect(await screen.findByRole('heading', { name: '통합검색 결과' }, { timeout: 25000 })).toBeVisible();
+    expect(screen.getByLabelText('통합검색 검색어')).toBeVisible();
+    expect(screen.queryByText('요청하신 페이지를 찾을 수 없습니다')).not.toBeInTheDocument();
+  }, 30000);
+
   it('renders the NotFound page for unknown routes', async () => {
     render(
       <AppSettingsProvider>

@@ -97,6 +97,14 @@ function AppRouter() {
           }
         />
         <Route
+          path="/search"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/groupware/*"
           element={
             <ProtectedRoute>

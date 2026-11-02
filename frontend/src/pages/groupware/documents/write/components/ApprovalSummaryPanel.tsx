@@ -35,6 +35,11 @@ export function ApprovalSummaryPanel({
       count: summary?.referenceConfirmationRequiredCount ?? 0,
       label: '내가 확인할 문서',
     },
+    {
+      scope: 'MY_FINAL_CONFIRMATION_PENDING',
+      count: summary?.finalConfirmationRequiredCount ?? 0,
+      label: getDocumentApprovalScopeLabel('MY_FINAL_CONFIRMATION_PENDING'),
+    },
   ];
 
   return (

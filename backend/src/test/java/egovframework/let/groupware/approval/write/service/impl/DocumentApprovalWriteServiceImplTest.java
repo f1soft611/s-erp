@@ -379,6 +379,12 @@ class DocumentApprovalWriteServiceImplTest {
                 referenceActorParams.set(invocation.getArgument(0));
                 return referenceItems;
             }
+            if ("selectFinalConfirmationRequiredCount".equals(methodName)) {
+                return 1L;
+            }
+            if ("selectFinalConfirmationItems".equals(methodName)) {
+                return Collections.singletonList(listItem(51L, "COMPLETED", "Final confirmation"));
+            }
             return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
         });
         DocumentApprovalAccessServiceImpl access = new DocumentApprovalAccessServiceImpl(summaryDao);
@@ -399,6 +405,9 @@ class DocumentApprovalWriteServiceImplTest {
                 .isEqualTo("COMPLETED");
         assertThat(json.path("referenceConfirmationItems").get(1).path("documentStatus").asText())
                 .isEqualTo("REJECTED");
+        assertThat(json.path("finalConfirmationRequiredCount").asLong()).isEqualTo(1L);
+        assertThat(json.path("finalConfirmationItems").get(0).path("electronicApprovalId").asLong())
+                .isEqualTo(51L);
         assertThat(referenceActorParams.get())
                 .containsEntry("tenantId", 4L)
                 .containsEntry("participantUserId", "101");

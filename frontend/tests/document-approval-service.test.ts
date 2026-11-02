@@ -276,8 +276,10 @@ describe('document approval service', () => {
       revisionRequestedCount: 5,
       rejectedCount: 6,
       referenceConfirmationRequiredCount: 1,
+      finalConfirmationRequiredCount: 1,
       notices: [document],
       referenceConfirmationItems: [document],
+      finalConfirmationItems: [document],
     };
     const detail = {
       ...document,
@@ -353,6 +355,8 @@ describe('document approval service', () => {
           revisionRequestedCount: 0,
           rejectedCount: 0,
           referenceConfirmationRequiredCount,
+          finalConfirmationRequiredCount: 0,
+          finalConfirmationItems: [],
           notices: [],
           referenceConfirmationItems: [],
         },
@@ -378,6 +382,8 @@ describe('document approval service', () => {
           referenceConfirmationRequiredCount: 1,
           notices: [],
           referenceConfirmationItems: [referenceItem],
+          finalConfirmationRequiredCount: 0,
+          finalConfirmationItems: [],
         },
       });
 
@@ -405,6 +411,54 @@ describe('document approval service', () => {
       '/api/v1/groupware/approvals/41/reference-confirmation',
       {},
     );
+  });
+
+  it.each([
+    { finalConfirmationRequiredCount: undefined },
+    { finalConfirmationRequiredCount: -1 },
+    { finalConfirmationRequiredCount: 1.5 },
+    { finalConfirmationRequiredCount: Number.MAX_SAFE_INTEGER + 1 },
+    { finalConfirmationRequiredCount: '1' },
+    { finalConfirmationItems: undefined },
+    { finalConfirmationItems: null },
+    { finalConfirmationItems: [{ electronicApprovalId: 41, title: '불완전한 문서' }] },
+  ])('rejects malformed final-confirmation summaries: %j', async (patch) => {
+    api.get.mockResolvedValueOnce({ item: {
+      actionRequiredCount: 0, inProgressCount: 0, draftCount: 0,
+      completedCount: 0, revisionRequestedCount: 0, rejectedCount: 0,
+      referenceConfirmationRequiredCount: 0, referenceConfirmationItems: [],
+      finalConfirmationRequiredCount: 0, finalConfirmationItems: [], notices: [],
+      ...patch,
+    } });
+    await expect(getDocumentApprovalSummary()).rejects.toThrow('전자결재 요약 응답');
+  });
+
+  it('uses the dedicated final-confirmation endpoint and validates its persisted result', async () => {
+    const service = await import('../src/pages/groupware/documents/write/services/documentApproval.service');
+    const confirmFinal = Reflect.get(service, 'confirmDocumentFinalConfirmation');
+    expect(typeof confirmFinal).toBe('function');
+    const item = { electronicApprovalId: 41, actionStatus: 'CONFIRMED', actionAt: '2026-11-02T02:00:00Z' };
+    api.post.mockResolvedValueOnce({ item });
+    await expect(Reflect.apply(confirmFinal, undefined, [41])).resolves.toEqual(item);
+    expect(api.post).toHaveBeenCalledWith('/api/v1/groupware/approvals/41/final-confirmation', {});
+    await expect(Reflect.apply(confirmFinal, undefined, [0])).rejects.toThrow();
+    expect(api.post).toHaveBeenCalledOnce();
+    api.post.mockRejectedValueOnce(new Error('확인 권한이 없습니다.'));
+    await expect(Reflect.apply(confirmFinal, undefined, [41])).rejects.toThrow('확인 권한이 없습니다.');
+  });
+
+  it.each([
+    null,
+    { electronicApprovalId: 42, actionStatus: 'CONFIRMED', actionAt: '2026-11-02T02:00:00Z' },
+    { electronicApprovalId: 41, actionStatus: 'PENDING', actionAt: '2026-11-02T02:00:00Z' },
+    { electronicApprovalId: 41, actionStatus: 'CONFIRMED' },
+    { electronicApprovalId: 41, actionStatus: 'CONFIRMED', actionAt: 'not-a-date' },
+  ])('rejects malformed final-confirmation responses: %j', async (item) => {
+    const service = await import('../src/pages/groupware/documents/write/services/documentApproval.service');
+    const confirmFinal = Reflect.get(service, 'confirmDocumentFinalConfirmation');
+    expect(typeof confirmFinal).toBe('function');
+    api.post.mockResolvedValueOnce({ item });
+    await expect(Reflect.apply(confirmFinal, undefined, [41])).rejects.toThrow('최종확인 응답');
   });
 
   it('adds references with the approved endpoint and validates the persisted result', async () => {
