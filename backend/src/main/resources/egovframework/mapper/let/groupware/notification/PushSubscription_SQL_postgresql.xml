@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PushSubscriptionDAO">
+
+    <select id="lockSubscriptionOwner" parameterType="map" resultType="long">
+        SELECT user_id
+        FROM public.tb_user
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+        FOR UPDATE
+    </select>
+
+    <insert id="upsertSubscription" parameterType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO"
+            useGeneratedKeys="true" keyProperty="subscriptionId" keyColumn="subscription_id">
+        INSERT INTO public.tb_push_subscription (
+            tenant_id, user_id, endpoint_hash, endpoint_ciphertext, keys_ciphertext,
+            encryption_key_version, status, inactive_at
+        ) VALUES (
+            #{tenantId, jdbcType=BIGINT},
+            #{userId, jdbcType=BIGINT},
+            #{endpointHash, jdbcType=BINARY},
+            #{endpointCiphertext, jdbcType=BINARY},
+            #{keysCiphertext, jdbcType=BINARY},
+            #{encryptionKeyVersion, jdbcType=VARCHAR},
+            'ACTIVE',
+            NULL
+        )
+        ON CONFLICT (endpoint_hash) DO UPDATE
+        SET tenant_id = EXCLUDED.tenant_id,
+            user_id = EXCLUDED.user_id,
+            endpoint_ciphertext = EXCLUDED.endpoint_ciphertext,
+            keys_ciphertext = EXCLUDED.keys_ciphertext,
+            encryption_key_version = EXCLUDED.encryption_key_version,
+            status = 'ACTIVE',
+            inactive_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="deactivateSubscription" parameterType="map">
+        UPDATE public.tb_push_subscription
+        SET status = 'INACTIVE',
+            inactive_at = COALESCE(inactive_at, CURRENT_TIMESTAMP),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+          AND subscription_id = #{subscriptionId, jdbcType=BIGINT}
+          AND status = 'ACTIVE'
+    </update>
+
+    <select id="selectActiveSubscriptions" parameterType="map"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_hash AS endpointHash,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt,
+               inactive_at AS inactiveAt
+        FROM public.tb_push_subscription
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+          AND status = 'ACTIVE'
+        ORDER BY subscription_id
+    </select>
+
+    <select id="selectSubscriptionForDelivery" parameterType="long"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status
+        FROM public.tb_push_subscription
+        WHERE subscription_id = #{subscriptionId, jdbcType=BIGINT}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="countActiveSubscriptions" parameterType="map" resultType="long">
+        SELECT COUNT(*)
+        FROM public.tb_push_subscription
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="selectSubscription" parameterType="map"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_hash AS endpointHash,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt,
+               inactive_at AS inactiveAt
+        FROM public.tb_push_subscription
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+          AND subscription_id = #{subscriptionId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectSubscriptionByEndpointHash" parameterType="byte[]"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_hash AS endpointHash,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt,
+               inactive_at AS inactiveAt
+        FROM public.tb_push_subscription
+        WHERE endpoint_hash = #{endpointHash, jdbcType=BINARY}
+    </select>
+
+</mapper>

@@ -40,6 +40,24 @@ class NotificationMapperXmlTest {
         assertTrue(archiveOne.contains("notification_id = #{notificationId}"));
     }
 
+
+    @Test
+    void pushEnqueueResolvesNotificationByUniqueOwnerEventSourceTuple() throws Exception {
+        String xml = readMapper();
+        String resolve = selectBlock(xml, "selectNotificationId").replaceAll("\\s+", " ");
+        String pushState = selectBlock(xml, "selectPushNotification").replaceAll("\\s+", " ");
+
+        assertTrue(resolve.contains("tenant_id = #{tenantId}"));
+        assertTrue(resolve.contains("recipient_user_id = #{recipientUserId}"));
+        assertTrue(resolve.contains("event_type = #{eventType}"));
+        assertTrue(resolve.contains("source_type = #{sourceType}"));
+        assertTrue(resolve.contains("source_id = #{sourceId}"));
+        assertTrue(pushState.contains("notification_id = #{notificationId}"));
+        assertTrue(pushState.contains("tenant_id AS tenantId"));
+        assertTrue(pushState.contains("recipient_user_id AS recipientUserId"));
+        assertTrue(pushState.contains("archived_at AS archivedAt"));
+    }
+
     private static String selectBlock(String xml, String id) {
         return block(xml, "<select id=\"" + id + "\"", "</select>", id);
     }

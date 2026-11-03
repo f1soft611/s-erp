@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,11 +13,13 @@ import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.com.cmm.LoginVO;
 import egovframework.let.groupware.notification.domain.repository.NotificationDAO;
 import egovframework.let.groupware.notification.domain.model.NotificationVO;
+import egovframework.let.groupware.notification.service.PushDeliveryService;
 import egovframework.let.groupware.realtime.RealtimePublisher;
 import egovframework.let.groupware.realtime.RealtimeArea;
 
@@ -24,15 +27,91 @@ class NotificationServiceImplTest {
 
     private final NotificationDAO notificationDAO = mock(NotificationDAO.class);
     private final RealtimePublisher realtime = mock(RealtimePublisher.class);
-    private final NotificationServiceImpl service = new NotificationServiceImpl(notificationDAO, realtime);
+    private final PushDeliveryService pushDeliveryService = mock(PushDeliveryService.class);
+    private final NotificationServiceImpl service =
+            new NotificationServiceImpl(notificationDAO, realtime, pushDeliveryService);
 
     @Test
     void onlyInsertedEventsSignalOwnerAndDirectMessageArea() throws Exception {
         when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 0);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L);
         service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", 72L, "Title", "Summary");
         service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", 72L, "Title", "Summary");
         verify(realtime).publish(4L, 19L, RealtimeArea.NOTIFICATION);
         verify(realtime).publish(4L, 19L, RealtimeArea.MESSAGE);
+        verify(pushDeliveryService).enqueue(73L);
+        verify(notificationDAO).selectNotificationId(anyMap());
+    }
+
+
+    @Test
+    void insertsOneOutboxForNewNotificationUsingItsUniqueTupleInOrder() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L);
+
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE",
+                72L, "Title", "Summary");
+
+        org.mockito.InOrder order = inOrder(notificationDAO, pushDeliveryService);
+        order.verify(notificationDAO).insertNotification(anyMap());
+        order.verify(notificationDAO).selectNotificationId(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && Long.valueOf(19L).equals(params.get("recipientUserId"))
+                        && "DIRECT_MESSAGE_RECEIVED".equals(params.get("eventType"))
+                        && "DIRECT_MESSAGE".equals(params.get("sourceType"))
+                        && Long.valueOf(72L).equals(params.get("sourceId"))));
+        order.verify(pushDeliveryService).enqueue(73L);
+    }
+
+    @Test
+    void enqueuesBothSupportedNotificationEventTypes() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 1);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L, 74L);
+
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE",
+                72L, "Title", "Summary");
+        service.createEvent(4L, 19L, "APPROVAL_COMMENT_MENTION", "APPROVAL_COMMENT",
+                75L, "Title", "Summary");
+
+        verify(pushDeliveryService).enqueue(73L);
+        verify(pushDeliveryService).enqueue(74L);
+    }
+
+    @Test
+    void duplicateNotificationDoesNotResolveIdOrEnqueueAnotherOutbox() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(0);
+
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE",
+                72L, "Title", "Summary");
+
+        verify(notificationDAO, never()).selectNotificationId(anyMap());
+        verify(pushDeliveryService, never()).enqueue(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void outboxFailurePropagatesFromTheNotificationTransaction() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L);
+        org.mockito.Mockito.doThrow(new IllegalStateException("outbox insert failed"))
+                .when(pushDeliveryService).enqueue(73L);
+
+        assertThatThrownBy(() -> service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED",
+                "DIRECT_MESSAGE", 72L, "Title", "Summary"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("outbox insert failed");
+
+        try {
+            org.assertj.core.api.Assertions.assertThat(
+                    NotificationServiceImpl.class
+                            .getMethod("createEvent", Long.class, Long.class, String.class, String.class,
+                                    Long.class, String.class, String.class)
+                            .getAnnotation(Transactional.class))
+                    .isNotNull();
+        } catch (NoSuchMethodException error) {
+            throw new AssertionError(error);
+        }
+        verify(realtime, never()).publish(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

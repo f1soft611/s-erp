@@ -24,6 +24,12 @@ import type { MyProfile } from './types/profileSettings';
 import { PageLoadBoundary } from '../../shared/components/PageLoadBoundary';
 import { AppSaveButton } from '../../shared/components/AppSaveButton';
 import { useInitialLoadState } from '../../shared/hooks/useInitialLoadState';
+import {
+  disablePushOnCurrentDevice,
+  enablePushOnCurrentDevice,
+  getPushSubscriptionStatus,
+  type PushDeviceStatus,
+} from '../../shared/services/pushSubscriptionService';
 
 const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_IMAGE_SIZE = 512;
@@ -145,8 +151,26 @@ function ProfileSettingsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pushStatus, setPushStatus] = useState<PushDeviceStatus>({ state: 'loading' });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
   const [retryToken, setRetryToken] = useState(0);
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
+
+  useEffect(() => {
+    let active = true;
+    getPushSubscriptionStatus()
+      .then((status) => {
+        if (active) setPushStatus(status);
+      })
+      .catch(() => {
+        if (active) {
+          setPushStatus({ state: 'error' });
+          setPushError('웹 푸시 상태를 불러오지 못했습니다. 다시 시도해 주세요.');
+        }
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -201,6 +225,43 @@ function ProfileSettingsPage() {
       setSaving(false);
     }
   };
+
+  const handleEnablePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    try {
+      setPushStatus(await enablePushOnCurrentDevice());
+    } catch {
+      setPushStatus({ state: 'error' });
+      setPushError('웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    try {
+      setPushStatus(await disablePushOnCurrentDevice());
+    } catch {
+      setPushError('웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const pushStatusMessage = pushStatus.state === 'loading'
+    ? '웹 푸시 상태를 확인하고 있습니다.'
+    : pushStatus.state === 'enabled'
+      ? `이 기기에서 웹 푸시가 켜져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`
+      : pushStatus.state === 'denied'
+        ? '브라우저 설정에서 알림 권한을 허용해야 웹 푸시를 켤 수 있습니다.'
+        : pushStatus.state === 'unsupported'
+          ? '현재 브라우저 또는 보안 연결에서는 웹 푸시를 사용할 수 없습니다.'
+          : pushStatus.state === 'error'
+            ? '웹 푸시 상태를 불러오지 못했습니다.'
+            : `이 기기에서 웹 푸시가 꺼져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`;
 
   return (
     <Container
@@ -290,6 +351,46 @@ function ProfileSettingsPage() {
                 onChange={setStampImage}
                 onError={setError}
               />
+            </Box>
+          </Stack>
+        </Paper>
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+          <Stack spacing={2} sx={{ minWidth: 0 }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                웹 푸시 알림
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                이 브라우저에서 업무 알림을 받도록 설정합니다. 알림 종류별 설정은 제공하지 않습니다.
+              </Typography>
+            </Box>
+            <Typography role="status" aria-live="polite">
+              {pushStatusMessage}
+            </Typography>
+            {pushError ? <Alert severity="error">{pushError}</Alert> : null}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {pushStatus.state === 'enabled'
+                || (pushStatus.state === 'denied' && pushStatus.currentDevice?.subscribed) ? (
+                <Button
+                  variant="outlined"
+                  disabled={pushBusy}
+                  onClick={() => void handleDisablePush()}
+                  sx={{ maxWidth: '100%', whiteSpace: 'normal', textAlign: 'left' }}
+                >
+                  {pushBusy ? '웹 푸시 끄는 중...' : '이 기기에서 웹 푸시 끄기'}
+                </Button>
+              ) : pushStatus.state === 'loading' ? (
+                <Button disabled>상태 확인 중...</Button>
+              ) : pushStatus.state === 'denied' || pushStatus.state === 'unsupported' ? null : (
+                <Button
+                  variant="contained"
+                  disabled={pushBusy}
+                  onClick={() => void handleEnablePush()}
+                  sx={{ maxWidth: '100%', whiteSpace: 'normal', textAlign: 'left' }}
+                >
+                  {pushBusy ? '웹 푸시 켜는 중...' : '이 기기에서 웹 푸시 켜기'}
+                </Button>
+              )}
             </Box>
           </Stack>
         </Paper>
