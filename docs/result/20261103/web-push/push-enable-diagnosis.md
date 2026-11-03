@@ -60,3 +60,28 @@ Code inspection found a definite dispatch blocker: registration allowed the prov
 - No schema or screen changes. No credentials, endpoint values, or user rows were read for diagnosis; only metadata and status counts were retrieved.
 - Real external delivery is not yet verified. Reload/restart the backend and send a new unread notification to the subscribed recipient; existing permanent failures are not automatically replayed.
 - Closing a site tab or minimizing a supported browser differs from fully exiting it. Closed-browser delivery depends on browser/OS background push support and settings; force termination, offline/powered-off devices, or disabled OS notifications cannot be treated as a guaranteed real-time delivery environment.
+
+## Message/work copy, S-ERP logo, and detail navigation
+
+Implemented the requested presentation change:
+
+- Server payload includes only the existing notification metadata and `category`: `DIRECT_MESSAGE_RECEIVED` maps to `message`; other events map to `work`. The notification query now projects the existing `event_type` column. Default read-only MCP `list_tables`/`describe_table` confirmed that column; no rows, credentials, or schema changes were needed.
+- Service Worker displays `새 쪽지 알림이 왔습니다.` for messages and `새 업무 알림이 왔습니다.` for work. Old payloads without category retain the work fallback. Caller text, sender, contents, and navigation URL are not rendered.
+- `/push-icon.png` is a 256px PNG converted from the repository's existing `/logo.ico`. The app notification image changes; the browser/OS-owned application badge cannot be replaced by this setting.
+- Click navigation retains the fixed same-origin notification inbox, then calls the authenticated owner-scoped read API and uses the existing message/document resolver. Unauthenticated clicks preserve only a positive safe notification ID through login, never an arbitrary return URL. After login, permission checks still occur before detail access.
+
+Verification:
+
+- Backend payload/worker/notification mapper/push mapper suites passed (32 tests). The factory category regression failed before implementation, and the worker test verifies message category reaches the transport.
+- Frontend SW/login-return/inbox suites passed (18 tests). Existing login suite passed separately (10 tests); one combined run exceeded the dashboard lazy-load timeout.
+- Frontend build passed. Scoped lint for all presentation changes passed. Full lint remains blocked by the pre-existing conditional `useImperativeHandle` error in `tests/common-code-management-page.test.tsx:53`, with existing repository warnings; unrelated files were not changed.
+- Changed Java classes compiled with `javac --release 8`; temporary class output was removed.
+- `node tests\push-presentation.browser.mjs` passed against the existing S-ERP server at `127.0.0.1:4173`. Chromium decoded the logo, verified both detail routes with synthetic authorized service responses, and checked no horizontal overflow at 375/768/1280px. The existing server was left running.
+
+Screenshots show a clearly labelled browser preview of the real SW-generated title/body/icon, not native OS notification screenshots:
+
+- [375px](screenshots/push-presentation-375.png)
+- [768px](screenshots/push-presentation-768.png)
+- [1280px](screenshots/push-presentation-1280.png)
+
+Restart/reload the backend and refresh the frontend after deployment. If an old Service Worker remains waiting, close all S-ERP tabs and reopen the app to activate it. New notifications use the new category and icon; already displayed notifications do not change. Native OS rendering and external push delivery with the new copy are not asserted by the synthetic browser checks.
