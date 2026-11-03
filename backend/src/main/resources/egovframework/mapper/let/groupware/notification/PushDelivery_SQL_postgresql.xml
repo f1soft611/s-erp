@@ -19,8 +19,8 @@
             WHERE status = 'PENDING'
                OR (status = 'PROCESSING' AND lease_until &lt;= CURRENT_TIMESTAMP)
             ORDER BY created_at, outbox_id
-            FOR UPDATE SKIP LOCKED
             LIMIT #{limit, jdbcType=INTEGER}
+            FOR UPDATE SKIP LOCKED
         )
         UPDATE public.tb_push_outbox AS outbox
         SET status = 'PROCESSING',
@@ -143,8 +143,8 @@
                    AND delivery.lease_until &lt;= CURRENT_TIMESTAMP
                )
             ORDER BY COALESCE(delivery.next_attempt_at, delivery.created_at), delivery.delivery_id
-            FOR UPDATE OF delivery SKIP LOCKED
             LIMIT #{limit, jdbcType=INTEGER}
+            FOR UPDATE OF delivery SKIP LOCKED
         )
         UPDATE public.tb_push_delivery AS delivery
         SET status = 'PROCESSING',

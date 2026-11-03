@@ -935,7 +935,7 @@
 
 ## 변경 이력
 
-- 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 승인 사양의 이전 읽기 전용 PostgreSQL MCP metadata 확인 기록을 근거로 했으며, 본 작업에서는 새 조회를 수행하거나 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.
+- 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 구현 후 검토에서 읽기 전용 PostgreSQL MCP `list_tables`와 `describe_table`로 `tb_notification`, `tb_user`, `tb_tenant`의 현재 메타데이터를 재확인했고 데이터 행은 조회하지 않았으며, 실제 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.
 - 2026-11-02: 기안자 최종확인 도입 중 실제 결재선 participant unique 제약이 동일 기안자의 일반 결재 행/내부 최종확인 행 삽입을 막는 것을 MCP 메타데이터로 확인했다. 일반 participant 중복 제한과 문서당 최종확인 단일 행 제한으로 분리하고, 배포 전 진행 중 문서는 최종처리 시 확인 행을 생성하는 계약을 추가했다. [20261102_003 DDL/rollback/변경 이력](20261102/20261102_003_change_drafter_final_confirmation_schema.md) 참고.
 - 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
 - 2026-10-29: 참조자별 확인을 위해 `tb_electronic_approval_line_info` 참조 행의 `CONFIRMED`/`action_at` 상태와 `tb_common_comment` SYSTEM `REFERENCE_CONFIRMED` 이벤트를 허용하는 `20261029_001` migration 초안을 정의했다. 읽기 전용 PostgreSQL MCP의 테이블/컬럼 및 CHECK 제약 메타데이터를 확인했고, 행 데이터는 조회하지 않았다. 실제 DB에는 적용하지 않았다. [backend/DATABASE/20261029](../../backend/DATABASE/20261029) 및 [docs/database/20261029](20261029) 참고.

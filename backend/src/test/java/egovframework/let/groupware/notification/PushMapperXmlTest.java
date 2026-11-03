@@ -106,6 +106,10 @@ class PushMapperXmlTest {
         assertTrue(normalized.startsWith("WITH candidates AS"));
         assertTrue(normalized.contains("FOR UPDATE SKIP LOCKED")
                 || normalized.contains("FOR UPDATE OF delivery SKIP LOCKED"));
+        int limitIndex = normalized.indexOf("LIMIT #{limit");
+        int lockIndex = normalized.indexOf("FOR UPDATE");
+        assertTrue(limitIndex >= 0 && lockIndex > limitIndex,
+                "PostgreSQL LIMIT must precede the locking clause");
         assertTrue(normalized.contains("UPDATE public.tb_push_"));
         assertTrue(normalized.contains("lease_token = #{leaseToken"));
         assertTrue(normalized.contains("lease_until = #{leaseUntil"));
