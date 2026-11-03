@@ -55,6 +55,7 @@ class NotificationMapperXmlTest {
         assertTrue(pushState.contains("notification_id = #{notificationId}"));
         assertTrue(pushState.contains("tenant_id AS tenantId"));
         assertTrue(pushState.contains("recipient_user_id AS recipientUserId"));
+        assertTrue(pushState.contains("event_type AS eventType"));
         assertTrue(pushState.contains("archived_at AS archivedAt"));
     }
 
