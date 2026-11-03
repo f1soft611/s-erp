@@ -11,7 +11,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     await page.route('**/__push-presentation', (route) => route.fulfill({
       contentType: 'text/html',
-      body: '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:16px;font-family:sans-serif}#preview{display:grid;gap:12px}.push-preview{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #ccc;border-radius:12px}.push-preview img{width:48px;height:48px}*{box-sizing:border-box}</style></head><body><h2>푸시 표시 미리보기 (OS 알림 화면 아님)</h2><div id="preview"></div><div id="root"></div></body></html>',
+      body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:16px;font-family:sans-serif}#preview{display:grid;gap:12px}.push-preview{display:flex;align-items:center;gap:16px;padding:16px;border:1px solid #ccc;border-radius:12px}.push-preview img{width:48px;height:48px}*{box-sizing:border-box}</style></head><body><h2>푸시 표시 미리보기 (OS 알림 화면 아님)</h2><div id="preview"></div><div id="root"></div></body></html>',
     }));
     await page.route('**/src/shared/services/notificationService.ts*', (route) => route.fulfill({
       contentType: 'application/javascript',
