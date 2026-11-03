@@ -18,7 +18,7 @@ import {
   moveMenuFavorite,
   renameMenuFavoriteFolder,
 } from '../src/pages/dashboard/services/menuFavorite.service';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DashboardMenuTree } from '../src/pages/dashboard/components/DashboardMenuTree';
 import { MenuFavoritesTree } from '../src/pages/dashboard/components/MenuFavoritesTree';
 
@@ -452,5 +452,66 @@ describe('menu favorites service', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: '즐겨찾기 폴더 만들기' })).not.toBeInTheDocument();
     });
+  });
+
+  it('distinguishes folders from same-name menus without changing tree actions', () => {
+    const onMenuSelect = vi.fn();
+    render(
+      <MenuFavoritesTree
+        favorites={{
+          folders: [
+            { folderId: 11, folderName: '공지사항' },
+            { folderId: 12, folderName: '빈 폴더' },
+          ],
+          favorites: [
+            { favoriteId: 25, menuId: 210, folderId: null, favoriteName: null },
+            { favoriteId: 26, menuId: 211, folderId: 11, favoriteName: '결재 바로가기' },
+          ],
+        }}
+        moduleItems={[{
+          id: 'groupware',
+          name: '그룹웨어',
+          icon: null,
+          tree: [
+            { id: 'notice', menuId: 210, name: '공지사항', path: '/groupware/notice' },
+            { id: 'approval', menuId: 211, name: '결재', path: '/groupware/approval' },
+          ],
+          menus: [],
+        }]}
+        onMenuSelect={onMenuSelect}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+        onError={vi.fn()}
+      />,
+    );
+
+    const rootMenu = screen.getByRole('treeitem', { name: '메뉴: 공지사항' });
+    const folder = screen.getByRole('treeitem', { name: '폴더: 공지사항' });
+    expect(within(rootMenu).getByTestId('ArticleOutlinedIcon')).toBeInTheDocument();
+    expect(within(rootMenu).queryByText('폴더')).not.toBeInTheDocument();
+    expect(within(folder).getByTestId('FolderOutlinedIcon')).toBeInTheDocument();
+    expect(within(folder).getByText('폴더')).toBeInTheDocument();
+
+    fireEvent.click(within(rootMenu).getByTestId('ArticleOutlinedIcon'));
+    expect(onMenuSelect).toHaveBeenLastCalledWith('groupware', 'notice');
+    onMenuSelect.mockClear();
+
+    fireEvent.click(within(folder).getByText('공지사항'));
+    expect(folder).toHaveAttribute('aria-expanded', 'true');
+    expect(onMenuSelect).not.toHaveBeenCalled();
+    const childMenu = screen.getByRole('treeitem', { name: '메뉴: 결재 바로가기' });
+    expect(within(childMenu).getByTestId('ArticleOutlinedIcon')).toBeInTheDocument();
+    fireEvent.click(within(childMenu).getByText('결재 바로가기'));
+    expect(onMenuSelect).toHaveBeenLastCalledWith('groupware', 'approval');
+    onMenuSelect.mockClear();
+
+    fireEvent.click(within(folder).getByRole('button', { name: '즐겨찾기 작업: 공지사항' }));
+    expect(screen.getByRole('menuitem', { name: '폴더 이름 변경' })).toBeInTheDocument();
+    expect(onMenuSelect).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    const emptyFolder = screen.getByRole('treeitem', { name: '폴더: 빈 폴더' });
+    expect(within(emptyFolder).getByText('폴더')).toBeInTheDocument();
+    fireEvent.click(within(emptyFolder).getByText('빈 폴더'));
+    expect(screen.getByText('폴더가 비어 있습니다.')).toBeInTheDocument();
   });
 });

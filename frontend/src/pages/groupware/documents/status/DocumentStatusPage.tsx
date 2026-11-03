@@ -5,7 +5,7 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { EmptySearchResultMessage } from '../../../../shared/components/EmptySearchResultMessage';
+import { SearchResultMessage } from '../../../../shared/components/SearchResultMessage';
 import { DocumentStatusDetail } from './components/DocumentStatusDetail';
 import { DocumentStatusGrid } from './components/DocumentStatusGrid';
 import { DocumentStatusSearchArea } from './components/DocumentStatusSearchArea';
@@ -103,8 +103,8 @@ export function DocumentStatusPage({
         onClose={list.clearError}
       />
       {list.hasLoaded && !list.loading && !list.initialLoad.loading
-        && list.totalRowCount === 0 && !search.defaultsError && !list.error ? (
-        <EmptySearchResultMessage onReset={search.resetSearch} />
+        && !search.defaultsError && !list.error ? (
+        <SearchResultMessage resultCount={list.totalRowCount} />
       ) : null}
       {search.defaultsError || list.error ? (
         <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>

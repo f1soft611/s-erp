@@ -193,7 +193,10 @@ export function UnifiedSearchPage() {
                                   <Highlight title={item.title} keyword={keyword} />
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
-                                  {item.description}
+                                  <Highlight
+                                    title={item.description}
+                                    keyword={keyword}
+                                  />
                                 </Typography>
                               </Box>
                             </ListItemButton>

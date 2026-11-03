@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
 import { DashboardMenuTree } from '../src/pages/dashboard/components/DashboardMenuTree';
@@ -136,6 +136,131 @@ describe('Dashboard sidebar', () => {
     expect(profileAvatars).toHaveLength(2);
     expect(getComputedStyle(profileAvatars[0]).backgroundColor).toBe(
       getComputedStyle(profileAvatars[1]).backgroundColor,
+    );
+  });
+
+  describe('persistent recent menus', () => {
+    beforeEach(() => {
+      const defaultFetch = window.fetch;
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes('/boards/notice/login-popups')) {
+          return new Response(JSON.stringify({
+            resultCode: '200', result: { resultList: [] },
+          }), { status: 200 });
+        }
+        if (String(input).includes('/api/v1/menus/my')) {
+          return new Response(JSON.stringify({
+            resultCode: '200',
+            result: {
+              user: { userId: 'test-user', roles: [] },
+              menus: [{
+                menuId: 1, name: '그룹웨어', path: '/groupware',
+                children: [{
+                  menuId: 2, name: '종합현황', path: '/groupware/overview',
+                  permissions: { read: true, create: false, update: false, delete: false },
+                }],
+              }],
+            },
+          }), { status: 200 });
+        }
+        return defaultFetch(input, init);
+      });
+    });
+
+    async function loginRecentMenuUser() {
+      await screen.findByLabelText(/업체코드/i);
+      await loginAsAdmin();
+    }
+
+    it('keeps recent menus across logout, login and a new browser session', async () => {
+      const historyKey = 's-erp:recent-menu-history';
+      window.sessionStorage.clear();
+      window.localStorage.setItem(historyKey, JSON.stringify([{
+        menuId: 'previous-menu',
+        moduleId: 'dashboard',
+        label: '이전 메뉴',
+        path: '/',
+        visitedAt: Date.now() - 60_000,
+      }]));
+      const view = render(<App />);
+      await loginRecentMenuUser();
+
+      expect(await screen.findByRole('button', { name: /이전 메뉴/i })).toBeInTheDocument();
+      await waitFor(() => {
+        const entries = JSON.parse(window.localStorage.getItem(historyKey) ?? '[]');
+        expect(entries[0].path).toBe('/groupware/overview');
+      });
+      const savedHistory = window.localStorage.getItem(historyKey);
+      fireEvent.click(screen.getByRole('button', { name: /프로필 메뉴 열기/i }));
+      fireEvent.click(screen.getByText(/로그아웃/i));
+      await screen.findByLabelText(/업체코드/i);
+      expect(window.localStorage.getItem(historyKey)).toBe(savedHistory);
+
+      await loginRecentMenuUser();
+      expect(await screen.findByRole('button', { name: /이전 메뉴/i })).toBeInTheDocument();
+      view.unmount();
+      window.sessionStorage.clear();
+      render(<App />);
+      expect(await screen.findByRole('button', { name: /이전 메뉴/i })).toBeInTheDocument();
+    }, 15_000);
+
+    it('migrates existing session history to persistent storage', async () => {
+      const historyKey = 's-erp:recent-menu-history';
+      window.sessionStorage.clear();
+      window.sessionStorage.setItem(historyKey, JSON.stringify([{
+        menuId: 'previous-menu',
+        moduleId: 'dashboard',
+        label: '이관 메뉴',
+        path: '/',
+        visitedAt: Date.now() - 60_000,
+      }]));
+      render(<App />);
+      await loginRecentMenuUser();
+
+      expect(await screen.findByRole('button', { name: /이관 메뉴/i })).toBeInTheDocument();
+      await waitFor(() => expect(window.localStorage.getItem(historyKey)).toContain('이관 메뉴'));
+      expect(window.sessionStorage.getItem(historyKey)).toBeNull();
+    });
+
+    it('prefers persistent history and keeps only the latest five distinct menus', async () => {
+      const historyKey = 's-erp:recent-menu-history';
+      window.sessionStorage.clear();
+      window.sessionStorage.setItem(historyKey, JSON.stringify([{
+        menuId: 'stale-menu', moduleId: 'dashboard', label: '과거 세션 메뉴',
+        path: '/', visitedAt: Date.now() - 60_000,
+      }]));
+      window.localStorage.setItem(historyKey, JSON.stringify(
+        Array.from({ length: 8 }, (_, index) => ({
+          menuId: `previous-${index}`, moduleId: 'dashboard', label: `저장 메뉴 ${index}`,
+          path: '/', visitedAt: Date.now() - (index + 1) * 60_000,
+        })),
+      ));
+      render(<App />);
+      await loginRecentMenuUser();
+      expect(await screen.findByRole('button', { name: /저장 메뉴 0/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /과거 세션 메뉴/i })).not.toBeInTheDocument();
+      await waitFor(() => {
+        const entries = JSON.parse(window.localStorage.getItem(historyKey) ?? '[]');
+        expect(entries).toHaveLength(5);
+        expect(new Set(entries.map((entry: { menuId: string }) => entry.menuId)).size).toBe(5);
+        expect(entries[0].label).toBe('종합현황');
+      });
+    });
+
+    it.each(['{broken', '{}', '[null, {"menuId":"invalid"}]'])(
+      'recovers from invalid persistent recent menus: %s',
+      async (rawHistory) => {
+        const historyKey = 's-erp:recent-menu-history';
+        window.sessionStorage.clear();
+        window.localStorage.setItem(historyKey, rawHistory);
+        render(<App />);
+        await loginRecentMenuUser();
+        await waitFor(() => {
+          const entries = JSON.parse(window.localStorage.getItem(historyKey) ?? '[]');
+          expect(entries).toHaveLength(1);
+          expect(entries[0].label).toBe('종합현황');
+        });
+      },
     );
   });
 

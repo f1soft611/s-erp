@@ -186,7 +186,11 @@ describe('sales order status page', () => {
       message.compareDocumentPosition(screen.getByRole('grid', { name: '수주현황 목록' }))
         & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    fireEvent.click(within(message).getByRole('button', { name: '검색 조건 초기화' }));
+    expect(within(message).getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(within(message).queryByRole('button', { name: '검색 조건 초기화' })).not.toBeInTheDocument();
+    fireEvent.click(within(message).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
     await waitFor(() => expect(listRequests()).toHaveLength(2));
     expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
     expect(listRequests().at(-1)?.get('orderDtFrom')).toBe('2026-09-27');
@@ -198,6 +202,21 @@ describe('sales order status page', () => {
     expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
     fireEvent.click(within(error).getByRole('button'));
     expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+  });
+
+  it('announces positive result counts and shows the message again after a reload', async () => {
+    renderStatusPage();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '조회 결과 총 1건입니다.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '조회 결과 총 1건입니다.',
+    );
   });
 
   it('uses the dashboard month instead of an unrelated saved search', async () => {

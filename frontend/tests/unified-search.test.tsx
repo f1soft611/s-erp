@@ -103,6 +103,24 @@ describe('unified search', () => {
     expect(document.querySelector('mark')).toHaveTextContent('검색');
   });
 
+  it('highlights case-insensitive query matches in result descriptions as text', async () => {
+    const data = response('SEARCH result');
+    data.item.groups[0].items[0].description =
+      'matching SEARCH phrase <script>alert(1)</script>';
+    api.apiGet.mockResolvedValue(data);
+    setup('/search?keyword=search&type=ALL&page=1');
+
+    expect(await screen.findByRole('button', { name: /SEARCH result MENU/ })).toBeVisible();
+    const description = await screen.findByText(
+      (_, element) =>
+        element?.tagName === 'P' &&
+        element.textContent === 'matching SEARCH phrase <script>alert(1)</script>',
+    );
+    expect(within(description).getByText('SEARCH', { selector: 'mark' })).toBeVisible();
+    expect(description.querySelector('script')).toBeNull();
+    expect(description).toHaveTextContent('<script>alert(1)</script>');
+  });
+
   it('preserves aggregate counts when switching to a category and paging by URL', async () => {
     setup('/search?keyword=공지&type=ALL&page=1');
     await screen.findByRole('tab', { name: '전체 25' });

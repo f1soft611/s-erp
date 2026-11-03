@@ -53,4 +53,20 @@ describe('shared page notifications', () => {
 
     expect(screen.getByRole('alert')).toHaveClass('MuiAlert-colorInfo');
   });
+
+  it('uses reduced vertical spacing only when compact layout is requested', () => {
+    const { rerender } = render(
+      <PageMessageArea message="조회 결과입니다." severity="info" compact role="status" />,
+    );
+    expect(screen.getByRole('status').parentElement).toHaveStyle({
+      paddingTop: '8px',
+      paddingBottom: '0px',
+    });
+
+    rerender(<PageMessageArea message="오류입니다." />);
+    expect(screen.getByRole('alert').parentElement).toHaveStyle({
+      paddingTop: '16px',
+      paddingBottom: '16px',
+    });
+  });
 });
