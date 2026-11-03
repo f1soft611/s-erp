@@ -2,6 +2,14 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="PushSubscriptionDAO">
 
+    <select id="lockSubscriptionOwner" parameterType="map" resultType="long">
+        SELECT user_id
+        FROM public.tb_user
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+        FOR UPDATE
+    </select>
+
     <insert id="upsertSubscription" parameterType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO"
             useGeneratedKeys="true" keyProperty="subscriptionId" keyColumn="subscription_id">
         INSERT INTO public.tb_push_subscription (
@@ -65,6 +73,42 @@
         WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
           AND user_id = #{userId, jdbcType=BIGINT}
           AND status = 'ACTIVE'
+    </select>
+
+    <select id="selectSubscription" parameterType="map"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_hash AS endpointHash,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt,
+               inactive_at AS inactiveAt
+        FROM public.tb_push_subscription
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND user_id = #{userId, jdbcType=BIGINT}
+          AND subscription_id = #{subscriptionId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectSubscriptionByEndpointHash" parameterType="byte[]"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_hash AS endpointHash,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status,
+               created_at AS createdAt,
+               updated_at AS updatedAt,
+               inactive_at AS inactiveAt
+        FROM public.tb_push_subscription
+        WHERE endpoint_hash = #{endpointHash, jdbcType=BINARY}
     </select>
 
 </mapper>

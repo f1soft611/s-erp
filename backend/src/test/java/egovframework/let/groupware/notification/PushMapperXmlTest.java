@@ -45,6 +45,23 @@ class PushMapperXmlTest {
     }
 
     @Test
+    void subscriptionOwnerLockAndStatusLookupAreTenantAndUserScoped() throws Exception {
+        Document mapper = readMapper(SUBSCRIPTION_RESOURCE);
+        String ownerLock = statement(mapper, "select", "lockSubscriptionOwner");
+        String ownedSubscription = statement(mapper, "select", "selectSubscription");
+        String endpointLookup = statement(mapper, "select", "selectSubscriptionByEndpointHash");
+
+        assertTrue(ownerLock.contains("FROM public.tb_user"));
+        assertTrue(ownerLock.contains("tenant_id = #{tenantId, jdbcType=BIGINT}"));
+        assertTrue(ownerLock.contains("user_id = #{userId, jdbcType=BIGINT}"));
+        assertTrue(ownerLock.contains("FOR UPDATE"));
+        assertTrue(ownedSubscription.contains("tenant_id = #{tenantId, jdbcType=BIGINT}"));
+        assertTrue(ownedSubscription.contains("user_id = #{userId, jdbcType=BIGINT}"));
+        assertTrue(ownedSubscription.contains("subscription_id = #{subscriptionId, jdbcType=BIGINT}"));
+        assertTrue(endpointLookup.contains("endpoint_hash = #{endpointHash, jdbcType=BINARY}"));
+    }
+
+    @Test
     void databaseConstraintsMakeOutboxAndDeliveryCreationIdempotent() throws Exception {
         String migration = readText("DATABASE/20261103/20261103_001_create_web_push_delivery.sql");
         String normalized = migration.replaceAll("\\s+", " ");
@@ -84,8 +101,11 @@ class PushMapperXmlTest {
         parseMapper(configuration, SUBSCRIPTION_RESOURCE);
         parseMapper(configuration, DELIVERY_RESOURCE);
 
+        assertTrue(configuration.hasStatement("PushSubscriptionDAO.lockSubscriptionOwner"));
         assertTrue(configuration.hasStatement("PushSubscriptionDAO.upsertSubscription"));
         assertTrue(configuration.hasStatement("PushSubscriptionDAO.deactivateSubscription"));
+        assertTrue(configuration.hasStatement("PushSubscriptionDAO.selectSubscription"));
+        assertTrue(configuration.hasStatement("PushSubscriptionDAO.selectSubscriptionByEndpointHash"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.insertOutbox"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimOutboxes"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimDeliveries"));
