@@ -64,10 +64,7 @@ import type { DocumentApprovalScope } from '../groupware/documents/write/types/d
 import { NotFoundPage } from '../errors/NotFoundPage';
 import { NotificationInboxPage } from '../groupware/notifications/NotificationInboxPage';
 import { MessageInboxPage } from '../groupware/messages/MessageInboxPage';
-import {
-  clearPageSessionState,
-  usePageSessionState,
-} from '../../shared/hooks/usePageSessionState';
+import { clearPageSessionState } from '../../shared/hooks/usePageSessionState';
 
 const themeOptions = [
   { value: 'light', label: '밝은 테마' },
@@ -168,9 +165,45 @@ type RecentMenuEntry = {
   visitedAt: number;
 };
 
-const RECENT_MENU_SESSION_KEY = 's-erp:recent-menu-history';
+const RECENT_MENU_STORAGE_KEY = 's-erp:recent-menu-history';
 const COMMON_CODE_PAGE_SESSION_KEY = 's-erp:page:common-code-management';
 const RECENT_MENU_LIMIT = 5;
+
+const readRecentMenus = (): RecentMenuEntry[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const rawValue = window[storageName].getItem(RECENT_MENU_STORAGE_KEY);
+      if (!rawValue) {
+        continue;
+      }
+      const parsedValue: unknown = JSON.parse(rawValue);
+      if (!Array.isArray(parsedValue)) {
+        continue;
+      }
+      return parsedValue.filter((value: unknown): value is RecentMenuEntry => {
+        if (!value || typeof value !== 'object') {
+          return false;
+        }
+        const entry = value as Partial<RecentMenuEntry>;
+        return typeof entry.menuId === 'string'
+          && typeof entry.moduleId === 'string'
+          && typeof entry.label === 'string'
+          && typeof entry.path === 'string'
+          && typeof entry.visitedAt === 'number'
+          && Number.isFinite(entry.visitedAt)
+          && (entry.moduleName === undefined || typeof entry.moduleName === 'string')
+          && (entry.breadcrumbPath === undefined || typeof entry.breadcrumbPath === 'string');
+      }).slice(0, RECENT_MENU_LIMIT);
+    } catch {
+      // Try the legacy session history if persistent storage is unavailable or invalid.
+    }
+  }
+  return [];
+};
 
 const writeRecentMenus = (items: RecentMenuEntry[]) => {
   if (typeof window === 'undefined') {
@@ -178,10 +211,11 @@ const writeRecentMenus = (items: RecentMenuEntry[]) => {
   }
 
   try {
-    window.sessionStorage.setItem(
-      RECENT_MENU_SESSION_KEY,
+    window.localStorage.setItem(
+      RECENT_MENU_STORAGE_KEY,
       JSON.stringify(items),
     );
+    window.sessionStorage.removeItem(RECENT_MENU_STORAGE_KEY);
   } catch {
     // Ignore storage errors; the user still gets the current page flow.
   }
@@ -204,11 +238,7 @@ function DashboardPage() {
   const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
   const [menusReloadToken, setMenusReloadToken] = useState(0);
   const lastRecordedMenuRef = useRef('');
-  const {
-    state: recentMenuState,
-    setState: setRecentMenuState,
-    resetState: resetRecentMenuState,
-  } = usePageSessionState<RecentMenuEntry[]>(RECENT_MENU_SESSION_KEY, []);
+  const [recentMenuState, setRecentMenuState] = useState(readRecentMenus);
   const defaultModule = moduleItems[0];
   const defaultMenuId = defaultModule?.menus[0]?.id ?? '';
   const emptyModule: ModuleItem = {
@@ -500,7 +530,6 @@ function DashboardPage() {
   };
 
   const handleLogout = () => {
-    resetRecentMenuState();
     clearPageSessionState(COMMON_CODE_PAGE_SESSION_KEY);
     logout();
     navigate('/login', { replace: true });

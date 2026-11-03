@@ -527,10 +527,22 @@ describe('shared feed components', () => {
     );
 
     const badge = screen.getByTestId('system-event-badge');
+    const badgeLabel = screen.getByText(label, { selector: '.MuiChip-label' });
+    const authorName = screen.getByText('시스템', {
+      selector: '.MuiTypography-caption',
+    });
     expect(badge).toHaveTextContent(label);
     expect(badge).toHaveClass(`MuiChip-color${color[0].toUpperCase()}${color.slice(1)}`);
     expect(badge).toHaveClass(`MuiChip-${variant}`);
-    expect(badge).toHaveStyle({ borderRadius: '8px' });
+    expect(badge).toHaveStyle({ borderRadius: '8px', height: '20px' });
+    expect(badgeLabel).toHaveStyle({
+      fontSize: '0.75rem',
+      paddingLeft: '6px',
+      paddingRight: '6px',
+    });
+    expect(getComputedStyle(badgeLabel).fontSize).toBe(
+      getComputedStyle(authorName).fontSize,
+    );
     expect(screen.queryByRole('img', { name: '시스템 메시지' })).not.toBeInTheDocument();
     expect(screen.getByText('시스템 처리 내용')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '댓글 메뉴 시스템' })).not.toBeInTheDocument();

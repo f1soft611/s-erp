@@ -196,7 +196,12 @@ public class DirectMessageServiceImpl implements DirectMessageService {
         if (messageDAO.updateThreadUpdatedAt(params) != 1) {
             throw new IllegalStateException("쪽지 대화의 최신 시각을 갱신할 수 없습니다.");
         }
-        String summary = content.length() > 497 ? content.substring(0, 497) + "..." : content;
+        int summaryEnd = Math.min(content.length(), 497);
+        if (summaryEnd < content.length() && Character.isHighSurrogate(content.charAt(summaryEnd - 1))
+                && Character.isLowSurrogate(content.charAt(summaryEnd))) {
+            summaryEnd--;
+        }
+        String summary = content.length() > 497 ? content.substring(0, summaryEnd) + "..." : content;
         notificationService.createEvent((Long) params.get("tenantId"), recipientId,
                 "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE", messageId, "새 쪽지가 도착했습니다.", summary);
         realtime.publish((Long) params.get("tenantId"), senderId, RealtimeArea.MESSAGE);

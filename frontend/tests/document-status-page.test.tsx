@@ -535,6 +535,14 @@ describe('document status page', () => {
   }, 15000);
 
   it('restores the default submitted date after resetting conditions', async () => {
+    const openDetailSearch = () => {
+      const toggle = screen.getByRole('button', {
+        name: /상세 검색 (열기|닫기)/,
+      });
+      if (toggle.getAttribute('aria-expanded') === 'false') {
+        fireEvent.click(toggle);
+      }
+    };
     window.sessionStorage.setItem(
       's-erp:page:document-status',
       JSON.stringify({
@@ -549,7 +557,8 @@ describe('document status page', () => {
     );
     const firstRender = renderDocumentStatusPage();
     expect(await screen.findByText(/조회 결과가 없습니다/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
+    openDetailSearch();
+    fireEvent.click(screen.getByRole('button', { name: '초기화' }));
 
     await waitFor(() => {
       expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
@@ -568,7 +577,7 @@ describe('document status page', () => {
         },
       });
     });
-    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    openDetailSearch();
     expect(screen.getByLabelText('결재신청일 시작일'))
       .toHaveValue(SYSTEM_DATE_RANGE.from);
     expect(screen.getByLabelText('결재신청일 종료일'))
@@ -584,7 +593,7 @@ describe('document status page', () => {
     expect(getListRequest().get('submittedAtTo')).toBe(SYSTEM_DATE_RANGE.to);
     expect(getListRequest().has('title')).toBe(false);
     expect(getListRequest().has('keyword')).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: '상세 검색 열기' }));
+    openDetailSearch();
     expect(screen.getByLabelText('결재신청일 시작일'))
       .toHaveValue(SYSTEM_DATE_RANGE.from);
     expect(screen.getByLabelText('결재신청일 종료일'))
@@ -861,7 +870,8 @@ describe('document status page', () => {
       message.compareDocumentPosition(screen.getByRole('grid', { name: '문서현황' }))
         & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(within(message).getByRole('button', { name: '검색 조건 초기화' })).toBeInTheDocument();
+    expect(within(message).getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(within(message).queryByRole('button', { name: '검색 조건 초기화' })).not.toBeInTheDocument();
   });
 
   it('hides the empty result message while refreshing and after rows arrive', async () => {
@@ -875,7 +885,7 @@ describe('document status page', () => {
 
     let resolveList!: (value: { resultList: DocumentStatusRow[]; totalRowCount: number }) => void;
     api.get.mockImplementation(() => new Promise((resolve) => { resolveList = resolve; }));
-    fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
+    fireEvent.click(screen.getByRole('button', { name: '조회' }));
     await waitFor(() => expect(getListRequests()).toBe(2));
     expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
     expect(getListRequest().get('submittedAtFrom')).toBe(SYSTEM_DATE_RANGE.from);
@@ -883,6 +893,6 @@ describe('document status page', () => {
 
     await act(async () => resolveList({ resultList: [row], totalRowCount: 1 }));
     await screen.findByRole('gridcell', { name: 'Annual plan' });
-    expect(screen.queryByText(/조회 결과가 없습니다/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('조회 결과 총 1건입니다.');
   });
 });

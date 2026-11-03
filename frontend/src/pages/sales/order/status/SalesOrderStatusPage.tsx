@@ -5,7 +5,7 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { EmptySearchResultMessage } from '../../../../shared/components/EmptySearchResultMessage';
+import { SearchResultMessage } from '../../../../shared/components/SearchResultMessage';
 import type {
   MenuPermission,
   MenuTreeNode,
@@ -143,8 +143,8 @@ export function SalesOrderStatusPage({
           onClose={list.clearError}
         />
         {list.hasLoaded && !list.loading && !list.initialLoad.loading
-          && list.rows.length === 0 && !search.defaultsError && !list.error ? (
-          <EmptySearchResultMessage onReset={search.resetSearch} />
+          && !search.defaultsError && !list.error ? (
+          <SearchResultMessage resultCount={list.rows.length} />
         ) : null}
         <Box
           sx={{

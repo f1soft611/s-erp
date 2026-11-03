@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import MoreVertOutlined from '@mui/icons-material/MoreVertOutlined';
 import FolderOutlined from '@mui/icons-material/FolderOutlined';
+import ArticleOutlined from '@mui/icons-material/ArticleOutlined';
 import StarOutlineOutlined from '@mui/icons-material/StarOutlineOutlined';
 import type {
   FavoriteFolder,
@@ -28,7 +29,7 @@ import {
   MenuFavoriteContextMenu,
   type FavoriteContextTarget,
 } from './MenuFavoriteContextMenu';
-import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
+import { SimpleTreeView, TreeItem, treeItemClasses } from '@mui/x-tree-view';
 import { CommonDialog } from '../../../shared/components/CommonDialog';
 
 type Props = {
@@ -127,19 +128,44 @@ export function MenuFavoritesTree({
       <TreeItem
         key={`favorite-${favorite.favoriteId}`}
         itemId={`favorite-${favorite.favoriteId}`}
+        aria-label={`메뉴: ${label}`}
+        sx={(theme) => ({
+          [`& > .${treeItemClasses.content}`]: {
+            minHeight: 36,
+            mb: 0.25,
+            borderRadius: 1,
+            borderLeft: '3px solid transparent',
+            fontSize: '0.875rem',
+            color: theme.palette.mode === 'dark' ? '#dbeafe' : '#475569',
+          },
+        })}
         label={
           <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
             <Box
               component="span"
               onClick={() => onMenuSelect(resolved.moduleId, resolved.node.id)}
-              sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}
             >
-              {label}
+              <ArticleOutlined fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />
+              <Box
+                component="span"
+                title={label}
+                sx={{
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 400,
+                }}
+              >
+                {label}
+              </Box>
             </Box>
             <IconButton
               size="small"
               aria-label={`즐겨찾기 작업: ${label}`}
               onClick={(event) => showMenu(event, { kind: 'favorite', favorite, label })}
+              sx={{ flexShrink: 0 }}
             >
               <MoreVertOutlined fontSize="small" />
             </IconButton>
@@ -154,14 +180,45 @@ export function MenuFavoritesTree({
     <TreeItem
       key={`folder-${folder.folderId}`}
       itemId={`folder-${folder.folderId}`}
+      aria-label={`폴더: ${folder.folderName}`}
+      sx={(theme) => ({
+        [`& > .${treeItemClasses.content}`]: {
+          minHeight: 36,
+          mb: 0.25,
+          borderRadius: 1,
+          borderLeft: '3px solid transparent',
+          fontSize: '0.875rem',
+          color: theme.palette.mode === 'dark' ? '#dbeafe' : '#475569',
+        },
+      })}
       label={
         <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-          <FolderOutlined fontSize="small" sx={{ mr: 1 }} />
-          <Box sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{folder.folderName}</Box>
+          <FolderOutlined fontSize="small" sx={{ mr: 1, flexShrink: 0 }} />
+          <Box
+            title={folder.folderName}
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontWeight: 400,
+            }}
+          >
+            {folder.folderName}
+          </Box>
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ ml: 1, mr: 0.5, color: 'text.secondary', flexShrink: 0 }}
+          >
+            폴더
+          </Typography>
           <IconButton
             size="small"
             aria-label={`즐겨찾기 작업: ${folder.folderName}`}
             onClick={(event) => showMenu(event, { kind: 'folder', folder })}
+            sx={{ flexShrink: 0 }}
           >
             <MoreVertOutlined fontSize="small" />
           </IconButton>
@@ -198,27 +255,58 @@ export function MenuFavoritesTree({
   };
 
   return (
-    <Box sx={{ display: 'flex', flex: 1, minHeight: 0, flexDirection: 'column' }}>
+    <Box
+      sx={(theme) => ({
+        display: 'flex',
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        flexDirection: 'column',
+        bgcolor: theme.palette.mode === 'dark' ? '#111827' : '#f7f9fc',
+      })}
+    >
       <Box
         onContextMenu={(event) => showMenu(event, { kind: 'root' })}
-        sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}
+        sx={(theme) => ({
+          px: 2,
+          height: 'var(--dashboard-header-height)',
+          flexShrink: 0,
+          boxSizing: 'border-box',
+          borderBottom: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          bgcolor: theme.palette.mode === 'dark' ? '#0f172a' : '#f1f5f9',
+        })}
       >
-        <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', fontWeight: 800 }}>
+        <Typography
+          component="h2"
+          variant="subtitle2"
+          sx={(theme) => ({
+            display: 'flex',
+            alignItems: 'center',
+            fontWeight: 800,
+            color: theme.palette.mode === 'dark' ? '#cbd5e1' : '#475569',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          })}
+        >
           <StarOutlineOutlined fontSize="small" sx={{ mr: 1 }} />
           즐겨찾기
-          <Button
-            size="small"
-            aria-label="새 폴더"
-            onClick={() => {
-              setCreateFolderName('');
-              setCreateFolderError('');
-              setCreateFolderOpen(true);
-            }}
-            sx={{ ml: 'auto', textTransform: 'none' }}
-          >
-            새 폴더
-          </Button>
         </Typography>
+        <Button
+          size="small"
+          aria-label="새 폴더"
+          onClick={() => {
+            setCreateFolderName('');
+            setCreateFolderError('');
+            setCreateFolderOpen(true);
+          }}
+          sx={{ ml: 'auto', textTransform: 'none' }}
+        >
+          새 폴더
+        </Button>
       </Box>
       <SimpleTreeView sx={{ flex: 1, overflow: 'auto', p: 1.5 }}>
         {favorites.favorites

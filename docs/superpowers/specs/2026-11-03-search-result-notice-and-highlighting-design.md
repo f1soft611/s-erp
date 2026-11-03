@@ -6,7 +6,7 @@ Make the document-status and sales-order-status result notices consistent and co
 
 ## Design
 
-Both status pages already render the shared `EmptySearchResultMessage` below their search controls and before their grids. Replace that empty-only presentation with a shared `SearchResultMessage` that receives the successful result count. It displays the existing no-results guidance when the count is zero and `조회 결과 총 N건입니다.` otherwise. Both variants use the same dismissible info/status Alert and compact vertical spacing (`py: 1`); the reset button is removed. The pages keep their existing success/loading/error gates, use document `totalRowCount` and sales `rows.length`, and mount the message only for a successful result. Closing it hides it until the next successful query, which naturally remounts it after the in-flight state.
+Both status pages already render the shared `EmptySearchResultMessage` below their search controls and before their grids. Replace that empty-only presentation with a shared `SearchResultMessage` that receives the successful result count. It displays the existing no-results guidance when the count is zero and `조회 결과 총 N건입니다.` otherwise. Both variants use the same dismissible info/status Alert; the reset button is removed. Compact spacing uses 8px above the Alert and no wrapper padding below it, because each following grid container already contributes 8px of top padding. The visible gap above and below the Alert is therefore the same 8px. The pages keep their existing success/loading/error gates, use document `totalRowCount` and sales `rows.length`, and mount the message only for a successful result. Closing it hides it until the next successful query, which naturally remounts it after the in-flight state.
 
 Add a compact-spacing option to `PageMessageArea` so this change does not alter error messages elsewhere. Keep horizontal padding and existing responsive wrapping behavior.
 
@@ -16,7 +16,7 @@ Add a compact-spacing option to `PageMessageArea` so this change does not alter 
 
 1. Implement independent notices in both status pages. Rejected because it duplicates copy, spacing, and dismiss behavior and can drift.
 2. Change `PageMessageArea` spacing globally. Rejected because it would alter unrelated error alerts.
-3. **Recommended:** extend the shared result notice and add an opt-in compact mode to the shared alert. This meets the visual consistency request while keeping unrelated alerts unchanged.
+3. **Recommended:** extend the shared result notice and add an opt-in compact mode to the shared alert. Account for the existing grid top padding so the visible gaps around the notice are equal, while keeping unrelated alerts unchanged.
 
 ## Components and data flow
 

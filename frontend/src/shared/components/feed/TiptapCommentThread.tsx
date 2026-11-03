@@ -576,7 +576,12 @@ function CommentItem({
                   label={comment.systemEventBadge.label}
                   color={comment.systemEventBadge.color}
                   variant={comment.systemEventBadge.variant}
-                  sx={{ borderRadius: '8px' }}
+                  sx={{
+                    height: 20,
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    '& .MuiChip-label': { px: 0.75 },
+                  }}
                 />
               ) : (
                 <InfoOutlinedIcon

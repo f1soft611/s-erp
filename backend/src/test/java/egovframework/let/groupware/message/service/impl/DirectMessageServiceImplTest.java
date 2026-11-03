@@ -72,6 +72,21 @@ class DirectMessageServiceImplTest {
     }
 
     @Test
+    void notificationPreviewDoesNotSplitEmojiAtTruncationBoundary() throws Exception {
+        DirectMessageVO thread = new DirectMessageVO();
+        thread.setOtherUserId(22L);
+        when(messageDAO.selectThreadForParticipant(anyMap())).thenReturn(thread);
+        when(messageDAO.insertMessage(anyMap())).thenReturn(102L);
+        when(messageDAO.updateThreadUpdatedAt(anyMap())).thenReturn(1);
+        String prefix = "x".repeat(496);
+        String content = prefix + "\ud83d\ude00tail";
+        DirectMessageVO result = service.reply(authenticatedUser(), 65L, content);
+        org.junit.jupiter.api.Assertions.assertEquals(content, result.getContent());
+        verify(notificationService).createEvent(4L, 22L, "DIRECT_MESSAGE_RECEIVED",
+                "DIRECT_MESSAGE", 102L, "새 쪽지가 도착했습니다.", prefix + "...");
+    }
+
+    @Test
     void failedMessageWriteDoesNotScheduleSignals() throws Exception {
         DirectMessageVO thread = new DirectMessageVO();
         thread.setOtherUserId(22L);
