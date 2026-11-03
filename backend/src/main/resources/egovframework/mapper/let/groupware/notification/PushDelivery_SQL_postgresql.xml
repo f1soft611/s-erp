@@ -66,6 +66,15 @@
           AND lease_until > CURRENT_TIMESTAMP
     </update>
 
+    <select id="selectOutbox" parameterType="long"
+            resultType="egovframework.let.groupware.notification.domain.model.PushOutboxVO">
+        SELECT outbox_id AS outboxId,
+               notification_id AS notificationId,
+               status
+        FROM public.tb_push_outbox
+        WHERE outbox_id = #{outboxId, jdbcType=BIGINT}
+    </select>
+
     <update id="markOutboxCompleted" parameterType="map">
         UPDATE public.tb_push_outbox AS outbox
         SET status = 'COMPLETED',
@@ -130,9 +139,8 @@
         WITH candidates AS (
             SELECT delivery.delivery_id
             FROM public.tb_push_delivery AS delivery
-            INNER JOIN public.tb_push_subscription AS subscription
+            LEFT JOIN public.tb_push_subscription AS subscription
               ON subscription.subscription_id = delivery.subscription_id
-             AND subscription.status = 'ACTIVE'
             WHERE delivery.status = 'PENDING'
                OR (
                    delivery.status = 'RETRY_WAIT'

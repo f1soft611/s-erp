@@ -67,6 +67,20 @@
         ORDER BY subscription_id
     </select>
 
+    <select id="selectSubscriptionForDelivery" parameterType="long"
+            resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
+        SELECT subscription_id AS subscriptionId,
+               tenant_id AS tenantId,
+               user_id AS userId,
+               endpoint_ciphertext AS endpointCiphertext,
+               keys_ciphertext AS keysCiphertext,
+               encryption_key_version AS encryptionKeyVersion,
+               status
+        FROM public.tb_push_subscription
+        WHERE subscription_id = #{subscriptionId, jdbcType=BIGINT}
+          AND status = 'ACTIVE'
+    </select>
+
     <select id="countActiveSubscriptions" parameterType="map" resultType="long">
         SELECT COUNT(*)
         FROM public.tb_push_subscription

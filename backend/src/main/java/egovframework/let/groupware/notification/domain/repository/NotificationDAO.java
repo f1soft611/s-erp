@@ -7,6 +7,7 @@ import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
 import egovframework.let.groupware.notification.domain.model.NotificationVO;
+import egovframework.let.groupware.notification.domain.model.PushNotificationVO;
 
 @Repository("notificationDAO")
 public class NotificationDAO extends EgovAbstractMapper {
@@ -33,6 +34,14 @@ public class NotificationDAO extends EgovAbstractMapper {
 
     public int archiveReadNotifications(Map<String, Object> params) throws Exception {
         return update("NotificationDAO.archiveReadNotifications", params);
+    }
+
+    public Long selectNotificationId(Map<String, Object> params) throws Exception {
+        return selectOne("NotificationDAO.selectNotificationId", params);
+    }
+
+    public PushNotificationVO selectPushNotification(Long notificationId) throws Exception {
+        return selectOne("NotificationDAO.selectPushNotification", notificationId);
     }
 
     public int insertNotification(Map<String, Object> params) throws Exception {

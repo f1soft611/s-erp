@@ -33,6 +33,10 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return update("PushDeliveryDAO.markOutboxNoRecipient", leaseParams(outboxId, leaseToken));
     }
 
+    public PushOutboxVO selectOutbox(Long outboxId) throws Exception {
+        return selectOne("PushDeliveryDAO.selectOutbox", outboxId);
+    }
+
     public int markOutboxCompleted(Long outboxId) throws Exception {
         return update("PushDeliveryDAO.markOutboxCompleted", idParams(outboxId));
     }

@@ -80,13 +80,26 @@ class PushMapperXmlTest {
         String outboxClaim = statement(mapper, "select", "claimOutboxes");
         String deliveryClaim = statement(mapper, "select", "claimDeliveries");
         String retry = statement(mapper, "update", "scheduleDeliveryRetry");
+        String deliveryInsert = statement(mapper, "insert", "insertDelivery");
 
         assertClaim(outboxClaim);
         assertClaim(deliveryClaim);
+        assertTrue(outboxClaim.contains("status = 'PROCESSING' AND lease_until <= CURRENT_TIMESTAMP"));
+        assertTrue(deliveryClaim.contains("delivery.status = 'PROCESSING' AND delivery.lease_until <= CURRENT_TIMESTAMP"));
+        assertTrue(deliveryInsert.contains("ON CONFLICT (outbox_id, subscription_id) DO NOTHING"));
         assertTrue(retry.contains("status = 'RETRY_WAIT'"));
         assertTrue(retry.contains("next_attempt_at = #{nextAttemptAt"));
         assertTrue(retry.contains("lease_token = #{leaseToken"));
         assertTrue(retry.contains("lease_until > CURRENT_TIMESTAMP"));
+    }
+
+
+    @Test
+    void deliveryClaimCanReclaimRowsForInactiveSubscriptionsSoTheyCanBeSuppressed() throws Exception {
+        String claim = statement(readMapper(DELIVERY_RESOURCE), "select", "claimDeliveries");
+
+        assertTrue(claim.contains("LEFT JOIN public.tb_push_subscription"));
+        assertTrue(!claim.contains("subscription.status = 'ACTIVE'"));
     }
 
     @Test
@@ -106,7 +119,9 @@ class PushMapperXmlTest {
         assertTrue(configuration.hasStatement("PushSubscriptionDAO.deactivateSubscription"));
         assertTrue(configuration.hasStatement("PushSubscriptionDAO.selectSubscription"));
         assertTrue(configuration.hasStatement("PushSubscriptionDAO.selectSubscriptionByEndpointHash"));
+        assertTrue(configuration.hasStatement("PushSubscriptionDAO.selectSubscriptionForDelivery"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.insertOutbox"));
+        assertTrue(configuration.hasStatement("PushDeliveryDAO.selectOutbox"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimOutboxes"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimDeliveries"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.scheduleDeliveryRetry"));

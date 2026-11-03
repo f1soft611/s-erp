@@ -51,6 +51,10 @@ public class PushSubscriptionDAO extends EgovAbstractMapper {
         return selectList("PushSubscriptionDAO.selectActiveSubscriptions", params);
     }
 
+    public PushSubscriptionVO selectSubscriptionForDelivery(Long subscriptionId) throws Exception {
+        return selectOne("PushSubscriptionDAO.selectSubscriptionForDelivery", subscriptionId);
+    }
+
     public Long countActiveSubscriptions(Long tenantId, Long userId) throws Exception {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", tenantId);
