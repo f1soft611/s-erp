@@ -63,6 +63,12 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return update("PushDeliveryDAO.markDeliverySent", leaseParams(deliveryId, leaseToken));
     }
 
+    public int renewDeliveryLease(Long deliveryId, UUID leaseToken, LocalDateTime leaseUntil) throws Exception {
+        Map<String, Object> params = leaseParams(deliveryId, leaseToken);
+        params.put("leaseUntil", leaseUntil);
+        return update("PushDeliveryDAO.renewDeliveryLease", params);
+    }
+
     public int scheduleDeliveryRetry(Long deliveryId, UUID leaseToken, LocalDateTime nextAttemptAt,
             String errorCode) throws Exception {
         Map<String, Object> params = leaseParams(deliveryId, leaseToken);

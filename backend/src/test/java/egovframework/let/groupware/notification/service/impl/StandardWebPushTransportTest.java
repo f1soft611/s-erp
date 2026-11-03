@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -13,6 +14,9 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +36,36 @@ class StandardWebPushTransportTest {
         assertThat(connection.getReadTimeout()).isEqualTo(5000);
         assertThat(connection.getInstanceFollowRedirects()).isFalse();
         assertThat(connection.body.toByteArray()).isNotEmpty();
+    }
+
+    @Test
+    void disconnectsARequestWhoseBodyWriteExceedsTheOverallRequestDeadline() throws Exception {
+        BlockingWriteConnection connection = new BlockingWriteConnection(
+                new URL("https://fcm.googleapis.com/send/test"));
+        StandardWebPushTransport boundedTransport = transport(connection, 2000);
+        AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Thread sender = new Thread(() -> {
+            try {
+                boundedTransport.send("https://fcm.googleapis.com/send/test", subscriptionPublicKey(),
+                        Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[16]), "{}");
+            } catch (Throwable error) {
+                failure.set(error);
+            }
+        });
+        sender.setDaemon(true);
+
+        sender.start();
+        try {
+            assertThat(connection.disconnected.await(4, TimeUnit.SECONDS)).isTrue();
+            sender.join(2000);
+            assertThat(sender.isAlive()).isFalse();
+            assertThat(failure.get()).isInstanceOf(WebPushTransport.TransportException.class)
+                    .satisfies(error -> assertThat(((WebPushTransport.TransportException) error).getFailureKind())
+                            .isEqualTo(WebPushTransport.FailureKind.TRANSIENT));
+        } finally {
+            connection.releaseWrite.countDown();
+            sender.join(2000);
+        }
     }
 
     @Test
@@ -68,7 +102,12 @@ class StandardWebPushTransportTest {
                         .isEqualTo(WebPushTransport.FailureKind.PERMANENT));
     }
 
-    private static StandardWebPushTransport transport(RecordingConnection connection) throws Exception {
+    private static StandardWebPushTransport transport(HttpURLConnection connection) throws Exception {
+        return transport(connection, 5000);
+    }
+
+    private static StandardWebPushTransport transport(HttpURLConnection connection, int readTimeoutMillis)
+            throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(new ECGenParameterSpec("secp256r1"));
         KeyPair vapid = generator.generateKeyPair();
@@ -83,7 +122,7 @@ class StandardWebPushTransportTest {
         return new StandardWebPushTransport(
                 Base64.getUrlEncoder().withoutPadding().encodeToString(publicBytes),
                 Base64.getUrlEncoder().withoutPadding().encodeToString(privateBytes),
-                "mailto:push@example.invalid", 3000, 5000,
+                "mailto:push@example.invalid", 3000, readTimeoutMillis, readTimeoutMillis,
                 url -> connection);
     }
 
@@ -122,5 +161,39 @@ class StandardWebPushTransportTest {
         @Override public String getHeaderField(String name) {
             return "Retry-After".equalsIgnoreCase(name) ? retryAfter : null;
         }
+    }
+
+    private static final class BlockingWriteConnection extends HttpURLConnection {
+        private final CountDownLatch disconnected = new CountDownLatch(1);
+        private final CountDownLatch releaseWrite = new CountDownLatch(1);
+
+        private BlockingWriteConnection(URL url) {
+            super(url);
+        }
+
+        @Override public void disconnect() {
+            disconnected.countDown();
+            releaseWrite.countDown();
+        }
+        @Override public boolean usingProxy() { return false; }
+        @Override public void connect() { connected = true; }
+        @Override public OutputStream getOutputStream() {
+            return new OutputStream() {
+                @Override public void write(int value) throws IOException {
+                    try {
+                        if (!releaseWrite.await(10, TimeUnit.SECONDS)) {
+                            throw new IOException("write timed out");
+                        }
+                    } catch (InterruptedException error) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("write interrupted", error);
+                    }
+                    if (disconnected.getCount() == 0) {
+                        throw new IOException("connection disconnected");
+                    }
+                }
+            };
+        }
+        @Override public int getResponseCode() { return 201; }
     }
 }

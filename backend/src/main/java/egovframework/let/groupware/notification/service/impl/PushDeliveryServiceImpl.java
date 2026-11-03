@@ -216,8 +216,14 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         }
         String p256dh = keys.substring(0, separator);
         String auth = keys.substring(separator + 1);
+        String payload = payloadFactory.create(notification.getNotificationId());
+        int renewed = deliveryDAO.renewDeliveryLease(
+                delivery.getDeliveryId(), leaseToken, now().plusSeconds(leaseSeconds));
+        if (renewed != 1) {
+            throw new IllegalStateException("Web push delivery lease was lost before transport dispatch.");
+        }
         try {
-            transport.send(endpoint, p256dh, auth, payloadFactory.create(notification.getNotificationId()));
+            transport.send(endpoint, p256dh, auth, payload);
             requireDeliveryUpdate(deliveryDAO.markDeliverySent(delivery.getDeliveryId(), leaseToken));
         } catch (TransportException failure) {
             recordTransportFailure(delivery, subscription, leaseToken, now, failure);

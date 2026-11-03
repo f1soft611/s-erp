@@ -124,6 +124,7 @@ class PushMapperXmlTest {
         assertTrue(configuration.hasStatement("PushDeliveryDAO.selectOutbox"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimOutboxes"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.claimDeliveries"));
+        assertTrue(configuration.hasStatement("PushDeliveryDAO.renewDeliveryLease"));
         assertTrue(configuration.hasStatement("PushDeliveryDAO.scheduleDeliveryRetry"));
     }
 

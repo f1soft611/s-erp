@@ -14,6 +14,12 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
 
@@ -39,12 +45,23 @@ public class StandardWebPushTransport implements WebPushTransport {
 
     private static final int MAX_TTL_SECONDS = 3600;
     private static final int MAX_RETRY_AFTER_SECONDS = 3600;
+    private static final int MAX_REQUEST_TIMEOUT_MILLIS = 20000;
+    private static final ScheduledExecutorService REQUEST_DEADLINES =
+            Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable task) {
+                    Thread thread = new Thread(task, "web-push-deadline");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
 
     private final String vapidPublicKey;
     private final String vapidPrivateKey;
     private final String vapidSubject;
     private final int connectTimeoutMillis;
     private final int readTimeoutMillis;
+    private final int requestTimeoutMillis;
     private final ConnectionFactory connectionFactory;
 
     public StandardWebPushTransport(
@@ -52,18 +69,22 @@ public class StandardWebPushTransport implements WebPushTransport {
             @Value("$" + "{WEB_PUSH_VAPID_PRIVATE_KEY}") String vapidPrivateKey,
             @Value("$" + "{WEB_PUSH_VAPID_SUBJECT}") String vapidSubject,
             @Value("$" + "{WEB_PUSH_CONNECT_TIMEOUT_MS:3000}") int connectTimeoutMillis,
-            @Value("$" + "{WEB_PUSH_READ_TIMEOUT_MS:5000}") int readTimeoutMillis) {
+            @Value("$" + "{WEB_PUSH_READ_TIMEOUT_MS:5000}") int readTimeoutMillis,
+            @Value("$" + "{WEB_PUSH_REQUEST_TIMEOUT_MS:10000}") int requestTimeoutMillis) {
         this(vapidPublicKey, vapidPrivateKey, vapidSubject, connectTimeoutMillis, readTimeoutMillis,
+                requestTimeoutMillis,
                 url -> (HttpURLConnection) url.openConnection());
     }
 
     StandardWebPushTransport(String vapidPublicKey, String vapidPrivateKey, String vapidSubject,
-            int connectTimeoutMillis, int readTimeoutMillis, ConnectionFactory connectionFactory) {
+            int connectTimeoutMillis, int readTimeoutMillis, int requestTimeoutMillis,
+            ConnectionFactory connectionFactory) {
         this.vapidPublicKey = vapidPublicKey;
         this.vapidPrivateKey = vapidPrivateKey;
         this.vapidSubject = vapidSubject;
         this.connectTimeoutMillis = connectTimeoutMillis;
         this.readTimeoutMillis = readTimeoutMillis;
+        this.requestTimeoutMillis = requestTimeoutMillis;
         this.connectionFactory = connectionFactory;
         validateConfiguration();
     }
@@ -75,6 +96,7 @@ public class StandardWebPushTransport implements WebPushTransport {
                 || vapidSubject == null || !vapidSubject.matches("mailto:[^\\s@]+@[^\\s@]+")
                 || connectTimeoutMillis < 1 || connectTimeoutMillis > 10000
                 || readTimeoutMillis < 1 || readTimeoutMillis > 15000
+                || requestTimeoutMillis < 1 || requestTimeoutMillis > MAX_REQUEST_TIMEOUT_MILLIS
                 || !isCanonicalBase64Url(vapidPublicKey) || !isCanonicalBase64Url(vapidPrivateKey)) {
             throw new IllegalStateException("Web push VAPID transport configuration is invalid.");
         }
@@ -91,10 +113,25 @@ public class StandardWebPushTransport implements WebPushTransport {
     @Override
     public void send(String endpoint, String p256dh, String auth, String payload) throws TransportException {
         URI destination = validateEndpoint(endpoint);
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(requestTimeoutMillis);
         HttpPost request = prepareRequest(destination, p256dh, auth, payload);
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        if (remainingNanos <= 0) {
+            throw requestTimeout();
+        }
         HttpURLConnection connection = null;
+        ScheduledFuture<?> deadline = null;
+        AtomicBoolean requestTimedOut = new AtomicBoolean(false);
         try {
             connection = connectionFactory.open(destination.toURL());
+            final HttpURLConnection activeConnection = connection;
+            deadline = REQUEST_DEADLINES.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    requestTimedOut.set(true);
+                    activeConnection.disconnect();
+                }
+            }, remainingNanos, TimeUnit.NANOSECONDS);
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(connectTimeoutMillis);
             connection.setReadTimeout(readTimeoutMillis);
@@ -112,21 +149,40 @@ public class StandardWebPushTransport implements WebPushTransport {
                 connection.setFixedLengthStreamingMode((int) contentLength);
             }
             try (OutputStream output = connection.getOutputStream()) {
+                if (requestTimedOut.get()) {
+                    throw requestTimeout();
+                }
                 entity.writeTo(output);
             }
+            if (requestTimedOut.get()) {
+                throw requestTimeout();
+            }
             int status = connection.getResponseCode();
+            if (requestTimedOut.get()) {
+                throw requestTimeout();
+            }
             if (status < 200 || status >= 300) {
                 throw classify(status, connection.getHeaderField("Retry-After"));
             }
         } catch (TransportException error) {
             throw error;
         } catch (IOException error) {
+            if (requestTimedOut.get()) {
+                throw requestTimeout();
+            }
             throw new TransportException(FailureKind.TRANSIENT, "NETWORK_ERROR", 0, null);
         } finally {
+            if (deadline != null) {
+                deadline.cancel(false);
+            }
             if (connection != null) {
                 connection.disconnect();
             }
         }
+    }
+
+    private TransportException requestTimeout() {
+        return new TransportException(FailureKind.TRANSIENT, "REQUEST_TIMEOUT", 0, null);
     }
 
     private HttpPost prepareRequest(URI endpoint, String p256dh, String auth, String payload)

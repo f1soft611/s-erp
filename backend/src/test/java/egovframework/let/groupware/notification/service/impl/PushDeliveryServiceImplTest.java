@@ -20,6 +20,9 @@ import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +63,7 @@ class PushDeliveryServiceImplTest {
         when(deliveryDAO.markOutboxExpanded(anyLong(), any(UUID.class))).thenReturn(1);
         when(deliveryDAO.markOutboxNoRecipient(anyLong(), any(UUID.class))).thenReturn(1);
         when(deliveryDAO.markDeliverySent(anyLong(), any(UUID.class))).thenReturn(1);
+        when(deliveryDAO.renewDeliveryLease(anyLong(), any(UUID.class), any(LocalDateTime.class))).thenReturn(1);
         when(deliveryDAO.scheduleDeliveryRetry(anyLong(), any(UUID.class),
                 any(LocalDateTime.class), anyString())).thenReturn(1);
         when(deliveryDAO.markDeliveryPermanentFailure(anyLong(), any(UUID.class))).thenReturn(1);
@@ -311,6 +315,54 @@ class PushDeliveryServiceImplTest {
     }
 
     @Test
+    void refreshesDeliveryLeaseAfterSlowPreparationBeforeNetworkDispatch() throws Exception {
+        MutableClock clock = new MutableClock(NOW);
+        service = new PushDeliveryServiceImpl(deliveryDAO, notificationDAO, subscriptionDAO, cipher,
+                transport, new PushPayloadFactory(new ObjectMapper()), true, clock);
+        AtomicReference<Instant> dispatchTime = new AtomicReference<Instant>();
+        AtomicInteger decryptions = new AtomicInteger();
+        AtomicBoolean preparationDelayApplied = new AtomicBoolean();
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
+        when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class))).thenAnswer(invocation -> {
+            if (preparationDelayApplied.compareAndSet(false, true)) {
+                clock.advanceSeconds(25L);
+            }
+            return decryptions.getAndIncrement() == 0
+                    ? "https://fcm.googleapis.com/send/token" : "p256dh\nauth";
+        });
+        org.mockito.Mockito.doAnswer(invocation -> {
+            dispatchTime.set(clock.instant());
+            return null;
+        }).when(transport).send(anyString(), anyString(), anyString(), anyString());
+
+        service.deliverDueNotifications();
+
+        ArgumentCaptor<LocalDateTime> leaseUntil = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(deliveryDAO).renewDeliveryLease(eq(21L), any(UUID.class), leaseUntil.capture());
+        assertThat(leaseUntil.getValue().toInstant(ZoneOffset.UTC)).isAfter(dispatchTime.get().plusSeconds(20));
+    }
+
+    @Test
+    void doesNotDispatchWhenDeliveryLeaseCannotBeRenewed() throws Exception {
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
+                "https://fcm.googleapis.com/send/token", "p256dh\nauth");
+        when(deliveryDAO.renewDeliveryLease(anyLong(), any(UUID.class), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.deliverDueNotifications())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Web push delivery lease was lost before transport dispatch.");
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void failsLoudlyWhenSuccessUpdateNoLongerOwnsTheDeliveryLease() throws Exception {
         when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
                 .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
@@ -363,5 +415,21 @@ class PushDeliveryServiceImplTest {
         subscription.setEndpointCiphertext(new byte[] {1});
         subscription.setKeysCiphertext(new byte[] {2});
         return subscription;
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        private void advanceSeconds(long seconds) {
+            instant = instant.plusSeconds(seconds);
+        }
+
+        @Override public ZoneOffset getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public Instant instant() { return instant; }
     }
 }
