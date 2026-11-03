@@ -207,12 +207,32 @@ class PushDeliveryServiceImplTest {
     }
 
     @Test
-    void suppressesArchivedOrReadNotificationsBeforeNetworkDispatch() throws Exception {
+    void suppressesArchivedNotificationsBeforeNetworkDispatch() throws Exception {
         when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
                 .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
         PushNotificationVO notification = notification(123L);
         notification.setArchivedAt(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC));
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification);
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
+                "https://fcm.googleapis.com/send/token", "p256dh\nauth");
+
+        service.deliverDueNotifications();
+
+        verify(deliveryDAO).markDeliverySuppressed(eq(21L), any(UUID.class));
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void suppressesReadNotificationsBeforeNetworkDispatch() throws Exception {
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        PushNotificationVO notification = notification(123L);
+        notification.setReadAt(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC));
+        when(notificationDAO.selectPushNotification(123L)).thenReturn(notification);
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
+                "https://fcm.googleapis.com/send/token", "p256dh\nauth");
 
         service.deliverDueNotifications();
 

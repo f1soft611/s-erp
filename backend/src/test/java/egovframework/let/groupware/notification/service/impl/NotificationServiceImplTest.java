@@ -64,6 +64,20 @@ class NotificationServiceImplTest {
     }
 
     @Test
+    void enqueuesBothSupportedNotificationEventTypes() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 1);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L, 74L);
+
+        service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE",
+                72L, "Title", "Summary");
+        service.createEvent(4L, 19L, "APPROVAL_COMMENT_MENTION", "APPROVAL_COMMENT",
+                75L, "Title", "Summary");
+
+        verify(pushDeliveryService).enqueue(73L);
+        verify(pushDeliveryService).enqueue(74L);
+    }
+
+    @Test
     void duplicateNotificationDoesNotResolveIdOrEnqueueAnotherOutbox() throws Exception {
         when(notificationDAO.insertNotification(anyMap())).thenReturn(0);
 

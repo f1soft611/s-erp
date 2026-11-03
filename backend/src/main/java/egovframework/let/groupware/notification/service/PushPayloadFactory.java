@@ -9,8 +9,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Component
 public class PushPayloadFactory {
 
-    private static final String APPLICATION_ROUTE = "/groupware/notifications?pushNotificationId=";
-
     private final ObjectMapper objectMapper;
 
     public PushPayloadFactory(ObjectMapper objectMapper) {
@@ -22,17 +20,11 @@ public class PushPayloadFactory {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("notificationId", notificationId.longValue());
         payload.put("kind", "notification");
-        payload.put("url", getApplicationRoute(notificationId));
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException error) {
             throw new IllegalStateException("Unable to serialize web push payload.", error);
         }
-    }
-
-    public String getApplicationRoute(Long notificationId) {
-        validateNotificationId(notificationId);
-        return APPLICATION_ROUTE + notificationId;
     }
 
     private void validateNotificationId(Long notificationId) {

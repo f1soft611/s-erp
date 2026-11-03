@@ -11,12 +11,11 @@ class PushPayloadFactoryTest {
     private final PushPayloadFactory factory = new PushPayloadFactory(new ObjectMapper());
 
     @Test
-    void createsOnlyNotificationIdAndKindWithAFixedRoute() throws Exception {
-        assertThat(factory.create(123L)).isEqualTo(
-                "{\"notificationId\":123,\"kind\":\"notification\",\"url\":\"/groupware/notifications?pushNotificationId=123\"}");
-        assertThat(factory.getApplicationRoute(123L))
-                .isEqualTo("/groupware/notifications?pushNotificationId=123");
-        assertThat(factory.create(123L)).doesNotContain("title", "summary", "content", "endpoint", "secret");
+    void createsExactlyNotificationIdAndKindWithoutAnUrl() throws Exception {
+        assertThat(factory.create(123L))
+                .isEqualTo("{\"notificationId\":123,\"kind\":\"notification\"}");
+        assertThat(factory.create(123L))
+                .doesNotContain("url", "title", "summary", "content", "endpoint", "secret");
     }
 
     @Test
