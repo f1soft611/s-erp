@@ -30,10 +30,21 @@ import {
   getPushSubscriptionStatus,
   type PushDeviceStatus,
 } from '../../shared/services/pushSubscriptionService';
+import { ApiNetworkError, ApiResponseError } from '../../shared/services/apiErrors';
 
 const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_IMAGE_SIZE = 512;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg']);
+
+function pushErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiNetworkError || error instanceof ApiResponseError) {
+    return error.message;
+  }
+  if (error instanceof Error && error.message.startsWith('웹 푸시')) {
+    return error.message;
+  }
+  return fallback;
+}
 
 async function normalizeImageFile(file: File): Promise<string> {
   if (!IMAGE_TYPES.has(file.type)) {
@@ -163,10 +174,13 @@ function ProfileSettingsPage() {
       .then((status) => {
         if (active) setPushStatus(status);
       })
-      .catch(() => {
+      .catch((requestError: unknown) => {
         if (active) {
           setPushStatus({ state: 'error' });
-          setPushError('웹 푸시 상태를 불러오지 못했습니다. 다시 시도해 주세요.');
+          setPushError(pushErrorMessage(
+            requestError,
+            '웹 푸시 상태를 불러오지 못했습니다. 다시 시도해 주세요.',
+          ));
         }
       });
     return () => { active = false; };
@@ -231,9 +245,12 @@ function ProfileSettingsPage() {
     setPushError('');
     try {
       setPushStatus(await enablePushOnCurrentDevice());
-    } catch {
+    } catch (requestError: unknown) {
       setPushStatus({ state: 'error' });
-      setPushError('웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.');
+      setPushError(pushErrorMessage(
+        requestError,
+        '웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.',
+      ));
     } finally {
       setPushBusy(false);
     }
@@ -244,24 +261,29 @@ function ProfileSettingsPage() {
     setPushError('');
     try {
       setPushStatus(await disablePushOnCurrentDevice());
-    } catch {
-      setPushError('웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.');
+    } catch (requestError: unknown) {
+      setPushError(pushErrorMessage(
+        requestError,
+        '웹 푸시 설정을 변경하지 못했습니다. 다시 시도해 주세요.',
+      ));
     } finally {
       setPushBusy(false);
     }
   };
 
-  const pushStatusMessage = pushStatus.state === 'loading'
-    ? '웹 푸시 상태를 확인하고 있습니다.'
-    : pushStatus.state === 'enabled'
-      ? `이 기기에서 웹 푸시가 켜져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`
-      : pushStatus.state === 'denied'
-        ? '브라우저 설정에서 알림 권한을 허용해야 웹 푸시를 켤 수 있습니다.'
-        : pushStatus.state === 'unsupported'
-          ? '현재 브라우저 또는 보안 연결에서는 웹 푸시를 사용할 수 없습니다.'
-          : pushStatus.state === 'error'
-            ? '웹 푸시 상태를 불러오지 못했습니다.'
-            : `이 기기에서 웹 푸시가 꺼져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`;
+  const pushStatusMessage = pushStatus.enabled === false
+    ? '서버에서 웹 푸시 기능이 꺼져 있습니다. 운영 설정 확인이 필요합니다.'
+    : pushStatus.state === 'loading'
+      ? '웹 푸시 상태를 확인하고 있습니다.'
+      : pushStatus.state === 'enabled'
+        ? `이 기기에서 웹 푸시가 켜져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`
+        : pushStatus.state === 'denied'
+          ? '브라우저 설정에서 알림 권한을 허용해야 웹 푸시를 켤 수 있습니다.'
+          : pushStatus.state === 'unsupported'
+            ? '현재 브라우저 또는 보안 연결에서는 웹 푸시를 사용할 수 없습니다.'
+            : pushStatus.state === 'error'
+              ? '웹 푸시 상태를 불러오지 못했습니다.'
+              : `이 기기에서 웹 푸시가 꺼져 있습니다. (활성 기기 ${pushStatus.activeDeviceCount ?? 0}대)`;
 
   return (
     <Container
@@ -381,7 +403,8 @@ function ProfileSettingsPage() {
                 </Button>
               ) : pushStatus.state === 'loading' ? (
                 <Button disabled>상태 확인 중...</Button>
-              ) : pushStatus.state === 'denied' || pushStatus.state === 'unsupported' ? null : (
+              ) : pushStatus.state === 'denied' || pushStatus.state === 'unsupported'
+                || pushStatus.enabled === false ? null : (
                 <Button
                   variant="contained"
                   disabled={pushBusy}

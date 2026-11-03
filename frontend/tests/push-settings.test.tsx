@@ -100,6 +100,37 @@ describe('ProfileSettingsPage web push settings', () => {
     expect(screen.queryByRole('button', { name: '이 기기에서 웹 푸시 켜기' })).not.toBeInTheDocument();
   });
 
+  it('explains when web push is disabled on the server and does not offer enable', async () => {
+    pushMocks.getPushSubscriptionStatus.mockResolvedValueOnce({
+      state: 'disabled',
+      enabled: false,
+      activeDeviceCount: 0,
+      currentDevice: { subscribed: false, subscriptionId: null },
+    });
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    expect(await screen.findByText(/서버에서 웹 푸시 기능이 꺼져 있습니다/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: '이 기기에서 웹 푸시 켜기' })).not.toBeInTheDocument();
+  });
+
+  it('shows safe status and enable failure details instead of hiding them', async () => {
+    pushMocks.getPushSubscriptionStatus
+      .mockRejectedValueOnce(new Error('웹 푸시 상태를 확인할 수 없습니다.'));
+    render(<MemoryRouter><ProfileSettingsPage /></MemoryRouter>);
+    expect(await screen.findByText('웹 푸시 상태를 확인할 수 없습니다.')).toBeVisible();
+
+    pushMocks.getPushSubscriptionStatus.mockResolvedValueOnce({
+      state: 'disabled',
+      enabled: true,
+      activeDeviceCount: 0,
+      currentDevice: { subscribed: false, subscriptionId: null },
+    });
+    pushMocks.enablePushOnCurrentDevice.mockRejectedValueOnce(
+      new Error('웹 푸시 공개키를 확인할 수 없습니다.'),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '이 기기에서 웹 푸시 켜기' }));
+    expect(await screen.findByText('웹 푸시 공개키를 확인할 수 없습니다.')).toBeVisible();
+  });
+
   it('offers current-device disable and reports API failures without changing profile state', async () => {
     pushMocks.getPushSubscriptionStatus.mockResolvedValue({
       state: 'enabled',

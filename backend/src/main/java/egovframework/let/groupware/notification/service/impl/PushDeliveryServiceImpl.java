@@ -103,15 +103,14 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
     @Transactional(rollbackFor = Exception.class)
     public int expandDueOutboxes() throws Exception {
         UUID leaseToken = UUID.randomUUID();
-        LocalDateTime now = now();
         List<PushOutboxVO> outboxes = deliveryDAO.claimOutboxes(
-                leaseToken, now.plusSeconds(leaseSeconds), batchSize);
+                leaseToken, leaseSeconds, batchSize);
         if (outboxes == null) {
             throw new IllegalStateException("Unable to claim web push outboxes.");
         }
         int expanded = 0;
         for (PushOutboxVO outbox : outboxes) {
-            requireOutboxLease(outbox);
+            requireClaimedOutbox(outbox);
             if (!enabled) {
                 completeNoRecipient(outbox, leaseToken);
                 continue;
@@ -164,7 +163,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
             UUID leaseToken = UUID.randomUUID();
             LocalDateTime now = now();
             List<PushDeliveryVO> deliveries = deliveryDAO.claimDeliveries(
-                    leaseToken, now.plusSeconds(leaseSeconds), 1);
+                    leaseToken, leaseSeconds, 1);
             if (deliveries == null) {
                 throw new IllegalStateException("Unable to claim web push deliveries.");
             }
@@ -175,7 +174,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
                 throw new IllegalStateException("Web push delivery claim exceeded its requested batch size.");
             }
             PushDeliveryVO delivery = deliveries.get(0);
-            requireDeliveryLease(delivery);
+            requireClaimedDelivery(delivery);
             processDelivery(delivery, leaseToken, now);
             attempted++;
         }
@@ -218,7 +217,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         String auth = keys.substring(separator + 1);
         String payload = payloadFactory.create(notification.getNotificationId());
         int renewed = deliveryDAO.renewDeliveryLease(
-                delivery.getDeliveryId(), leaseToken, now().plusSeconds(leaseSeconds));
+                delivery.getDeliveryId(), leaseToken, leaseSeconds);
         if (renewed != 1) {
             throw new IllegalStateException("Web push delivery lease was lost before transport dispatch.");
         }
@@ -303,17 +302,16 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         }
     }
 
-    private void requireOutboxLease(PushOutboxVO outbox) {
-        if (outbox == null || outbox.getOutboxId() == null || outbox.getNotificationId() == null
-                || outbox.getLeaseToken() == null) {
-            throw new IllegalStateException("Claimed web push outbox lease is invalid.");
+    private void requireClaimedOutbox(PushOutboxVO outbox) {
+        if (outbox == null || outbox.getOutboxId() == null || outbox.getNotificationId() == null) {
+            throw new IllegalStateException("Claimed web push outbox is missing required identifiers.");
         }
     }
 
-    private void requireDeliveryLease(PushDeliveryVO delivery) {
+    private void requireClaimedDelivery(PushDeliveryVO delivery) {
         if (delivery == null || delivery.getDeliveryId() == null || delivery.getOutboxId() == null
-                || delivery.getSubscriptionId() == null || delivery.getLeaseToken() == null) {
-            throw new IllegalStateException("Claimed web push delivery lease is invalid.");
+                || delivery.getSubscriptionId() == null) {
+            throw new IllegalStateException("Claimed web push delivery is missing required identifiers.");
         }
     }
 

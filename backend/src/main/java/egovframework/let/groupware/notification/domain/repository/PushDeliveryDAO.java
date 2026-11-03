@@ -19,9 +19,9 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return insert("PushDeliveryDAO.insertOutbox", outbox);
     }
 
-    public List<PushOutboxVO> claimOutboxes(UUID leaseToken, LocalDateTime leaseUntil, Integer limit)
+    public List<PushOutboxVO> claimOutboxes(UUID leaseToken, Long leaseSeconds, Integer limit)
             throws Exception {
-        Map<String, Object> params = claimParams(leaseToken, leaseUntil, limit);
+        Map<String, Object> params = claimParams(leaseToken, leaseSeconds, limit);
         return selectList("PushDeliveryDAO.claimOutboxes", params);
     }
 
@@ -53,9 +53,9 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return update("PushDeliveryDAO.suppressInactiveDeliveries", outboxId);
     }
 
-    public List<PushDeliveryVO> claimDeliveries(UUID leaseToken, LocalDateTime leaseUntil, Integer limit)
+    public List<PushDeliveryVO> claimDeliveries(UUID leaseToken, Long leaseSeconds, Integer limit)
             throws Exception {
-        Map<String, Object> params = claimParams(leaseToken, leaseUntil, limit);
+        Map<String, Object> params = claimParams(leaseToken, leaseSeconds, limit);
         return selectList("PushDeliveryDAO.claimDeliveries", params);
     }
 
@@ -63,9 +63,9 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return update("PushDeliveryDAO.markDeliverySent", leaseParams(deliveryId, leaseToken));
     }
 
-    public int renewDeliveryLease(Long deliveryId, UUID leaseToken, LocalDateTime leaseUntil) throws Exception {
+    public int renewDeliveryLease(Long deliveryId, UUID leaseToken, Long leaseSeconds) throws Exception {
         Map<String, Object> params = leaseParams(deliveryId, leaseToken);
-        params.put("leaseUntil", leaseUntil);
+        params.put("leaseSeconds", leaseSeconds);
         return update("PushDeliveryDAO.renewDeliveryLease", params);
     }
 
@@ -89,10 +89,10 @@ public class PushDeliveryDAO extends EgovAbstractMapper {
         return update("PushDeliveryDAO.markDeliverySuppressed", leaseParams(deliveryId, leaseToken));
     }
 
-    private static Map<String, Object> claimParams(UUID leaseToken, LocalDateTime leaseUntil, Integer limit) {
+    private static Map<String, Object> claimParams(UUID leaseToken, Long leaseSeconds, Integer limit) {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("leaseToken", leaseToken);
-        params.put("leaseUntil", leaseUntil);
+        params.put("leaseSeconds", leaseSeconds);
         params.put("limit", limit);
         return params;
     }

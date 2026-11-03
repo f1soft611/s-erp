@@ -28,6 +28,20 @@ class PushEndpointPolicyTest {
     }
 
     @Test
+    void acceptsWindowsPushTokenQueryOnlyOnWindowsPushHosts() throws Exception {
+        PushEndpointPolicy policy = policyFor("8.8.8.8");
+
+        policy.validate(request("https://wns2.notify.windows.com/w/?token=opaque%2Btoken%2Fvalue"));
+
+        assertBadRequest(() -> policy.validate(
+                request("https://wns2.notify.windows.com/w/?other=opaque-token")));
+        assertBadRequest(() -> policy.validate(
+                request("https://wns2.notify.windows.com/w/?token=opaque-token&other=value")));
+        assertBadRequest(() -> policy.validate(
+                request("https://fcm.googleapis.com/send/token?token=opaque-token")));
+    }
+
+    @Test
     void rejectsUnsupportedSchemesHostsCredentialsPortsAndQueryStrings() throws Exception {
         PushEndpointPolicy policy = policyFor("8.8.8.8");
 

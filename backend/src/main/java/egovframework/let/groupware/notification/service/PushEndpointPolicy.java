@@ -53,7 +53,7 @@ public class PushEndpointPolicy {
             if (!"https".equalsIgnoreCase(endpoint.getScheme())
                     || !StringUtils.hasText(endpoint.getHost())
                     || endpoint.getRawUserInfo() != null
-                    || endpoint.getRawQuery() != null
+                    || (endpoint.getRawQuery() != null && !isAllowedQuery(endpoint))
                     || endpoint.getRawFragment() != null
                     || (endpoint.getPort() != -1 && endpoint.getPort() != 443)
                     || !StringUtils.hasText(endpoint.getRawPath())) {
@@ -63,6 +63,16 @@ public class PushEndpointPolicy {
         } catch (URISyntaxException error) {
             throw invalidEndpoint();
         }
+    }
+
+    public static boolean isAllowedQuery(URI endpoint) {
+        String host = endpoint.getHost().toLowerCase(java.util.Locale.ROOT);
+        String query = endpoint.getRawQuery();
+        return host.endsWith(".notify.windows.com")
+                && query.startsWith("token=")
+                && query.length() > "token=".length()
+                && query.indexOf('&') < 0
+                && query.indexOf(';') < 0;
     }
 
     private void validateHost(String host) {

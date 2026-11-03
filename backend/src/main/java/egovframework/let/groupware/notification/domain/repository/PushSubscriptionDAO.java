@@ -33,7 +33,9 @@ public class PushSubscriptionDAO extends EgovAbstractMapper {
     }
 
     public PushSubscriptionVO selectSubscriptionByEndpointHash(byte[] endpointHash) throws Exception {
-        return selectOne("PushSubscriptionDAO.selectSubscriptionByEndpointHash", endpointHash);
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("endpointHash", endpointHash);
+        return selectOne("PushSubscriptionDAO.selectSubscriptionByEndpointHash", params);
     }
 
     public int deactivateSubscription(Long tenantId, Long userId, Long subscriptionId) throws Exception {

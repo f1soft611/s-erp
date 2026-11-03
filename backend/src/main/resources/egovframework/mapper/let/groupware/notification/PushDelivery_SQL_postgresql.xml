@@ -26,7 +26,7 @@
         SET status = 'PROCESSING',
             attempt_count = outbox.attempt_count + 1,
             lease_token = #{leaseToken, jdbcType=OTHER},
-            lease_until = #{leaseUntil, jdbcType=TIMESTAMP},
+            lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
             updated_at = CURRENT_TIMESTAMP
         FROM candidates
         WHERE outbox.outbox_id = candidates.outbox_id
@@ -158,7 +158,7 @@
         SET status = 'PROCESSING',
             attempt_count = delivery.attempt_count + 1,
             lease_token = #{leaseToken, jdbcType=OTHER},
-            lease_until = #{leaseUntil, jdbcType=TIMESTAMP},
+            lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
             updated_at = CURRENT_TIMESTAMP
         FROM candidates
         WHERE delivery.delivery_id = candidates.delivery_id
@@ -191,13 +191,12 @@
 
     <update id="renewDeliveryLease" parameterType="map">
         UPDATE public.tb_push_delivery
-        SET lease_until = #{leaseUntil, jdbcType=TIMESTAMP},
+        SET lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
             updated_at = CURRENT_TIMESTAMP
         WHERE delivery_id = #{id, jdbcType=BIGINT}
           AND status = 'PROCESSING'
           AND lease_token = #{leaseToken, jdbcType=OTHER}
           AND lease_until > CURRENT_TIMESTAMP
-          AND #{leaseUntil, jdbcType=TIMESTAMP} > CURRENT_TIMESTAMP
     </update>
 
     <update id="scheduleDeliveryRetry" parameterType="map">

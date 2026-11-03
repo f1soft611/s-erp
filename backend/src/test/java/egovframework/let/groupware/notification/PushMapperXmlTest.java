@@ -1,20 +1,35 @@
 package egovframework.let.groupware.notification;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.PreparedStatement;
+import java.util.Collections;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.scripting.defaults.DefaultParameterHandler;
 import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.RowBounds;
+import org.apache.ibatis.session.defaults.DefaultSqlSession;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import egovframework.let.groupware.notification.domain.model.PushSubscriptionVO;
+import egovframework.let.groupware.notification.domain.repository.PushSubscriptionDAO;
 
 class PushMapperXmlTest {
 
@@ -22,6 +37,34 @@ class PushMapperXmlTest {
             "egovframework/mapper/let/groupware/notification/PushSubscription_SQL_postgresql.xml";
     private static final String DELIVERY_RESOURCE =
             "egovframework/mapper/let/groupware/notification/PushDelivery_SQL_postgresql.xml";
+
+    @Test
+    void endpointHashLookupBindsDaoBytesThroughTheActualMyBatisSession() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, SUBSCRIPTION_RESOURCE);
+        Executor executor = mock(Executor.class);
+        PreparedStatement jdbc = mock(PreparedStatement.class);
+        PushSubscriptionVO subscription = new PushSubscriptionVO();
+        when(executor.query(any(MappedStatement.class), any(), any(RowBounds.class), any()))
+                .thenAnswer(invocation -> {
+                    MappedStatement statement = invocation.getArgument(0);
+                    Object parameter = invocation.getArgument(1);
+                    BoundSql sql = statement.getBoundSql(parameter);
+                    new DefaultParameterHandler(statement, parameter, sql).setParameters(jdbc);
+                    return Collections.singletonList(subscription);
+                });
+        DefaultSqlSession session = new DefaultSqlSession(configuration, executor);
+        PushSubscriptionDAO dao = new PushSubscriptionDAO() {
+            @Override
+            public <T> T selectOne(String statement, Object parameter) {
+                return session.selectOne(statement, parameter);
+            }
+        };
+        byte[] hash = new byte[32];
+
+        assertSame(subscription, dao.selectSubscriptionByEndpointHash(hash));
+        verify(jdbc).setBytes(1, hash);
+    }
 
     @Test
     void subscriptionWritesAreBoundToAuthenticatedOwnerAndEndpointConflictsTransferIdempotently()
@@ -93,6 +136,21 @@ class PushMapperXmlTest {
         assertTrue(retry.contains("lease_until > CURRENT_TIMESTAMP"));
     }
 
+    @Test
+    void leaseDeadlinesUseDatabaseClockInsteadOfApplicationLocalDateTime() throws Exception {
+        Document mapper = readMapper(DELIVERY_RESOURCE);
+        String outboxClaim = statement(mapper, "select", "claimOutboxes");
+        String deliveryClaim = statement(mapper, "select", "claimDeliveries");
+        String renew = statement(mapper, "update", "renewDeliveryLease");
+
+        assertTrue(outboxClaim.contains("CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second')"));
+        assertTrue(deliveryClaim.contains("CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second')"));
+        assertTrue(renew.contains("CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second')"));
+        assertTrue(!outboxClaim.contains("#{leaseUntil"));
+        assertTrue(!deliveryClaim.contains("#{leaseUntil"));
+        assertTrue(!renew.contains("#{leaseUntil"));
+    }
+
 
     @Test
     void deliveryClaimCanReclaimRowsForInactiveSubscriptionsSoTheyCanBeSuppressed() throws Exception {
@@ -148,7 +206,7 @@ class PushMapperXmlTest {
                 "PostgreSQL LIMIT must precede the locking clause");
         assertTrue(normalized.contains("UPDATE public.tb_push_"));
         assertTrue(normalized.contains("lease_token = #{leaseToken"));
-        assertTrue(normalized.contains("lease_until = #{leaseUntil"));
+        assertTrue(normalized.contains("lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds"));
         assertTrue(normalized.contains("RETURNING"));
         assertTrue(!normalized.contains(";"));
     }

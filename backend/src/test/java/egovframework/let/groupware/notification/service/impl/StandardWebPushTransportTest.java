@@ -14,15 +14,44 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 
 import egovframework.let.groupware.notification.service.WebPushTransport;
 
 class StandardWebPushTransportTest {
+
+    @Test
+    void createsEnabledTransportBeanThroughItsConfiguredConstructor() {
+        Map<String, Object> properties = new HashMap<String, Object>();
+        properties.put("WEB_PUSH_ENABLED", "true");
+        byte[] publicKey = new byte[65];
+        publicKey[0] = 4;
+        properties.put("WEB_PUSH_VAPID_PUBLIC_KEY",
+                Base64.getUrlEncoder().withoutPadding().encodeToString(publicKey));
+        properties.put("WEB_PUSH_VAPID_PRIVATE_KEY",
+                Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]));
+        properties.put("WEB_PUSH_VAPID_SUBJECT", "mailto:push@example.invalid");
+
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.getEnvironment().getPropertySources()
+                .addFirst(new MapPropertySource("webPushTest", properties));
+        context.register(StandardWebPushTransport.class);
+        try {
+            context.refresh();
+
+            assertThat(context.getBean(StandardWebPushTransport.class)).isNotNull();
+        } finally {
+            context.close();
+        }
+    }
 
     @Test
     void preparesEncryptedPostWithBoundedTimeoutAndRedirectsDisabled() throws Exception {
@@ -36,6 +65,47 @@ class StandardWebPushTransportTest {
         assertThat(connection.getReadTimeout()).isEqualTo(5000);
         assertThat(connection.getInstanceFollowRedirects()).isFalse();
         assertThat(connection.body.toByteArray()).isNotEmpty();
+    }
+
+    @Test
+    void sendsWindowsPushTokenQueryWithoutChangingTheDestination() throws Exception {
+        String endpoint = "https://wns2.notify.windows.com/w/?token=opaque%2Btoken%2Fvalue";
+        RecordingConnection connection = new RecordingConnection(new URL(endpoint), 201);
+        AtomicReference<URL> destination = new AtomicReference<URL>();
+        transport(url -> {
+            destination.set(url);
+            return connection;
+        }, 5000).send(endpoint, subscriptionPublicKey(),
+                Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[16]), "{}");
+
+        assertThat(destination.get().toExternalForm()).isEqualTo(endpoint);
+        assertThat(connection.body.toByteArray()).isNotEmpty();
+        assertThat(connection.getInstanceFollowRedirects()).isFalse();
+    }
+
+    @Test
+    void rejectsQueriesOutsideTheSingleWindowsTokenBeforeOpeningAConnection() throws Exception {
+        RecordingConnection connection = new RecordingConnection(
+                new URL("https://wns2.notify.windows.com/w/"), 201);
+        AtomicReference<URL> destination = new AtomicReference<URL>();
+        StandardWebPushTransport transport = transport(url -> {
+            destination.set(url);
+            return connection;
+        }, 5000);
+        String publicKey = subscriptionPublicKey();
+        String auth = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[16]);
+        for (String endpoint : new String[] {
+                "https://fcm.googleapis.com/send/test?token=opaque-token",
+                "https://wns2.notify.windows.com/w/?token=",
+                "https://wns2.notify.windows.com/w/?other=opaque-token",
+                "https://wns2.notify.windows.com/w/?token=one&token=two",
+                "https://wns2.notify.windows.com/w/?token=one;other=two"
+        }) {
+            assertThatThrownBy(() -> transport.send(endpoint, publicKey, auth, "{}"))
+                    .isInstanceOfSatisfying(WebPushTransport.TransportException.class,
+                            failure -> assertThat(failure.getErrorCode()).isEqualTo("INVALID_ENDPOINT"));
+        }
+        assertThat(destination.get()).isNull();
     }
 
     @Test
@@ -108,6 +178,12 @@ class StandardWebPushTransportTest {
 
     private static StandardWebPushTransport transport(HttpURLConnection connection, int readTimeoutMillis)
             throws Exception {
+        return transport(url -> connection, readTimeoutMillis);
+    }
+
+    private static StandardWebPushTransport transport(
+            StandardWebPushTransport.ConnectionFactory connectionFactory, int readTimeoutMillis)
+            throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(new ECGenParameterSpec("secp256r1"));
         KeyPair vapid = generator.generateKeyPair();
@@ -123,7 +199,7 @@ class StandardWebPushTransportTest {
                 Base64.getUrlEncoder().withoutPadding().encodeToString(publicBytes),
                 Base64.getUrlEncoder().withoutPadding().encodeToString(privateBytes),
                 "mailto:push@example.invalid", 3000, readTimeoutMillis, readTimeoutMillis,
-                url -> connection);
+                connectionFactory);
     }
 
     private static String subscriptionPublicKey() throws Exception {

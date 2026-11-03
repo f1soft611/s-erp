@@ -108,7 +108,7 @@
           AND subscription_id = #{subscriptionId, jdbcType=BIGINT}
     </select>
 
-    <select id="selectSubscriptionByEndpointHash" parameterType="byte[]"
+    <select id="selectSubscriptionByEndpointHash" parameterType="map"
             resultType="egovframework.let.groupware.notification.domain.model.PushSubscriptionVO">
         SELECT subscription_id AS subscriptionId,
                tenant_id AS tenantId,

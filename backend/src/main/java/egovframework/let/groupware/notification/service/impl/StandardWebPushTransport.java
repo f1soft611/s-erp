@@ -27,6 +27,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.jose4j.lang.JoseException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -36,6 +37,7 @@ import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import egovframework.let.groupware.notification.service.WebPushTransport;
+import egovframework.let.groupware.notification.service.PushEndpointPolicy;
 import egovframework.let.groupware.notification.service.WebPushTransport.FailureKind;
 import egovframework.let.groupware.notification.service.WebPushTransport.TransportException;
 
@@ -64,6 +66,7 @@ public class StandardWebPushTransport implements WebPushTransport {
     private final int requestTimeoutMillis;
     private final ConnectionFactory connectionFactory;
 
+    @Autowired
     public StandardWebPushTransport(
             @Value("$" + "{WEB_PUSH_VAPID_PUBLIC_KEY}") String vapidPublicKey,
             @Value("$" + "{WEB_PUSH_VAPID_PRIVATE_KEY}") String vapidPrivateKey,
@@ -207,7 +210,8 @@ public class StandardWebPushTransport implements WebPushTransport {
                     || "web.push.apple.com".equals(normalizedHost)
                     || normalizedHost.endsWith(".notify.windows.com");
             if (!"https".equalsIgnoreCase(uri.getScheme()) || !allowedHost
-                    || uri.getRawUserInfo() != null || uri.getRawQuery() != null
+                    || uri.getRawUserInfo() != null
+                    || (uri.getRawQuery() != null && !PushEndpointPolicy.isAllowedQuery(uri))
                     || uri.getRawFragment() != null || (uri.getPort() != -1 && uri.getPort() != 443)
                     || uri.getRawPath() == null || uri.getRawPath().isEmpty()) {
                 throw new URISyntaxException("", "Invalid push destination");
