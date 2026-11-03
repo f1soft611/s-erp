@@ -8,9 +8,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Constructor;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -53,8 +55,16 @@ class PushDeliveryServiceImplTest {
                 transport, new PushPayloadFactory(new ObjectMapper()), true,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         when(deliveryDAO.selectOutbox(11L)).thenReturn(outbox(11L, 123L));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.emptyList());
         when(deliveryDAO.markOutboxExpanded(anyLong(), any(UUID.class))).thenReturn(1);
         when(deliveryDAO.markOutboxNoRecipient(anyLong(), any(UUID.class))).thenReturn(1);
+        when(deliveryDAO.markDeliverySent(anyLong(), any(UUID.class))).thenReturn(1);
+        when(deliveryDAO.scheduleDeliveryRetry(anyLong(), any(UUID.class),
+                any(LocalDateTime.class), anyString())).thenReturn(1);
+        when(deliveryDAO.markDeliveryPermanentFailure(anyLong(), any(UUID.class))).thenReturn(1);
+        when(deliveryDAO.markDeliveryExhausted(anyLong(), any(UUID.class))).thenReturn(1);
+        when(deliveryDAO.markDeliverySuppressed(anyLong(), any(UUID.class))).thenReturn(1);
     }
 
     @Test
@@ -95,8 +105,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void deliversPayloadWithoutNotificationTextAndMarksAcceptedResponseSent() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
         PushNotificationVO notification = notification(123L);
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification);
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
@@ -105,6 +116,10 @@ class PushDeliveryServiceImplTest {
 
         service.deliverDueNotifications();
 
+        ArgumentCaptor<LocalDateTime> lease = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(deliveryDAO, times(2)).claimDeliveries(any(UUID.class), lease.capture(), eq(1));
+        assertThat(lease.getAllValues())
+                .containsOnly(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC).plusSeconds(30));
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
         verify(transport).send(eq("https://fcm.googleapis.com/send/token"), eq("p256dh"), eq("auth"),
                 payload.capture());
@@ -115,8 +130,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void disablesExpiredSubscriptionAndMarksItsDeliveryTerminal() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
         when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
@@ -133,8 +149,10 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void schedulesTransientFailureWithBackoffAndPreservesOtherDeviceDelivery() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Arrays.asList(delivery(21L, 11L, 31L, 1), delivery(22L, 11L, 32L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.singletonList(delivery(22L, 11L, 32L, 1)),
+                        Collections.emptyList());
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
         when(subscriptionDAO.selectSubscriptionForDelivery(32L)).thenReturn(subscription(32L));
@@ -154,8 +172,10 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void marksPermanentFailureAndExhaustedAttemptWithoutAnotherNetworkCall() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Arrays.asList(delivery(21L, 11L, 31L, 1), delivery(22L, 11L, 32L, 6)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.singletonList(delivery(22L, 11L, 32L, 6)),
+                        Collections.emptyList());
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
         when(subscriptionDAO.selectSubscriptionForDelivery(32L)).thenReturn(subscription(32L));
@@ -175,8 +195,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void suppressesDeliveryForInactiveSubscriptionAndCompletesItsOutbox() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(null);
 
@@ -189,8 +210,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void makesFifthTransientFailureTerminalInsteadOfSchedulingAnUnboundedRetry() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 5)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 5)),
+                        Collections.emptyList());
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
         when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
         when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
@@ -208,8 +230,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void suppressesArchivedNotificationsBeforeNetworkDispatch() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
         PushNotificationVO notification = notification(123L);
         notification.setArchivedAt(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC));
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification);
@@ -225,8 +248,9 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void suppressesReadNotificationsBeforeNetworkDispatch() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
-                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)));
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
         PushNotificationVO notification = notification(123L);
         notification.setReadAt(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC));
         when(notificationDAO.selectPushNotification(123L)).thenReturn(notification);
@@ -242,13 +266,64 @@ class PushDeliveryServiceImplTest {
 
     @Test
     void propagatesDatabaseFailuresInsteadOfTreatingThemAsTransportErrors() throws Exception {
-        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(50)))
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
                 .thenThrow(new IllegalStateException("database unavailable"));
 
         assertThatThrownBy(() -> service.deliverDueNotifications())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("database unavailable");
         verify(transport, never()).send(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void claimsNoLaterDeliveriesWhenTheCurrentItemCannotBeProcessed() throws Exception {
+        PushDeliveryVO first = delivery(21L, 11L, 31L, 1);
+        PushDeliveryVO second = delivery(22L, 11L, 32L, 1);
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenAnswer(invocation -> {
+                    int limit = invocation.getArgument(2);
+                    return Arrays.asList(first, second).subList(0, Math.min(limit, 2));
+                });
+        when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class)))
+                .thenThrow(new IllegalStateException("subscription decrypt failed"));
+
+        assertThatThrownBy(() -> service.deliverDueNotifications())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("subscription decrypt failed");
+
+        verify(deliveryDAO).claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1));
+    }
+
+    @Test
+    void rejectsDeliveryLeaseShorterThanTheBoundedTransportTimeouts() {
+        assertThatThrownBy(() -> {
+            Constructor<PushDeliveryServiceImpl> constructor = PushDeliveryServiceImpl.class
+                    .getDeclaredConstructor(PushDeliveryDAO.class, NotificationDAO.class,
+                            PushSubscriptionDAO.class, PushSubscriptionCipher.class, WebPushTransport.class,
+                            PushPayloadFactory.class, boolean.class, Clock.class, int.class, long.class);
+            constructor.setAccessible(true);
+            constructor.newInstance(deliveryDAO, notificationDAO, subscriptionDAO, cipher,
+                    transport, new PushPayloadFactory(new ObjectMapper()), true,
+                    Clock.fixed(NOW, ZoneOffset.UTC), 50, 25L);
+        }).hasCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void failsLoudlyWhenSuccessUpdateNoLongerOwnsTheDeliveryLease() throws Exception {
+        when(deliveryDAO.claimDeliveries(any(UUID.class), any(LocalDateTime.class), eq(1)))
+                .thenReturn(Collections.singletonList(delivery(21L, 11L, 31L, 1)),
+                        Collections.emptyList());
+        when(notificationDAO.selectPushNotification(123L)).thenReturn(notification(123L));
+        when(subscriptionDAO.selectSubscriptionForDelivery(31L)).thenReturn(subscription(31L));
+        when(cipher.decrypt(anyString(), any(byte[].class))).thenReturn(
+                "https://fcm.googleapis.com/send/token", "p256dh\nauth");
+        when(deliveryDAO.markDeliverySent(eq(21L), any(UUID.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.deliverDueNotifications())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Web push delivery lease was lost before status update.");
     }
 
     private static PushOutboxVO outbox(Long outboxId, Long notificationId) {

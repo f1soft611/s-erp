@@ -31,6 +31,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
 
     private static final int DEFAULT_BATCH_SIZE = 50;
     private static final int MAX_BATCH_SIZE = 50;
+    private static final long MIN_LEASE_SECONDS = 30L;
     private static final int MAX_ATTEMPTS = 5;
     private static final long MAX_PENDING_SECONDS = 3600L;
     private static final long[] RETRY_DELAYS_SECONDS = {30L, 120L, 600L, 1800L};
@@ -68,7 +69,8 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
             PushSubscriptionDAO subscriptionDAO, PushSubscriptionCipher cipher,
             WebPushTransport transport, PushPayloadFactory payloadFactory, boolean enabled,
             Clock clock, int batchSize, long leaseSeconds) {
-        if (batchSize < 1 || batchSize > MAX_BATCH_SIZE || leaseSeconds < 1 || leaseSeconds > 300) {
+        if (batchSize < 1 || batchSize > MAX_BATCH_SIZE
+                || leaseSeconds < MIN_LEASE_SECONDS || leaseSeconds > 300) {
             throw new IllegalArgumentException("Invalid web push worker bounds.");
         }
         this.deliveryDAO = deliveryDAO;
@@ -157,15 +159,22 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         if (transport == null) {
             throw new IllegalStateException("Web push transport is not configured.");
         }
-        UUID leaseToken = UUID.randomUUID();
-        LocalDateTime now = now();
-        List<PushDeliveryVO> deliveries = deliveryDAO.claimDeliveries(
-                leaseToken, now.plusSeconds(leaseSeconds), batchSize);
-        if (deliveries == null) {
-            throw new IllegalStateException("Unable to claim web push deliveries.");
-        }
         int attempted = 0;
-        for (PushDeliveryVO delivery : deliveries) {
+        while (attempted < batchSize) {
+            UUID leaseToken = UUID.randomUUID();
+            LocalDateTime now = now();
+            List<PushDeliveryVO> deliveries = deliveryDAO.claimDeliveries(
+                    leaseToken, now.plusSeconds(leaseSeconds), 1);
+            if (deliveries == null) {
+                throw new IllegalStateException("Unable to claim web push deliveries.");
+            }
+            if (deliveries.isEmpty()) {
+                break;
+            }
+            if (deliveries.size() != 1) {
+                throw new IllegalStateException("Web push delivery claim exceeded its requested batch size.");
+            }
+            PushDeliveryVO delivery = deliveries.get(0);
             requireDeliveryLease(delivery);
             processDelivery(delivery, leaseToken, now);
             attempted++;
@@ -180,19 +189,19 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         PushNotificationVO notification = notificationDAO.selectPushNotification(
                 notificationIdForOutbox(delivery.getOutboxId()));
         if (notification == null || notification.getArchivedAt() != null || notification.getReadAt() != null) {
-            deliveryDAO.markDeliverySuppressed(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliverySuppressed(delivery.getDeliveryId(), leaseToken));
             completeOutboxIfTerminal(delivery.getOutboxId());
             return;
         }
         PushSubscriptionVO subscription = subscriptionDAO.selectSubscriptionForDelivery(
                 delivery.getSubscriptionId());
         if (subscription == null || !"ACTIVE".equals(subscription.getStatus())) {
-            deliveryDAO.markDeliverySuppressed(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliverySuppressed(delivery.getDeliveryId(), leaseToken));
             completeOutboxIfTerminal(delivery.getOutboxId());
             return;
         }
         if (isExhausted(delivery, now)) {
-            deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken));
             completeOutboxIfTerminal(delivery.getOutboxId());
             return;
         }
@@ -209,7 +218,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         String auth = keys.substring(separator + 1);
         try {
             transport.send(endpoint, p256dh, auth, payloadFactory.create(notification.getNotificationId()));
-            deliveryDAO.markDeliverySent(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliverySent(delivery.getDeliveryId(), leaseToken));
         } catch (TransportException failure) {
             recordTransportFailure(delivery, subscription, leaseToken, now, failure);
         }
@@ -230,18 +239,20 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         if (kind == FailureKind.SUBSCRIPTION_GONE) {
             subscriptionDAO.deactivateSubscription(subscription.getTenantId(), subscription.getUserId(),
                     subscription.getSubscriptionId());
-            deliveryDAO.markDeliveryPermanentFailure(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(
+                    deliveryDAO.markDeliveryPermanentFailure(delivery.getDeliveryId(), leaseToken));
             return;
         }
         if (kind == FailureKind.PERMANENT) {
-            deliveryDAO.markDeliveryPermanentFailure(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(
+                    deliveryDAO.markDeliveryPermanentFailure(delivery.getDeliveryId(), leaseToken));
             return;
         }
         if (kind != FailureKind.TRANSIENT) {
             throw new IllegalStateException("Web push transport failure classification is invalid.");
         }
         if (delivery.getAttemptCount() >= MAX_ATTEMPTS || isOlderThanLimit(delivery, now)) {
-            deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken));
             return;
         }
         int delayIndex = Math.min(delivery.getAttemptCount() - 1, RETRY_DELAYS_SECONDS.length - 1);
@@ -252,10 +263,11 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         LocalDateTime nextAttempt = now.plusSeconds(delay);
         LocalDateTime deadline = delivery.getCreatedAt().plusSeconds(MAX_PENDING_SECONDS);
         if (!nextAttempt.isBefore(deadline)) {
-            deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken);
+            requireDeliveryUpdate(deliveryDAO.markDeliveryExhausted(delivery.getDeliveryId(), leaseToken));
             return;
         }
-        deliveryDAO.scheduleDeliveryRetry(delivery.getDeliveryId(), leaseToken, nextAttempt, failure.getErrorCode());
+        requireDeliveryUpdate(deliveryDAO.scheduleDeliveryRetry(
+                delivery.getDeliveryId(), leaseToken, nextAttempt, failure.getErrorCode()));
     }
 
     private boolean isExhausted(PushDeliveryVO delivery, LocalDateTime now) {
@@ -277,6 +289,12 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
 
     private void completeOutboxIfTerminal(Long outboxId) throws Exception {
         deliveryDAO.markOutboxCompleted(outboxId);
+    }
+
+    private void requireDeliveryUpdate(int affectedRows) {
+        if (affectedRows != 1) {
+            throw new IllegalStateException("Web push delivery lease was lost before status update.");
+        }
     }
 
     private void requireOutboxLease(PushOutboxVO outbox) {
