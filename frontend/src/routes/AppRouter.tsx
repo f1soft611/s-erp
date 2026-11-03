@@ -1,5 +1,6 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { resolvePushNotificationPath } from '../shared/utils/notificationPath';
 import {
   isAuthenticated,
   subscribeAuthChange,
@@ -34,13 +35,22 @@ function useAuthState() {
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAuthState();
+  const location = useLocation();
   console.log('PublicRoute auth', isAuthed, 'path', window.location.pathname);
 
-  return isAuthed ? <Navigate to="/" replace /> : <>{children}</>;
+  return isAuthed
+    ? <Navigate to={resolvePushNotificationPath(location.state?.pushNotificationId) ?? '/'} replace />
+    : <>{children}</>;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAuthState();
+  const location = useLocation();
+  const pushIds = new URLSearchParams(location.search).getAll('pushNotificationId');
+  const pushNotificationId = location.pathname === '/groupware/notifications'
+    && pushIds.length === 1 && /^\d+$/.test(pushIds[0])
+    && resolvePushNotificationPath(Number(pushIds[0]))
+    ? Number(pushIds[0]) : null;
   console.log(
     'ProtectedRoute auth',
     isAuthed,
@@ -48,7 +58,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.pathname,
   );
 
-  return isAuthed ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAuthed ? <>{children}</>
+    : <Navigate to="/login" state={{ pushNotificationId }} replace />;
 }
 
 function AppRouter() {

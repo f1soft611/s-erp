@@ -15,6 +15,7 @@ import egovframework.let.groupware.notification.domain.model.NotificationPageVO;
 import egovframework.let.groupware.notification.domain.model.NotificationVO;
 import egovframework.let.groupware.notification.domain.repository.NotificationDAO;
 import egovframework.let.groupware.notification.service.NotificationService;
+import egovframework.let.groupware.notification.service.PushDeliveryService;
 import egovframework.let.groupware.realtime.RealtimeArea;
 import egovframework.let.groupware.realtime.RealtimePublisher;
 
@@ -23,10 +24,13 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationDAO notificationDAO;
     private final RealtimePublisher realtime;
+    private final PushDeliveryService pushDeliveryService;
 
-    public NotificationServiceImpl(NotificationDAO notificationDAO, RealtimePublisher realtime) {
+    public NotificationServiceImpl(NotificationDAO notificationDAO, RealtimePublisher realtime,
+            PushDeliveryService pushDeliveryService) {
         this.notificationDAO = notificationDAO;
         this.realtime = realtime;
+        this.pushDeliveryService = pushDeliveryService;
     }
 
     @Override
@@ -51,7 +55,12 @@ public class NotificationServiceImpl implements NotificationService {
         params.put("sourceId", sourceId);
         params.put("title", title.trim());
         params.put("summary", summary.trim());
-        if (notificationDAO.insertNotification(params) > 0) {
+        if (notificationDAO.insertNotification(params) == 1) {
+            Long notificationId = notificationDAO.selectNotificationId(params);
+            if (notificationId == null || notificationId.longValue() <= 0) {
+                throw new IllegalStateException("새 알림 ID를 확인할 수 없습니다.");
+            }
+            pushDeliveryService.enqueue(notificationId);
             realtime.publish(tenantId, recipientUserId, RealtimeArea.NOTIFICATION);
             if ("DIRECT_MESSAGE_RECEIVED".equals(eventType)) {
                 realtime.publish(tenantId, recipientUserId, RealtimeArea.MESSAGE);

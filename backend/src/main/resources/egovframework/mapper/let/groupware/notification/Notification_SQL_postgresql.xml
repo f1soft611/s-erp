@@ -97,6 +97,29 @@
           </if>
     </update>
 
+    <select id="selectNotificationId" parameterType="map" resultType="long">
+        SELECT notification_id
+        FROM public.tb_notification
+        WHERE tenant_id = #{tenantId}
+          AND recipient_user_id = #{recipientUserId}
+          AND event_type = #{eventType}
+          AND source_type = #{sourceType}
+          AND source_id = #{sourceId}
+    </select>
+
+    <select id="selectPushNotification" parameterType="long"
+            resultType="egovframework.let.groupware.notification.domain.model.PushNotificationVO">
+        SELECT notification_id AS notificationId,
+               tenant_id AS tenantId,
+               recipient_user_id AS recipientUserId,
+               event_type AS eventType,
+               read_at AS readAt,
+               archived_at AS archivedAt,
+               created_at AS createdAt
+        FROM public.tb_notification
+        WHERE notification_id = #{notificationId}
+    </select>
+
     <insert id="insertNotification" parameterType="map">
         INSERT INTO public.tb_notification (
             tenant_id, recipient_user_id, event_type, source_type, source_id, title, summary

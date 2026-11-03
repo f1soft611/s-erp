@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PushDeliveryDAO">
+
+    <insert id="insertOutbox" parameterType="egovframework.let.groupware.notification.domain.model.PushOutboxVO"
+            useGeneratedKeys="true"
+            keyProperty="outboxId" keyColumn="outbox_id">
+        INSERT INTO public.tb_push_outbox (notification_id)
+        VALUES (#{notificationId, jdbcType=BIGINT})
+        ON CONFLICT (notification_id) DO NOTHING
+    </insert>
+
+    <select id="claimOutboxes" parameterType="map"
+            resultType="egovframework.let.groupware.notification.domain.model.PushOutboxVO"
+            affectData="true">
+        WITH candidates AS (
+            SELECT outbox_id
+            FROM public.tb_push_outbox
+            WHERE status = 'PENDING'
+               OR (status = 'PROCESSING' AND lease_until &lt;= CURRENT_TIMESTAMP)
+            ORDER BY created_at, outbox_id
+            LIMIT #{limit, jdbcType=INTEGER}
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE public.tb_push_outbox AS outbox
+        SET status = 'PROCESSING',
+            attempt_count = outbox.attempt_count + 1,
+            lease_token = #{leaseToken, jdbcType=OTHER},
+            lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
+            updated_at = CURRENT_TIMESTAMP
+        FROM candidates
+        WHERE outbox.outbox_id = candidates.outbox_id
+        RETURNING outbox.outbox_id AS outboxId,
+                  outbox.notification_id AS notificationId,
+                  outbox.status,
+                  outbox.attempt_count AS attemptCount,
+                  outbox.lease_token AS leaseToken,
+                  outbox.lease_until AS leaseUntil,
+                  outbox.created_at AS createdAt,
+                  outbox.updated_at AS updatedAt,
+                  outbox.completed_at AS completedAt
+    </select>
+
+    <update id="markOutboxExpanded" parameterType="map">
+        UPDATE public.tb_push_outbox
+        SET status = 'EXPANDED',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE outbox_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="markOutboxNoRecipient" parameterType="map">
+        UPDATE public.tb_push_outbox
+        SET status = 'NO_RECIPIENT',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE outbox_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <select id="selectOutbox" parameterType="long"
+            resultType="egovframework.let.groupware.notification.domain.model.PushOutboxVO">
+        SELECT outbox_id AS outboxId,
+               notification_id AS notificationId,
+               status
+        FROM public.tb_push_outbox
+        WHERE outbox_id = #{outboxId, jdbcType=BIGINT}
+    </select>
+
+    <update id="markOutboxCompleted" parameterType="map">
+        UPDATE public.tb_push_outbox AS outbox
+        SET status = 'COMPLETED',
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE outbox.outbox_id = #{id, jdbcType=BIGINT}
+          AND outbox.status = 'EXPANDED'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM public.tb_push_delivery AS delivery
+              WHERE delivery.outbox_id = outbox.outbox_id
+                AND delivery.status IN ('PENDING', 'PROCESSING', 'RETRY_WAIT')
+          )
+    </update>
+
+    <update id="markOutboxFailed" parameterType="map">
+        UPDATE public.tb_push_outbox
+        SET status = 'FAILED',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE outbox_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <insert id="insertDelivery" parameterType="egovframework.let.groupware.notification.domain.model.PushDeliveryVO"
+            useGeneratedKeys="true" keyProperty="deliveryId" keyColumn="delivery_id">
+        INSERT INTO public.tb_push_delivery (outbox_id, subscription_id)
+        VALUES (
+            #{outboxId, jdbcType=BIGINT},
+            #{subscriptionId, jdbcType=BIGINT}
+        )
+        ON CONFLICT (outbox_id, subscription_id) DO NOTHING
+    </insert>
+
+    <update id="suppressInactiveDeliveries" parameterType="long">
+        UPDATE public.tb_push_delivery AS delivery
+        SET status = 'SUPPRESSED',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        FROM public.tb_push_subscription AS subscription
+        WHERE delivery.subscription_id = subscription.subscription_id
+          AND delivery.outbox_id = #{outboxId, jdbcType=BIGINT}
+          AND subscription.status = 'INACTIVE'
+          AND (
+              delivery.status IN ('PENDING', 'RETRY_WAIT')
+              OR (
+                  delivery.status = 'PROCESSING'
+                  AND delivery.lease_until &lt;= CURRENT_TIMESTAMP
+              )
+          )
+    </update>
+
+    <select id="claimDeliveries" parameterType="map"
+            resultType="egovframework.let.groupware.notification.domain.model.PushDeliveryVO"
+            affectData="true">
+        WITH candidates AS (
+            SELECT delivery.delivery_id
+            FROM public.tb_push_delivery AS delivery
+            LEFT JOIN public.tb_push_subscription AS subscription
+              ON subscription.subscription_id = delivery.subscription_id
+            WHERE delivery.status = 'PENDING'
+               OR (
+                   delivery.status = 'RETRY_WAIT'
+                   AND delivery.next_attempt_at &lt;= CURRENT_TIMESTAMP
+               )
+               OR (
+                   delivery.status = 'PROCESSING'
+                   AND delivery.lease_until &lt;= CURRENT_TIMESTAMP
+               )
+            ORDER BY COALESCE(delivery.next_attempt_at, delivery.created_at), delivery.delivery_id
+            LIMIT #{limit, jdbcType=INTEGER}
+            FOR UPDATE OF delivery SKIP LOCKED
+        )
+        UPDATE public.tb_push_delivery AS delivery
+        SET status = 'PROCESSING',
+            attempt_count = delivery.attempt_count + 1,
+            lease_token = #{leaseToken, jdbcType=OTHER},
+            lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
+            updated_at = CURRENT_TIMESTAMP
+        FROM candidates
+        WHERE delivery.delivery_id = candidates.delivery_id
+        RETURNING delivery.delivery_id AS deliveryId,
+                  delivery.outbox_id AS outboxId,
+                  delivery.subscription_id AS subscriptionId,
+                  delivery.status,
+                  delivery.attempt_count AS attemptCount,
+                  delivery.next_attempt_at AS nextAttemptAt,
+                  delivery.lease_token AS leaseToken,
+                  delivery.lease_until AS leaseUntil,
+                  delivery.last_error_code AS lastErrorCode,
+                  delivery.created_at AS createdAt,
+                  delivery.updated_at AS updatedAt,
+                  delivery.completed_at AS completedAt
+    </select>
+
+    <update id="markDeliverySent" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET status = 'SENT',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="renewDeliveryLease" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET lease_until = CURRENT_TIMESTAMP + (#{leaseSeconds, jdbcType=BIGINT} * INTERVAL '1 second'),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="scheduleDeliveryRetry" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET status = 'RETRY_WAIT',
+            next_attempt_at = #{nextAttemptAt, jdbcType=TIMESTAMP},
+            last_error_code = #{errorCode, jdbcType=VARCHAR},
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="markDeliveryPermanentFailure" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET status = 'PERMANENT_FAILURE',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="markDeliveryExhausted" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET status = 'EXHAUSTED',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+    <update id="markDeliverySuppressed" parameterType="map">
+        UPDATE public.tb_push_delivery
+        SET status = 'SUPPRESSED',
+            lease_token = NULL,
+            lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP
+        WHERE delivery_id = #{id, jdbcType=BIGINT}
+          AND status = 'PROCESSING'
+          AND lease_token = #{leaseToken, jdbcType=OTHER}
+          AND lease_until > CURRENT_TIMESTAMP
+    </update>
+
+</mapper>

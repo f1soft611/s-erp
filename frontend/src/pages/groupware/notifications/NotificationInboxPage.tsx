@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../../shared/context/NotificationContext';
 import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {
@@ -53,6 +53,7 @@ const notificationTypeIndicators: Record<NotificationEventType, { label: string;
 
 export function NotificationInboxPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showError, showSuccess } = useNotification();
   const [filter, setFilter] = useState<NotificationFilter>('ALL');
   const [typeFilter, setTypeFilter] = useState<NotificationTypeFilter>('ALL');
@@ -68,6 +69,52 @@ export function NotificationInboxPage() {
   const filters = useRef({ filter, typeFilter });
   const requestId = useRef(0);
   const loadedCount = useRef(20);
+  const processedPushQuery = useRef<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pushIds = params.getAll('pushNotificationId');
+    if (pushIds.length === 0) {
+      processedPushQuery.current = null;
+      return;
+    }
+    if (processedPushQuery.current === location.search) return;
+    processedPushQuery.current = location.search;
+
+    const consumePushQuery = () => {
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('pushNotificationId');
+      const query = nextParams.toString();
+      navigate({
+        pathname: location.pathname,
+        search: query ? `?${query}` : '',
+        hash: '',
+      }, { replace: true });
+    };
+
+    if (pushIds.length !== 1 || !/^\d+$/.test(pushIds[0])) {
+      consumePushQuery();
+      return;
+    }
+    const notificationId = Number(pushIds[0]);
+    if (!Number.isSafeInteger(notificationId) || notificationId <= 0) {
+      consumePushQuery();
+      return;
+    }
+
+    let active = true;
+    markNotificationRead(notificationId)
+      .then((item) => {
+        if (!active) return;
+        const path = notificationPath(item);
+        if (path) navigate(path, { replace: true });
+        else consumePushQuery();
+      })
+      .catch(() => {
+        if (active) consumePushQuery();
+      });
+    return () => { active = false; };
+  }, [location.pathname, location.search, navigate]);
 
   useLayoutEffect(() => {
     filters.current = { filter, typeFilter };

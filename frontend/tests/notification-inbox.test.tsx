@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NotificationPage } from '../src/shared/types/notification.types';
 
@@ -50,6 +50,24 @@ describe('NotificationInboxPage', () => {
     });
     mocks.archiveNotification.mockResolvedValue(undefined);
     mocks.archiveReadNotifications.mockResolvedValue({ archivedCount: 1 });
+  });
+
+  it.each([
+    ['DIRECT_MESSAGE_RECEIVED', 'DIRECT_MESSAGE', null, '/groupware/messages?messageId=82'],
+    ['APPROVAL_COMMENT_MENTION', 'APPROVAL_COMMENT', 29, '/groupware/doc/write?approvalId=29'],
+  ])('opens the authorized %s detail after a push click', async (eventType, sourceType, targetId, path) => {
+    mocks.markNotificationRead.mockResolvedValue({
+      notificationId: 14, eventType, sourceType, sourceId: 82, targetId,
+    });
+    function Destination() {
+      const location = useLocation();
+      return <div>destination:{location.pathname}{location.search}</div>;
+    }
+    render(<MemoryRouter initialEntries={['/groupware/notifications?pushNotificationId=14']}>
+      <NotificationInboxPage /><Destination />
+    </MemoryRouter>);
+    expect(await screen.findByText(`destination:${path}`)).toBeVisible();
+    expect(mocks.markNotificationRead).toHaveBeenCalledWith(14);
   });
 
   it('shows a leading category icon with the original title and summary for each event type', async () => {
