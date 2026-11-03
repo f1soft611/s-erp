@@ -1,6 +1,7 @@
 const PUSH_TITLE = 'S-ERP';
-const PUSH_BODY = '새 업무 알림이 도착했습니다.';
-const PUSH_ICON = '/favicon.svg';
+const PUSH_BODY = '새 업무 알림이 왔습니다.';
+const PUSH_MESSAGE_BODY = '새 쪽지 알림이 왔습니다.';
+const PUSH_ICON = '/push-icon.png';
 
 function isNotificationId(value) {
   return Number.isSafeInteger(value) && value > 0;
@@ -17,7 +18,7 @@ self.addEventListener('push', (event) => {
     return;
   }
   event.waitUntil(self.registration.showNotification(PUSH_TITLE, {
-    body: PUSH_BODY,
+    body: payload.category === 'message' ? PUSH_MESSAGE_BODY : PUSH_BODY,
     icon: PUSH_ICON,
     tag: `notification-${payload.notificationId}`,
     renotify: false,

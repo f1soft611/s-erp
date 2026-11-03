@@ -30,11 +30,28 @@ describe('push service worker', () => {
     expect(worker.showNotification).toHaveBeenCalledWith(
       'S-ERP',
       expect.objectContaining({
-        body: '새 업무 알림이 도착했습니다.',
-        icon: '/favicon.svg',
+        body: '새 업무 알림이 왔습니다.',
+        icon: '/push-icon.png',
         data: { notificationId: 14 },
       }),
     );
+  });
+
+  it('uses message copy without exposing payload text or sender details', async () => {
+    const worker = loadServiceWorker();
+    const waitUntil = vi.fn();
+    worker.listeners.get('push')?.({
+      data: { json: () => ({
+        notificationId: 15, kind: 'notification', category: 'message',
+        body: 'private message', title: 'private sender',
+      }) },
+      waitUntil,
+    } as never);
+    await waitUntil.mock.calls[0][0];
+    expect(worker.showNotification).toHaveBeenCalledWith('S-ERP', expect.objectContaining({
+      body: '새 쪽지 알림이 왔습니다.', icon: '/push-icon.png',
+      data: { notificationId: 15 },
+    }));
   });
 
   it.each([

@@ -15,11 +15,12 @@ public class PushPayloadFactory {
         this.objectMapper = objectMapper;
     }
 
-    public String create(Long notificationId) {
+    public String create(Long notificationId, String eventType) {
         validateNotificationId(notificationId);
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("notificationId", notificationId.longValue());
         payload.put("kind", "notification");
+        payload.put("category", "DIRECT_MESSAGE_RECEIVED".equals(eventType) ? "message" : "work");
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException error) {

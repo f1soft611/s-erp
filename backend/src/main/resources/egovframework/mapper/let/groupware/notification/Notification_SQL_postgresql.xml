@@ -112,6 +112,7 @@
         SELECT notification_id AS notificationId,
                tenant_id AS tenantId,
                recipient_user_id AS recipientUserId,
+               event_type AS eventType,
                read_at AS readAt,
                archived_at AS archivedAt,
                created_at AS createdAt

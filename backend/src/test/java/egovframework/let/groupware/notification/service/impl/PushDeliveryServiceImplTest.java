@@ -141,7 +141,8 @@ class PushDeliveryServiceImplTest {
         ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
         verify(transport).send(eq("https://fcm.googleapis.com/send/token"), eq("p256dh"), eq("auth"),
                 payload.capture());
-        assertThat(payload.getValue()).contains("\"notificationId\":123", "\"kind\":\"notification\"")
+        assertThat(payload.getValue()).contains("\"notificationId\":123", "\"kind\":\"notification\"",
+                "\"category\":\"message\"")
                 .doesNotContain("title", "summary", "content", "endpoint", "p256dh", "auth");
         verify(deliveryDAO).markDeliverySent(eq(21L), any(UUID.class));
     }
@@ -431,6 +432,7 @@ class PushDeliveryServiceImplTest {
     private static PushNotificationVO notification(Long notificationId) {
         PushNotificationVO notification = new PushNotificationVO();
         notification.setNotificationId(notificationId);
+        notification.setEventType("DIRECT_MESSAGE_RECEIVED");
         notification.setTenantId(4L);
         notification.setRecipientUserId(19L);
         return notification;

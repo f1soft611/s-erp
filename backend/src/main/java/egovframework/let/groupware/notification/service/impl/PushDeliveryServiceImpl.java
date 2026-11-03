@@ -215,7 +215,7 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
         }
         String p256dh = keys.substring(0, separator);
         String auth = keys.substring(separator + 1);
-        String payload = payloadFactory.create(notification.getNotificationId());
+        String payload = payloadFactory.create(notification.getNotificationId(), notification.getEventType());
         int renewed = deliveryDAO.renewDeliveryLease(
                 delivery.getDeliveryId(), leaseToken, leaseSeconds);
         if (renewed != 1) {

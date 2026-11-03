@@ -1,5 +1,6 @@
 import { Alert } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { resolvePushNotificationPath } from '../../shared/utils/notificationPath';
 import AuthLayout from '../../shared/components/layout/AuthLayout';
 import {
   readSessionNotice,
@@ -10,6 +11,7 @@ import { LoginForm } from './components/LoginForm';
 
 function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const sessionNotice = readSessionNotice();
   const {
     values,
@@ -37,7 +39,7 @@ function LoginPage() {
 
     if (result?.ok) {
       setSessionNotice(null);
-      navigate('/', { replace: true });
+      navigate(resolvePushNotificationPath(location.state?.pushNotificationId) ?? '/', { replace: true });
     }
   };
 
