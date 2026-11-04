@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { Alert, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import SaveIcon from '@mui/icons-material/Save';
+import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
+import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
@@ -17,17 +23,23 @@ import {
 } from './services/salesDelivery.service';
 import type { DeliveryForm, DeliveryItem, DeliveryPageProps, DeliveryRow, SourceOrderRow } from './types/salesDelivery.types';
 
+export type DeliveryEmbeddedActionState = {
+  canSave: boolean; canDelete: boolean; saving: boolean; saveDisabled: boolean; deleteDisabled: boolean;
+  save: () => void; remove: () => void;
+};
 type Props = DeliveryPageProps & {
   salesDeliveryId?: number;
   embedded?: boolean;
+  mode?: 'view' | 'edit';
   onSaved?: (item: DeliveryItem) => void;
   onDeleted?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
+  onEmbeddedActionsChange?: (actions: DeliveryEmbeddedActionState | null) => void;
 };
 export function SalesDeliveryCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions, salesDeliveryId,
-  embedded = false, onSaved, onDeleted, onDirtyChange, onPendingChange,
+  embedded = false, mode = 'edit', onSaved, onDeleted, onDirtyChange, onPendingChange, onEmbeddedActionsChange,
 }: Props) {
   const [form, setForm] = useState<DeliveryForm>(emptyDelivery);
   const [baseline, setBaseline] = useState(() => JSON.stringify(form));
@@ -49,8 +61,8 @@ export function SalesDeliveryCreatePage({
   const busy = useRef(false);
   const materialPatch = useRef<((changes: Partial<DeliveryRow>) => void) | null>(null);
   const canRead = Boolean(permissions?.read);
-  const canSave = canRead && Boolean(savedId ? permissions?.update : permissions?.create);
-  const canDelete = canRead && Boolean(savedId && permissions?.delete);
+  const canSave = canRead && mode !== 'view' && Boolean(savedId ? permissions?.update : permissions?.create);
+  const canDelete = canRead && mode !== 'view' && Boolean(savedId && permissions?.delete);
   const editable = canSave && !pending && !loading && !locked;
   const dirty = JSON.stringify(form) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
@@ -88,7 +100,7 @@ export function SalesDeliveryCreatePage({
     setItem(null); setSavedId(undefined); setLocked(false); setLoadError(false);
     setError(''); setNotice(''); applyForm(emptyDelivery()); setConfirm(null);
   };
-  const save = async () => {
+  const save = useCallback(async () => {
     if (!editable || busy.current) return;
     const current = { ...form, details: grid.current?.getActiveRows() ?? form.details };
     const message = validateDelivery(current);
@@ -110,7 +122,16 @@ export function SalesDeliveryCreatePage({
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : '납품 저장에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
-  };
+  }, [editable, form, savedId, applyItem, onSaved]);
+  const requestDelete = useCallback(() => setConfirm('delete'), []);
+  const deleteDisabled = pending || loading || locked;
+  useEffect(() => {
+    if (embedded) onEmbeddedActionsChange?.({
+      canSave, canDelete, saving: pending, saveDisabled: !editable, deleteDisabled,
+      save: () => void save(), remove: requestDelete,
+    });
+  }, [embedded, onEmbeddedActionsChange, canSave, canDelete, pending, editable, deleteDisabled, save, requestDelete]);
+  useEffect(() => () => onEmbeddedActionsChange?.(null), [onEmbeddedActionsChange]);
   const remove = async () => {
     setConfirm(null);
     if (!canDelete || !savedId || busy.current) return;
@@ -124,32 +145,43 @@ export function SalesDeliveryCreatePage({
     setForm(next); setRows(next.details); setGridKey((value) => value + 1);
     setSelectedIds([]); setSourceOpen(false); setError('');
   }, [form.deliveryDt]);
-  const actions = <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-    {!embedded && permissions?.create && canRead ? <Button disabled={pending || loading} onClick={() => dirty ? setConfirm('new') : reset()}>신규</Button> : null}
-    {savedId && canRead ? <Button disabled={pending || loading} onClick={() => {
-      if (!dirty || window.confirm('저장되지 않은 변경사항을 버리고 다시 조회하시겠습니까?')) void load(savedId);
-    }}>재조회</Button> : null}
-    {canSave ? <Button variant="contained" disabled={!editable} onClick={() => void save()}>{pending ? '저장 중' : '저장'}</Button> : null}
-    {canDelete ? <Button color="error" disabled={pending || loading || locked} onClick={() => setConfirm('delete')}>삭제</Button> : null}
-  </Box>;
+  const actions: PermissionActionGroupDefinition[] = [
+    { key: 'write', actions: [
+      { label: '신규', icon: NoteAddOutlinedIcon, visible: Boolean(permissions?.create) && mode !== 'view',
+        disabled: pending || loading, onClick: () => dirty ? setConfirm('new') : reset() },
+      { label: '저장', icon: SaveIcon, visible: canSave, saving: pending, disabled: !editable, onClick: () => void save() },
+    ] },
+    { key: 'delete', actions: [
+      { label: '삭제', icon: DeleteForeverOutlinedIcon, visible: Boolean(permissions?.delete) && mode !== 'view', disabled: !canDelete || deleteDisabled, onClick: requestDelete },
+    ] },
+  ];
   const totals = form.details.reduce((total, row) => ({
     supply: total.supply + Number(row.supplyAmt), vat: total.vat + Number(row.vatAmt), total: total.total + Number(row.totalAmt),
   }), { supply: 0, vat: 0, total: 0 });
   if (!canRead) return <Alert severity="warning">납품등록 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-    {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} /> : null}
-    <Box sx={{ p: { xs: 1, sm: 2 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflow: 'auto', gap: 1 }}>
-      {actions}
+    {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
+    <Box role="region" aria-label="납품 입력 내용" aria-busy={pending || loading}
+      sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
+      {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">납품을 불러오는 중입니다.</Typography> : null}
       <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="납품등록"
         onRetry={() => savedId && void load(savedId)}>
-        <Paper variant="outlined" sx={{ p: 2, minWidth: 0 }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1 }}>
-            <TextField size="small" label="납품번호" value={item?.deliveryNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }} />
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>납품 기본정보</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1,
+            '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
+            <TextField size="small" label="납품번호" value={item?.deliveryNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }}
+              sx={{ '& .MuiInputBase-input': { fontSize: { xs: '0.75rem', sm: '1rem' } } }} />
             <TextField size="small" label="납품일자" type="date" required value={form.deliveryDt} disabled={!editable}
               onChange={(event) => change('deliveryDt', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+            <CustomerPicker required disabled={!editable || Boolean(savedId) || form.deliveryType === 'ORDER'} triggerMode="icon"
+              value={form.customerId ? { id: form.customerId, code: form.customerCode, name: form.customerName } : null}
+              search={searchOrderCustomers} onChange={(customer) => {
+                setForm((current) => ({ ...current, customerId: customer.id, customerCode: customer.code, customerName: customer.name }));
+              }} />
             <TextField select size="small" label="납품구분" value={form.deliveryType} disabled={!editable || Boolean(savedId)}
               onChange={(event) => {
                 const next = { ...emptyDelivery(), deliveryDt: form.deliveryDt, deliveryType: event.target.value as DeliveryForm['deliveryType'] };
@@ -158,25 +190,25 @@ export function SalesDeliveryCreatePage({
               }}>
               <MenuItem value="DIRECT">직납품</MenuItem><MenuItem value="ORDER">수주납품</MenuItem>
             </TextField>
-            <CustomerPicker required disabled={!editable || Boolean(savedId) || form.deliveryType === 'ORDER'} triggerMode="icon"
-              value={form.customerId ? { id: form.customerId, code: form.customerCode, name: form.customerName } : null}
-              search={searchOrderCustomers} onChange={(customer) => {
-                setForm((current) => ({ ...current, customerId: customer.id, customerCode: customer.code, customerName: customer.name }));
-              }} />
-            {form.deliveryType === 'ORDER' ? <Box sx={{ display: 'flex', gap: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', gap: 1, minWidth: 0, '& .MuiFormControl-root': { m: 0 } }}>
               <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo} slotProps={{ input: { readOnly: true } }} />
-              <Button disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>수주 선택</Button>
-            </Box> : null}
+              {form.deliveryType === 'ORDER' ? <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>수주 선택</Button> : null}
+            </Box>
             <TextField size="small" label="납품장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
             <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
-            <TextField size="small" label="비고" value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
+            <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
         </Paper>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-          <Typography variant="subtitle2">납품 상세</Typography>
+        <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
+        <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>납품 상세</Typography>
+            <Typography variant="caption" color="text.secondary">{mode === 'view' ? '납품 품목 내역입니다.' : '행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행을 삭제할 수 있습니다.'}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {canSave && form.deliveryType === 'DIRECT' ? <>
-            <Button disabled={!editable} onClick={() => grid.current?.addRow()}>상세 행 추가</Button>
-            <Button disabled={!editable || selectedIds.length !== 1} onClick={() => {
+            <Button size="small" variant="outlined" startIcon={<AddIcon />} disabled={!editable} onClick={() => grid.current?.addRow()}>상세 행 추가</Button>
+            <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || selectedIds.length !== 1} onClick={() => {
               const row = grid.current?.getSelectedRows()[0];
               if (!row) return;
               materialPatch.current = (patch) => {
@@ -187,16 +219,21 @@ export function SalesDeliveryCreatePage({
               setMaterialOpen(true);
             }}>품목 선택</Button>
           </> : null}
-          {canSave ? <Button color="error" disabled={!editable || !selectedIds.length} onClick={() => grid.current?.deleteSelectedRows()}>선택 행 삭제</Button> : null}
+          </Box>
         </Box>
-        <Box sx={{ flex: 1, minHeight: 300, minWidth: 0, overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
           <DeliveryDetailGrid key={gridKey} gridRef={grid} rows={rows} disabled={!editable} source={form.deliveryType === 'ORDER'}
             onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} />
         </Box>
-        <Box aria-label="납품 금액 합계" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2, p: 1 }}>
-          <Typography>공급가 합계 {totals.supply.toFixed(2)}</Typography><Typography>VAT 합계 {totals.vat.toFixed(2)}</Typography>
-          <Typography sx={{ fontWeight: 700 }}>총 합계 {totals.total.toFixed(2)}</Typography>
+        <Box aria-label="납품 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: { xs: 1.5, sm: 2 } }}>
+          {([['공급가 합계', totals.supply], ['부가세 합계', totals.vat], ['총 합계', totals.total]] as const).map(([label, amount]) => (
+            <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
+              <Typography variant="body2" color="text.secondary">{label}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{amount.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+            </Box>
+          ))}
         </Box>
+        </Paper>
       </PageLoadBoundary>
     </Box>
     {sourceOpen ? <SourceOrderPicker open onClose={() => setSourceOpen(false)} onSelect={selectSource} /> : null}

@@ -30,6 +30,15 @@ const props = {
 function mount(node: React.ReactNode) {
   render(<RouterProvider router={createMemoryRouter([{ path: '/', element: node }])} />);
 }
+async function openStatusDocument(mode: 'view' | 'edit') {
+  fireEvent.click(await screen.findByRole('button', { name: 'SD-1 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '납품 상세' });
+  expect(await within(panel).findByRole('table', { name: '납품 품목 목록' })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(within(panel).getByRole('button', { name: '납품 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: mode === 'edit' ? '수정' : '자세히보기' }));
+  return screen.findByRole('dialog', { name: mode === 'edit' ? '납품 수정' : '납품 상세보기' });
+}
 beforeEach(() => {
   vi.clearAllMocks(); sessionStorage.clear();
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
@@ -84,8 +93,7 @@ it.each(['missing', 'read-denied'] as const)('opens read-only status detail when
     selectedMenuPermissions={{ read: true, create: false, update: false, delete: false }} />);
   const link = await screen.findByRole('button', { name: 'SD-1 상세 보기' });
   expect(link).toBeEnabled();
-  fireEvent.click(link);
-  const dialog = await screen.findByRole('dialog', { name: '납품 상세' });
+  const dialog = await openStatusDocument('view');
   await within(dialog).findByDisplayValue('SD-1');
   expect(getDelivery).toHaveBeenCalledWith(1);
   expect(within(dialog).getByLabelText('납품장소')).toBeDisabled();
@@ -100,12 +108,17 @@ it('retains only registration-menu update and delete capabilities in status deta
       permissions: { read: false, create: false, update: true, delete: true },
     }] }}
     selectedMenuPermissions={{ read: true, create: false, update: false, delete: false }} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'SD-1 상세 보기' }));
-  const dialog = await screen.findByRole('dialog', { name: '납품 상세' });
+  const dialog = await openStatusDocument('edit');
   await within(dialog).findByDisplayValue('SD-1');
   expect(within(dialog).getByLabelText('납품장소')).toBeEnabled();
   expect(within(dialog).getByRole('button', { name: '저장', exact: true })).toBeEnabled();
   expect(within(dialog).getByRole('button', { name: '삭제', exact: true })).toBeEnabled();
+  const footer = within(dialog).getByTestId('common-dialog-actions');
+  expect(within(footer).getByRole('button', { name: '저장', exact: true })).toBeInTheDocument();
+  expect(within(within(dialog).getByTestId('common-dialog-footer-start')).getByRole('button', { name: '삭제', exact: true })).toBeInTheDocument();
+  expect(within(footer).getByRole('button', { name: '취소', exact: true })).toBeInTheDocument();
+  const input = within(dialog).getByRole('region', { name: '납품 입력 내용' });
+  expect(within(input).queryByRole('button', { name: '저장', exact: true })).not.toBeInTheDocument();
 }, 15000);
 it('creates direct delivery from shared customer/material pickers with edited quantity and price', async () => {
   vi.mocked(createDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof createDelivery>>);
@@ -166,4 +179,30 @@ it('confirms deletion before requesting and resets to a new direct document', as
   fireEvent.click(screen.getByRole('button', { name: '계속', exact: true }));
   await waitFor(() => expect(deleteDelivery).toHaveBeenCalledWith(1));
   await screen.findByDisplayValue('저장 시 자동 채번');
+});
+it('matches order registration sections and keeps document actions in the page header', () => {
+  mount(<SalesDeliveryCreatePage {...props} />);
+  const input = screen.getByRole('region', { name: '납품 입력 내용' });
+  expect(within(input).getByText('납품 기본정보')).toBeInTheDocument();
+  expect(within(input).getByText('납품 상세')).toBeInTheDocument();
+  expect(input).not.toContainElement(screen.getByRole('button', { name: '저장', exact: true }));
+  expect(screen.getByRole('button', { name: '삭제', exact: true })).toBeDisabled();
+  const toolbar = screen.getByTestId('sales-delivery-detail-toolbar');
+  expect(within(toolbar).getByRole('button', { name: '상세 행 추가' })).toBeInTheDocument();
+  expect(within(toolbar).getByRole('button', { name: '품목 선택', exact: true })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '선택 행 삭제' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('비고').tagName).toBe('TEXTAREA');
+  expect(screen.getByLabelText('납품 금액 합계')).toHaveTextContent('부가세 합계');
+});
+it('matches order status quick search behavior and result message', async () => {
+  mount(<SalesDeliveryStatusPage {...props} />);
+  await waitFor(() => expect(getDeliveryStatus).toHaveBeenCalledTimes(1));
+  const input = screen.getByRole('textbox', { name: '납품현황 빠른 검색' });
+  fireEvent.change(input, { target: { value: '납품검색' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  await waitFor(() => expect(getDeliveryStatus).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '납품검색' })));
+  fireEvent.click(screen.getByRole('button', { name: '납품현황 검색어 초기화' }));
+  expect(input).toHaveValue('');
+  expect(screen.getByRole('columnheader', { name: 'No' })).toBeInTheDocument();
+  expect(await screen.findByText('조회 결과가 없습니다. 조회 기간을 넓히거나 검색 조건을 변경해 주세요.')).toBeInTheDocument();
 });
