@@ -1,0 +1,93 @@
+import type { MenuPermission, ModuleItem, PageContent } from '../../../../dashboard/types/dashboard';
+
+export type DeliveryType = 'DIRECT' | 'ORDER';
+export type DeliveryDetail = {
+  salesDeliveryDetailId: number;
+  lineNo: number;
+  materialId: number;
+  materialCode: string | null;
+  materialName: string | null;
+  unit: string | null;
+  salesOrderDetailId: number | null;
+  deliveryQty: number;
+  unitPrice: number;
+  supplyAmt: number;
+  vatAmt: number;
+  totalAmt: number;
+};
+export type DeliveryItem = {
+  salesDeliveryId: number;
+  deliveryNo: string;
+  deliveryDt: string;
+  deliveryType: DeliveryType;
+  customerId: number;
+  customerCode: string | null;
+  customerName: string | null;
+  salesOrderId: number | null;
+  orderNo: string | null;
+  deliveryPlace: string | null;
+  deliveryMethod: string | null;
+  remark: string | null;
+  totalAmt: number;
+  createdBy?: string | null;
+  writer?: boolean | null;
+  details: DeliveryDetail[];
+};
+export type DeliveryRow = Omit<DeliveryDetail, 'salesDeliveryDetailId' | 'lineNo' | 'materialId'> & {
+  rowId: string;
+  materialId: number | null;
+};
+export type DeliveryForm = {
+  deliveryDt: string;
+  deliveryType: DeliveryType;
+  customerId: number | null;
+  customerCode: string;
+  customerName: string;
+  salesOrderId: number | null;
+  orderNo: string;
+  deliveryPlace: string;
+  deliveryMethod: string;
+  remark: string;
+  details: DeliveryRow[];
+};
+export type DeliveryPayload = Pick<DeliveryForm, 'deliveryDt' | 'deliveryType' | 'salesOrderId' | 'deliveryPlace' | 'deliveryMethod' | 'remark'> & {
+  customerId: number;
+  details: { materialId: number; salesOrderDetailId: number | null; deliveryQty: number; unitPrice: number; vatAmt: number }[];
+};
+export type SourceOrderRow = {
+  salesOrderId: number;
+  salesOrderDetailId: number;
+  orderNo: string;
+  orderDt: string;
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  deliveryPlace: string | null;
+  deliveryMethod: string | null;
+  lineNo: number;
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  unit: string | null;
+  orderQty: number;
+  shippedQty: number;
+  remainingQty: number;
+  unitPrice: number;
+};
+export type DeliveryStatusRow = Omit<DeliveryItem, 'details' | 'totalAmt'> & DeliveryDetail;
+export type DeliveryFilters = {
+  deliveryDtFrom: string;
+  deliveryDtTo: string;
+  keyword: string;
+  deliveryType: string;
+  customerKeyword: string;
+  materialKeyword: string;
+  deliveryNo: string;
+};
+export type DeliveryPageProps = {
+  selectedModule: ModuleItem;
+  currentMenuName: string;
+  content: PageContent;
+  breadcrumbItems: string[];
+  selectedMenuPermissions?: MenuPermission;
+};

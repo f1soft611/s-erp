@@ -47,6 +47,8 @@ class SalesOrderServiceImplTest {
         when(salesOrderDAO.existsMaterial(anyMap())).thenReturn(true);
         when(salesOrderDAO.insertOrderHeader(anyMap())).thenReturn(300L);
         when(salesOrderDAO.insertOrderDetail(anyMap())).thenReturn(400L);
+        when(salesOrderDAO.selectOrderForUpdate(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(0);
         when(idSequenceService.nextValue("SALES_ORDER_NO", "71", "20261027"))
                 .thenReturn(1L);
     }
@@ -258,11 +260,40 @@ class SalesOrderServiceImplTest {
                 .containsEntry("salesOrderId", 300L)
                 .containsEntry("updatedBy", "user02");
 
-        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("출하완료"));
+        when(salesOrderDAO.selectOrderForUpdate(anyMap())).thenReturn(storedOrder("출하완료"));
         assertThatThrownBy(() -> service.deleteOrder(71L, "user02", 300L))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void locksOrderAndRejectsAnyDeliveryReferenceBeforeReplacingDetails() throws Exception {
+        when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(1);
+
+        assertThatThrownBy(() -> service.updateOrder(71L, "user02", 300L, validPayload()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(salesOrderDAO);
+        inOrder.verify(salesOrderDAO).selectOrderForUpdate(anyMap());
+        inOrder.verify(salesOrderDAO).countDeliveryReferences(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).deleteOrderDetails(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
+    }
+
+    @Test
+    void rejectsDeletingOrderWithDeliveryHistoryAfterLockingIt() throws Exception {
+        when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(1);
+
+        assertThatThrownBy(() -> service.deleteOrder(71L, "user02", 300L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(salesOrderDAO).selectOrderForUpdate(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).softDeleteOrderHeader(anyMap());
     }
 
     private SalesOrderVO storedOrder(String status) {

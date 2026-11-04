@@ -853,6 +853,42 @@
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
 - 감사 사용자 길이 보정: [확장 SQL](20261028/20261028_009_expand_sales_order_audit_columns.sql), [안전 롤백](20261028/20261028_009_rollback_sales_order_audit_columns.sql), [변경 이력](20261028/20261028_009_change_sales_order_audit_columns.md). 신규 환경에서도 기존 생성 DDL 후 확장 SQL을 적용한다.
 
+### tb_sales_delivery_hd / tb_sales_delivery_dt (2026-11-04, 미적용)
+
+수주 연계 납품과 수주 없는 직납품을 별도 문서로 관리한다. 기본 DB MCP에서 기존 수주/거래처/품목의 컬럼·복합 FK 대상키를 확인했고, 신규 납품 테이블은 아직 존재하지 않는다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_sales_delivery_hd` | `sales_delivery_id` | `bigserial` | NOT NULL, PK | 납품 ID |
+| | `tenant_id` | `bigint` | NOT NULL | 소유 테넌트 |
+| | `delivery_no` | `varchar(30)` | NOT NULL | tenant별 유일 납품번호, SD-일자-순번 |
+| | `delivery_dt` | `date` | NOT NULL | 납품일자 |
+| | `delivery_type` | `varchar(10)` | NOT NULL | ORDER 수주납품 / DIRECT 직납품 |
+| | `customer_id` | `bigint` | NOT NULL | tenant 복합 거래처 FK |
+| | `sales_order_id` | `bigint` | NULL | 연결 수주 FK, 직납품 NULL |
+| | `delivery_place`, `delivery_method` | `varchar(200)`, `varchar(50)` | NULL | 납품장소/배송방법 |
+| | `total_amt` | `numeric(15,2)` | NOT NULL, 0 | 상세 합계 합산 |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, Y | 논리삭제 시 N |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 NOT NULL/CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_dt` | `sales_delivery_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `sales_delivery_id`, `tenant_id` | `bigint` | NOT NULL | 헤더/테넌트 |
+| | `delivery_type` | `varchar(10)` | NOT NULL | 부모와 동일한 구분, 복합 FK |
+| | `line_no` | `integer` | NOT NULL | 양수, 문서 내 유일 순번 |
+| | `material_id` | `bigint` | NOT NULL | tenant 복합 품목 FK |
+| | `sales_order_id`, `sales_order_detail_id` | `bigint` | NULL | 수주납품에서만 둘 다 필수 |
+| | `delivery_qty` | `numeric(15,2)` | NOT NULL | 양수 납품수량 |
+| | `unit_price`, `supply_amt`, `total_amt` | `numeric(15,2)` | NOT NULL | 비음수 단가/공급가/합계 |
+| | `vat_amt` | `numeric(15,2)` | NOT NULL, 0 | 비음수 부가세 |
+
+- 부모/상세의 tenant, 구분 및 연결 수주를 복합 FK로 제한한다. DIRECT는 source IDs가 모두 NULL, ORDER는 모두 NOT NULL인 CHECK를 둔다.
+- 기존 `tb_sales_order_dt`에 `(sales_order_detail_id,sales_order_id,tenant_id,material_id)` 복합 UNIQUE를 추가한다. 납품상세는 이 키를 참조하여 수주·품목·tenant 일치를 보장한다.
+- 수량 양수, 금액 비음수/NaN 거부, 상세 합계=공급가+VAT CHECK. 문서 내 중복 수주상세는 UNIQUE로 제한한다.
+- tenant+일자/거래처/수주참조, 상세 tenant+품목/수주참조 인덱스를 제공한다.
+- 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
+- [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
+
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
 
 `20261027_002` 설계 초안이며 현재 central DB에 적용되지 않았다. 실제 현행 스키마로 오인하지 않도록 아래 정의는 제안 상태로만 기록한다.

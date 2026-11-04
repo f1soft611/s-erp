@@ -116,6 +116,17 @@
           AND h.use_at = 'Y'
     </select>
 
+    <select id="selectOrderForUpdate" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               h.tenant_id AS tenantId,
+               h.status AS status
+        FROM tb_sales_order_hd h
+        WHERE h.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
     <select id="selectOrderDetails" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO">
         SELECT d.sales_order_detail_id AS salesOrderDetailId,
                d.sales_order_id AS salesOrderId,
@@ -147,6 +158,13 @@
         WHERE sales_order_id = #{salesOrderId}
           AND tenant_id = #{tenantId}
           AND COALESCE(shipped_qty, 0) &gt; 0
+    </select>
+
+    <select id="countDeliveryReferences" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_delivery_dt
+        WHERE sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
     </select>
 
     <update id="updateOrderHeader" parameterType="map">

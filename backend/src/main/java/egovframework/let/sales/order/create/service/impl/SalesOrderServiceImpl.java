@@ -209,7 +209,17 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     }
 
     private void requireEditable(Long tenantId, Long salesOrderId) throws Exception {
-        SalesOrderVO order = findOrder(tenantId, salesOrderId);
+        if (tenantId == null || salesOrderId == null || salesOrderId < 1L) {
+            throw orderNotFound();
+        }
+        SalesOrderVO order = salesOrderDAO.selectOrderForUpdate(orderParams(tenantId, salesOrderId));
+        if (order == null) {
+            throw orderNotFound();
+        }
+        if (salesOrderDAO.countDeliveryReferences(orderParams(tenantId, salesOrderId)) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "납품 이력이 있는 수주는 수정/삭제할 수 없습니다.");
+        }
         if (!EDITABLE_STATUS.equals(order.getStatus())
                 || salesOrderDAO.countShippedDetails(orderParams(tenantId, salesOrderId)) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,

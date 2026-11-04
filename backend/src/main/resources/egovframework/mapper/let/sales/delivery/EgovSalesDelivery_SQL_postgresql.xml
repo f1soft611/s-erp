@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesDeliveryDAO">
+
+    <select id="existsActiveCustomer" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_customer_info
+            WHERE customer_id = #{id, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND use_at = 'Y'
+        )
+    </select>
+
+    <select id="existsActiveMaterial" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_material_info
+            WHERE material_id = #{id, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND delete_status = 'N'
+              AND deleted_at IS NULL
+        )
+    </select>
+
+    <select id="lockSourceOrder" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderHeaderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               h.customer_id AS customerId,
+               h.status AS status,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod
+        FROM tb_sales_order_hd h
+        WHERE h.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
+    <select id="selectSourceOrderDetail" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               d.sales_order_detail_id AS salesOrderDetailId,
+               h.customer_id AS customerId,
+               d.material_id AS materialId,
+               d.order_qty AS orderQty,
+               COALESCE(d.shipped_qty, 0) AS shippedQty,
+               d.unit_price AS unitPrice
+        FROM tb_sales_order_dt d
+        JOIN tb_sales_order_hd h
+          ON h.sales_order_id = d.sales_order_id
+         AND h.tenant_id = d.tenant_id
+        WHERE d.sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND d.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+    </select>
+
+    <select id="selectSourceOrders" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               d.sales_order_detail_id AS salesOrderDetailId,
+               h.order_no AS orderNo,
+               h.order_dt AS orderDt,
+               h.customer_id AS customerId,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               d.line_no AS lineNo,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               d.order_qty AS orderQty,
+               COALESCE(d.shipped_qty, 0) AS shippedQty,
+               d.order_qty - COALESCE(d.shipped_qty, 0) AS remainingQty,
+               d.unit_price AS unitPrice
+        FROM tb_sales_order_hd h
+        JOIN tb_sales_order_dt d
+          ON d.sales_order_id = h.sales_order_id
+         AND d.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+         AND c.use_at = 'Y'
+        JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+          AND m.delete_status = 'N'
+          AND m.deleted_at IS NULL
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.status NOT IN ('수주취소', '취소', '출하완료', '완료')
+          AND d.order_qty &gt; COALESCE(d.shipped_qty, 0)
+        <if test="keyword != null and keyword != ''">
+          AND (h.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_code ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY h.order_dt DESC, h.sales_order_id DESC, d.line_no
+        LIMIT #{limit}
+    </select>
+
+    <select id="insertDeliveryHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_delivery_hd (
+            tenant_id, delivery_no, delivery_dt, delivery_type, customer_id, sales_order_id,
+            delivery_place, delivery_method, total_amt, remark, created_by
+        ) VALUES (
+            #{tenantId, jdbcType=BIGINT}, #{deliveryNo}, CAST(#{deliveryDt} AS date),
+            #{deliveryType, jdbcType=VARCHAR}, #{customerId, jdbcType=BIGINT},
+            #{salesOrderId, jdbcType=BIGINT}, #{deliveryPlace}, #{deliveryMethod},
+            #{totalAmt, jdbcType=NUMERIC}, #{remark}, #{createdBy}
+        )
+        RETURNING sales_delivery_id
+    </select>
+
+    <select id="insertDeliveryDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_delivery_dt (
+            sales_delivery_id, tenant_id, delivery_type, line_no, material_id,
+            sales_order_id, sales_order_detail_id, delivery_qty, unit_price,
+            supply_amt, vat_amt, total_amt
+        ) VALUES (
+            #{salesDeliveryId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT},
+            #{deliveryType, jdbcType=VARCHAR}, #{lineNo}, #{materialId, jdbcType=BIGINT},
+            #{salesOrderId, jdbcType=BIGINT}, #{salesOrderDetailId, jdbcType=BIGINT},
+            #{deliveryQty, jdbcType=NUMERIC}, #{unitPrice, jdbcType=NUMERIC},
+            #{supplyAmt, jdbcType=NUMERIC}, #{vatAmt, jdbcType=NUMERIC},
+            #{totalAmt, jdbcType=NUMERIC}
+        )
+        RETURNING sales_delivery_detail_id
+    </select>
+
+    <select id="selectDelivery" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliveryVO">
+        SELECT h.sales_delivery_id AS salesDeliveryId,
+               h.delivery_no AS deliveryNo,
+               h.delivery_dt AS deliveryDt,
+               h.delivery_type AS deliveryType,
+               h.customer_id AS customerId,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.sales_order_id AS salesOrderId,
+               o.order_no AS orderNo,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               h.remark AS remark,
+               h.total_amt AS totalAmt,
+               h.created_by AS createdBy
+        FROM tb_sales_delivery_hd h
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_sales_order_hd o
+          ON o.sales_order_id = h.sales_order_id
+         AND o.tenant_id = h.tenant_id
+        WHERE h.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+    </select>
+
+    <select id="lockDeliveryHeader" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliveryVO">
+        SELECT h.sales_delivery_id AS salesDeliveryId,
+               h.delivery_type AS deliveryType,
+               h.customer_id AS customerId,
+               h.sales_order_id AS salesOrderId,
+               h.created_by AS createdBy
+        FROM tb_sales_delivery_hd h
+        WHERE h.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
+    <select id="selectDeliveryDetails" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliveryDetailVO">
+        SELECT d.sales_delivery_detail_id AS salesDeliveryDetailId,
+               d.line_no AS lineNo,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               d.sales_order_id AS salesOrderId,
+               d.sales_order_detail_id AS salesOrderDetailId,
+               d.delivery_qty AS deliveryQty,
+               d.unit_price AS unitPrice,
+               d.supply_amt AS supplyAmt,
+               d.vat_amt AS vatAmt,
+               d.total_amt AS totalAmt
+        FROM tb_sales_delivery_dt d
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        WHERE d.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND d.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY d.line_no
+    </select>
+
+    <update id="adjustShippedQty" parameterType="map">
+        UPDATE tb_sales_order_dt
+        SET shipped_qty = COALESCE(shipped_qty, 0) + #{deltaQty, jdbcType=NUMERIC}
+        WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND COALESCE(shipped_qty, 0) + #{deltaQty, jdbcType=NUMERIC} &gt;= 0
+    </update>
+
+    <update id="updateDeliveryHeader" parameterType="map">
+        UPDATE tb_sales_delivery_hd
+        SET delivery_dt = CAST(#{deliveryDt} AS date),
+            delivery_place = #{deliveryPlace},
+            delivery_method = #{deliveryMethod},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <delete id="deleteDeliveryDetails" parameterType="map">
+        DELETE FROM tb_sales_delivery_dt
+        WHERE sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="softDeleteDeliveryHeader" parameterType="map">
+        UPDATE tb_sales_delivery_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <select id="selectDeliveryStatus" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliveryStatusVO">
+        SELECT h.sales_delivery_id AS salesDeliveryId,
+               d.sales_delivery_detail_id AS salesDeliveryDetailId,
+               h.delivery_no AS deliveryNo,
+               h.delivery_dt AS deliveryDt,
+               h.delivery_type AS deliveryType,
+               h.customer_id AS customerId,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.sales_order_id AS salesOrderId,
+               o.order_no AS orderNo,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               h.remark AS remark,
+               h.created_by AS createdBy,
+               COALESCE(h.created_by = #{userId}, FALSE) AS writer,
+               d.line_no AS lineNo,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               d.sales_order_detail_id AS salesOrderDetailId,
+               d.delivery_qty AS deliveryQty,
+               d.unit_price AS unitPrice,
+               d.supply_amt AS supplyAmt,
+               d.vat_amt AS vatAmt,
+               d.total_amt AS totalAmt
+        FROM tb_sales_delivery_hd h
+        JOIN tb_sales_delivery_dt d
+          ON d.sales_delivery_id = h.sales_delivery_id
+         AND d.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_sales_order_hd o
+          ON o.sales_order_id = h.sales_order_id
+         AND o.tenant_id = h.tenant_id
+        JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.delivery_dt BETWEEN CAST(#{deliveryDtFrom} AS date) AND CAST(#{deliveryDtTo} AS date)
+        <if test="deliveryType != null and deliveryType != ''">
+          AND h.delivery_type = #{deliveryType}
+        </if>
+        <if test="customerKeyword != null and customerKeyword != ''">
+          AND (c.customer_code ILIKE '%' || #{customerKeyword} || '%'
+               OR c.customer_name ILIKE '%' || #{customerKeyword} || '%')
+        </if>
+        <if test="materialKeyword != null and materialKeyword != ''">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="deliveryNo != null and deliveryNo != ''">
+          AND h.delivery_no ILIKE '%' || #{deliveryNo} || '%'
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (h.delivery_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_code ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY h.delivery_dt DESC, h.sales_delivery_id DESC, d.line_no
+    </select>
+</mapper>

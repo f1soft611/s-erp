@@ -24,6 +24,8 @@ import { MaterialManagementPage } from '../../co/master/materials/MaterialManage
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
+import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
+import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -188,6 +190,12 @@ export function DashboardContent({
         isTenantAdmin={isTenantAdmin}
       />
     );
+  }
+
+  if (selectedModule.id === 'sales' && (currentPageKey === 'delivery-create' || currentPageKey === 'delivery-status')) {
+    const DeliveryPage = currentPageKey === 'delivery-create' ? SalesDeliveryCreatePage : SalesDeliveryStatusPage;
+    return <DeliveryPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {

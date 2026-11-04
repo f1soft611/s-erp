@@ -69,15 +69,30 @@ class SalesOrderTenantScopeMapperTest {
         Configuration configuration = parse();
 
         for (String id : Arrays.asList(
-                "selectOrder", "selectOrderDetails", "countShippedDetails",
+                "selectOrder", "selectOrderForUpdate", "selectOrderDetails", "countShippedDetails",
+                "countDeliveryReferences",
                 "updateOrderHeader", "deleteOrderDetails", "softDeleteOrderHeader")) {
             BoundSql sql = sql(configuration, id);
             assertThat(normalize(sql.getSql())).as(id).contains("tenant_id = ?");
             assertThat(properties(sql)).as(id).contains("tenantId", "salesOrderId");
         }
-        for (String id : Arrays.asList("selectOrder", "updateOrderHeader", "softDeleteOrderHeader")) {
+        for (String id : Arrays.asList(
+                "selectOrder", "selectOrderForUpdate", "updateOrderHeader", "softDeleteOrderHeader")) {
             assertThat(normalize(sql(configuration, id).getSql())).as(id).contains("use_at = 'Y'");
         }
+    }
+
+    @Test
+    void locksOrderAndCountsAllDeliveryHistoryIncludingSoftDeletedHeaders() throws Exception {
+        Configuration configuration = parse();
+        BoundSql lock = sql(configuration, "selectOrderForUpdate");
+        assertThat(normalize(lock.getSql())).contains("FOR UPDATE OF h", "h.tenant_id = ?");
+        assertThat(properties(lock)).contains("tenantId", "salesOrderId");
+        BoundSql references = sql(configuration, "countDeliveryReferences");
+        assertThat(normalize(references.getSql())).contains(
+                "FROM tb_sales_delivery_dt", "tenant_id = ?", "sales_order_id = ?");
+        assertThat(normalize(references.getSql())).doesNotContain("use_at");
+        assertThat(properties(references)).contains("tenantId", "salesOrderId");
     }
 
     @Test
