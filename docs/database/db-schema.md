@@ -918,6 +918,37 @@
 - migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
 - [DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 
+### tb_system_policy / tb_system_policy_history (2026-11-05, 미적용)
+
+PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 저장소다. 사용자 생성 정책 값은 이 테이블이 원천이며, 기본 정책 `DELIVERY_PLAN_MODE`/`OVER_DELIVERY_POLICY`의 실제 적용값은 계속 `tb_tenant.delivery_plan_mode`/`over_delivery_policy`이다(정책 행 값은 복제본).
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_system_policy` | `policy_id` | `bigint identity` | NOT NULL, PK | 정책 ID |
+| | `tenant_id` | `bigint` | NOT NULL, FK `tb_tenant` | 소유 tenant; `(tenant_id, policy_code)` unique |
+| | `policy_code` | `varchar(80)` | NOT NULL | `^[A-Z0-9_]{2,80}$`, 등록 후 불변 |
+| | `policy_nm`, `category_nm`, `policy_dc` | `varchar(100/80/1000)` | 이름·분류 NOT NULL 비공백, 설명 기본 `''` | 정책명/분류/설명 |
+| | `value_type` | `varchar(20)` | NOT NULL | `BOOLEAN/NUMBER/SELECT/TEXT/DATE/USER_LIST`, 등록 후 불변 |
+| | `value_json` | `jsonb` | NOT NULL | 정책 값 raw JSON; 타입별 JSON 형태 CHECK |
+| | `options_json` | `jsonb` | NOT NULL, `[]` | SELECT 선택지 `[{value,label}]` 배열 |
+| | `min_value`, `max_value` | `numeric` | NULL | NUMBER 범위, min ≤ max |
+| | `unit_nm` | `varchar(30)` | NOT NULL, `''` | NUMBER 단위 |
+| | `version` | `integer` | NOT NULL, `1` | 낙관적 잠금 버전(≥1) |
+| | `system_policy_at` | `char(1)` | NOT NULL, `N` | 기본 정책 여부; 기본 정책 코드 ⇔ `Y` CHECK |
+| | `created_by`, `updated_by` | `bigint` | NULL | 등록/수정 사용자 ID |
+| | `created_at`, `updated_at` | `timestamp` | NOT NULL, CURRENT_TIMESTAMP | 감사 일시 |
+| `tb_system_policy_history` | `history_id` | `bigint identity` | NOT NULL, PK | 이력 ID |
+| | `tenant_id` | `bigint` | NOT NULL, FK `tb_tenant` | 소유 tenant |
+| | `policy_id`, `policy_code` | `bigint`, `varchar(80)` | NOT NULL | 정책 식별(삭제 후 보존을 위해 FK/CASCADE 없음) |
+| | `action_cd` | `varchar(10)` | NOT NULL | `CREATE/UPDATE/DELETE` |
+| | `before_value`, `after_value` | `jsonb` | NULL | 변경 전/후 값 |
+| | `before_snapshot`, `after_snapshot` | `jsonb` | 작업별 필수 CHECK | 전체 정책 스냅샷 |
+| | `changed_by`, `changed_at` | `bigint`, `timestamp` | 변경자 NULL, 일시 CURRENT_TIMESTAMP | 변경자/일시; `(tenant_id, policy_id, changed_at DESC, history_id DESC)` 인덱스 |
+
+- DDL은 모든 기존 테넌트에 기본 정책 2건을 현재 tb_tenant 값으로 복제하며 tb_tenant는 수정하지 않는다. 신규 테넌트의 기본 정책 행은 별도 운영 절차로 생성한다.
+- 기본 정책 저장은 tb_tenant 행 잠금 후 같은 트랜잭션에서 tenant 컬럼, 정책 행 version, 이력을 함께 갱신한다. 납품계획 헤더가 있으면 운영모드 변경을 거부한다. 기존 납품 Mapper/서비스는 변경하지 않는다.
+- 메뉴 `ST_SYSTEM_POLICY`(`/settings/system/policies`)는 SETTINGS > `ST_SYSTEM` 하위에 등록하고 기존 PLATFORM_ADMIN 역할에만 권한을 부여한다. 메뉴 트리 API는 PLATFORM_ADMIN 외 역할에 이 메뉴를 노출하지 않는다.
+- [DDL/메뉴/롤백 변경 이력](20261105/20261105_004_change_system_policy_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_004_시스템정책_관리_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
 
 `20261027_002` 설계 초안이며 현재 central DB에 적용되지 않았다. 실제 현행 스키마로 오인하지 않도록 아래 정의는 제안 상태로만 기록한다.
@@ -1000,6 +1031,7 @@
 
 ## 변경 이력
 
+- 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
 - 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 구현 후 검토에서 읽기 전용 PostgreSQL MCP `list_tables`와 `describe_table`로 `tb_notification`, `tb_user`, `tb_tenant`의 현재 메타데이터를 재확인했고 데이터 행은 조회하지 않았으며, 실제 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.
 - 2026-11-02: 기안자 최종확인 도입 중 실제 결재선 participant unique 제약이 동일 기안자의 일반 결재 행/내부 최종확인 행 삽입을 막는 것을 MCP 메타데이터로 확인했다. 일반 participant 중복 제한과 문서당 최종확인 단일 행 제한으로 분리하고, 배포 전 진행 중 문서는 최종처리 시 확인 행을 생성하는 계약을 추가했다. [20261102_003 DDL/rollback/변경 이력](20261102/20261102_003_change_drafter_final_confirmation_schema.md) 참고.
 - 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.

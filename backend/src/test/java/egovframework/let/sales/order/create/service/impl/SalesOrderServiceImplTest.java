@@ -49,6 +49,7 @@ class SalesOrderServiceImplTest {
         MockitoAnnotations.openMocks(this);
         service = new SalesOrderServiceImpl(salesOrderDAO, idSequenceService, salesDeliveryPlanService);
         when(salesDeliveryPlanService.getMode(71L)).thenReturn("MANUAL");
+        when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("MANUAL");
         when(salesOrderDAO.existsCustomer(anyMap())).thenReturn(true);
         when(salesOrderDAO.existsMaterial(anyMap())).thenReturn(true);
         when(salesOrderDAO.insertOrderHeader(anyMap())).thenReturn(300L);
@@ -105,8 +106,23 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void createsAutomaticPlanWithOrderDetailDatesFallingBackToHeaderDate() throws Exception {
+    void createLocksTenantPlanModeBeforeInsertingTheOrderAndIgnoresUnlockedMode() throws Exception {
         when(salesDeliveryPlanService.getMode(71L)).thenReturn("AUTO");
+
+        service.createOrder(71L, "user01", validPayload());
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(salesDeliveryPlanService, salesOrderDAO);
+        order.verify(salesDeliveryPlanService).lockModeForPlanCreation(71L);
+        order.verify(salesOrderDAO).insertOrderHeader(anyMap());
+        verify(salesDeliveryPlanService, org.mockito.Mockito.never()).getMode(71L);
+        verify(salesDeliveryPlanService, org.mockito.Mockito.never())
+                .createAutomaticPlan(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void createsAutomaticPlanWithOrderDetailDatesFallingBackToHeaderDate() throws Exception {
+        when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("AUTO");
         SalesOrderCreateRequestVO payload = validPayload();
         payload.setDeliveryDt(LocalDate.of(2026, 11, 5));
         payload.getDetails().get(0).setDeliveryDt(null);

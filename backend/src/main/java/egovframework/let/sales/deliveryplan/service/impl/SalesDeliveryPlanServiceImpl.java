@@ -15,6 +15,7 @@ import java.util.Set;
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
@@ -51,7 +52,17 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     @Override
     public String getMode(Long tenantId) throws Exception {
         validateTenant(tenantId);
-        String mode = dao.selectTenantMode(tenantId);
+        return normalizeMode(dao.selectTenantMode(tenantId));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public String lockModeForPlanCreation(Long tenantId) throws Exception {
+        validateTenant(tenantId);
+        return normalizeMode(dao.lockTenantModeForPlanCreation(tenantId));
+    }
+
+    private String normalizeMode(String mode) {
         if (!StringUtils.hasText(mode)) {
             return MODE_AUTO;
         }
@@ -90,7 +101,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     public SalesDeliveryPlanVO create(Long tenantId, String userId, SalesDeliveryPlanRequestVO request)
             throws Exception {
         validatePrincipal(tenantId, userId);
-        requireManualMode(tenantId);
+        if (!MODE_MANUAL.equals(lockModeForPlanCreation(tenantId))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "AUTO 테넌트에서는 납품계획을 직접 관리할 수 없습니다.");
+        }
         return createPlan(tenantId, userId, request);
     }
 
@@ -99,7 +112,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     public void createAutomaticPlan(Long tenantId, String userId, SalesDeliveryPlanRequestVO request)
             throws Exception {
         validatePrincipal(tenantId, userId);
-        if (!MODE_AUTO.equals(getMode(tenantId))) {
+        if (!MODE_AUTO.equals(lockModeForPlanCreation(tenantId))) {
             throw conflict("MANUAL 테넌트의 납품계획은 사용자가 직접 등록해야 합니다.");
         }
         createPlan(tenantId, userId, request);

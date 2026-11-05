@@ -18,6 +18,7 @@ import { DocumentStatusPage } from '../../groupware/documents/status/DocumentSta
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
+import { SystemPolicyPage } from '../../settings/system/policies/SystemPolicyPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
@@ -48,6 +49,7 @@ type DashboardContentProps = {
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
   isTenantAdmin?: boolean;
+  isPlatformAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
   requestedApprovalId?: number | null;
@@ -156,6 +158,7 @@ export function DashboardContent({
   content,
   selectedMenuPermissions,
   isTenantAdmin = false,
+  isPlatformAdmin = false,
   dashboardScope = null,
   onDashboardScopeChange,
   requestedApprovalId,
@@ -296,6 +299,10 @@ export function DashboardContent({
         isTenantAdmin={isTenantAdmin}
       />
     );
+  }
+
+  if (selectedModule.id === 'settings' && currentPageKey === 'policies') {
+    return <SystemPolicyPage isPlatformAdmin={isPlatformAdmin} selectedMenuPermissions={selectedMenuPermissions} breadcrumbItems={breadcrumbItems} />;
   }
 
   if (selectedModule.id === 'settings' && currentPageKey === 'roles') {

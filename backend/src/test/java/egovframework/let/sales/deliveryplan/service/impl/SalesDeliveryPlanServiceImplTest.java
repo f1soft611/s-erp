@@ -40,6 +40,51 @@ class SalesDeliveryPlanServiceImplTest {
         MockitoAnnotations.openMocks(this);
         service = new SalesDeliveryPlanServiceImpl(dao, sequenceService);
         when(dao.selectTenantMode(71L)).thenReturn("MANUAL");
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("MANUAL");
+    }
+
+    @Test
+    void manualCreationReadsModeUnderTenantShareLockBeforeLockingTheOrder() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("MANUAL");
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
+
+        assertThatThrownBy(() -> service.create(71L, "user01", request(detail(null, 801L, "1"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        verify(dao, never()).lockSourceOrder(anyMap());
+        verify(dao, never()).insertPlanHeader(anyMap());
+
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("MANUAL");
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null, new SalesDeliveryPlanVO());
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(sequenceService.nextValue(
+                org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        service.create(71L, "user01", request(detail(null, 801L, "1")));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(dao);
+        order.verify(dao, org.mockito.Mockito.times(2)).lockTenantModeForPlanCreation(71L);
+        order.verify(dao).lockSourceOrder(anyMap());
+        order.verify(dao).insertPlanHeader(anyMap());
+        verify(dao, never()).selectTenantMode(71L);
+    }
+
+    @Test
+    void automaticCreationRejectsModeChangedBeforeTheTenantShareLock() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("MANUAL");
+
+        assertThatThrownBy(() -> service.createAutomaticPlan(71L, "user01", request(detail(null, 801L, "1"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verify(dao, never()).lockSourceOrder(anyMap());
+        verify(dao, never()).insertPlanHeader(anyMap());
     }
 
     @Test
@@ -71,7 +116,7 @@ class SalesDeliveryPlanServiceImplTest {
 
     @Test
     void rejectsManualPlanCreationForAutoTenant() throws Exception {
-        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
 
         assertThatThrownBy(() -> service.create(71L, "user01", request(detail(null, 801L, "1"))))
                 .isInstanceOf(ResponseStatusException.class)

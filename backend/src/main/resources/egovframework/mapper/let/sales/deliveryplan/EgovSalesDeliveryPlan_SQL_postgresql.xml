@@ -15,6 +15,15 @@
           AND use_at = 'Y'
     </select>
 
+    <!-- 납품계획 헤더 생성 경로 전용: 시스템 정책의 운영모드 변경(FOR UPDATE)과 직렬화하며, 수주 잠금보다 먼저 획득한다. -->
+    <select id="lockTenantModeForPlanCreation" parameterType="long" resultType="string">
+        SELECT delivery_plan_mode
+        FROM tb_tenant
+        WHERE tenant_id = #{_parameter, jdbcType=BIGINT}
+          AND use_at = 'Y'
+        FOR SHARE
+    </select>
+
     <select id="lockSourceOrder" parameterType="map"
             resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderHeaderVO">
         SELECT h.sales_order_id AS salesOrderId,

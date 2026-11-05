@@ -1107,6 +1107,7 @@ function DashboardPage() {
                       'PLATFORM_ADMIN',
                       'ADMIN',
                     ].includes((profile.roleName ?? '').trim().toUpperCase())}
+                    isPlatformAdmin={(profile.roleName ?? '').trim().toUpperCase() === 'PLATFORM_ADMIN'}
                     requestedApprovalId={requestedApprovalId}
                     requestedPostId={requestedPostId}
                     onRequestedPostClose={() => {
