@@ -116,6 +116,17 @@
           AND h.use_at = 'Y'
     </select>
 
+    <select id="selectOrderForUpdate" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               h.tenant_id AS tenantId,
+               h.status AS status
+        FROM tb_sales_order_hd h
+        WHERE h.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
     <select id="selectOrderDetails" parameterType="map" resultType="egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO">
         SELECT d.sales_order_detail_id AS salesOrderDetailId,
                d.sales_order_id AS salesOrderId,
@@ -149,6 +160,49 @@
           AND COALESCE(shipped_qty, 0) &gt; 0
     </select>
 
+    <select id="countDeliveryReferences" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_delivery_dt
+        WHERE sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="countPlanReferences" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_delivery_plan_hd
+        WHERE sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </select>
+
+    <select id="countOrderDetailReferences" parameterType="map" resultType="int">
+        SELECT (
+            SELECT COUNT(*)
+            FROM tb_sales_delivery_plan_dt
+            WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+        ) + (
+            SELECT COUNT(*)
+            FROM tb_sales_delivery_dt
+            WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+        )
+    </select>
+
+    <select id="countOrderDeliveryReferences" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_delivery_dt
+        WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="sumPlannedQty" parameterType="map" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(planned_qty), 0)
+        FROM tb_sales_delivery_plan_dt
+        WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
     <update id="updateOrderHeader" parameterType="map">
         UPDATE tb_sales_order_hd
         SET order_dt = CAST(#{orderDt} AS date),
@@ -166,10 +220,26 @@
           AND use_at = 'Y'
     </update>
 
-    <delete id="deleteOrderDetails" parameterType="map">
+    <update id="updateOrderDetail" parameterType="map">
+        UPDATE tb_sales_order_dt
+        SET material_id = #{materialId},
+            order_qty = #{orderQty},
+            unit_price = #{unitPrice},
+            supply_amt = #{supplyAmt},
+            vat_amt = #{vatAmt},
+            total_amt = #{totalAmt},
+            delivery_dt = CAST(#{deliveryDt} AS date)
+        WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND line_no = #{lineNo, jdbcType=INTEGER}
+    </update>
+
+    <delete id="deleteOrderDetail" parameterType="map">
         DELETE FROM tb_sales_order_dt
-        WHERE sales_order_id = #{salesOrderId}
-          AND tenant_id = #{tenantId}
+        WHERE sales_order_detail_id = #{salesOrderDetailId, jdbcType=BIGINT}
+          AND sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
     </delete>
 
     <update id="softDeleteOrderHeader" parameterType="map">

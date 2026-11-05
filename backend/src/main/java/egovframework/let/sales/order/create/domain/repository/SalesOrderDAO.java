@@ -77,6 +77,17 @@ public class SalesOrderDAO extends EgovAbstractMapper {
     }
 
     /**
+     * 수주 헤더를 잠가 수주 수정/삭제와 납품 생성 간 경합을 방지한다.
+     *
+     * @param params 테넌트 ID와 수주 ID
+     * @return 잠금된 사용 중 수주 헤더
+     * @throws Exception 조회 중 발생한 예외
+     */
+    public SalesOrderVO selectOrderForUpdate(Map<String, Object> params) throws Exception {
+        return selectOne("SalesOrderDAO.selectOrderForUpdate", params);
+    }
+
+    /**
      * 수주 상세를 품목 코드/명과 함께 순번 순서로 조회한다.
      *
      * @param params 테넌트 ID와 수주 ID
@@ -100,6 +111,37 @@ public class SalesOrderDAO extends EgovAbstractMapper {
     }
 
     /**
+     * 삭제 여부와 관계없이 납품 상세가 수주를 참조하는지 확인한다.
+     *
+     * @param params 테넌트 ID와 수주 ID
+     * @return 납품 이력에서 참조하는 상세 수
+     * @throws Exception 조회 중 발생한 예외
+     */
+    public int countDeliveryReferences(Map<String, Object> params) throws Exception {
+        Integer count = selectOne("SalesOrderDAO.countDeliveryReferences", params);
+        return count == null ? 0 : count;
+    }
+
+    public int countPlanReferences(Map<String, Object> params) throws Exception {
+        Integer count = selectOne("SalesOrderDAO.countPlanReferences", params);
+        return count == null ? 0 : count;
+    }
+
+    public int countOrderDetailReferences(Map<String, Object> params) throws Exception {
+        Integer count = selectOne("SalesOrderDAO.countOrderDetailReferences", params);
+        return count == null ? 0 : count;
+    }
+
+    public int countOrderDeliveryReferences(Map<String, Object> params) throws Exception {
+        Integer count = selectOne("SalesOrderDAO.countOrderDeliveryReferences", params);
+        return count == null ? 0 : count;
+    }
+
+    public java.math.BigDecimal sumPlannedQty(Map<String, Object> params) throws Exception {
+        return selectOne("SalesOrderDAO.sumPlannedQty", params);
+    }
+
+    /**
      * 수주 헤더를 수정한다. 수주번호는 변경하지 않는다.
      *
      * @param params 수주 헤더 수정 값
@@ -110,15 +152,12 @@ public class SalesOrderDAO extends EgovAbstractMapper {
         return update("SalesOrderDAO.updateOrderHeader", params);
     }
 
-    /**
-     * 수주의 상세 행을 모두 삭제한다.
-     *
-     * @param params 테넌트 ID와 수주 ID
-     * @return 삭제된 행 수
-     * @throws Exception 삭제 중 발생한 예외
-     */
-    public int deleteOrderDetails(Map<String, Object> params) throws Exception {
-        return delete("SalesOrderDAO.deleteOrderDetails", params);
+    public int updateOrderDetail(Map<String, Object> params) throws Exception {
+        return update("SalesOrderDAO.updateOrderDetail", params);
+    }
+
+    public int deleteOrderDetail(Map<String, Object> params) throws Exception {
+        return delete("SalesOrderDAO.deleteOrderDetail", params);
     }
 
     /**

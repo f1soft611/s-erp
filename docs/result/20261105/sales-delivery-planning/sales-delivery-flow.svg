@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1320" viewBox="0 0 1440 1320" role="img" aria-labelledby="title description">
+  <title id="title">테넌트별 납품계획 및 납품 업무 흐름</title>
+  <desc id="description">테넌트 운영 모드에 따라 수주 저장 후 납품계획을 수동 등록하거나 자동 생성하고, 계획 기준 수주납품과 별도의 직납품으로 진행하는 흐름도</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#eef3fa"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#11284b"/>
+      <stop offset="1" stop-color="#1b4776"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#72849a"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3877c7"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#219276"/>
+    </marker>
+    <style>
+      text { font-family: Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #203047; }
+      .eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 2px; fill: #a9c7eb; }
+      .title { font-size: 34px; font-weight: 800; fill: #ffffff; }
+      .subtitle { font-size: 16px; fill: #d6e5f6; }
+      .section { font-size: 17px; font-weight: 800; }
+      .card-title { font-size: 20px; font-weight: 800; }
+      .body { font-size: 15px; fill: #53657b; }
+      .small { font-size: 13px; fill: #63758a; }
+      .label { font-size: 13px; font-weight: 700; }
+      .white { fill: #ffffff; }
+      .muted-white { fill: #d9e7f5; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1320" fill="url(#background)"/>
+  <rect x="0" y="0" width="1440" height="190" fill="url(#header)"/>
+  <circle cx="1325" cy="48" r="115" fill="#ffffff" opacity=".045"/>
+  <circle cx="1385" cy="175" r="74" fill="#6ba5e8" opacity=".10"/>
+  <text x="78" y="48" class="eyebrow">S-ERP  /  SALES OPERATIONS</text>
+  <text x="78" y="101" class="title">테넌트별 납품계획 · 납품 업무 흐름</text>
+  <text x="78" y="139" class="subtitle">계획 운영 방식은 테넌트 설정으로 구분하고, 수주납품과 직납품 경로를 명확히 분리합니다.</text>
+
+  <!-- Tenant mode -->
+  <rect x="500" y="220" width="440" height="116" rx="18" fill="#ffffff" stroke="#d7e1ed" stroke-width="2"/>
+  <rect x="500" y="220" width="10" height="116" rx="5" fill="#315e92"/>
+  <text x="720" y="258" text-anchor="middle" class="section" fill="#48637f">테넌트 설정 확인</text>
+  <text x="720" y="292" text-anchor="middle" class="card-title">delivery_plan_mode</text>
+  <rect x="651" y="300" width="138" height="28" rx="14" fill="#edf3fb"/>
+  <text x="720" y="319" text-anchor="middle" class="small">AUTO  /  MANUAL</text>
+
+  <!-- Branch connectors -->
+  <path d="M720 336 V350 H390 V374" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <path d="M720 350 H1050 V374" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+
+  <!-- MANUAL lane -->
+  <rect x="90" y="375" width="600" height="282" rx="22" fill="#f3f7fd" stroke="#b8cdea" stroke-width="2"/>
+  <rect x="90" y="375" width="600" height="54" rx="22" fill="#e5eefb"/>
+  <path d="M90 407 V429 H690 V407" fill="#e5eefb"/>
+  <circle cx="124" cy="402" r="10" fill="#3877c7"/>
+  <text x="147" y="408" class="section" fill="#245995">MANUAL  ·  계획을 직접 관리</text>
+  <rect x="125" y="456" width="220" height="145" rx="15" fill="#ffffff" stroke="#c9d8eb" stroke-width="1.5"/>
+  <text x="150" y="489" class="card-title">수주 등록</text>
+  <text x="150" y="521" class="body">거래처 · 품목 · 수량 입력</text>
+  <text x="150" y="550" class="body">수주 저장</text>
+  <rect x="411" y="456" width="244" height="145" rx="15" fill="#ffffff" stroke="#a9c5e7" stroke-width="1.5"/>
+  <text x="436" y="489" class="card-title">납품계획 등록</text>
+  <text x="436" y="521" class="body">사용자가 계획일·수량 입력</text>
+  <text x="436" y="550" class="body">한 수주상세를 여러 일정으로 분할</text>
+  <path d="M350 529 H401" fill="none" stroke="#3877c7" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <rect x="125" y="615" width="530" height="27" rx="13" fill="#e7f0fb"/>
+  <text x="390" y="634" text-anchor="middle" class="small" fill="#356499">계획 생성 전에는 해당 수주의 수주납품 불가</text>
+
+  <!-- AUTO lane -->
+  <rect x="750" y="375" width="600" height="282" rx="22" fill="#f1faf7" stroke="#b6dfd1" stroke-width="2"/>
+  <rect x="750" y="375" width="600" height="54" rx="22" fill="#def3eb"/>
+  <path d="M750 407 V429 H1350 V407" fill="#def3eb"/>
+  <circle cx="784" cy="402" r="10" fill="#219276"/>
+  <text x="807" y="408" class="section" fill="#18755e">AUTO  ·  계획을 자동 생성</text>
+  <rect x="785" y="456" width="220" height="145" rx="15" fill="#ffffff" stroke="#c8e3d9" stroke-width="1.5"/>
+  <text x="810" y="489" class="card-title">수주 등록</text>
+  <text x="810" y="521" class="body">거래처 · 품목 · 수량 입력</text>
+  <text x="810" y="550" class="body">수주 저장</text>
+  <rect x="1071" y="456" width="244" height="145" rx="15" fill="#ffffff" stroke="#a9d8c8" stroke-width="1.5"/>
+  <text x="1096" y="489" class="card-title">납품계획 자동 생성</text>
+  <text x="1096" y="521" class="body">수주 저장과 같은 트랜잭션</text>
+  <text x="1096" y="550" class="body">상세 납기일 → 헤더 납기일</text>
+  <text x="1096" y="574" class="small">둘 다 없으면 계획일 미정</text>
+  <path d="M1010 529 H1061" fill="none" stroke="#219276" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  <rect x="785" y="615" width="530" height="27" rx="13" fill="#e2f4ed"/>
+  <text x="1050" y="634" text-anchor="middle" class="small" fill="#237e65">계획 등록 화면은 숨김 · 서버도 수동 계획 작업을 제한</text>
+
+  <!-- Converge into plan balance -->
+  <path d="M390 658 V688 H720 V706" fill="none" stroke="#3877c7" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <path d="M1050 658 V688 H720" fill="none" stroke="#219276" stroke-width="2.5"/>
+  <rect x="390" y="708" width="660" height="115" rx="20" fill="#ffffff" stroke="#9eb4cd" stroke-width="2"/>
+  <rect x="390" y="708" width="12" height="115" rx="6" fill="#526f91"/>
+  <text x="720" y="746" text-anchor="middle" class="section" fill="#526f91">수주납품용 납품계획 상세</text>
+  <text x="720" y="778" text-anchor="middle" class="card-title">수주·계획 기준수량과 실제 납품수량을 별도 관리</text>
+  <text x="720" y="804" text-anchor="middle" class="small">미납수량 / 초과납품 수량을 구분 · 직납품은 이 단계를 건너뜀</text>
+
+  <!-- Independent ORDER and DIRECT entry paths -->
+  <path d="M500 823 V941 H390 V958" fill="none" stroke="#3877c7" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <rect x="402" y="905" width="224" height="27" rx="13" fill="#e5eefb"/>
+  <text x="514" y="923" text-anchor="middle" class="label" fill="#356499">계획 상세 선택 · ORDER</text>
+  <rect x="810" y="858" width="500" height="58" rx="28" fill="#e2f4ed" stroke="#b6dfd1" stroke-width="1.5"/>
+  <text x="1060" y="894" text-anchor="middle" class="section" fill="#18755e">수주 없이 바로 시작  ·  DIRECT 선택</text>
+  <path d="M1060 916 V958" fill="none" stroke="#219276" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+
+  <!-- ORDER delivery -->
+  <rect x="90" y="966" width="600" height="248" rx="22" fill="#ffffff" stroke="#b8cdea" stroke-width="2"/>
+  <rect x="90" y="966" width="600" height="58" rx="22" fill="#e8f0fc"/>
+  <path d="M90 1002 V1024 H690 V1002" fill="#e8f0fc"/>
+  <circle cx="126" cy="995" r="11" fill="#3877c7"/>
+  <text x="151" y="1002" class="card-title" fill="#245995">수주납품  ·  계획 잔량 기준</text>
+  <circle cx="130" cy="1060" r="13" fill="#e8f0fc"/><text x="130" y="1065" text-anchor="middle" class="label" fill="#245995">1</text>
+  <text x="156" y="1065" class="body">계획 상세 선택 · 부분 납품 가능</text>
+  <circle cx="130" cy="1101" r="13" fill="#e8f0fc"/><text x="130" y="1106" text-anchor="middle" class="label" fill="#245995">2</text>
+  <text x="156" y="1106" class="body">기준 초과 시 테넌트의 초과납품 정책 적용</text>
+  <circle cx="130" cy="1142" r="13" fill="#e8f0fc"/><text x="130" y="1147" text-anchor="middle" class="label" fill="#245995">3</text>
+  <text x="156" y="1147" class="body">납품현황에서 수정·삭제 시 수량 역보정</text>
+  <rect x="125" y="1172" width="530" height="25" rx="12" fill="#f0f5fb"/>
+  <text x="390" y="1190" text-anchor="middle" class="small">BLOCK 차단(기본) / WARN 초과수량 확인 후 저장</text>
+
+  <!-- DIRECT delivery -->
+  <rect x="750" y="966" width="600" height="248" rx="22" fill="#ffffff" stroke="#b6dfd1" stroke-width="2"/>
+  <rect x="750" y="966" width="600" height="58" rx="22" fill="#e3f5ef"/>
+  <path d="M750 1002 V1024 H1350 V1002" fill="#e3f5ef"/>
+  <circle cx="786" cy="995" r="11" fill="#219276"/>
+  <text x="811" y="1002" class="card-title" fill="#18755e">직납품  ·  수주·계획 생략</text>
+  <circle cx="790" cy="1060" r="13" fill="#e3f5ef"/><text x="790" y="1065" text-anchor="middle" class="label" fill="#18755e">1</text>
+  <text x="816" y="1065" class="body">거래처와 품목을 직접 선택</text>
+  <circle cx="790" cy="1101" r="13" fill="#e3f5ef"/><text x="790" y="1106" text-anchor="middle" class="label" fill="#18755e">2</text>
+  <text x="816" y="1106" class="body">수주·계획 상세 참조 없이 납품 등록</text>
+  <circle cx="790" cy="1142" r="13" fill="#e3f5ef"/><text x="790" y="1147" text-anchor="middle" class="label" fill="#18755e">3</text>
+  <text x="816" y="1147" class="body">계획 운영 모드와 무관하게 사용 가능</text>
+  <rect x="785" y="1172" width="530" height="25" rx="12" fill="#eef8f4"/>
+  <text x="1050" y="1190" text-anchor="middle" class="small">수주출하량·계획납품량에 영향 없음</text>
+
+  <!-- Shared integrity and data model -->
+  <rect x="90" y="1236" width="1260" height="58" rx="16" fill="#1e3551"/>
+  <text x="720" y="1261" text-anchor="middle" class="label white">수주납품 정합성  ·  수주 헤더 잠금 → 초과정책·수량 검증 → 납품 및 수량 동기화를 한 트랜잭션으로 처리</text>
+  <text x="720" y="1282" text-anchor="middle" class="small muted-white">테넌트 설정: delivery_plan_mode + over_delivery_policy (서로 독립)  ·  기준수량은 초과 실적에 맞춰 자동 증가시키지 않음</text>
+</svg>

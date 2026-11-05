@@ -8,6 +8,7 @@ import type {
 } from '../types/dashboard';
 
 export const emptyUserMenuResponse: UserMenuResponse = {
+  deliveryPlanMode: 'AUTO',
   user: {
     userId: '',
     roles: [],

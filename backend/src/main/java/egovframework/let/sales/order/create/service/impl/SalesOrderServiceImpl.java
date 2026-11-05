@@ -23,6 +23,9 @@ import egovframework.let.sales.order.create.domain.model.SalesOrderVO;
 import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.sales.order.create.service.SalesOrderService;
 import egovframework.let.common.idsequence.service.IdSequenceService;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailRequestVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
+import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
 
 /**
  * 수주 등록 검증, 계산, 채번 및 저장을 처리하는 서비스 구현 클래스.
@@ -43,10 +46,13 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
 
     private final SalesOrderDAO salesOrderDAO;
     private final IdSequenceService idSequenceService;
+    private final SalesDeliveryPlanService salesDeliveryPlanService;
 
-    public SalesOrderServiceImpl(SalesOrderDAO salesOrderDAO, IdSequenceService idSequenceService) {
+    public SalesOrderServiceImpl(SalesOrderDAO salesOrderDAO, IdSequenceService idSequenceService,
+            SalesDeliveryPlanService salesDeliveryPlanService) {
         this.salesOrderDAO = salesOrderDAO;
         this.idSequenceService = idSequenceService;
+        this.salesDeliveryPlanService = salesDeliveryPlanService;
     }
 
     /**
@@ -65,6 +71,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validatePrincipal(tenantId, userId);
         validatePayload(payload);
         validateCustomer(tenantId, payload.getCustomerId());
+        String deliveryPlanMode = salesDeliveryPlanService.getMode(tenantId);
 
         List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
         BigDecimal headerTotal = sumTotals(preparedDetails);
@@ -95,6 +102,22 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
             SalesOrderDetailVO savedDetail = persistDetail(
                     salesOrderId, tenantId, lineNo++, prepared);
             savedDetails.add(savedDetail);
+        }
+        if ("AUTO".equals(deliveryPlanMode)) {
+            SalesDeliveryPlanRequestVO planRequest = new SalesDeliveryPlanRequestVO();
+            planRequest.setSalesOrderId(salesOrderId);
+            List<SalesDeliveryPlanDetailRequestVO> planDetails =
+                    new ArrayList<SalesDeliveryPlanDetailRequestVO>();
+            for (SalesOrderDetailVO savedDetail : savedDetails) {
+                SalesDeliveryPlanDetailRequestVO planDetail = new SalesDeliveryPlanDetailRequestVO();
+                planDetail.setSalesOrderDetailId(savedDetail.getSalesOrderDetailId());
+                planDetail.setPlanDt(savedDetail.getDeliveryDt() == null
+                        ? payload.getDeliveryDt() : savedDetail.getDeliveryDt());
+                planDetail.setPlannedQty(savedDetail.getOrderQty());
+                planDetails.add(planDetail);
+            }
+            planRequest.setDetails(planDetails);
+            salesDeliveryPlanService.createAutomaticPlan(tenantId, userId, planRequest);
         }
 
         SalesOrderVO saved = new SalesOrderVO();
@@ -152,6 +175,65 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validateCustomer(tenantId, payload.getCustomerId());
 
         List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
+        List<SalesOrderDetailVO> existingDetails =
+                salesOrderDAO.selectOrderDetails(orderParams(tenantId, salesOrderId));
+        String planMode = salesDeliveryPlanService.getMode(tenantId);
+        boolean allowExcess = "WARN".equals(salesDeliveryPlanService.getOverDeliveryPolicy(tenantId));
+        Map<Integer, SalesOrderDetailVO> existingByLine = new HashMap<Integer, SalesOrderDetailVO>();
+        for (SalesOrderDetailVO detail : existingDetails) {
+            existingByLine.put(detail.getLineNo(), detail);
+        }
+        List<Long> retainedDetailIds = new ArrayList<Long>();
+        List<SalesOrderDetailVO> existingLines = new ArrayList<SalesOrderDetailVO>();
+        for (int index = 0; index < preparedDetails.size(); index++) {
+            int lineNo = index + 1;
+            PreparedDetail prepared = preparedDetails.get(index);
+            SalesOrderDetailVO existing = existingByLine.get(lineNo);
+            existingLines.add(existing);
+            if (existing == null) {
+                retainedDetailIds.add(null);
+                continue;
+            }
+            int detailReferences = salesOrderDAO.countOrderDetailReferences(
+                    orderDetailParams(tenantId, salesOrderId, existing.getSalesOrderDetailId()));
+            int deliveryReferences = salesOrderDAO.countOrderDeliveryReferences(
+                    orderDetailParams(tenantId, salesOrderId, existing.getSalesOrderDetailId()));
+            if (!existing.getMaterialId().equals(prepared.materialId)
+                    && (detailReferences > 0 || deliveryReferences > 0)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "계획 또는 납품에 사용된 수주 상세의 품목은 변경할 수 없습니다.");
+            }
+            if (!allowExcess && prepared.orderQty.compareTo(existing.getShippedQty() == null
+                    ? ZERO : existing.getShippedQty()) < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "수주수량은 이미 출하된 수량보다 적을 수 없습니다.");
+            }
+            BigDecimal plannedQty = salesOrderDAO.sumPlannedQty(
+                    orderDetailParams(tenantId, salesOrderId, existing.getSalesOrderDetailId()));
+            if ("MANUAL".equals(planMode) && plannedQty != null
+                    && prepared.orderQty.compareTo(plannedQty) < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "수주수량은 기존 납품계획 수량보다 적을 수 없습니다.");
+            }
+            retainedDetailIds.add(existing.getSalesOrderDetailId());
+        }
+
+        List<SalesOrderDetailVO> removedDetails = new ArrayList<SalesOrderDetailVO>();
+        for (SalesOrderDetailVO detail : existingDetails) {
+            if (detail.getLineNo() == null || detail.getLineNo() > preparedDetails.size()) {
+                int detailReferences = salesOrderDAO.countOrderDetailReferences(
+                        orderDetailParams(tenantId, salesOrderId, detail.getSalesOrderDetailId()));
+                int deliveryReferences = salesOrderDAO.countOrderDeliveryReferences(
+                        orderDetailParams(tenantId, salesOrderId, detail.getSalesOrderDetailId()));
+                if (deliveryReferences > 0 || detail.getShippedQty() != null
+                        && detail.getShippedQty().signum() > 0
+                        || "MANUAL".equals(planMode) && detailReferences > 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "계획 또는 납품에 사용된 수주 상세는 삭제할 수 없습니다.");
+                }
+                removedDetails.add(detail);
+            }
+        }
         BigDecimal headerTotal = sumTotals(preparedDetails);
 
         Map<String, Object> headerParams = orderParams(tenantId, salesOrderId);
@@ -168,10 +250,34 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
             throw orderNotFound();
         }
 
-        salesOrderDAO.deleteOrderDetails(orderParams(tenantId, salesOrderId));
-        int lineNo = 1;
-        for (PreparedDetail prepared : preparedDetails) {
-            persistDetail(salesOrderId, tenantId, lineNo++, prepared);
+        for (int index = 0; index < preparedDetails.size(); index++) {
+            int lineNo = index + 1;
+            PreparedDetail prepared = preparedDetails.get(index);
+            SalesOrderDetailVO existing = existingLines.get(index);
+            if (existing == null) {
+                SalesOrderDetailVO inserted = persistDetail(salesOrderId, tenantId, lineNo, prepared);
+                retainedDetailIds.set(index, inserted.getSalesOrderDetailId());
+                continue;
+            }
+            Map<String, Object> detailParams = orderDetailParams(
+                    tenantId, salesOrderId, existing.getSalesOrderDetailId(), lineNo, prepared, userId);
+            if (salesOrderDAO.updateOrderDetail(detailParams) != 1) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "수주 상세가 동시에 변경되었습니다.");
+            }
+        }
+
+        if ("AUTO".equals(planMode)) {
+            salesDeliveryPlanService.synchronizeAutomaticPlan(
+                    tenantId, userId, salesOrderId, retainedDetailIds);
+        }
+        for (SalesOrderDetailVO detail : removedDetails) {
+            Map<String, Object> params = orderDetailParams(
+                    tenantId, salesOrderId, detail.getSalesOrderDetailId());
+            if (salesOrderDAO.deleteOrderDetail(params) != 1) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "수주 상세가 동시에 변경되었습니다.");
+            }
         }
         return getOrder(tenantId, userId, salesOrderId);
     }
@@ -189,6 +295,13 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     public void deleteOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
         validatePrincipal(tenantId, userId);
         requireEditable(tenantId, salesOrderId);
+        Map<String, Object> order = orderParams(tenantId, salesOrderId);
+        if (salesOrderDAO.countDeliveryReferences(order) > 0
+                || salesOrderDAO.countPlanReferences(order) > 0
+                || salesOrderDAO.countShippedDetails(order) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "납품계획 또는 납품 이력이 있는 수주는 삭제할 수 없습니다.");
+        }
 
         Map<String, Object> params = orderParams(tenantId, salesOrderId);
         params.put("updatedBy", userId);
@@ -209,11 +322,16 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     }
 
     private void requireEditable(Long tenantId, Long salesOrderId) throws Exception {
-        SalesOrderVO order = findOrder(tenantId, salesOrderId);
-        if (!EDITABLE_STATUS.equals(order.getStatus())
-                || salesOrderDAO.countShippedDetails(orderParams(tenantId, salesOrderId)) > 0) {
+        if (tenantId == null || salesOrderId == null || salesOrderId < 1L) {
+            throw orderNotFound();
+        }
+        SalesOrderVO order = salesOrderDAO.selectOrderForUpdate(orderParams(tenantId, salesOrderId));
+        if (order == null) {
+            throw orderNotFound();
+        }
+        if (!EDITABLE_STATUS.equals(order.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "출하가 진행되었거나 수주등록 상태가 아닌 수주는 수정/삭제할 수 없습니다.");
+                    "수주등록 상태의 수주만 수정/삭제할 수 있습니다.");
         }
     }
 
@@ -254,6 +372,27 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("salesOrderId", salesOrderId);
+        return params;
+    }
+
+    private Map<String, Object> orderDetailParams(Long tenantId, Long salesOrderId, Long detailId) {
+        Map<String, Object> params = orderParams(tenantId, salesOrderId);
+        params.put("salesOrderDetailId", detailId);
+        return params;
+    }
+
+    private Map<String, Object> orderDetailParams(Long tenantId, Long salesOrderId,
+            Long detailId, int lineNo, PreparedDetail detail, String userId) {
+        Map<String, Object> params = orderDetailParams(tenantId, salesOrderId, detailId);
+        params.put("lineNo", lineNo);
+        params.put("materialId", detail.materialId);
+        params.put("orderQty", detail.orderQty);
+        params.put("unitPrice", detail.unitPrice);
+        params.put("supplyAmt", detail.supplyAmt);
+        params.put("vatAmt", detail.vatAmt);
+        params.put("totalAmt", detail.totalAmt);
+        params.put("deliveryDt", detail.deliveryDt);
+        params.put("updatedBy", userId);
         return params;
     }
 
