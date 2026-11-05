@@ -10,6 +10,11 @@ import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO;
 public interface SalesDeliveryPlanService {
     String getMode(Long tenantId) throws Exception;
 
+    /**
+     * 납품계획 헤더를 생성할 수 있는 트랜잭션에서 수주 잠금보다 먼저 호출해 테넌트 운영모드를 공유 잠금으로 읽는다.
+     */
+    String lockModeForPlanCreation(Long tenantId) throws Exception;
+
     String getOverDeliveryPolicy(Long tenantId) throws Exception;
 
     List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, String keyword) throws Exception;

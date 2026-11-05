@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1320" viewBox="0 0 1440 1320" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="2020" viewBox="0 0 1440 2020" role="img" aria-labelledby="title description">
   <title id="title">테넌트별 납품계획 및 납품 업무 흐름</title>
-  <desc id="description">테넌트 운영 모드에 따라 수주 저장 후 납품계획을 수동 등록하거나 자동 생성하고, 계획 기준 수주납품과 별도의 직납품으로 진행하는 흐름도</desc>
+  <desc id="description">AUTO/MANUAL 납품계획 운영, 독립적인 직납품, 수주납품의 기준 초과 판단과 BLOCK 차단 또는 WARN 경고 취소·확인 저장, 기준수량 보존을 설명하는 흐름도</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f8fbff"/>
@@ -34,13 +34,13 @@
     </style>
   </defs>
 
-  <rect width="1440" height="1320" fill="url(#background)"/>
+  <rect width="1440" height="2020" fill="url(#background)"/>
   <rect x="0" y="0" width="1440" height="190" fill="url(#header)"/>
   <circle cx="1325" cy="48" r="115" fill="#ffffff" opacity=".045"/>
   <circle cx="1385" cy="175" r="74" fill="#6ba5e8" opacity=".10"/>
   <text x="78" y="48" class="eyebrow">S-ERP  /  SALES OPERATIONS</text>
   <text x="78" y="101" class="title">테넌트별 납품계획 · 납품 업무 흐름</text>
-  <text x="78" y="139" class="subtitle">계획 운영 방식은 테넌트 설정으로 구분하고, 수주납품과 직납품 경로를 명확히 분리합니다.</text>
+  <text x="78" y="139" class="subtitle">계획 운영 AUTO / MANUAL과 초과납품 BLOCK / WARN은 서로 독립된 테넌트 정책입니다.</text>
 
   <!-- Tenant mode -->
   <rect x="500" y="220" width="440" height="116" rx="18" fill="#ffffff" stroke="#d7e1ed" stroke-width="2"/>
@@ -113,7 +113,7 @@
   <rect x="90" y="966" width="600" height="58" rx="22" fill="#e8f0fc"/>
   <path d="M90 1002 V1024 H690 V1002" fill="#e8f0fc"/>
   <circle cx="126" cy="995" r="11" fill="#3877c7"/>
-  <text x="151" y="1002" class="card-title" fill="#245995">수주납품  ·  계획 잔량 기준</text>
+  <text x="151" y="1002" class="card-title" fill="#245995">수주납품  ·  계획 선택 후 수량 입력</text>
   <circle cx="130" cy="1060" r="13" fill="#e8f0fc"/><text x="130" y="1065" text-anchor="middle" class="label" fill="#245995">1</text>
   <text x="156" y="1065" class="body">계획 상세 선택 · 부분 납품 가능</text>
   <circle cx="130" cy="1101" r="13" fill="#e8f0fc"/><text x="130" y="1106" text-anchor="middle" class="label" fill="#245995">2</text>
@@ -136,10 +136,47 @@
   <circle cx="790" cy="1142" r="13" fill="#e3f5ef"/><text x="790" y="1147" text-anchor="middle" class="label" fill="#18755e">3</text>
   <text x="816" y="1147" class="body">계획 운영 모드와 무관하게 사용 가능</text>
   <rect x="785" y="1172" width="530" height="25" rx="12" fill="#eef8f4"/>
-  <text x="1050" y="1190" text-anchor="middle" class="small">수주출하량·계획납품량에 영향 없음</text>
+  <text x="1050" y="1190" text-anchor="middle" class="small">직납품 저장 · 수주출하량·계획납품량에 영향 없음</text>
 
-  <!-- Shared integrity and data model -->
-  <rect x="90" y="1236" width="1260" height="58" rx="16" fill="#1e3551"/>
-  <text x="720" y="1261" text-anchor="middle" class="label white">수주납품 정합성  ·  수주 헤더 잠금 → 초과정책·수량 검증 → 납품 및 수량 동기화를 한 트랜잭션으로 처리</text>
-  <text x="720" y="1282" text-anchor="middle" class="small muted-white">테넌트 설정: delivery_plan_mode + over_delivery_policy (서로 독립)  ·  기준수량은 초과 실적에 맞춰 자동 증가시키지 않음</text>
+  <text x="960" y="1265" text-anchor="middle" class="card-title">수주납품 저장 시 초과납품 정책 적용</text>
+  <path d="M390 1214 V1300" fill="none" stroke="#3877c7" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <path d="M390 1305 L580 1365 L390 1425 L200 1365 Z" fill="#ffffff" stroke="#8da7c6" stroke-width="2"/>
+  <text x="390" y="1360" text-anchor="middle" class="section">저장 후 누적수량이</text>
+  <text x="390" y="1385" text-anchor="middle" class="section">수주 또는 계획 기준 초과?</text>
+  <path d="M580 1365 H844" fill="none" stroke="#219276" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  <text x="710" y="1349" text-anchor="middle" class="label">아니오 · 기준 이내</text>
+  <rect x="850" y="1325" width="460" height="80" rx="16" fill="#e2f4ed" stroke="#b6dfd1" stroke-width="2"/>
+  <text x="1080" y="1360" text-anchor="middle" class="card-title">일반 납품 저장</text>
+  <text x="1080" y="1386" text-anchor="middle" class="small">납품내역 저장 + 수주·계획 실적 동기화</text>
+  <path d="M390 1425 V1460" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="420" y="1449" class="label">예 · 초과</text>
+  <rect x="200" y="1465" width="380" height="65" rx="15" fill="#edf3fb" stroke="#b8cdea" stroke-width="2"/>
+  <text x="390" y="1493" text-anchor="middle" class="section">테넌트 초과납품 정책 확인</text>
+  <text x="390" y="1516" text-anchor="middle" class="small">over_delivery_policy</text>
+  <path d="M390 1530 V1550 H280 V1575" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M390 1550 H915 V1575" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="110" y="1580" width="340" height="100" rx="18" fill="#fff0ef" stroke="#e0a7a1" stroke-width="2"/>
+  <text x="280" y="1615" text-anchor="middle" class="card-title" style="fill:#a83c36">BLOCK · 차단 (기본값)</text>
+  <text x="280" y="1644" text-anchor="middle" class="body">초과 저장 불가 · 입력 수량 조정</text>
+  <text x="280" y="1666" text-anchor="middle" class="small">확인 플래그가 있어도 우회 불가</text>
+  <rect x="520" y="1580" width="790" height="100" rx="18" fill="#fff8e9" stroke="#e3c483" stroke-width="2"/>
+  <text x="915" y="1615" text-anchor="middle" class="card-title" style="fill:#946218">WARN · 경고 후 사용자 선택</text>
+  <text x="915" y="1644" text-anchor="middle" class="body">수주·계획 기준수량 / 저장 후 누적수량 / 초과수량 안내</text>
+  <text x="915" y="1666" text-anchor="middle" class="small">잔량 0 또는 이미 초과된 계획도 추가 납품 가능 · 실제 양수 입력 필요</text>
+  <path d="M915 1680 V1705 H670 V1730" fill="none" stroke="#72849a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M915 1705 H1140 V1730" fill="none" stroke="#219276" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  <text x="710" y="1724" class="label">취소</text>
+  <text x="995" y="1724" class="label">초과납품 저장 선택</text>
+  <rect x="520" y="1735" width="300" height="100" rx="16" fill="#ffffff" stroke="#c7d2df" stroke-width="2"/>
+  <text x="670" y="1772" text-anchor="middle" class="card-title">저장하지 않음</text>
+  <text x="670" y="1801" text-anchor="middle" class="body">입력 유지 · 수정 후 다시 저장 가능</text>
+  <rect x="930" y="1735" width="420" height="100" rx="16" fill="#e2f4ed" stroke="#b6dfd1" stroke-width="2"/>
+  <text x="1140" y="1772" text-anchor="middle" class="card-title">최신 정책·수량 재검증 후 저장</text>
+  <text x="1140" y="1801" text-anchor="middle" class="body">BLOCK으로 바뀌면 저장 거부</text>
+  <rect x="90" y="1860" width="1260" height="65" rx="16" fill="#e8eff9"/>
+  <text x="720" y="1887" text-anchor="middle" class="section">기준수량 보존  ·  수주 100 / 실납품 105 → 기준 100 유지 / 미납 0 / 초과납품 5</text>
+  <text x="720" y="1910" text-anchor="middle" class="small">생산 로스를 감안한 추가 생산분도 기존 수주에 연결해 납품 · 수주·계획 기준수량 자동 증액 없음</text>
+  <rect x="90" y="1945" width="1260" height="58" rx="16" fill="#1e3551"/>
+  <text x="720" y="1970" text-anchor="middle" class="label white">수주 헤더 잠금 → 수주·계획별 누적량 검증 → 납품 저장 및 수량 동기화를 한 트랜잭션으로 처리</text>
+  <text x="720" y="1991" text-anchor="middle" class="small muted-white">수정: 해당 납품의 기존 수량 제외 후 재계산 · 삭제: 실적 역보정 · WARN 확인은 별도 승인권한을 의미하지 않음</text>
 </svg>

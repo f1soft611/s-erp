@@ -21,6 +21,10 @@ public class SalesDeliveryPlanDAO extends EgovAbstractMapper {
         return selectOne("SalesDeliveryPlanDAO.selectTenantMode", tenantId);
     }
 
+    public String lockTenantModeForPlanCreation(Long tenantId) throws Exception {
+        return selectOne("SalesDeliveryPlanDAO.lockTenantModeForPlanCreation", tenantId);
+    }
+
     public SalesDeliverySourceOrderHeaderVO lockSourceOrder(Map<String, Object> params) throws Exception {
         return selectOne("SalesDeliveryPlanDAO.lockSourceOrder", params);
     }

@@ -322,6 +322,42 @@ class SystemMenuPermissionServiceTest {
     }
 
     @Test
+    void systemPolicyMenuIsVisibleOnlyToPlatformAdminEvenWithGenericOrRoleGrants() throws Exception {
+        for (String roleCode : new String[] { "TENANT_ADMIN", "ADMIN", "TENANT_USER", null, "PLATFORM_ADMIN" }) {
+            SystemMenuDAO dao = mock(SystemMenuDAO.class);
+            SystemModuleService modules = mock(SystemModuleService.class);
+            SystemMenuServiceImpl service = new SystemMenuServiceImpl(dao, modules);
+            SystemModuleVO settings = new SystemModuleVO();
+            settings.setModuleId(2L);
+            settings.setModuleNm("환경설정");
+            settings.setModuleUrl("/settings");
+            settings.setUseAt("Y");
+            SystemMenuVO system = menu(3L);
+            system.setModuleId(2L);
+            system.setMenuUrl("/settings/system");
+            SystemMenuVO roles = menu(4L);
+            roles.setModuleId(2L);
+            roles.setParentMenuId(3L);
+            roles.setMenuUrl("/settings/system/roles");
+            SystemMenuVO policies = menu(5L);
+            policies.setModuleId(2L);
+            policies.setParentMenuId(3L);
+            policies.setMenuUrl("/settings/system/policies/");
+            when(modules.listModules(tenantId)).thenReturn(Collections.singletonList(settings));
+            when(dao.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(system, roles, policies));
+            when(dao.selectTenantDeliveryPlanMode(tenantId)).thenReturn("MANUAL");
+            when(dao.selectMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                    .thenReturn(Arrays.asList(permissionCodeRow(4L, "READ"), permissionCodeRow(5L, "READ")));
+
+            MyMenuResponseVO response = service.getMyMenuTree(tenantId, "user", roleCode);
+
+            List<MenuTreeNodeVO> children = response.getMenus().get(0).getChildren().get(0).getChildren();
+            boolean visible = children.stream().anyMatch(node -> Long.valueOf(5L).equals(node.getMenuId()));
+            assertEquals("PLATFORM_ADMIN".equals(roleCode), visible, "role " + roleCode);
+            assertEquals(true, children.stream().anyMatch(node -> Long.valueOf(4L).equals(node.getMenuId())));
+        }
+    }
+    @Test
     void deleteMenuDeletesPermissionMappingsBeforeMenu() throws Exception {
         SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(systemMenuDAO, mock(SystemModuleService.class));

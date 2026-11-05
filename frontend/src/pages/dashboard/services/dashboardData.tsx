@@ -100,6 +100,12 @@ export const defaultPage: PageContent = {
 };
 
 export const pageContentMap: Record<string, PageContent> = {
+  policies: {
+    title: '시스템 정책',
+    description: '현재 회사의 업무 정책을 타입별로 등록하고 적용값을 관리합니다.',
+    cards: [],
+    items: [],
+  },
   'delivery-create': {
     title: '납품등록',
     description: '거래처 직납품과 수주 연계 납품을 등록하고 관리합니다.',

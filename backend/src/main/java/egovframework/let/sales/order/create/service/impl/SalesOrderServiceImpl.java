@@ -71,7 +71,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         validatePrincipal(tenantId, userId);
         validatePayload(payload);
         validateCustomer(tenantId, payload.getCustomerId());
-        String deliveryPlanMode = salesDeliveryPlanService.getMode(tenantId);
+        String deliveryPlanMode = salesDeliveryPlanService.lockModeForPlanCreation(tenantId);
 
         List<PreparedDetail> preparedDetails = prepareDetails(tenantId, payload);
         BigDecimal headerTotal = sumTotals(preparedDetails);

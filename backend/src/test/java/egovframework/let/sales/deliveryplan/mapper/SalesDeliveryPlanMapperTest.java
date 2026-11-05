@@ -21,12 +21,15 @@ class SalesDeliveryPlanMapperTest {
     void parsesPlanStatementsAndEnforcesTenantAndOrderScopes() throws Exception {
         Configuration configuration = parse();
         for (String id : Arrays.asList(
-                "selectTenantMode", "lockSourceOrder", "selectPlanByOrder", "selectPlanHeader",
+                "selectTenantMode", "lockTenantModeForPlanCreation", "lockSourceOrder", "selectPlanByOrder", "selectPlanHeader",
                 "lockPlanHeader", "selectPlanDetails", "selectOrderLines", "selectPlanSourceOrders",
                 "insertPlanHeader", "insertPlanDetail", "updatePlanDetail", "deletePlanDetail",
                 "countDeliveryReferences", "selectPlanStatus")) {
             assertThat(configuration.hasStatement("SalesDeliveryPlanDAO." + id)).as(id).isTrue();
         }
+        String modeLock = normalize(sql(configuration, "lockTenantModeForPlanCreation").getSql());
+        assertThat(modeLock).contains("SELECT delivery_plan_mode", "FROM tb_tenant", "tenant_id = ?", "FOR SHARE")
+                .doesNotContain("FOR UPDATE");
         String header = normalize(sql(configuration, "selectPlanHeader").getSql());
         assertThat(header).contains("ph.tenant_id = ?", "ph.use_at = 'Y'");
         String orderLock = normalize(sql(configuration, "lockSourceOrder").getSql());
