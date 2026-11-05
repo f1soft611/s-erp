@@ -99,6 +99,12 @@
             mn.menu_id ASC
     </select>
 
+    <select id="selectTenantDeliveryPlanMode" parameterType="long" resultType="string">
+        SELECT delivery_plan_mode
+        FROM tb_tenant
+        WHERE tenant_id = #{value, jdbcType=BIGINT}
+    </select>
+
     <select id="selectMenuById" parameterType="map" resultMap="menu">
         SELECT
             mn.menu_id,

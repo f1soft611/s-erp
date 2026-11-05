@@ -9,6 +9,7 @@ export type DeliveryDetail = {
   materialName: string | null;
   unit: string | null;
   salesOrderDetailId: number | null;
+  salesDeliveryPlanDetailId: number | null;
   deliveryQty: number;
   unitPrice: number;
   supplyAmt: number;
@@ -52,16 +53,21 @@ export type DeliveryForm = {
 };
 export type DeliveryPayload = Pick<DeliveryForm, 'deliveryDt' | 'deliveryType' | 'salesOrderId' | 'deliveryPlace' | 'deliveryMethod' | 'remark'> & {
   customerId: number;
-  details: { materialId: number; salesOrderDetailId: number | null; deliveryQty: number; unitPrice: number; vatAmt: number }[];
+  overDeliveryConfirmed?: boolean;
+  details: { materialId: number; salesOrderDetailId: number | null; salesDeliveryPlanDetailId: number | null;
+    deliveryQty: number; unitPrice: number; vatAmt: number }[];
 };
 export type SourceOrderRow = {
   salesOrderId: number;
   salesOrderDetailId: number;
+  salesDeliveryPlanDetailId: number;
   orderNo: string;
   orderDt: string;
   customerId: number;
   customerCode: string;
   customerName: string;
+  planNo: string;
+  planDt: string | null;
   deliveryPlace: string | null;
   deliveryMethod: string | null;
   lineNo: number;
@@ -71,6 +77,8 @@ export type SourceOrderRow = {
   unit: string | null;
   orderQty: number;
   shippedQty: number;
+  plannedQty: number;
+  deliveredQty: number;
   remainingQty: number;
   unitPrice: number;
 };

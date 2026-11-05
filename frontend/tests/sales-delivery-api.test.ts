@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost, apiPut, apiDelete } from '../src/shared/services/apiClient';
+import { ApiResponseError } from '../src/shared/services/apiErrors';
 import {
   buildDeliveryPayload, validateDelivery, sourceOrderForm, createDelivery,
   getDelivery, updateDelivery, deleteDelivery, searchSourceOrders, getDeliveryStatus,
@@ -12,10 +13,12 @@ vi.mock('../src/shared/services/apiClient', () => ({
 }));
 
 export const source: SourceOrderRow = {
-  salesOrderId: 7, salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04',
-  customerId: 10, customerCode: 'C10', customerName: '거래처', deliveryPlace: '창고',
+  salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+  customerId: 10, customerCode: 'C10', deliveryPlace: '창고',
+  customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
   deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
-  materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 4, remainingQty: 6, unitPrice: 100,
+  materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 4, plannedQty: 6,
+  deliveredQty: 0, remainingQty: 6, unitPrice: 100,
 };
 
 function form(): DeliveryForm {
@@ -29,12 +32,36 @@ describe('sales delivery contract', () => {
     expect(result.customerId).toBe(10);
     expect(result.salesOrderId).toBe(7);
     expect(result.details).toHaveLength(1);
-    expect(result.details[0]).toMatchObject({ deliveryQty: 6, salesOrderDetailId: 70, vatAmt: 60 });
+    expect(result.details[0]).toMatchObject({ deliveryQty: 6, salesOrderDetailId: 70,
+      salesDeliveryPlanDetailId: 700, vatAmt: 60 });
+  });
+  it('keeps exhausted plan rows selectable without initializing a negative delivery quantity', () => {
+    const result = sourceOrderForm([{ ...source, remainingQty: -5, deliveredQty: 11 }], '2026-11-04');
+    expect(result.details).toHaveLength(1);
+    expect(result.details[0]).toMatchObject({ salesDeliveryPlanDetailId: 700, deliveryQty: 0, supplyAmt: 0 });
+    expect(validateDelivery(result)).toContain('납품수량');
+  });
+  it.each(['create', 'update'] as const)('converts only the server confirmation conflict for %s into a warning', async (operation) => {
+    const request = () => operation === 'create'
+      ? createDelivery(buildDeliveryPayload(form()))
+      : updateDelivery(3, buildDeliveryPayload(form()));
+    const api = operation === 'create' ? vi.mocked(apiPost) : vi.mocked(apiPut);
+    api.mockRejectedValue(new ApiResponseError('[OVER_DELIVERY_CONFIRM_REQUIRED] 수주 100, 저장후 105, 초과 5', 409));
+    await expect(request()).rejects.toMatchObject({
+      name: 'OverDeliveryConfirmationRequired', message: '수주 100, 저장후 105, 초과 5',
+    });
+    const ordinary = new ApiResponseError('잔량 초과', 409);
+    api.mockRejectedValue(ordinary);
+    await expect(request()).rejects.toBe(ordinary);
+    const denied = new ApiResponseError('[OVER_DELIVERY_CONFIRM_REQUIRED] 권한 오류', 403);
+    api.mockRejectedValue(denied);
+    await expect(request()).rejects.toBe(denied);
   });
   it('sends direct references as null and excludes display/server amount fields', () => {
     const payload = buildDeliveryPayload({ ...form(), deliveryType: 'DIRECT' });
     expect(payload.salesOrderId).toBeNull();
-    expect(payload.details).toEqual([{ materialId: 20, salesOrderDetailId: null, deliveryQty: 6, unitPrice: 100, vatAmt: 60 }]);
+    expect(payload.details).toEqual([{ materialId: 20, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+      deliveryQty: 6, unitPrice: 100, vatAmt: 60 }]);
   });
   it('rejects missing headers, source references, duplicate source lines and invalid amounts', () => {
     expect(validateDelivery({ ...form(), deliveryDt: '', customerId: null })).toContain('납품일자');

@@ -112,6 +112,18 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  'delivery-plan-create': {
+    title: '납품계획 등록',
+    description: '수주를 기준으로 예정일별 납품계획을 등록하고 분할 수량을 관리합니다.',
+    cards: [],
+    items: [],
+  },
+  'delivery-plan-status': {
+    title: '납품계획 현황',
+    description: '계획일 기준으로 납품계획과 납품 잔량을 조회하고 수정합니다.',
+    cards: [],
+    items: [],
+  },
   materials: {
     title: '품목관리',
     description: '품목의 규격, 분류, 재고 및 소비기한 기준정보를 관리합니다.',

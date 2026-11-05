@@ -1,0 +1,480 @@
+[
+  {
+    "viewport": {
+      "width": 375,
+      "height": 800
+    },
+    "documentWidth": 375,
+    "dialog": {
+      "x": 0,
+      "y": 0,
+      "width": 375,
+      "height": 800
+    },
+    "form": {
+      "x": 16,
+      "y": 73,
+      "width": 343,
+      "height": 40
+    },
+    "input": {
+      "x": 16,
+      "y": 73,
+      "width": 247,
+      "height": 40
+    },
+    "inputRoot": {
+      "x": 16,
+      "y": 73,
+      "width": 247,
+      "height": 40
+    },
+    "searchButton": {
+      "x": 271,
+      "y": 73,
+      "width": 88,
+      "height": 40
+    },
+    "grid": {
+      "x": 16,
+      "y": 125,
+      "width": 343,
+      "height": 602
+    },
+    "scrollable": [
+      {
+        "tag": "DIV",
+        "role": null,
+        "className": "MuiBox-root css-fa9xz6",
+        "clientWidth": 341,
+        "scrollWidth": 891,
+        "overflowX": "auto"
+      },
+      {
+        "tag": "DIV",
+        "role": null,
+        "className": "MuiBox-root css-1au68bp",
+        "clientWidth": 326,
+        "scrollWidth": 891,
+        "overflowX": "auto"
+      }
+    ],
+    "headers": [
+      {
+        "label": "수주번호",
+        "x": 17,
+        "y": 126,
+        "width": 165,
+        "height": 28,
+        "right": 182
+      },
+      {
+        "label": "수주일자",
+        "x": 182,
+        "y": 126,
+        "width": 96,
+        "height": 28,
+        "right": 278
+      },
+      {
+        "label": "거래처",
+        "x": 278,
+        "y": 126,
+        "width": 125,
+        "height": 28,
+        "right": 403
+      },
+      {
+        "label": "품목코드",
+        "x": 403,
+        "y": 126,
+        "width": 100,
+        "height": 28,
+        "right": 503
+      },
+      {
+        "label": "품목명",
+        "x": 503,
+        "y": 126,
+        "width": 135,
+        "height": 28,
+        "right": 638
+      },
+      {
+        "label": "주문수량",
+        "x": 638,
+        "y": 126,
+        "width": 90,
+        "height": 28,
+        "right": 728
+      },
+      {
+        "label": "출하수량",
+        "x": 728,
+        "y": 126,
+        "width": 90,
+        "height": 28,
+        "right": 818
+      },
+      {
+        "label": "잔량",
+        "x": 818,
+        "y": 126,
+        "width": 90,
+        "height": 28,
+        "right": 908
+      }
+    ],
+    "horizontalOverflow": false
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 900
+    },
+    "documentWidth": 768,
+    "dialog": {
+      "x": 32,
+      "y": 67.5,
+      "width": 704,
+      "height": 765
+    },
+    "form": {
+      "x": 57,
+      "y": 141.5,
+      "width": 654,
+      "height": 40
+    },
+    "input": {
+      "x": 57,
+      "y": 141.5,
+      "width": 558,
+      "height": 40
+    },
+    "inputRoot": {
+      "x": 57,
+      "y": 141.5,
+      "width": 558,
+      "height": 40
+    },
+    "searchButton": {
+      "x": 623,
+      "y": 141.5,
+      "width": 88,
+      "height": 40
+    },
+    "grid": {
+      "x": 57,
+      "y": 193.5,
+      "width": 654,
+      "height": 565
+    },
+    "scrollable": [
+      {
+        "tag": "DIV",
+        "role": null,
+        "className": "MuiBox-root css-fa9xz6",
+        "clientWidth": 652,
+        "scrollWidth": 891,
+        "overflowX": "auto"
+      },
+      {
+        "tag": "DIV",
+        "role": null,
+        "className": "MuiBox-root css-1au68bp",
+        "clientWidth": 637,
+        "scrollWidth": 891,
+        "overflowX": "auto"
+      }
+    ],
+    "headers": [
+      {
+        "label": "수주번호",
+        "x": 58,
+        "y": 194.5,
+        "width": 165,
+        "height": 28,
+        "right": 223
+      },
+      {
+        "label": "수주일자",
+        "x": 223,
+        "y": 194.5,
+        "width": 96,
+        "height": 28,
+        "right": 319
+      },
+      {
+        "label": "거래처",
+        "x": 319,
+        "y": 194.5,
+        "width": 125,
+        "height": 28,
+        "right": 444
+      },
+      {
+        "label": "품목코드",
+        "x": 444,
+        "y": 194.5,
+        "width": 100,
+        "height": 28,
+        "right": 544
+      },
+      {
+        "label": "품목명",
+        "x": 544,
+        "y": 194.5,
+        "width": 135,
+        "height": 28,
+        "right": 679
+      },
+      {
+        "label": "주문수량",
+        "x": 679,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 769
+      },
+      {
+        "label": "출하수량",
+        "x": 769,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 859
+      },
+      {
+        "label": "잔량",
+        "x": 859,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 949
+      }
+    ],
+    "horizontalOverflow": false
+  },
+  {
+    "viewport": {
+      "width": 1030,
+      "height": 668
+    },
+    "documentWidth": 1030,
+    "dialog": {
+      "x": 32,
+      "y": 50.09375,
+      "width": 966,
+      "height": 567.796875
+    },
+    "form": {
+      "x": 57,
+      "y": 124.09375,
+      "width": 916,
+      "height": 40
+    },
+    "input": {
+      "x": 57,
+      "y": 124.09375,
+      "width": 820,
+      "height": 40
+    },
+    "inputRoot": {
+      "x": 57,
+      "y": 124.09375,
+      "width": 820,
+      "height": 40
+    },
+    "searchButton": {
+      "x": 885,
+      "y": 124.09375,
+      "width": 88,
+      "height": 40
+    },
+    "grid": {
+      "x": 57,
+      "y": 176.09375,
+      "width": 916,
+      "height": 367.796875
+    },
+    "scrollable": [],
+    "headers": [
+      {
+        "label": "수주번호",
+        "x": 58,
+        "y": 177.09375,
+        "width": 165,
+        "height": 28,
+        "right": 223
+      },
+      {
+        "label": "수주일자",
+        "x": 223,
+        "y": 177.09375,
+        "width": 96,
+        "height": 28,
+        "right": 319
+      },
+      {
+        "label": "거래처",
+        "x": 319,
+        "y": 177.09375,
+        "width": 125,
+        "height": 28,
+        "right": 444
+      },
+      {
+        "label": "품목코드",
+        "x": 444,
+        "y": 177.09375,
+        "width": 100,
+        "height": 28,
+        "right": 544
+      },
+      {
+        "label": "품목명",
+        "x": 544,
+        "y": 177.09375,
+        "width": 135,
+        "height": 28,
+        "right": 679
+      },
+      {
+        "label": "주문수량",
+        "x": 679,
+        "y": 177.09375,
+        "width": 90,
+        "height": 28,
+        "right": 769
+      },
+      {
+        "label": "출하수량",
+        "x": 769,
+        "y": 177.09375,
+        "width": 90,
+        "height": 28,
+        "right": 859
+      },
+      {
+        "label": "잔량",
+        "x": 859,
+        "y": 177.09375,
+        "width": 90,
+        "height": 28,
+        "right": 949
+      }
+    ],
+    "horizontalOverflow": false
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "documentWidth": 1280,
+    "dialog": {
+      "x": 145,
+      "y": 67.5,
+      "width": 990,
+      "height": 765
+    },
+    "form": {
+      "x": 170,
+      "y": 141.5,
+      "width": 940,
+      "height": 40
+    },
+    "input": {
+      "x": 170,
+      "y": 141.5,
+      "width": 844,
+      "height": 40
+    },
+    "inputRoot": {
+      "x": 170,
+      "y": 141.5,
+      "width": 844,
+      "height": 40
+    },
+    "searchButton": {
+      "x": 1022,
+      "y": 141.5,
+      "width": 88,
+      "height": 40
+    },
+    "grid": {
+      "x": 170,
+      "y": 193.5,
+      "width": 940,
+      "height": 565
+    },
+    "scrollable": [],
+    "headers": [
+      {
+        "label": "수주번호",
+        "x": 171,
+        "y": 194.5,
+        "width": 165,
+        "height": 28,
+        "right": 336
+      },
+      {
+        "label": "수주일자",
+        "x": 336,
+        "y": 194.5,
+        "width": 96,
+        "height": 28,
+        "right": 432
+      },
+      {
+        "label": "거래처",
+        "x": 432,
+        "y": 194.5,
+        "width": 125,
+        "height": 28,
+        "right": 557
+      },
+      {
+        "label": "품목코드",
+        "x": 557,
+        "y": 194.5,
+        "width": 100,
+        "height": 28,
+        "right": 657
+      },
+      {
+        "label": "품목명",
+        "x": 657,
+        "y": 194.5,
+        "width": 135,
+        "height": 28,
+        "right": 792
+      },
+      {
+        "label": "주문수량",
+        "x": 792,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 882
+      },
+      {
+        "label": "출하수량",
+        "x": 882,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 972
+      },
+      {
+        "label": "잔량",
+        "x": 972,
+        "y": 194.5,
+        "width": 90,
+        "height": 28,
+        "right": 1062
+      }
+    ],
+    "horizontalOverflow": false
+  }
+]

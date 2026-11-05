@@ -18,5 +18,6 @@ public class SalesDeliveryRequestVO implements Serializable {
     private String deliveryPlace;
     private String deliveryMethod;
     private String remark;
+    private boolean overDeliveryConfirmed;
     private List<SalesDeliveryDetailRequestVO> details;
 }

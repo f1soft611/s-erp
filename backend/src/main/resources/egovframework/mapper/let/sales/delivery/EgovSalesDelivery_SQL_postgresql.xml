@@ -56,30 +56,78 @@
           AND h.use_at = 'Y'
     </select>
 
+    <select id="selectSourcePlanDetail" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               od.sales_order_detail_id AS salesOrderDetailId,
+               pd.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId,
+               h.customer_id AS customerId,
+               od.material_id AS materialId,
+               od.order_qty AS orderQty,
+               COALESCE(od.shipped_qty, 0) AS shippedQty,
+               pd.planned_qty AS plannedQty,
+               pd.delivered_qty AS deliveredQty,
+               pd.planned_qty - pd.delivered_qty AS remainingQty,
+               od.unit_price AS unitPrice
+        FROM tb_sales_delivery_plan_dt pd
+        JOIN tb_sales_delivery_plan_hd ph
+          ON ph.sales_delivery_plan_id = pd.sales_delivery_plan_id
+         AND ph.tenant_id = pd.tenant_id
+         AND ph.sales_order_id = pd.sales_order_id
+         AND ph.use_at = 'Y'
+        JOIN tb_sales_order_hd h
+          ON h.sales_order_id = pd.sales_order_id
+         AND h.tenant_id = pd.tenant_id
+         AND h.use_at = 'Y'
+        JOIN tb_sales_order_dt od
+          ON od.sales_order_detail_id = pd.sales_order_detail_id
+         AND od.sales_order_id = pd.sales_order_id
+         AND od.tenant_id = pd.tenant_id
+         AND od.material_id = pd.material_id
+        WHERE pd.sales_delivery_plan_detail_id = #{salesDeliveryPlanDetailId, jdbcType=BIGINT}
+          AND pd.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND pd.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+        FOR UPDATE OF pd
+    </select>
+
     <select id="selectSourceOrders" parameterType="map"
             resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO">
         SELECT h.sales_order_id AS salesOrderId,
                d.sales_order_detail_id AS salesOrderDetailId,
+               pd.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId,
                h.order_no AS orderNo,
                h.order_dt AS orderDt,
                h.customer_id AS customerId,
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
+               ph.plan_no AS planNo,
                h.delivery_place AS deliveryPlace,
                h.delivery_method AS deliveryMethod,
-               d.line_no AS lineNo,
+               pd.line_no AS lineNo,
+               pd.plan_dt AS planDt,
                d.material_id AS materialId,
                m.material_code AS materialCode,
                m.material_name AS materialName,
                m.unit AS unit,
                d.order_qty AS orderQty,
                COALESCE(d.shipped_qty, 0) AS shippedQty,
-               d.order_qty - COALESCE(d.shipped_qty, 0) AS remainingQty,
+               pd.planned_qty AS plannedQty,
+               pd.delivered_qty AS deliveredQty,
+               pd.planned_qty - pd.delivered_qty AS remainingQty,
                d.unit_price AS unitPrice
         FROM tb_sales_order_hd h
         JOIN tb_sales_order_dt d
           ON d.sales_order_id = h.sales_order_id
          AND d.tenant_id = h.tenant_id
+        JOIN tb_sales_delivery_plan_hd ph
+          ON ph.sales_order_id = h.sales_order_id
+         AND ph.tenant_id = h.tenant_id
+         AND ph.use_at = 'Y'
+        JOIN tb_sales_delivery_plan_dt pd
+          ON pd.sales_delivery_plan_id = ph.sales_delivery_plan_id
+         AND pd.sales_order_id = d.sales_order_id
+         AND pd.sales_order_detail_id = d.sales_order_detail_id
+         AND pd.tenant_id = d.tenant_id
         JOIN tb_customer_info c
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
@@ -92,13 +140,18 @@
         WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND h.use_at = 'Y'
           AND h.status NOT IN ('수주취소', '취소', '출하완료', '완료')
-          AND d.order_qty &gt; COALESCE(d.shipped_qty, 0)
+          AND (pd.planned_qty &gt; pd.delivered_qty OR EXISTS (
+              SELECT 1 FROM tb_tenant t
+              WHERE t.tenant_id = h.tenant_id
+                AND t.use_at = 'Y'
+                AND t.over_delivery_policy = 'WARN'
+          ))
         <if test="keyword != null and keyword != ''">
           AND (h.order_no ILIKE '%' || #{keyword} || '%'
                OR c.customer_code ILIKE '%' || #{keyword} || '%'
                OR c.customer_name ILIKE '%' || #{keyword} || '%')
         </if>
-        ORDER BY h.order_dt DESC, h.sales_order_id DESC, d.line_no
+        ORDER BY h.order_dt DESC, h.sales_order_id DESC, pd.line_no
         LIMIT #{limit}
     </select>
 
@@ -118,12 +171,14 @@
     <select id="insertDeliveryDetail" parameterType="map" resultType="long">
         INSERT INTO tb_sales_delivery_dt (
             sales_delivery_id, tenant_id, delivery_type, line_no, material_id,
-            sales_order_id, sales_order_detail_id, delivery_qty, unit_price,
+            sales_order_id, sales_order_detail_id, sales_delivery_plan_detail_id,
+            delivery_qty, unit_price,
             supply_amt, vat_amt, total_amt
         ) VALUES (
             #{salesDeliveryId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT},
             #{deliveryType, jdbcType=VARCHAR}, #{lineNo}, #{materialId, jdbcType=BIGINT},
             #{salesOrderId, jdbcType=BIGINT}, #{salesOrderDetailId, jdbcType=BIGINT},
+            #{salesDeliveryPlanDetailId, jdbcType=BIGINT},
             #{deliveryQty, jdbcType=NUMERIC}, #{unitPrice, jdbcType=NUMERIC},
             #{supplyAmt, jdbcType=NUMERIC}, #{vatAmt, jdbcType=NUMERIC},
             #{totalAmt, jdbcType=NUMERIC}
@@ -183,6 +238,7 @@
                m.unit AS unit,
                d.sales_order_id AS salesOrderId,
                d.sales_order_detail_id AS salesOrderDetailId,
+               d.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId,
                d.delivery_qty AS deliveryQty,
                d.unit_price AS unitPrice,
                d.supply_amt AS supplyAmt,
@@ -204,6 +260,31 @@
           AND sales_order_id = #{salesOrderId, jdbcType=BIGINT}
           AND tenant_id = #{tenantId, jdbcType=BIGINT}
           AND COALESCE(shipped_qty, 0) + #{deltaQty, jdbcType=NUMERIC} &gt;= 0
+          AND (#{deltaQty, jdbcType=NUMERIC} &lt;= 0
+               OR COALESCE(shipped_qty, 0) + #{deltaQty, jdbcType=NUMERIC} &lt;= order_qty
+               OR EXISTS (
+                   SELECT 1 FROM tb_tenant t
+                   WHERE t.tenant_id = tb_sales_order_dt.tenant_id
+                     AND t.use_at = 'Y' AND t.over_delivery_policy = 'WARN'
+               ))
+    </update>
+
+    <update id="adjustPlanDeliveredQty" parameterType="map">
+        UPDATE tb_sales_delivery_plan_dt
+        SET delivered_qty = delivered_qty + #{deltaQty, jdbcType=NUMERIC},
+            updated_by = #{updatedBy, jdbcType=VARCHAR},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE sales_delivery_plan_detail_id = #{salesDeliveryPlanDetailId, jdbcType=BIGINT}
+          AND sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND delivered_qty + #{deltaQty, jdbcType=NUMERIC} &gt;= 0
+          AND (#{deltaQty, jdbcType=NUMERIC} &lt;= 0
+               OR delivered_qty + #{deltaQty, jdbcType=NUMERIC} &lt;= planned_qty
+               OR EXISTS (
+                   SELECT 1 FROM tb_tenant t
+                   WHERE t.tenant_id = tb_sales_delivery_plan_dt.tenant_id
+                     AND t.use_at = 'Y' AND t.over_delivery_policy = 'WARN'
+               ))
     </update>
 
     <update id="updateDeliveryHeader" parameterType="map">

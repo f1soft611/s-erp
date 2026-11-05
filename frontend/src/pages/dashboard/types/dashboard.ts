@@ -30,6 +30,7 @@ export type MenuNode = {
 };
 
 export type UserMenuResponse = {
+  deliveryPlanMode?: 'AUTO' | 'MANUAL';
   user: {
     userId: string;
     roles: string[];

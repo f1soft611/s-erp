@@ -18,6 +18,7 @@ public class SalesDeliveryDetailVO implements Serializable {
     private String unit;
     private Long salesOrderId;
     private Long salesOrderDetailId;
+    private Long salesDeliveryPlanDetailId;
     private BigDecimal deliveryQty;
     private BigDecimal unitPrice;
     private BigDecimal supplyAmt;

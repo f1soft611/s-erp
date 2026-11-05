@@ -19,9 +19,9 @@ import { activeDeliveryRows, DeliveryDetailGrid } from './components/DeliveryDet
 import { SourceOrderPicker } from './components/SourceOrderPicker';
 import {
   buildDeliveryPayload, createDelivery, deleteDelivery, deliveryForm, emptyDelivery, getDelivery,
-  sourceOrderForm, updateDelivery, validateDelivery,
+  OverDeliveryConfirmationRequired, sourceOrderForm, updateDelivery, validateDelivery,
 } from './services/salesDelivery.service';
-import type { DeliveryForm, DeliveryItem, DeliveryPageProps, DeliveryRow, SourceOrderRow } from './types/salesDelivery.types';
+import type { DeliveryForm, DeliveryItem, DeliveryPageProps, DeliveryPayload, DeliveryRow, SourceOrderRow } from './types/salesDelivery.types';
 
 export type DeliveryEmbeddedActionState = {
   canSave: boolean; canDelete: boolean; saving: boolean; saveDisabled: boolean; deleteDisabled: boolean;
@@ -57,13 +57,14 @@ export function SalesDeliveryCreatePage({
   const [materialOpen, setMaterialOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [confirm, setConfirm] = useState<'new' | 'delete' | null>(null);
+  const [overDelivery, setOverDelivery] = useState<{ payload: DeliveryPayload; message: string } | null>(null);
   const grid = useRef<F1GridRef<DeliveryRow>>(null);
   const busy = useRef(false);
   const materialPatch = useRef<((changes: Partial<DeliveryRow>) => void) | null>(null);
   const canRead = Boolean(permissions?.read);
   const canSave = canRead && mode !== 'view' && Boolean(savedId ? permissions?.update : permissions?.create);
   const canDelete = canRead && mode !== 'view' && Boolean(savedId && permissions?.delete);
-  const editable = canSave && !pending && !loading && !locked;
+  const editable = canSave && !pending && !loading && !locked && !overDelivery;
   const dirty = JSON.stringify(form) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
   const blocker = useBlocker(!embedded && (dirty || pending));
@@ -98,19 +99,15 @@ export function SalesDeliveryCreatePage({
   }, []);
   const reset = () => {
     setItem(null); setSavedId(undefined); setLocked(false); setLoadError(false);
-    setError(''); setNotice(''); applyForm(emptyDelivery()); setConfirm(null);
+    setError(''); setNotice(''); applyForm(emptyDelivery()); setConfirm(null); setOverDelivery(null);
   };
-  const save = useCallback(async () => {
-    if (!editable || busy.current) return;
-    const current = { ...form, details: grid.current?.getActiveRows() ?? form.details };
-    const message = validateDelivery(current);
-    grid.current?.validate();
-    if (message) { setError(message); return; }
+  const savePayload = useCallback(async (payload: DeliveryPayload) => {
+    if (busy.current || !canSave) return;
     busy.current = true; setPending(true); setError(''); setNotice('');
     try {
       const saved = savedId
-        ? await updateDelivery(savedId, buildDeliveryPayload(current))
-        : await createDelivery(buildDeliveryPayload(current));
+        ? await updateDelivery(savedId, payload)
+        : await createDelivery(payload);
       setSavedId(saved.salesDeliveryId);
       setItem(saved);
       setLocked(true);
@@ -120,11 +117,25 @@ export function SalesDeliveryCreatePage({
       } catch {
         setError(`납품은 저장되었지만 다시 불러오지 못했습니다. 납품번호: ${saved.deliveryNo}. 재조회를 눌러 주세요.`);
       }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '납품 저장에 실패했습니다.'); }
+    } catch (cause) {
+      if (cause instanceof OverDeliveryConfirmationRequired) {
+        setOverDelivery({ payload, message: cause.message });
+      } else {
+        setError(cause instanceof Error ? cause.message : '납품 저장에 실패했습니다.');
+      }
+    }
     finally { busy.current = false; setPending(false); }
-  }, [editable, form, savedId, applyItem, onSaved]);
+  }, [canSave, savedId, applyItem, onSaved]);
+  const save = useCallback(async () => {
+    if (!editable || busy.current) return;
+    const current = { ...form, details: grid.current?.getActiveRows() ?? form.details };
+    const message = validateDelivery(current);
+    grid.current?.validate();
+    if (message) { setError(message); return; }
+    await savePayload(buildDeliveryPayload(current));
+  }, [editable, form, savePayload]);
   const requestDelete = useCallback(() => setConfirm('delete'), []);
-  const deleteDisabled = pending || loading || locked;
+  const deleteDisabled = pending || loading || locked || Boolean(overDelivery);
   useEffect(() => {
     if (embedded) onEmbeddedActionsChange?.({
       canSave, canDelete, saving: pending, saveDisabled: !editable, deleteDisabled,
@@ -148,7 +159,7 @@ export function SalesDeliveryCreatePage({
   const actions: PermissionActionGroupDefinition[] = [
     { key: 'write', actions: [
       { label: '신규', icon: NoteAddOutlinedIcon, visible: Boolean(permissions?.create) && mode !== 'view',
-        disabled: pending || loading, onClick: () => dirty ? setConfirm('new') : reset() },
+        disabled: pending || loading || Boolean(overDelivery), onClick: () => dirty ? setConfirm('new') : reset() },
       { label: '저장', icon: SaveIcon, visible: canSave, saving: pending, disabled: !editable, onClick: () => void save() },
     ] },
     { key: 'delete', actions: [
@@ -192,7 +203,7 @@ export function SalesDeliveryCreatePage({
             </TextField>
             <Box sx={{ display: 'flex', gap: 1, minWidth: 0, '& .MuiFormControl-root': { m: 0 } }}>
               <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo} slotProps={{ input: { readOnly: true } }} />
-              {form.deliveryType === 'ORDER' ? <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>수주 선택</Button> : null}
+              {form.deliveryType === 'ORDER' ? <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>계획 선택</Button> : null}
             </Box>
             <TextField size="small" label="납품장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
             <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
@@ -245,6 +256,17 @@ export function SalesDeliveryCreatePage({
     <UnsavedChangesConfirmDialog open={confirm !== null} title={confirm === 'delete' ? '납품 삭제' : '저장하지 않은 변경사항'}
       description={confirm === 'delete' ? '이 납품을 삭제하시겠습니까?' : '입력 내용을 버리고 신규 문서를 작성하시겠습니까?'}
       onCancel={() => setConfirm(null)} onContinue={() => confirm === 'delete' ? void remove() : reset()} />
+    <UnsavedChangesConfirmDialog open={overDelivery !== null} title="초과납품 확인"
+      dialogTitleId="over-delivery-confirm-title"
+      description={`${overDelivery?.message ?? ''} 수주·계획수량은 변경하지 않고 실제 납품수량으로 저장합니다. 초과납품으로 저장하시겠습니까?`}
+      continueLabel="초과납품 저장" confirmButtonColor="warning" disableContinue={pending}
+      onCancel={() => setOverDelivery(null)}
+      onContinue={() => {
+        if (!overDelivery || busy.current) return;
+        const payload = { ...overDelivery.payload, overDeliveryConfirmed: true };
+        setOverDelivery(null);
+        void savePayload(payload);
+      }} />
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}
       onCancel={() => blocker.state === 'blocked' && blocker.reset()}
       onContinue={() => blocker.state === 'blocked' && blocker.proceed()} />

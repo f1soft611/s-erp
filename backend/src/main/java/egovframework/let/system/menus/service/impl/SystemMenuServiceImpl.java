@@ -259,7 +259,15 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         List<SystemModuleVO> modules = systemModuleService.listModules(tenantId).stream()
                 .filter(module -> "Y".equalsIgnoreCase(module.getUseAt()))
                 .collect(Collectors.toList());
-        List<SystemMenuVO> menus = systemMenuDAO.selectActiveMenusForTenant(tenantId);
+        List<SystemMenuVO> menus = new ArrayList<>(systemMenuDAO.selectActiveMenusForTenant(tenantId));
+        String deliveryPlanMode = systemMenuDAO.selectTenantDeliveryPlanMode(tenantId);
+        if (!"AUTO".equals(deliveryPlanMode) && !"MANUAL".equals(deliveryPlanMode)) {
+            throw new IllegalStateException("테넌트 납품계획 운영모드를 확인할 수 없습니다.");
+        }
+        if ("AUTO".equals(deliveryPlanMode)) {
+            menus.removeIf(menu -> menu.getMenuUrl() != null
+                    && menu.getMenuUrl().startsWith("/sales/delivery-plan"));
+        }
         List<Long> effectiveRoleIds = resolveEffectiveRoleIds(tenantId, userId, roleId);
         Map<Long, Set<String>> permissionCodesByMenuId = permissionCodesByMenuId(menus, tenantId, effectiveRoleIds);
 
@@ -290,6 +298,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         user.setRoles(roleNames.isEmpty() ? Collections.emptyList() : new ArrayList<>(roleNames));
         response.setUser(user);
         response.setMenus(tree);
+        response.setDeliveryPlanMode(deliveryPlanMode);
         return response;
     }
 

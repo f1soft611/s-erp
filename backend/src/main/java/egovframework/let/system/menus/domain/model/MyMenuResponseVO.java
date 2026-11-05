@@ -26,6 +26,9 @@ public class MyMenuResponseVO implements Serializable {
     @Schema(description = "모듈-메뉴 트리")
     private List<MenuTreeNodeVO> menus;
 
+    @Schema(description = "납품계획 운영모드(AUTO/MANUAL)")
+    private String deliveryPlanMode;
+
     @Getter
     @Setter
     public static class UserSummary implements Serializable {

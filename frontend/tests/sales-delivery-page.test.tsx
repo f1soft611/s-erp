@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesDeliveryCreatePage } from '../src/pages/sales/delivery/create/SalesDeliveryCreatePage';
 import { SalesDeliveryStatusPage } from '../src/pages/sales/delivery/status/SalesDeliveryStatusPage';
-import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
+import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
 vi.mock('../src/pages/sales/delivery/create/services/salesDelivery.service', async (original) => ({
@@ -19,7 +19,8 @@ const item = {
   customerId: 10, customerCode: 'C10', customerName: '거래처', salesOrderId: null, orderNo: null,
   deliveryPlace: '원래 장소', deliveryMethod: '', remark: '', totalAmt: 220, writer: false,
   details: [{ salesDeliveryDetailId: 2, lineNo: 1, materialId: 20, materialCode: 'M20', materialName: '품목',
-    unit: 'EA', salesOrderDetailId: null, deliveryQty: 2, unitPrice: 100, supplyAmt: 200, vatAmt: 20, totalAmt: 220 }],
+    unit: 'EA', salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    deliveryQty: 2, unitPrice: 100, supplyAmt: 200, vatAmt: 20, totalAmt: 220 }],
 };
 const props = {
   selectedModule: { id: 'sales', tree: [] } as unknown as ModuleItem,
@@ -67,6 +68,42 @@ it('prevents duplicate save and reloads authoritative server amounts', async () 
   await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
   expect(screen.getByLabelText('납품 금액 합계')).toHaveTextContent('220.00');
 });
+it('preserves input when overdelivery confirmation is cancelled and requests fresh confirmation on the next save', async () => {
+  vi.mocked(updateDelivery).mockRejectedValue(new OverDeliveryConfirmationRequired('수주수량 100 / 누적납품 105 / 초과 5'));
+  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
+  await screen.findByDisplayValue('SD-1');
+  fireEvent.change(screen.getByLabelText('납품장소'), { target: { value: '추가 생산분' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  const dialog = await screen.findByRole('dialog', { name: '초과납품 확인' });
+  expect(dialog).toHaveTextContent('초과 5');
+  expect(screen.getByLabelText('납품장소')).toBeDisabled();
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소', exact: true }));
+  expect(screen.getByLabelText('납품장소')).toHaveValue('추가 생산분');
+  expect(screen.getByLabelText('납품장소')).toBeEnabled();
+  expect(updateDelivery).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole('button', { name: '저장', exact: true }));
+  await screen.findByRole('dialog', { name: '초과납품 확인' });
+  expect(vi.mocked(updateDelivery).mock.calls.every(([, payload]) => !payload.overDeliveryConfirmed)).toBe(true);
+}, 15000);
+it('resubmits only the warned snapshot with explicit confirmation and prevents duplicate confirmed saves', async () => {
+  let resolve!: (value: Awaited<ReturnType<typeof updateDelivery>>) => void;
+  vi.mocked(updateDelivery)
+    .mockRejectedValueOnce(new OverDeliveryConfirmationRequired('계획수량 2 / 누적납품 3 / 초과 1'))
+    .mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);
+  await screen.findByDisplayValue('SD-1');
+  fireEvent.change(screen.getByLabelText('납품장소'), { target: { value: '확인된 입력' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  const dialog = await screen.findByRole('dialog', { name: '초과납품 확인' });
+  const confirm = within(dialog).getByRole('button', { name: '초과납품 저장', exact: true });
+  fireEvent.click(confirm); fireEvent.click(confirm);
+  expect(updateDelivery).toHaveBeenCalledTimes(2);
+  const initialPayload = vi.mocked(updateDelivery).mock.calls[0][1];
+  expect(vi.mocked(updateDelivery).mock.calls[1][1]).toEqual({ ...initialPayload, overDeliveryConfirmed: true });
+  expect(await screen.findByRole('button', { name: '저장', exact: true })).toBeDisabled();
+  resolve(item as Awaited<ReturnType<typeof updateDelivery>>);
+  await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
+}, 15000);
 it('does not expose mutations without permissions', async () => {
   mount(<SalesDeliveryCreatePage {...props} selectedMenuPermissions={{ read: true }} salesDeliveryId={1} />);
   await screen.findByDisplayValue('SD-1');
@@ -143,23 +180,25 @@ it('creates direct delivery from shared customer/material pickers with edited qu
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
     deliveryType: 'DIRECT', customerId: 10, salesOrderId: null,
-    details: [{ materialId: 20, salesOrderDetailId: null, deliveryQty: 2, unitPrice: 100, vatAmt: 20 }],
+    details: [{ materialId: 20, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+      deliveryQty: 2, unitPrice: 100, vatAmt: 20 }],
   })));
 }, 15000);
 it('selects one order, populates remaining lines and prevents source identity editing', async () => {
   vi.mocked(searchSourceOrders).mockResolvedValue([{
-    salesOrderId: 7, salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04',
-    customerId: 10, customerCode: 'C10', customerName: '거래처', deliveryPlace: '창고', deliveryMethod: '택배',
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배',
     lineNo: 1, materialId: 20, materialCode: 'M20', materialName: '품목', unit: 'EA',
-    orderQty: 10, shippedQty: 4, remainingQty: 6, unitPrice: 100,
+    orderQty: 10, shippedQty: 4, plannedQty: 6, deliveredQty: 0, remainingQty: 6, unitPrice: 100,
   }]);
   vi.mocked(createDelivery).mockResolvedValue({ ...item, deliveryType: 'ORDER' } as Awaited<ReturnType<typeof createDelivery>>);
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox'));
   fireEvent.click(screen.getByRole('option', { name: '수주납품' }));
-  fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: '계획 선택', exact: true }));
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
-  fireEvent.click(await screen.findByRole('button', { name: 'SO-7 선택' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-1 선택' }));
   expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7');
   expect(screen.getByLabelText('납품장소')).toHaveValue('창고');
   expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
@@ -167,9 +206,27 @@ it('selects one order, populates remaining lines and prevents source identity ed
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
     salesOrderId: 7, deliveryType: 'ORDER',
-    details: [{ materialId: 20, salesOrderDetailId: 70, deliveryQty: 6, unitPrice: 100, vatAmt: 60 }],
+    details: [{ materialId: 20, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700,
+      deliveryQty: 6, unitPrice: 100, vatAmt: 60 }],
   })));
 }, 15000);
+it('keeps source-order search controls together in a full-width modal form', async () => {
+  vi.mocked(searchSourceOrders).mockResolvedValue([]);
+  mount(<SalesDeliveryCreatePage {...props} />);
+  fireEvent.mouseDown(screen.getByRole('combobox'));
+  fireEvent.click(screen.getByRole('option', { name: '수주납품' }));
+  fireEvent.click(screen.getByRole('button', { name: '계획 선택', exact: true }));
+  const searchForm = await screen.findByRole('form', { name: '납품계획 선택 검색' });
+  const searchInput = within(searchForm).getByRole('textbox', { name: '계획번호·수주번호·거래처 검색' });
+  const searchButton = within(searchForm).getByRole('button', { name: '검색', exact: true });
+  const searchField = searchInput.closest('.MuiOutlinedInput-root');
+  expect(searchField).not.toBeNull();
+  expect(getComputedStyle(searchField!).height).toBe('40px');
+  expect(getComputedStyle(searchButton).height).toBe('40px');
+  fireEvent.change(searchInput, { target: { value: 'SO-찾기' } });
+  fireEvent.submit(searchForm);
+  await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith('SO-찾기'));
+});
 it('confirms deletion before requesting and resets to a new direct document', async () => {
   vi.mocked(deleteDelivery).mockResolvedValue();
   mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);

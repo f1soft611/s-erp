@@ -26,6 +26,8 @@ import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreateP
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
 import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
+import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
+import { SalesDeliveryPlanStatusPage } from '../../sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -195,6 +197,14 @@ export function DashboardContent({
   if (selectedModule.id === 'sales' && (currentPageKey === 'delivery-create' || currentPageKey === 'delivery-status')) {
     const DeliveryPage = currentPageKey === 'delivery-create' ? SalesDeliveryCreatePage : SalesDeliveryStatusPage;
     return <DeliveryPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
+
+  if (selectedModule.id === 'sales'
+    && (currentPageKey === 'delivery-plan-create' || currentPageKey === 'delivery-plan-status')) {
+    const PlanPage = currentPageKey === 'delivery-plan-create'
+      ? SalesDeliveryPlanCreatePage : SalesDeliveryPlanStatusPage;
+    return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 

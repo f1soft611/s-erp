@@ -12,6 +12,7 @@ public class SalesDeliveryDetailRequestVO implements Serializable {
     private static final long serialVersionUID = 1L;
     private Long materialId;
     private Long salesOrderDetailId;
+    private Long salesDeliveryPlanDetailId;
     private BigDecimal deliveryQty;
     private BigDecimal unitPrice;
     private BigDecimal vatAmt;

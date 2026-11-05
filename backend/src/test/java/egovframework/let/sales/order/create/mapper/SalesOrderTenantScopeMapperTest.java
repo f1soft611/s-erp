@@ -70,8 +70,8 @@ class SalesOrderTenantScopeMapperTest {
 
         for (String id : Arrays.asList(
                 "selectOrder", "selectOrderForUpdate", "selectOrderDetails", "countShippedDetails",
-                "countDeliveryReferences",
-                "updateOrderHeader", "deleteOrderDetails", "softDeleteOrderHeader")) {
+                "countDeliveryReferences", "countPlanReferences", "updateOrderHeader",
+                "softDeleteOrderHeader")) {
             BoundSql sql = sql(configuration, id);
             assertThat(normalize(sql.getSql())).as(id).contains("tenant_id = ?");
             assertThat(properties(sql)).as(id).contains("tenantId", "salesOrderId");
@@ -79,6 +79,13 @@ class SalesOrderTenantScopeMapperTest {
         for (String id : Arrays.asList(
                 "selectOrder", "selectOrderForUpdate", "updateOrderHeader", "softDeleteOrderHeader")) {
             assertThat(normalize(sql(configuration, id).getSql())).as(id).contains("use_at = 'Y'");
+        }
+        for (String id : Arrays.asList(
+                "countOrderDetailReferences", "countOrderDeliveryReferences",
+                "sumPlannedQty", "updateOrderDetail", "deleteOrderDetail")) {
+            BoundSql sql = sql(configuration, id);
+            assertThat(normalize(sql.getSql())).as(id).contains("tenant_id = ?");
+            assertThat(properties(sql)).as(id).contains("tenantId", "salesOrderDetailId");
         }
     }
 
@@ -93,6 +100,10 @@ class SalesOrderTenantScopeMapperTest {
                 "FROM tb_sales_delivery_dt", "tenant_id = ?", "sales_order_id = ?");
         assertThat(normalize(references.getSql())).doesNotContain("use_at");
         assertThat(properties(references)).contains("tenantId", "salesOrderId");
+        BoundSql detailReferences = sql(configuration, "countOrderDetailReferences");
+        assertThat(normalize(detailReferences.getSql())).contains(
+                "tb_sales_delivery_plan_dt", "tb_sales_delivery_dt", "tenant_id = ?");
+        assertThat(properties(detailReferences)).contains("salesOrderDetailId", "tenantId");
     }
 
     @Test
@@ -147,6 +158,7 @@ class SalesOrderTenantScopeMapperTest {
         params.put("createdBy", "user01");
         params.put("salesOrderId", 300L);
         params.put("lineNo", 1);
+        params.put("salesOrderDetailId", 400L);
         params.put("materialId", 20L);
         params.put("orderQty", 2);
         params.put("unitPrice", 2);

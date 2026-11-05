@@ -99,6 +99,25 @@ class SalesDeliveryApiControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void warningReasonSurvivesExistingErrorEnvelopeAndConfirmationIsDeserialized() throws Exception {
+        String warning = "[OVER_DELIVERY_CONFIRM_REQUIRED]계획 기준수량 4, 저장후누적 6, 초과수량 2";
+        mvc = MockMvcBuilders.standaloneSetup(
+                new SalesDeliveryApiController(new ResultVoHelper(), service))
+                .setControllerAdvice(new egovframework.com.cmm.GlobalExceptionHandler())
+                .setCustomArgumentResolvers(loginUserResolver()).build();
+        when(service.createDelivery(eq(71L), eq("user01"), any()))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT, warning));
+
+        mvc.perform(post(ROOT).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deliveryType\":\"ORDER\",\"overDeliveryConfirmed\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(warning));
+        verify(service).createDelivery(eq(71L), eq("user01"),
+                org.mockito.ArgumentMatchers.argThat(request -> request.isOverDeliveryConfirmed()));
+    }
+
     private HandlerMethodArgumentResolver loginUserResolver() {
         return new HandlerMethodArgumentResolver() {
             @Override

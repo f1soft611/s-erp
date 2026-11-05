@@ -31,6 +31,10 @@ public class SalesDeliveryDAO extends EgovAbstractMapper {
         return selectOne("SalesDeliveryDAO.selectSourceOrderDetail", params);
     }
 
+    public SalesDeliverySourceOrderVO selectSourcePlanDetail(Map<String, Object> params) throws Exception {
+        return selectOne("SalesDeliveryDAO.selectSourcePlanDetail", params);
+    }
+
     public List<SalesDeliverySourceOrderVO> selectSourceOrders(Map<String, Object> params)
             throws Exception {
         return selectList("SalesDeliveryDAO.selectSourceOrders", params);
@@ -67,6 +71,10 @@ public class SalesDeliveryDAO extends EgovAbstractMapper {
 
     public int adjustShippedQty(Map<String, Object> params) throws Exception {
         return update("SalesDeliveryDAO.adjustShippedQty", params);
+    }
+
+    public int adjustPlanDeliveredQty(Map<String, Object> params) throws Exception {
+        return update("SalesDeliveryDAO.adjustPlanDeliveredQty", params);
     }
 
     public int softDeleteDeliveryHeader(Map<String, Object> params) throws Exception {

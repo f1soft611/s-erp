@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../shared/services/apiClient';
+import { ApiResponseError } from '../../../../../shared/services/apiErrors';
 import type { DeliveryFilters, DeliveryForm, DeliveryItem, DeliveryPayload, DeliveryRow, DeliveryStatusRow, SourceOrderRow } from '../types/salesDelivery.types';
 
 const PATH = '/api/v1/sales/deliveries';
@@ -17,7 +18,7 @@ export function deliveryAmounts(qty: number, price: number, vat?: number) {
 }
 export function newDeliveryRow(): DeliveryRow {
   return { rowId: `delivery-${crypto.randomUUID()}`, materialId: null, materialCode: '', materialName: '', unit: '',
-    salesOrderDetailId: null, deliveryQty: 0, unitPrice: 0, ...deliveryAmounts(0, 0) };
+    salesOrderDetailId: null, salesDeliveryPlanDetailId: null, deliveryQty: 0, unitPrice: 0, ...deliveryAmounts(0, 0) };
 }
 export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string): DeliveryForm {
   if (!rows.length) throw new Error('수주를 선택해 주세요.');
@@ -25,10 +26,11 @@ export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string): Del
   return { ...emptyDelivery(), deliveryDt, deliveryType: 'ORDER', customerId: source.customerId,
     customerCode: source.customerCode, customerName: source.customerName, salesOrderId: source.salesOrderId,
     orderNo: source.orderNo, deliveryPlace: source.deliveryPlace ?? '', deliveryMethod: source.deliveryMethod ?? '',
-    details: rows.filter((row) => row.salesOrderId === source.salesOrderId && Number(row.remainingQty) > 0).map((row) => ({
+    details: rows.filter((row) => row.salesOrderId === source.salesOrderId).map((row) => ({
       ...newDeliveryRow(), materialId: row.materialId, materialCode: row.materialCode, materialName: row.materialName,
-      unit: row.unit, salesOrderDetailId: row.salesOrderDetailId, deliveryQty: Number(row.remainingQty),
-      unitPrice: Number(row.unitPrice), ...deliveryAmounts(Number(row.remainingQty), Number(row.unitPrice)),
+      unit: row.unit, salesOrderDetailId: row.salesOrderDetailId,
+      salesDeliveryPlanDetailId: row.salesDeliveryPlanDetailId, deliveryQty: Math.max(Number(row.remainingQty), 0),
+      unitPrice: Number(row.unitPrice), ...deliveryAmounts(Math.max(Number(row.remainingQty), 0), Number(row.unitPrice)),
     })) };
 }
 export function deliveryForm(item: DeliveryItem): DeliveryForm {
@@ -51,7 +53,7 @@ export function validateDelivery(form: DeliveryForm): string {
   if (form.deliveryType === 'ORDER' && !form.salesOrderId) return '수주를 선택해 주세요.';
   if (!form.details.length) return '품목 상세를 1건 이상 입력해 주세요.';
   if (form.deliveryPlace.length > 200 || form.deliveryMethod.length > 50 || form.remark.length > 500) return '입력 가능한 글자 수를 초과했습니다.';
-  const sourceIds = new Set<number>();
+  const planIds = new Set<number>();
   const numeric = (value: number) => Number.isFinite(value) && value >= 0 && value <= 9_999_999_999_999.99
     && Math.abs(value * 100 - Math.round(value * 100)) < 0.01;
   for (const row of form.details) {
@@ -61,9 +63,9 @@ export function validateDelivery(form: DeliveryForm): string {
     if (!numeric(row.vatAmt)) return 'VAT는 0 이상의 소수 2자리 값이어야 합니다.';
     if (!numeric(row.supplyAmt) || !numeric(row.totalAmt)) return '계산된 금액이 허용 범위를 초과했습니다.';
     if (form.deliveryType === 'ORDER') {
-      if (!row.salesOrderDetailId) return '수주 상세를 선택해 주세요.';
-      if (sourceIds.has(row.salesOrderDetailId)) return '중복 수주 상세는 사용할 수 없습니다.';
-      sourceIds.add(row.salesOrderDetailId);
+      if (!row.salesOrderDetailId || !row.salesDeliveryPlanDetailId) return '납품계획 상세를 선택해 주세요.';
+      if (planIds.has(row.salesDeliveryPlanDetailId)) return '중복 납품계획 상세는 사용할 수 없습니다.';
+      planIds.add(row.salesDeliveryPlanDetailId);
     }
   }
   return '';
@@ -74,6 +76,7 @@ export function buildDeliveryPayload(form: DeliveryForm): DeliveryPayload {
     deliveryPlace: form.deliveryPlace.trim(), deliveryMethod: form.deliveryMethod.trim(), remark: form.remark.trim(),
     details: form.details.map((row) => ({ materialId: Number(row.materialId),
       salesOrderDetailId: form.deliveryType === 'ORDER' ? row.salesOrderDetailId : null,
+      salesDeliveryPlanDetailId: form.deliveryType === 'ORDER' ? row.salesDeliveryPlanDetailId : null,
       deliveryQty: row.deliveryQty, unitPrice: row.unitPrice, vatAmt: row.vatAmt })) };
 }
 function requireItem(response: { item?: DeliveryItem | null }) {
@@ -81,13 +84,30 @@ function requireItem(response: { item?: DeliveryItem | null }) {
   return response.item;
 }
 export async function createDelivery(payload: DeliveryPayload) {
-  return requireItem(await apiPost<{ item?: DeliveryItem }>(PATH, payload));
+  return saveDelivery(() => apiPost<{ item?: DeliveryItem }>(PATH, payload));
 }
 export async function getDelivery(id: number) {
   return requireItem(await apiGet<{ item?: DeliveryItem }>(`${PATH}/${id}`));
 }
 export async function updateDelivery(id: number, payload: DeliveryPayload) {
-  return requireItem(await apiPut<{ item?: DeliveryItem }>(`${PATH}/${id}`, payload));
+  return saveDelivery(() => apiPut<{ item?: DeliveryItem }>(`${PATH}/${id}`, payload));
+}
+export class OverDeliveryConfirmationRequired extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OverDeliveryConfirmationRequired';
+  }
+}
+async function saveDelivery(request: () => Promise<{ item?: DeliveryItem }>) {
+  try {
+    return requireItem(await request());
+  } catch (cause) {
+    const prefix = '[OVER_DELIVERY_CONFIRM_REQUIRED]';
+    if (cause instanceof ApiResponseError && cause.status === 409 && cause.message.startsWith(prefix)) {
+      throw new OverDeliveryConfirmationRequired(cause.message.slice(prefix.length).trim());
+    }
+    throw cause;
+  }
 }
 export async function deleteDelivery(id: number) {
   await apiDelete(`${PATH}/${id}`);

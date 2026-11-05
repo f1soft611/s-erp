@@ -13,20 +13,25 @@ public class SalesDeliverySourceOrderVO implements Serializable {
     private static final long serialVersionUID = 1L;
     private Long salesOrderId;
     private Long salesOrderDetailId;
+    private Long salesDeliveryPlanDetailId;
     private String orderNo;
     private LocalDate orderDt;
     private Long customerId;
     private String customerCode;
     private String customerName;
+    private String planNo;
     private String deliveryPlace;
     private String deliveryMethod;
     private Integer lineNo;
+    private LocalDate planDt;
     private Long materialId;
     private String materialCode;
     private String materialName;
     private String unit;
     private BigDecimal orderQty;
     private BigDecimal shippedQty;
+    private BigDecimal plannedQty;
+    private BigDecimal deliveredQty;
     private BigDecimal remainingQty;
     private BigDecimal unitPrice;
 }

@@ -33,23 +33,28 @@ import egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.delivery.domain.model.SalesDeliveryStatusSearchVO;
 import egovframework.let.sales.delivery.domain.model.SalesDeliveryVO;
 import egovframework.let.sales.delivery.domain.repository.SalesDeliveryDAO;
+import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
 
 class SalesDeliveryServiceImplTest {
     @Mock
     private SalesDeliveryDAO dao;
     @Mock
     private IdSequenceService sequenceService;
+    @Mock
+    private SalesDeliveryPlanService planService;
     private SalesDeliveryServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new SalesDeliveryServiceImpl(dao, sequenceService);
+        service = new SalesDeliveryServiceImpl(dao, sequenceService, planService);
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("BLOCK");
         when(dao.existsActiveCustomer(anyMap())).thenReturn(true);
         when(dao.existsActiveMaterial(anyMap())).thenReturn(true);
         when(dao.insertDeliveryHeader(anyMap())).thenReturn(501L);
         when(dao.insertDeliveryDetail(anyMap())).thenReturn(601L, 602L);
         when(dao.adjustShippedQty(anyMap())).thenReturn(1);
+        when(dao.adjustPlanDeliveredQty(anyMap())).thenReturn(1);
         when(sequenceService.nextValue("SALES_DELIVERY_NO", "71", "20261104"))
                 .thenReturn(1L);
     }
@@ -83,6 +88,7 @@ class SalesDeliveryServiceImplTest {
         assertThat(detail.getValue()).containsEntry("deliveryType", "DIRECT")
                 .containsEntry("salesOrderId", null)
                 .containsEntry("salesOrderDetailId", null)
+                .containsEntry("salesDeliveryPlanDetailId", null)
                 .containsEntry("deliveryQty", new BigDecimal("1.25"))
                 .containsEntry("supplyAmt", new BigDecimal("1.39"))
                 .containsEntry("vatAmt", new BigDecimal("0.14"))
@@ -105,9 +111,12 @@ class SalesDeliveryServiceImplTest {
         assertThat(saved.getDetails().get(0).getDeliveryQty()).isEqualByComparingTo("2");
         org.mockito.InOrder order = inOrder(dao);
         order.verify(dao).lockSourceOrder(anyMap());
-        order.verify(dao).selectSourceOrderDetail(anyMap());
+        order.verify(dao).selectSourcePlanDetail(anyMap());
         verify(dao).adjustShippedQty(argThat(params ->
                 new BigDecimal("2.00").equals(params.get("deltaQty"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(params ->
+                new BigDecimal("2.00").equals(params.get("deltaQty"))
+                        && Long.valueOf(900L).equals(params.get("salesDeliveryPlanDetailId"))));
     }
 
     @Test
@@ -138,6 +147,106 @@ class SalesDeliveryServiceImplTest {
     }
 
     @Test
+    void warnRequiresExplicitConfirmationAndReportsBothBaselinesBeforeAnyMutation() throws Exception {
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("WARN");
+        stubOrderAndLine("4", "4", "4");
+
+        assertThatThrownBy(() -> service.createDelivery(71L, "user01", orderPayload("2")))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(error.getReason()).startsWith("[OVER_DELIVERY_CONFIRM_REQUIRED]")
+                            .contains("계획", "수주", "기준수량 4", "저장후누적 6", "초과수량 2");
+                });
+        verifyNoInteractions(sequenceService);
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+        verify(dao, never()).insertDeliveryDetail(anyMap());
+        verify(dao, never()).adjustShippedQty(anyMap());
+        verify(dao, never()).adjustPlanDeliveredQty(anyMap());
+    }
+
+    @Test
+    void confirmedWarnAllowsExhaustedPlanWithoutInflatingBaselines() throws Exception {
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("WARN");
+        stubOrderAndLine("4", "4", "5");
+        SalesDeliveryRequestVO payload = orderPayload("2");
+        payload.setOverDeliveryConfirmed(true);
+        when(dao.selectDelivery(anyMap())).thenReturn(storedOrderDelivery("2"));
+
+        service.createDelivery(71L, "user01", payload);
+
+        verify(dao).adjustShippedQty(argThat(p -> new BigDecimal("2.00").equals(p.get("deltaQty"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(p -> new BigDecimal("2.00").equals(p.get("deltaQty"))));
+        verify(dao).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
+    void confirmationCannotBypassBlockOrChangedPolicyOnRetry() throws Exception {
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("WARN", "BLOCK");
+        stubOrderAndLine("4", "4", "4");
+        SalesDeliveryRequestVO payload = orderPayload("1");
+        assertStatus(HttpStatus.CONFLICT, () -> service.createDelivery(71L, "user01", payload));
+        payload.setOverDeliveryConfirmed(true);
+
+        assertThatThrownBy(() -> service.createDelivery(71L, "user01", payload))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error ->
+                        assertThat(error.getReason()).doesNotStartWith("[OVER_DELIVERY_CONFIRM_REQUIRED]"));
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
+    void sumsSplitPlansAgainstSingleOrderDetailEvenWhenEachPlanFits() throws Exception {
+        stubOrderAndLine("10", "10", "0");
+        SalesDeliverySourceOrderVO first = sourceLine("10", "10", "0");
+        first.setShippedQty(new BigDecimal("2"));
+        SalesDeliverySourceOrderVO second = sourceLine("10", "10", "0");
+        second.setShippedQty(new BigDecimal("2"));
+        second.setSalesDeliveryPlanDetailId(901L);
+        when(dao.selectSourcePlanDetail(anyMap())).thenReturn(first, second);
+        SalesDeliveryRequestVO payload = orderPayload("5");
+        SalesDeliveryDetailRequestVO other = orderDetail("4");
+        other.setSalesDeliveryPlanDetailId(901L);
+        payload.setDetails(Arrays.asList(payload.getDetails().get(0), other));
+
+        assertThatThrownBy(() -> service.createDelivery(71L, "user01", payload))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error ->
+                        assertThat(error.getReason()).contains("수주", "저장후누적 11", "초과수량 1"));
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
+    void warnUpdateSubtractsOwnContributionAndDeleteReversesExcess() throws Exception {
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("WARN");
+        SalesDeliveryVO stored = storedOrderDelivery("6");
+        when(dao.selectDelivery(anyMap())).thenReturn(stored);
+        when(dao.lockDeliveryHeader(anyMap())).thenReturn(stored);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(stored.getDetails());
+        stubOrderAndLine("4", "4", "6");
+        when(dao.updateDeliveryHeader(anyMap())).thenReturn(1);
+        when(dao.softDeleteDeliveryHeader(anyMap())).thenReturn(1);
+
+        service.updateDelivery(71L, "user01", 501L, orderPayload("4"));
+        service.deleteDelivery(71L, "user01", 501L);
+
+        verify(dao).adjustShippedQty(argThat(p -> new BigDecimal("-2.00").equals(p.get("deltaQty"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(p -> new BigDecimal("-2.00").equals(p.get("deltaQty"))));
+        verify(dao).adjustShippedQty(argThat(p -> new BigDecimal("-6.00").equals(p.get("deltaQty"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(p -> new BigDecimal("-6.00").equals(p.get("deltaQty"))));
+    }
+
+    @Test
+    void warnConfirmationStillRejectsInvalidReferenceAndNumericOverflow() throws Exception {
+        when(planService.getOverDeliveryPolicy(71L)).thenReturn("WARN");
+        stubOrderAndLine("4", "4", "4");
+        SalesDeliveryRequestVO payload = orderPayload("10000000000000");
+        payload.setOverDeliveryConfirmed(true);
+        assertStatus(HttpStatus.BAD_REQUEST, () -> service.createDelivery(71L, "user01", payload));
+        payload.getDetails().get(0).setDeliveryQty(BigDecimal.ONE);
+        when(dao.selectSourcePlanDetail(anyMap())).thenReturn(null);
+        assertStatus(HttpStatus.CONFLICT, () -> service.createDelivery(71L, "user01", payload));
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
     void rejectsDuplicateOrderDetailReferences() throws Exception {
         SalesDeliveryRequestVO payload = orderPayload("1");
         payload.setDetails(Arrays.asList(orderDetail("2"), orderDetail("1")));
@@ -163,11 +272,12 @@ class SalesDeliveryServiceImplTest {
     @Test
     void updateRestoresOwnShippedQtyBeforeCheckingNewRemainder() throws Exception {
         SalesDeliveryVO stored = storedOrderDelivery("3");
+        when(dao.selectDelivery(anyMap())).thenReturn(stored);
         when(dao.lockDeliveryHeader(anyMap())).thenReturn(stored);
         when(dao.selectDeliveryDetails(anyMap()))
                 .thenReturn(Collections.singletonList(stored.getDetails().get(0)));
         when(dao.lockSourceOrder(anyMap())).thenReturn(orderSnapshot());
-        when(dao.selectSourceOrderDetail(anyMap())).thenReturn(sourceLine("4", "3"));
+        when(dao.selectSourcePlanDetail(anyMap())).thenReturn(sourceLine("4", "4", "3"));
         when(dao.updateDeliveryHeader(anyMap())).thenReturn(1);
         when(dao.selectDelivery(anyMap())).thenReturn(stored);
         when(dao.selectDeliveryDetails(anyMap()))
@@ -179,11 +289,16 @@ class SalesDeliveryServiceImplTest {
         assertThat(updated.getSalesDeliveryId()).isEqualTo(501L);
         verify(dao).adjustShippedQty(argThat(params ->
                 new BigDecimal("1.00").equals(params.get("deltaQty"))));
+        org.mockito.InOrder lockOrder = inOrder(dao);
+        lockOrder.verify(dao).selectDelivery(anyMap());
+        lockOrder.verify(dao).lockSourceOrder(anyMap());
+        lockOrder.verify(dao).lockDeliveryHeader(anyMap());
     }
 
     @Test
     void rejectsChangingLinkedOrderOnUpdate() throws Exception {
         SalesDeliveryVO stored = storedOrderDelivery("2");
+        when(dao.selectDelivery(anyMap())).thenReturn(stored);
         when(dao.lockDeliveryHeader(anyMap())).thenReturn(stored);
         SalesDeliveryRequestVO payload = orderPayload("2");
         payload.setSalesOrderId(301L);
@@ -206,6 +321,7 @@ class SalesDeliveryServiceImplTest {
     @Test
     void deleteReversesLinkedQuantityAndRepeatedDeleteReturnsNotFound() throws Exception {
         SalesDeliveryVO stored = storedOrderDelivery("2");
+        when(dao.selectDelivery(anyMap())).thenReturn(stored);
         when(dao.lockDeliveryHeader(anyMap())).thenReturn(stored, null);
         when(dao.selectDeliveryDetails(anyMap()))
                 .thenReturn(Collections.singletonList(stored.getDetails().get(0)));
@@ -216,6 +332,10 @@ class SalesDeliveryServiceImplTest {
 
         verify(dao).adjustShippedQty(argThat(params ->
                 new BigDecimal("-2.00").equals(params.get("deltaQty"))));
+        org.mockito.InOrder lockOrder = inOrder(dao);
+        lockOrder.verify(dao).selectDelivery(anyMap());
+        lockOrder.verify(dao).lockSourceOrder(anyMap());
+        lockOrder.verify(dao).lockDeliveryHeader(anyMap());
         assertStatus(HttpStatus.NOT_FOUND, () ->
                 service.deleteDelivery(71L, "user01", 501L));
     }
@@ -258,9 +378,9 @@ class SalesDeliveryServiceImplTest {
                         && "SO".equals(params.get("keyword"))));
     }
 
-    private void stubOrderAndLine(String orderQty, String lineQty, String shippedQty) throws Exception {
+    private void stubOrderAndLine(String orderQty, String lineQty, String deliveredQty) throws Exception {
         when(dao.lockSourceOrder(anyMap())).thenReturn(orderSnapshot());
-        when(dao.selectSourceOrderDetail(anyMap())).thenReturn(sourceLine(orderQty, lineQty, shippedQty));
+        when(dao.selectSourcePlanDetail(anyMap())).thenReturn(sourceLine(orderQty, lineQty, deliveredQty));
     }
 
     private SalesDeliverySourceOrderHeaderVO orderSnapshot() {
@@ -271,18 +391,18 @@ class SalesDeliveryServiceImplTest {
         return order;
     }
 
-    private SalesDeliverySourceOrderVO sourceLine(String orderQty, String shippedQty) {
-        return sourceLine(orderQty, orderQty, shippedQty);
-    }
-
-    private SalesDeliverySourceOrderVO sourceLine(String orderQty, String materialOrderQty, String shippedQty) {
+    private SalesDeliverySourceOrderVO sourceLine(String orderQty, String plannedQty, String deliveredQty) {
         SalesDeliverySourceOrderVO line = new SalesDeliverySourceOrderVO();
         line.setSalesOrderId(300L);
         line.setSalesOrderDetailId(400L);
+        line.setSalesDeliveryPlanDetailId(900L);
         line.setCustomerId(10L);
         line.setMaterialId(20L);
-        line.setOrderQty(new BigDecimal(materialOrderQty));
-        line.setShippedQty(new BigDecimal(shippedQty));
+        line.setOrderQty(new BigDecimal(orderQty));
+        line.setShippedQty(new BigDecimal(deliveredQty));
+        line.setPlannedQty(new BigDecimal(plannedQty));
+        line.setDeliveredQty(new BigDecimal(deliveredQty));
+        line.setRemainingQty(new BigDecimal(plannedQty).subtract(new BigDecimal(deliveredQty)));
         line.setUnitPrice(new BigDecimal("2"));
         return line;
     }
@@ -304,6 +424,7 @@ class SalesDeliveryServiceImplTest {
         detail.setMaterialId(20L);
         detail.setSalesOrderId(300L);
         detail.setSalesOrderDetailId(400L);
+        detail.setSalesDeliveryPlanDetailId(900L);
         detail.setDeliveryQty(new BigDecimal(quantity).setScale(2));
         return detail;
     }
@@ -337,6 +458,7 @@ class SalesDeliveryServiceImplTest {
     private SalesDeliveryDetailRequestVO orderDetail(String quantity) {
         SalesDeliveryDetailRequestVO detail = directDetail();
         detail.setSalesOrderDetailId(400L);
+        detail.setSalesDeliveryPlanDetailId(900L);
         detail.setDeliveryQty(new BigDecimal(quantity));
         return detail;
     }

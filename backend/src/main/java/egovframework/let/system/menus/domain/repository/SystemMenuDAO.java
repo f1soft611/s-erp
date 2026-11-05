@@ -33,6 +33,13 @@ public class SystemMenuDAO extends EgovAbstractMapper {
     }
 
     /**
+     * 납품계획 메뉴 표시를 위한 tenant 운영모드를 조회한다.
+     */
+    public String selectTenantDeliveryPlanMode(Long tenantId) throws Exception {
+        return selectOne("SystemMenuDAO.selectTenantDeliveryPlanMode", tenantId);
+    }
+
+    /**
      * 메뉴 단건을 조회한다.
      */
     public SystemMenuVO selectMenuById(Map<String, Object> params) throws Exception {

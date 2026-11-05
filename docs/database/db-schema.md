@@ -16,6 +16,8 @@
 | registration_date            | date      | 등록일                                   |
 | logo_image                   | text      | 로고 이미지                              |
 | onboarding_status            | varchar   | 온보딩 상태                              |
+| delivery_plan_mode           | varchar(10) | 납품계획 운영모드 (`AUTO` 기본, `MANUAL`) |
+| over_delivery_policy         | varchar(10) | 초과납품 정책 (`BLOCK` 기본, `WARN` 경고확인 허용), 20261105_003 미적용 |
 | use_at                       | char      | 사용 여부 (Y/N)                          |
 | created_at                   | timestamp | 생성 일시                                |
 | updated_at                   | timestamp | 수정 일시                                |
@@ -888,6 +890,33 @@
 - tenant+일자/거래처/수주참조, 상세 tenant+품목/수주참조 인덱스를 제공한다.
 - 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
 - [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
+
+### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 미적용)
+
+테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 계획 헤더는 수주당 하나이고, 계획 상세는 수주상세별 납기일/수량을 나눠 저장한다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_tenant` | `delivery_plan_mode` | `varchar(10)` | NOT NULL, `AUTO` | 납품계획 모드 (`AUTO`/`MANUAL`) |
+| `tb_sales_delivery_plan_hd` | `sales_delivery_plan_id` | `bigserial` | NOT NULL, PK | 계획 헤더 ID |
+| | `tenant_id`, `sales_order_id` | `bigint` | NOT NULL | tenant와 원 수주 복합 FK |
+| | `plan_no` | `varchar(30)` | NOT NULL | tenant별 계획번호 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_plan_dt` | `sales_delivery_plan_detail_id` | `bigserial` | NOT NULL, PK | 계획 상세 ID |
+| | `sales_delivery_plan_id`, `tenant_id`, `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 계획 헤더/원 수주/수주상세/품목 tenant 복합 FK |
+| | `line_no` | `integer` | NOT NULL | 계획서 안 순번 |
+| | `plan_dt` | `date` | NULL | 계획 납기일; NULL은 미정 |
+| | `planned_qty`, `delivered_qty` | `numeric(15,2)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_dt` | `sales_delivery_plan_detail_id` | `bigint` | NULL | ORDER 상세 필수, DIRECT 상세 NULL; 계획 상세 복합 FK |
+
+- 계획 상세의 같은 수주상세 복수행을 허용하여 날짜/수량 분할을 지원한다. 계획수량 합은 주문수량 이하이며, 20261105_003 이후 실제 납품량은 비음수·유한수로 유지한다. `BLOCK`은 기준 초과를 서버에서 거부하고 `WARN`은 명시적 확인 후 허용한다. 수주·계획 기준수량은 자동 증가시키지 않는다.
+- 납품상세는 계획상세/tenant/order/order detail 복합 FK를 사용한다. 기존 문서 내 source unique는 계획상세 기준 unique로 바뀐다.
+- migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
+- [DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
 

@@ -85,6 +85,17 @@ class SalesDeliveryMapperTest {
         assertThat(adjustment).contains("COALESCE(shipped_qty, 0) + ? >= 0");
     }
 
+    @Test
+    void warnSourcesIncludeExhaustedPlansAndCounterUpdatesReadServerPolicy() throws Exception {
+        Configuration configuration = parse();
+        assertThat(normalize(sql(configuration, "selectSourceOrders").getSql()))
+                .contains("over_delivery_policy = 'WARN'", "pd.planned_qty - pd.delivered_qty AS remainingQty");
+        for (String id : Arrays.asList("adjustShippedQty", "adjustPlanDeliveredQty")) {
+            assertThat(normalize(sql(configuration, id).getSql()))
+                    .contains("over_delivery_policy = 'WARN'", ">= 0", "? <= 0");
+        }
+    }
+
     private Configuration parse() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {
