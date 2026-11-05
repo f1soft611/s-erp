@@ -299,13 +299,25 @@ public class SystemPolicyServiceImpl extends EgovAbstractServiceImpl implements 
         if (value == null || !value.isTextual() || !optionValues(options).contains(value.textValue())) {
             throw badRequest("허용된 선택지 값만 저장할 수 있습니다.");
         }
-        Definition definition = normalizeCommon(request);
+        requireUnchanged(request.getPolicyName(), current.getPolicyName(), "정책명");
+        requireUnchanged(request.getCategory(), current.getCategory(), "분류");
+        requireUnchanged(request.getDescription(), current.getDescription(), "설명");
+        Definition definition = new Definition();
+        definition.policyName = current.getPolicyName();
+        definition.category = current.getCategory();
+        definition.description = current.getDescription() == null ? "" : current.getDescription();
         definition.value = value;
         definition.valueJson = writeJson(value);
         definition.options = options;
         definition.optionsJson = writeJson(options);
         definition.unit = currentUnit;
         return definition;
+    }
+
+    private static void requireUnchanged(String requested, String stored, String label) {
+        if (requested != null && !trim(requested).equals(trim(stored))) {
+            throw badRequest("시스템 기본 정책의 " + label + "은(는) 변경할 수 없습니다.");
+        }
     }
 
     private Definition normalizeDefinition(Long tenantId, String type, SystemPolicySaveRequestVO request) throws Exception {

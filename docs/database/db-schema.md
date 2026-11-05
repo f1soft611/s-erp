@@ -945,8 +945,8 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 | | `before_snapshot`, `after_snapshot` | `jsonb` | 작업별 필수 CHECK | 전체 정책 스냅샷 |
 | | `changed_by`, `changed_at` | `bigint`, `timestamp` | 변경자 NULL, 일시 CURRENT_TIMESTAMP | 변경자/일시; `(tenant_id, policy_id, changed_at DESC, history_id DESC)` 인덱스 |
 
-- DDL은 모든 기존 테넌트에 기본 정책 2건을 현재 tb_tenant 값으로 복제하며 tb_tenant는 수정하지 않는다. 신규 테넌트의 기본 정책 행은 별도 운영 절차로 생성한다.
-- 기본 정책 저장은 tb_tenant 행 잠금 후 같은 트랜잭션에서 tenant 컬럼, 정책 행 version, 이력을 함께 갱신한다. 납품계획 헤더가 있으면 운영모드 변경을 거부한다. 기존 납품 Mapper/서비스는 변경하지 않는다.
+- DDL은 모든 기존 테넌트에 기본 정책 2건을 현재 tb_tenant 값으로 복제하며 tb_tenant는 수정하지 않는다. 중앙 DB 전체 복제로 생성되는 테넌트는 정책 행이 함께 복제되며, 복제가 아닌 경로로 생성된 테넌트만 기본 정책 INSERT(누락 행만 추가)를 운영 절차로 재실행한다.
+- 기본 정책 저장은 tb_tenant 행 잠금(FOR UPDATE) 후 같은 트랜잭션에서 tenant 컬럼, 정책 행 version, 이력을 함께 갱신하며 정책명·분류·설명·선택지·제약은 저장값을 유지한다. 납품계획 헤더가 있으면 운영모드 변경을 거부한다. 납품계획 헤더 생성 경로는 수주 잠금보다 먼저 tb_tenant 행을 FOR SHARE로 잠그고 운영모드를 읽어 모드 변경과 직렬화한다(스키마 변경 없음).
 - 메뉴 `ST_SYSTEM_POLICY`(`/settings/system/policies`)는 SETTINGS > `ST_SYSTEM` 하위에 등록하고 기존 PLATFORM_ADMIN 역할에만 권한을 부여한다. 메뉴 트리 API는 PLATFORM_ADMIN 외 역할에 이 메뉴를 노출하지 않는다.
 - [DDL/메뉴/롤백 변경 이력](20261105/20261105_004_change_system_policy_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_004_시스템정책_관리_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
@@ -1031,7 +1031,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ## 변경 이력
 
-- 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
+- 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 본 작업에서 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. 후속 MCP `list_tables`/`describe_table`(tb_tenant, tb_sales_delivery_plan_hd, tb_sales_order_hd, tb_system_policy, tb_id_sequence) 재확인 시 정책 테이블이 기본 DB에 존재했으나 본 작업이 적용한 것은 아니다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
 - 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 구현 후 검토에서 읽기 전용 PostgreSQL MCP `list_tables`와 `describe_table`로 `tb_notification`, `tb_user`, `tb_tenant`의 현재 메타데이터를 재확인했고 데이터 행은 조회하지 않았으며, 실제 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.
 - 2026-11-02: 기안자 최종확인 도입 중 실제 결재선 participant unique 제약이 동일 기안자의 일반 결재 행/내부 최종확인 행 삽입을 막는 것을 MCP 메타데이터로 확인했다. 일반 participant 중복 제한과 문서당 최종확인 단일 행 제한으로 분리하고, 배포 전 진행 중 문서는 최종처리 시 확인 행을 생성하는 계약을 추가했다. [20261102_003 DDL/rollback/변경 이력](20261102/20261102_003_change_drafter_final_confirmation_schema.md) 참고.
 - 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.
