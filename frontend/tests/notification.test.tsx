@@ -60,7 +60,7 @@ describe('shared page notifications', () => {
     );
     expect(screen.getByRole('status').parentElement).toHaveStyle({
       paddingTop: '8px',
-      paddingBottom: '0px',
+      paddingBottom: '8px',
     });
 
     rerender(<PageMessageArea message="오류입니다." />);

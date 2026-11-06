@@ -602,7 +602,11 @@ export function SalesOrderCreatePage({
           minWidth: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 },
+          p: embedded
+            ? 0
+            : error
+              ? { xs: 2, sm: 2, lg: 2 }
+              : { xs: 1.5, sm: 2, lg: 3 },
         }}
       >
         {validationMessages.length > 0 && (
@@ -619,6 +623,7 @@ export function SalesOrderCreatePage({
           message={error}
           onClose={() => setError('')}
           severity="error"
+          compact
         />
         <Paper
           variant="outlined"
