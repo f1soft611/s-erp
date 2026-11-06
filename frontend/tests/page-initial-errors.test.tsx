@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
-import { WarehouseManagementPage } from '../src/pages/settings/system/warehouses/WarehouseManagementPage';
+import { WarehouseManagementPage } from '../src/pages/co/master/warehouse/WarehouseManagementPage';
 import { NotificationProvider } from '../src/shared/context/NotificationContext';
 import { ApiNetworkError } from '../src/shared/services/apiErrors';
 
@@ -23,6 +23,7 @@ describe('data-backed page initial failures', () => {
     ['settings', 'menus'],
     ['co', 'common-code'],
     ['co', 'customers'],
+    ['co', 'warehouse'],
     ['co', 'materials'],
     ['co', 'form'],
     ['sales', 'status'],
@@ -54,7 +55,7 @@ describe('data-backed page initial failures', () => {
 
   it('uses the same initial failure state in the warehouse page', async () => {
     render(<WarehouseManagementPage
-      selectedModule={{ id: 'settings', name: 'Synthetic ERP', icon: null, menus: [], tree: [] }}
+      selectedModule={{ id: 'co', name: 'Synthetic ERP', icon: null, menus: [], tree: [] }}
       currentMenuName="창고관리"
       content={{ title: '창고관리', description: '', cards: [], items: [] }}
     />);
