@@ -45,7 +45,7 @@ export function PageMessageArea({
       sx={{
         px: { xs: 1.5, sm: 3 },
         pt: compact ? 1 : 2,
-        pb: compact ? 0 : 2,
+        pb: compact ? 1 : 2,
       }}
     >
       <Alert

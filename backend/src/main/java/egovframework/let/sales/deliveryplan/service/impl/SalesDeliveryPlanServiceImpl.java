@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,6 +38,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     private static final String MODE_MANUAL = "MANUAL";
     private static final String PLAN_NO_GENERATOR_KEY = "SALES_DELIVERY_PLAN_NO";
     private static final String EDITABLE_ORDER_STATUS = "수주등록";
+    private static final int PLAN_NO_MAX_LENGTH = 30;
     private static final BigDecimal ZERO = new BigDecimal("0.00");
     private static final int QTY_SCALE = 2;
     private static final int MAX_NUMERIC_PRECISION = 15;
@@ -115,7 +117,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         if (!MODE_AUTO.equals(lockModeForPlanCreation(tenantId))) {
             throw conflict("MANUAL 테넌트의 납품계획은 사용자가 직접 등록해야 합니다.");
         }
-        createPlan(tenantId, userId, request);
+        persistPlan(tenantId, userId, request);
     }
 
     @Override
@@ -205,6 +207,17 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
 
     private SalesDeliveryPlanVO createPlan(Long tenantId, String userId, SalesDeliveryPlanRequestVO request)
             throws Exception {
+        Long planId = persistPlan(tenantId, userId, request);
+        Map<String, Object> orderParams = orderParams(tenantId, request.getSalesOrderId());
+        SalesDeliveryPlanVO result = dao.selectPlanByOrder(orderParams);
+        if (result == null) {
+            throw new IllegalStateException("저장한 납품계획을 다시 조회할 수 없습니다.");
+        }
+        result.setDetails(dao.selectPlanDetails(planParams(tenantId, planId)));
+        return result;
+    }
+
+    private Long persistPlan(Long tenantId, String userId, SalesDeliveryPlanRequestVO request) throws Exception {
         validateRequest(request, false);
 
         Map<String, Object> orderParams = orderParams(tenantId, request.getSalesOrderId());
@@ -249,12 +262,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             }
         }
 
-        SalesDeliveryPlanVO result = dao.selectPlanByOrder(orderParams);
-        if (result == null) {
-            throw new IllegalStateException("저장한 납품계획을 다시 조회할 수 없습니다.");
-        }
-        result.setDetails(dao.selectPlanDetails(planParams(tenantId, planId)));
-        return result;
+        return planId;
     }
 
     @Override
@@ -519,13 +527,16 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     private String generatePlanNo(Long tenantId) throws Exception {
-        LocalDate today = LocalDate.now();
-        Long sequence = sequenceService.nextValue(PLAN_NO_GENERATOR_KEY, tenantId.toString(),
-                today.toString().replace("-", ""));
+        String dateKey = LocalDate.now().toString().replace("-", "");
+        Long sequence = sequenceService.nextValue(PLAN_NO_GENERATOR_KEY, tenantId.toString(), dateKey);
         if (sequence == null || sequence.longValue() < 1L) {
             throw new IllegalStateException("납품계획번호 채번에 실패했습니다.");
         }
-        return String.format("DP-%s-%04d", today.toString().replace("-", ""), sequence);
+        String planNo = String.format(Locale.ROOT, "DP-%s-%04d", dateKey, sequence);
+        if (planNo.length() > PLAN_NO_MAX_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "납품계획번호를 생성할 수 없습니다.");
+        }
+        return planNo;
     }
 
     private void validateRequest(SalesDeliveryPlanRequestVO request, boolean update) {

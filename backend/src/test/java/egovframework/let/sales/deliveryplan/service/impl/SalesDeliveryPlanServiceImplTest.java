@@ -88,6 +88,65 @@ class SalesDeliveryPlanServiceImplTest {
     }
 
     @Test
+    void automaticCreationDoesNotRequireReloadingTheInsertedPlanHeader() throws Exception {
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null);
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(sequenceService.nextValue(
+                org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+
+        service.createAutomaticPlan(71L, "user01", request(detail(null, 801L, "10")));
+
+        verify(dao).selectPlanByOrder(anyMap());
+        verify(dao).insertPlanHeader(anyMap());
+        verify(dao).insertPlanDetail(anyMap());
+    }
+
+    @Test
+    void rejectsDeliveryPlanNumbersThatExceedTheSharedNumberLengthLimit() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null);
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(sequenceService.nextValue(
+                org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(Long.MAX_VALUE);
+
+        assertThatThrownBy(() -> service.create(71L, "user01", request(detail(null, 801L, "1"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+
+        verify(dao, never()).insertPlanHeader(anyMap());
+    }
+
+    @Test
+    void generatesDeliveryPlanNumberWithDocumentPrefixDateAndFourDigitSequence() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        SalesDeliveryPlanVO savedPlan = new SalesDeliveryPlanVO();
+        savedPlan.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null, savedPlan);
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
+        when(sequenceService.nextValue(
+                org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+
+        service.create(71L, "user01", request(detail(null, 801L, "1")));
+
+        String expectedPlanNo = "DP-" + LocalDate.now().toString().replace("-", "") + "-0001";
+        verify(dao).insertPlanHeader(org.mockito.ArgumentMatchers.argThat(
+                params -> expectedPlanNo.equals(params.get("planNo"))));
+    }
+
+    @Test
     void createsManualSplitPlanOnlyWithinTheOrderQuantity() throws Exception {
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
         SalesDeliveryPlanVO savedPlan = new SalesDeliveryPlanVO();

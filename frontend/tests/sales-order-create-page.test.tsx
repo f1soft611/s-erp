@@ -183,6 +183,22 @@ describe('sales order entry page', () => {
     expect(within(grid).queryByLabelText('납기 필수')).not.toBeInTheDocument();
   });
 
+  it('uses compact spacing for order-save errors', async () => {
+    createSalesOrderMock.mockRejectedValue(new Error('수주 저장에 실패했습니다.'));
+    renderSalesOrderPage();
+    await selectCustomer();
+    await addAndCompleteDetail();
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('수주 저장에 실패했습니다.');
+    expect(alert.parentElement).toHaveStyle({
+      paddingTop: '8px',
+      paddingBottom: '8px',
+    });
+  }, 15000);
+
   it('highlights invalid detail cells with F1-Grid validation and clears them after correction', async () => {
     renderSalesOrderPage();
     await selectCustomer();
@@ -323,6 +339,7 @@ describe('sales order entry page', () => {
   it('shows save failure and retains all entered values', async () => {
     createSalesOrderMock.mockRejectedValue(new Error('저장을 완료하지 못했습니다.'));
     renderSalesOrderPage();
+    const initialOrderDate = (screen.getByLabelText(/수주일자/) as HTMLInputElement).value;
     await selectCustomer();
     await addAndCompleteDetail();
 
@@ -335,7 +352,7 @@ describe('sales order entry page', () => {
       'C-10 · 거래처 10',
     );
     expect(screen.getByLabelText('견적번호')).toHaveValue('');
-    expect(screen.getByLabelText(/수주일자/)).toHaveValue('2026-10-27');
+    expect(screen.getByLabelText(/수주일자/)).toHaveValue(initialOrderDate);
     const row = screen.getByRole('row', { name: /order-line-.*행 선택/ });
     expect(within(row).getByRole('gridcell', { name: 'M-20' })).toBeInTheDocument();
     expect(within(row).getByRole('gridcell', { name: '2.00' })).toBeInTheDocument();
