@@ -20,6 +20,7 @@ import { ModuleManagementPage } from '../../settings/system/modules/ModuleManage
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
+import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
@@ -327,6 +328,19 @@ export function DashboardContent({
         content={content}
         breadcrumbItems={breadcrumbItems}
         selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'co' && currentPageKey === 'warehouse') {
+    return (
+      <WarehouseManagementPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+        isTenantAdmin={isTenantAdmin}
       />
     );
   }
