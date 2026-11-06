@@ -1860,6 +1860,18 @@ public class EgovConfigAppIdGen {
 				.setFillChar('0')
 				.build();
 	}
+	@Bean(destroyMethod = "destroy")
+	public EgovTableIdGnrServiceImpl warehouseCodeIdGnrService() {
+		return new EgovIdGnrBuilder().setDataSource(egovDataSource)
+				.setEgovIdGnrStrategyImpl(new EgovIdGnrStrategyImpl())
+				.setBlockSize(1)
+				.setTable("IDS")
+				.setTableName("tb_warehouse")
+				.setPreFix("")
+				.setCipers(3)
+				.setFillChar('0')
+				.build();
+	}
 
 	@Bean(destroyMethod = "destroy")
 	public EgovTableIdGnrServiceImpl egovCommonCodeItemIdGnrService() {

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="WarehouseDAO">
+
+    <resultMap id="warehouseMap" type="egovframework.let.co.master.warehouse.domain.model.WarehouseVO">
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="warehouseCode" column="warehouse_code"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="warehouseType" column="warehouse_type"/>
+        <result property="deleteLockAt" column="delete_lock_at"/>
+        <result property="disuseAt" column="disuse_at"/>
+        <result property="stockQtyDispAt" column="stock_qty_disp_at"/>
+        <result property="stockIoAt" column="stock_io_at"/>
+        <result property="safetyStockAlertAt" column="safety_stock_alert_at"/>
+        <result property="stockDefaultAt" column="stock_default_at"/>
+        <result property="plantId" column="plant_id"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="managerUserId" column="manager_user_id"/>
+        <result property="managerUserName" column="manager_user_name"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="departmentName" column="department_name"/>
+        <result property="telNo" column="tel_no"/>
+        <result property="faxNo" column="fax_no"/>
+        <result property="address" column="address"/>
+        <result property="remark" column="remark"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="warehouseUserOption" type="egovframework.let.co.master.warehouse.domain.model.WarehouseUserOptionVO">
+        <result property="userId" column="user_id"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="departmentNm" column="department_nm"/>
+        <result property="userNm" column="user_nm"/>
+        <result property="profileImage" column="profile_image"/>
+        <result property="levelNm" column="level_nm"/>
+    </resultMap>
+
+    <sql id="warehouseColumns">
+        warehouse_id,
+        tenant_id,
+        warehouse_code,
+        warehouse_name,
+        warehouse_type,
+        delete_lock_at,
+        disuse_at,
+        stock_qty_disp_at,
+        stock_io_at,
+        safety_stock_alert_at,
+        stock_default_at,
+        plant_id,
+        customer_id,
+        manager_user_id,
+        department_id,
+        tel_no,
+        fax_no,
+        address,
+        remark,
+        created_by,
+        created_at,
+        updated_by,
+        updated_at,
+        (SELECT u.user_nm FROM tb_user u
+         WHERE u.tenant_id = tb_warehouse.tenant_id
+           AND u.user_id = tb_warehouse.manager_user_id) AS manager_user_name,
+        (SELECT d.department_nm FROM tb_department d
+         WHERE d.tenant_id = tb_warehouse.tenant_id
+           AND d.department_id = tb_warehouse.department_id) AS department_name
+    </sql>
+
+    <select id="selectWarehouseList"
+            parameterType="map"
+            resultMap="warehouseMap">
+        SELECT <include refid="warehouseColumns"/>
+        FROM tb_warehouse
+        WHERE tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (
+                warehouse_code ILIKE '%' || #{keyword} || '%'
+                OR warehouse_name ILIKE '%' || #{keyword} || '%'
+            )
+        </if>
+        <if test="warehouseType != null and warehouseType != ''">
+            AND warehouse_type = #{warehouseType}
+        </if>
+        <if test="disuseAt != null and disuseAt != ''">
+            AND disuse_at = #{disuseAt}
+        </if>
+        ORDER BY warehouse_code ASC, warehouse_id ASC
+    </select>
+
+    <select id="selectWarehouseById" parameterType="map" resultMap="warehouseMap">
+        SELECT <include refid="warehouseColumns"/>
+        FROM tb_warehouse
+        WHERE warehouse_id = #{warehouseId}
+          AND tenant_id = #{tenantId}
+    </select>
+
+    <select id="selectWarehouseIdByCode" parameterType="map" resultType="long">
+        SELECT warehouse_id
+        FROM tb_warehouse
+        WHERE tenant_id = #{tenantId}
+          AND warehouse_code = #{warehouseCode}
+        <if test="excludeWarehouseId != null">
+            AND warehouse_id != #{excludeWarehouseId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="insertWarehouse" parameterType="map" resultType="long">
+        INSERT INTO tb_warehouse (
+            tenant_id,
+            warehouse_code,
+            warehouse_name,
+            warehouse_type,
+            delete_lock_at,
+            disuse_at,
+            stock_qty_disp_at,
+            stock_io_at,
+            safety_stock_alert_at,
+            stock_default_at,
+            plant_id,
+            customer_id,
+            manager_user_id,
+            department_id,
+            tel_no,
+            fax_no,
+            address,
+            remark,
+            created_by,
+            updated_by
+        ) VALUES (
+            #{tenantId},
+            #{warehouseCode},
+            #{warehouseName},
+            #{warehouseType},
+            #{deleteLockAt},
+            #{disuseAt},
+            #{stockQtyDispAt},
+            #{stockIoAt},
+            #{safetyStockAlertAt},
+            #{stockDefaultAt},
+            #{plantId,jdbcType=BIGINT},
+            #{customerId,jdbcType=BIGINT},
+            #{managerUserId,jdbcType=BIGINT},
+            #{departmentId,jdbcType=BIGINT},
+            #{telNo},
+            #{faxNo},
+            #{address},
+            #{remark},
+            #{createdBy},
+            #{updatedBy}
+        )
+        RETURNING warehouse_id
+    </select>
+
+    <update id="updateWarehouse" parameterType="map">
+        UPDATE tb_warehouse
+        SET warehouse_code = #{warehouseCode},
+            warehouse_name = #{warehouseName},
+            warehouse_type = #{warehouseType},
+            delete_lock_at = #{deleteLockAt},
+            disuse_at = #{disuseAt},
+            stock_qty_disp_at = #{stockQtyDispAt},
+            stock_io_at = #{stockIoAt},
+            safety_stock_alert_at = #{safetyStockAlertAt},
+            stock_default_at = #{stockDefaultAt},
+            plant_id = #{plantId,jdbcType=BIGINT},
+            customer_id = #{customerId,jdbcType=BIGINT},
+            manager_user_id = #{managerUserId,jdbcType=BIGINT},
+            department_id = #{departmentId,jdbcType=BIGINT},
+            tel_no = #{telNo},
+            fax_no = #{faxNo},
+            address = #{address},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE warehouse_id = #{warehouseId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+    <select id="selectUserOptions" parameterType="long" resultMap="warehouseUserOption">
+        SELECT
+            u.user_id,
+            u.department_id,
+            d.department_nm,
+            u.user_nm,
+            la.profile_image,
+            CASE WHEN lg.group_code = 'LEVEL' THEN li.item_nm END AS level_nm
+        FROM tb_user u
+        JOIN tb_login_account la
+          ON la.login_id = u.login_id
+         AND la.tenant_id = u.tenant_id
+         AND la.use_at = 'Y'
+        LEFT JOIN tb_department d
+          ON d.department_id = u.department_id
+         AND d.tenant_id = u.tenant_id
+        LEFT JOIN tb_common_code_item li
+          ON li.common_code_item_id = u.level_id
+         AND li.tenant_id = u.tenant_id
+         AND li.use_at = 'Y'
+        LEFT JOIN tb_common_code_group lg
+          ON lg.common_code_group_id = li.group_id
+         AND lg.tenant_id = u.tenant_id
+         AND lg.group_code = 'LEVEL'
+         AND lg.use_at = 'Y'
+        WHERE u.tenant_id = #{value}
+          AND u.use_at = 'Y'
+        ORDER BY u.user_nm ASC, u.user_id ASC
+    </select>
+
+</mapper>
