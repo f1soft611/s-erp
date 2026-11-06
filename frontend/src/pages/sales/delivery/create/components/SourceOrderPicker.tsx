@@ -32,19 +32,19 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
     ...row, excessQty: Math.max(-Number(row.remainingQty), 0),
   })), [rows]);
   const columns = useMemo<F1GridColumn<SourcePlanRow>[]>(() => [
-    { field: 'planNo', headerName: '계획번호', width: 165,
+    { field: 'planNo', headerName: '계획번호', width: 165, align: 'center',
       renderCell: ({ row }) => <Button size="small" sx={{ minWidth: 0, px: 0.5, whiteSpace: 'nowrap' }}
         onClick={() => onSelect(rows.filter((item) => item.salesOrderId === row.salesOrderId))}>{row.planNo} 선택</Button> },
-    { field: 'orderDt', headerName: '수주일자', type: 'date', width: 96 },
-    { field: 'planDt', headerName: '계획일자', type: 'date', width: 96 },
-    { field: 'customerName', headerName: '거래처', width: 125 },
-    { field: 'materialCode', headerName: '품목코드', width: 100 },
-    { field: 'materialName', headerName: '품목명', width: 135 },
-    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 90 },
-    { field: 'deliveredQty', headerName: '기납품', type: 'decimal', width: 90 },
-    { field: 'remainingQty', headerName: '미납수량', type: 'decimal', width: 90,
+    { field: 'orderDt', headerName: '수주일자', type: 'date', width: 96, align: 'center' },
+    { field: 'planDt', headerName: '계획일자', type: 'date', width: 96, align: 'center' },
+    { field: 'customerName', headerName: '거래처', width: 125, align: 'center' },
+    { field: 'materialCode', headerName: '품목코드', width: 100, align: 'center' },
+    { field: 'materialName', headerName: '품목명', width: 135, align: 'center' },
+    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 90, align: 'right' },
+    { field: 'deliveredQty', headerName: '기납품', type: 'decimal', width: 90, align: 'right' },
+    { field: 'remainingQty', headerName: '미납수량', type: 'decimal', width: 90, align: 'right',
       renderCell: ({ row }) => Math.max(Number(row.remainingQty), 0).toLocaleString('ko-KR') },
-    { field: 'excessQty', headerName: '초과납품', type: 'decimal', width: 90 },
+    { field: 'excessQty', headerName: '초과납품', type: 'decimal', width: 90, align: 'right' },
   ], [rows, onSelect]);
   return <CommonDialog open={open} onClose={onClose} title="납품계획 선택" size="lg" fullScreenOnMobile
     bodyMode="fill" paperHeight="min(900px, 85vh)" actions={<Button onClick={onClose}>닫기</Button>}>

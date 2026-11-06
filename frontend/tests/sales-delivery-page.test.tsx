@@ -119,6 +119,18 @@ it('loads status with mandatory current-month period and renders required chip',
   expect(screen.getByRole('grid', { name: '납품현황 목록' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /납품일.*삭제/ })).not.toBeInTheDocument();
 });
+it('aligns delivery status codes and names centrally and numeric values to the right', async () => {
+  vi.mocked(getDeliveryStatus).mockResolvedValue(
+    [{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>,
+  );
+  mount(<SalesDeliveryStatusPage {...props} />);
+  const grid = await screen.findByRole('grid', { name: '납품현황 목록' });
+
+  expect(within(grid).getByRole('gridcell', { name: 'C10' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(grid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(grid).getByRole('gridcell', { name: 'SD-1' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(grid).getByRole('gridcell', { name: '원래 장소' })).toHaveStyle({ justifyContent: 'flex-start' });
+});
 it.each(['missing', 'read-denied'] as const)('opens read-only status detail when registration menu is %s', async (registration) => {
   vi.mocked(getDeliveryStatus).mockResolvedValue([{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>);
   const tree = registration === 'missing' ? [] : [{
@@ -198,8 +210,17 @@ it('selects one order, populates remaining lines and prevents source identity ed
   fireEvent.click(screen.getByRole('option', { name: '수주납품' }));
   fireEvent.click(screen.getByRole('button', { name: '계획 선택', exact: true }));
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  const sourceGrid = await screen.findByRole('grid', { name: '납품 대상 계획 목록' });
+  expect(within(sourceGrid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(sourceGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(sourceGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'center' });
   fireEvent.click(await screen.findByRole('button', { name: 'DP-1 선택' }));
   expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7');
+  const deliveryGrid = screen.getByRole('grid', { name: '납품 상세 목록' });
+  const deliveryCells = within(deliveryGrid).getAllByRole('gridcell');
+  expect(within(deliveryGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
+  expect(within(deliveryGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'center' });
+  expect(deliveryCells[4]).toHaveStyle({ justifyContent: 'flex-end' });
   expect(screen.getByLabelText('납품장소')).toHaveValue('창고');
   expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
   expect(screen.queryByRole('button', { name: '품목 선택', exact: true })).not.toBeInTheDocument();
