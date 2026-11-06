@@ -16,6 +16,8 @@
 | registration_date            | date      | 등록일                                   |
 | logo_image                   | text      | 로고 이미지                              |
 | onboarding_status            | varchar   | 온보딩 상태                              |
+| delivery_plan_mode           | varchar(10) | 납품계획 운영모드 (`AUTO` 기본, `MANUAL`) |
+| over_delivery_policy         | varchar(10) | 초과납품 정책 (`BLOCK` 기본, `WARN` 경고확인 허용), 20261105_003 미적용 |
 | use_at                       | char      | 사용 여부 (Y/N)                          |
 | created_at                   | timestamp | 생성 일시                                |
 | updated_at                   | timestamp | 수정 일시                                |
@@ -853,6 +855,100 @@
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
 - 감사 사용자 길이 보정: [확장 SQL](20261028/20261028_009_expand_sales_order_audit_columns.sql), [안전 롤백](20261028/20261028_009_rollback_sales_order_audit_columns.sql), [변경 이력](20261028/20261028_009_change_sales_order_audit_columns.md). 신규 환경에서도 기존 생성 DDL 후 확장 SQL을 적용한다.
 
+### tb_sales_delivery_hd / tb_sales_delivery_dt (2026-11-04, 미적용)
+
+수주 연계 납품과 수주 없는 직납품을 별도 문서로 관리한다. 기본 DB MCP에서 기존 수주/거래처/품목의 컬럼·복합 FK 대상키를 확인했고, 신규 납품 테이블은 아직 존재하지 않는다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_sales_delivery_hd` | `sales_delivery_id` | `bigserial` | NOT NULL, PK | 납품 ID |
+| | `tenant_id` | `bigint` | NOT NULL | 소유 테넌트 |
+| | `delivery_no` | `varchar(30)` | NOT NULL | tenant별 유일 납품번호, SD-일자-순번 |
+| | `delivery_dt` | `date` | NOT NULL | 납품일자 |
+| | `delivery_type` | `varchar(10)` | NOT NULL | ORDER 수주납품 / DIRECT 직납품 |
+| | `customer_id` | `bigint` | NOT NULL | tenant 복합 거래처 FK |
+| | `sales_order_id` | `bigint` | NULL | 연결 수주 FK, 직납품 NULL |
+| | `delivery_place`, `delivery_method` | `varchar(200)`, `varchar(50)` | NULL | 납품장소/배송방법 |
+| | `total_amt` | `numeric(15,2)` | NOT NULL, 0 | 상세 합계 합산 |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, Y | 논리삭제 시 N |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 NOT NULL/CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_dt` | `sales_delivery_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `sales_delivery_id`, `tenant_id` | `bigint` | NOT NULL | 헤더/테넌트 |
+| | `delivery_type` | `varchar(10)` | NOT NULL | 부모와 동일한 구분, 복합 FK |
+| | `line_no` | `integer` | NOT NULL | 양수, 문서 내 유일 순번 |
+| | `material_id` | `bigint` | NOT NULL | tenant 복합 품목 FK |
+| | `sales_order_id`, `sales_order_detail_id` | `bigint` | NULL | 수주납품에서만 둘 다 필수 |
+| | `delivery_qty` | `numeric(15,2)` | NOT NULL | 양수 납품수량 |
+| | `unit_price`, `supply_amt`, `total_amt` | `numeric(15,2)` | NOT NULL | 비음수 단가/공급가/합계 |
+| | `vat_amt` | `numeric(15,2)` | NOT NULL, 0 | 비음수 부가세 |
+
+- 부모/상세의 tenant, 구분 및 연결 수주를 복합 FK로 제한한다. DIRECT는 source IDs가 모두 NULL, ORDER는 모두 NOT NULL인 CHECK를 둔다.
+- 기존 `tb_sales_order_dt`에 `(sales_order_detail_id,sales_order_id,tenant_id,material_id)` 복합 UNIQUE를 추가한다. 납품상세는 이 키를 참조하여 수주·품목·tenant 일치를 보장한다.
+- 수량 양수, 금액 비음수/NaN 거부, 상세 합계=공급가+VAT CHECK. 문서 내 중복 수주상세는 UNIQUE로 제한한다.
+- tenant+일자/거래처/수주참조, 상세 tenant+품목/수주참조 인덱스를 제공한다.
+- 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
+- [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
+
+### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 미적용)
+
+테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 계획 헤더는 수주당 하나이고, 계획 상세는 수주상세별 납기일/수량을 나눠 저장한다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_tenant` | `delivery_plan_mode` | `varchar(10)` | NOT NULL, `AUTO` | 납품계획 모드 (`AUTO`/`MANUAL`) |
+| `tb_sales_delivery_plan_hd` | `sales_delivery_plan_id` | `bigserial` | NOT NULL, PK | 계획 헤더 ID |
+| | `tenant_id`, `sales_order_id` | `bigint` | NOT NULL | tenant와 원 수주 복합 FK |
+| | `plan_no` | `varchar(30)` | NOT NULL | tenant별 계획번호 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_plan_dt` | `sales_delivery_plan_detail_id` | `bigserial` | NOT NULL, PK | 계획 상세 ID |
+| | `sales_delivery_plan_id`, `tenant_id`, `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 계획 헤더/원 수주/수주상세/품목 tenant 복합 FK |
+| | `line_no` | `integer` | NOT NULL | 계획서 안 순번 |
+| | `plan_dt` | `date` | NULL | 계획 납기일; NULL은 미정 |
+| | `planned_qty`, `delivered_qty` | `numeric(15,2)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
+| | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
+| | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
+| `tb_sales_delivery_dt` | `sales_delivery_plan_detail_id` | `bigint` | NULL | ORDER 상세 필수, DIRECT 상세 NULL; 계획 상세 복합 FK |
+
+- 계획 상세의 같은 수주상세 복수행을 허용하여 날짜/수량 분할을 지원한다. 계획수량 합은 주문수량 이하이며, 20261105_003 이후 실제 납품량은 비음수·유한수로 유지한다. `BLOCK`은 기준 초과를 서버에서 거부하고 `WARN`은 명시적 확인 후 허용한다. 수주·계획 기준수량은 자동 증가시키지 않는다.
+- 납품상세는 계획상세/tenant/order/order detail 복합 FK를 사용한다. 기존 문서 내 source unique는 계획상세 기준 unique로 바뀐다.
+- migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
+- [DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
+
+### tb_system_policy / tb_system_policy_history (2026-11-05, 미적용)
+
+PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 저장소다. 사용자 생성 정책 값은 이 테이블이 원천이며, 기본 정책 `DELIVERY_PLAN_MODE`/`OVER_DELIVERY_POLICY`의 실제 적용값은 계속 `tb_tenant.delivery_plan_mode`/`over_delivery_policy`이다(정책 행 값은 복제본).
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_system_policy` | `policy_id` | `bigint identity` | NOT NULL, PK | 정책 ID |
+| | `tenant_id` | `bigint` | NOT NULL, FK `tb_tenant` | 소유 tenant; `(tenant_id, policy_code)` unique |
+| | `policy_code` | `varchar(80)` | NOT NULL | `^[A-Z0-9_]{2,80}$`, 등록 후 불변 |
+| | `policy_nm`, `category_nm`, `policy_dc` | `varchar(100/80/1000)` | 이름·분류 NOT NULL 비공백, 설명 기본 `''` | 정책명/분류/설명 |
+| | `value_type` | `varchar(20)` | NOT NULL | `BOOLEAN/NUMBER/SELECT/TEXT/DATE/USER_LIST`, 등록 후 불변 |
+| | `value_json` | `jsonb` | NOT NULL | 정책 값 raw JSON; 타입별 JSON 형태 CHECK |
+| | `options_json` | `jsonb` | NOT NULL, `[]` | SELECT 선택지 `[{value,label}]` 배열 |
+| | `min_value`, `max_value` | `numeric` | NULL | NUMBER 범위, min ≤ max |
+| | `unit_nm` | `varchar(30)` | NOT NULL, `''` | NUMBER 단위 |
+| | `version` | `integer` | NOT NULL, `1` | 낙관적 잠금 버전(≥1) |
+| | `system_policy_at` | `char(1)` | NOT NULL, `N` | 기본 정책 여부; 기본 정책 코드 ⇔ `Y` CHECK |
+| | `created_by`, `updated_by` | `bigint` | NULL | 등록/수정 사용자 ID |
+| | `created_at`, `updated_at` | `timestamp` | NOT NULL, CURRENT_TIMESTAMP | 감사 일시 |
+| `tb_system_policy_history` | `history_id` | `bigint identity` | NOT NULL, PK | 이력 ID |
+| | `tenant_id` | `bigint` | NOT NULL, FK `tb_tenant` | 소유 tenant |
+| | `policy_id`, `policy_code` | `bigint`, `varchar(80)` | NOT NULL | 정책 식별(삭제 후 보존을 위해 FK/CASCADE 없음) |
+| | `action_cd` | `varchar(10)` | NOT NULL | `CREATE/UPDATE/DELETE` |
+| | `before_value`, `after_value` | `jsonb` | NULL | 변경 전/후 값 |
+| | `before_snapshot`, `after_snapshot` | `jsonb` | 작업별 필수 CHECK | 전체 정책 스냅샷 |
+| | `changed_by`, `changed_at` | `bigint`, `timestamp` | 변경자 NULL, 일시 CURRENT_TIMESTAMP | 변경자/일시; `(tenant_id, policy_id, changed_at DESC, history_id DESC)` 인덱스 |
+
+- DDL은 모든 기존 테넌트에 기본 정책 2건을 현재 tb_tenant 값으로 복제하며 tb_tenant는 수정하지 않는다. 중앙 DB 전체 복제로 생성되는 테넌트는 정책 행이 함께 복제되며, 복제가 아닌 경로로 생성된 테넌트만 기본 정책 INSERT(누락 행만 추가)를 운영 절차로 재실행한다.
+- 기본 정책 저장은 tb_tenant 행 잠금(FOR UPDATE) 후 같은 트랜잭션에서 tenant 컬럼, 정책 행 version, 이력을 함께 갱신하며 정책명·분류·설명·선택지·제약은 저장값을 유지한다. 납품계획 헤더가 있으면 운영모드 변경을 거부한다. 납품계획 헤더 생성 경로는 수주 잠금보다 먼저 tb_tenant 행을 FOR SHARE로 잠그고 운영모드를 읽어 모드 변경과 직렬화한다(스키마 변경 없음).
+- 메뉴 `ST_SYSTEM_POLICY`(`/settings/system/policies`)는 SETTINGS > `ST_SYSTEM` 하위에 등록하고 기존 PLATFORM_ADMIN 역할에만 권한을 부여한다. 메뉴 트리 API는 PLATFORM_ADMIN 외 역할에 이 메뉴를 노출하지 않는다.
+- [DDL/메뉴/롤백 변경 이력](20261105/20261105_004_change_system_policy_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_004_시스템정책_관리_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 ### 품목·거래처 분류 스키마 (DDL 초안, 미적용)
 
 `20261027_002` 설계 초안이며 현재 central DB에 적용되지 않았다. 실제 현행 스키마로 오인하지 않도록 아래 정의는 제안 상태로만 기록한다.
@@ -935,6 +1031,7 @@
 
 ## 변경 이력
 
+- 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 본 작업에서 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. 후속 MCP `list_tables`/`describe_table`(tb_tenant, tb_sales_delivery_plan_hd, tb_sales_order_hd, tb_system_policy, tb_id_sequence) 재확인 시 정책 테이블이 기본 DB에 존재했으나 본 작업이 적용한 것은 아니다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
 - 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 구현 후 검토에서 읽기 전용 PostgreSQL MCP `list_tables`와 `describe_table`로 `tb_notification`, `tb_user`, `tb_tenant`의 현재 메타데이터를 재확인했고 데이터 행은 조회하지 않았으며, 실제 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.
 - 2026-11-02: 기안자 최종확인 도입 중 실제 결재선 participant unique 제약이 동일 기안자의 일반 결재 행/내부 최종확인 행 삽입을 막는 것을 MCP 메타데이터로 확인했다. 일반 participant 중복 제한과 문서당 최종확인 단일 행 제한으로 분리하고, 배포 전 진행 중 문서는 최종처리 시 확인 행을 생성하는 계약을 추가했다. [20261102_003 DDL/rollback/변경 이력](20261102/20261102_003_change_drafter_final_confirmation_schema.md) 참고.
 - 2026-10-30: 공통 알림 및 1:1 쪽지 `tb_notification`, `tb_direct_message_thread`, `tb_direct_message` DDL/rollback 참고 초안 `20261030_005`를 정의했다. 읽기 전용 PostgreSQL MCP로 세 테이블의 컬럼, 제약 및 인덱스가 이미 존재하며 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 기존 DB에 적용하지 않았다. 초안은 현재 DB에 실행하지 않는다. [backend/DATABASE/20261030](../../backend/DATABASE/20261030) 및 [docs/database/20261030](20261030) 참고.

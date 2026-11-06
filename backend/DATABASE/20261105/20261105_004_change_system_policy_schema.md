@@ -1,0 +1,21 @@
+# 시스템 정책 스키마 변경
+
+- 날짜/작업: 2026-11-05 / 004.
+- 선행: 20261105_002 납품계획 스키마(`tb_tenant.delivery_plan_mode`, `tb_sales_delivery_plan_hd`), 20261105_003 초과납품 정책(`tb_tenant.over_delivery_policy`).
+- 대상: 신규 `tb_system_policy`, `tb_system_policy_history`. 메뉴 seed는 `tb_menu`, `tb_menu_permission`, `tb_role_menu_permission`(기존 PLATFORM_ADMIN 역할만). `tb_tenant`는 DDL에서 읽기만 한다.
+- 변경:
+  - `tb_system_policy`: tenant_id + policy_code 유일, 값(`value_json`)/선택지(`options_json`) JSONB, NUMBER 범위(`min_value`/`max_value`), 단위, `version` 낙관적 잠금, `system_policy_at`, 생성/수정자·시각. 코드 형식, 타입 enum, 타입별 값 JSON 형태, 범위, 기본 정책 코드⇔system_policy_at='Y' CHECK.
+  - `tb_system_policy_history`: CREATE/UPDATE/DELETE 전후 값과 전체 스냅샷. 삭제 후 이력 보존을 위해 정책 FK·CASCADE 없음.
+  - 기본 정책 `DELIVERY_PLAN_MODE`(AUTO/MANUAL), `OVER_DELIVERY_POLICY`(BLOCK/WARN)를 모든 기존 테넌트에 현재 tb_tenant 값 그대로 복제(`ON CONFLICT DO NOTHING`). tb_tenant 값은 변경하지 않는다.
+  - 메뉴 `ST_SYSTEM_POLICY` `/settings/system/policies`를 SETTINGS 모듈의 `ST_SYSTEM` 하위 마지막 순서로 등록하고 READ/CREATE/UPDATE/DELETE를 정의, 기존 PLATFORM_ADMIN 역할에만 부여한다. 역할/계정은 생성하지 않는다.
+- 영향:
+  - 기본 정책의 실제 원천은 계속 tb_tenant 컬럼이다. 조회는 tb_tenant 값을 읽고, 저장은 같은 트랜잭션에서 tb_tenant 행 잠금(FOR UPDATE) 후 컬럼과 정책 행(version)을 함께 갱신한다. 기본 정책의 정책명·분류·설명·선택지·제약은 저장값을 유지하며 값만 변경한다. 납품계획 헤더 생성 경로(수주 등록 AUTO 자동계획, MANUAL 계획 등록)는 수주 잠금보다 먼저 `tb_tenant` 행을 `FOR SHARE`로 잠근 상태에서 운영모드를 읽으므로(`SalesDeliveryPlanDAO.lockTenantModeForPlanCreation`), 운영모드 변경과 계획 헤더 생성이 직렬화된다. 테이블/컬럼 변경은 없다.
+  - 납품계획 헤더가 하나라도 있으면 운영모드 변경을 거부한다. WARN→BLOCK 전환은 기존 실적을 삭제·변경하지 않는다.
+  - 메뉴 트리 API는 roleCode가 PLATFORM_ADMIN이 아니면 이 메뉴를 항상 제외한다(역할 매핑·무역할 일괄 권한과 무관).
+  - 중앙 DB 전체 복제로 생성되는 테넌트는 정책 행이 함께 복제되므로 별도 프로비저닝이 필요 없다. 복제가 아닌 경로로 생성된 테넌트에 한해 운영 절차로 생성 스크립트의 기본 정책 INSERT(`ON CONFLICT DO NOTHING`, 누락 행만 추가)를 다시 실행한다. 테넌트 프로비저닝 기능은 이번 범위가 아니다.
+- 적용: 실제 DB 미적용. 읽기 전용 MCP `list_tables`(정책 테이블 없음 확인)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite) 메타데이터만 확인했고 업무 데이터 행은 조회하지 않았다. 격리된 PGlite 스텁 DB에서 DDL/seed/제약/롤백 가드를 검증했다.
+- 메뉴 seed: `v_tenant_id`를 승인된 대상 테넌트로 지정해야 실행된다. 재실행 시 기존 메뉴/권한을 보존하며 경로·부모·모듈 충돌 시 중단한다.
+- 롤백:
+  - 메뉴: `20261105_004_rollback_system_policy_menu.sql`. PLATFORM_ADMIN 외 권한, 하위 메뉴, 즐겨찾기 참조가 있으면 중단한다.
+  - 스키마: `20261105_004_rollback_system_policy_schema.sql`. 사용자 정책(system_policy_at='N') 또는 이력 행이 있으면 중단하며 데이터를 조용히 삭제하지 않는다. 기본 정책 값은 tb_tenant에 남는다.
+- 사본: `docs/database/20261105`와 `backend/DATABASE/20261105`의 같은 004 파일을 동일하게 유지한다.

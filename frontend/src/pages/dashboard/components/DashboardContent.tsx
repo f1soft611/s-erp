@@ -18,6 +18,7 @@ import { DocumentStatusPage } from '../../groupware/documents/status/DocumentSta
 import { MenuManagementPage } from '../../settings/system/menus/MenuManagementPage';
 import { ModuleManagementPage } from '../../settings/system/modules/ModuleManagementPage';
 import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPage';
+import { SystemPolicyPage } from '../../settings/system/policies/SystemPolicyPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
 import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseManagementPage';
@@ -25,6 +26,10 @@ import { MaterialManagementPage } from '../../co/master/materials/MaterialManage
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
+import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
+import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
+import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
+import { SalesDeliveryPlanStatusPage } from '../../sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -45,6 +50,7 @@ type DashboardContentProps = {
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
   isTenantAdmin?: boolean;
+  isPlatformAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
   onDashboardScopeChange?: (scope: DocumentApprovalScope | null) => void;
   requestedApprovalId?: number | null;
@@ -153,6 +159,7 @@ export function DashboardContent({
   content,
   selectedMenuPermissions,
   isTenantAdmin = false,
+  isPlatformAdmin = false,
   dashboardScope = null,
   onDashboardScopeChange,
   requestedApprovalId,
@@ -189,6 +196,20 @@ export function DashboardContent({
         isTenantAdmin={isTenantAdmin}
       />
     );
+  }
+
+  if (selectedModule.id === 'sales' && (currentPageKey === 'delivery-create' || currentPageKey === 'delivery-status')) {
+    const DeliveryPage = currentPageKey === 'delivery-create' ? SalesDeliveryCreatePage : SalesDeliveryStatusPage;
+    return <DeliveryPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
+
+  if (selectedModule.id === 'sales'
+    && (currentPageKey === 'delivery-plan-create' || currentPageKey === 'delivery-plan-status')) {
+    const PlanPage = currentPageKey === 'delivery-plan-create'
+      ? SalesDeliveryPlanCreatePage : SalesDeliveryPlanStatusPage;
+    return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {
@@ -279,6 +300,10 @@ export function DashboardContent({
         isTenantAdmin={isTenantAdmin}
       />
     );
+  }
+
+  if (selectedModule.id === 'settings' && currentPageKey === 'policies') {
+    return <SystemPolicyPage isPlatformAdmin={isPlatformAdmin} selectedMenuPermissions={selectedMenuPermissions} breadcrumbItems={breadcrumbItems} />;
   }
 
   if (selectedModule.id === 'settings' && currentPageKey === 'roles') {

@@ -177,6 +177,7 @@ class SystemMenuPermissionServiceTest {
         menu.setMenuUrl("/settings/system/menus");
         when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
         when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Collections.singletonList(menu));
+        when(systemMenuDAO.selectTenantDeliveryPlanMode(tenantId)).thenReturn("MANUAL");
         when(systemMenuDAO.selectMenuPermissionCodeRows(
                 org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
                 .thenReturn(Arrays.asList(
@@ -194,6 +195,7 @@ class SystemMenuPermissionServiceTest {
         assertEquals(true, node.getPermissions().isUpdate());
         assertEquals(true, node.getPermissions().isDelete());
         assertEquals(false, node.getPermissions().isExcel());
+        assertEquals("MANUAL", response.getDeliveryPlanMode());
     }
 
     @Test
@@ -224,6 +226,7 @@ class SystemMenuPermissionServiceTest {
 
         when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
         when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(parentMenu, leafMenu));
+        when(systemMenuDAO.selectTenantDeliveryPlanMode(tenantId)).thenReturn("MANUAL");
         when(systemMenuDAO.selectRoleMenuPermissionCodeRows(
                 org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
                 .thenReturn(Collections.singletonList(permissionCodeRow(leafMenu.getMenuId(), "READ")));
@@ -266,6 +269,7 @@ class SystemMenuPermissionServiceTest {
 
         when(systemModuleService.listModules(tenantId)).thenReturn(Collections.singletonList(module));
         when(systemMenuDAO.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(parentMenu, leafMenu));
+        when(systemMenuDAO.selectTenantDeliveryPlanMode(tenantId)).thenReturn("MANUAL");
         when(systemMenuDAO.selectRoleIdsByUserAccount(tenantId, "admin")).thenReturn(Arrays.asList(7L, 9L));
         when(systemMenuDAO.selectRoleMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
                 .thenAnswer(invocation -> {
@@ -287,6 +291,72 @@ class SystemMenuPermissionServiceTest {
         assertEquals(false, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getPermissions().isCreate());
     }
 
+    @Test
+    void autoTenantReceivesModeButNotManualDeliveryPlanMenus() throws Exception {
+        SystemMenuDAO dao = mock(SystemMenuDAO.class);
+        SystemModuleService modules = mock(SystemModuleService.class);
+        SystemMenuServiceImpl service = new SystemMenuServiceImpl(dao, modules);
+        SystemModuleVO sales = new SystemModuleVO();
+        sales.setModuleId(3L);
+        sales.setModuleNm("영업관리");
+        sales.setModuleUrl("/sales");
+        sales.setUseAt("Y");
+        SystemMenuVO plan = menu(31L);
+        plan.setModuleId(3L);
+        plan.setMenuNm("납품계획");
+        plan.setMenuUrl("/sales/delivery-plan");
+        SystemMenuVO planCreate = menu(32L);
+        planCreate.setModuleId(3L);
+        planCreate.setParentMenuId(31L);
+        planCreate.setMenuUrl("/sales/delivery-plan/delivery-plan-create");
+        when(modules.listModules(tenantId)).thenReturn(Collections.singletonList(sales));
+        when(dao.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(plan, planCreate));
+        when(dao.selectTenantDeliveryPlanMode(tenantId)).thenReturn("AUTO");
+        when(dao.selectMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                .thenReturn(Collections.emptyList());
+
+        MyMenuResponseVO response = service.getMyMenuTree(tenantId, "admin", "TENANT_ADMIN");
+
+        assertEquals("AUTO", response.getDeliveryPlanMode());
+        assertEquals(0, response.getMenus().get(0).getChildren().size());
+    }
+
+    @Test
+    void systemPolicyMenuIsVisibleOnlyToPlatformAdminEvenWithGenericOrRoleGrants() throws Exception {
+        for (String roleCode : new String[] { "TENANT_ADMIN", "ADMIN", "TENANT_USER", null, "PLATFORM_ADMIN" }) {
+            SystemMenuDAO dao = mock(SystemMenuDAO.class);
+            SystemModuleService modules = mock(SystemModuleService.class);
+            SystemMenuServiceImpl service = new SystemMenuServiceImpl(dao, modules);
+            SystemModuleVO settings = new SystemModuleVO();
+            settings.setModuleId(2L);
+            settings.setModuleNm("환경설정");
+            settings.setModuleUrl("/settings");
+            settings.setUseAt("Y");
+            SystemMenuVO system = menu(3L);
+            system.setModuleId(2L);
+            system.setMenuUrl("/settings/system");
+            SystemMenuVO roles = menu(4L);
+            roles.setModuleId(2L);
+            roles.setParentMenuId(3L);
+            roles.setMenuUrl("/settings/system/roles");
+            SystemMenuVO policies = menu(5L);
+            policies.setModuleId(2L);
+            policies.setParentMenuId(3L);
+            policies.setMenuUrl("/settings/system/policies/");
+            when(modules.listModules(tenantId)).thenReturn(Collections.singletonList(settings));
+            when(dao.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(system, roles, policies));
+            when(dao.selectTenantDeliveryPlanMode(tenantId)).thenReturn("MANUAL");
+            when(dao.selectMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
+                    .thenReturn(Arrays.asList(permissionCodeRow(4L, "READ"), permissionCodeRow(5L, "READ")));
+
+            MyMenuResponseVO response = service.getMyMenuTree(tenantId, "user", roleCode);
+
+            List<MenuTreeNodeVO> children = response.getMenus().get(0).getChildren().get(0).getChildren();
+            boolean visible = children.stream().anyMatch(node -> Long.valueOf(5L).equals(node.getMenuId()));
+            assertEquals("PLATFORM_ADMIN".equals(roleCode), visible, "role " + roleCode);
+            assertEquals(true, children.stream().anyMatch(node -> Long.valueOf(4L).equals(node.getMenuId())));
+        }
+    }
     @Test
     void deleteMenuDeletesPermissionMappingsBeforeMenu() throws Exception {
         SystemMenuDAO systemMenuDAO = mock(SystemMenuDAO.class);

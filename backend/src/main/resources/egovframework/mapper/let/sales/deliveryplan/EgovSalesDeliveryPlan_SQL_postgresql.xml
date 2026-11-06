@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesDeliveryPlanDAO">
+    <select id="selectTenantOverDeliveryPolicy" parameterType="long" resultType="string">
+        SELECT over_delivery_policy
+        FROM tb_tenant
+        WHERE tenant_id = #{_parameter, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </select>
+
+    <select id="selectTenantMode" parameterType="long" resultType="string">
+        SELECT delivery_plan_mode
+        FROM tb_tenant
+        WHERE tenant_id = #{_parameter, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </select>
+
+    <!-- 납품계획 헤더 생성 경로 전용: 시스템 정책의 운영모드 변경(FOR UPDATE)과 직렬화하며, 수주 잠금보다 먼저 획득한다. -->
+    <select id="lockTenantModeForPlanCreation" parameterType="long" resultType="string">
+        SELECT delivery_plan_mode
+        FROM tb_tenant
+        WHERE tenant_id = #{_parameter, jdbcType=BIGINT}
+          AND use_at = 'Y'
+        FOR SHARE
+    </select>
+
+    <select id="lockSourceOrder" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderHeaderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               h.customer_id AS customerId,
+               h.status AS status,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod
+        FROM tb_sales_order_hd h
+        WHERE h.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
+    <sql id="planHeaderColumns">
+        ph.sales_delivery_plan_id AS salesDeliveryPlanId,
+        ph.tenant_id AS tenantId,
+        ph.plan_no AS planNo,
+        ph.sales_order_id AS salesOrderId,
+        oh.order_no AS orderNo,
+        oh.order_dt AS orderDt,
+        oh.customer_id AS customerId,
+        c.customer_code AS customerCode,
+        c.customer_name AS customerName,
+        ph.created_by AS createdBy
+    </sql>
+
+    <sql id="planHeaderJoins">
+        FROM tb_sales_delivery_plan_hd ph
+        JOIN tb_sales_order_hd oh
+          ON oh.sales_order_id = ph.sales_order_id
+         AND oh.tenant_id = ph.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = oh.customer_id
+         AND c.tenant_id = oh.tenant_id
+    </sql>
+
+    <select id="selectPlanByOrder" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO">
+        SELECT <include refid="planHeaderColumns"/>
+        <include refid="planHeaderJoins"/>
+        WHERE ph.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND ph.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ph.use_at = 'Y'
+    </select>
+
+    <select id="selectPlanHeader" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO">
+        SELECT <include refid="planHeaderColumns"/>
+        <include refid="planHeaderJoins"/>
+        WHERE ph.sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
+          AND ph.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ph.use_at = 'Y'
+    </select>
+
+    <select id="lockPlanHeader" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO">
+        SELECT <include refid="planHeaderColumns"/>
+        <include refid="planHeaderJoins"/>
+        WHERE ph.sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
+          AND ph.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ph.use_at = 'Y'
+        FOR UPDATE OF ph
+    </select>
+
+    <select id="selectPlanDetails" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailVO">
+        SELECT pd.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId,
+               pd.sales_delivery_plan_id AS salesDeliveryPlanId,
+               pd.sales_order_id AS salesOrderId,
+               pd.sales_order_detail_id AS salesOrderDetailId,
+               pd.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               pd.line_no AS lineNo,
+               pd.plan_dt AS planDt,
+               pd.planned_qty AS plannedQty,
+               pd.delivered_qty AS deliveredQty,
+               pd.planned_qty - pd.delivered_qty AS remainingQty,
+               od.order_qty AS orderQty,
+               COALESCE(od.shipped_qty, 0) AS shippedQty
+        FROM tb_sales_delivery_plan_dt pd
+        JOIN tb_sales_order_dt od
+          ON od.sales_order_detail_id = pd.sales_order_detail_id
+         AND od.sales_order_id = pd.sales_order_id
+         AND od.tenant_id = pd.tenant_id
+         AND od.material_id = pd.material_id
+        JOIN tb_material_info m
+          ON m.material_id = pd.material_id
+         AND m.tenant_id = pd.tenant_id
+        WHERE pd.sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
+          AND pd.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY pd.line_no
+    </select>
+
+    <select id="selectOrderLines" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailVO">
+        SELECT od.sales_order_id AS salesOrderId,
+               od.sales_order_detail_id AS salesOrderDetailId,
+               od.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               od.line_no AS lineNo,
+               od.order_qty AS orderQty,
+               COALESCE(od.shipped_qty, 0) AS shippedQty,
+               COALESCE(od.delivery_dt, oh.delivery_dt) AS planDt
+        FROM tb_sales_order_dt od
+        JOIN tb_sales_order_hd oh
+          ON oh.sales_order_id = od.sales_order_id
+         AND oh.tenant_id = od.tenant_id
+        JOIN tb_material_info m
+          ON m.material_id = od.material_id
+         AND m.tenant_id = od.tenant_id
+        WHERE od.sales_order_id = #{salesOrderId, jdbcType=BIGINT}
+          AND od.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY od.line_no
+    </select>
+
+    <select id="selectPlanSourceOrders" parameterType="map"
+            resultType="egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO">
+        SELECT h.sales_order_id AS salesOrderId,
+               od.sales_order_detail_id AS salesOrderDetailId,
+               h.order_no AS orderNo,
+               h.order_dt AS orderDt,
+               h.customer_id AS customerId,
+               c.customer_code AS customerCode,
+               c.customer_name AS customerName,
+               h.delivery_place AS deliveryPlace,
+               h.delivery_method AS deliveryMethod,
+               COALESCE(od.delivery_dt, h.delivery_dt) AS planDt,
+               od.line_no AS lineNo,
+               od.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.unit AS unit,
+               od.order_qty AS orderQty,
+               COALESCE(od.shipped_qty, 0) AS shippedQty,
+               od.order_qty - COALESCE(od.shipped_qty, 0) AS remainingQty,
+               od.unit_price AS unitPrice
+        FROM tb_sales_order_hd h
+        JOIN tb_sales_order_dt od
+          ON od.sales_order_id = h.sales_order_id
+         AND od.tenant_id = h.tenant_id
+        JOIN tb_customer_info c
+          ON c.customer_id = h.customer_id
+         AND c.tenant_id = h.tenant_id
+         AND c.use_at = 'Y'
+        JOIN tb_material_info m
+          ON m.material_id = od.material_id
+         AND m.tenant_id = od.tenant_id
+         AND m.delete_status = 'N'
+         AND m.deleted_at IS NULL
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.status = '수주등록'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM tb_sales_delivery_plan_hd ph
+              WHERE ph.sales_order_id = h.sales_order_id
+                AND ph.tenant_id = h.tenant_id
+                AND ph.use_at = 'Y'
+          )
+        <if test="keyword != null">
+          AND (h.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_code ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY h.order_dt DESC, h.sales_order_id DESC, od.line_no
+        LIMIT #{limit, jdbcType=INTEGER}
+    </select>
+
+    <select id="insertPlanHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_delivery_plan_hd (
+            tenant_id, sales_order_id, plan_no, created_by
+        ) VALUES (
+            #{tenantId, jdbcType=BIGINT}, #{salesOrderId, jdbcType=BIGINT},
+            #{planNo, jdbcType=VARCHAR}, #{createdBy, jdbcType=VARCHAR}
+        )
+        RETURNING sales_delivery_plan_id
+    </select>
+
+    <select id="insertPlanDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_delivery_plan_dt (
+            sales_delivery_plan_id, tenant_id, sales_order_id, sales_order_detail_id,
+            material_id, line_no, plan_dt, planned_qty, created_by
+        ) VALUES (
+            #{salesDeliveryPlanId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT},
+            #{salesOrderId, jdbcType=BIGINT}, #{salesOrderDetailId, jdbcType=BIGINT},
+            #{materialId, jdbcType=BIGINT}, #{lineNo, jdbcType=INTEGER},
+            #{planDt, jdbcType=DATE}, #{plannedQty, jdbcType=NUMERIC},
+            #{createdBy, jdbcType=VARCHAR}
+        )
+        RETURNING sales_delivery_plan_detail_id
+    </select>
+
+    <update id="updatePlanDetail" parameterType="map">
+        UPDATE tb_sales_delivery_plan_dt
+        SET material_id = #{materialId, jdbcType=BIGINT},
+            line_no = #{lineNo, jdbcType=INTEGER},
+            plan_dt = #{planDt, jdbcType=DATE},
+            planned_qty = #{plannedQty, jdbcType=NUMERIC},
+            updated_by = #{updatedBy, jdbcType=VARCHAR},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE sales_delivery_plan_detail_id = #{salesDeliveryPlanDetailId, jdbcType=BIGINT}
+          AND sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND delivered_qty = #{deliveredQty, jdbcType=NUMERIC}
+    </update>
+
+    <delete id="deletePlanDetail" parameterType="map">
+        DELETE FROM tb_sales_delivery_plan_dt
+        WHERE sales_delivery_plan_detail_id = #{salesDeliveryPlanDetailId, jdbcType=BIGINT}
+          AND sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM tb_sales_delivery_dt dd
+              WHERE dd.sales_delivery_plan_detail_id = tb_sales_delivery_plan_dt.sales_delivery_plan_detail_id
+                AND dd.tenant_id = tb_sales_delivery_plan_dt.tenant_id
+          )
+    </delete>
+
+    <select id="countDeliveryReferences" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_sales_delivery_dt dd
+        WHERE dd.sales_delivery_plan_detail_id = #{salesDeliveryPlanDetailId, jdbcType=BIGINT}
+          AND dd.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectPlanStatus" parameterType="map"
+            resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO">
+        SELECT <include refid="planHeaderColumns"/>
+        <include refid="planHeaderJoins"/>
+        LEFT JOIN tb_sales_delivery_plan_dt pd
+          ON pd.sales_delivery_plan_id = ph.sales_delivery_plan_id
+         AND pd.tenant_id = ph.tenant_id
+        WHERE ph.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND ph.use_at = 'Y'
+        <if test="planDtFrom != null">
+          AND pd.plan_dt &gt;= #{planDtFrom, jdbcType=DATE}
+        </if>
+        <if test="planDtTo != null">
+          AND pd.plan_dt &lt;= #{planDtTo, jdbcType=DATE}
+        </if>
+        <if test="keyword != null">
+          AND (ph.plan_no ILIKE '%' || #{keyword} || '%'
+               OR oh.order_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_code ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        GROUP BY ph.sales_delivery_plan_id, oh.order_no, oh.order_dt, oh.customer_id,
+                 c.customer_code, c.customer_name
+        ORDER BY oh.order_dt DESC, ph.sales_delivery_plan_id DESC
+    </select>
+</mapper>

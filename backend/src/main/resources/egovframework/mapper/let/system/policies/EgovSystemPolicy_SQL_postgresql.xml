@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 시스템 정책: 모든 문장은 로그인 tenantId 로 범위를 제한한다. 기본 정책 값은 tb_tenant 컬럼이 실제 원천이다. -->
+<mapper namespace="SystemPolicyDAO">
+
+    <select id="selectPolicyList" parameterType="long" resultType="egovframework.let.system.policies.domain.model.SystemPolicyVO">
+        SELECT
+            p.policy_id AS policyId,
+            p.policy_code AS policyCode,
+            p.policy_nm AS policyName,
+            p.category_nm AS category,
+            p.policy_dc AS description,
+            p.value_type AS valueType,
+            CASE
+                WHEN p.system_policy_at = 'Y' AND p.policy_code = 'DELIVERY_PLAN_MODE' THEN to_jsonb(t.delivery_plan_mode)::text
+                WHEN p.system_policy_at = 'Y' AND p.policy_code = 'OVER_DELIVERY_POLICY' THEN to_jsonb(t.over_delivery_policy)::text
+                ELSE p.value_json::text
+            END AS valueJson,
+            p.options_json::text AS optionsJson,
+            p.min_value AS minValue,
+            p.max_value AS maxValue,
+            p.unit_nm AS unit,
+            p.version AS version,
+            (p.system_policy_at = 'Y') AS systemPolicy,
+            to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+        FROM tb_system_policy p
+        JOIN tb_tenant t ON t.tenant_id = p.tenant_id
+        WHERE p.tenant_id = #{tenantId}
+        ORDER BY p.system_policy_at DESC, p.category_nm, p.policy_nm, p.policy_id
+    </select>
+
+    <select id="selectPolicyById" parameterType="map" resultType="egovframework.let.system.policies.domain.model.SystemPolicyVO">
+        SELECT
+            p.policy_id AS policyId,
+            p.policy_code AS policyCode,
+            p.policy_nm AS policyName,
+            p.category_nm AS category,
+            p.policy_dc AS description,
+            p.value_type AS valueType,
+            CASE
+                WHEN p.system_policy_at = 'Y' AND p.policy_code = 'DELIVERY_PLAN_MODE' THEN to_jsonb(t.delivery_plan_mode)::text
+                WHEN p.system_policy_at = 'Y' AND p.policy_code = 'OVER_DELIVERY_POLICY' THEN to_jsonb(t.over_delivery_policy)::text
+                ELSE p.value_json::text
+            END AS valueJson,
+            p.options_json::text AS optionsJson,
+            p.min_value AS minValue,
+            p.max_value AS maxValue,
+            p.unit_nm AS unit,
+            p.version AS version,
+            (p.system_policy_at = 'Y') AS systemPolicy,
+            to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+        FROM tb_system_policy p
+        JOIN tb_tenant t ON t.tenant_id = p.tenant_id
+        WHERE p.tenant_id = #{tenantId}
+          AND p.policy_id = #{policyId}
+    </select>
+
+    <select id="selectPolicyByIdForUpdate" parameterType="map" resultType="egovframework.let.system.policies.domain.model.SystemPolicyVO">
+        SELECT
+            p.policy_id AS policyId,
+            p.policy_code AS policyCode,
+            p.policy_nm AS policyName,
+            p.category_nm AS category,
+            p.policy_dc AS description,
+            p.value_type AS valueType,
+            p.value_json::text AS valueJson,
+            p.options_json::text AS optionsJson,
+            p.min_value AS minValue,
+            p.max_value AS maxValue,
+            p.unit_nm AS unit,
+            p.version AS version,
+            (p.system_policy_at = 'Y') AS systemPolicy,
+            to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+        FROM tb_system_policy p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.policy_id = #{policyId}
+        FOR UPDATE OF p
+    </select>
+
+    <select id="selectPolicyIdByCode" parameterType="map" resultType="long">
+        SELECT p.policy_id
+        FROM tb_system_policy p
+        WHERE p.tenant_id = #{tenantId}
+          AND p.policy_code = #{policyCode}
+    </select>
+
+    <select id="selectTenantPolicyValuesForUpdate" parameterType="long" resultType="egovframework.let.system.policies.domain.model.SystemPolicyTenantValueVO">
+        SELECT
+            t.delivery_plan_mode AS deliveryPlanMode,
+            t.over_delivery_policy AS overDeliveryPolicy
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId}
+        FOR UPDATE
+    </select>
+
+    <select id="existsDeliveryPlanHeader" parameterType="long" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_sales_delivery_plan_hd h
+            WHERE h.tenant_id = #{tenantId}
+        )
+    </select>
+
+    <select id="insertPolicy" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_system_policy (
+            tenant_id, policy_code, policy_nm, category_nm, policy_dc, value_type,
+            value_json, options_json, min_value, max_value, unit_nm, version, system_policy_at,
+            created_by, updated_by
+        )
+        SELECT
+            t.tenant_id,
+            #{policyCode},
+            #{policyName},
+            #{category},
+            #{description},
+            #{valueType},
+            CAST(#{valueJson} AS jsonb),
+            CAST(#{optionsJson} AS jsonb),
+            #{minValue, jdbcType=NUMERIC},
+            #{maxValue, jdbcType=NUMERIC},
+            #{unit},
+            1,
+            'N',
+            #{actorId, jdbcType=BIGINT},
+            #{actorId, jdbcType=BIGINT}
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId}
+        RETURNING policy_id
+    </select>
+
+    <update id="updatePolicy" parameterType="map">
+        UPDATE tb_system_policy
+        SET policy_nm = #{policyName},
+            category_nm = #{category},
+            policy_dc = #{description},
+            value_json = CAST(#{valueJson} AS jsonb),
+            options_json = CAST(#{optionsJson} AS jsonb),
+            min_value = #{minValue, jdbcType=NUMERIC},
+            max_value = #{maxValue, jdbcType=NUMERIC},
+            unit_nm = #{unit},
+            version = version + 1,
+            updated_by = #{actorId, jdbcType=BIGINT},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND policy_id = #{policyId}
+          AND version = #{version}
+    </update>
+
+    <update id="updateTenantDeliveryPlanMode" parameterType="map">
+        UPDATE tb_tenant
+        SET delivery_plan_mode = #{value}
+        WHERE tenant_id = #{tenantId}
+          AND #{value} IN ('AUTO', 'MANUAL')
+    </update>
+
+    <update id="updateTenantOverDeliveryPolicy" parameterType="map">
+        UPDATE tb_tenant
+        SET over_delivery_policy = #{value}
+        WHERE tenant_id = #{tenantId}
+          AND #{value} IN ('BLOCK', 'WARN')
+    </update>
+
+    <delete id="deletePolicy" parameterType="map">
+        DELETE FROM tb_system_policy
+        WHERE tenant_id = #{tenantId}
+          AND policy_id = #{policyId}
+          AND version = #{version}
+          AND system_policy_at = 'N'
+    </delete>
+
+    <insert id="insertPolicyHistory" parameterType="map">
+        INSERT INTO tb_system_policy_history (
+            tenant_id, policy_id, policy_code, action_cd,
+            before_value, after_value, before_snapshot, after_snapshot, changed_by
+        )
+        SELECT
+            t.tenant_id,
+            #{policyId, jdbcType=BIGINT},
+            #{policyCode},
+            #{action},
+            CAST(#{beforeValueJson, jdbcType=VARCHAR} AS jsonb),
+            CAST(#{afterValueJson, jdbcType=VARCHAR} AS jsonb),
+            CAST(#{beforeSnapshotJson, jdbcType=VARCHAR} AS jsonb),
+            CAST(#{afterSnapshotJson, jdbcType=VARCHAR} AS jsonb),
+            #{actorId, jdbcType=BIGINT}
+        FROM tb_tenant t
+        WHERE t.tenant_id = #{tenantId}
+    </insert>
+
+    <select id="selectPolicyHistoryList" parameterType="map" resultType="egovframework.let.system.policies.domain.model.SystemPolicyHistoryVO">
+        SELECT
+            h.action_cd AS action,
+            COALESCE(u.user_nm, h.changed_by::text, '') AS changedBy,
+            to_char(h.changed_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS changedAt,
+            h.before_value::text AS beforeValueJson,
+            h.after_value::text AS afterValueJson
+        FROM tb_system_policy_history h
+        LEFT JOIN tb_user u
+          ON u.user_id = h.changed_by
+         AND u.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId}
+          AND h.policy_id = #{policyId}
+        ORDER BY h.changed_at DESC, h.history_id DESC
+        LIMIT 50
+    </select>
+
+    <select id="selectActiveUsers" parameterType="map" resultType="egovframework.let.system.policies.domain.model.SystemPolicyUserVO">
+        SELECT
+            u.user_id AS userId,
+            u.user_nm AS userName
+        FROM tb_user u
+        WHERE u.tenant_id = #{tenantId}
+          AND u.use_at = 'Y'
+        <if test="keyword != null and keyword != ''">
+          AND u.user_nm ILIKE '%' || #{keyword} || '%' ESCAPE '\'
+        </if>
+        ORDER BY u.user_nm, u.user_id
+        LIMIT 50
+    </select>
+
+    <select id="countActiveUsersByIds" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM tb_user u
+        WHERE u.tenant_id = #{tenantId}
+          AND u.use_at = 'Y'
+          AND u.user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+</mapper>

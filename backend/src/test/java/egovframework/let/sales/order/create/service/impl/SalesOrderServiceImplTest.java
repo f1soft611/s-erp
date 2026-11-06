@@ -28,6 +28,8 @@ import egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO;
 import egovframework.let.sales.order.create.domain.model.SalesOrderVO;
 import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.common.idsequence.service.IdSequenceService;
+import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 
 class SalesOrderServiceImplTest {
 
@@ -37,16 +39,23 @@ class SalesOrderServiceImplTest {
     @Mock
     private IdSequenceService idSequenceService;
 
+    @Mock
+    private SalesDeliveryPlanService salesDeliveryPlanService;
+
     private SalesOrderServiceImpl service;
 
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
-        service = new SalesOrderServiceImpl(salesOrderDAO, idSequenceService);
+        service = new SalesOrderServiceImpl(salesOrderDAO, idSequenceService, salesDeliveryPlanService);
+        when(salesDeliveryPlanService.getMode(71L)).thenReturn("MANUAL");
+        when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("MANUAL");
         when(salesOrderDAO.existsCustomer(anyMap())).thenReturn(true);
         when(salesOrderDAO.existsMaterial(anyMap())).thenReturn(true);
         when(salesOrderDAO.insertOrderHeader(anyMap())).thenReturn(300L);
         when(salesOrderDAO.insertOrderDetail(anyMap())).thenReturn(400L);
+        when(salesOrderDAO.selectOrderForUpdate(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(0);
         when(idSequenceService.nextValue("SALES_ORDER_NO", "71", "20261027"))
                 .thenReturn(1L);
     }
@@ -94,6 +103,43 @@ class SalesOrderServiceImplTest {
                 .containsEntry("totalAmt", new BigDecimal("1.53"));
         verify(idSequenceService).nextValue(
                 "SALES_ORDER_NO", "71", "20261027");
+    }
+
+    @Test
+    void createLocksTenantPlanModeBeforeInsertingTheOrderAndIgnoresUnlockedMode() throws Exception {
+        when(salesDeliveryPlanService.getMode(71L)).thenReturn("AUTO");
+
+        service.createOrder(71L, "user01", validPayload());
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(salesDeliveryPlanService, salesOrderDAO);
+        order.verify(salesDeliveryPlanService).lockModeForPlanCreation(71L);
+        order.verify(salesOrderDAO).insertOrderHeader(anyMap());
+        verify(salesDeliveryPlanService, org.mockito.Mockito.never()).getMode(71L);
+        verify(salesDeliveryPlanService, org.mockito.Mockito.never())
+                .createAutomaticPlan(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void createsAutomaticPlanWithOrderDetailDatesFallingBackToHeaderDate() throws Exception {
+        when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("AUTO");
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.setDeliveryDt(LocalDate.of(2026, 11, 5));
+        payload.getDetails().get(0).setDeliveryDt(null);
+        when(salesOrderDAO.insertOrderDetail(anyMap())).thenReturn(401L);
+
+        service.createOrder(71L, "user01", payload);
+
+        ArgumentCaptor<SalesDeliveryPlanRequestVO> request =
+                ArgumentCaptor.forClass(SalesDeliveryPlanRequestVO.class);
+        org.mockito.Mockito.verify(salesDeliveryPlanService)
+                .createAutomaticPlan(org.mockito.ArgumentMatchers.eq(71L),
+                        org.mockito.ArgumentMatchers.eq("user01"), request.capture());
+        assertThat(request.getValue().getSalesOrderId()).isEqualTo(300L);
+        assertThat(request.getValue().getDetails()).hasSize(1);
+        assertThat(request.getValue().getDetails().get(0).getSalesOrderDetailId()).isEqualTo(401L);
+        assertThat(request.getValue().getDetails().get(0).getPlanDt())
+                .isEqualTo(LocalDate.of(2026, 11, 5));
     }
 
     @Test
@@ -205,7 +251,7 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void updatesHeaderAndReplacesDetailsWithoutRenumberingTheOrder() throws Exception {
+    void updatesHeaderAndInsertsMissingDetailsWithoutRenumberingTheOrder() throws Exception {
         when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
         when(salesOrderDAO.countShippedDetails(anyMap())).thenReturn(0);
         when(salesOrderDAO.updateOrderHeader(anyMap())).thenReturn(1);
@@ -223,7 +269,7 @@ class SalesOrderServiceImplTest {
                 .containsEntry("totalAmt", new BigDecimal("5.00"))
                 .doesNotContainKey("orderNo");
         org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(salesOrderDAO);
-        inOrder.verify(salesOrderDAO).deleteOrderDetails(anyMap());
+        inOrder.verify(salesOrderDAO).updateOrderHeader(anyMap());
         inOrder.verify(salesOrderDAO).insertOrderDetail(argThat(params ->
                 Integer.valueOf(1).equals(params.get("lineNo"))
                         && Long.valueOf(300L).equals(params.get("salesOrderId"))));
@@ -231,17 +277,101 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void rejectsUpdateOfShippedOrderWithConflictBeforeWriting() throws Exception {
+    void preservesExistingDetailIdentityWhenUpdatingTheSameLine() throws Exception {
+        SalesOrderDetailVO existing = new SalesOrderDetailVO();
+        existing.setSalesOrderDetailId(401L);
+        existing.setSalesOrderId(300L);
+        existing.setTenantId(71L);
+        existing.setLineNo(1);
+        existing.setMaterialId(20L);
+        existing.setOrderQty(new BigDecimal("2.00"));
+        existing.setShippedQty(new BigDecimal("0.00"));
         when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
-        when(salesOrderDAO.countShippedDetails(anyMap())).thenReturn(1);
+        when(salesOrderDAO.selectOrderDetails(anyMap()))
+                .thenReturn(Collections.singletonList(existing), Collections.singletonList(existing));
+        when(salesOrderDAO.updateOrderHeader(anyMap())).thenReturn(1);
+        when(salesOrderDAO.updateOrderDetail(anyMap())).thenReturn(1);
+
+        service.updateOrder(71L, "user02", 300L, validPayload());
+
+        verify(salesOrderDAO, org.mockito.Mockito.never()).insertOrderDetail(anyMap());
+        ArgumentCaptor<Map<String, Object>> detailParams = ArgumentCaptor.forClass(Map.class);
+        verify(salesOrderDAO).updateOrderDetail(detailParams.capture());
+        assertThat(detailParams.getValue()).containsEntry("salesOrderDetailId", 401L)
+                .containsEntry("lineNo", 1)
+                .containsEntry("materialId", 20L);
+    }
+
+    @Test
+    void synchronizesAutomaticPlanAfterUpdatingOrderDetails() throws Exception {
+        SalesOrderDetailVO existing = new SalesOrderDetailVO();
+        existing.setSalesOrderDetailId(401L);
+        existing.setSalesOrderId(300L);
+        existing.setTenantId(71L);
+        existing.setLineNo(1);
+        existing.setMaterialId(20L);
+        existing.setOrderQty(new BigDecimal("2.00"));
+        existing.setShippedQty(new BigDecimal("0.00"));
+        when(salesDeliveryPlanService.getMode(71L)).thenReturn("AUTO");
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.selectOrderDetails(anyMap()))
+                .thenReturn(Collections.singletonList(existing), Collections.singletonList(existing));
+        when(salesOrderDAO.updateOrderHeader(anyMap())).thenReturn(1);
+        when(salesOrderDAO.updateOrderDetail(anyMap())).thenReturn(1);
+
+        service.updateOrder(71L, "user02", 300L, validPayload());
+
+        org.mockito.Mockito.verify(salesDeliveryPlanService).synchronizeAutomaticPlan(
+                org.mockito.ArgumentMatchers.eq(71L), org.mockito.ArgumentMatchers.eq("user02"),
+                org.mockito.ArgumentMatchers.eq(300L),
+                org.mockito.ArgumentMatchers.eq(Collections.singletonList(401L)));
+    }
+
+    @Test
+    void rejectsReducingOrderQuantityBelowShippedQuantity() throws Exception {
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        SalesOrderDetailVO existing = new SalesOrderDetailVO();
+        existing.setSalesOrderDetailId(401L);
+        existing.setLineNo(1);
+        existing.setMaterialId(20L);
+        existing.setOrderQty(new BigDecimal("3.00"));
+        existing.setShippedQty(new BigDecimal("2.50"));
+        when(salesOrderDAO.selectOrderDetails(anyMap())).thenReturn(Collections.singletonList(existing));
 
         assertThatThrownBy(() -> service.updateOrder(71L, "user02", 300L, validPayload()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
-
         verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
-        verify(salesOrderDAO, org.mockito.Mockito.never()).deleteOrderDetails(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
+    }
+
+    @Test
+    void warnAllowsUnrelatedAutoOrderEditWithoutInflatingBaselineOrChangingReferences() throws Exception {
+        when(salesDeliveryPlanService.getMode(71L)).thenReturn("AUTO");
+        when(salesDeliveryPlanService.getOverDeliveryPolicy(71L)).thenReturn("WARN");
+        SalesOrderDetailVO existing = new SalesOrderDetailVO();
+        existing.setSalesOrderDetailId(401L);
+        existing.setLineNo(1);
+        existing.setMaterialId(20L);
+        existing.setOrderQty(new BigDecimal("2.00"));
+        existing.setShippedQty(new BigDecimal("3.00"));
+        when(salesOrderDAO.selectOrderDetails(anyMap())).thenReturn(Collections.singletonList(existing));
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        when(salesOrderDAO.updateOrderHeader(anyMap())).thenReturn(1);
+        when(salesOrderDAO.updateOrderDetail(anyMap())).thenReturn(1);
+        when(salesOrderDAO.countOrderDeliveryReferences(anyMap())).thenReturn(1);
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.setRemark("비고 수정");
+
+        service.updateOrder(71L, "user02", 300L, payload);
+
+        verify(salesOrderDAO).updateOrderDetail(argThat(params ->
+                Long.valueOf(401L).equals(params.get("salesOrderDetailId"))
+                        && new BigDecimal("2.00").equals(params.get("orderQty"))
+                        && !params.containsKey("shippedQty")));
+        verify(salesDeliveryPlanService).synchronizeAutomaticPlan(
+                71L, "user02", 300L, Collections.singletonList(401L));
     }
 
     @Test
@@ -258,11 +388,53 @@ class SalesOrderServiceImplTest {
                 .containsEntry("salesOrderId", 300L)
                 .containsEntry("updatedBy", "user02");
 
-        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("출하완료"));
+        when(salesOrderDAO.selectOrderForUpdate(anyMap())).thenReturn(storedOrder("출하완료"));
         assertThatThrownBy(() -> service.deleteOrder(71L, "user02", 300L))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void locksOrderAndRejectsDeletingAReferencedDetail() throws Exception {
+        SalesOrderDetailVO first = new SalesOrderDetailVO();
+        first.setSalesOrderDetailId(401L);
+        first.setLineNo(1);
+        first.setMaterialId(20L);
+        first.setOrderQty(new BigDecimal("2.00"));
+        first.setShippedQty(new BigDecimal("0.00"));
+        SalesOrderDetailVO second = new SalesOrderDetailVO();
+        second.setSalesOrderDetailId(402L);
+        second.setLineNo(2);
+        second.setMaterialId(21L);
+        second.setOrderQty(new BigDecimal("2.00"));
+        second.setShippedQty(new BigDecimal("0.00"));
+        when(salesOrderDAO.selectOrderDetails(anyMap())).thenReturn(Arrays.asList(first, second));
+        when(salesOrderDAO.countOrderDetailReferences(argThat(params ->
+                Long.valueOf(402L).equals(params.get("salesOrderDetailId"))))).thenReturn(1);
+
+        assertThatThrownBy(() -> service.updateOrder(71L, "user02", 300L, validPayload()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(salesOrderDAO);
+        inOrder.verify(salesOrderDAO).selectOrderForUpdate(anyMap());
+        inOrder.verify(salesOrderDAO).selectOrderDetails(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
+    }
+
+    @Test
+    void rejectsDeletingOrderWithDeliveryHistoryAfterLockingIt() throws Exception {
+        when(salesOrderDAO.countDeliveryReferences(anyMap())).thenReturn(1);
+
+        assertThatThrownBy(() -> service.deleteOrder(71L, "user02", 300L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(salesOrderDAO).selectOrderForUpdate(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).softDeleteOrderHeader(anyMap());
     }
 
     private SalesOrderVO storedOrder(String status) {

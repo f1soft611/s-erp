@@ -1,0 +1,1034 @@
+[
+  {
+    "width": 375,
+    "registration": {
+      "order": {
+        "save": {
+          "x": 190.328125,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 116,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 92,
+          "y": 301.9375,
+          "width": 283,
+          "height": 598.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 104,
+          "y": 313.9375,
+          "width": 259,
+          "height": 511.25,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "12px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 117,
+          "y": 370.9375,
+          "width": 233,
+          "height": 441.25,
+          "display": "grid",
+          "gridTemplateColumns": "233px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 117,
+          "y": 749.1875,
+          "width": 233,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 104,
+          "y": 568.1875,
+          "width": 259,
+          "height": 320,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 137.328125
+        },
+        "summary": {
+          "x": 105,
+          "y": 965.1875,
+          "width": 257,
+          "height": 166,
+          "display": "grid",
+          "gridTemplateColumns": "233px",
+          "padding": "12px",
+          "borderRadius": "0px"
+        }
+      },
+      "delivery": {
+        "save": {
+          "x": 190.328125,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 116,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 92,
+          "y": 301.9375,
+          "width": 283,
+          "height": 598.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 104,
+          "y": 313.9375,
+          "width": 259,
+          "height": 463.25,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "12px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 117,
+          "y": 370.9375,
+          "width": 233,
+          "height": 393.25,
+          "display": "grid",
+          "gridTemplateColumns": "233px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 117,
+          "y": 701.1875,
+          "width": 233,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 104,
+          "y": 775.1875,
+          "width": 259,
+          "height": 320,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 137.328125
+        },
+        "summary": {
+          "x": 105,
+          "y": 1172.1875,
+          "width": 257,
+          "height": 166,
+          "display": "grid",
+          "gridTemplateColumns": "233px",
+          "padding": "12px",
+          "borderRadius": "0px"
+        }
+      }
+    }
+  },
+  {
+    "width": 375,
+    "status": {
+      "order": {
+        "search": {
+          "x": 156,
+          "y": 311.9375,
+          "width": 155,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 100,
+          "y": 438.953125,
+          "width": 267,
+          "height": 445.046875,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 116,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 92,
+          "y": 145,
+          "width": 283,
+          "height": 755,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 0,
+          "y": 0,
+          "width": 375,
+          "height": 900,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "footer": {
+          "x": 0,
+          "y": 842,
+          "width": 375,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 16px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 191,
+          "y": 855,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 16,
+          "y": 854,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      },
+      "delivery": {
+        "search": {
+          "x": 156,
+          "y": 311.9375,
+          "width": 155,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 100,
+          "y": 438.953125,
+          "width": 267,
+          "height": 445.046875,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 116,
+          "y": 256.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 92,
+          "y": 145,
+          "width": 283,
+          "height": 755,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 0,
+          "y": 0,
+          "width": 375,
+          "height": 900,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "footer": {
+          "x": 0,
+          "y": 842,
+          "width": 375,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 16px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 191,
+          "y": 855,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 16,
+          "y": 854,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      }
+    }
+  },
+  {
+    "width": 768,
+    "registration": {
+      "order": {
+        "save": {
+          "x": 478.328125,
+          "y": 212.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 404,
+          "y": 212.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 380,
+          "y": 257.9375,
+          "width": 388,
+          "height": 642.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 396,
+          "y": 273.9375,
+          "width": 356,
+          "height": 333,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 413,
+          "y": 334.9375,
+          "width": 322,
+          "height": 255,
+          "display": "grid",
+          "gridTemplateColumns": "153px 153px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 413,
+          "y": 526.9375,
+          "width": 322,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 396,
+          "y": 622.9375,
+          "width": 356,
+          "height": 320,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 230.328125
+        },
+        "summary": {
+          "x": 397,
+          "y": 1027.9375,
+          "width": 354,
+          "height": 110.046875,
+          "display": "grid",
+          "gridTemplateColumns": "102px 102px 102px",
+          "padding": "16px",
+          "borderRadius": "0px"
+        }
+      },
+      "delivery": {
+        "save": {
+          "x": 478.328125,
+          "y": 192.921875,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 404,
+          "y": 192.921875,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 380,
+          "y": 237.921875,
+          "width": 388,
+          "height": 662.078125,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 396,
+          "y": 253.921875,
+          "width": 356,
+          "height": 333,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 413,
+          "y": 314.921875,
+          "width": 322,
+          "height": 255,
+          "display": "grid",
+          "gridTemplateColumns": "153px 153px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 413,
+          "y": 506.921875,
+          "width": 322,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 396,
+          "y": 602.921875,
+          "width": 356,
+          "height": 320,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 230.328125
+        },
+        "summary": {
+          "x": 397,
+          "y": 1007.921875,
+          "width": 354,
+          "height": 110.046875,
+          "display": "grid",
+          "gridTemplateColumns": "102px 102px 102px",
+          "padding": "16px",
+          "borderRadius": "0px"
+        }
+      }
+    }
+  },
+  {
+    "width": 768,
+    "status": {
+      "order": {
+        "search": {
+          "x": 444,
+          "y": 267.9375,
+          "width": 260,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 396,
+          "y": 394.953125,
+          "width": 356,
+          "height": 489.046875,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 404,
+          "y": 212.9375,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 380,
+          "y": 101,
+          "width": 388,
+          "height": 799,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 32,
+          "y": 36,
+          "width": 704,
+          "height": 828,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "footer": {
+          "x": 33,
+          "y": 805,
+          "width": 702,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 24px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 543,
+          "y": 818,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 57,
+          "y": 817,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      },
+      "delivery": {
+        "search": {
+          "x": 444,
+          "y": 247.921875,
+          "width": 260,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 396,
+          "y": 374.9375,
+          "width": 356,
+          "height": 509.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 404,
+          "y": 192.921875,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 380,
+          "y": 101,
+          "width": 388,
+          "height": 799,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 32,
+          "y": 36,
+          "width": 704,
+          "height": 828,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "footer": {
+          "x": 33,
+          "y": 805,
+          "width": 702,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 24px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 543,
+          "y": 818,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 57,
+          "y": 817,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      }
+    }
+  },
+  {
+    "width": 1280,
+    "registration": {
+      "order": {
+        "save": {
+          "x": 1115.34375,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 1041.015625,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 380,
+          "y": 151.921875,
+          "width": 900,
+          "height": 748.078125,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "24px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 404,
+          "y": 175.921875,
+          "width": 852,
+          "height": 237,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 421,
+          "y": 236.921875,
+          "width": 818,
+          "height": 159,
+          "display": "grid",
+          "gridTemplateColumns": "192.5px 192.5px 192.5px 192.5px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 421,
+          "y": 332.921875,
+          "width": 818,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 404,
+          "y": 428.921875,
+          "width": 852,
+          "height": 447.078125,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 119.078125
+        },
+        "summary": {
+          "x": 405,
+          "y": 801,
+          "width": 850,
+          "height": 74,
+          "display": "grid",
+          "gridTemplateColumns": "267.328px 267.328px 267.344px",
+          "padding": "16px",
+          "borderRadius": "0px"
+        }
+      },
+      "delivery": {
+        "save": {
+          "x": 1115.34375,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "new": {
+          "x": 1041.015625,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "region": {
+          "x": 380,
+          "y": 151.921875,
+          "width": 900,
+          "height": 748.078125,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "24px",
+          "borderRadius": "0px"
+        },
+        "basic": {
+          "x": 404,
+          "y": 175.921875,
+          "width": 852,
+          "height": 237,
+          "display": "block",
+          "gridTemplateColumns": "none",
+          "padding": "16px",
+          "borderRadius": "12px"
+        },
+        "fields": {
+          "x": 421,
+          "y": 236.921875,
+          "width": 818,
+          "height": 159,
+          "display": "grid",
+          "gridTemplateColumns": "192.5px 192.5px 192.5px 192.5px",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "remark": {
+          "x": 421,
+          "y": 332.921875,
+          "width": 818,
+          "height": 63,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "8.5px 14px",
+          "borderRadius": "6px"
+        },
+        "detail": {
+          "x": 404,
+          "y": 428.921875,
+          "width": 852,
+          "height": 447.078125,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "12px"
+        },
+        "addOffset": {
+          "right": 119.078125
+        },
+        "summary": {
+          "x": 405,
+          "y": 801,
+          "width": 850,
+          "height": 74,
+          "display": "grid",
+          "gridTemplateColumns": "267.328px 267.328px 267.344px",
+          "padding": "16px",
+          "borderRadius": "0px"
+        }
+      }
+    }
+  },
+  {
+    "width": 1280,
+    "status": {
+      "order": {
+        "search": {
+          "x": 444,
+          "y": 161.921875,
+          "width": 320,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 396,
+          "y": 276.9375,
+          "width": 868,
+          "height": 607.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 1189.671875,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 380,
+          "y": 59,
+          "width": 900,
+          "height": 841,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 145,
+          "y": 36,
+          "width": 990,
+          "height": 828,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "footer": {
+          "x": 146,
+          "y": 805,
+          "width": 988,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 24px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 942,
+          "y": 818,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 170,
+          "y": 817,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      },
+      "delivery": {
+        "search": {
+          "x": 444,
+          "y": 161.921875,
+          "width": 320,
+          "height": 40,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px 8px 8px 0px"
+        },
+        "grid": {
+          "x": 396,
+          "y": 276.9375,
+          "width": 868,
+          "height": 607.0625,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "read": {
+          "x": 1189.671875,
+          "y": 75,
+          "width": 66.328125,
+          "height": 28,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "4px 10px",
+          "borderRadius": "6px"
+        },
+        "panel": {
+          "x": 380,
+          "y": 59,
+          "width": 900,
+          "height": 841,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "editor": {
+          "x": 145,
+          "y": 36,
+          "width": 990,
+          "height": 828,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "0px",
+          "borderRadius": "6px"
+        },
+        "footer": {
+          "x": 146,
+          "y": 805,
+          "width": 988,
+          "height": 58,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "12px 24px",
+          "borderRadius": "0px"
+        },
+        "save": {
+          "x": 942,
+          "y": 818,
+          "width": 96,
+          "height": 32,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 20px",
+          "borderRadius": "9px"
+        },
+        "delete": {
+          "x": 170,
+          "y": 817,
+          "width": 74.1875,
+          "height": 34,
+          "display": "flex",
+          "gridTemplateColumns": "none",
+          "padding": "6px 12px",
+          "borderRadius": "6px"
+        }
+      }
+    }
+  }
+]

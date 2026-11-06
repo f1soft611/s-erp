@@ -40,6 +40,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
 
     private static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
     private static final String TENANT_ADMIN = "TENANT_ADMIN";
+    private static final String SYSTEM_POLICY_MENU_URL = "/settings/system/policies";
 
     private final SystemMenuDAO systemMenuDAO;
     private final SystemModuleService systemModuleService;
@@ -254,12 +255,34 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         }
     }
 
+    private static boolean isSystemPolicyMenu(String menuUrl) {
+        if (menuUrl == null) {
+            return false;
+        }
+        String normalized = menuUrl.trim();
+        while (normalized.length() > 1 && normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return SYSTEM_POLICY_MENU_URL.equals(normalized) || normalized.startsWith(SYSTEM_POLICY_MENU_URL + "/");
+    }
     @Override
     public MyMenuResponseVO getMyMenuTree(Long tenantId, String userId, Long roleId, String roleCode) throws Exception {
         List<SystemModuleVO> modules = systemModuleService.listModules(tenantId).stream()
                 .filter(module -> "Y".equalsIgnoreCase(module.getUseAt()))
                 .collect(Collectors.toList());
-        List<SystemMenuVO> menus = systemMenuDAO.selectActiveMenusForTenant(tenantId);
+        List<SystemMenuVO> menus = new ArrayList<>(systemMenuDAO.selectActiveMenusForTenant(tenantId));
+        String deliveryPlanMode = systemMenuDAO.selectTenantDeliveryPlanMode(tenantId);
+        if (!"AUTO".equals(deliveryPlanMode) && !"MANUAL".equals(deliveryPlanMode)) {
+            throw new IllegalStateException("테넌트 납품계획 운영모드를 확인할 수 없습니다.");
+        }
+        if ("AUTO".equals(deliveryPlanMode)) {
+            menus.removeIf(menu -> menu.getMenuUrl() != null
+                    && menu.getMenuUrl().startsWith("/sales/delivery-plan"));
+        }
+        if (roleCode == null || !PLATFORM_ADMIN.equals(roleCode.trim())) {
+            // 시스템 정책 메뉴는 테넌트 관리자 일괄 권한/역할 매핑과 무관하게 PLATFORM_ADMIN 에게만 노출한다.
+            menus.removeIf(menu -> isSystemPolicyMenu(menu.getMenuUrl()));
+        }
         List<Long> effectiveRoleIds = resolveEffectiveRoleIds(tenantId, userId, roleId);
         Map<Long, Set<String>> permissionCodesByMenuId = permissionCodesByMenuId(menus, tenantId, effectiveRoleIds);
 
@@ -290,6 +313,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         user.setRoles(roleNames.isEmpty() ? Collections.emptyList() : new ArrayList<>(roleNames));
         response.setUser(user);
         response.setMenus(tree);
+        response.setDeliveryPlanMode(deliveryPlanMode);
         return response;
     }
 
