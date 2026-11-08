@@ -16,13 +16,13 @@ export function DeliveryEditorDialog({ id, mode, page, permissions, onClose, onS
   const [actions, setActions] = useState<DeliveryEmbeddedActionState | null>(null);
   const close = useCallback(() => {
     if (pending.current) return;
-    if (dirty.current && !window.confirm('저장되지 않은 납품 내용이 있습니다. 닫으시겠습니까?')) return;
+    if (dirty.current && !window.confirm('저장되지 않은 출하 내용이 있습니다. 닫으시겠습니까?')) return;
     onClose();
   }, [onClose]);
   const onDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
   const onPending = useCallback((value: boolean) => { pending.current = value; }, []);
   const editing = mode === 'edit';
-  return <CommonDialog open title={editing ? '납품 수정' : '납품 상세보기'} onClose={close} size="lg" bodyMode="fill"
+  return <CommonDialog open title={editing ? '출하 수정' : '출하 상세보기'} onClose={close} size="lg" bodyMode="fill"
     paperHeight="min(900px, 92vh)" fullScreenOnMobile
     footerStart={editing && actions?.canDelete ? <Button variant="outlined" color="error" startIcon={<DeleteForeverOutlinedIcon />}
       disabled={actions.deleteDisabled} onClick={actions.remove}>삭제</Button> : undefined}

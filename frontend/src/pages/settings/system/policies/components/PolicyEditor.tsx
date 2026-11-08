@@ -83,8 +83,8 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
             <Divider />
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>현재 적용값 설정</Typography>
             <PolicyValueInput draft={draft} disabled={saving} onChange={(value) => set('value', value)} />
-            {policy?.policyCode === 'DELIVERY_PLAN_MODE' && <Alert severity="warning">기존 납품계획이 있으면 운영 방식을 바꿀 수 없습니다. 기존 계획을 자동 변환하지 않습니다.</Alert>}
-            {policy?.policyCode === 'OVER_DELIVERY_POLICY' && <Alert severity="warning">차단으로 전환해도 기존 초과 실적은 유지됩니다. 이후 저장은 차단 정책으로 검증합니다.</Alert>}
+            {policy?.policyCode === 'DELIVERY_PLAN_MODE' && <Alert severity="warning">기존 출하계획이 있으면 운영 방식을 바꿀 수 없습니다. 기존 계획을 자동 변환하지 않습니다.</Alert>}
+            {policy?.policyCode === 'OVER_DELIVERY_POLICY' && <Alert severity="warning">차단으로 전환해도 기존 초과 출하 실적은 유지됩니다. 이후 저장은 차단 정책으로 검증합니다.</Alert>}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>

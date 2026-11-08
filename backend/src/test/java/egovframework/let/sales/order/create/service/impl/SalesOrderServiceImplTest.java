@@ -328,6 +328,33 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void rejectsAutoOrderQuantityBelowExistingPlanBeforeUpdatingOrder() throws Exception {
+        when(salesDeliveryPlanService.getMode(71L)).thenReturn("AUTO");
+        when(salesDeliveryPlanService.getOverDeliveryPolicy(71L)).thenReturn("BLOCK");
+        when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
+        SalesOrderDetailVO existing = new SalesOrderDetailVO();
+        existing.setSalesOrderDetailId(401L);
+        existing.setSalesOrderId(300L);
+        existing.setTenantId(71L);
+        existing.setLineNo(1);
+        existing.setMaterialId(20L);
+        existing.setOrderQty(new BigDecimal("3.00"));
+        existing.setShippedQty(BigDecimal.ZERO);
+        when(salesOrderDAO.selectOrderDetails(anyMap()))
+                .thenReturn(Collections.singletonList(existing));
+        when(salesOrderDAO.sumPlannedQty(anyMap())).thenReturn(new BigDecimal("2.50"));
+
+        assertThatThrownBy(() -> service.updateOrder(71L, "user02", 300L, validPayload()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(salesOrderDAO).sumPlannedQty(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderHeader(anyMap());
+        verify(salesOrderDAO, org.mockito.Mockito.never()).updateOrderDetail(anyMap());
+    }
+
+    @Test
     void rejectsReducingOrderQuantityBelowShippedQuantity() throws Exception {
         when(salesOrderDAO.selectOrder(anyMap())).thenReturn(storedOrder("수주등록"));
         SalesOrderDetailVO existing = new SalesOrderDetailVO();

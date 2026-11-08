@@ -58,19 +58,25 @@ export async function searchPlanSourceOrders(keyword: string) {
 
 export async function createDeliveryPlan(request: DeliveryPlanRequest) {
   const response = await apiPost<{ item?: DeliveryPlanItem }>(PATH, request);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
 export async function getDeliveryPlan(id: number) {
   const response = await apiGet<{ item?: DeliveryPlanItem }>(`${PATH}/${id}`);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
+  return response.item;
+}
+
+export async function getDeliveryPlanByOrder(salesOrderId: number) {
+  const response = await apiGet<{ item?: DeliveryPlanItem }>(`${PATH}/by-order/${salesOrderId}`);
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
 export async function updateDeliveryPlan(id: number, request: DeliveryPlanRequest) {
   const response = await apiPut<{ item?: DeliveryPlanItem }>(`${PATH}/${id}`, request);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
@@ -79,6 +85,6 @@ export async function getDeliveryPlanStatus(filters: DeliveryPlanFilters) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value.trim()) params.set(key, value.trim()); });
   const response = await apiGet<{ items?: DeliveryPlanStatusRow[] }>(`${PATH}/status?${params}`);
-  if (!Array.isArray(response.items)) throw new Error('납품계획 현황 응답을 확인해 주세요.');
+  if (!Array.isArray(response.items)) throw new Error('출하계획 현황 응답을 확인해 주세요.');
   return response.items;
 }

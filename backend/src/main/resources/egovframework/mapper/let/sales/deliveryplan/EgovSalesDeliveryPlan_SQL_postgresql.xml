@@ -181,13 +181,26 @@
         WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND h.use_at = 'Y'
           AND h.status = '수주등록'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM tb_sales_delivery_plan_hd ph
-              WHERE ph.sales_order_id = h.sales_order_id
-                AND ph.tenant_id = h.tenant_id
-                AND ph.use_at = 'Y'
-          )
+        <choose>
+          <when test="deliveryPlanMode == 'AUTO'">
+            AND EXISTS (
+                SELECT 1
+                FROM tb_sales_delivery_plan_hd ph
+                WHERE ph.sales_order_id = h.sales_order_id
+                  AND ph.tenant_id = h.tenant_id
+                  AND ph.use_at = 'Y'
+            )
+          </when>
+          <otherwise>
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tb_sales_delivery_plan_hd ph
+                WHERE ph.sales_order_id = h.sales_order_id
+                  AND ph.tenant_id = h.tenant_id
+                  AND ph.use_at = 'Y'
+            )
+          </otherwise>
+        </choose>
         <if test="keyword != null">
           AND (h.order_no ILIKE '%' || #{keyword} || '%'
                OR c.customer_code ILIKE '%' || #{keyword} || '%'

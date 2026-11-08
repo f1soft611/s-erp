@@ -49,6 +49,7 @@ type DashboardContentProps = {
   breadcrumbItems: string[];
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
+  deliveryPlanMode?: 'AUTO' | 'MANUAL';
   isTenantAdmin?: boolean;
   isPlatformAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
@@ -158,6 +159,7 @@ export function DashboardContent({
   breadcrumbItems,
   content,
   selectedMenuPermissions,
+  deliveryPlanMode,
   isTenantAdmin = false,
   isPlatformAdmin = false,
   dashboardScope = null,
@@ -209,7 +211,8 @@ export function DashboardContent({
     const PlanPage = currentPageKey === 'delivery-plan-create'
       ? SalesDeliveryPlanCreatePage : SalesDeliveryPlanStatusPage;
     return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
-      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      deliveryPlanMode={deliveryPlanMode} />;
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {

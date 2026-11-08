@@ -18,12 +18,12 @@ import { DeliveryStatusDetailPanel } from './components/DeliveryStatusDetailPane
 
 const SESSION_KEY = 's-erp:page:sales-delivery-status';
 const fields: PageSearchField[] = [
-  { field: 'deliveryDt', label: '납품일', type: 'date', required: true, searchSpan: 2 },
-  { field: 'deliveryType', label: '납품구분', type: 'select', searchSpan: 1,
-    options: [{ value: '', label: '전체' }, { value: 'DIRECT', label: '직납품' }, { value: 'ORDER', label: '수주납품' }] },
+  { field: 'deliveryDt', label: '출하일', type: 'date', required: true, searchSpan: 2 },
+  { field: 'deliveryType', label: '출하구분', type: 'select', searchSpan: 1,
+    options: [{ value: '', label: '전체' }, { value: 'DIRECT', label: '직출하' }, { value: 'ORDER', label: '수주출하' }] },
   { field: 'customerKeyword', label: '거래처', type: 'text', searchSpan: 1 },
   { field: 'materialKeyword', label: '품목', type: 'text', searchSpan: 1 },
-  { field: 'deliveryNo', label: '납품번호', type: 'text', searchSpan: 1 },
+  { field: 'deliveryNo', label: '출하번호', type: 'text', searchSpan: 1 },
 ];
 type SearchValues = Record<string, PageSearchFieldValue>;
 function valuesOf(filters: DeliveryFilters): SearchValues {
@@ -88,7 +88,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
       if (active && token === request.current) { setRows(items); setHasLoaded(true); }
     }).catch((cause) => {
       if (active && token === request.current) {
-        setError(cause instanceof Error ? cause.message : '납품현황 조회에 실패했습니다.');
+        setError(cause instanceof Error ? cause.message : '출하현황 조회에 실패했습니다.');
         setInitialError(true);
       }
     }).finally(() => { if (active && token === request.current) setLoading(false); });
@@ -99,7 +99,7 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
     let active = true;
     setDetailLoading(true); setDetailError('');
     getDelivery(selectedId).then((item) => { if (active) setDetail(item); })
-      .catch((cause) => { if (active) setDetailError(cause instanceof Error ? cause.message : '납품 조회에 실패했습니다.'); })
+      .catch((cause) => { if (active) setDetailError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.'); })
       .finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
   }, [selectedId, detailRefresh, canRead]);
@@ -114,54 +114,54 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
   }, []);
   const search = useCallback((values: SearchValues = detailValues) => {
     const next = filtersOf(keyword, values);
-    if (!validDeliveryPeriod(next)) { setError('납품일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
+    if (!validDeliveryPeriod(next)) { setError('출하일 기간의 시작일과 종료일을 확인해 주세요.'); return; }
     setDetailValues(values); setFilters(next); setSession(next);
   }, [detailValues, keyword, setSession]);
   const columns = useMemo<F1GridColumn<DeliveryStatusRow>[]>(() => [
     { field: 'salesDeliveryDetailId', headerName: 'No', type: 'rownumber', width: 56, align: 'center', pinned: 'left', search: { hidden: true }, form: { hidden: true } },
-    { field: 'deliveryNo', headerName: '납품번호', width: 140, align: 'center', mergeRows: true, renderCell: ({ row }) => (
+    { field: 'deliveryNo', headerName: '출하번호', width: 140, align: 'center', mergeRows: true, renderCell: ({ row }) => (
       <Link component="button" type="button" underline="hover" disabled={!canRead} onClick={(event) => {
         event.stopPropagation(); if (canRead) { setDetail(null); setSelectedId(row.salesDeliveryId); }
       }} aria-label={`${row.deliveryNo} 상세 보기`} sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 'inherit', verticalAlign: 'baseline' }}>{row.deliveryNo}</Link>
     ) },
-    { field: 'deliveryDt', headerName: '납품일자', type: 'date', width: 80, align: 'center', mergeRows: true },
+    { field: 'deliveryDt', headerName: '출하일자', type: 'date', width: 80, align: 'center', mergeRows: true },
     { field: 'customerCode', headerName: '거래처코드', width: 80, align: 'center', mergeRows: true },
     { field: 'customerName', headerName: '거래처명', width: 160, align: 'center', mergeRows: true },
     { field: 'orderNo', headerName: '연결 수주번호', width: 140, align: 'center', mergeRows: true },
-    { field: 'deliveryType', headerName: '납품구분', width: 80, align: 'center', mergeRows: true, renderCell: ({ row }) => row.deliveryType === 'ORDER' ? '수주납품' : '직납품' },
-    { field: 'deliveryPlace', headerName: '납품장소', width: 150, align: 'left', mergeRows: true },
+    { field: 'deliveryType', headerName: '출하구분', width: 80, align: 'center', mergeRows: true, renderCell: ({ row }) => row.deliveryType === 'ORDER' ? '수주출하' : '직출하' },
+    { field: 'deliveryPlace', headerName: '출하장소', width: 150, align: 'left', mergeRows: true },
     { field: 'deliveryMethod', headerName: '배송방법', width: 110, align: 'left', mergeRows: true },
     { field: 'lineNo', headerName: '행', width: 56, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center' },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'center' },
     { field: 'unit', headerName: '단위', width: 80, align: 'center' },
     ...(['deliveryQty', 'unitPrice', 'supplyAmt', 'vatAmt', 'totalAmt'] as const).map((field, index) => ({
-      field, headerName: ['납품수량', '단가', '공급가', 'VAT', '합계'][index],
+      field, headerName: ['출하수량', '단가', '공급가', 'VAT', '합계'][index],
       type: 'decimal' as const, decimalPlaces: 2, width: 130, align: 'right' as const,
     })),
     { field: 'remark', headerName: '비고', width: 200, align: 'left', mergeRows: true },
   ], [canRead]);
-  if (!canRead) return <Alert severity="warning">납품현황 조회 권한이 없습니다.</Alert>;
+  if (!canRead) return <Alert severity="warning">출하현황 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={props.breadcrumbItems.length ? props.breadcrumbItems : [props.currentMenuName]} description={props.content.description}
       actionGroups={[{ key: 'read', actions: [{ label: '조회', icon: SearchIcon, visible: canRead, disabled: loading, onClick: () => search(appliedValues) }] }]} />
-    <PageLoadBoundary loading={loading} error={initialError && !hasLoaded ? 'server' : null} label="납품현황" onRetry={() => setRefresh((value) => value + 1)}>
+    <PageLoadBoundary loading={loading} error={initialError && !hasLoaded ? 'server' : null} label="출하현황" onRetry={() => setRefresh((value) => value + 1)}>
       <PageSearchArea detailFields={fields} detailValues={detailValues} appliedDetailValues={appliedValues}
         defaultValues={defaultValues} onDetailValuesChange={setDetailValues} onDetailSearch={search}
         onDetailReset={() => {
           setKeyword(''); setDetailValues(defaultValues); setFilters(defaults); setSession(defaults);
         }} detailLoading={loading} onDefaultSearch={() => search(appliedValues)}
-        searchField={<TextField size="small" margin="none" placeholder="납품번호/거래처/품목/수주번호 검색" value={keyword}
+        searchField={<TextField size="small" margin="none" placeholder="출하번호/거래처/품목/수주번호 검색" value={keyword}
           onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') search(appliedValues); }}
-          slotProps={{ htmlInput: { 'aria-label': '납품현황 빠른 검색' }, input: { endAdornment: keyword ? (
-            <IconButton type="button" size="small" edge="end" aria-label="납품현황 검색어 초기화" onClick={() => setKeyword('')} sx={{ p: 0.25 }}><ClearIcon fontSize="small" /></IconButton>
+          slotProps={{ htmlInput: { 'aria-label': '출하현황 빠른 검색' }, input: { endAdornment: keyword ? (
+            <IconButton type="button" size="small" edge="end" aria-label="출하현황 검색어 초기화" onClick={() => setKeyword('')} sx={{ p: 0.25 }}><ClearIcon fontSize="small" /></IconButton>
           ) : null } }}
           sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: '100%', borderRadius: '0 8px 8px 0', backgroundColor: theme.palette.background.paper } })} />} />
       <PageMessageArea message={error} onClose={() => setError('')} />
       {hasLoaded && !loading && !error ? <SearchResultMessage resultCount={rows.length} /> : null}
       <Box sx={{ px: { xs: 1, sm: 2 }, pb: 2, pt: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
         <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="납품현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId"
+        <F1Grid ariaLabel="출하현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId"
           storageKey="sales-delivery-status-grid-v1" loading={loading} showCheckbox={false} height="100%" minHeight={320}
           selectionMode="row" selectRowOnContextMenu={false}
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}

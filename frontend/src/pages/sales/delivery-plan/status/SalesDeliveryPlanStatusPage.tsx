@@ -29,7 +29,7 @@ export function SalesDeliveryPlanStatusPage({
     setLoading(true);
     setError('');
     try { setRows(await getDeliveryPlanStatus(next)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '납품계획 현황 조회에 실패했습니다.'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.'); }
     finally { setLoading(false); }
   }, []);
 
@@ -39,7 +39,7 @@ export function SalesDeliveryPlanStatusPage({
     getDeliveryPlanStatus(defaultDeliveryPlanFilters())
       .then((result) => { if (active) setRows(result); })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : '납품계획 현황 조회에 실패했습니다.');
+        if (active) setError(cause instanceof Error ? cause.message : '출하계획 현황 조회에 실패했습니다.');
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -54,7 +54,7 @@ export function SalesDeliveryPlanStatusPage({
       const item = await getDeliveryPlan(row.salesDeliveryPlanId);
       setDetails(item.details);
       setEditRows(item.details);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '납품계획 상세 조회에 실패했습니다.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 상세 조회에 실패했습니다.'); }
     finally { setDetailLoading(false); }
   };
 
@@ -75,9 +75,9 @@ export function SalesDeliveryPlanStatusPage({
       setDetails(updated.details);
       setEditRows(updated.details);
       setEditing(false);
-      setNotice(`납품계획 ${updated.planNo}이 수정되었습니다.`);
+      setNotice(`출하계획 ${updated.planNo}이 수정되었습니다.`);
       await runSearch(filters);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '납품계획 수정에 실패했습니다.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '출하계획 수정에 실패했습니다.'); }
     finally { setLoading(false); }
   };
 
@@ -88,7 +88,7 @@ export function SalesDeliveryPlanStatusPage({
       disabled: loading, onClick: () => void search(),
     }],
   }];
-  if (!permissions?.read) return <Alert severity="warning">납품계획 현황 조회 권한이 없습니다.</Alert>;
+  if (!permissions?.read) return <Alert severity="warning">출하계획 현황 조회 권한이 없습니다.</Alert>;
 
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
@@ -113,7 +113,7 @@ export function SalesDeliveryPlanStatusPage({
       <SearchResultMessage resultCount={rows.length} />
       <Paper variant="outlined" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden', borderRadius: 2 }}>
         <TableContainer sx={{ height: '100%', overflow: 'auto' }}>
-          <Table size="small" stickyHeader sx={{ minWidth: 720 }} aria-label="납품계획 현황 목록">
+          <Table size="small" stickyHeader sx={{ minWidth: 720 }} aria-label="출하계획 현황 목록">
             <TableHead><TableRow><TableCell>계획번호</TableCell><TableCell>수주번호</TableCell>
               <TableCell>수주일자</TableCell><TableCell>거래처</TableCell><TableCell>상세</TableCell></TableRow></TableHead>
             <TableBody>{rows.map((row) => <TableRow key={row.salesDeliveryPlanId} hover>
@@ -135,11 +135,11 @@ export function SalesDeliveryPlanStatusPage({
             {editing ? '저장' : '수정'}</Button> : null}
         </Box>
         <TableContainer sx={{ maxHeight: 320, overflow: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 660 }} aria-label="납품계획 상세 목록">
+          <Table size="small" sx={{ minWidth: 660 }} aria-label="출하계획 상세 목록">
             <TableHead><TableRow><TableCell>품목코드</TableCell><TableCell>품목명</TableCell>
               <TableCell>계획일</TableCell><TableCell align="right">수주수량</TableCell>
-              <TableCell align="right">계획수량</TableCell><TableCell align="right">납품</TableCell>
-              <TableCell align="right">미납수량</TableCell><TableCell align="right">초과납품</TableCell></TableRow></TableHead>
+              <TableCell align="right">계획수량</TableCell><TableCell align="right">출하</TableCell>
+              <TableCell align="right">미출하수량</TableCell><TableCell align="right">초과출하</TableCell></TableRow></TableHead>
             <TableBody>{(editing ? editRows : details).map((detail) => <TableRow key={detail.salesDeliveryPlanDetailId}>
               <TableCell>{detail.materialCode}</TableCell><TableCell>{detail.materialName}</TableCell>
               <TableCell>{editing ? <TextField type="date" size="small" value={detail.planDt ?? ''}

@@ -11,7 +11,7 @@ import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { SearchResultMessage } from '../../../../shared/components/SearchResultMessage';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type { DeliveryPlanRequest, DeliveryPlanPageProps, PlanSourceOrderRow } from '../types/salesDeliveryPlan.types';
-import { createDeliveryPlan, searchPlanSourceOrders, validateDeliveryPlan } from '../services/salesDeliveryPlan.service';
+import { createDeliveryPlan, getDeliveryPlanByOrder, searchPlanSourceOrders, updateDeliveryPlan, validateDeliveryPlan } from '../services/salesDeliveryPlan.service';
 
 type PlanRow = DeliveryPlanRequest['details'][number] & {
   rowId: string;
@@ -33,6 +33,7 @@ function createRequest(order: PlanSourceOrderRow[], rows: PlanRow[]): DeliveryPl
 
 export function SalesDeliveryPlanCreatePage({
   currentMenuName, content, breadcrumbItems, selectedMenuPermissions: permissions,
+  deliveryPlanMode = 'MANUAL',
 }: DeliveryPlanPageProps) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
@@ -44,8 +45,13 @@ export function SalesDeliveryPlanCreatePage({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [planNo, setPlanNo] = useState('');
+  const [planId, setPlanId] = useState<number | null>(null);
   const canRead = Boolean(permissions?.read);
-  const canCreate = canRead && Boolean(permissions?.create) && !saving;
+  const canSelectOrder = canRead && !saving
+    && (deliveryPlanMode === 'AUTO' ? Boolean(permissions?.update) : Boolean(permissions?.create));
+  const canWrite = canRead && !saving
+    && (planId === null ? deliveryPlanMode === 'MANUAL' && Boolean(permissions?.create)
+      : Boolean(permissions?.update));
   const request = useMemo(() => createRequest(selectedOrder, rows), [selectedOrder, rows]);
 
   const search = async () => {
@@ -56,7 +62,7 @@ export function SalesDeliveryPlanCreatePage({
     finally { setLoading(false); }
   };
 
-  const selectOrder = (orderId: number) => {
+  const selectOrder = async (orderId: number) => {
     const order = sourceRows.filter((row) => row.salesOrderId === orderId);
     setSelectedOrder(order);
     setRows(order.map((row, index) => ({
@@ -66,24 +72,50 @@ export function SalesDeliveryPlanCreatePage({
       unit: row.unit, orderQty: Number(row.orderQty),
     })));
     setPlanNo('');
+    setPlanId(null);
     setNotice('');
     setError('');
     setSourceOpen(false);
+    if (deliveryPlanMode !== 'AUTO') return;
+
+    setLoading(true);
+    try {
+      const saved = await getDeliveryPlanByOrder(orderId);
+      setPlanId(saved.salesDeliveryPlanId);
+      setPlanNo(saved.planNo);
+      setRows(saved.details.map((detail) => ({
+        rowId: String(detail.salesDeliveryPlanDetailId),
+        salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
+        salesOrderDetailId: detail.salesOrderDetailId,
+        planDt: detail.planDt,
+        plannedQty: Number(detail.plannedQty),
+        materialId: detail.materialId,
+        materialCode: detail.materialCode,
+        materialName: detail.materialName,
+        unit: detail.unit,
+        orderQty: Number(detail.orderQty),
+      })));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '기존 출하계획을 불러오지 못했습니다.');
+    } finally { setLoading(false); }
   };
 
   const save = async () => {
-    if (!canCreate) return;
+    if (!canWrite) return;
     const message = validateDeliveryPlan(request, selectedOrder);
     if (message) { setError(message); return; }
     setSaving(true);
     setError('');
     setNotice('');
     try {
-      const saved = await createDeliveryPlan(request);
+      const saved = planId === null
+        ? await createDeliveryPlan(request)
+        : await updateDeliveryPlan(planId, request);
+      setPlanId(saved.salesDeliveryPlanId);
       setPlanNo(saved.planNo);
-      setNotice(`납품계획이 저장되었습니다. 계획번호: ${saved.planNo}`);
+      setNotice(`${planId === null ? '출하계획이 등록' : '출하계획이 수정'}되었습니다. 계획번호: ${saved.planNo}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '납품계획 저장에 실패했습니다.');
+      setError(cause instanceof Error ? cause.message : '출하계획 저장에 실패했습니다.');
     } finally { setSaving(false); }
   };
 
@@ -94,6 +126,7 @@ export function SalesDeliveryPlanCreatePage({
     setSelectedOrder([]);
     setRows([]);
     setPlanNo('');
+    setPlanId(null);
     setNotice('');
     setError('');
   };
@@ -101,23 +134,25 @@ export function SalesDeliveryPlanCreatePage({
   const actions: PermissionActionGroupDefinition[] = [{
     key: 'write',
     actions: [
-      { label: '신규', icon: NoteAddOutlinedIcon, visible: canRead, disabled: !canCreate, onClick: createNew },
-      { label: '수주 선택', icon: SearchIcon, visible: canRead, disabled: !canCreate || Boolean(planNo), onClick: () => setSourceOpen(true) },
-      { label: '저장', icon: SaveIcon, visible: canRead, saving, disabled: !canCreate || !selectedOrder.length || Boolean(planNo), onClick: () => void save() },
+      { label: '신규', icon: NoteAddOutlinedIcon, visible: canRead, disabled: !canSelectOrder, onClick: createNew },
+      { label: '수주 선택', icon: SearchIcon, visible: canRead, disabled: !canSelectOrder || planId !== null, onClick: () => setSourceOpen(true) },
+      { label: planId === null ? '저장' : '수정 저장', icon: SaveIcon, visible: canRead, saving,
+        disabled: !canWrite || !selectedOrder.length || (deliveryPlanMode === 'AUTO' && planId === null),
+        onClick: () => void save() },
     ],
   }];
 
-  if (!canRead) return <Alert severity="warning">납품계획 등록 조회 권한이 없습니다.</Alert>;
+  if (!canRead) return <Alert severity="warning">출하계획등록 조회 권한이 없습니다.</Alert>;
 
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
-    <Box role="region" aria-label="납품계획 입력 내용"
+    <Box role="region" aria-label="출하계획 입력 내용"
       sx={{ p: { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflow: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>납품계획 기본정보</Typography>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하계획 기본정보</Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
           <TextField size="small" label="계획번호" value={planNo || '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }} />
           <TextField size="small" label="수주번호" value={selectedOrder[0]?.orderNo ?? ''} slotProps={{ input: { readOnly: true } }} />
@@ -127,11 +162,11 @@ export function SalesDeliveryPlanCreatePage({
       </Paper>
       <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap', p: { xs: 1.5, sm: 2 } }}>
-          <Box><Typography variant="subtitle1" sx={{ fontWeight: 700 }}>납품계획 상세</Typography>
+          <Box><Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하계획 상세</Typography>
             <Typography variant="caption" color="text.secondary">같은 수주 품목을 예정일별로 분할할 수 있습니다.</Typography></Box>
         </Box>
         <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 780 }} aria-label="납품계획 상세 목록">
+          <Table size="small" sx={{ minWidth: 780 }} aria-label="출하계획 상세 목록">
             <TableHead><TableRow>
               <TableCell>행</TableCell><TableCell>품목코드</TableCell><TableCell>품목명</TableCell>
               <TableCell align="right">수주수량</TableCell><TableCell>계획일</TableCell>
@@ -143,25 +178,25 @@ export function SalesDeliveryPlanCreatePage({
               return <TableRow key={row.rowId}>
                 <TableCell>{index + 1}</TableCell><TableCell>{row.materialCode}</TableCell>
                 <TableCell>{row.materialName}</TableCell><TableCell align="right">{row.orderQty.toLocaleString()}</TableCell>
-                <TableCell><TextField type="date" size="small" value={row.planDt ?? ''} disabled={!canCreate || Boolean(planNo)}
+                <TableCell><TextField type="date" size="small" value={row.planDt ?? ''} disabled={!canWrite}
                   onChange={(event) => setRows((current) => current.map((item) => item.rowId === row.rowId
                     ? { ...item, planDt: event.target.value || null } : item))}
                   slotProps={{ inputLabel: { shrink: true } }} /></TableCell>
                 <TableCell align="right"><TextField size="small" type="number" value={row.plannedQty}
-                  disabled={!canCreate || Boolean(planNo)} slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                  disabled={!canWrite} slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                   onChange={(event) => setRows((current) => current.map((item) => item.rowId === row.rowId
                     ? { ...item, plannedQty: Number(event.target.value) } : item))} /></TableCell>
                 <TableCell align="right" sx={{ color: total > row.orderQty ? 'error.main' : 'text.primary' }}>
                   {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
                 <TableCell><Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <Button size="small" startIcon={<AddIcon />} disabled={!canCreate || Boolean(planNo)}
+                  <Button size="small" startIcon={<AddIcon />} disabled={!canWrite}
                     onClick={() => setRows((current) => [...current, {
                       ...row, rowId: `split-${crypto.randomUUID()}`, salesDeliveryPlanDetailId: null,
                       planDt: null, plannedQty: 0,
                     }])}>분할</Button>
                   {rows.filter((item) => item.salesOrderDetailId === row.salesOrderDetailId).length > 1
                     ? <Button size="small" color="error" aria-label="분할행 삭제"
-                      disabled={!canCreate || Boolean(planNo)}
+                      disabled={!canWrite}
                       onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}>
                       <DeleteOutlinedIcon fontSize="small" />
                     </Button> : null}

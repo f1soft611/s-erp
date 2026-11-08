@@ -273,11 +273,7 @@ public class SystemMenuServiceImpl extends EgovAbstractServiceImpl implements Sy
         List<SystemMenuVO> menus = new ArrayList<>(systemMenuDAO.selectActiveMenusForTenant(tenantId));
         String deliveryPlanMode = systemMenuDAO.selectTenantDeliveryPlanMode(tenantId);
         if (!"AUTO".equals(deliveryPlanMode) && !"MANUAL".equals(deliveryPlanMode)) {
-            throw new IllegalStateException("테넌트 납품계획 운영모드를 확인할 수 없습니다.");
-        }
-        if ("AUTO".equals(deliveryPlanMode)) {
-            menus.removeIf(menu -> menu.getMenuUrl() != null
-                    && menu.getMenuUrl().startsWith("/sales/delivery-plan"));
+            throw new IllegalStateException("테넌트 출하계획 운영모드를 확인할 수 없습니다.");
         }
         if (roleCode == null || !PLATFORM_ADMIN.equals(roleCode.trim())) {
             // 시스템 정책 메뉴는 테넌트 관리자 일괄 권한/역할 매핑과 무관하게 PLATFORM_ADMIN 에게만 노출한다.

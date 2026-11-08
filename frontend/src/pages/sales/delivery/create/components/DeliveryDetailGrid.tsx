@@ -32,7 +32,7 @@ export function DeliveryDetailGrid({ rows, gridRef, disabled, source, onChanges,
       validate: (_value, row) => Number(row.materialId) > 0 || '품목을 선택해 주세요.' },
     { field: 'materialName', headerName: '품목명', width: 180, align: 'center', editable: false },
     { field: 'unit', headerName: '단위', width: 80, align: 'center', editable: false },
-    { field: 'deliveryQty', headerName: '납품수량', type: 'decimal', decimalPlaces: 2, width: 120, align: 'right',
+    { field: 'deliveryQty', headerName: '출하수량', type: 'decimal', decimalPlaces: 2, width: 120, align: 'right',
       editable: !disabled, required: true, min: 0, validate: (value) => Number(value) > 0 || '수량은 0보다 커야 합니다.',
       onValueChange: (row, value) => ({ deliveryQty: Number(value), ...deliveryAmounts(Number(value), row.unitPrice) }) },
     { field: 'unitPrice', headerName: '단가', type: 'currency', decimalPlaces: 2, width: 120, align: 'right', min: 0,
@@ -44,7 +44,7 @@ export function DeliveryDetailGrid({ rows, gridRef, disabled, source, onChanges,
       onValueChange: (row, value) => deliveryAmounts(row.deliveryQty, row.unitPrice, Number(value)) },
     { field: 'totalAmt', headerName: '합계', type: 'currency', decimalPlaces: 2, width: 140, align: 'right', editable: false },
   ], [disabled, source, onMaterial]);
-  return <F1Grid ref={gridRef} ariaLabel="납품 상세 목록" rows={rows} columns={columns} rowKey="rowId"
+  return <F1Grid ref={gridRef} ariaLabel="출하 상세 목록" rows={rows} columns={columns} rowKey="rowId"
     storageKey="sales-delivery-details-v1" createRow={newDeliveryRow} onChangesChange={onChanges}
     onSelectionChange={onSelection} showCheckbox height="100%" minHeight={260}
     allowAddRowInContextMenu={!disabled && !source} allowDuplicateRowInContextMenu={false}

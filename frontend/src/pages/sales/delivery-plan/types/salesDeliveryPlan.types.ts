@@ -57,6 +57,7 @@ export type DeliveryPlanPageProps = {
   content: PageContent;
   breadcrumbItems: string[];
   selectedMenuPermissions?: MenuPermission;
+  deliveryPlanMode?: 'AUTO' | 'MANUAL';
 };
 
 export type PlanSourceOrderRow = {
