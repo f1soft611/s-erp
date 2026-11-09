@@ -34,7 +34,7 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
   const columns = useMemo<F1GridColumn<SourcePlanRow>[]>(() => [
     { field: 'planNo', headerName: '계획번호', width: 165, align: 'center',
       renderCell: ({ row }) => <Button size="small" sx={{ minWidth: 0, px: 0.5, whiteSpace: 'nowrap' }}
-        onClick={() => onSelect(rows.filter((item) => item.salesOrderId === row.salesOrderId))}>{row.planNo} 선택</Button> },
+        onClick={() => onSelect(rows.filter((item) => item.salesOrderId === row.salesOrderId))}>{row.planNo}</Button> },
     { field: 'orderDt', headerName: '수주일자', type: 'date', width: 96, align: 'center' },
     { field: 'planDt', headerName: '계획일자', type: 'date', width: 96, align: 'center' },
     { field: 'customerName', headerName: '거래처', width: 125, align: 'center' },
@@ -62,7 +62,7 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 240, overflow: 'hidden' }}>
       <F1Grid ariaLabel="출하 대상 계획 목록" rows={displayRows} columns={columns} rowKey="salesDeliveryPlanDetailId"
-        loading={loading} showCheckbox={false} canExportExcel={false} allowAddRowInContextMenu={false}
+        loading={loading} showCheckbox={false} selectionMode="row" canExportExcel={false} allowAddRowInContextMenu={false}
         allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} height="100%" />
       </Box>
     </Box>

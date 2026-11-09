@@ -1,10 +1,25 @@
 import { apiGet, apiPost, apiPut } from '../../../../shared/services/apiClient';
 import { localDate } from '../../delivery/create/services/salesDelivery.service';
 import type {
-  DeliveryPlanFilters, DeliveryPlanItem, DeliveryPlanRequest, DeliveryPlanStatusRow, PlanSourceOrderRow,
+  DeliveryPlanDetail, DeliveryPlanFilters, DeliveryPlanItem, DeliveryPlanRequest, DeliveryPlanStatusRow, PlanRow, PlanSourceOrderRow,
 } from '../types/salesDeliveryPlan.types';
 
 const PATH = '/api/v1/sales/delivery-plans';
+
+export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
+  return details.map((detail) => ({
+    rowId: String(detail.salesDeliveryPlanDetailId),
+    salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
+    salesOrderDetailId: detail.salesOrderDetailId,
+    planDt: detail.planDt,
+    plannedQty: Number(detail.plannedQty),
+    materialId: detail.materialId,
+    materialCode: detail.materialCode,
+    materialName: detail.materialName,
+    unit: detail.unit,
+    orderQty: Number(detail.orderQty),
+  }));
+}
 
 function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -25,7 +40,7 @@ export function validDeliveryPlanPeriod(filters: Pick<DeliveryPlanFilters, 'plan
     && filters.planDtFrom <= filters.planDtTo;
 }
 
-export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: PlanSourceOrderRow[]) {
+export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: Pick<PlanSourceOrderRow, 'salesOrderDetailId' | 'orderQty'>[]) {
   if (!request.salesOrderId || !Number.isSafeInteger(request.salesOrderId)) return '수주를 선택해 주세요.';
   if (!request.details.length) return '계획 상세를 1건 이상 입력해 주세요.';
   const validLines = new Map(sourceRows.map((row) => [row.salesOrderDetailId, row]));

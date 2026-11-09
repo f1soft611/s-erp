@@ -16,6 +16,19 @@ class SalesDeliveryPlanningSchemaContractTest {
             "20261106_004_change_sales_shipment_labels.sql";
 
     @Test
+    void shipmentPlanMenusAreReparentedWithoutReplacingTheirIds() throws Exception {
+        String file = "20261109_001_move_sales_shipment_plan_menus.sql";
+        Path docsFile = Paths.get("..", "docs", "database", "20261109", file);
+        Path backendFile = Paths.get("DATABASE", "20261109", file);
+        assertThat(Files.exists(docsFile)).as("menu correction migration").isTrue();
+        String sql = read(docsFile);
+        assertThat(sql).contains("SALES_DELIVERY_PLAN_CREATE", "SALES_DELIVERY_PLAN_STATUS",
+                "SALES_DELIVERY", "parent_menu_id", "RAISE EXCEPTION", "ON CONFLICT");
+        assertThat(sql).doesNotContain("DELETE FROM public.tb_role_menu_permission");
+        assertThat(Files.readAllBytes(backendFile)).containsExactly(Files.readAllBytes(docsFile));
+    }
+
+    @Test
     void migrationAddsTenantModeAndBackfillsPlanLinksBeforeEnforcingThem() throws Exception {
         Path migration = Paths.get("..", "docs", "database", "20261105", MIGRATION);
         assertThat(Files.exists(migration)).as("migration file").isTrue();

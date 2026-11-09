@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesDeliveryCreatePage } from '../src/pages/sales/delivery/create/SalesDeliveryCreatePage';
 import { SalesDeliveryStatusPage } from '../src/pages/sales/delivery/status/SalesDeliveryStatusPage';
+import { SourceOrderPicker } from '../src/pages/sales/delivery/create/components/SourceOrderPicker';
 import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
@@ -44,6 +45,12 @@ beforeEach(() => {
   vi.clearAllMocks(); sessionStorage.clear();
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
   vi.mocked(getDeliveryStatus).mockResolvedValue([]);
+});
+it('opens the shipment plan selector using the icon inside the order field', () => {
+  mount(<SalesDeliveryCreatePage {...props} />);
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
+  fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
+  expect(screen.getByRole('button', { name: '계획 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
 });
 it('preserves edits on failed save and permits update without writer ownership', async () => {
   vi.mocked(updateDelivery).mockRejectedValue(new Error('잔량 초과'));
@@ -214,7 +221,11 @@ it('selects one order, populates remaining lines and prevents source identity ed
   expect(within(sourceGrid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(sourceGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(sourceGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'center' });
-  fireEvent.click(await screen.findByRole('button', { name: 'DP-1 선택' }));
+  const sourceRow = within(sourceGrid).getByRole('gridcell', { name: 'M20' }).closest('[role="row"]')!;
+  fireEvent.mouseDown(within(sourceRow as HTMLElement).getByRole('gridcell', { name: 'M20' }), { button: 0 });
+  expect(sourceRow.querySelector('[data-row-selection-overlay]')).not.toBeNull();
+  expect(screen.getByRole('dialog', { name: '출하계획 선택' })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-1', exact: true }));
   expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7');
   const deliveryGrid = screen.getByRole('grid', { name: '출하 상세 목록' });
   const deliveryCells = within(deliveryGrid).getAllByRole('gridcell');
@@ -247,6 +258,23 @@ it('keeps source-order search controls together in a full-width modal form', asy
   fireEvent.change(searchInput, { target: { value: 'SO-찾기' } });
   fireEvent.submit(searchForm);
   await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith('SO-찾기'));
+});
+it('selects all plan rows belonging to the clicked order only', async () => {
+  const base = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
+  };
+  const rows = [base, { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701 },
+    { ...base, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800, planNo: 'DP-2' }];
+  vi.mocked(searchSourceOrders).mockResolvedValue(rows);
+  const onSelect = vi.fn();
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={onSelect} />);
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  const buttons = await screen.findAllByRole('button', { name: 'DP-1', exact: true });
+  fireEvent.click(buttons[0]);
+  expect(onSelect).toHaveBeenCalledWith(rows.slice(0, 2));
 });
 it('confirms deletion before requesting and resets to a new direct document', async () => {
   vi.mocked(deleteDelivery).mockResolvedValue();

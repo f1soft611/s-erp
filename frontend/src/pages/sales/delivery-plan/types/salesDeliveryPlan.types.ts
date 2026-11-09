@@ -26,6 +26,15 @@ export type DeliveryPlanDetail = DeliveryPlanDetailRequest & {
   orderQty: number;
 };
 
+export type PlanRow = DeliveryPlanDetailRequest & {
+  rowId: string;
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  unit: string | null;
+  orderQty: number;
+};
+
 export type DeliveryPlanItem = {
   salesDeliveryPlanId: number;
   tenantId: number;

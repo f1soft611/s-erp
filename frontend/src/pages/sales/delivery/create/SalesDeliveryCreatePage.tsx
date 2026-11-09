@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
-import { Alert, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, InputAdornment, MenuItem, Paper, TextField, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
@@ -201,10 +201,11 @@ export function SalesDeliveryCreatePage({
               }}>
               <MenuItem value="DIRECT">직출하</MenuItem><MenuItem value="ORDER">수주출하</MenuItem>
             </TextField>
-            <Box sx={{ display: 'flex', gap: 1, minWidth: 0, '& .MuiFormControl-root': { m: 0 } }}>
-              <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo} slotProps={{ input: { readOnly: true } }} />
-              {form.deliveryType === 'ORDER' ? <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>계획 선택</Button> : null}
-            </Box>
+            <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo}
+              slotProps={{ input: { readOnly: true, endAdornment: form.deliveryType === 'ORDER' ? <InputAdornment position="end">
+                <Tooltip title="계획 선택"><span><IconButton size="small" aria-label="계획 선택" disabled={!editable || Boolean(savedId)}
+                  onClick={() => setSourceOpen(true)}><SearchIcon fontSize="small" /></IconButton></span></Tooltip>
+              </InputAdornment> : null } }} />
             <TextField size="small" label="출하장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
             <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
