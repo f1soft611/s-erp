@@ -24,7 +24,7 @@ describe('Dashboard brand navigation', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('link', { name: 'S-ERP' }));
+    fireEvent.click(screen.getByRole('link', { name: 'iPlusMES' }));
 
     expect(screen.getByLabelText('Current path')).toHaveTextContent(
       '/groupware/overview',

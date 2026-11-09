@@ -41,7 +41,7 @@ digraph tdd {
 
 ---
 
-## ⚙️ S-ERP 프로젝트 전용 필수 구현 규칙
+## ⚙️ iPlusMES 프로젝트 전용 필수 구현 규칙
 
 ### 🎨 프론트엔드 (React / Vite / Vitest)
 

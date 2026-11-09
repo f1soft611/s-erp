@@ -1,4 +1,4 @@
-const PUSH_TITLE = 'S-ERP';
+const PUSH_TITLE = 'iPlusMES';
 const PUSH_BODY = '새 업무 알림이 왔습니다.';
 const PUSH_MESSAGE_BODY = '새 쪽지 알림이 왔습니다.';
 const PUSH_ICON = '/push-icon.png';

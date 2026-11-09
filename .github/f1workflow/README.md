@@ -12,7 +12,7 @@ F1Workflow는 **Superpowers의 핵심 철학(브레인스토밍 → 설계 → �
 - ✅ **Systematic Debugging** - 가설 설정과 원인 추적 기반의 체계적 디버깅 (Ad-hoc 수정 금지)
 - ✅ **Evidence over Claims** - 완료 주장 전 실제 빌드/테스트/스크린샷 증거 확보 (Evidence-based verification)
 - ✅ **Subagent & Parallel Execution** - 독립 과제 분산 및 서브에이전트 주도 실행
-- ✅ **Adaptive Architecture** - 프로젝트 스택(S-ERP React/Vite/Vitest, Java/eGovFrame/MyBatis 등) 자동 적용
+- ✅ **Adaptive Architecture** - 프로젝트 스택(iPlusMES React/Vite/Vitest, Java/eGovFrame/MyBatis 등) 자동 적용
 
 ## 📁 디렉토리 구조
 
@@ -38,13 +38,13 @@ F1Workflow는 **Superpowers의 핵심 철학(브레인스토밍 → 설계 → �
 
 ## 🔄 Superpowers 기반 워크플로우
 
-작업을 시작하면 먼저 `spike`, `bounded`, `architectural` 중 작업 경로를 분류합니다. S-ERP의 문서 우선 규칙에 따라 코드/기능 변경은 작업지시서, 계획서, 상세 사양서를 거치며, 각 승인 게이트와 산출물은 `docs/result/YYYYMMDD/<work-slug>/progress.md` 원장에 기록합니다.
+작업을 시작하면 먼저 `spike`, `bounded`, `architectural` 중 작업 경로를 분류합니다. iPlusMES의 문서 우선 규칙에 따라 코드/기능 변경은 작업지시서, 계획서, 상세 사양서를 거치며, 각 승인 게이트와 산출물은 `docs/result/YYYYMMDD/<work-slug>/progress.md` 원장에 기록합니다.
 
 ```
 START
   ↓
 [1] 프로젝트 분석 & 기술 감지
-  ├─ 언어, 프레임워크, 아키텍처 판별 (S-ERP React/Vite/Vitest, Java/eGovFrame 등)
+  ├─ 언어, 프레임워크, 아키텍처 판별 (iPlusMES React/Vite/Vitest, Java/eGovFrame 등)
   ├─ 기술 스택 정의 자동 로드
   └─ 테스트 프레임워크 및 DB 스키마 관리 규칙 식별
   ↓
@@ -55,7 +55,7 @@ START
   ↓
 [3] 설계 검증 (Design Validation)
   ├─ 기술적 타당성 검증
-  ├─ S-ERP 팀 규칙(문서 우선, DB 스키마 추적) 부합 여부 확인
+  ├─ iPlusMES 팀 규칙(문서 우선, DB 스키마 추적) 부합 여부 확인
   └─ 승인 확인
   ↓
 [4] Git 워크트리 설정 (using-git-worktrees)
@@ -99,7 +99,7 @@ END
 
 ## 🛠️ 지원 기술 스택
 
-### 1️⃣ **[신규 추가] S-ERP 프론트엔드 (React + TypeScript + Vite + Vitest)** ⭐ _현재 프로젝트 적용_
+### 1️⃣ **[신규 추가] iPlusMES 프론트엔드 (React + TypeScript + Vite + Vitest)** ⭐ _현재 프로젝트 적용_
 
 - **언어/런타임**: TypeScript, Node.js (Vite)
 - **프레임워크/라이브러리**: React 18, MUI (Material UI), F1-Grid
@@ -111,7 +111,7 @@ END
   - UI 검증 시 DOM 존재 확인에 그치지 않고 Playwright 스크린샷 기반 시각적 렌더링 검증
   - 와일드카드 라우팅(`/dashboard/*`) 딥링크 진입 시 UI 클릭 동작 모사 검증
 
-### 2️⃣ **[신규 추가] S-ERP 백엔드 (Java + Spring Boot / eGovFrame + MyBatis)** ⭐ _현재 프로젝트 적용_
+### 2️⃣ **[신규 추가] iPlusMES 백엔드 (Java + Spring Boot / eGovFrame + MyBatis)** ⭐ _현재 프로젝트 적용_
 
 - **언어/런타임**: Java 8+, Spring Boot / 전자정부프레임워크(eGovFrame) 4.x
 - **ORM/DB**: MyBatis, PostgreSQL (전자정부 eGovAbstractDAO 기반)
@@ -174,8 +174,8 @@ END
 ### 언어 감지
 
 ```
-S-ERP React  → frontend/package.json, frontend/src/
-S-ERP Java   → backend/pom.xml, backend/src/main/java/
+iPlusMES React  → frontend/package.json, frontend/src/
+iPlusMES Java   → backend/pom.xml, backend/src/main/java/
 Node.js      → package.json, node_modules/
 Python       → requirements.txt, pyproject.toml, setup.py
 Go           → go.mod, go.sum
@@ -186,8 +186,8 @@ C#           → *.csproj, *.sln
 ### 프레임워크 및 프론트/백엔드 감지
 
 ```
-S-ERP React Frontend  → "react", "vite", "@mui/material" in frontend/package.json
-S-ERP eGov/Spring     → pom.xml의 org.egovframe.rte 및 spring-boot-starter-web
+iPlusMES React Frontend  → "react", "vite", "@mui/material" in frontend/package.json
+iPlusMES eGov/Spring     → pom.xml의 org.egovframe.rte 및 spring-boot-starter-web
 React (일반)          → "react" in package.json
 Vue.js                → "vue" in package.json
 Express               → "express" in package.json
@@ -199,7 +199,7 @@ Spring Boot           → pom.xml의 spring-boot-starter
 ### 테스트 프레임워크 감지
 
 ```
-Vitest (S-ERP)  → vitest.config.ts 또는 "vitest" in frontend/package.json
+Vitest (iPlusMES)  → vitest.config.ts 또는 "vitest" in frontend/package.json
 Playwright      → scripts/capture-*.js 또는 playwright 의존성
 JUnit / Mockito → backend/pom.xml의 junit / mockito 의존성
 Jest            → jest.config.js 또는 "jest" in package.json
@@ -217,11 +217,11 @@ pytest          → pytest.ini 또는 conftest.py
 - `tech-stacks/[detected-tech].yml` 자동 로드 (예: `s-erp-react-vite.yml`, `s-erp-java-egov.yml`)
 - 프로젝트 프로필 및 DB 스키마 관리 규칙 생성
 
-**산출물 (S-ERP 예시)**:
+**산출물 (iPlusMES 예시)**:
 
 ```json
 {
-  "project_name": "S-ERP",
+  "project_name": "iPlusMES",
   "frontend": {
     "language": "TypeScript",
     "framework": "React 18 + Vite",
@@ -244,8 +244,8 @@ pytest          → pytest.ini 또는 conftest.py
 
 **기술/프로젝트 특화 질문**:
 
-- S-ERP Frontend: "MUI 테마 margin 설정이나 TreeView 리렌더링 영향 범위는 검토되었는가?"
-- S-ERP Backend: "다중 테 모드 Context 세팅 및 `backend/DATABASE/YYYYMMDD` 스키마 이력 관리가 필요한가?"
+- iPlusMES Frontend: "MUI 테마 margin 설정이나 TreeView 리렌더링 영향 범위는 검토되었는가?"
+- iPlusMES Backend: "다중 테 모드 Context 세팅 및 `backend/DATABASE/YYYYMMDD` 스키마 이력 관리가 필요한가?"
 - TypeScript: "타입 안정성을 어떻게 보장할 것인가?"
 - Python: "가상 환경 관리는 poetry/pipenv 중 어떤 것을 사용할 것인가?"
 
@@ -253,7 +253,7 @@ pytest          → pytest.ini 또는 conftest.py
 
 **기술 검증 체크리스트**:
 
-- S-ERP 팀 개발 규칙 준수 (문서 우선, 범위 최소화, 검증 우선)
+- iPlusMES 팀 개발 규칙 준수 (문서 우선, 범위 최소화, 검증 우선)
 - 프레임워크 베스트 프랙티스 준수
 - 의존성 버전 호환성 및 DB Migration 스크립트 작성 여부
 
@@ -262,12 +262,12 @@ pytest          → pytest.ini 또는 conftest.py
 **기술 자동화**:
 
 ```bash
-# S-ERP 프론트엔드 작업 공간 준비
+# iPlusMES 프론트엔드 작업 공간 준비
 git worktree add feature/[task-name]
 cd feature/[task-name]/frontend
 npm install
 
-# S-ERP 백엔드 작업 공간 준비
+# iPlusMES 백엔드 작업 공간 준비
 git worktree add feature/[task-name]
 cd feature/[task-name]/backend
 mvn clean compile
@@ -277,8 +277,8 @@ mvn clean compile
 
 **기술별 세분화**:
 
-- **S-ERP React**: 컴포넌트, 서비스, Vitest 테스트 파일, Playwright 캡처 스크립트 분해
-- **S-ERP Java**: Controller, Service, Mapper XML, DTO, DB 스크립트(`YYYYMMDD_NNN_*.sql`) 분해
+- **iPlusMES React**: 컴포넌트, 서비스, Vitest 테스트 파일, Playwright 캡처 스크립트 분해
+- **iPlusMES Java**: Controller, Service, Mapper XML, DTO, DB 스크립트(`YYYYMMDD_NNN_*.sql`) 분해
 
 ### 단계 6: 계획 실행 및 병렬 분산 (subagent-driven / dispatching-parallel)
 
@@ -289,7 +289,7 @@ mvn clean compile
 
 ### 단계 7: TDD 및 체계적 디버깅 (test-driven-development / systematic-debugging)
 
-#### S-ERP React (Vitest) TDD 예시
+#### iPlusMES React (Vitest) TDD 예시
 
 ```typescript
 // RED: 실패하는 Vitest 작성
@@ -338,10 +338,10 @@ mvn "-Dtest=TenantAuthTokenTest" test
 
 ## 💡 기술 스택별 템플릿 예시
 
-### S-ERP React + Vite + Vitest (`s-erp-react-vite.yml`)
+### iPlusMES React + Vite + Vitest (`s-erp-react-vite.yml`)
 
 ```yaml
-name: 'S-ERP React Frontend'
+name: 'iPlusMES React Frontend'
 language: 'TypeScript'
 framework: 'React 18 (Vite)'
 ui_library: 'MUI + F1-Grid'
@@ -362,10 +362,10 @@ tdd_tips:
   - 'Playwright 스크린샷 경로는 영문/숫자/하이픈만 사용'
 ```
 
-### S-ERP Java + Spring Boot / eGovFrame (`s-erp-java-egov.yml`)
+### iPlusMES Java + Spring Boot / eGovFrame (`s-erp-java-egov.yml`)
 
 ```yaml
-name: 'S-ERP Java Backend'
+name: 'iPlusMES Java Backend'
 language: 'Java 8+'
 framework: 'Spring Boot / eGovFrame 4.x'
 orm: 'MyBatis (PostgreSQL)'
@@ -517,7 +517,7 @@ VS Code Copilot Chat에서 `/f1workflow` 프롬프트를 사용하여 실행할 
 
 | 항목              | F1Workflow (Superpowers 결합)                    | 일반 수동 개발                     |
 | :---------------- | :----------------------------------------------- | :--------------------------------- |
-| **프로젝트 감지** | ✅ 자동 (S-ERP React/Vite, Java/eGovFrame 등)    | ❌ 수동 판단                       |
+| **프로젝트 감지** | ✅ 자동 (iPlusMES React/Vite, Java/eGovFrame 등)    | ❌ 수동 판단                       |
 | **요구사항 분석** | ✅ 브레인스토밍 스킬 기반 소크라테스식 정제      | ❌ 모호한 요구사항 그대로 개발     |
 | **작업 격리**     | ✅ Git Worktree 자동 격리                        | ❌ 단일 작업공간 엉킴 발생         |
 | **구현 방식**     | ✅ TDD (RED-GREEN-REFACTOR) & 서브에이전트       | ❌ 코드부터 임의 작성              |

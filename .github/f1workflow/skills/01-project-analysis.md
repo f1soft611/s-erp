@@ -12,12 +12,12 @@
 
 ### 2. 기술 스택 프로필 판별 및 정의 로드
 
-- **S-ERP 프론트엔드 (`frontend/`)**:
+- **iPlusMES 프론트엔드 (`frontend/`)**:
   - 스택 정의 참조: `.github/f1workflow/tech-stacks/s-erp-react-vite.yml`
   - `frontend/package.json`, `frontend/vite.config.ts`, `frontend/tsconfig.json` 확인
   - 주요 스택: React 18, TypeScript, Vite, Vitest, MUI (Material UI), F1-Grid
   - 테스트 명령: `npm run test` (Vitest), UI 캡처: Playwright 스크립트 (`scripts/capture-*.js`)
-- **S-ERP 백엔드 (`backend/`)**:
+- **iPlusMES 백엔드 (`backend/`)**:
   - 스택 정의 참조: `.github/f1workflow/tech-stacks/s-erp-java-egov.yml`
   - `backend/pom.xml`, `backend/src/main/resources/` 확인
   - 주요 스택: Java 8+, Spring Boot / eGovFrame 4.x, MyBatis (PostgreSQL), Maven

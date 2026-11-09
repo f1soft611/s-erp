@@ -1,6 +1,6 @@
 ---
 applyTo: '**/*.{ts,tsx,js,jsx,java,md}'
-description: 'S-ERP 팀 개발 규칙: 문서 우선, 범위 통제, 검증, DB 스키마 추적 관리.'
+description: 'iPlusMES 팀 개발 규칙: 문서 우선, 범위 통제, 검증, DB 스키마 추적 관리.'
 ---
 
 # 팀 개발 규칙
