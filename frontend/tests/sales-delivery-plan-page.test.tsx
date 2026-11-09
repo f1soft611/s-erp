@@ -40,6 +40,20 @@ const props = {
   selectedMenuPermissions: { read: true, create: true, update: true, delete: false, excel: false },
 };
 
+function planCell(grid: HTMLElement, rowIndex: number, columnIndex: number) {
+  const rows = within(grid).getAllByRole('row').filter((row) => within(row).queryByText('M20'));
+  return within(rows[rowIndex]).getAllByRole('gridcell')[columnIndex];
+}
+
+function editCell(grid: HTMLElement, rowIndex: number, columnIndex: number, value: string) {
+  const cell = planCell(grid, rowIndex, columnIndex);
+  fireEvent.doubleClick(cell);
+  const input = cell.querySelector('input');
+  if (!input) throw new Error('Grid cell editor did not open');
+  fireEvent.change(input, { target: { value } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([source]);
@@ -64,6 +78,19 @@ it('opens plan details by clicking the plan number like shipment status', async 
   expect(within(panel).getByRole('button', { name: '출하계획 더보기' })).toBeInTheDocument();
 });
 
+it('shows the detail response writer profile instead of the status list writer', async () => {
+  vi.mocked(getDeliveryPlan).mockResolvedValue({
+    ...plan, createdByName: '검증 작성자',
+    createdByProfileImage: 'data:image/png;base64,c3ludGhldGlj', createdAt: '2026-11-09 10:30',
+  } as DeliveryPlanItem);
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  const panel = await screen.findByRole('region', { name: '출하계획 상세' });
+  const avatar = await within(panel).findByRole('img', { name: '검증 작성자' });
+  expect(avatar).toHaveAttribute('src', 'data:image/png;base64,c3ludGhldGlj');
+  expect(within(panel).getByText('작성자 · 등록 2026-11-09 10:30')).toBeInTheDocument();
+});
+
 it('uses the standard grid for the status list', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   expect(await screen.findByRole('grid', { name: '출하계획 현황 목록' })).toBeInTheDocument();
@@ -72,7 +99,7 @@ it('uses the standard grid for the status list', async () => {
 it('edits plan quantity as a native grid cell and saves it', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
@@ -88,6 +115,39 @@ it('edits plan quantity as a native grid cell and saves it', async () => {
   fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
     details: [expect.objectContaining({ plannedQty: 8 })],
+  })));
+});
+
+it('matches shipment form row height and basic information spacing', async () => {
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '자세히보기' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 상세보기' });
+  const grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
+  const body = grid.querySelector('[data-f1-grid-selecting]')!;
+  expect(getComputedStyle(body).gridTemplateRows).toContain('32px');
+  const infoGrid = within(dialog).getByLabelText('계획번호').closest('.MuiFormControl-root')!.parentElement!;
+  expect(getComputedStyle(infoGrid).rowGap).toBe('8px');
+  expect(getComputedStyle(infoGrid).columnGap).toBe('16px');
+});
+
+it('commits a cell when save is clicked without pressing Enter', async () => {
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  const cell = planCell(within(dialog).getByRole('grid'), 0, 5);
+  fireEvent.doubleClick(cell);
+  fireEvent.change(cell.querySelector('input')!, { target: { value: '7' } });
+  const save = within(dialog).getByRole('button', { name: '저장', exact: true });
+  fireEvent.mouseDown(save);
+  fireEvent.click(save);
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
+    details: [expect.objectContaining({ plannedQty: 7 })],
   })));
 });
 
@@ -113,13 +173,16 @@ it('loads and updates an existing AUTO plan instead of creating another plan', a
   await waitFor(() => expect(getDeliveryPlanByOrder).toHaveBeenCalledWith(7));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(screen.getByLabelText('계획번호')).toHaveValue('DP-9');
-  expect(screen.getByDisplayValue('2026-11-12')).toBeInTheDocument();
-  expect(screen.getByRole('spinbutton')).toHaveValue(8);
+  const grid = screen.getByRole('grid', { name: '출하계획 상세 목록' });
+  expect(planCell(grid, 0, 4)).toHaveTextContent('2026-11-12');
+  expect(planCell(grid, 0, 5)).toHaveTextContent('8');
+  editCell(grid, 0, 4, '2026-11-13');
+  editCell(grid, 0, 5, '7');
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
     salesOrderId: 7,
     details: [{ salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70,
-      planDt: '2026-11-12', plannedQty: 8 }],
+      planDt: '2026-11-13', plannedQty: 7 }],
   }));
   expect(createDeliveryPlan).not.toHaveBeenCalled();
 });
@@ -173,12 +236,12 @@ it('loads, edits, and saves plan quantities from the status detail', async () =>
   render(<SalesDeliveryPlanStatusPage {...props} />);
   await waitFor(() => expect(getDeliveryPlanStatus).toHaveBeenCalled());
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   expect(getDeliveryPlan).toHaveBeenCalledWith(9);
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const detailTable = screen.getByRole('grid', { name: '출하계획 상세 목록' });
-  fireEvent.change(within(detailTable).getByRole('spinbutton'), { target: { value: '8' } });
+  editCell(detailTable, 0, 5, '8');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
     salesOrderId: 7,
@@ -195,7 +258,7 @@ it('allows status editing with registration menu update permission', async () =>
   render(<SalesDeliveryPlanStatusPage {...props} selectedModule={selectedModule}
     selectedMenuPermissions={{ read: true, create: false, update: false, delete: false, excel: false }} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   expect(screen.getByRole('menuitem', { name: '수정' })).toBeEnabled();
 });
@@ -208,7 +271,7 @@ it('does not expose status editing when registration menu read is denied', async
   render(<SalesDeliveryPlanStatusPage {...props} selectedModule={selectedModule}
     selectedMenuPermissions={{ read: true, create: false, update: false, delete: false, excel: false }} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   expect(screen.queryByRole('menuitem', { name: '수정' })).not.toBeInTheDocument();
 });
@@ -227,7 +290,7 @@ it('shows excess separately and permits preserving the planned baseline when del
   expect(within(table).getByText('5')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
-  expect(within(screen.getByRole('dialog')).getByRole('spinbutton')).toHaveAttribute('min', '0');
+  expect(planCell(within(screen.getByRole('dialog')).getByRole('grid'), 0, 5)).toHaveTextContent('10');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, expect.objectContaining({
     details: [expect.objectContaining({ plannedQty: 10 })],
@@ -237,16 +300,21 @@ it('shows excess separately and permits preserving the planned baseline when del
 it('uses the registration form in status editing and saves split rows', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
   const grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
   expect(within(grid).getByRole('columnheader', { name: '분할' })).toBeInTheDocument();
-  fireEvent.change(within(grid).getByRole('spinbutton'), { target: { value: '6' } });
+  editCell(grid, 0, 5, '6');
   fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
-  const quantities = within(grid).getAllByRole('spinbutton');
-  fireEvent.change(quantities[1], { target: { value: '4' } });
+  const splitGrid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
+  const firstSplit = within(splitGrid).getAllByRole('button', { name: '분할', exact: true })[0];
+  const deleteButton = within(splitGrid).getAllByRole('button', { name: '분할행 삭제' })[0];
+  expect(getComputedStyle(firstSplit.parentElement!).justifyContent).toBe('center');
+  expect(getComputedStyle(deleteButton).minWidth).toBe('0px');
+  editCell(splitGrid, 1, 5, '4');
+  expect(planCell(splitGrid, 0, 6)).toHaveTextContent('10');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
     salesOrderId: 7,
@@ -257,14 +325,94 @@ it('uses the registration form in status editing and saves split rows', async ()
   }));
 });
 
-it('applies registration quantity validation in status editing', async () => {
+it('inserts a split after its source and immediately edits the new quantity', async () => {
+  vi.mocked(getDeliveryPlan).mockResolvedValue({
+    ...plan, details: [
+      { ...plan.details[0], plannedQty: 6 },
+      { ...plan.details[0], salesDeliveryPlanDetailId: 91, salesOrderDetailId: 71,
+        materialId: 21, materialCode: 'M21', materialName: '품목2', orderQty: 4, plannedQty: 4 },
+    ],
+  });
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
-  fireEvent.change(within(dialog).getByRole('spinbutton'), { target: { value: '11' } });
+  let grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
+  fireEvent.click(within(grid).getAllByRole('button', { name: '분할', exact: true })[0]);
+  grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
+  const itemRows = within(grid).getAllByRole('row').filter((row) =>
+    within(row).queryByText('M20') || within(row).queryByText('M21'));
+  expect(itemRows.map((row) => within(row).getAllByRole('gridcell')[1].textContent))
+    .toEqual(['M20', 'M20', 'M21']);
+  const editor = planCell(grid, 1, 5).querySelector('input');
+  expect(editor).not.toBeNull();
+  await waitFor(() => expect(editor).toHaveFocus());
+  fireEvent.change(editor!, { target: { value: '4' } });
+  fireEvent.keyDown(editor!, { key: 'Enter' });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
+    salesOrderId: 7, details: [
+      { salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 6 },
+      { salesDeliveryPlanDetailId: null, salesOrderDetailId: 70, planDt: null, plannedQty: 4 },
+      { salesDeliveryPlanDetailId: 91, salesOrderDetailId: 71, planDt: '2026-11-08', plannedQty: 4 },
+    ],
+  }));
+});
+
+it('keeps split rows grouped with their order line after reopening a saved plan', async () => {
+  vi.mocked(getDeliveryPlan).mockResolvedValue({
+    ...plan, details: [
+      { ...plan.details[0], plannedQty: 6 },
+      { ...plan.details[0], salesDeliveryPlanDetailId: 91, salesOrderDetailId: 71,
+        materialId: 21, materialCode: 'M21', materialName: '품목2', orderQty: 4, plannedQty: 4 },
+      { ...plan.details[0], salesDeliveryPlanDetailId: 92, planDt: null, plannedQty: 4 },
+    ],
+  });
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const grid = within(screen.getByRole('dialog')).getByRole('grid', { name: '출하계획 상세 목록' });
+  const rows = within(grid).getAllByRole('row').filter((row) =>
+    within(row).queryByText('M20') || within(row).queryByText('M21'));
+  expect(rows.map((row) => within(row).getAllByRole('gridcell')[1].textContent))
+    .toEqual(['M20', 'M20', 'M21']);
+});
+
+it('retains edited values after deleting a split row and warns before closing', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  try {
+    render(<SalesDeliveryPlanStatusPage {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+    await screen.findByRole('group', { name: '출하계획 정보' });
+    fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+    const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+    let grid = within(dialog).getByRole('grid');
+    editCell(grid, 0, 5, '6');
+    fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
+    grid = within(dialog).getByRole('grid');
+    const secondRow = planCell(grid, 1, 5).closest('[role="row"]') as HTMLElement;
+    fireEvent.click(within(secondRow).getByRole('button', { name: '분할행 삭제' }));
+    grid = within(dialog).getByRole('grid');
+    expect(planCell(grid, 0, 5)).toHaveTextContent('6');
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(dialog).toBeInTheDocument();
+  } finally { confirm.mockRestore(); }
+});
+
+it('applies registration quantity validation in status editing', async () => {
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  editCell(within(dialog).getByRole('grid'), 0, 5, '11');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
   expect(within(dialog).getByText('계획수량 합계가 수주수량을 초과했습니다.')).toBeInTheDocument();
   expect(updateDeliveryPlan).not.toHaveBeenCalled();
@@ -274,19 +422,21 @@ it('opens a read-only detail dialog and keeps edits after a failed save', async 
   vi.mocked(updateDeliveryPlan).mockRejectedValue(new Error('저장 실패'));
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByText('DP-9 · SO-7');
+  await screen.findByRole('group', { name: '출하계획 정보' });
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '자세히보기' }));
   expect(screen.getByRole('dialog', { name: '출하계획 상세보기' })).toBeInTheDocument();
-  expect(within(screen.getByRole('dialog')).getByRole('spinbutton')).toBeDisabled();
+  const readOnlyCell = planCell(within(screen.getByRole('dialog')).getByRole('grid'), 0, 5);
+  fireEvent.doubleClick(readOnlyCell);
+  expect(readOnlyCell.querySelector('input')).toBeNull();
   fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: '닫기', exact: true })[1]);
   fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
   const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
-  fireEvent.change(within(dialog).getByRole('spinbutton'), { target: { value: '8' } });
+  editCell(within(dialog).getByRole('grid'), 0, 5, '8');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
   expect(await within(dialog).findByText('저장 실패')).toBeInTheDocument();
-  expect(within(dialog).getByRole('spinbutton')).toHaveValue(8);
+  expect(planCell(within(dialog).getByRole('grid'), 0, 5)).toHaveTextContent('8');
 });
 
 it('does not allow opening an empty editor when loading plan details fails', async () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Box, Button, TextField } from '@mui/material';
 import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import SaveIcon from '@mui/icons-material/Save';
@@ -6,7 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
-import { F1Grid, type F1GridColumn } from '../../../../shared/components/f1-grid';
+import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../shared/components/f1-grid';
 import { DeliveryPlanForm } from '../components/DeliveryPlanForm';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type { DeliveryPlanRequest, DeliveryPlanPageProps, PlanRow, PlanSourceOrderRow } from '../types/salesDeliveryPlan.types';
@@ -30,6 +30,8 @@ export function SalesDeliveryPlanCreatePage({
   const [sourceRows, setSourceRows] = useState<PlanSourceOrderRow[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<PlanSourceOrderRow[]>([]);
   const [rows, setRows] = useState<PlanRow[]>([]);
+  const gridRef = useRef<F1GridRef<PlanRow>>(null);
+  const [formVersion, setFormVersion] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -42,8 +44,6 @@ export function SalesDeliveryPlanCreatePage({
   const canWrite = canRead && !saving
     && (planId === null ? deliveryPlanMode === 'MANUAL' && Boolean(permissions?.create)
       : Boolean(permissions?.update));
-  const request = useMemo(() => createRequest(selectedOrder, rows), [selectedOrder, rows]);
-
   const search = async () => {
     setLoading(true);
     setError('');
@@ -55,6 +55,7 @@ export function SalesDeliveryPlanCreatePage({
   const selectOrder = async (orderId: number) => {
     const order = sourceRows.filter((row) => row.salesOrderId === orderId);
     setSelectedOrder(order);
+    setFormVersion((version) => version + 1);
     setRows(order.map((row, index) => ({
       rowId: `${row.salesOrderDetailId}-${index}`, salesDeliveryPlanDetailId: null,
       salesOrderDetailId: row.salesOrderDetailId, planDt: row.planDt, plannedQty: Number(row.orderQty),
@@ -74,6 +75,7 @@ export function SalesDeliveryPlanCreatePage({
       setPlanId(saved.salesDeliveryPlanId);
       setPlanNo(saved.planNo);
       setRows(planRowsFromDetails(saved.details));
+      setFormVersion((version) => version + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '기존 출하계획을 불러오지 못했습니다.');
     } finally { setLoading(false); }
@@ -81,17 +83,20 @@ export function SalesDeliveryPlanCreatePage({
 
   const save = async () => {
     if (!canWrite) return;
-    const message = validateDeliveryPlan(request, selectedOrder);
+    const currentRequest = createRequest(selectedOrder, gridRef.current?.getActiveRows() ?? rows);
+    const message = validateDeliveryPlan(currentRequest, selectedOrder);
     if (message) { setError(message); return; }
     setSaving(true);
     setError('');
     setNotice('');
     try {
       const saved = planId === null
-        ? await createDeliveryPlan(request)
-        : await updateDeliveryPlan(planId, request);
+        ? await createDeliveryPlan(currentRequest)
+        : await updateDeliveryPlan(planId, currentRequest);
       setPlanId(saved.salesDeliveryPlanId);
       setPlanNo(saved.planNo);
+      setRows(planRowsFromDetails(saved.details));
+      setFormVersion((version) => version + 1);
       setNotice(`${planId === null ? '출하계획이 등록' : '출하계획이 수정'}되었습니다. 계획번호: ${saved.planNo}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '출하계획 저장에 실패했습니다.');
@@ -104,6 +109,7 @@ export function SalesDeliveryPlanCreatePage({
     setSourceRows([]);
     setSelectedOrder([]);
     setRows([]);
+    setFormVersion((version) => version + 1);
     setPlanNo('');
     setPlanId(null);
     setNotice('');
@@ -135,10 +141,10 @@ export function SalesDeliveryPlanCreatePage({
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
     <Box role="region" aria-label="출하계획 입력 내용"
-      sx={{ p: { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflow: 'auto', gap: 2 }}>
+      sx={{ p: { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <DeliveryPlanForm planNo={planNo} orderNo={selectedOrder[0]?.orderNo ?? ''} orderDt={selectedOrder[0]?.orderDt ?? ''}
+      <DeliveryPlanForm key={formVersion} gridRef={gridRef} planNo={planNo} orderNo={selectedOrder[0]?.orderNo ?? ''} orderDt={selectedOrder[0]?.orderDt ?? ''}
         customerName={selectedOrder[0]?.customerName ?? ''} rows={rows} setRows={setRows} editable={canWrite}
         canSelectOrder={canSelectOrder && planId === null} onSelectOrder={() => setSourceOpen(true)} />
     </Box>

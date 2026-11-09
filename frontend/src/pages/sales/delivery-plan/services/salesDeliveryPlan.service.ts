@@ -7,18 +7,24 @@ import type {
 const PATH = '/api/v1/sales/delivery-plans';
 
 export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
-  return details.map((detail) => ({
-    rowId: String(detail.salesDeliveryPlanDetailId),
-    salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
-    salesOrderDetailId: detail.salesOrderDetailId,
-    planDt: detail.planDt,
-    plannedQty: Number(detail.plannedQty),
-    materialId: detail.materialId,
-    materialCode: detail.materialCode,
-    materialName: detail.materialName,
-    unit: detail.unit,
-    orderQty: Number(detail.orderQty),
-  }));
+  const groups = new Map<number, PlanRow[]>();
+  for (const detail of details) {
+    const group = groups.get(detail.salesOrderDetailId) ?? [];
+    group.push({
+      rowId: String(detail.salesDeliveryPlanDetailId),
+      salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
+      salesOrderDetailId: detail.salesOrderDetailId,
+      planDt: detail.planDt,
+      plannedQty: Number(detail.plannedQty),
+      materialId: detail.materialId,
+      materialCode: detail.materialCode,
+      materialName: detail.materialName,
+      unit: detail.unit,
+      orderQty: Number(detail.orderQty),
+    });
+    groups.set(detail.salesOrderDetailId, group);
+  }
+  return Array.from(groups.values()).flat();
 }
 
 function validDate(value: string) {

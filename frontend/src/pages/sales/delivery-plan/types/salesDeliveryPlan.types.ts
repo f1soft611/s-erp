@@ -46,6 +46,9 @@ export type DeliveryPlanItem = {
   customerCode: string;
   customerName: string;
   createdBy: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
   details: DeliveryPlanDetail[];
 };
 

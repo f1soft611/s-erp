@@ -191,6 +191,8 @@ const currentRows = grid.acceptSavedRows(savedRows);
 - dirty 판정은 최초 수정 시 해당 필드의 원본값만 `originalValuesById`에 저장하는 sparse 방식이다. 수정 후 다시 원본 값(빈 값 포함)으로 되돌리면 해당 필드 patch와 dirty 마크가 제거되고, 행의 모든 필드가 원본과 같아지면 행 상태도 `updated`에서 `normal`로 되돌아간다.
 - `type: 'select'`의 표시 label은 저장값과 `options[].value`가 같은 타입과 값으로 일치할 때 매핑된다. 숫자 ID는 행과 옵션 양쪽에서 같은 숫자 타입으로 정규화한다. null 같은 실제 저장값의 표시 문구가 옵션 값과 다르면 `renderCell`에서만 placeholder를 표현하고 저장값은 변경하지 않는다.
 - 인라인 셀 편집은 commit 시 모든 편집기 타입에서 `column.onValueChange`가 있으면 반환 patch를 적용하고, 없으면 편집한 `column.field` 값만 갱신한다. select 편집은 draft 문자열을 `options[].value`의 원래 타입으로 복원한 뒤 callback을 호출한다. 같은 값을 commit하면 dirty가 생기지 않는다.
+- 출하계획등록과 현황 상세 수정은 같은 `DeliveryPlanForm`을 사용하며 계획일은 `date`, 계획수량은 `decimal` 기본 셀 편집기로 수정한다. 출하 상세와 동일한 기본 행 높이(32px, 표시 배율 적용)를 사용한다. 확정된 활성 행은 합계·분할·삭제와 저장 요청에 반영하며, 편집 중 저장 버튼을 클릭해도 먼저 셀이 확정된다. 상세보기와 저장 중에는 편집하지 않는다.
+- 출하계획 상세의 분할·삭제 버튼은 분할 셀 가운데에 모아 배치한다. 분할 행은 선택한 행 바로 뒤에 삽입하고 계획수량 셀 편집을 시작한다. 수량은 자동 배분하지 않으며 재조회 시 같은 수주 상세의 행을 그룹으로 표시한다.
 - `number`/`decimal`/`currency` 셀에서 빈 입력을 commit하면 값은 `null`로 유지하고, 원본도 `null`이면 dirty 변경을 만들지 않는다. 명시적으로 입력한 숫자 `0`은 빈 값과 구분해 숫자 0으로 저장한다.
 - F1-Grid는 dirty 변경 집합을 제공하지만 조회/필터 적용으로 부모가 `rows`를 교체할 때 확인창을 자동 표시하지 않는다. 페이지는 `getChanges()` 또는 `onChangesChange`로 변경 유무를 확인하고, 변경 폐기 확인을 취소하면 Grid 상태를 유지하며 계속하면 Grid 상태를 초기화한 뒤 보류한 조회를 실행해야 한다.
 - 저장 뒤 목록을 재조회하는 기존 페이지는 저장 상태와 Grid `loading`을 분리한다. 품목관리와 거래처관리는 저장 후 재조회 자체를 하지 않는다. 두 화면 모두 저장 진행 아이콘·중복 저장 방지·편집 잠금을 유지하고, 최초/사용자 조회에만 Grid 로딩을 표시한다.

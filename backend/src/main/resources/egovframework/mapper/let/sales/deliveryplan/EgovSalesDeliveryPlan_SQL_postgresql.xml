@@ -72,8 +72,17 @@
 
     <select id="selectPlanHeader" parameterType="map"
             resultType="egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO">
-        SELECT <include refid="planHeaderColumns"/>
+        SELECT <include refid="planHeaderColumns"/>,
+               u.user_nm AS createdByName,
+               la.profile_image AS createdByProfileImage,
+               to_char(ph.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt
         <include refid="planHeaderJoins"/>
+        LEFT JOIN tb_login_account la
+          ON la.login_code = ph.created_by
+         AND la.tenant_id = ph.tenant_id
+        LEFT JOIN tb_user u
+          ON u.login_id = la.login_id
+         AND u.tenant_id = la.tenant_id
         WHERE ph.sales_delivery_plan_id = #{salesDeliveryPlanId, jdbcType=BIGINT}
           AND ph.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND ph.use_at = 'Y'
