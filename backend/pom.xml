@@ -6,7 +6,7 @@
 	<artifactId>s-erp-backend</artifactId>
 	<packaging>war</packaging>
 	<version>1.0.0</version>
-	<name>S-ERP Backend</name>
+	<name>iPlusMES Backend</name>
 	<url>example.egovframework.com</url>
 
 	<licenses>

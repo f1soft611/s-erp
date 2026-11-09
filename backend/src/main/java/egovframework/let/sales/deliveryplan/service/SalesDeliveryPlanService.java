@@ -11,7 +11,7 @@ public interface SalesDeliveryPlanService {
     String getMode(Long tenantId) throws Exception;
 
     /**
-     * 납품계획 헤더를 생성할 수 있는 트랜잭션에서 수주 잠금보다 먼저 호출해 테넌트 운영모드를 공유 잠금으로 읽는다.
+     * 출하계획 헤더를 생성할 수 있는 트랜잭션에서 수주 잠금보다 먼저 호출해 테넌트 운영모드를 공유 잠금으로 읽는다.
      */
     String lockModeForPlanCreation(Long tenantId) throws Exception;
 
@@ -27,6 +27,8 @@ public interface SalesDeliveryPlanService {
             List<Long> retainedOrderDetailIds) throws Exception;
 
     SalesDeliveryPlanVO get(Long tenantId, String userId, Long planId) throws Exception;
+
+    SalesDeliveryPlanVO getByOrder(Long tenantId, String userId, Long salesOrderId) throws Exception;
 
     SalesDeliveryPlanVO update(Long tenantId, String userId, Long planId, SalesDeliveryPlanRequestVO request)
             throws Exception;

@@ -1,6 +1,6 @@
 # 11. 완료, 정리 및 결과 문서화 스킬 (11-finalize)
 
-> **Superpowers `finishing-a-development-branch` 및 S-ERP 결과 문서화 규칙 결합**: 모든 검증이 완료되면 결과 문서를 작성하고 Git 작업 환경을 정돈하여 작업을 최종 마무리합니다.
+> **Superpowers `finishing-a-development-branch` 및 iPlusMES 결과 문서화 규칙 결합**: 모든 검증이 완료되면 결과 문서를 작성하고 Git 작업 환경을 정돈하여 작업을 최종 마무리합니다.
 
 ---
 

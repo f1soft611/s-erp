@@ -228,6 +228,9 @@ function DashboardPage() {
   const [profile, setProfile] = useState<UserMenuResponse['user']>(
     emptyUserMenuResponse.user,
   );
+  const [deliveryPlanMode, setDeliveryPlanMode] = useState<UserMenuResponse['deliveryPlanMode']>(
+    emptyUserMenuResponse.deliveryPlanMode,
+  );
   const [menusLoading, setMenusLoading] = useState(true);
   const [favorites, setFavorites] = useState<MenuFavoritesResponse>({
     folders: [],
@@ -276,6 +279,7 @@ function DashboardPage() {
         }
 
         setProfile(response.user ?? emptyUserMenuResponse.user);
+        setDeliveryPlanMode(response.deliveryPlanMode ?? 'AUTO');
         const sourceModules = buildModuleDescriptors(response);
         setModuleItems(
           buildModuleItems(hydrateModuleDescriptors(sourceModules, moduleRows)),
@@ -1100,6 +1104,7 @@ function DashboardPage() {
                     breadcrumbItems={breadcrumbItems}
                     content={content}
                     selectedMenuPermissions={currentMenu.permissions}
+                    deliveryPlanMode={deliveryPlanMode}
                     dashboardScope={dashboardScope}
                     onDashboardScopeChange={updateDashboardScope}
                     isTenantAdmin={[

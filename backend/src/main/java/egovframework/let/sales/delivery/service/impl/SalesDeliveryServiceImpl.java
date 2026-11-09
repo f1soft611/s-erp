@@ -80,7 +80,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         header.put("createdBy", userId);
         Long deliveryId = salesDeliveryDAO.insertDeliveryHeader(header);
         if (deliveryId == null || deliveryId.longValue() < 1L) {
-            throw new IllegalStateException("납품 헤더 저장에 실패했습니다.");
+            throw new IllegalStateException("출하 헤더 저장에 실패했습니다.");
         }
 
         persistDetails(deliveryId, tenantId, payload.getDeliveryType(), payload.getSalesOrderId(), details);
@@ -171,7 +171,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (!same(observed.getDeliveryType(), stored.getDeliveryType())
                 || !same(observed.getCustomerId(), stored.getCustomerId())
                 || !same(observed.getSalesOrderId(), stored.getSalesOrderId())) {
-            throw conflict("납품 연결이 조회 중 변경되었습니다. 다시 시도해 주세요.");
+            throw conflict("출하 연결이 조회 중 변경되었습니다. 다시 시도해 주세요.");
         }
         List<SalesDeliveryDetailVO> details = salesDeliveryDAO.selectDeliveryDetails(params);
         if (details != null && ORDER.equals(stored.getDeliveryType())) {
@@ -207,12 +207,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throws Exception {
         validatePrincipal(tenantId, userId);
         if (search == null) {
-            throw badRequest("납품일자 기간을 입력해 주세요.");
+            throw badRequest("출하일자 기간을 입력해 주세요.");
         }
         LocalDate from = parseDate(search.getDeliveryDtFrom());
         LocalDate to = parseDate(search.getDeliveryDtTo());
         if (from == null || to == null || from.isAfter(to)) {
-            throw badRequest("납품일 시작일과 종료일을 올바르게 입력해 주세요.");
+            throw badRequest("출하일 시작일과 종료일을 올바르게 입력해 주세요.");
         }
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("tenantId", tenantId);
@@ -241,7 +241,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (!same(delivery.getDeliveryType(), payload.getDeliveryType())
                 || !same(delivery.getCustomerId(), payload.getCustomerId())
                 || !same(delivery.getSalesOrderId(), payload.getSalesOrderId())) {
-            throw conflict("저장된 납품구분, 거래처 및 수주 연결은 변경할 수 없습니다.");
+            throw conflict("저장된 출하구분, 거래처 및 수주 연결은 변경할 수 없습니다.");
         }
     }
 
@@ -249,7 +249,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             Long tenantId, Long salesOrderId, Long customerId)
             throws Exception {
         if (salesOrderId == null || salesOrderId.longValue() < 1L) {
-            throw badRequest("수주납품은 수주를 선택해야 합니다.");
+            throw badRequest("수주출하는 수주를 선택해야 합니다.");
         }
         SalesDeliverySourceOrderHeaderVO order = salesDeliveryDAO.lockSourceOrder(
                 orderParams(tenantId, salesOrderId));
@@ -257,10 +257,10 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "수주를 찾을 수 없습니다.");
         }
         if (!same(order.getCustomerId(), customerId)) {
-            throw conflict("수주 거래처와 납품 거래처가 일치하지 않습니다.");
+            throw conflict("수주 거래처와 출하 거래처가 일치하지 않습니다.");
         }
         if (isClosedOrder(order.getStatus())) {
-            throw conflict("취소 또는 완료된 수주에는 납품할 수 없습니다.");
+            throw conflict("취소 또는 완료된 수주에는 출하할 수 없습니다.");
         }
         return order;
     }
@@ -297,7 +297,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                 BigDecimal after = valueOrZero(line.getDeliveredQty())
                         .subtract(previousQuantity(oldPlanQuantities, detail.salesDeliveryPlanDetailId))
                         .add(detail.deliveryQty);
-                validateCumulativeQuantity(after, "계획 누적납품수량");
+                validateCumulativeQuantity(after, "계획 누적출하수량");
                 addExcess(excesses, "계획 상세 " + detail.salesDeliveryPlanDetailId,
                         line.getPlannedQty(), after);
             }
@@ -311,10 +311,10 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             if (!excesses.isEmpty()) {
                 String message = String.join("; ", excesses);
                 if (!"WARN".equals(policy)) {
-                    throw conflict("초과납품 차단 정책입니다. " + message);
+                    throw conflict("초과출하 차단 정책입니다. " + message);
                 }
                 if (!payload.isOverDeliveryConfirmed()) {
-                    throw conflict("[OVER_DELIVERY_CONFIRM_REQUIRED]초과납품을 저장하시겠습니까? " + message);
+                    throw conflict("[OVER_DELIVERY_CONFIRM_REQUIRED]초과출하를 저장하시겠습니까? " + message);
                 }
             }
         }
@@ -349,7 +349,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         Long planDetailId = request.getSalesDeliveryPlanDetailId();
         if (payload.getSalesOrderId() == null || detailId == null || detailId.longValue() < 1L
                 || planDetailId == null || planDetailId.longValue() < 1L) {
-            throw badRequest("수주납품 상세는 납품계획 상세를 선택해야 합니다.");
+            throw badRequest("수주출하 상세는 출하계획 상세를 선택해야 합니다.");
         }
         Map<String, Object> params = sourceDetailParams(tenantId, payload.getSalesOrderId(), detailId);
         params.put("salesDeliveryPlanDetailId", planDetailId);
@@ -360,14 +360,14 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                 || !same(line.getSalesOrderDetailId(), detailId)
                 || !same(line.getSalesDeliveryPlanDetailId(), planDetailId)
                 || order == null || !same(order.getCustomerId(), payload.getCustomerId())) {
-            throw conflict("납품계획 상세의 거래처, 품목 또는 수주 연결이 유효하지 않습니다.");
+            throw conflict("출하계획 상세의 거래처, 품목 또는 수주 연결이 유효하지 않습니다.");
         }
         return line;
     }
 
     private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request) {
         if (request.getDeliveryQty() == null || request.getDeliveryQty().signum() <= 0) {
-            throw badRequest("납품수량은 0보다 커야 합니다.");
+            throw badRequest("출하수량은 0보다 커야 합니다.");
         }
         if (request.getUnitPrice() == null || request.getUnitPrice().signum() < 0) {
             throw badRequest("단가는 0 이상이어야 합니다.");
@@ -375,7 +375,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (request.getVatAmt() != null && request.getVatAmt().signum() < 0) {
             throw badRequest("부가세는 0 이상이어야 합니다.");
         }
-        BigDecimal quantity = inputNumeric(request.getDeliveryQty(), "납품수량");
+        BigDecimal quantity = inputNumeric(request.getDeliveryQty(), "출하수량");
         BigDecimal unitPrice = inputNumeric(request.getUnitPrice(), "단가");
         BigDecimal supplyAmt = money(quantity.multiply(unitPrice));
         validateNumeric(supplyAmt, "공급가액");
@@ -409,7 +409,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             params.put("totalAmt", detail.totalAmt);
             Long savedId = salesDeliveryDAO.insertDeliveryDetail(params);
             if (savedId == null || savedId.longValue() < 1L) {
-                throw new IllegalStateException("납품 상세 저장에 실패했습니다.");
+                throw new IllegalStateException("출하 상세 저장에 실패했습니다.");
             }
         }
     }
@@ -504,7 +504,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         params.put("deltaQty", delta);
         params.put("updatedBy", userId);
         if (salesDeliveryDAO.adjustPlanDeliveredQty(params) != 1) {
-            throw conflict("납품계획 잔량이 변경되었습니다. 다시 조회한 뒤 시도해 주세요.");
+            throw conflict("출하계획 잔량이 변경되었습니다. 다시 조회한 뒤 시도해 주세요.");
         }
     }
 
@@ -518,7 +518,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             total = total.add(detail.totalAmt);
         }
         total = money(total);
-        validateNumeric(total, "납품 총액");
+        validateNumeric(total, "출하 총액");
         return total;
     }
 
@@ -526,36 +526,36 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (payload == null || payload.getDeliveryDt() == null
                 || payload.getCustomerId() == null || payload.getCustomerId() < 1L
                 || payload.getDetails() == null || payload.getDetails().isEmpty()) {
-            throw badRequest("납품일자, 거래처 및 상세 품목을 입력해 주세요.");
+            throw badRequest("출하일자, 거래처 및 상세 품목을 입력해 주세요.");
         }
         if (!DIRECT.equals(payload.getDeliveryType()) && !ORDER.equals(payload.getDeliveryType())) {
-            throw badRequest("납품구분은 DIRECT 또는 ORDER여야 합니다.");
+            throw badRequest("출하구분은 DIRECT 또는 ORDER여야 합니다.");
         }
         if (DIRECT.equals(payload.getDeliveryType())) {
             if (payload.getSalesOrderId() != null) {
-                throw badRequest("직납품에는 수주를 연결할 수 없습니다.");
+                throw badRequest("직출하에는 수주를 연결할 수 없습니다.");
             }
             for (SalesDeliveryDetailRequestVO detail : payload.getDetails()) {
                 if (detail != null && (detail.getSalesOrderDetailId() != null
                         || detail.getSalesDeliveryPlanDetailId() != null)) {
-                    throw badRequest("직납품에는 수주 또는 납품계획 상세를 연결할 수 없습니다.");
+                    throw badRequest("직출하에는 수주 또는 출하계획 상세를 연결할 수 없습니다.");
                 }
             }
         } else if (payload.getSalesOrderId() == null || payload.getSalesOrderId() < 1L) {
-            throw badRequest("수주납품은 수주를 선택해야 합니다.");
+            throw badRequest("수주출하는 수주를 선택해야 합니다.");
         }
         Set<Long> planDetailIds = new HashSet<Long>();
         for (SalesDeliveryDetailRequestVO detail : payload.getDetails()) {
             if (ORDER.equals(payload.getDeliveryType()) && detail != null
                     && detail.getSalesDeliveryPlanDetailId() == null) {
-                throw badRequest("수주납품은 납품계획 상세를 선택해야 합니다.");
+                throw badRequest("수주출하는 출하계획 상세를 선택해야 합니다.");
             }
             if (detail != null && detail.getSalesDeliveryPlanDetailId() != null
                     && !planDetailIds.add(detail.getSalesDeliveryPlanDetailId())) {
-                throw badRequest("같은 납품계획 상세를 중복 등록할 수 없습니다.");
+                throw badRequest("같은 출하계획 상세를 중복 등록할 수 없습니다.");
             }
         }
-        validateText(payload.getDeliveryPlace(), 200, "납품장소");
+        validateText(payload.getDeliveryPlace(), 200, "출하장소");
         validateText(payload.getDeliveryMethod(), 50, "배송방법");
         validateText(payload.getRemark(), 500, "비고");
     }
@@ -571,11 +571,11 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         Long sequence = idSequenceService.nextValue(
                 DELIVERY_NO_GENERATOR_KEY, tenantId.toString(), dateKey);
         if (sequence == null || sequence.longValue() < 1L) {
-            throw new IllegalStateException("납품번호를 생성할 수 없습니다.");
+            throw new IllegalStateException("출하번호를 생성할 수 없습니다.");
         }
         String number = String.format(Locale.ROOT, "SD-%s-%04d", dateKey, sequence);
         if (number.length() > 30) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "납품번호를 생성할 수 없습니다.");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "출하번호를 생성할 수 없습니다.");
         }
         return number;
     }
@@ -589,7 +589,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
 
     private void validateDeliveryId(Long salesDeliveryId) {
         if (salesDeliveryId == null || salesDeliveryId.longValue() < 1L) {
-            throw badRequest("납품 ID는 1 이상의 값이어야 합니다.");
+            throw badRequest("출하 ID는 1 이상의 값이어야 합니다.");
         }
     }
 
@@ -637,7 +637,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         try {
             return LocalDate.parse(value);
         } catch (DateTimeParseException exception) {
-            throw badRequest("납품일자를 YYYY-MM-DD 형식으로 입력해 주세요.");
+            throw badRequest("출하일자를 YYYY-MM-DD 형식으로 입력해 주세요.");
         }
     }
 
@@ -691,7 +691,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     }
 
     private ResponseStatusException deliveryNotFound() {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, "납품 정보를 찾을 수 없습니다.");
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "출하 정보를 찾을 수 없습니다.");
     }
 
     private static final class PreparedDetail {

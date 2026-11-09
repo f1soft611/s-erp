@@ -70,7 +70,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
         mode = mode.trim().toUpperCase();
         if (!MODE_AUTO.equals(mode) && !MODE_MANUAL.equals(mode)) {
-            throw new IllegalStateException("테넌트 납품계획 운영 설정이 올바르지 않습니다.");
+            throw new IllegalStateException("테넌트 출하계획 운영 설정이 올바르지 않습니다.");
         }
         return mode;
     }
@@ -83,7 +83,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             return "BLOCK";
         }
         if (!"BLOCK".equals(policy) && !"WARN".equals(policy)) {
-            throw new IllegalStateException("테넌트 초과납품 정책이 올바르지 않습니다.");
+            throw new IllegalStateException("테넌트 초과출하 정책이 올바르지 않습니다.");
         }
         return policy;
     }
@@ -91,8 +91,8 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     @Override
     public List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, String keyword) throws Exception {
         validateTenant(tenantId);
-        requireManualMode(tenantId);
         Map<String, Object> params = tenantParams(tenantId);
+        params.put("deliveryPlanMode", getMode(tenantId));
         params.put("keyword", normalize(keyword));
         params.put("limit", 200);
         return dao.selectPlanSourceOrders(params);
@@ -104,7 +104,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             throws Exception {
         validatePrincipal(tenantId, userId);
         if (!MODE_MANUAL.equals(lockModeForPlanCreation(tenantId))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "AUTO 테넌트에서는 납품계획을 직접 관리할 수 없습니다.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "AUTO 테넌트에서는 출하계획을 직접 등록할 수 없습니다.");
         }
         return createPlan(tenantId, userId, request);
     }
@@ -115,7 +115,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             throws Exception {
         validatePrincipal(tenantId, userId);
         if (!MODE_AUTO.equals(lockModeForPlanCreation(tenantId))) {
-            throw conflict("MANUAL 테넌트의 납품계획은 사용자가 직접 등록해야 합니다.");
+            throw conflict("MANUAL 테넌트의 출하계획은 사용자가 직접 등록해야 합니다.");
         }
         persistPlan(tenantId, userId, request);
     }
@@ -127,7 +127,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         validatePrincipal(tenantId, userId);
         validateId(salesOrderId);
         if (!MODE_AUTO.equals(getMode(tenantId))) {
-            throw conflict("MANUAL 테넌트의 납품계획은 자동 수정할 수 없습니다.");
+            throw conflict("MANUAL 테넌트의 출하계획은 자동 수정할 수 없습니다.");
         }
 
         Map<String, Object> orderParams = orderParams(tenantId, salesOrderId);
@@ -137,11 +137,11 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         boolean allowExcess = "WARN".equals(getOverDeliveryPolicy(tenantId));
         SalesDeliveryPlanVO plan = dao.selectPlanByOrder(orderParams);
         if (plan == null) {
-            throw conflict("수주에 연결된 자동 납품계획을 찾을 수 없습니다.");
+            throw conflict("수주에 연결된 자동 출하계획을 찾을 수 없습니다.");
         }
         Map<String, Object> planParams = planParams(tenantId, plan.getSalesDeliveryPlanId());
         if (dao.lockPlanHeader(planParams) == null) {
-            throw notFound("납품계획을 찾을 수 없습니다.");
+            throw notFound("출하계획을 찾을 수 없습니다.");
         }
 
         if (retainedOrderDetailIds == null) {
@@ -153,7 +153,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                 new HashMap<Long, SalesDeliveryPlanDetailVO>();
         for (SalesDeliveryPlanDetailVO detail : dao.selectPlanDetails(planParams)) {
             if (currentByOrderDetail.put(detail.getSalesOrderDetailId(), detail) != null) {
-                throw conflict("자동 납품계획에서 수주 상세가 중복 참조됩니다.");
+                throw conflict("자동 출하계획에서 수주 상세가 중복 참조됩니다.");
             }
         }
         Set<Long> synchronizedIds = new HashSet<Long>();
@@ -172,20 +172,13 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                         plan.getSalesDeliveryPlanId(), line, detail, line.getLineNo(), userId);
                 Long insertedId = dao.insertPlanDetail(params);
                 if (insertedId == null || insertedId.longValue() < 1L) {
-                    throw new IllegalStateException("자동 납품계획 상세 저장에 실패했습니다.");
+                    throw new IllegalStateException("자동 출하계획 상세 저장에 실패했습니다.");
                 }
                 synchronizedIds.add(orderDetailId);
                 continue;
             }
             if (!allowExcess && detail.getPlannedQty().compareTo(zeroIfNull(existing.getDeliveredQty())) < 0) {
-                throw conflict("수주수량은 이미 납품된 수량보다 적을 수 없습니다.");
-            }
-            Map<String, Object> params = detailParams(tenantId, salesOrderId,
-                    plan.getSalesDeliveryPlanId(), line, detail, existing.getLineNo(), userId);
-            params.put("salesDeliveryPlanDetailId", existing.getSalesDeliveryPlanDetailId());
-            params.put("deliveredQty", existing.getDeliveredQty());
-            if (dao.updatePlanDetail(params) != 1) {
-                throw conflict("자동 납품계획 상세가 동시에 변경되었습니다.");
+                throw conflict("수주수량은 이미 출하된 수량보다 적을 수 없습니다.");
             }
             synchronizedIds.add(orderDetailId);
         }
@@ -194,14 +187,14 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             Map<String, Object> params = detailParamsForExisting(tenantId,
                     plan.getSalesDeliveryPlanId(), orphan.getSalesDeliveryPlanDetailId());
             if (dao.countDeliveryReferences(params) > 0 || isPositive(orphan.getDeliveredQty())) {
-                throw conflict("납품에 사용된 자동 납품계획 상세는 삭제할 수 없습니다.");
+                throw conflict("출하에 사용된 자동 출하계획 상세는 삭제할 수 없습니다.");
             }
             if (dao.deletePlanDetail(params) != 1) {
-                throw conflict("자동 납품계획 상세가 동시에 변경되었습니다.");
+                throw conflict("자동 출하계획 상세가 동시에 변경되었습니다.");
             }
         }
         if (!synchronizedIds.equals(retained)) {
-            throw conflict("자동 납품계획과 수주 상세가 일치하지 않습니다.");
+            throw conflict("자동 출하계획과 수주 상세가 일치하지 않습니다.");
         }
     }
 
@@ -211,7 +204,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         Map<String, Object> orderParams = orderParams(tenantId, request.getSalesOrderId());
         SalesDeliveryPlanVO result = dao.selectPlanByOrder(orderParams);
         if (result == null) {
-            throw new IllegalStateException("저장한 납품계획을 다시 조회할 수 없습니다.");
+            throw new IllegalStateException("저장한 출하계획을 다시 조회할 수 없습니다.");
         }
         result.setDetails(dao.selectPlanDetails(planParams(tenantId, planId)));
         return result;
@@ -226,10 +219,10 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             throw notFound("수주를 찾을 수 없습니다.");
         }
         if (!EDITABLE_ORDER_STATUS.equals(order.getStatus())) {
-            throw conflict("수주등록 상태의 수주만 납품계획을 등록할 수 있습니다.");
+            throw conflict("수주등록 상태의 수주만 출하계획을 등록할 수 있습니다.");
         }
         if (dao.selectPlanByOrder(orderParams) != null) {
-            throw conflict("수주에 이미 납품계획이 등록되어 있습니다.");
+            throw conflict("수주에 이미 출하계획이 등록되어 있습니다.");
         }
 
         List<SalesDeliveryPlanDetailVO> orderLines = dao.selectOrderLines(orderParams);
@@ -237,7 +230,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         Map<Long, BigDecimal> quantities = validateAndSumDetails(request, linesById, null);
         for (SalesDeliveryPlanDetailVO line : linesById.values()) {
             if (isPositive(line.getShippedQty())) {
-                throw conflict("납품 이력이 있는 수주에는 새 납품계획을 등록할 수 없습니다.");
+                throw conflict("출하 이력이 있는 수주에는 새 출하계획을 등록할 수 없습니다.");
             }
         }
         validateTotals(quantities, linesById, null, false);
@@ -248,7 +241,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         header.put("createdBy", userId);
         Long planId = dao.insertPlanHeader(header);
         if (planId == null || planId.longValue() < 1L) {
-            throw new IllegalStateException("납품계획 헤더 저장에 실패했습니다.");
+            throw new IllegalStateException("출하계획 헤더 저장에 실패했습니다.");
         }
 
         int lineNo = 1;
@@ -258,7 +251,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                     orderLine, detail, lineNo++, userId);
             Long detailId = dao.insertPlanDetail(params);
             if (detailId == null || detailId.longValue() < 1L) {
-                throw new IllegalStateException("납품계획 상세 저장에 실패했습니다.");
+                throw new IllegalStateException("출하계획 상세 저장에 실패했습니다.");
             }
         }
 
@@ -268,13 +261,27 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     @Override
     public SalesDeliveryPlanVO get(Long tenantId, String userId, Long planId) throws Exception {
         validatePrincipal(tenantId, userId);
-        requireManualMode(tenantId);
         validateId(planId);
         SalesDeliveryPlanVO plan = dao.selectPlanHeader(planParams(tenantId, planId));
         if (plan == null) {
-            throw notFound("납품계획을 찾을 수 없습니다.");
+            throw notFound("출하계획을 찾을 수 없습니다.");
         }
         plan.setDetails(dao.selectPlanDetails(planParams(tenantId, planId)));
+        return plan;
+    }
+
+    @Override
+    public SalesDeliveryPlanVO getByOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
+        validatePrincipal(tenantId, userId);
+        if (salesOrderId == null || salesOrderId.longValue() < 1L) {
+            throw notFound("출하계획을 찾을 수 없습니다.");
+        }
+        Map<String, Object> params = orderParams(tenantId, salesOrderId);
+        SalesDeliveryPlanVO plan = dao.selectPlanByOrder(params);
+        if (plan == null) {
+            throw notFound("출하계획을 찾을 수 없습니다.");
+        }
+        plan.setDetails(dao.selectPlanDetails(planParams(tenantId, plan.getSalesDeliveryPlanId())));
         return plan;
     }
 
@@ -284,13 +291,12 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             SalesDeliveryPlanRequestVO request) throws Exception {
         validatePrincipal(tenantId, userId);
         validateId(planId);
-        requireManualMode(tenantId);
         validateRequest(request, true);
 
         Map<String, Object> planParams = planParams(tenantId, planId);
         SalesDeliveryPlanVO plan = dao.selectPlanHeader(planParams);
         if (plan == null) {
-            throw notFound("납품계획을 찾을 수 없습니다.");
+            throw notFound("출하계획을 찾을 수 없습니다.");
         }
         Map<String, Object> orderParams = orderParams(tenantId, plan.getSalesOrderId());
         SalesDeliverySourceOrderHeaderVO order = dao.lockSourceOrder(orderParams);
@@ -300,13 +306,13 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         boolean allowExcess = "WARN".equals(getOverDeliveryPolicy(tenantId));
         SalesDeliveryPlanVO lockedPlan = dao.lockPlanHeader(planParams);
         if (lockedPlan == null) {
-            throw notFound("납품계획을 찾을 수 없습니다.");
+            throw notFound("출하계획을 찾을 수 없습니다.");
         }
         if (!same(plan.getSalesOrderId(), request.getSalesOrderId())) {
-            throw conflict("저장된 납품계획의 수주는 변경할 수 없습니다.");
+            throw conflict("저장된 출하계획의 수주는 변경할 수 없습니다.");
         }
         if (!EDITABLE_ORDER_STATUS.equals(order.getStatus())) {
-            throw conflict("수주등록 상태의 수주만 납품계획을 수정할 수 있습니다.");
+            throw conflict("수주등록 상태의 수주만 출하계획을 수정할 수 있습니다.");
         }
 
         List<SalesDeliveryPlanDetailVO> current = dao.selectPlanDetails(planParams);
@@ -319,7 +325,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             if (detail.getSalesDeliveryPlanDetailId() != null) {
                 SalesDeliveryPlanDetailVO stored = currentById.get(detail.getSalesDeliveryPlanDetailId());
                 if (!allowExcess && detail.getPlannedQty().compareTo(zeroIfNull(stored.getDeliveredQty())) < 0) {
-                    throw conflict("계획 상세 수량은 해당 상세에 이미 납품된 수량보다 적을 수 없습니다.");
+                    throw conflict("계획 상세 수량은 해당 상세에 이미 출하된 수량보다 적을 수 없습니다.");
                 }
             }
         }
@@ -331,7 +337,6 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     public List<SalesDeliveryPlanVO> listStatus(Long tenantId, String userId,
             SalesDeliveryPlanStatusSearchVO search) throws Exception {
         validatePrincipal(tenantId, userId);
-        requireManualMode(tenantId);
         if (search == null) {
             throw badRequest("검색 조건을 입력해 주세요.");
         }
@@ -366,13 +371,13 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                 nextLineNo++;
                 Long insertedId = dao.insertPlanDetail(params);
                 if (insertedId == null || insertedId.longValue() < 1L) {
-                    throw new IllegalStateException("납품계획 상세 저장에 실패했습니다.");
+                    throw new IllegalStateException("출하계획 상세 저장에 실패했습니다.");
                 }
                 continue;
             }
             SalesDeliveryPlanDetailVO stored = currentById.get(detailId);
             if (stored == null || !same(stored.getSalesOrderDetailId(), detail.getSalesOrderDetailId())) {
-                throw badRequest("납품계획 상세 항목이 올바르지 않습니다.");
+                throw badRequest("출하계획 상세 항목이 올바르지 않습니다.");
             }
             retainedIds.add(detailId);
             Map<String, Object> params = detailParams(tenantId, request.getSalesOrderId(), planId, source,
@@ -381,13 +386,13 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                     || !sameDecimal(stored.getPlannedQty(), detail.getPlannedQty());
             int references = dao.countDeliveryReferences(detailParamsForExisting(tenantId, planId, detailId));
             if (references > 0 && changed) {
-                throw conflict("납품에 사용된 납품계획 상세는 수정할 수 없습니다.");
+                throw conflict("출하에 사용된 출하계획 상세는 수정할 수 없습니다.");
             }
             if (changed) {
                 params.put("salesDeliveryPlanDetailId", detailId);
                 params.put("deliveredQty", stored.getDeliveredQty());
                 if (dao.updatePlanDetail(params) != 1) {
-                    throw notFound("납품계획 상세를 찾을 수 없습니다.");
+                    throw notFound("출하계획 상세를 찾을 수 없습니다.");
                 }
             }
         }
@@ -398,10 +403,10 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             Map<String, Object> params = detailParamsForExisting(
                     tenantId, planId, stored.getSalesDeliveryPlanDetailId());
             if (dao.countDeliveryReferences(params) > 0 || isPositive(stored.getDeliveredQty())) {
-                throw conflict("납품에 사용된 납품계획 상세는 삭제할 수 없습니다.");
+                throw conflict("출하에 사용된 출하계획 상세는 삭제할 수 없습니다.");
             }
             if (dao.deletePlanDetail(params) != 1) {
-                throw notFound("납품계획 상세를 찾을 수 없습니다.");
+                throw notFound("출하계획 상세를 찾을 수 없습니다.");
             }
         }
     }
@@ -421,11 +426,11 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             validateQuantity(detail.getPlannedQty());
             if (detail.getSalesDeliveryPlanDetailId() != null) {
                 if (currentById == null || !detailIds.add(detail.getSalesDeliveryPlanDetailId())) {
-                    throw badRequest("납품계획 상세 항목이 중복되었거나 올바르지 않습니다.");
+                    throw badRequest("출하계획 상세 항목이 중복되었거나 올바르지 않습니다.");
                 }
                 SalesDeliveryPlanDetailVO stored = currentById.get(detail.getSalesDeliveryPlanDetailId());
                 if (stored == null) {
-                    throw badRequest("납품계획 상세 항목이 올바르지 않습니다.");
+                    throw badRequest("출하계획 상세 항목이 올바르지 않습니다.");
                 }
             }
             BigDecimal previous = totals.get(detail.getSalesOrderDetailId());
@@ -449,7 +454,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                     }
                 }
                 if (entry.getValue().compareTo(delivered) < 0) {
-                    throw conflict("계획수량은 이미 납품된 수량보다 적을 수 없습니다.");
+                    throw conflict("계획수량은 이미 출하된 수량보다 적을 수 없습니다.");
                 }
             }
             if (ceiling == null || entry.getValue().compareTo(ceiling) > 0) {
@@ -530,11 +535,11 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         String dateKey = LocalDate.now().toString().replace("-", "");
         Long sequence = sequenceService.nextValue(PLAN_NO_GENERATOR_KEY, tenantId.toString(), dateKey);
         if (sequence == null || sequence.longValue() < 1L) {
-            throw new IllegalStateException("납품계획번호 채번에 실패했습니다.");
+            throw new IllegalStateException("출하계획번호 채번에 실패했습니다.");
         }
         String planNo = String.format(Locale.ROOT, "DP-%s-%04d", dateKey, sequence);
         if (planNo.length() > PLAN_NO_MAX_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "납품계획번호를 생성할 수 없습니다.");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "출하계획번호를 생성할 수 없습니다.");
         }
         return planNo;
     }
@@ -542,12 +547,12 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     private void validateRequest(SalesDeliveryPlanRequestVO request, boolean update) {
         if (request == null || request.getSalesOrderId() == null || request.getSalesOrderId().longValue() < 1L
                 || request.getDetails() == null || request.getDetails().isEmpty()) {
-            throw badRequest("수주와 납품계획 상세를 입력해 주세요.");
+            throw badRequest("수주와 출하계획 상세를 입력해 주세요.");
         }
         if (!update) {
             for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
                 if (detail != null && detail.getSalesDeliveryPlanDetailId() != null) {
-                    throw badRequest("신규 납품계획에는 기존 상세 ID를 지정할 수 없습니다.");
+                    throw badRequest("신규 출하계획에는 기존 상세 ID를 지정할 수 없습니다.");
                 }
             }
         }
@@ -562,7 +567,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
 
     private void requireManualMode(Long tenantId) throws Exception {
         if (!MODE_MANUAL.equals(getMode(tenantId))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "AUTO 테넌트에서는 납품계획을 직접 관리할 수 없습니다.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "AUTO 테넌트에서는 출하계획을 직접 등록할 수 없습니다.");
         }
     }
 
@@ -581,7 +586,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
 
     private void validateId(Long id) {
         if (id == null || id.longValue() < 1L) {
-            throw notFound("납품계획을 찾을 수 없습니다.");
+            throw notFound("출하계획을 찾을 수 없습니다.");
         }
     }
 

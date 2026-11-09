@@ -26,6 +26,15 @@ export type DeliveryPlanDetail = DeliveryPlanDetailRequest & {
   orderQty: number;
 };
 
+export type PlanRow = DeliveryPlanDetailRequest & {
+  rowId: string;
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  unit: string | null;
+  orderQty: number;
+};
+
 export type DeliveryPlanItem = {
   salesDeliveryPlanId: number;
   tenantId: number;
@@ -37,6 +46,9 @@ export type DeliveryPlanItem = {
   customerCode: string;
   customerName: string;
   createdBy: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
   details: DeliveryPlanDetail[];
 };
 
@@ -57,6 +69,7 @@ export type DeliveryPlanPageProps = {
   content: PageContent;
   breadcrumbItems: string[];
   selectedMenuPermissions?: MenuPermission;
+  deliveryPlanMode?: 'AUTO' | 'MANUAL';
 };
 
 export type PlanSourceOrderRow = {

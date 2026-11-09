@@ -44,7 +44,7 @@ public class SalesDeliveryApiController {
         Map<String, Object> values = new HashMap<String, Object>();
         values.put("item", salesDeliveryService.createDelivery(
                 user.getTenantId(), user.getId(), payload));
-        values.put("message", "납품이 성공적으로 등록되었습니다.");
+        values.put("message", "출하가 성공적으로 등록되었습니다.");
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
@@ -66,7 +66,7 @@ public class SalesDeliveryApiController {
         Map<String, Object> values = new HashMap<String, Object>();
         values.put("item", salesDeliveryService.updateDelivery(
                 user.getTenantId(), user.getId(), salesDeliveryId, payload));
-        values.put("message", "납품이 성공적으로 수정되었습니다.");
+        values.put("message", "출하가 성공적으로 수정되었습니다.");
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
@@ -76,7 +76,7 @@ public class SalesDeliveryApiController {
         requireAuthenticated(user);
         salesDeliveryService.deleteDelivery(user.getTenantId(), user.getId(), salesDeliveryId);
         Map<String, Object> values = new HashMap<String, Object>();
-        values.put("message", "납품이 성공적으로 삭제되었습니다.");
+        values.put("message", "출하가 성공적으로 삭제되었습니다.");
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 

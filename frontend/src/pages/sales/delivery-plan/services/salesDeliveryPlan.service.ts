@@ -1,10 +1,31 @@
 import { apiGet, apiPost, apiPut } from '../../../../shared/services/apiClient';
 import { localDate } from '../../delivery/create/services/salesDelivery.service';
 import type {
-  DeliveryPlanFilters, DeliveryPlanItem, DeliveryPlanRequest, DeliveryPlanStatusRow, PlanSourceOrderRow,
+  DeliveryPlanDetail, DeliveryPlanFilters, DeliveryPlanItem, DeliveryPlanRequest, DeliveryPlanStatusRow, PlanRow, PlanSourceOrderRow,
 } from '../types/salesDeliveryPlan.types';
 
 const PATH = '/api/v1/sales/delivery-plans';
+
+export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
+  const groups = new Map<number, PlanRow[]>();
+  for (const detail of details) {
+    const group = groups.get(detail.salesOrderDetailId) ?? [];
+    group.push({
+      rowId: String(detail.salesDeliveryPlanDetailId),
+      salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
+      salesOrderDetailId: detail.salesOrderDetailId,
+      planDt: detail.planDt,
+      plannedQty: Number(detail.plannedQty),
+      materialId: detail.materialId,
+      materialCode: detail.materialCode,
+      materialName: detail.materialName,
+      unit: detail.unit,
+      orderQty: Number(detail.orderQty),
+    });
+    groups.set(detail.salesOrderDetailId, group);
+  }
+  return Array.from(groups.values()).flat();
+}
 
 function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -25,7 +46,7 @@ export function validDeliveryPlanPeriod(filters: Pick<DeliveryPlanFilters, 'plan
     && filters.planDtFrom <= filters.planDtTo;
 }
 
-export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: PlanSourceOrderRow[]) {
+export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: Pick<PlanSourceOrderRow, 'salesOrderDetailId' | 'orderQty'>[]) {
   if (!request.salesOrderId || !Number.isSafeInteger(request.salesOrderId)) return '수주를 선택해 주세요.';
   if (!request.details.length) return '계획 상세를 1건 이상 입력해 주세요.';
   const validLines = new Map(sourceRows.map((row) => [row.salesOrderDetailId, row]));
@@ -58,19 +79,25 @@ export async function searchPlanSourceOrders(keyword: string) {
 
 export async function createDeliveryPlan(request: DeliveryPlanRequest) {
   const response = await apiPost<{ item?: DeliveryPlanItem }>(PATH, request);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
 export async function getDeliveryPlan(id: number) {
   const response = await apiGet<{ item?: DeliveryPlanItem }>(`${PATH}/${id}`);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
+  return response.item;
+}
+
+export async function getDeliveryPlanByOrder(salesOrderId: number) {
+  const response = await apiGet<{ item?: DeliveryPlanItem }>(`${PATH}/by-order/${salesOrderId}`);
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
 export async function updateDeliveryPlan(id: number, request: DeliveryPlanRequest) {
   const response = await apiPut<{ item?: DeliveryPlanItem }>(`${PATH}/${id}`, request);
-  if (!response.item) throw new Error('납품계획 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하계획 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 
@@ -79,6 +106,6 @@ export async function getDeliveryPlanStatus(filters: DeliveryPlanFilters) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value.trim()) params.set(key, value.trim()); });
   const response = await apiGet<{ items?: DeliveryPlanStatusRow[] }>(`${PATH}/status?${params}`);
-  if (!Array.isArray(response.items)) throw new Error('납품계획 현황 응답을 확인해 주세요.');
+  if (!Array.isArray(response.items)) throw new Error('출하계획 현황 응답을 확인해 주세요.');
   return response.items;
 }

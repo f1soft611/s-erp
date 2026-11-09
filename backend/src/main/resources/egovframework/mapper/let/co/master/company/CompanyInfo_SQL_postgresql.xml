@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CompanyInfoDAO">
+
+    <resultMap id="companyInfoMap" type="egovframework.let.co.master.company.domain.model.CompanyInfoVO">
+        <result property="companyName" column="tenant_nm"/>
+        <result property="businessNo" column="business_registration_number"/>
+        <result property="businessType" column="business_type"/>
+        <result property="businessCategory" column="business_category"/>
+        <result property="presidentName" column="president_name"/>
+        <result property="postCode" column="post_code"/>
+        <result property="address" column="address"/>
+        <result property="telephoneNo" column="telephone_no"/>
+        <result property="facsimileNo" column="facsimile_no"/>
+        <result property="stampImage" column="stamp_image"/>
+    </resultMap>
+
+    <select id="selectCompanyInfo" parameterType="long" resultMap="companyInfoMap">
+        SELECT tenant_nm,
+               business_registration_number,
+               business_type,
+               business_category,
+               president_name,
+               post_code,
+               address,
+               telephone_no,
+               facsimile_no,
+               stamp_image
+        FROM tb_tenant
+        WHERE tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </select>
+
+    <update id="updateCompanyInfo" parameterType="map">
+        UPDATE tb_tenant
+        SET tenant_nm = #{companyName},
+            business_registration_number = NULLIF(#{businessNo}, ''),
+            business_type = NULLIF(#{businessType}, ''),
+            business_category = NULLIF(#{businessCategory}, ''),
+            president_name = NULLIF(#{presidentName}, ''),
+            post_code = NULLIF(#{postCode}, ''),
+            address = NULLIF(#{address}, ''),
+            telephone_no = NULLIF(#{telephoneNo}, ''),
+            facsimile_no = NULLIF(#{facsimileNo}, ''),
+            <if test="stampImage != null">stamp_image = NULLIF(#{stampImage, jdbcType=VARCHAR}, ''),</if>
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </update>
+</mapper>

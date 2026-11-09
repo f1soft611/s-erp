@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
-import { Alert, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, InputAdornment, MenuItem, Paper, TextField, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
@@ -81,7 +81,7 @@ export function SalesDeliveryCreatePage({
     setLoading(true); setLoadError(false); setError('');
     try { applyItem(await getDelivery(id)); }
     catch (cause) {
-      setLoadError(true); setError(cause instanceof Error ? cause.message : '납품 조회에 실패했습니다.');
+      setLoadError(true); setError(cause instanceof Error ? cause.message : '출하 조회에 실패했습니다.');
     } finally { setLoading(false); }
   }, [applyItem]);
   useEffect(() => {
@@ -113,15 +113,15 @@ export function SalesDeliveryCreatePage({
       setLocked(true);
       try {
         const detail = await getDelivery(saved.salesDeliveryId);
-        applyItem(detail); setNotice(`납품이 저장되었습니다. 납품번호: ${detail.deliveryNo}`); onSaved?.(detail);
+        applyItem(detail); setNotice(`출하가 저장되었습니다. 출하번호: ${detail.deliveryNo}`); onSaved?.(detail);
       } catch {
-        setError(`납품은 저장되었지만 다시 불러오지 못했습니다. 납품번호: ${saved.deliveryNo}. 재조회를 눌러 주세요.`);
+        setError(`출하는 저장되었지만 다시 불러오지 못했습니다. 출하번호: ${saved.deliveryNo}. 재조회를 눌러 주세요.`);
       }
     } catch (cause) {
       if (cause instanceof OverDeliveryConfirmationRequired) {
         setOverDelivery({ payload, message: cause.message });
       } else {
-        setError(cause instanceof Error ? cause.message : '납품 저장에 실패했습니다.');
+        setError(cause instanceof Error ? cause.message : '출하 저장에 실패했습니다.');
       }
     }
     finally { busy.current = false; setPending(false); }
@@ -147,8 +147,8 @@ export function SalesDeliveryCreatePage({
     setConfirm(null);
     if (!canDelete || !savedId || busy.current) return;
     busy.current = true; setPending(true); setError('');
-    try { await deleteDelivery(savedId); reset(); setNotice('납품이 삭제되었습니다.'); onDeleted?.(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '납품 삭제에 실패했습니다.'); }
+    try { await deleteDelivery(savedId); reset(); setNotice('출하가 삭제되었습니다.'); onDeleted?.(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '출하 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
   };
   const selectSource = useCallback((source: SourceOrderRow[]) => {
@@ -169,43 +169,44 @@ export function SalesDeliveryCreatePage({
   const totals = form.details.reduce((total, row) => ({
     supply: total.supply + Number(row.supplyAmt), vat: total.vat + Number(row.vatAmt), total: total.total + Number(row.totalAmt),
   }), { supply: 0, vat: 0, total: 0 });
-  if (!canRead) return <Alert severity="warning">납품등록 조회 권한이 없습니다.</Alert>;
+  if (!canRead) return <Alert severity="warning">출하등록 조회 권한이 없습니다.</Alert>;
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
-    <Box role="region" aria-label="납품 입력 내용" aria-busy={pending || loading}
+    <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
       sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
-      {loading ? <Typography role="status">납품을 불러오는 중입니다.</Typography> : null}
-      <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="납품등록"
+      {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
+      <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"
         onRetry={() => savedId && void load(savedId)}>
         <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>납품 기본정보</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하 기본정보</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1,
             '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
-            <TextField size="small" label="납품번호" value={item?.deliveryNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }}
+            <TextField size="small" label="출하번호" value={item?.deliveryNo ?? '저장 시 자동 채번'} slotProps={{ input: { readOnly: true } }}
               sx={{ '& .MuiInputBase-input': { fontSize: { xs: '0.75rem', sm: '1rem' } } }} />
-            <TextField size="small" label="납품일자" type="date" required value={form.deliveryDt} disabled={!editable}
+            <TextField size="small" label="출하일자" type="date" required value={form.deliveryDt} disabled={!editable}
               onChange={(event) => change('deliveryDt', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
             <CustomerPicker required disabled={!editable || Boolean(savedId) || form.deliveryType === 'ORDER'} triggerMode="icon"
               value={form.customerId ? { id: form.customerId, code: form.customerCode, name: form.customerName } : null}
               search={searchOrderCustomers} onChange={(customer) => {
                 setForm((current) => ({ ...current, customerId: customer.id, customerCode: customer.code, customerName: customer.name }));
               }} />
-            <TextField select size="small" label="납품구분" value={form.deliveryType} disabled={!editable || Boolean(savedId)}
+            <TextField select size="small" label="출하구분" value={form.deliveryType} disabled={!editable || Boolean(savedId)}
               onChange={(event) => {
                 const next = { ...emptyDelivery(), deliveryDt: form.deliveryDt, deliveryType: event.target.value as DeliveryForm['deliveryType'] };
-                if (form.details.length && !window.confirm('납품구분을 변경하면 거래처와 상세가 초기화됩니다. 계속하시겠습니까?')) return;
+                if (form.details.length && !window.confirm('출하구분을 변경하면 거래처와 상세가 초기화됩니다. 계속하시겠습니까?')) return;
                 setForm(next); setRows([]); setGridKey((value) => value + 1);
               }}>
-              <MenuItem value="DIRECT">직납품</MenuItem><MenuItem value="ORDER">수주납품</MenuItem>
+              <MenuItem value="DIRECT">직출하</MenuItem><MenuItem value="ORDER">수주출하</MenuItem>
             </TextField>
-            <Box sx={{ display: 'flex', gap: 1, minWidth: 0, '& .MuiFormControl-root': { m: 0 } }}>
-              <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo} slotProps={{ input: { readOnly: true } }} />
-              {form.deliveryType === 'ORDER' ? <Button size="small" variant="outlined" startIcon={<SearchIcon />} disabled={!editable || Boolean(savedId)} sx={{ flexShrink: 0 }} onClick={() => setSourceOpen(true)}>계획 선택</Button> : null}
-            </Box>
-            <TextField size="small" label="납품장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
+            <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo}
+              slotProps={{ input: { readOnly: true, endAdornment: form.deliveryType === 'ORDER' ? <InputAdornment position="end">
+                <Tooltip title="계획 선택"><span><IconButton size="small" aria-label="계획 선택" disabled={!editable || Boolean(savedId)}
+                  onClick={() => setSourceOpen(true)}><SearchIcon fontSize="small" /></IconButton></span></Tooltip>
+              </InputAdornment> : null } }} />
+            <TextField size="small" label="출하장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
             <TextField size="small" label="배송방법" value={form.deliveryMethod} disabled={!editable} onChange={(event) => change('deliveryMethod', event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
@@ -213,8 +214,8 @@ export function SalesDeliveryCreatePage({
         <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
         <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>납품 상세</Typography>
-            <Typography variant="caption" color="text.secondary">{mode === 'view' ? '납품 품목 내역입니다.' : '행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행을 삭제할 수 있습니다.'}</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하 상세</Typography>
+            <Typography variant="caption" color="text.secondary">{mode === 'view' ? '출하 품목 내역입니다.' : '행을 추가해 품목을 선택하세요. 마우스 오른쪽 버튼으로 행을 삭제할 수 있습니다.'}</Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {canSave && form.deliveryType === 'DIRECT' ? <>
@@ -236,7 +237,7 @@ export function SalesDeliveryCreatePage({
           <DeliveryDetailGrid key={gridKey} gridRef={grid} rows={rows} disabled={!editable} source={form.deliveryType === 'ORDER'}
             onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} />
         </Box>
-        <Box aria-label="납품 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: { xs: 1.5, sm: 2 } }}>
+        <Box aria-label="출하 금액 합계" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1, p: { xs: 1.5, sm: 2 } }}>
           {([['공급가 합계', totals.supply], ['부가세 합계', totals.vat], ['총 합계', totals.total]] as const).map(([label, amount]) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1 }}>
               <Typography variant="body2" color="text.secondary">{label}</Typography>
@@ -253,13 +254,13 @@ export function SalesDeliveryCreatePage({
         materialPatch.current?.({ materialId: material.id, materialCode: material.code, materialName: material.name });
         setMaterialOpen(false); materialPatch.current = null;
       }} />
-    <UnsavedChangesConfirmDialog open={confirm !== null} title={confirm === 'delete' ? '납품 삭제' : '저장하지 않은 변경사항'}
-      description={confirm === 'delete' ? '이 납품을 삭제하시겠습니까?' : '입력 내용을 버리고 신규 문서를 작성하시겠습니까?'}
+    <UnsavedChangesConfirmDialog open={confirm !== null} title={confirm === 'delete' ? '출하 삭제' : '저장하지 않은 변경사항'}
+      description={confirm === 'delete' ? '이 출하를 삭제하시겠습니까?' : '입력 내용을 버리고 신규 문서를 작성하시겠습니까?'}
       onCancel={() => setConfirm(null)} onContinue={() => confirm === 'delete' ? void remove() : reset()} />
-    <UnsavedChangesConfirmDialog open={overDelivery !== null} title="초과납품 확인"
+    <UnsavedChangesConfirmDialog open={overDelivery !== null} title="초과출하 확인"
       dialogTitleId="over-delivery-confirm-title"
-      description={`${overDelivery?.message ?? ''} 수주·계획수량은 변경하지 않고 실제 납품수량으로 저장합니다. 초과납품으로 저장하시겠습니까?`}
-      continueLabel="초과납품 저장" confirmButtonColor="warning" disableContinue={pending}
+      description={`${overDelivery?.message ?? ''} 수주·계획수량은 변경하지 않고 실제 출하수량으로 저장합니다. 초과출하로 저장하시겠습니까?`}
+      continueLabel="초과출하 저장" confirmButtonColor="warning" disableContinue={pending}
       onCancel={() => setOverDelivery(null)}
       onContinue={() => {
         if (!overDelivery || busy.current) return;

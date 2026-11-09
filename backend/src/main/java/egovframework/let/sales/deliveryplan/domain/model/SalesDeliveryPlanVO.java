@@ -20,5 +20,8 @@ public class SalesDeliveryPlanVO implements Serializable {
     private String customerCode;
     private String customerName;
     private String createdBy;
+    private String createdByName;
+    private String createdByProfileImage;
+    private String createdAt;
     private List<SalesDeliveryPlanDetailVO> details;
 }

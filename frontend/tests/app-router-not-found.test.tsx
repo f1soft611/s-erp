@@ -87,6 +87,7 @@ describe('AppRouter not found fallback', () => {
       ),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: '돌아가기' })).toBeVisible();
+    expect(screen.getByText('© 2026 iPlusMES · F1soft')).toBeVisible();
   });
 
   it(

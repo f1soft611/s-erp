@@ -55,9 +55,9 @@ try {
         card.className = 'push-preview';
         const image = new Image();
         image.src = notification.icon;
-        image.alt = 'S-ERP';
+        image.alt = 'iPlusMES';
         await image.decode();
-        if (image.naturalWidth !== 256) throw new Error('S-ERP logo did not decode');
+        if (image.naturalWidth !== 256) throw new Error('iPlusMES logo did not decode');
         const text = document.createElement('div');
         text.textContent = `${notification.title} — ${notification.body}`;
         card.append(image, text);

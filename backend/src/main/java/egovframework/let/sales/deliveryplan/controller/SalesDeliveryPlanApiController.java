@@ -42,7 +42,7 @@ public class SalesDeliveryPlanApiController {
         requireAuthenticated(user);
         Map<String, Object> values = new HashMap<String, Object>();
         values.put("item", salesDeliveryPlanService.create(user.getTenantId(), user.getId(), request));
-        values.put("message", "납품계획이 성공적으로 등록되었습니다.");
+        values.put("message", "출하계획이 성공적으로 등록되었습니다.");
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
@@ -75,6 +75,16 @@ public class SalesDeliveryPlanApiController {
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 
+    @GetMapping("/by-order/{salesOrderId}")
+    public ResultVO getByOrder(@PathVariable Long salesOrderId,
+            @Parameter(hidden = true) @AuthenticationPrincipal LoginVO user) throws Exception {
+        requireAuthenticated(user);
+        Map<String, Object> values = new HashMap<String, Object>();
+        values.put("item", salesDeliveryPlanService.getByOrder(
+                user.getTenantId(), user.getId(), salesOrderId));
+        return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
+    }
+
     @PutMapping("/{salesDeliveryPlanId}")
     public ResultVO update(@PathVariable Long salesDeliveryPlanId,
             @RequestBody SalesDeliveryPlanRequestVO request,
@@ -83,7 +93,7 @@ public class SalesDeliveryPlanApiController {
         Map<String, Object> values = new HashMap<String, Object>();
         values.put("item", salesDeliveryPlanService.update(
                 user.getTenantId(), user.getId(), salesDeliveryPlanId, request));
-        values.put("message", "납품계획이 성공적으로 수정되었습니다.");
+        values.put("message", "출하계획이 성공적으로 수정되었습니다.");
         return resultVoHelper.buildFromMap(values, ResponseCode.SUCCESS);
     }
 

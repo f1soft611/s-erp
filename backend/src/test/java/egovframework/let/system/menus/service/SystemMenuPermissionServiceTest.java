@@ -292,7 +292,7 @@ class SystemMenuPermissionServiceTest {
     }
 
     @Test
-    void autoTenantReceivesModeButNotManualDeliveryPlanMenus() throws Exception {
+    void autoTenantReceivesAuthorizedDeliveryPlanMenus() throws Exception {
         SystemMenuDAO dao = mock(SystemMenuDAO.class);
         SystemModuleService modules = mock(SystemModuleService.class);
         SystemMenuServiceImpl service = new SystemMenuServiceImpl(dao, modules);
@@ -313,12 +313,17 @@ class SystemMenuPermissionServiceTest {
         when(dao.selectActiveMenusForTenant(tenantId)).thenReturn(Arrays.asList(plan, planCreate));
         when(dao.selectTenantDeliveryPlanMode(tenantId)).thenReturn("AUTO");
         when(dao.selectMenuPermissionCodeRows(org.mockito.ArgumentMatchers.any(SystemMenuSearchConditionVO.class)))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(Arrays.asList(
+                        permissionCodeRow(31L, "READ"),
+                        permissionCodeRow(32L, "READ")));
 
         MyMenuResponseVO response = service.getMyMenuTree(tenantId, "admin", "TENANT_ADMIN");
 
         assertEquals("AUTO", response.getDeliveryPlanMode());
-        assertEquals(0, response.getMenus().get(0).getChildren().size());
+        assertEquals(1, response.getMenus().get(0).getChildren().size());
+        assertEquals(31L, response.getMenus().get(0).getChildren().get(0).getMenuId());
+        assertEquals(1, response.getMenus().get(0).getChildren().get(0).getChildren().size());
+        assertEquals(32L, response.getMenus().get(0).getChildren().get(0).getChildren().get(0).getMenuId());
     }
 
     @Test

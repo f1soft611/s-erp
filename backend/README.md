@@ -1,11 +1,11 @@
-# S-ERP Backend
+# iPlusMES Backend
 
 ![java](https://img.shields.io/badge/java-007396?style=for-the-badge&logo=JAVA&logoColor=white)
 ![Spring_boot](https://img.shields.io/badge/Spring_Boot-F2F4F9?style=for-the-badge&logo=spring-boot)
 ![maven](https://img.shields.io/badge/Maven-C71A36?style=for-the-badge&logo=apache-maven&logoColor=white)
 ![swagger](https://img.shields.io/badge/swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
 
-이 백엔드는 로그인/인증 전용 최소 구조로 정리된 S-ERP 백엔드입니다. 레거시 업무 모듈, 멀티테넌트 운영 화면, 플랫폼 관리자 전용 기능, 타 프로젝트 명칭은 제거된 상태를 기준으로 유지합니다.
+이 백엔드는 로그인/인증 전용 최소 구조로 정리된 iPlusMES 백엔드입니다. 레거시 업무 모듈, 멀티테넌트 운영 화면, 플랫폼 관리자 전용 기능, 타 프로젝트 명칭은 제거된 상태를 기준으로 유지합니다.
 
 ## 환경
 

@@ -235,6 +235,7 @@
                d.material_id AS materialId,
                m.material_code AS materialCode,
                m.material_name AS materialName,
+               m.material_spec AS materialSpec,
                m.unit AS unit,
                d.sales_order_id AS salesOrderId,
                d.sales_order_detail_id AS salesOrderDetailId,

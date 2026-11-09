@@ -8,6 +8,18 @@ const options: MasterPickerOption[] = [
 ];
 
 describe('MasterPicker', () => {
+  it('displays additional information without changing selection behavior', async () => {
+    const option = { ...options[0], details: [{ label: '대표자명', value: '대표' }] };
+    const onChange = vi.fn();
+    render(<MasterPicker label="거래처" value={null} search={vi.fn(async () => [option])} onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    const choice = await screen.findByRole('button', { name: 'C-001 테스트 거래처 선택' });
+    expect(within(choice).getByText(/대표자명.*대표/)).toBeInTheDocument();
+    fireEvent.click(choice);
+    expect(onChange).toHaveBeenCalledWith(option);
+  });
+
   it('matches the adjacent picker button height to the small input height', () => {
     render(
       <MasterPicker

@@ -1,6 +1,6 @@
 # 03. 설계 검증 및 계획/사양서 작성 스킬 (03-design-validation)
 
-> **Superpowers `writing-plans` 및 S-ERP 팀 규칙 결합**: 작업지시서를 기반으로 구현 전 계획서, 상세 사양서, DB 변경 스크립트를 작성하여 작업 범위를 통제하고 명확히 정의합니다.
+> **Superpowers `writing-plans` 및 iPlusMES 팀 규칙 결합**: 작업지시서를 기반으로 구현 전 계획서, 상세 사양서, DB 변경 스크립트를 작성하여 작업 범위를 통제하고 명확히 정의합니다.
 
 ---
 

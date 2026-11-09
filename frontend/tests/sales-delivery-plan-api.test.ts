@@ -60,6 +60,6 @@ describe('sales delivery plan contract', () => {
     expect(apiPost).toHaveBeenCalledWith('/api/v1/sales/delivery-plans', request);
     expect(apiPut).toHaveBeenCalledWith('/api/v1/sales/delivery-plans/9', request);
     vi.mocked(apiGet).mockResolvedValue({});
-    await expect(getDeliveryPlan(9)).rejects.toThrow('납품계획 응답');
+    await expect(getDeliveryPlan(9)).rejects.toThrow('출하계획 응답');
   });
 });

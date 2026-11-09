@@ -37,6 +37,7 @@ describe('Login page', () => {
   it('renders the enterprise login fields', async () => {
     render(<App />);
 
+    expect(await screen.findByText('iPlusMES')).toBeInTheDocument();
     expect(await screen.findByLabelText(/업체코드/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/사용자 ID/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/비밀번호/i)).toBeInTheDocument();

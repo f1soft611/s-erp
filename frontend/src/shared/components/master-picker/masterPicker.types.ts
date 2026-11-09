@@ -2,6 +2,7 @@ export type MasterPickerOption = {
   id: number;
   code: string;
   name: string;
+  details?: { label: string; value: string }[];
 };
 
 export type MasterPickerSearch = (

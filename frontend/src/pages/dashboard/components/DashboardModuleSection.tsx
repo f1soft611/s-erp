@@ -57,7 +57,7 @@ export function DashboardModuleSection({
           lineHeight: 1.2,
         }}
       >
-        S-ERP
+        iPlusMES
       </Typography>
 
       <Stack spacing={1} sx={{ width: '100%' }}>

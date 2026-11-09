@@ -1,4 +1,4 @@
-name: 'S-ERP Java Backend'
+name: 'iPlusMES Java Backend'
 language: 'Java 8+'
 framework: 'Spring Boot / eGovFrame 4.x'
 orm: 'MyBatis (PostgreSQL)'

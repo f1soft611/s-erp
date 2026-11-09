@@ -1,4 +1,4 @@
-name: 'S-ERP React Frontend'
+name: 'iPlusMES React Frontend'
 language: 'TypeScript'
 framework: 'React 18 (Vite)'
 ui_library: 'MUI (Material UI) + F1-Grid'

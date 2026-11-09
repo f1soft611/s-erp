@@ -21,6 +21,7 @@ import { RoleManagementPage } from '../../settings/system/roles/RoleManagementPa
 import { SystemPolicyPage } from '../../settings/system/policies/SystemPolicyPage';
 import { CommonCodeManagementPage } from '../../co/master/common-code/CommonCodeManagementPage';
 import { CustomerManagementPage } from '../../co/master/customers/CustomerManagementPage';
+import { CompanyInfoPage } from '../../co/master/company/CompanyInfoPage';
 import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
@@ -30,6 +31,8 @@ import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDelive
 import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
 import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
 import { SalesDeliveryPlanStatusPage } from '../../sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
+import { SalesStatementCreatePage } from '../../sales/statement/SalesStatementCreatePage';
+import { SalesStatementStatusPage } from '../../sales/statement/SalesStatementStatusPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -49,6 +52,7 @@ type DashboardContentProps = {
   breadcrumbItems: string[];
   content: PageContent;
   selectedMenuPermissions?: MenuPermission;
+  deliveryPlanMode?: 'AUTO' | 'MANUAL';
   isTenantAdmin?: boolean;
   isPlatformAdmin?: boolean;
   dashboardScope?: DocumentApprovalScope | null;
@@ -158,6 +162,7 @@ export function DashboardContent({
   breadcrumbItems,
   content,
   selectedMenuPermissions,
+  deliveryPlanMode,
   isTenantAdmin = false,
   isPlatformAdmin = false,
   dashboardScope = null,
@@ -171,6 +176,11 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  if (selectedModule.id === 'co' && currentPageKey === 'company-info') {
+    return <CompanyInfoPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
 
   if (selectedModule.id === 'co' && currentPageKey === 'materials') {
     return (
@@ -204,12 +214,19 @@ export function DashboardContent({
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
+  if (selectedModule.id === 'sales' && (currentPageKey === 'statement-create' || currentPageKey === 'statement-status')) {
+    const StatementPage = currentPageKey === 'statement-create' ? SalesStatementCreatePage : SalesStatementStatusPage;
+    return <StatementPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
+
   if (selectedModule.id === 'sales'
     && (currentPageKey === 'delivery-plan-create' || currentPageKey === 'delivery-plan-status')) {
     const PlanPage = currentPageKey === 'delivery-plan-create'
       ? SalesDeliveryPlanCreatePage : SalesDeliveryPlanStatusPage;
     return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
-      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
+      deliveryPlanMode={deliveryPlanMode} />;
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {

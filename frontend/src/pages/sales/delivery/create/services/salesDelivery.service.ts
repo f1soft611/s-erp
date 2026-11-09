@@ -48,7 +48,7 @@ function validDate(value: string) {
   return Number.isFinite(parsed.getTime()) && localDate(parsed) === value;
 }
 export function validateDelivery(form: DeliveryForm): string {
-  if (!validDate(form.deliveryDt)) return '납품일자를 입력해 주세요.';
+  if (!validDate(form.deliveryDt)) return '출하일자를 입력해 주세요.';
   if (!form.customerId || !Number.isSafeInteger(form.customerId)) return '거래처를 선택해 주세요.';
   if (form.deliveryType === 'ORDER' && !form.salesOrderId) return '수주를 선택해 주세요.';
   if (!form.details.length) return '품목 상세를 1건 이상 입력해 주세요.';
@@ -58,13 +58,13 @@ export function validateDelivery(form: DeliveryForm): string {
     && Math.abs(value * 100 - Math.round(value * 100)) < 0.01;
   for (const row of form.details) {
     if (!row.materialId || !Number.isSafeInteger(row.materialId)) return '모든 상세 행의 품목을 선택해 주세요.';
-    if (!numeric(row.deliveryQty) || row.deliveryQty <= 0) return '납품수량은 0보다 큰 소수 2자리 값이어야 합니다.';
+    if (!numeric(row.deliveryQty) || row.deliveryQty <= 0) return '출하수량은 0보다 큰 소수 2자리 값이어야 합니다.';
     if (!numeric(row.unitPrice)) return '단가는 0 이상의 소수 2자리 값이어야 합니다.';
     if (!numeric(row.vatAmt)) return 'VAT는 0 이상의 소수 2자리 값이어야 합니다.';
     if (!numeric(row.supplyAmt) || !numeric(row.totalAmt)) return '계산된 금액이 허용 범위를 초과했습니다.';
     if (form.deliveryType === 'ORDER') {
-      if (!row.salesOrderDetailId || !row.salesDeliveryPlanDetailId) return '납품계획 상세를 선택해 주세요.';
-      if (planIds.has(row.salesDeliveryPlanDetailId)) return '중복 납품계획 상세는 사용할 수 없습니다.';
+      if (!row.salesOrderDetailId || !row.salesDeliveryPlanDetailId) return '출하계획 상세를 선택해 주세요.';
+      if (planIds.has(row.salesDeliveryPlanDetailId)) return '중복 출하계획 상세는 사용할 수 없습니다.';
       planIds.add(row.salesDeliveryPlanDetailId);
     }
   }
@@ -80,7 +80,7 @@ export function buildDeliveryPayload(form: DeliveryForm): DeliveryPayload {
       deliveryQty: row.deliveryQty, unitPrice: row.unitPrice, vatAmt: row.vatAmt })) };
 }
 function requireItem(response: { item?: DeliveryItem | null }) {
-  if (!response.item) throw new Error('납품 응답에 문서 정보가 없습니다.');
+  if (!response.item) throw new Error('출하 응답에 문서 정보가 없습니다.');
   return response.item;
 }
 export async function createDelivery(payload: DeliveryPayload) {
@@ -133,10 +133,10 @@ export function restoreDeliveryFilters(value: unknown, fallback: DeliveryFilters
   return validDeliveryPeriod(filters) && ['', 'DIRECT', 'ORDER'].includes(filters.deliveryType) ? filters : fallback;
 }
 export async function getDeliveryStatus(filters: DeliveryFilters): Promise<DeliveryStatusRow[]> {
-  if (!validDeliveryPeriod(filters)) throw new Error('납품일 기간의 시작일과 종료일을 확인해 주세요.');
+  if (!validDeliveryPeriod(filters)) throw new Error('출하일 기간의 시작일과 종료일을 확인해 주세요.');
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value.trim()) params.set(key, value.trim()); });
   const response = await apiGet<{ items?: DeliveryStatusRow[] }>(`${PATH}/status?${params}`);
-  if (!Array.isArray(response.items)) throw new Error('납품현황 응답을 확인해 주세요.');
+  if (!Array.isArray(response.items)) throw new Error('출하현황 응답을 확인해 주세요.');
   return response.items;
 }

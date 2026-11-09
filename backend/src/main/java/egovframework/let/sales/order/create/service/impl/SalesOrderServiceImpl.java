@@ -201,7 +201,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
             if (!existing.getMaterialId().equals(prepared.materialId)
                     && (detailReferences > 0 || deliveryReferences > 0)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "계획 또는 납품에 사용된 수주 상세의 품목은 변경할 수 없습니다.");
+                        "계획 또는 출하에 사용된 수주 상세의 품목은 변경할 수 없습니다.");
             }
             if (!allowExcess && prepared.orderQty.compareTo(existing.getShippedQty() == null
                     ? ZERO : existing.getShippedQty()) < 0) {
@@ -210,10 +210,10 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
             }
             BigDecimal plannedQty = salesOrderDAO.sumPlannedQty(
                     orderDetailParams(tenantId, salesOrderId, existing.getSalesOrderDetailId()));
-            if ("MANUAL".equals(planMode) && plannedQty != null
+            if (plannedQty != null
                     && prepared.orderQty.compareTo(plannedQty) < 0) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "수주수량은 기존 납품계획 수량보다 적을 수 없습니다.");
+                        "수주수량은 기존 출하계획 수량보다 적을 수 없습니다.");
             }
             retainedDetailIds.add(existing.getSalesOrderDetailId());
         }
@@ -229,7 +229,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
                         && detail.getShippedQty().signum() > 0
                         || "MANUAL".equals(planMode) && detailReferences > 0) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "계획 또는 납품에 사용된 수주 상세는 삭제할 수 없습니다.");
+                            "계획 또는 출하에 사용된 수주 상세는 삭제할 수 없습니다.");
                 }
                 removedDetails.add(detail);
             }
@@ -300,7 +300,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
                 || salesOrderDAO.countPlanReferences(order) > 0
                 || salesOrderDAO.countShippedDetails(order) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "납품계획 또는 납품 이력이 있는 수주는 삭제할 수 없습니다.");
+                    "출하계획 또는 출하 이력이 있는 수주는 삭제할 수 없습니다.");
         }
 
         Map<String, Object> params = orderParams(tenantId, salesOrderId);
@@ -338,7 +338,7 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
     private void validatePayload(SalesOrderCreateRequestVO payload) {
         validateHeader(payload);
         validateText(payload.getQuotNo(), 30, "견적번호");
-        validateText(payload.getDeliveryPlace(), 200, "납품장소");
+        validateText(payload.getDeliveryPlace(), 200, "출하장소");
         validateText(payload.getDeliveryMethod(), 50, "배송방법");
         validateText(payload.getRemark(), 500, "비고");
     }

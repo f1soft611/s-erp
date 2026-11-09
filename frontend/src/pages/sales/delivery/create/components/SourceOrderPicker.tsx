@@ -34,22 +34,22 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
   const columns = useMemo<F1GridColumn<SourcePlanRow>[]>(() => [
     { field: 'planNo', headerName: '계획번호', width: 165, align: 'center',
       renderCell: ({ row }) => <Button size="small" sx={{ minWidth: 0, px: 0.5, whiteSpace: 'nowrap' }}
-        onClick={() => onSelect(rows.filter((item) => item.salesOrderId === row.salesOrderId))}>{row.planNo} 선택</Button> },
+        onClick={() => onSelect(rows.filter((item) => item.salesOrderId === row.salesOrderId))}>{row.planNo}</Button> },
     { field: 'orderDt', headerName: '수주일자', type: 'date', width: 96, align: 'center' },
     { field: 'planDt', headerName: '계획일자', type: 'date', width: 96, align: 'center' },
     { field: 'customerName', headerName: '거래처', width: 125, align: 'center' },
     { field: 'materialCode', headerName: '품목코드', width: 100, align: 'center' },
     { field: 'materialName', headerName: '품목명', width: 135, align: 'center' },
     { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 90, align: 'right' },
-    { field: 'deliveredQty', headerName: '기납품', type: 'decimal', width: 90, align: 'right' },
+    { field: 'deliveredQty', headerName: '기출하', type: 'decimal', width: 90, align: 'right' },
     { field: 'remainingQty', headerName: '미납수량', type: 'decimal', width: 90, align: 'right',
       renderCell: ({ row }) => Math.max(Number(row.remainingQty), 0).toLocaleString('ko-KR') },
-    { field: 'excessQty', headerName: '초과납품', type: 'decimal', width: 90, align: 'right' },
+    { field: 'excessQty', headerName: '초과출하', type: 'decimal', width: 90, align: 'right' },
   ], [rows, onSelect]);
-  return <CommonDialog open={open} onClose={onClose} title="납품계획 선택" size="lg" fullScreenOnMobile
+  return <CommonDialog open={open} onClose={onClose} title="출하계획 선택" size="lg" fullScreenOnMobile
     bodyMode="fill" paperHeight="min(900px, 85vh)" actions={<Button onClick={onClose}>닫기</Button>}>
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, minWidth: 0, gap: 1.5 }}>
-      <Box component="form" aria-label="납품계획 선택 검색" onSubmit={(event) => {
+      <Box component="form" aria-label="출하계획 선택 검색" onSubmit={(event) => {
         event.preventDefault();
         void search();
       }} sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexShrink: 0 }}>
@@ -61,8 +61,8 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
       </Box>
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 240, overflow: 'hidden' }}>
-      <F1Grid ariaLabel="납품 대상 계획 목록" rows={displayRows} columns={columns} rowKey="salesDeliveryPlanDetailId"
-        loading={loading} showCheckbox={false} canExportExcel={false} allowAddRowInContextMenu={false}
+      <F1Grid ariaLabel="출하 대상 계획 목록" rows={displayRows} columns={columns} rowKey="salesDeliveryPlanDetailId"
+        loading={loading} showCheckbox={false} selectionMode="row" canExportExcel={false} allowAddRowInContextMenu={false}
         allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} height="100%" />
       </Box>
     </Box>

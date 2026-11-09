@@ -15,6 +15,11 @@
 | business_category            | varchar   | 업태                                     |
 | registration_date            | date      | 등록일                                   |
 | logo_image                   | text      | 로고 이미지                              |
+| president_name               | varchar(100) | 회사 대표자명                        |
+| post_code                    | varchar(20)  | 회사 우편번호                        |
+| address                      | varchar(500) | 회사 주소                            |
+| telephone_no                 | varchar(50)  | 회사 전화번호                        |
+| facsimile_no                 | varchar(50)  | 회사 팩스번호                        |
 | onboarding_status            | varchar   | 온보딩 상태                              |
 | delivery_plan_mode           | varchar(10) | 납품계획 운영모드 (`AUTO` 기본, `MANUAL`) |
 | over_delivery_policy         | varchar(10) | 초과납품 정책 (`BLOCK` 기본, `WARN` 경고확인 허용), 20261105_003 미적용 |
@@ -27,6 +32,32 @@
 
 - 테넌트 기본 정보 관리
 - 플랫폼 다중 테넌트 식별의 기준
+- 회사정보 공급자 필드는 `20261109_006_company_info.sql`로 추가하며 관리자 정보와 구분한다.
+- 회사 직인 `stamp_image`는 `20261109_009_company_statement_stamp.sql`로 추가한다.
+
+### 거래명세서: tb_sales_statement_hd / tb_sales_statement_dt
+
+| 테이블 | 컬럼 | 타입 | 설명 |
+| --- | --- | --- | --- |
+| hd | sales_statement_id | bigint | 명세서 PK |
+| hd | tenant_id, sales_delivery_id | bigint | 테넌트 및 출하 복합 FK |
+| hd | statement_no, statement_dt | varchar(30), date | 테넌트별 명세번호와 명세일 |
+| hd | delivery_no, delivery_dt, delivery_type, order_no | varchar, date | 출하 및 수주 식별정보 스냅샷 |
+| hd | supplier_name, supplier_business_no, supplier_president_name | varchar | 공급자 명칭·사업자번호·대표자 스냅샷 |
+| hd | supplier_business_type, supplier_business_category, supplier_post_code, supplier_address, supplier_telephone_no, supplier_facsimile_no | varchar | 공급자 업종·업태·주소·연락처 스냅샷 |
+| hd | supplier_stamp_image | text | 발행 시점 회사 직인 이미지 스냅샷 |
+| hd | customer_code, customer_name, customer_business_no, customer_president_name | varchar | 거래처 식별·사업자정보 스냅샷 |
+| hd | customer_business_type, customer_business_category, customer_post_code, customer_address, customer_telephone_no, customer_facsimile_no | varchar | 거래처 업종·업태·주소·연락처 스냅샷 |
+| hd | total_amt | numeric(15,2) | 출하 합계 스냅샷 |
+| hd | remark, use_at, created_by, created_at, updated_by, updated_at | varchar, char, timestamp | 비고·사용 여부·변경 이력 |
+| dt | sales_statement_detail_id | bigint | 상세 PK |
+| dt | sales_statement_id, tenant_id | bigint | 명세서 헤더 복합 FK |
+| dt | line_no | integer | 명세서 내 행 번호 |
+| dt | material_code, material_name, material_spec, unit | varchar | 품목 정보 스냅샷 |
+| dt | delivery_qty, unit_price, supply_amt, vat_amt, total_amt | numeric(15,2) | 출하 수량과 금액 스냅샷 |
+
+- 활성 명세서는 `(tenant_id, sales_delivery_id)` 부분 유일 인덱스로 출하당 한 건만 허용한다. 명세서를 비활성화하면 재등록할 수 있다.
+- SQL과 롤백은 `20261109_007_create_sales_statement.sql`, `20261109_007_rollback_sales_statement.sql`을 따른다.
 
 ### 2-4. tb_login_account
 

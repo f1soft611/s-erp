@@ -92,7 +92,7 @@ export function NotFoundPage() {
           letterSpacing: '0.01em',
         }}
       >
-        © 2026 S-ERP · F1soft
+        © 2026 iPlusMES · F1soft
       </Typography>
     </Box>
   );

@@ -42,6 +42,28 @@ describe('sales order master search adapters', () => {
     await expect(searchOrderMaterials('품목')).rejects.toBe(error);
   });
 
+  it('preserves useful item and customer information for picker results', async () => {
+    materialService.fetchMaterials.mockResolvedValue([{
+      materialId: 7, materialCode: 'M7', materialName: '품목',
+      materialSpec: '규격 A', materialSpec2: '규격 B', unit: 'EA', materialModelName: '모델 X',
+    }]);
+    customerService.fetchCustomers.mockResolvedValue([{
+      customerId: 8, customerCode: 'C8', customerName: '거래처',
+      businessNo: '123-45-67890', presidentName: '대표',
+    }]);
+    expect(await searchOrderMaterials('')).toEqual([expect.objectContaining({
+      details: expect.arrayContaining([
+        { label: '품목규격', value: '규격 A' }, { label: '품목규격2', value: '규격 B' },
+        { label: '단위', value: 'EA' }, { label: '품목모델명', value: '모델 X' },
+      ]),
+    })]);
+    expect(await searchOrderCustomers('')).toEqual([expect.objectContaining({
+      details: expect.arrayContaining([
+        { label: '사업자번호', value: '123-45-67890' }, { label: '대표자명', value: '대표' },
+      ]),
+    })]);
+  });
+
   it('rejects malformed master IDs rather than returning picker options', async () => {
     customerService.fetchCustomers.mockResolvedValue([
       { customerId: 0, customerCode: 'C-000', customerName: '잘못된 거래처' },

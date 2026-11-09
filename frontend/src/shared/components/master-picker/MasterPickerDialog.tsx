@@ -169,8 +169,10 @@ export function MasterPickerDialog({
                   />
                   <ListItemText
                     primary={option.name}
+                    secondary={option.details?.map(({ label: detailLabel, value }) => `${detailLabel}: ${value}`).join(' · ') || undefined}
                     slotProps={{
                       primary: { noWrap: true, sx: { fontWeight: 600 } },
+                      secondary: { sx: { overflowWrap: 'anywhere' } },
                     }}
                   />
                 </ListItemButton>

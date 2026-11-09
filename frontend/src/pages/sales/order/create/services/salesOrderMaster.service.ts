@@ -21,26 +21,33 @@ function createMasterOption(
   return { id, code: codeValue, name: nameValue };
 }
 
+function addDetails(option: MasterPickerOption, values: [string, string | null | undefined][]): MasterPickerOption {
+  const details = values.filter(([, value]) => typeof value === 'string' && value.trim())
+    .map(([label, value]) => ({ label, value: value!.trim() }));
+  return details.length ? { ...option, details } : option;
+}
+
 export const searchOrderCustomers: MasterPickerSearch = async (keyword) => {
   const customers = await fetchCustomers({ keyword, useAt: 'Y' });
   return customers.map((customer) =>
-    createMasterOption(
+    addDetails(createMasterOption(
       customer.customerId,
       customer.customerCode,
       customer.customerName,
       '거래처',
-    ),
+    ), [['사업자번호', customer.businessNo], ['대표자명', customer.presidentName]]),
   );
 };
 
 export const searchOrderMaterials: MasterPickerSearch = async (keyword) => {
   const materials = await fetchMaterials({ keyword });
   return materials.map((material) =>
-    createMasterOption(
+    addDetails(createMasterOption(
       material.materialId,
       material.materialCode,
       material.materialName,
       '품목',
-    ),
+    ), [['품목규격', material.materialSpec], ['품목규격2', material.materialSpec2],
+      ['단위', material.unit], ['품목모델명', material.materialModelName]]),
   );
 };

@@ -42,6 +42,17 @@ class SalesDeliveryPlanMapperTest {
     }
 
     @Test
+    void loadsPlanWriterProfileOnlyInTenantScopedDetailQuery() throws Exception {
+        Configuration configuration = parse();
+        String header = normalize(sql(configuration, "selectPlanHeader").getSql());
+        assertThat(header).contains("la.profile_image AS createdByProfileImage", "u.user_nm AS createdByName",
+                "la.login_code = ph.created_by", "la.tenant_id = ph.tenant_id",
+                "u.login_id = la.login_id", "u.tenant_id = la.tenant_id");
+        assertThat(normalize(sql(configuration, "selectPlanStatus").getSql())).doesNotContain("profile_image");
+        assertThat(normalize(sql(configuration, "lockPlanHeader").getSql())).doesNotContain("profile_image");
+    }
+
+    @Test
     void limitsPlanMutationsToTheCurrentTenantAndReferencedDocument() throws Exception {
         Configuration configuration = parse();
         String insertDetail = normalize(sql(configuration, "insertPlanDetail").getSql());

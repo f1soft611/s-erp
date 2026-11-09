@@ -186,23 +186,68 @@ class SalesDeliveryPlanServiceImplTest {
     }
 
     @Test
-    void blocksManualPlanReadsForAutoTenant() throws Exception {
+    void allowsAutoPlanReadsAndStatusQueriesWithoutAllowingManualCreation() throws Exception {
         when(dao.selectTenantMode(71L)).thenReturn("AUTO");
+        when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        plan.setSalesOrderId(301L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.emptyList());
         SalesDeliveryPlanStatusSearchVO search = new SalesDeliveryPlanStatusSearchVO();
         search.setPlanDtFrom("2026-11-01");
         search.setPlanDtTo("2026-11-30");
 
-        assertThatThrownBy(() -> service.listStatus(71L, "user01", search))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(error -> ((ResponseStatusException) error).getStatus())
-                .isEqualTo(HttpStatus.FORBIDDEN);
-        assertThatThrownBy(() -> service.get(71L, "user01", 701L))
+        assertThat(service.get(71L, "user01", 701L).getSalesDeliveryPlanId()).isEqualTo(701L);
+        service.listStatus(71L, "user01", search);
+        assertThat(service.listSourceOrders(71L, "SO-301")).isEmpty();
+        assertThatThrownBy(() -> service.create(71L, "user01", request(detail(null, 801L, "1"))))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
-        verify(dao, never()).selectPlanHeader(anyMap());
-        verify(dao, never()).selectPlanStatus(anyMap());
+        verify(dao).selectPlanStatus(anyMap());
+        verify(dao).selectPlanSourceOrders(org.mockito.ArgumentMatchers.argThat(
+                params -> "AUTO".equals(params.get("deliveryPlanMode"))));
+        verify(dao, never()).insertPlanHeader(anyMap());
+    }
+
+    @Test
+    void permitsUpdatingAnExistingAutoPlan() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        plan.setSalesOrderId(301L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
+        when(dao.lockPlanHeader(anyMap())).thenReturn(plan);
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        SalesDeliveryPlanDetailVO stored = orderLine();
+        stored.setSalesDeliveryPlanDetailId(901L);
+        stored.setLineNo(1);
+        stored.setPlannedQty(new BigDecimal("10.00"));
+        stored.setDeliveredQty(BigDecimal.ZERO);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.singletonList(stored));
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.countDeliveryReferences(anyMap())).thenReturn(0);
+        when(dao.updatePlanDetail(anyMap())).thenReturn(1);
+
+        SalesDeliveryPlanVO updated = service.update(71L, "user01", 701L, request(detail(901L, 801L, "8")));
+
+        assertThat(updated.getSalesDeliveryPlanId()).isEqualTo(701L);
+        verify(dao).updatePlanDetail(anyMap());
+    }
+
+    @Test
+    void loadsPlanByOrderWithinAuthenticatedTenant() throws Exception {
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        assertThat(service.getByOrder(71L, "user01", 301L).getSalesDeliveryPlanId()).isEqualTo(701L);
+        verify(dao).selectPlanByOrder(org.mockito.ArgumentMatchers.argThat(params ->
+                Long.valueOf(71L).equals(params.get("tenantId"))
+                        && Long.valueOf(301L).equals(params.get("salesOrderId"))));
     }
 
     @Test
@@ -221,7 +266,7 @@ class SalesDeliveryPlanServiceImplTest {
     }
 
     @Test
-    void synchronizesAutoPlanQuantityAndDateWithoutLosingDeliveredQuantity() throws Exception {
+    void preservesAutoPlanQuantityAndDateWhenSynchronizingAnEditedOrder() throws Exception {
         when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
@@ -239,16 +284,13 @@ class SalesDeliveryPlanServiceImplTest {
         stored.setLineNo(1);
         stored.setPlannedQty(new BigDecimal("10.00"));
         stored.setDeliveredQty(new BigDecimal("2.00"));
+        stored.setPlanDt(LocalDate.of(2026, 11, 14));
         when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.singletonList(stored));
-        when(dao.updatePlanDetail(anyMap())).thenReturn(1);
 
         service.synchronizeAutomaticPlan(71L, "user01", 301L, Collections.singletonList(801L));
 
-        verify(dao).updatePlanDetail(org.mockito.ArgumentMatchers.argThat(params ->
-                Long.valueOf(901L).equals(params.get("salesDeliveryPlanDetailId"))
-                        && new BigDecimal("8.00").equals(params.get("plannedQty"))
-                        && new BigDecimal("2.00").equals(params.get("deliveredQty"))
-                        && LocalDate.of(2026, 11, 12).equals(params.get("planDt"))));
+        verify(dao, never()).updatePlanDetail(anyMap());
+        verify(dao, never()).insertPlanDetail(anyMap());
     }
 
     @Test
@@ -276,7 +318,7 @@ class SalesDeliveryPlanServiceImplTest {
     }
 
     @Test
-    void warnAutoSynchronizationDoesNotInflateBaselineToActual() throws Exception {
+    void warnAutoSynchronizationPreservesAnExistingPlanBaseline() throws Exception {
         when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         when(dao.selectTenantOverDeliveryPolicy(71L)).thenReturn("WARN");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
@@ -291,13 +333,45 @@ class SalesDeliveryPlanServiceImplTest {
         stored.setDeliveredQty(new BigDecimal("12.00"));
         when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.singletonList(stored));
         when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
-        when(dao.updatePlanDetail(anyMap())).thenReturn(1);
 
         service.synchronizeAutomaticPlan(71L, "user01", 301L, Collections.singletonList(801L));
 
-        verify(dao).updatePlanDetail(org.mockito.ArgumentMatchers.argThat(params ->
-                new BigDecimal("10.00").equals(params.get("plannedQty"))
-                        && new BigDecimal("12.00").equals(params.get("deliveredQty"))));
+        verify(dao, never()).updatePlanDetail(anyMap());
+    }
+
+    @Test
+    void autoSynchronizationCreatesAnInitialPlanOnlyForNewOrderLines() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
+        when(dao.lockPlanHeader(anyMap())).thenReturn(plan);
+        SalesDeliveryPlanDetailVO existingLine = orderLine();
+        existingLine.setLineNo(1);
+        existingLine.setOrderQty(new BigDecimal("12.00"));
+        SalesDeliveryPlanDetailVO newLine = orderLine();
+        newLine.setSalesOrderDetailId(802L);
+        newLine.setLineNo(2);
+        newLine.setOrderQty(new BigDecimal("5.00"));
+        newLine.setPlanDt(LocalDate.of(2026, 11, 20));
+        when(dao.selectOrderLines(anyMap())).thenReturn(Arrays.asList(existingLine, newLine));
+        SalesDeliveryPlanDetailVO stored = orderLine();
+        stored.setSalesDeliveryPlanDetailId(901L);
+        stored.setLineNo(1);
+        stored.setPlannedQty(new BigDecimal("10.00"));
+        stored.setPlanDt(LocalDate.of(2026, 11, 14));
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.singletonList(stored));
+        when(dao.insertPlanDetail(anyMap())).thenReturn(902L);
+
+        service.synchronizeAutomaticPlan(71L, "user01", 301L, Arrays.asList(801L, 802L));
+
+        verify(dao, never()).updatePlanDetail(anyMap());
+        verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(params ->
+                Long.valueOf(802L).equals(params.get("salesOrderDetailId"))
+                        && Integer.valueOf(2).equals(params.get("lineNo"))
+                        && new BigDecimal("5.00").equals(params.get("plannedQty"))
+                        && LocalDate.of(2026, 11, 20).equals(params.get("planDt"))));
     }
 
     private SalesDeliverySourceOrderHeaderVO order() {

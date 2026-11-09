@@ -74,7 +74,7 @@ export function LoginForm({
               color="primary.main"
               sx={{ letterSpacing: 1.8, fontWeight: 800, lineHeight: 1.5 }}
             >
-              S-ERP
+              iPlusMES
             </Typography>
             <Typography
               variant="h4"
@@ -85,7 +85,7 @@ export function LoginForm({
                 color: 'text.primary',
               }}
             >
-              통합 ERP 시스템 로그인
+              통합 MES 시스템 로그인
             </Typography>
             <Typography
               variant="body2"
