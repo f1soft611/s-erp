@@ -15,6 +15,7 @@ public class SalesDeliveryDetailVO implements Serializable {
     private Long materialId;
     private String materialCode;
     private String materialName;
+    private String materialSpec;
     private String unit;
     private Long salesOrderId;
     private Long salesOrderDetailId;

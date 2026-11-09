@@ -72,6 +72,12 @@ class SalesDeliveryMapperTest {
     }
 
     @Test
+    void deliveryDetailProvidesMaterialSpecificationForStatementPreview() throws Exception {
+        assertThat(normalize(sql(parse(), "selectDeliveryDetails").getSql()))
+                .contains("m.material_spec AS materialSpec");
+    }
+
+    @Test
     void locksBothOrderAndDeliveryHeadersAndRetainsDeletedDeliveryReferences() throws Exception {
         Configuration configuration = parse();
         String orderLock = normalize(sql(configuration, "lockSourceOrder").getSql());

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesStatementDAO">
+    <select id="lockDelivery" parameterType="map" resultType="long">
+        SELECT sales_delivery_id FROM tb_sales_delivery_hd
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT} AND use_at = 'Y'
+        FOR UPDATE
+    </select>
+
+    <select id="existsActive" parameterType="map" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM tb_sales_statement_hd
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT} AND use_at = 'Y')
+    </select>
+
+    <select id="selectSources" parameterType="map" resultType="map">
+        SELECT h.sales_delivery_id AS "salesDeliveryId", h.delivery_no AS "deliveryNo",
+               to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt", h.delivery_type AS "deliveryType",
+               c.customer_name AS "customerName", h.total_amt AS "totalAmt"
+        FROM tb_sales_delivery_hd h
+        JOIN tb_customer_info c ON c.customer_id = h.customer_id AND c.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT} AND h.use_at = 'Y'
+          AND NOT EXISTS (SELECT 1 FROM tb_sales_statement_hd s
+              WHERE s.tenant_id = h.tenant_id AND s.sales_delivery_id = h.sales_delivery_id AND s.use_at = 'Y')
+          AND (#{keyword, jdbcType=VARCHAR} = '' OR h.delivery_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%')
+        ORDER BY h.delivery_dt DESC, h.sales_delivery_id DESC LIMIT 200
+    </select>
+
+    <select id="insertHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_sales_statement_hd (
+            tenant_id, sales_delivery_id, statement_no, statement_dt, delivery_no, delivery_dt,
+            delivery_type, order_no, supplier_name, supplier_business_no, supplier_president_name,
+            supplier_business_type, supplier_business_category, supplier_post_code, supplier_address,
+            supplier_telephone_no, supplier_facsimile_no, supplier_stamp_image, customer_code, customer_name,
+            customer_business_no, customer_president_name, customer_business_type, customer_business_category,
+            customer_post_code, customer_address, customer_telephone_no, customer_facsimile_no,
+            total_amt, remark, created_by)
+        SELECT h.tenant_id, h.sales_delivery_id, #{statementNo, jdbcType=VARCHAR},
+               #{statementDt, jdbcType=DATE}, h.delivery_no, h.delivery_dt,
+               h.delivery_type, o.order_no, t.tenant_nm, t.business_registration_number, t.president_name,
+               t.business_type, t.business_category, t.post_code, t.address, t.telephone_no, t.facsimile_no, t.stamp_image,
+               c.customer_code, c.customer_name, c.business_no, c.president_name,
+               c.business_item_1, c.business_status_1, c.post_code, c.address, c.telephone_no, c.facsimile_no,
+               h.total_amt, #{remark, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}
+        FROM tb_sales_delivery_hd h
+        JOIN tb_tenant t ON t.tenant_id = h.tenant_id
+        JOIN tb_customer_info c ON c.customer_id = h.customer_id AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_sales_order_hd o ON o.sales_order_id = h.sales_order_id AND o.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT} AND h.use_at = 'Y'
+        RETURNING sales_statement_id
+    </select>
+
+    <insert id="insertDetails" parameterType="map">
+        INSERT INTO tb_sales_statement_dt (
+            sales_statement_id, tenant_id, line_no, material_code, material_name, material_spec,
+            unit, delivery_qty, unit_price, supply_amt, vat_amt, total_amt)
+        SELECT #{salesStatementId, jdbcType=BIGINT}, d.tenant_id, d.line_no,
+               m.material_code, m.material_name, m.material_spec, m.unit,
+               d.delivery_qty, d.unit_price, d.supply_amt, d.vat_amt, d.total_amt
+        FROM tb_sales_delivery_dt d
+        LEFT JOIN tb_material_info m ON m.material_id = d.material_id AND m.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND d.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
+    </insert>
+
+    <select id="selectHeader" parameterType="map" resultType="map">
+        SELECT h.sales_statement_id AS "salesStatementId", h.sales_delivery_id AS "salesDeliveryId",
+               h.statement_no AS "statementNo", to_char(h.statement_dt, 'YYYY-MM-DD') AS "statementDt",
+               h.delivery_no AS "deliveryNo", to_char(h.delivery_dt, 'YYYY-MM-DD') AS "deliveryDt", h.delivery_type AS "deliveryType",
+               h.order_no AS "orderNo", h.supplier_name AS "supplierName",
+               h.supplier_business_no AS "supplierBusinessNo", h.supplier_president_name AS "supplierPresidentName",
+               h.supplier_business_type AS "supplierBusinessType", h.supplier_business_category AS "supplierBusinessCategory",
+               h.supplier_post_code AS "supplierPostCode", h.supplier_address AS "supplierAddress",
+               h.supplier_telephone_no AS "supplierTelephoneNo", h.supplier_facsimile_no AS "supplierFacsimileNo",
+               COALESCE(h.supplier_stamp_image, t.stamp_image) AS "supplierStampImage",
+               h.customer_code AS "customerCode", h.customer_name AS "customerName",
+               h.customer_business_no AS "customerBusinessNo", h.customer_president_name AS "customerPresidentName",
+               h.customer_business_type AS "customerBusinessType", h.customer_business_category AS "customerBusinessCategory",
+               h.customer_post_code AS "customerPostCode", h.customer_address AS "customerAddress",
+               h.customer_telephone_no AS "customerTelephoneNo", h.customer_facsimile_no AS "customerFacsimileNo",
+               h.total_amt AS "totalAmt", h.remark AS "remark", h.created_by AS "createdBy",
+               to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS "createdAt",
+               u.user_nm AS "createdByName", la.profile_image AS "createdByProfileImage"
+        FROM tb_sales_statement_hd h
+        LEFT JOIN tb_tenant t ON t.tenant_id = h.tenant_id
+        LEFT JOIN tb_login_account la ON la.login_code = h.created_by AND la.tenant_id = h.tenant_id
+        LEFT JOIN tb_user u ON u.login_id = la.login_id AND u.tenant_id = la.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.sales_statement_id = #{salesStatementId, jdbcType=BIGINT} AND h.use_at = 'Y'
+    </select>
+
+    <select id="selectDetails" parameterType="map" resultType="map">
+        SELECT sales_statement_detail_id AS "salesStatementDetailId", line_no AS "lineNo",
+               material_code AS "materialCode", material_name AS "materialName", material_spec AS "materialSpec",
+               unit, delivery_qty AS "deliveryQty", unit_price AS "unitPrice", supply_amt AS "supplyAmt",
+               vat_amt AS "vatAmt", total_amt AS "totalAmt"
+        FROM tb_sales_statement_dt
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND sales_statement_id = #{salesStatementId, jdbcType=BIGINT}
+        ORDER BY line_no
+    </select>
+
+    <select id="selectStatus" parameterType="map" resultType="map">
+        SELECT h.sales_statement_id AS "salesStatementId", h.statement_no AS "statementNo",
+               to_char(h.statement_dt, 'YYYY-MM-DD') AS "statementDt", h.delivery_no AS "deliveryNo",
+               h.customer_code AS "customerCode", h.customer_name AS "customerName", h.total_amt AS "totalAmt",
+               d.sales_statement_detail_id AS "salesStatementDetailId", d.line_no AS "lineNo",
+               d.material_code AS "materialCode", d.material_name AS "materialName", d.material_spec AS "materialSpec",
+               d.unit, d.delivery_qty AS "deliveryQty", d.unit_price AS "unitPrice",
+               d.supply_amt AS "supplyAmt", d.vat_amt AS "vatAmt", d.total_amt AS "lineTotalAmt"
+        FROM tb_sales_statement_hd h
+        JOIN tb_sales_statement_dt d ON d.sales_statement_id = h.sales_statement_id AND d.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT} AND h.use_at = 'Y'
+          AND h.statement_dt BETWEEN #{from, jdbcType=DATE} AND #{to, jdbcType=DATE}
+          AND (#{keyword, jdbcType=VARCHAR} = '' OR h.statement_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+              OR h.delivery_no ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+              OR h.customer_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%'
+              OR d.material_name ILIKE '%' || #{keyword, jdbcType=VARCHAR} || '%')
+        ORDER BY h.statement_dt DESC, h.sales_statement_id DESC, d.line_no
+    </select>
+
+    <update id="updateHeader" parameterType="map">
+        UPDATE tb_sales_statement_hd SET statement_dt = #{statementDt, jdbcType=DATE},
+               remark = #{remark, jdbcType=VARCHAR}, updated_by = #{userId, jdbcType=VARCHAR},
+               updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND sales_statement_id = #{salesStatementId, jdbcType=BIGINT} AND use_at = 'Y'
+    </update>
+
+    <update id="deleteHeader" parameterType="map">
+        UPDATE tb_sales_statement_hd SET use_at = 'N', updated_by = #{userId, jdbcType=VARCHAR},
+               updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND sales_statement_id = #{salesStatementId, jdbcType=BIGINT} AND use_at = 'Y'
+    </update>
+</mapper>
