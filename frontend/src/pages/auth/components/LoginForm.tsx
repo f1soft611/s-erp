@@ -85,7 +85,7 @@ export function LoginForm({
                 color: 'text.primary',
               }}
             >
-              통합 ERP 시스템 로그인
+              통합 MES 시스템 로그인
             </Typography>
             <Typography
               variant="body2"
