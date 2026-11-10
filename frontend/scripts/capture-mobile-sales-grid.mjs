@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { installSalesDeliveryBrowserMocks } from '../tests/fixtures/sales-delivery.browser-fixtures.mjs';
 
 const screenshotDir = path.resolve(import.meta.dirname, '../../docs/result/20261110/mobile-sales-grid/screenshots');
+const fieldScreenshotDir = path.resolve(import.meta.dirname, '../../docs/result/20261110/order-number-field/screenshots');
 const permissions = { read: true, create: true, update: true, delete: true, excel: true };
 const salesMenus = [
   { menuId: 911, name: '수주등록', path: '/sales/order/create', permissions },
@@ -20,6 +21,7 @@ const source = {
   unit: 'EA', orderQty: 10, shippedQty: 0, unitPrice: 100, planDt: '2026-11-10',
 };
 await fs.mkdir(screenshotDir, { recursive: true });
+await fs.mkdir(fieldScreenshotDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
@@ -134,6 +136,24 @@ try {
       await region.waitFor();
       const grid = page.getByRole('grid', { name: `${title} 상세 목록` });
       await grid.waitFor();
+      if (title === '수주') {
+        const fields = [];
+        for (const label of ['수주번호', '견적번호', '수주상태']) {
+          fields.push(await page.getByLabel(label, { exact: true }).evaluate((input) => {
+            const style = getComputedStyle(input);
+            return {
+              fontSize: style.fontSize, fontFamily: style.fontFamily,
+              height: input.closest('.MuiInputBase-root').getBoundingClientRect().height,
+            };
+          }));
+        }
+        assert.ok(fields.every((field) => field.fontSize === fields[1].fontSize &&
+          field.fontFamily === fields[1].fontFamily && Math.abs(field.height - fields[1].height) < 1),
+        `Order field size mismatch at ${width}: ${JSON.stringify(fields)}`);
+        assert.equal(await page.getByLabel('수주번호', { exact: true }).getAttribute('readonly'), '');
+        await page.getByLabel('수주번호', { exact: true }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(fieldScreenshotDir, `order-fields-${width}.png`), animations: 'disabled' });
+      }
       const mobile = width < 768;
       const modules = page.getByRole('navigation', { name: '모듈 선택' });
       const moduleBox = await modules.boundingBox();
