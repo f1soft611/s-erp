@@ -55,20 +55,19 @@ export function ListView<T extends CommonViewItem>({
             label={item.categoryLabel}
             size="small"
             color={item.categoryColor}
+            variant={item.categoryVariant ?? 'filled'}
             sx={{
               flexShrink: 0,
               ml: 'auto',
               height: 22,
               fontWeight: 700,
+              borderRadius: '6px',
               ...(item.categoryColor
                 ? {}
                 : {
                     bgcolor: 'rgba(59,130,246,0.18)',
                     color: '#2563eb',
                   }),
-              ...(item.badgeBorderRadius
-                ? { borderRadius: item.badgeBorderRadius }
-                : {}),
             }}
           />
         ) : null;
@@ -82,9 +81,7 @@ export function ListView<T extends CommonViewItem>({
               flexShrink: 0,
               height: 22,
               fontWeight: 700,
-              ...(item.badgeBorderRadius
-                ? { borderRadius: item.badgeBorderRadius }
-                : {}),
+              borderRadius: '6px',
             }}
           />
         ) : null;

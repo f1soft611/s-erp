@@ -268,7 +268,7 @@ function CommentEditor({
         mt: 1,
         minWidth: 0,
         border: `1px solid ${isDark ? 'rgba(148,163,184,0.24)' : 'rgba(148,163,184,0.3)'}`,
-        borderRadius: 1.5,
+        borderRadius: 1,
         bgcolor: isDark ? 'rgba(15,23,42,0.76)' : '#fff',
         overflow: 'hidden',
       }}
@@ -376,7 +376,7 @@ function CommentEditor({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   border: `1px solid ${
                     isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.18)'
                   }`,
@@ -578,7 +578,7 @@ function CommentItem({
                   variant={comment.systemEventBadge.variant}
                   sx={{
                     height: 20,
-                    borderRadius: '8px',
+                    borderRadius: '6px',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}
@@ -677,7 +677,7 @@ function CommentItem({
                       minWidth: 0,
                       px: 0.75,
                       py: 0.25,
-                      borderRadius: 1.25,
+                      borderRadius: 1,
                       border: `1px solid ${
                         isDark
                           ? 'rgba(148,163,184,0.18)'
@@ -875,7 +875,7 @@ function CommentItem({
                     minWidth: 0,
                     px: 0.75,
                     py: 0.25,
-                    borderRadius: 1.25,
+                    borderRadius: 1,
                     border: `1px solid ${
                       isDark
                         ? 'rgba(148,163,184,0.18)'

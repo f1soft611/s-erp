@@ -207,7 +207,7 @@ export function DocumentComposerDialog({
               onClick={() => void submitDraft()}
               disabled={!canSubmitDraft}
               sx={{
-                borderRadius: 1.5,
+                borderRadius: 1,
                 fontWeight: 700,
                 minWidth: { xs: 96, sm: 112 },
                 px: { xs: 2, sm: 2.5 },
@@ -223,7 +223,7 @@ export function DocumentComposerDialog({
               onClick={() => void saveDraft()}
               disabled={!canSaveDraft}
               sx={{
-                borderRadius: 1.5,
+                borderRadius: 1,
                 fontWeight: 700,
                 minWidth: { xs: 80, sm: 96 },
                 px: { xs: 2, sm: 2.5 },
@@ -239,7 +239,7 @@ export function DocumentComposerDialog({
               color="primary"
               onClick={closeComposer}
               sx={{
-                borderRadius: 1.5,
+                borderRadius: 1,
                 fontWeight: 600,
                 minWidth: { xs: 56, sm: 64 },
                 px: { xs: 1.5, sm: 2 },
@@ -354,13 +354,13 @@ export function DocumentComposerDialog({
                 flexShrink: 0,
                 '& .MuiOutlinedInput-root': {
                   bgcolor: fieldSurfaceBackground,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   border: 'none',
                   '& fieldset': { border: 'none' },
                 },
                 '& .MuiInputBase-root': {
                   bgcolor: fieldSurfaceBackground,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                 },
                 '& .MuiInputBase-input::placeholder': {
                   color: theme.palette.text.disabled,

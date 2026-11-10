@@ -444,7 +444,7 @@ export function DashboardMenuTree({
               minWidth: 22,
               px: 0.6,
               py: 0.15,
-              borderRadius: 10,
+              borderRadius: 1,
               bgcolor: isDark ? 'rgba(96,165,250,0.18)' : '#dbeafe',
               color: isDark ? '#bfdbfe' : '#2563eb',
               fontWeight: 800,
@@ -477,7 +477,7 @@ export function DashboardMenuTree({
                   px: 1,
                   py: 0.7,
                   minHeight: 46,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   color: isDark ? '#dbeafe' : '#1e293b',
                   bgcolor: isDark
                     ? 'rgba(96,165,250,0.08)'

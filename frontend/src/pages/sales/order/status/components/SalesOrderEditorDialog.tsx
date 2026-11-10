@@ -58,7 +58,7 @@ export function SalesOrderEditorDialog({
         <AppSaveButton
           variant="contained"
           saving={actionState.saving}
-          sx={{ borderRadius: 1.5, fontWeight: 700, minWidth: 96, px: 2.5 }}
+          sx={{ borderRadius: 1, fontWeight: 700, minWidth: 96, px: 2.5 }}
           onClick={actionState.save}
           disabled={actionState.saveDisabled}
         >

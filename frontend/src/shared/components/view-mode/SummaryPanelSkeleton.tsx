@@ -5,7 +5,7 @@ export function SummaryPanelSkeleton() {
     <Stack data-testid="summary-panel-skeleton" spacing={2}>
       <Card
         sx={{
-          borderRadius: 3,
+          borderRadius: 1,
           border: '1px solid',
           borderColor: 'divider',
           boxShadow: 'none',
@@ -25,7 +25,7 @@ export function SummaryPanelSkeleton() {
               variant="rounded"
               width={52}
               height={24}
-              sx={{ borderRadius: 999 }}
+              sx={{ borderRadius: 1 }}
             />
           </Box>
           <Stack spacing={1.25} sx={{ mt: 1.5 }}>
@@ -47,7 +47,7 @@ export function SummaryPanelSkeleton() {
       </Card>
       <Card
         sx={{
-          borderRadius: 3,
+          borderRadius: 1,
           border: '1px solid',
           borderColor: 'divider',
           boxShadow: 'none',

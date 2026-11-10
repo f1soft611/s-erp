@@ -41,6 +41,19 @@ describe('ApprovalNoticePanel', () => {
     expect(screen.queryByText(item.date)).not.toBeInTheDocument();
   });
 
+  it('uses the shared radius for the status badge', () => {
+    render(
+      <ApprovalNoticePanel
+        items={[{ ...item, statusColor: 'info', statusVariant: 'filled' }]}
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText(item.status).closest('.MuiChip-root')).toHaveStyle({
+      borderRadius: '6px',
+    });
+  });
+
   it('does not substitute the list date when the submitted date is missing', () => {
     render(<ApprovalNoticePanel items={[item]} onSelect={() => undefined} />);
 

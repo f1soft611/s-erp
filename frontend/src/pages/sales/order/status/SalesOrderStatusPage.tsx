@@ -87,6 +87,12 @@ export function SalesOrderStatusPage({
   const handleDetailClose = useCallback(() => {
     if (detail.editorMode === null) closeDetail();
   }, [closeDetail, detail.editorMode]);
+  const showSearchResultMessage =
+    list.hasLoaded &&
+    !list.loading &&
+    !list.initialLoad.loading &&
+    !search.defaultsError &&
+    !list.error;
   const pageActionGroups: PermissionActionGroupDefinition[] = [
     {
       key: 'read',
@@ -141,16 +147,20 @@ export function SalesOrderStatusPage({
         <PageMessageArea
           message={search.defaultsError ?? list.error}
           onClose={list.clearError}
+          horizontalPadding="grid"
         />
-        {list.hasLoaded && !list.loading && !list.initialLoad.loading
-          && !search.defaultsError && !list.error ? (
-          <SearchResultMessage resultCount={list.rows.length} />
+        {showSearchResultMessage ? (
+          <SearchResultMessage
+            resultCount={list.rows.length}
+            horizontalPadding="grid"
+          />
         ) : null}
         <Box
+          data-testid="sales-status-content"
           sx={{
             px: { xs: 1, sm: 2 },
+            pt: showSearchResultMessage ? 0 : 1,
             pb: 2,
-            pt: 1,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,

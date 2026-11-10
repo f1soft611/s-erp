@@ -1,6 +1,7 @@
 import { Chip, Link } from '@mui/material';
 import type { F1GridColumn } from '../../../../../shared/components/f1-grid/types/grid.types';
 import type { DocumentStatusRow } from '../types/documentStatus.types';
+import { getApprovalStatusPresentation } from '../../write/data/documentPresentation';
 import {
   ACTION_STATUS_LABELS,
   ACTION_STATUS_OPTIONS,
@@ -8,7 +9,6 @@ import {
   DOCUMENT_TYPE_OPTIONS,
   PARTICIPANT_TYPE_LABELS,
   PARTICIPANT_TYPE_OPTIONS,
-  STATUS_COLORS,
   STATUS_LABELS,
 } from './documentStatusOptions';
 
@@ -108,18 +108,25 @@ export function createDocumentStatusColumns({
       align: 'center',
       editable: false,
       search: { label: '결재상태', order: 2, span: 2, group: '결재상태' },
-      renderCell: ({ row }) => (
-        <Chip
-          size="small"
-          color={STATUS_COLORS[row.documentStatus]}
-          label={
-            row.documentType === 'BUSINESS_CONTACT' &&
-            row.documentStatus === 'COMPLETED'
-              ? '발송완료'
-              : (STATUS_LABELS[row.documentStatus] ?? row.documentStatus)
-          }
-        />
-      ),
+      renderCell: ({ row }) => {
+        const presentation = getApprovalStatusPresentation(
+          row.documentStatus,
+          row.documentType,
+        );
+        return (
+          <Chip
+            size="small"
+            color={presentation.color}
+            variant={presentation.variant}
+            label={
+              row.documentType === 'BUSINESS_CONTACT' &&
+              row.documentStatus === 'COMPLETED'
+                ? '발송완료'
+                : (STATUS_LABELS[row.documentStatus] ?? row.documentStatus)
+            }
+          />
+        );
+      },
     },
     {
       field: 'submittedAt',

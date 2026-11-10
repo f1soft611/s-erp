@@ -33,7 +33,7 @@ export function PageLoadingSkeleton({ rows = 6 }: PageLoadingSkeletonProps) {
         width: '100%',
       }}
     >
-      <Skeleton variant="rectangular" height={52} sx={{ borderRadius: 2 }} />
+      <Skeleton variant="rectangular" height={52} sx={{ borderRadius: 1 }} />
       {Array.from({ length: rows - 1 }).map((_, index) => (
         <Skeleton
           key={`page-loading-skeleton-row-${index}`}

@@ -292,7 +292,7 @@ export function CustomerManagementPage({
               height: 40,
               '& .MuiOutlinedInput-root': {
                 height: '100%',
-                borderRadius: '0 8px 8px 0',
+                borderRadius: '0 6px 6px 0',
                 backgroundColor:
                   theme.palette.mode === 'dark'
                     ? 'rgba(15, 23, 42, 0.72)'

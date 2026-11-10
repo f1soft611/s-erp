@@ -8,7 +8,7 @@ import type {
 } from '../types/documentWrite.types';
 
 export type { ApprovalStatusColor } from '../types/documentWrite.types';
-export type DocumentKindColor = 'primary' | 'info' | 'warning' | 'secondary';
+export type DocumentKindColor = 'primary' | 'success' | 'warning' | 'secondary';
 
 export type ApprovalStatusPresentation = {
   label: ApprovalStatus;
@@ -19,13 +19,14 @@ export type ApprovalStatusPresentation = {
 export type DocumentKindPresentation = {
   label: string;
   color: DocumentKindColor;
+  variant: 'outlined';
 };
 
 const approvalStatusPresentation: Record<
   ApprovalDocumentStatus,
   ApprovalStatusPresentation
 > = {
-  DRAFT: { label: '임시저장', color: 'default', variant: 'outlined' },
+  DRAFT: { label: '임시저장', color: 'default', variant: 'filled' },
   PENDING: { label: '결재진행중', color: 'info', variant: 'filled' },
   IN_PROGRESS: { label: '결재진행중', color: 'info', variant: 'filled' },
   COMPLETED: { label: '승인', color: 'success', variant: 'filled' },
@@ -34,10 +35,10 @@ const approvalStatusPresentation: Record<
 };
 
 const documentKindPresentation: Record<DocumentKind, DocumentKindPresentation> = {
-  기안서: { label: '기안', color: 'primary' },
-  업무연락: { label: '업무', color: 'info' },
-  지출결의서: { label: '지출', color: 'warning' },
-  근태신청: { label: '근태', color: 'secondary' },
+  기안서: { label: '기안', color: 'primary', variant: 'outlined' },
+  업무연락: { label: '업무', color: 'success', variant: 'outlined' },
+  지출결의서: { label: '지출', color: 'warning', variant: 'outlined' },
+  근태신청: { label: '근태', color: 'secondary', variant: 'outlined' },
 };
 
 const documentKindByType: Record<DocumentApprovalRecord['documentType'], DocumentKind> = {
@@ -88,7 +89,7 @@ export function getApprovalStatusPresentation(
   documentType?: DocumentApprovalRecord['documentType'],
 ): ApprovalStatusPresentation {
   if (status === 'COMPLETED' && documentType === 'BUSINESS_CONTACT') {
-    return { label: '발송완료', color: 'success', variant: 'filled' };
+    return { label: '발송완료', color: 'info', variant: 'filled' };
   }
   return approvalStatusPresentation[status];
 }

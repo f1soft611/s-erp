@@ -26,7 +26,7 @@ describe('document presentation metadata', () => {
   it('labels a completed business contact as sent instead of approved', () => {
     expect(getApprovalStatusPresentation('COMPLETED', 'BUSINESS_CONTACT')).toEqual({
       label: '발송완료',
-      color: 'success',
+      color: 'info',
       variant: 'filled',
     });
     expect(getApprovalStatusPresentation('COMPLETED', 'DRAFTING').label).toBe('승인');
@@ -54,7 +54,7 @@ describe('document presentation metadata', () => {
   });
 
   it.each([
-    ['DRAFT_SAVED', '임시저장', 'default', 'outlined', 'DRAFT'],
+    ['DRAFT_SAVED', '임시저장', 'default', 'filled', 'DRAFT'],
     ['SUBMITTED', '결재신청', 'info', 'filled', 'PENDING'],
     ['RESUBMITTED', '재상신', 'info', 'filled', 'PENDING'],
     ['SUBMISSION_CANCELED', '결재신청 취소', 'error', 'outlined', 'DRAFT'],
@@ -69,7 +69,9 @@ describe('document presentation metadata', () => {
       color: eventType.endsWith('_CANCELED')
         ? getApprovalStatusPresentation('REJECTED').color
         : getApprovalStatusPresentation(status).color,
-      variant: getApprovalStatusPresentation(status).variant,
+      variant: eventType.endsWith('_CANCELED')
+        ? 'outlined'
+        : getApprovalStatusPresentation(status).variant,
     });
   });
 
@@ -81,7 +83,7 @@ describe('document presentation metadata', () => {
   );
 
   it.each([
-    ['DRAFT', '임시저장', 'default', 'outlined'],
+    ['DRAFT', '임시저장', 'default', 'filled'],
     ['PENDING', '결재진행중', 'info', 'filled'],
     ['IN_PROGRESS', '결재진행중', 'info', 'filled'],
     ['COMPLETED', '승인', 'success', 'filled'],
@@ -92,11 +94,11 @@ describe('document presentation metadata', () => {
   });
 
   it.each([
-    ['DRAFTING', '기안', 'primary'],
-    ['BUSINESS_CONTACT', '업무', 'info'],
-    ['EXPENSE_RESOLUTION', '지출', 'warning'],
-    ['ATTENDANCE_APPLICATION', '근태', 'secondary'],
-  ] as const)('maps %s to its canonical document-kind badge', (kind, label, color) => {
-    expect(getDocumentKindPresentation(kind)).toEqual({ label, color });
+    ['DRAFTING', '기안', 'primary', 'outlined'],
+    ['BUSINESS_CONTACT', '업무', 'success', 'outlined'],
+    ['EXPENSE_RESOLUTION', '지출', 'warning', 'outlined'],
+    ['ATTENDANCE_APPLICATION', '근태', 'secondary', 'outlined'],
+  ] as const)('maps %s to its canonical document-kind badge', (kind, label, color, variant) => {
+    expect(getDocumentKindPresentation(kind)).toEqual({ label, color, variant });
   });
 });

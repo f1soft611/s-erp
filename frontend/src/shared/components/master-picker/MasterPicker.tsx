@@ -70,7 +70,7 @@ export function MasterPicker({
             },
           }}
           sx={{
-            '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 },
+            '& .MuiInputBase-root': { height: 40, borderRadius: 1 },
             '& .MuiFormHelperText-root': { whiteSpace: 'nowrap' },
           }}
         />
@@ -88,7 +88,7 @@ export function MasterPicker({
               minWidth: 76,
               height: 40,
               minHeight: 40,
-              borderRadius: 1.5,
+              borderRadius: 1,
               fontWeight: 700,
             }}
           >

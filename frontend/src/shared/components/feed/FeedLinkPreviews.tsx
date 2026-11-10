@@ -71,7 +71,7 @@ function InternalLinkPreview({
 
   const cardSx = {
     width: '100%', minWidth: 0, border: 1, borderColor: 'divider',
-    borderRadius: 1.5, p: 1.5, textAlign: 'left', bgcolor: 'background.paper',
+    borderRadius: 1, p: 1.5, textAlign: 'left', bgcolor: 'background.paper',
     overflowWrap: 'anywhere',
   } as const;
   if (status !== 'ready' || !record) {
@@ -159,7 +159,7 @@ function ExternalLinkPreview({
 
   const cardSx = {
     display: 'flex', alignItems: 'stretch', gap: 1.5, width: '100%', minWidth: 0,
-    border: 1, borderColor: 'divider', borderRadius: 1.5, p: 1.5,
+    border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5,
     color: 'inherit', textDecoration: 'none', bgcolor: 'background.paper',
     overflowWrap: 'anywhere',
     '&:hover': { bgcolor: 'action.hover' },

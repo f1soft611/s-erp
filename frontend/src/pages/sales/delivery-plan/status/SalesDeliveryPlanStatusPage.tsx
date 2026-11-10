@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
@@ -39,7 +39,7 @@ function InfoItem({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function InfoGroup({ title, children }: { title: string; children: ReactNode }) {
-  return <Box role="group" aria-label={title} sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 1.5, sm: 2 }, bgcolor: 'background.paper' }}>
+  return <Box role="group" aria-label={title} sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 1.5, sm: 2 }, bgcolor: 'background.paper' }}>
     <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{title}</Typography>
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>{children}</Box>
   </Box>;
@@ -162,7 +162,7 @@ export function SalesDeliveryPlanStatusPage({
     setEditRows(planRowsFromDetails(details));
     setError('');
   };
-  const detailTable = <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflowX: 'auto' }}>
+  const detailTable = <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
     <Table size="small" sx={{ minWidth: 660, '& .MuiTableCell-head': { bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700, whiteSpace: 'nowrap' },
       '& .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root': { borderBottom: 0 } }} aria-label="출하계획 상세 목록">
       <TableHead><TableRow><TableCell>품목코드</TableCell><TableCell>품목명</TableCell>
@@ -200,18 +200,25 @@ export function SalesDeliveryPlanStatusPage({
         onKeyDown={(event) => { if (event.key === 'Enter') void search(); }}
         slotProps={{ htmlInput: { 'aria-label': '출하계획현황 빠른 검색' } }}
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
-          height: '100%', borderRadius: '0 8px 8px 0', backgroundColor: theme.palette.background.paper,
+          height: '100%', borderRadius: '0 6px 6px 0', backgroundColor: theme.palette.background.paper,
         } })} />} />
-    <Box sx={{ px: { xs: 1, sm: 2 }, pb: 2, pt: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1.5 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+    <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1 }}>
+      <PageMessageArea
+        message={error}
+        onClose={() => setError('')}
+        horizontalPadding="none"
+      />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <SearchResultMessage resultCount={rows.length} />
-      <Paper variant="outlined" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden', borderRadius: 2 }}>
+      <SearchResultMessage
+        resultCount={rows.length}
+        horizontalPadding="none"
+      />
+      <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanId"
           loading={loading} showCheckbox={false} height="100%" minHeight={240} selectionMode="row"
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />
-      </Paper>
+      </Box>
     </Box>
       {selected ? <PageAreaOverlay onClose={() => setSelected(null)}>
       <PostDetailPanel title="출하계획 상세" subtitle={`계획번호: ${selected.planNo}`}
@@ -236,7 +243,7 @@ export function SalesDeliveryPlanStatusPage({
             </Stack>
           </Stack>
           <Box aria-label="출하계획 요약" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' },
-            alignItems: 'center', gap: { xs: 1.5, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
+            alignItems: 'center', gap: { xs: 1.5, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="caption" color="text.secondary" component="div">거래처</Typography>
               <Typography variant="h6" component="div" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{selected.customerName || '-'}</Typography>

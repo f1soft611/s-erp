@@ -40,7 +40,7 @@ export function NoticeEmptyState({ onCreate }: NoticeEmptyStateProps) {
             top: 18,
             width: 76,
             height: 70,
-            borderRadius: 1.5,
+            borderRadius: 1,
             border: '2px solid',
             borderColor: 'text.primary',
             bgcolor: 'background.paper',
@@ -114,7 +114,7 @@ export function NoticeEmptyState({ onCreate }: NoticeEmptyStateProps) {
           variant="outlined"
           startIcon={<EditOutlinedIcon />}
           onClick={onCreate}
-          sx={{ minWidth: 168, borderRadius: 999, fontWeight: 700 }}
+          sx={{ minWidth: 168, borderRadius: 1, fontWeight: 700 }}
         >
           글쓰기
         </Button>

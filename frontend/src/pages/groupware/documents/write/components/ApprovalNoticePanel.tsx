@@ -11,7 +11,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
   return (
     <Card
       sx={{
-        borderRadius: 3,
+        borderRadius: 1,
         border: '1px solid rgba(148,163,184,0.18)',
         boxShadow: 'none',
       }}
@@ -37,7 +37,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                 p: 1.5,
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 2,
+                borderRadius: 1,
                 bgcolor: 'action.hover',
                 color: 'text.primary',
                 textAlign: 'left',
@@ -67,7 +67,7 @@ export function ApprovalNoticePanel({ items, onSelect }: ApprovalNoticePanelProp
                   sx={{
                     height: 22,
                     fontWeight: 700,
-                    borderRadius: item.badgeBorderRadius ?? '8px',
+                    borderRadius: '6px',
                   }}
                 />
               </Stack>

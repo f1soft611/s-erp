@@ -83,7 +83,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
           { label: '정책 추가', icon: AddIcon, visible: Boolean(selectedMenuPermissions?.create), disabled: loading || Boolean(editor) || Boolean(deleting), onClick: () => setEditor({ policy: null }) },
         ] }]} />
       <Stack spacing={2.5} sx={{ p: { xs: 2, md: 3 } }}>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
             <Chip label="플랫폼 관리자 전용" color="primary" variant="outlined" sx={{ alignSelf: 'start' }} />
             <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>현재 회사: {getStoredAuth()?.tenantCode ?? '현재 로그인 회사'} · 다른 회사의 설정은 변경하지 않습니다.</Typography>
@@ -104,7 +104,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
         {loading && <Box role="status" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><CircularProgress size={18} /><Typography>정책 조회 중</Typography></Box>}
         {!loading && !filtered.length && <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">{policies.length ? '검색 조건에 맞는 정책이 없습니다.' : '등록된 정책이 없습니다. 정책 추가로 시작하세요.'}</Typography></Paper>}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-          {filtered.map((policy) => <Paper key={policy.policyId} variant="outlined" sx={{ p: 2.5, borderRadius: 2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {filtered.map((policy) => <Paper key={policy.policyId} variant="outlined" sx={{ p: 2.5, borderRadius: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
               <Chip size="small" variant="outlined" label={policy.category} /><Chip size="small" label={POLICY_TYPES[policy.valueType]} />
               {policy.systemPolicy && <Chip size="small" color="primary" variant="outlined" label="시스템 필수" />}

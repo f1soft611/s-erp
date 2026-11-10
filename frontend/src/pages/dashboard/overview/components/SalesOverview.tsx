@@ -34,7 +34,7 @@ function SalesTrend({ rows, selectedMonth }: { rows: DashboardSales['trend']; se
               aria-label={`${row.month} 수주 공급가액 ${formatNumber(row.supplyAmount)}원, ${row.orderCount}건 상세 보기`}
               sx={(theme) => ({
                 minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                height: 204, px: 0.4, pt: 1, borderRadius: '8px 8px 0 0',
+                height: 204, px: 0.4, pt: 1, borderRadius: '6px 6px 0 0',
                 '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
                 '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 2 },
               })}>
@@ -82,7 +82,7 @@ export function SalesOverview({ month, onMonthChange, data, loading, error, onRe
         <TextField type="month" label="수주 조회 월" size="small" margin="none" value={month}
           onChange={(event) => { if (isDashboardMonth(event.target.value)) onMonthChange(event.target.value); }}
           slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: '1900-01', max: '9998-12' } }}
-          sx={{ width: { xs: '100%', sm: 176 }, '& .MuiOutlinedInput-root': { bgcolor: 'background.paper', borderRadius: 2 } }} />
+          sx={{ width: { xs: '100%', sm: 176 }, '& .MuiOutlinedInput-root': { bgcolor: 'background.paper', borderRadius: 1 } }} />
       </Stack>
       {error ? <OverviewError label="수주 현황" onRetry={onRetry} /> : loading || !data ? <SalesOverviewSkeleton /> : (
         <Stack spacing={2.5}>
@@ -119,7 +119,7 @@ export function SalesOverview({ month, onMonthChange, data, loading, error, onRe
                       onClick={() => navigate(salesDuePath(data.asOfDate, item.orderNo))}
                       label={`${item.orderNo} 납기 예정 수주 보기`}>
                       <Box sx={(theme) => ({
-                        flexShrink: 0, width: 46, borderRadius: 2, overflow: 'hidden', border: '1px solid',
+                        flexShrink: 0, width: 46, borderRadius: 1, overflow: 'hidden', border: '1px solid',
                         borderColor: 'divider', textAlign: 'center',
                         bgcolor: days === 0 ? alpha(theme.palette.primary.main, 0.09) : 'action.hover',
                         color: days === 0 ? 'primary.main' : 'text.primary',

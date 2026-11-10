@@ -503,7 +503,7 @@ export function MessageInboxPage() {
                   sx={{
                     border: 1,
                     borderColor: 'divider',
-                    borderRadius: 1.5,
+                    borderRadius: 1,
                     bgcolor: 'background.paper',
                     overflow: 'hidden',
                     '&:focus-within': { borderColor: 'primary.main' },

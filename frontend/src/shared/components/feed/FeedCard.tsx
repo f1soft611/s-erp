@@ -42,7 +42,7 @@ export function FeedCard({
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        borderRadius: 3,
+        borderRadius: 1,
         border: '1px solid rgba(148,163,184,0.18)',
         boxShadow: 'none',
         bgcolor: isDark ? 'rgba(15, 23, 42, 0.75)' : '#ffffff',

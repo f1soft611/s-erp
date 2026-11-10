@@ -173,14 +173,15 @@ export function SalesDeliveryCreatePage({
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
-      sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+      sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+        display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}
       {loading ? <Typography role="status">출하를 불러오는 중입니다.</Typography> : null}
       <PageLoadBoundary loading={loading} error={loadError ? 'server' : null} label="출하등록"
         onRetry={() => savedId && void load(savedId)}>
-        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}>
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하 기본정보</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, columnGap: 2, rowGap: 1,
             '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
@@ -211,7 +212,7 @@ export function SalesDeliveryCreatePage({
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
         </Paper>
-        <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
+        <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 1, overflow: 'hidden' }}>
         <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하 상세</Typography>

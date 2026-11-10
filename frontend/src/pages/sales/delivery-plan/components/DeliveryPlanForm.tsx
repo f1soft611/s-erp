@@ -62,7 +62,7 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
       </Box> },
   ], [editable, gridRef, replaceRows, rows]);
   return <>
-    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>출하계획 기본정보</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
         columnGap: 2, rowGap: 1, '& > .MuiFormControl-root': { m: 0 }, '& > .MuiStack-root': { mt: 0 } }}>
@@ -77,7 +77,7 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
         <TextField size="small" label="거래처" value={customerName} slotProps={{ input: { readOnly: true } }} />
       </Box>
     </Paper>
-    <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden', pb: 1 }}>
+    <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 1, overflow: 'hidden', pb: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
         <Box><Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하계획 상세</Typography>
           <Typography variant="caption" color="text.secondary">같은 수주 품목을 예정일별로 분할할 수 있습니다.</Typography></Box>

@@ -30,6 +30,18 @@ export function createAppTheme(mode: AppThemeMode = 'light') {
       secondary: {
         main: isDark ? '#e2e8f0' : '#0f172a',
       },
+      info: {
+        main: '#6478a6',
+        contrastText: '#ffffff',
+      },
+      success: {
+        main: '#66a86b',
+        contrastText: '#ffffff',
+      },
+      error: {
+        main: '#e64f4f',
+        contrastText: '#ffffff',
+      },
       background: {
         default: isDark ? '#0f172a' : '#f4f7fb',
         paper: isDark ? '#111827' : '#ffffff',
@@ -53,6 +65,17 @@ export function createAppTheme(mode: AppThemeMode = 'light') {
       },
     },
     components: {
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: basePalette.shape.borderRadius,
+            '&.MuiChip-colorDefault.MuiChip-filled': {
+              backgroundColor: '#a5b1ca',
+              color: '#ffffff',
+            },
+          },
+        },
+      },
       MuiButton: {
         defaultProps: {
           disableElevation: true,

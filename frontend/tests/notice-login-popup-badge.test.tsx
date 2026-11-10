@@ -71,4 +71,7 @@ it.each(['light', 'dark'] as const)('uses the same category foreground and backg
   expect(list.color).toBe(feed.color);
   expect(feed.height).toBe('28px');
   expect(list.height).toBe('22px');
+  expect(feed.borderRadius).toBe('6px');
+  expect(list.borderRadius).toBe('6px');
+  expect(screen.getAllByText('일반')[0].closest('.MuiChip-root')).toHaveClass('MuiChip-outlined');
 });

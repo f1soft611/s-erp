@@ -58,7 +58,7 @@ export function LoginForm({
       sx={{
         width: '100%',
         maxWidth: 450,
-        borderRadius: 3,
+        borderRadius: 1,
         border: `1px solid ${alpha(theme.palette.divider, isDark ? 0.8 : 0.7)}`,
         boxShadow: isDark
           ? '0 18px 48px rgba(2, 6, 23, 0.34)'
@@ -162,7 +162,7 @@ export function LoginForm({
             disabled={submitDisabled}
             sx={{
               minHeight: 48,
-              borderRadius: 1.5,
+              borderRadius: 1,
               fontWeight: 700,
               bgcolor: 'primary.main',
               boxShadow: `0 8px 18px ${alpha(theme.palette.primary.main, 0.2)}`,
@@ -178,7 +178,7 @@ export function LoginForm({
             <Box
               sx={{
                 p: 1.25,
-                borderRadius: 1.5,
+                borderRadius: 1,
                 border: `1px solid ${alpha(theme.palette.divider, 0.55)}`,
                 bgcolor: isDark
                   ? alpha(theme.palette.background.default, 0.4)

@@ -66,6 +66,10 @@ beforeEach(() => {
 
 it('uses the standard grid for the registration details', () => {
   render(<SalesDeliveryPlanCreatePage {...props} />);
+  expect(screen.getByRole('region', { name: '출하계획 입력 내용' })).toHaveStyle({
+    paddingTop: '8px',
+    paddingBottom: '16px',
+  });
   expect(screen.getByRole('grid', { name: '출하계획 상세 목록' })).toBeInTheDocument();
   expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))
     .getByRole('button', { name: '수주 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
@@ -93,7 +97,13 @@ it('shows the detail response writer profile instead of the status list writer',
 
 it('uses the standard grid for the status list', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
-  expect(await screen.findByRole('grid', { name: '출하계획 현황 목록' })).toBeInTheDocument();
+  const grid = await screen.findByRole('grid', { name: '출하계획 현황 목록' });
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+    paddingTop: '8px',
+    paddingBottom: '16px',
+  });
+  expect(grid.parentElement).not.toHaveClass('MuiPaper-outlined');
+  expect(grid).toHaveStyle({ borderWidth: '1px' });
 });
 
 it('edits plan quantity as a native grid cell and saves it', async () => {

@@ -290,7 +290,7 @@ const renderHookColumns: F1GridColumn<DemoRow>[] = [
             minWidth: 62,
             px: 1,
             py: 0.5,
-            borderRadius: 999,
+            borderRadius: 1,
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: '0.02em',
@@ -309,7 +309,7 @@ const renderHookColumns: F1GridColumn<DemoRow>[] = [
       return {
         backgroundColor: meta.background,
         color: meta.color,
-        borderRadius: 8,
+        borderRadius: 1,
         padding: '2px 8px',
         border: `1px solid ${meta.border}`,
       };

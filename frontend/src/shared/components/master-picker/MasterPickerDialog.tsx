@@ -105,7 +105,7 @@ export function MasterPickerDialog({
             onChange={(event) => setKeyword(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             sx={{
-              '& .MuiInputBase-root': { height: 40, borderRadius: 1.5 },
+              '& .MuiInputBase-root': { height: 40, borderRadius: 1 },
             }}
           />
           <Button
@@ -118,7 +118,7 @@ export function MasterPickerDialog({
               flexShrink: 0,
               height: 40,
               minHeight: 40,
-              borderRadius: 1.5,
+              borderRadius: 1,
               fontWeight: 700,
             }}
           >
@@ -151,7 +151,7 @@ export function MasterPickerDialog({
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 1.5,
+                    borderRadius: 1,
                     gap: 1.5,
                     mb: 1,
                     '&:hover': {

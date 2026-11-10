@@ -204,10 +204,10 @@ export function CompanyInfoPage({
     display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
     columnGap: 2, rowGap: 1.5, mt: 2.5,
   };
-  const sectionStyle = { p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 };
+  const sectionStyle = { p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 1 };
   const sectionTitle = (icon: React.ReactNode, title: string, description: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-      <Box sx={{ display: 'flex', p: 1, borderRadius: 1.5, color: 'primary.main', bgcolor: 'action.hover' }}>{icon}</Box>
+      <Box sx={{ display: 'flex', p: 1, borderRadius: 1, color: 'primary.main', bgcolor: 'action.hover' }}>{icon}</Box>
       <Box><Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{title}</Typography>
         <Typography variant="body2" color="text.secondary">{description}</Typography></Box>
     </Box>
@@ -262,7 +262,7 @@ export function CompanyInfoPage({
           <Paper elevation={0} sx={sectionStyle}>
             {sectionTitle(<VerifiedRoundedIcon />, '회사 직인', '저장 후 새로 발행하는 거래명세서에 표시됩니다.')}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2.5, flexWrap: 'wrap' }}>
-              <Box sx={{ width: 100, height: 100, border: '1px dashed', borderColor: 'divider', borderRadius: 2,
+              <Box sx={{ width: 100, height: 100, border: '1px dashed', borderColor: 'divider', borderRadius: 1,
                 display: 'grid', placeItems: 'center', overflow: 'hidden', bgcolor: 'background.default' }}>
                 {company.stampImage ? <Box component="img" src={company.stampImage} alt="회사 직인 미리보기"
                   sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> :

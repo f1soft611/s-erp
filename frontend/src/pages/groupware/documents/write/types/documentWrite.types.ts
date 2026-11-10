@@ -73,7 +73,6 @@ export type DocumentWriteItem = {
   status: ApprovalStatus;
   statusColor?: ApprovalStatusColor;
   statusVariant?: 'filled' | 'outlined';
-  badgeBorderRadius?: string;
   author: string;
   date: string;
   dateSourceLabel?: DocumentDateSourceLabel;

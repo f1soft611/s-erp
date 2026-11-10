@@ -8,7 +8,7 @@ export type CommonFileViewItem = {
   sizeLabel: string;
   description?: string;
 };
-export type CommonViewCategoryColor = 'primary' | 'info' | 'warning' | 'secondary';
+export type CommonViewCategoryColor = 'primary' | 'info' | 'success' | 'warning' | 'secondary';
 
 export type CommonViewItem = {
   id: string | number;
@@ -18,7 +18,7 @@ export type CommonViewItem = {
   isPinned?: boolean;
   categoryLabel?: string;
   categoryColor?: CommonViewCategoryColor;
-  badgeBorderRadius?: string;
+  categoryVariant?: 'filled' | 'outlined';
   statusLabel?: string;
   statusColor?: 'default' | 'error' | 'info' | 'success' | 'warning';
   statusVariant?: 'filled' | 'outlined';

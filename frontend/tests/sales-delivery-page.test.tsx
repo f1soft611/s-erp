@@ -289,6 +289,7 @@ it('confirms deletion before requesting and resets to a new direct document', as
 it('matches order registration sections and keeps document actions in the page header', () => {
   mount(<SalesDeliveryCreatePage {...props} />);
   const input = screen.getByRole('region', { name: '출하 입력 내용' });
+  expect(input).toHaveStyle({ paddingTop: '8px', paddingBottom: '16px' });
   expect(within(input).getByText('출하 기본정보')).toBeInTheDocument();
   expect(within(input).getByText('출하 상세')).toBeInTheDocument();
   expect(input).not.toContainElement(screen.getByRole('button', { name: '저장', exact: true }));
@@ -311,4 +312,8 @@ it('matches order status quick search behavior and result message', async () => 
   expect(input).toHaveValue('');
   expect(screen.getByRole('columnheader', { name: 'No' })).toBeInTheDocument();
   expect(await screen.findByText('조회 결과가 없습니다. 조회 기간을 넓히거나 검색 조건을 변경해 주세요.')).toBeInTheDocument();
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+    paddingTop: '0px',
+    paddingBottom: '16px',
+  });
 });

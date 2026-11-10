@@ -83,7 +83,7 @@ function NoticeDetailLoadingHarness() {
 
 describe('Community notice page', () => {
   it.each([false, true])(
-    'uses distinct category colors without changing labels or pin state for isDark=%s',
+    'uses distinct outlined category colors without changing labels or pin state for isDark=%s',
     (isDark) => {
       const items = [
         {
@@ -116,8 +116,10 @@ describe('Community notice page', () => {
 
       expect(firstCategory).toBeInTheDocument();
       expect(secondCategory).toBeInTheDocument();
-      expect(getComputedStyle(firstCategory!).backgroundColor).not.toBe(
-        getComputedStyle(secondCategory!).backgroundColor,
+      expect(firstCategory).toHaveClass('MuiChip-outlined');
+      expect(secondCategory).toHaveClass('MuiChip-outlined');
+      expect(getComputedStyle(firstCategory!).borderColor).not.toBe(
+        getComputedStyle(secondCategory!).borderColor,
       );
       for (const [index, category] of [firstCategory, secondCategory].entries()) {
         const { backgroundColor } = getNoticeCategoryPresentation(
@@ -125,13 +127,12 @@ describe('Community notice page', () => {
           isDark,
         );
         expect(category).toHaveStyle({
-          backgroundColor,
-          color:
-            items[index].state === '필독'
-              ? '#ffffff'
-              : theme.palette.getContrastText(backgroundColor),
+          borderColor: backgroundColor,
+          color: isDark
+            ? theme.palette.getContrastText(backgroundColor)
+            : backgroundColor,
           height: '28px',
-          borderRadius: '8px',
+          borderRadius: '6px',
         });
       }
       expect(

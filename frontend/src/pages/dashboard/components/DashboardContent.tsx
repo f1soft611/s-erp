@@ -470,7 +470,7 @@ export function DashboardContent({
               <Card
                 key={card.label}
                 sx={{
-                  borderRadius: 3,
+                  borderRadius: 1,
                   border: '1px solid rgba(148,163,184,0.18)',
                   boxShadow: 'none',
                   bgcolor: 'background.paper',
@@ -512,7 +512,7 @@ export function DashboardContent({
           >
             <Card
               sx={{
-                borderRadius: 3,
+                borderRadius: 1,
                 border: '1px solid rgba(148,163,184,0.18)',
                 boxShadow: 'none',
               }}
@@ -540,7 +540,7 @@ export function DashboardContent({
                         flexDirection: 'column',
                         gap: 0.5,
                         border: '1px solid rgba(148,163,184,0.18)',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.5,
                       }}
                     >
@@ -571,7 +571,7 @@ export function DashboardContent({
 
             <Card
               sx={{
-                borderRadius: 3,
+                borderRadius: 1,
                 border: '1px solid rgba(148,163,184,0.18)',
                 boxShadow: 'none',
               }}

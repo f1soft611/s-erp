@@ -464,7 +464,7 @@ export function NoticeComposerDialog({
           (title.trim().length === 0 && editorIsEmpty)
         }
         sx={{
-          borderRadius: 1.5,
+          borderRadius: 1,
           fontWeight: 700,
           minWidth: 96,
           px: 2.5,
@@ -482,7 +482,7 @@ export function NoticeComposerDialog({
         onClick={handleCloseRequest}
         disabled={saving || closing || editorSaveLifecycle.uploadingCount > 0}
         sx={{
-          borderRadius: 1.5,
+          borderRadius: 1,
           fontWeight: 600,
           px: 2,
           backgroundColor: 'transparent',
@@ -537,14 +537,14 @@ export function NoticeComposerDialog({
           sx={{
             '& .MuiOutlinedInput-root': {
               bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
+              borderRadius: 1,
               '&.Mui-error fieldset': {
                 border: `1px solid ${theme.palette.error.main}`,
               },
             },
             '& .MuiInputBase-root': {
               bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
+              borderRadius: 1,
             },
             '& .MuiFormLabel-root': {
               color: theme.palette.text.secondary,
@@ -610,11 +610,11 @@ export function NoticeComposerDialog({
           sx={{
             '& .MuiOutlinedInput-root': {
               bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
+              borderRadius: 1,
             },
             '& .MuiInputBase-root': {
               bgcolor: fieldSurfaceBackground,
-              borderRadius: 1.5,
+              borderRadius: 1,
             },
             '& .MuiInputBase-input::placeholder': {
               color: theme.palette.text.disabled,
@@ -793,7 +793,7 @@ export function NoticeComposerDialog({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          borderRadius: 1.5,
+                          borderRadius: 1,
                           border: `1px solid ${panelBorder}`,
                           bgcolor: resolvedDark
                             ? 'rgba(30,41,59,0.8)'
@@ -857,7 +857,7 @@ export function NoticeComposerDialog({
                             width: 32,
                             height: 32,
                             p: 0,
-                            borderRadius: 1.5,
+                            borderRadius: 1,
                             borderColor: resolvedDark
                               ? 'rgba(148,163,184,0.28)'
                               : 'rgba(148,163,184,0.25)',

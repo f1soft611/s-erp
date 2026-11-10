@@ -156,10 +156,19 @@ export function SalesDeliveryStatusPage(props: DeliveryPageProps) {
           slotProps={{ htmlInput: { 'aria-label': '출하현황 빠른 검색' }, input: { endAdornment: keyword ? (
             <IconButton type="button" size="small" edge="end" aria-label="출하현황 검색어 초기화" onClick={() => setKeyword('')} sx={{ p: 0.25 }}><ClearIcon fontSize="small" /></IconButton>
           ) : null } }}
-          sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: '100%', borderRadius: '0 8px 8px 0', backgroundColor: theme.palette.background.paper } })} />} />
-      <PageMessageArea message={error} onClose={() => setError('')} />
-      {hasLoaded && !loading && !error ? <SearchResultMessage resultCount={rows.length} /> : null}
-      <Box sx={{ px: { xs: 1, sm: 2 }, pb: 2, pt: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
+          sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: '100%', borderRadius: '0 6px 6px 0', backgroundColor: theme.palette.background.paper } })} />} />
+      <PageMessageArea
+        message={error}
+        onClose={() => setError('')}
+        horizontalPadding="grid"
+      />
+      {hasLoaded && !loading && !error ? (
+        <SearchResultMessage
+          resultCount={rows.length}
+          horizontalPadding="grid"
+        />
+      ) : null}
+      <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>
         <Box sx={{ flex: 1, minHeight: 320, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="출하현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryDetailId"
           storageKey="sales-delivery-status-grid-v1" loading={loading} showCheckbox={false} height="100%" minHeight={320}

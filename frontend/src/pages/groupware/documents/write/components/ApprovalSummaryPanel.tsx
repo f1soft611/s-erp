@@ -45,7 +45,7 @@ export function ApprovalSummaryPanel({
   return (
     <Card
       sx={{
-        borderRadius: 3,
+        borderRadius: 1,
         border: '1px solid rgba(148,163,184,0.18)',
         boxShadow: 'none',
       }}

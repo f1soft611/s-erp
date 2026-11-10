@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { Box } from '@mui/material';
 import {
   NotificationProvider,
   useNotification,
@@ -67,6 +68,42 @@ describe('shared page notifications', () => {
     expect(screen.getByRole('alert').parentElement).toHaveStyle({
       paddingTop: '16px',
       paddingBottom: '16px',
+    });
+  });
+
+  it('removes its own horizontal padding when aligned inside a grid gutter', () => {
+    render(
+      <PageMessageArea
+        message="조회 결과입니다."
+        severity="info"
+        role="status"
+        horizontalPadding="none"
+      />,
+    );
+
+    expect(screen.getByRole('status').parentElement).toHaveStyle({
+      paddingLeft: '0px',
+      paddingRight: '0px',
+    });
+  });
+
+  it.each([
+    { label: 'error', severity: undefined, compact: false },
+    { label: 'result', severity: 'info' as const, compact: true },
+  ])('balances following content after a $label message', ({ severity, compact }) => {
+    render(
+      <>
+        <PageMessageArea
+          message="메시지"
+          severity={severity}
+          compact={compact}
+        />
+        <Box data-testid="message-content" sx={{ pt: 1 }} />
+      </>,
+    );
+
+    expect(screen.getByTestId('message-content')).toHaveStyle({
+      paddingTop: '0px',
     });
   });
 });

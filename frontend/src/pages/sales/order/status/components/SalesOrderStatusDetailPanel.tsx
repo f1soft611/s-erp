@@ -67,7 +67,7 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
         minWidth: 0,
         border: '1px solid',
         borderColor: 'divider',
-        borderRadius: 2,
+        borderRadius: 1,
         p: { xs: 1.5, sm: 2 },
         bgcolor: 'background.paper',
       }}
@@ -148,7 +148,7 @@ export function SalesOrderStatusDetailPanel({
                 gap: { xs: 1.5, sm: 2 },
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 2,
+                borderRadius: 1,
                 p: { xs: 2, sm: 2.5 },
                 bgcolor: 'action.hover',
               }}
@@ -209,7 +209,7 @@ export function SalesOrderStatusDetailPanel({
                 <Chip size="small" variant="outlined" label={`${order.details.length}건`} />
               </Stack>
               <TableContainer
-                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflowX: 'auto' }}
+                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}
               >
                 <Table
                   size="small"
