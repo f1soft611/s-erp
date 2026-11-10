@@ -27,6 +27,10 @@
 - `PwaInstallPrompt`는 라우터 안에서 로그인 전부터 설치 이벤트를 수신하되, 인증이 완료되고 경로가 메인(`/groupware/overview`)일 때만 배너를 표시한다.
 - 로그인 화면과 메인 이외 경로에서는 안내가 보이지 않는다. 로그인 전에 발생한 `beforeinstallprompt` 이벤트는 로그인 후 메인 화면에서 사용할 수 있다.
 - 회귀 테스트는 비활성 상태에서 이벤트를 수신해도 숨겨져 있고, 활성화 후 재수신 없이 표시되는 동작을 확인한다.
+- 통과: 브라우저 검증 `node tests/pwa-install.browser.mjs` — 로그인 숨김, `/groupware/overview` 표시, 375px/768px/1280px 및 iOS 확인
+- 통과: PWA/manifest/Web Push 회귀 테스트 — 19 tests
+- 통과: `npm run build`
+- 통과: `npx oxlint src/App.tsx src/routes/AppRouter.tsx src/shared/components/PwaInstallPrompt.tsx tests/pwa-install-prompt.test.tsx tests/pwa-install.browser.mjs`
 
 ## 검증
 
