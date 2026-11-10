@@ -65,8 +65,9 @@ export function DashboardSidebar({
   const isDark = theme.palette.mode === 'dark';
 
   return (
-    <Box sx={{ display: 'flex', flexShrink: 0 }}>
+    <Box sx={{ display: 'flex', flexShrink: 0, minWidth: 0 }}>
       <DashboardModuleSection
+        isMobile={isMobile}
         moduleItems={moduleItems}
         selectedModuleId={selectedModuleId}
         hasFavorites={Boolean(favorites?.favorites.length)}
@@ -85,7 +86,7 @@ export function DashboardSidebar({
             flexShrink: 0,
             '& .MuiDrawer-paper': {
               position: isMobile ? 'fixed' : 'relative',
-              width: isMobile ? 'min(280px, calc(100vw - 92px))' : 288,
+              width: isMobile ? 'min(320px, calc(100vw - 32px))' : 288,
               bgcolor: isDark ? '#0f172a' : '#f8fafc',
               color: isDark ? '#e2e8f0' : '#0f172a',
               borderRight: `1px solid ${theme.palette.divider}`,

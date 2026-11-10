@@ -48,7 +48,7 @@ export function PageHeader({
   const breadcrumbBlock = (
     <Box
       sx={{
-        width: { xs: '100%', sm: 'auto' },
+        width: 'auto',
         minWidth: 0,
         maxWidth: '100%',
       }}

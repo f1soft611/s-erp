@@ -32,6 +32,15 @@ type MultiSelectRow = {
   ownerIds: string[];
 };
 
+it.each(['date', 'datetime', 'time'] as const)('keeps an empty %s field label above the native placeholder', (type) => {
+  render(<GridFormField
+    column={{ field: 'memo', headerName: '일정', type }}
+    row={{ memo: '' }} mode="create" value="" readOnly={false} onPatch={vi.fn()} />);
+  const input = screen.getByLabelText('일정');
+  const label = document.querySelector(`label[for="${input.id}"]`);
+  expect(label).toHaveAttribute('data-shrink', 'true');
+});
+
 describe('F1-Grid form model', () => {
   it('reports required and digit-count errors consistently from form apply and grid validate', () => {
     const ref = createRef<F1GridRef<{ id: string; number: string }>>();
@@ -1136,6 +1145,87 @@ const integratedColumns: F1GridColumn<IntegratedFormRow>[] = [
 ];
 
 describe('F1-Grid row form integration', () => {
+  function mobileViewport() {
+    let mobile = true;
+    const listeners = new Set<(event: { matches: boolean }) => void>();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(max-width: 767px)' && mobile,
+      media: query,
+      addEventListener: (_type: string, listener: (event: { matches: boolean }) => void) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: (event: { matches: boolean }) => void) => listeners.delete(listener),
+    }));
+    return () => act(() => {
+      mobile = false;
+      listeners.forEach((listener) => listener({ matches: false }));
+    });
+  }
+
+  it('defaults mobile row creation to a validated draft form without a plugin', () => {
+    mobileViewport();
+    const ref = createRef<F1GridRef<IntegratedFormRow>>();
+    render(<F1Grid ref={ref} rows={[]} rowKey="id"
+      columns={[{ field: 'name', headerName: '이름', editable: true, required: true }]}
+      createRow={() => ({ id: 'new', name: '', status: '사용' })} />);
+
+    act(() => ref.current?.addRow());
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeInTheDocument();
+    expect(ref.current?.getActiveRows()).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    expect(screen.getByText('이름은(는) 필수입니다.')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: /이름/ }), { target: { value: '신규 품목' } });
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    expect(ref.current?.getChanges().insertedRows).toEqual([{ id: 'new', name: '신규 품목', status: '사용' }]);
+  });
+
+  it('discards a cancelled mobile draft and keeps an open draft across a desktop resize', () => {
+    const resizeToDesktop = mobileViewport();
+    const ref = createRef<F1GridRef<IntegratedFormRow>>();
+    render(<F1Grid ref={ref} rows={[]} columns={integratedColumns} rowKey="id"
+      createRow={() => ({ id: 'new', name: '초안', status: '사용' })} />);
+    act(() => ref.current?.addRow());
+    resizeToDesktop();
+    expect(screen.getByRole('dialog', { name: '신규 등록' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '취소', exact: true }));
+    expect(ref.current?.getActiveRows()).toEqual([]);
+    expect(ref.current?.getChanges().insertedRows).toEqual([]);
+  });
+
+  it('opens the mobile row form from startEdit and commits only on apply', () => {
+    mobileViewport();
+    const ref = createRef<F1GridRef<IntegratedFormRow>>();
+    render(<F1Grid ref={ref} rows={integratedRows} columns={integratedColumns} rowKey="id" />);
+    act(() => ref.current?.startEdit('ROW-001', 'name'));
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '취소할 값' } });
+    fireEvent.click(screen.getByRole('button', { name: '취소', exact: true }));
+    expect(ref.current?.getChanges().updatedRows).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'ROW-001 행 정보 수정' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '수정 품목' } });
+    fireEvent.click(screen.getByRole('button', { name: '적용', exact: true }));
+    expect(ref.current?.getChanges().updatedRows[0].name).toBe('수정 품목');
+  });
+
+  it('keeps readonly mobile grids and explicitly disabled plugins free of automatic form actions', () => {
+    mobileViewport();
+    const ref = createRef<F1GridRef<IntegratedFormRow>>();
+    const { rerender } = render(<F1Grid rows={integratedRows}
+      columns={[{ field: 'name', headerName: '이름', editable: false }]} rowKey="id" />);
+    expect(screen.queryByRole('columnheader', { name: '상세' })).not.toBeInTheDocument();
+    rerender(<F1Grid ref={ref} rows={integratedRows} columns={integratedColumns} rowKey="id"
+      rowFormPlugin={{ enabled: false }} createRow={() => ({ id: 'new', name: '즉시 추가', status: '사용' })} />);
+    act(() => ref.current?.addRow());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(ref.current?.getChanges().insertedRows).toHaveLength(1);
+  });
+
+  it('keeps desktop row creation immediate when no plugin is configured', () => {
+    const ref = createRef<F1GridRef<IntegratedFormRow>>();
+    render(<F1Grid ref={ref} rows={[]} columns={integratedColumns} rowKey="id"
+      createRow={() => ({ id: 'new', name: '즉시 추가', status: '사용' })} />);
+    act(() => ref.current?.addRow());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(ref.current?.getChanges().insertedRows).toHaveLength(1);
+  });
+
   it('renders the synthetic action column only when the row form plugin is active', () => {
     const { rerender } = render(
       <F1Grid

@@ -159,12 +159,12 @@ export function SalesStatementCreatePage({
             disabled={!editable} onChange={(event) => setRemark(event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
         </Box>
       </Paper>
-      <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden', pb: 1 }}>
         <Box sx={{ p: { xs: 1.5, sm: 2 }, pb: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>거래명세서 상세</Typography>
           <Typography variant="caption" color="text.secondary">출하 품목과 금액을 저장 시점 기준으로 보관합니다.</Typography>
         </Box>
-        <Box sx={{ minHeight: 260, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+        <Box sx={{ minHeight: 260, minWidth: 0, flex: '1 0 260px', overflow: 'hidden', px: 1 }}>
           <F1Grid ariaLabel="거래명세서 상세 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId"
             showCheckbox={false} selectionMode="row" canExportExcel={false} allowAddRowInContextMenu={false}
             allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} height="100%" />

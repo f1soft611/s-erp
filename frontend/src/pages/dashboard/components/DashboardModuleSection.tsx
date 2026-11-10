@@ -12,6 +12,7 @@ import type { ModuleItem } from '../types/dashboard';
 type DashboardModuleSectionProps = {
   moduleItems: ModuleItem[];
   selectedModuleId: string;
+  isMobile?: boolean;
   hasFavorites?: boolean;
   favoritesSelected?: boolean;
   onModuleChange: (moduleId: string) => void;
@@ -21,6 +22,7 @@ type DashboardModuleSectionProps = {
 export function DashboardModuleSection({
   moduleItems,
   selectedModuleId,
+  isMobile = false,
   hasFavorites = false,
   favoritesSelected = false,
   onModuleChange,
@@ -32,18 +34,22 @@ export function DashboardModuleSection({
 
   return (
     <Box
+      component="nav"
+      aria-label="모듈 선택"
       sx={{
-        width: 92,
+        width: isMobile ? '100%' : 92,
+        minWidth: 0,
         bgcolor: railBg,
-        borderRight: `1px solid ${theme.palette.divider}`,
+        borderRight: isMobile ? 0 : `1px solid ${theme.palette.divider}`,
+        borderBottom: isMobile ? `1px solid ${theme.palette.divider}` : 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        py: 2,
+        py: isMobile ? 0.5 : 2,
         px: 1,
       }}
     >
-      <Typography
+      {!isMobile && <Typography
         component={Link}
         to="/groupware/overview"
         variant="caption"
@@ -58,9 +64,10 @@ export function DashboardModuleSection({
         }}
       >
         iPlusMES
-      </Typography>
+      </Typography>}
 
-      <Stack spacing={1} sx={{ width: '100%' }}>
+      <Stack direction={isMobile ? 'row' : 'column'} spacing={1}
+        sx={{ width: '100%', minWidth: 0, overflowX: isMobile ? 'auto' : 'visible' }}>
         {moduleItems.map(({ id, name, icon }) => (
           <ListItemButton
             key={id}
@@ -72,7 +79,9 @@ export function DashboardModuleSection({
             aria-label={name}
             sx={{
               borderRadius: 1.5,
-              minHeight: 56,
+              minHeight: isMobile ? 44 : 56,
+              minWidth: isMobile ? 68 : 0,
+              flexShrink: 0,
               px: 0.5,
               py: 0.5,
               color:
@@ -157,7 +166,9 @@ export function DashboardModuleSection({
             aria-label="즐겨찾기"
             sx={{
               borderRadius: 1.5,
-              minHeight: 56,
+              minHeight: isMobile ? 44 : 56,
+              minWidth: isMobile ? 68 : 0,
+              flexShrink: 0,
               px: 0.5,
               py: 0.5,
               color: favoritesSelected ? '#1d4ed8' : isDark ? '#cbd5e1' : '#475569',

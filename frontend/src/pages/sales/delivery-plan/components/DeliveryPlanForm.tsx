@@ -77,12 +77,12 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
         <TextField size="small" label="거래처" value={customerName} slotProps={{ input: { readOnly: true } }} />
       </Box>
     </Paper>
-    <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
+    <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden', pb: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
         <Box><Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하계획 상세</Typography>
           <Typography variant="caption" color="text.secondary">같은 수주 품목을 예정일별로 분할할 수 있습니다.</Typography></Box>
       </Box>
-      <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
+      <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
         <F1Grid key={gridVersion} ref={gridRef} ariaLabel="출하계획 상세 목록" rows={rows} columns={columns} rowKey="rowId"
           onChangesChange={() => {
             const active = gridRef.current?.getActiveRows();

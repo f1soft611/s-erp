@@ -211,7 +211,7 @@ export function SalesDeliveryCreatePage({
             <TextField size="small" label="비고" multiline minRows={2} sx={{ gridColumn: '1 / -1' }} value={form.remark} disabled={!editable} onChange={(event) => change('remark', event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} />
           </Box>
         </Paper>
-        <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
+        <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', flex: '1 0 auto', minHeight: 320, minWidth: 0, borderRadius: 2, overflow: 'hidden' }}>
         <Box data-testid="sales-delivery-detail-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, alignItems: 'center', p: { xs: 1.5, sm: 2 }, pb: 1 }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>출하 상세</Typography>
@@ -233,7 +233,7 @@ export function SalesDeliveryCreatePage({
           </> : null}
           </Box>
         </Box>
-        <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
+        <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
           <DeliveryDetailGrid key={gridKey} gridRef={grid} rows={rows} disabled={!editable} source={form.deliveryType === 'ORDER'}
             onChanges={handleChanges} onSelection={setSelectedIds} onMaterial={openMaterial} />
         </Box>
