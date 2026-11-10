@@ -12,7 +12,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 
 const THEME_STORAGE_KEY = 'erp-theme';
 const DISPLAY_SCALE_STORAGE_KEY = 'erp-display-scale';
-const DEFAULT_DISPLAY_SCALE = 1;
+const DEFAULT_DISPLAY_SCALE = 0.9;
 
 type AppSettingsContextValue = {
   themeMode: AppThemeMode;
