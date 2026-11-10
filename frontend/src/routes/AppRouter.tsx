@@ -5,6 +5,7 @@ import {
   isAuthenticated,
   subscribeAuthChange,
 } from '../shared/services/authService';
+import { PwaInstallPrompt } from '../shared/components/PwaInstallPrompt';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
@@ -63,93 +64,101 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRouter() {
+  const isAuthed = useAuthState();
+  const location = useLocation();
+
   return (
-    <Suspense fallback={null}>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
-        <Route path="/f1-grid-docs" element={<F1GridDocsPage />} />
-        <Route
-          path="/dashboard/profile"
-          element={
-            <ProtectedRoute>
-              <ProfileSettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/security"
-          element={
-            <ProtectedRoute>
-              <SecuritySettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/*"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/search"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/groupware/*"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/sales/*"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/co/*"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings/*"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Suspense>
+    <>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
+          <Route path="/f1-grid-docs" element={<F1GridDocsPage />} />
+          <Route
+            path="/dashboard/profile"
+            element={
+              <ProtectedRoute>
+                <ProfileSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/security"
+            element={
+              <ProtectedRoute>
+                <SecuritySettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groupware/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sales/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/co/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+      <PwaInstallPrompt
+        enabled={isAuthed && location.pathname === '/groupware/overview'}
+      />
+    </>
   );
 }
 

@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PwaInstallPrompt } from '../src/shared/components/PwaInstallPrompt';
+
+const DISMISSED_KEY = 'iplusmes:pwa-install-dismissed';
+const DISMISS_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -19,6 +22,10 @@ function dispatchInstallPrompt(
 }
 
 describe('PwaInstallPrompt', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     Object.defineProperty(navigator, 'userAgent', {
@@ -47,14 +54,27 @@ describe('PwaInstallPrompt', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: '앱 설치' })).not.toBeInTheDocument());
   });
 
+  it('waits for the authenticated main screen before showing a captured install prompt', async () => {
+    const { rerender } = render(<PwaInstallPrompt enabled={false} />);
+    dispatchInstallPrompt();
+
+    expect(screen.queryByRole('button', { name: '앱 설치' })).not.toBeInTheDocument();
+
+    rerender(<PwaInstallPrompt enabled />);
+
+    expect(await screen.findByRole('button', { name: '앱 설치' })).toBeInTheDocument();
+  });
+
   it('does not automatically retry when the native prompt is dismissed', async () => {
+    const now = 1_800_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(now);
     render(<PwaInstallPrompt />);
     const installEvent = dispatchInstallPrompt('dismissed');
     fireEvent.click(await screen.findByRole('button', { name: '앱 설치' }));
 
     await waitFor(() => expect(installEvent.prompt).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('button', { name: '앱 설치' })).not.toBeInTheDocument();
-    expect(localStorage.getItem('iplusmes:pwa-install-dismissed')).toBeNull();
+    expect(localStorage.getItem(DISMISSED_KEY)).toBe(String(now));
   });
 
   it('shows a browser-menu fallback when opening the native prompt fails', async () => {
@@ -98,16 +118,37 @@ describe('PwaInstallPrompt', () => {
     expect(localStorage.getItem('iplusmes:pwa-install-completed')).toBe('true');
   });
 
-  it('persists dismissal across mounts', async () => {
+  it('suppresses the reminder across mounts for seven days after closing it', async () => {
+    const now = 1_800_000_000_000;
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(now);
     const { unmount } = render(<PwaInstallPrompt />);
     dispatchInstallPrompt();
     fireEvent.click(await screen.findByRole('button', { name: '설치 안내 닫기' }));
 
-    await waitFor(() => expect(localStorage.getItem('iplusmes:pwa-install-dismissed')).toBe('true'));
+    await waitFor(() => expect(localStorage.getItem(DISMISSED_KEY)).toBe(String(now)));
     unmount();
+    dateNow.mockReturnValue(now + DISMISS_INTERVAL_MS - 1);
     render(<PwaInstallPrompt />);
     dispatchInstallPrompt();
 
     expect(screen.queryByRole('button', { name: '앱 설치' })).not.toBeInTheDocument();
+  });
+
+  it('shows the reminder again after seven days', async () => {
+    const now = 1_800_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    localStorage.setItem(DISMISSED_KEY, String(now - DISMISS_INTERVAL_MS));
+    render(<PwaInstallPrompt />);
+    dispatchInstallPrompt();
+
+    expect(await screen.findByRole('button', { name: '앱 설치' })).toBeInTheDocument();
+  });
+
+  it('does not treat a legacy permanent dismissal value as a valid timestamp', async () => {
+    localStorage.setItem(DISMISSED_KEY, 'true');
+    render(<PwaInstallPrompt />);
+    dispatchInstallPrompt();
+
+    expect(await screen.findByRole('button', { name: '앱 설치' })).toBeInTheDocument();
   });
 });

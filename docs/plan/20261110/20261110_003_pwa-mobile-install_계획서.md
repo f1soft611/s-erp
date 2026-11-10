@@ -4,7 +4,7 @@
 
 **Goal:** Make iPlusMES installable from supported mobile browsers and guide uninstalled users without sending an OS notification.
 
-**Architecture:** Serve a static web app manifest and correctly sized app icons from Vite's `public` directory. Add a root-level React reminder that uses `beforeinstallprompt` on supported browsers, gives iOS users manual Add to Home Screen instructions, and does not change the existing Web Push service worker.
+**Architecture:** Serve a static web app manifest and correctly sized app icons from Vite's `public` directory. Keep a React reminder mounted inside the router so it can capture `beforeinstallprompt` before login, but enable its UI only for authenticated users at `/groupware/overview`. Give iOS users manual Add to Home Screen instructions and do not change the existing Web Push service worker.
 
 **Tech Stack:** React 19, TypeScript, Vite 8, MUI, Vitest, Testing Library, Playwright.
 
@@ -15,8 +15,8 @@
 - `frontend/public/manifest.webmanifest`: app identity, root scope, standalone launch, theme color and icon paths.
 - `frontend/public/pwa-icon-192.png`, `frontend/public/pwa-icon-512.png`, `frontend/public/apple-touch-icon.png`: platform app icons derived from the existing branded `push-icon.png`.
 - `frontend/index.html`: manifest and mobile installation metadata.
-- `frontend/src/shared/components/PwaInstallPrompt.tsx`: browser event handling, standalone/iOS detection, install action and persistent dismissal.
-- `frontend/src/App.tsx`: mount the reminder once at the application root.
+- `frontend/src/shared/components/PwaInstallPrompt.tsx`: browser event handling, standalone/iOS detection, install action and seven-day dismissal cooldown.
+- `frontend/src/routes/AppRouter.tsx`: keep the reminder mounted across routes and enable it only for authenticated users at `/`.
 - `frontend/tests/pwa-install-prompt.test.tsx`: install event, user gesture, iOS instructions, standalone, install completion and dismissal regression tests.
 - `frontend/tests/pwa-manifest.test.ts`: static manifest and icon reference validation.
 - `frontend/tests/pwa-install.browser.mjs`: repeatable real-browser check at supported responsive widths and screenshot capture.
@@ -52,7 +52,7 @@ it('opens the native prompt only after the user selects install', async () => {
 });
 ```
 
-Add separate tests that set `navigator.userAgent` to an iOS value and confirm the Share > Add to Home Screen instructions, set `(display-mode: standalone)` to true and confirm no reminder, dispatch `appinstalled` and confirm it is hidden, and click the accessible close action then remount to confirm local-storage dismissal persists.
+Add separate tests that set `navigator.userAgent` to an iOS value and confirm the Share > Add to Home Screen instructions, set `(display-mode: standalone)` to true and confirm no reminder, dispatch `appinstalled` and confirm it is hidden, and verify dismissal suppresses the reminder for seven days but allows it again once seven days have elapsed. Treat the legacy `true` dismissal value as expired because it has no timestamp.
 
 The manifest test reads `frontend/public/manifest.webmanifest`, asserts `name`, `short_name`, `start_url`, `scope`, `display`, `theme_color` and icon sizes, then confirms each icon path exists.
 
@@ -109,7 +109,7 @@ npm run test -- tests/pwa-manifest.test.ts
 
 Expected: PASS with all three local icon files present and the manifest fields matching the install contract.
 
-### Task 3: Implement the root install reminder
+### Task 3: Implement the router-level install reminder
 
 **Files:**
 - Create: `frontend/src/shared/components/PwaInstallPrompt.tsx`
@@ -122,15 +122,15 @@ Define a local event type with `prompt(): Promise<void>` and `userChoice: Promis
 
 - [ ] **Step 2: Implement install and dismissal transitions**
 
-Listen for `beforeinstallprompt` and `appinstalled` in an effect, remove both listeners on cleanup, and preserve the install event until the user action. Call `preventDefault()` on the install event and `prompt()` only in the click handler. Hide and persist completion after accepted install or `appinstalled`. Store explicit dismissal under a namespaced key such as `iplusmes:pwa-install-dismissed`; catch no errors silently and do not request `Notification` permission.
+Listen for `beforeinstallprompt` and `appinstalled` in an effect, remove both listeners on cleanup, and preserve the install event until the user action. Call `preventDefault()` on the install event and `prompt()` only in the click handler. Hide and persist completion after accepted install or `appinstalled`. Store the dismissal time in milliseconds under a namespaced key such as `iplusmes:pwa-install-dismissed`; suppress the reminder for seven days after the close action or a dismissed native prompt, then allow it again. Treat legacy non-timestamp values as expired. Catch no errors silently and do not request `Notification` permission.
 
 - [ ] **Step 3: Render the supported-browser and iOS guidance**
 
-For browsers with a saved install event, show a compact MUI `Snackbar`/`Alert` with `앱 설치` and `설치 안내 닫기` actions. For an iOS user agent that is not standalone, show `공유 메뉴에서 홈 화면에 추가를 선택해 설치할 수 있습니다.` with a close action. Render nothing for unsupported platforms, completed installs, standalone mode, or prior dismissal.
+For browsers with a saved install event, show a compact MUI `Snackbar`/`Alert` with `앱 설치` and `설치 안내 닫기` actions. For an iOS user agent that is not standalone, show `공유 메뉴에서 홈 화면에 추가를 선택해 설치할 수 있습니다.` with a close action. Render nothing for unsupported platforms, completed installs, standalone mode, or a dismissal less than seven days old.
 
-- [ ] **Step 4: Mount the reminder at the app root**
+- [ ] **Step 4: Gate the reminder to the authenticated main screen**
 
-Render `<PwaInstallPrompt />` once inside the existing `App` tree, alongside the `RouterProvider`, so it persists across route changes and is available on both login and authenticated routes.
+Render `<PwaInstallPrompt enabled={isAuthenticated && pathname === '/groupware/overview'} />` once inside `AppRouter`, outside the route switch, so its browser event listener remains active before login while its banner is shown only on the authenticated main screen. Remove the app-root mount from `App.tsx`.
 
 - [ ] **Step 5: Run focused component tests**
 
@@ -138,7 +138,7 @@ Render `<PwaInstallPrompt />` once inside the existing `App` tree, alongside the
 npm run test -- tests/pwa-install-prompt.test.tsx
 ```
 
-Expected: PASS for prompt user gesture, accepted/dismissed result, `appinstalled`, standalone, iOS instructions, and persistent dismissal.
+Expected: PASS for prompt user gesture, accepted/dismissed result, `appinstalled`, standalone, iOS instructions, dismissal cooldown, and reappearance after seven days.
 
 ### Task 4: Verify build, existing Web Push, and responsive browser behavior
 

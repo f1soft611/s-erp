@@ -4,6 +4,7 @@ import { Alert, Button, IconButton, Snackbar, Stack } from '@mui/material';
 
 const DISMISSED_KEY = 'iplusmes:pwa-install-dismissed';
 const COMPLETED_KEY = 'iplusmes:pwa-install-completed';
+const DISMISS_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type InstallOutcome = 'accepted' | 'dismissed';
 
@@ -13,6 +14,10 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 type PromptState = 'hidden' | 'install' | 'ios' | 'error';
+
+interface PwaInstallPromptProps {
+  enabled?: boolean;
+}
 
 function isStandalone(): boolean {
   const displayMode = typeof window.matchMedia === 'function'
@@ -28,9 +33,18 @@ function isIosBrowser(): boolean {
   return isIosDevice || isIpadDesktopMode;
 }
 
+function hasRecentDismissal(): boolean {
+  const dismissedAt = Number(localStorage.getItem(DISMISSED_KEY));
+  const elapsed = Date.now() - dismissedAt;
+  return Number.isFinite(dismissedAt)
+    && dismissedAt > 0
+    && elapsed >= 0
+    && elapsed < DISMISS_INTERVAL_MS;
+}
+
 function isSuppressed(): boolean {
   return isStandalone()
-    || localStorage.getItem(DISMISSED_KEY) === 'true'
+    || hasRecentDismissal()
     || localStorage.getItem(COMPLETED_KEY) === 'true';
 }
 
@@ -39,7 +53,7 @@ function initialPromptState(): PromptState {
   return isIosBrowser() ? 'ios' : 'hidden';
 }
 
-export function PwaInstallPrompt() {
+export function PwaInstallPrompt({ enabled = true }: PwaInstallPromptProps) {
   const [promptState, setPromptState] = useState<PromptState>(initialPromptState);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -66,7 +80,7 @@ export function PwaInstallPrompt() {
   }, []);
 
   function dismissPrompt() {
-    localStorage.setItem(DISMISSED_KEY, 'true');
+    localStorage.setItem(DISMISSED_KEY, String(Date.now()));
     setInstallEvent(null);
     setPromptState('hidden');
   }
@@ -77,14 +91,17 @@ export function PwaInstallPrompt() {
     setInstallEvent(null);
     try {
       await currentEvent.prompt();
-      await currentEvent.userChoice;
+      const { outcome } = await currentEvent.userChoice;
+      if (outcome === 'dismissed') {
+        localStorage.setItem(DISMISSED_KEY, String(Date.now()));
+      }
       setPromptState('hidden');
     } catch {
       setPromptState('error');
     }
   }
 
-  const open = promptState !== 'hidden';
+  const open = enabled && promptState !== 'hidden';
   const message = promptState === 'ios'
     ? '공유 메뉴에서 홈 화면에 추가를 선택해 설치할 수 있습니다.'
     : promptState === 'error'

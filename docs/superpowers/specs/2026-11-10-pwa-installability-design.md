@@ -13,8 +13,8 @@ Let users install the existing iPlusMES web application from a supported mobile 
 - Reuse the existing branded push icon to produce appropriately sized application icons.
 - Show an in-app install reminder when the browser exposes `beforeinstallprompt`; invoke the native prompt only after the user selects the install action.
 - On iOS browsers, where the native prompt event is unavailable, show brief Add to Home Screen instructions.
-- Hide the reminder when the app is already running in standalone mode, after installation, or after the user dismisses it.
-- Keep the reminder responsive and available on login and application routes.
+- Hide the reminder when the app is already running in standalone mode or after installation. A user dismissal suppresses the reminder for seven days.
+- Keep the reminder listener mounted across routes, while showing the banner only on the authenticated main route.
 
 ### Excluded
 
@@ -27,14 +27,15 @@ Let users install the existing iPlusMES web application from a supported mobile 
 
 Use the platform web app manifest directly; do not add a second service worker or a PWA plugin for this installability-only change. The existing `/sw.js` remains owned by Web Push and continues to be registered only through the user's explicit push opt-in flow. The manifest supports install metadata independently of that opt-in.
 
-Place the install reminder at the application root so it can observe browser install events regardless of the current route. It detects standalone display mode, listens for the browser install prompt and `appinstalled` events, and stores dismissal in local storage. The install action calls `prompt()` only in response to a user gesture. For iOS, the reminder explains the browser's Share > Add to Home Screen flow; it does not request notification permission.
+Place the install reminder inside the router so it can observe browser install events before login and across route changes. Keep it hidden unless the user is authenticated and at the main route (`/groupware/overview`). It detects standalone display mode, listens for the browser install prompt and `appinstalled` events, and stores dismissal in local storage. The install action calls `prompt()` only in response to a user gesture. For iOS, the reminder explains the browser's Share > Add to Home Screen flow; it does not request notification permission.
 
 ## User experience
 
 - Supported browsers show a compact, dismissible install reminder only when the app is not installed and an install prompt is available.
 - The install button opens the browser's native confirmation flow. Dismissing that native prompt does not change application notification permissions.
 - iOS shows a short manual installation hint because Safari does not expose `beforeinstallprompt`.
-- Installed standalone sessions and dismissed reminders do not show the reminder again.
+- Installed standalone sessions do not show the reminder. Dismissed reminders can reappear after seven days if the app remains uninstalled.
+- Login and non-main routes never show the reminder; a browser install event received before login remains available for the authenticated `/groupware/overview` route.
 - The reminder must not cover critical controls at 375px, 768px, or 1280px widths.
 
 ## Failure and compatibility behavior
@@ -46,6 +47,6 @@ Place the install reminder at the application root so it can observe browser ins
 ## Verification
 
 - Verify manifest metadata and referenced icon files in the production build.
-- Test install prompt, install completion, standalone detection, iOS instructions, and dismissal behavior.
+- Test install prompt, install completion, standalone detection, iOS instructions, and reminder reappearance after the seven-day dismissal period.
 - Run frontend tests, build, and lint.
 - Verify the rendered reminder at 375px, 768px, and 1280px in a real browser and capture result screenshots.
