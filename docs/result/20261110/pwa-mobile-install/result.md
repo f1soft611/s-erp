@@ -4,9 +4,29 @@
 
 - `frontend/public/manifest.webmanifest`, 192/512 PWA 아이콘, 180 iOS touch icon과 `frontend/index.html`의 설치 메타데이터를 추가했다.
 - 기존 브랜드 push 아이콘을 기준으로 크기별 아이콘을 만들었다.
-- 앱 root에 설치 안내를 추가했다. 지원 브라우저는 사용자 클릭 시 native 설치 prompt를 열고, iOS는 공유 메뉴의 홈 화면 추가 방법을 안내한다.
-- 사용자가 설치 안내를 닫으면 다시 표시하지 않으며, 설치 완료/standalone 실행에서도 숨긴다. OS 알림 권한은 요청하지 않는다.
+- 라우터 내부에 설치 안내를 배치했다. 지원 브라우저는 사용자 클릭 시 native 설치 prompt를 열고, iOS는 공유 메뉴의 홈 화면 추가 방법을 안내한다.
+- 사용자가 설치 안내를 닫으면 7일간 숨기며, 설치 완료/standalone 실행에서는 계속 숨긴다. OS 알림 권한은 요청하지 않는다.
 - 기존 `/sw.js`, Web Push 등록 흐름, backend, API와 DB는 변경하지 않았다. 오프라인 캐시는 제공하지 않는다.
+
+## 후속 변경: 주간 설치 안내
+
+- 닫기 시각을 epoch milliseconds로 저장하고, 7일 동안 안내를 숨긴 뒤 미설치 상태면 다시 표시한다. 브라우저 설치 프롬프트를 거절한 경우도 같은 7일 기준을 적용한다.
+- 기존 local storage의 영구 닫기 값 `true`는 유효한 시각이 아니므로 만료된 것으로 처리한다.
+- 설치 완료 표식과 standalone 실행은 7일 경과 여부와 관계없이 계속 안내를 숨긴다.
+- 회귀 검증은 닫은 직후와 7일 미만의 숨김, 7일 후 재표시, 기존 값 처리, Web Push 회귀를 포함한다.
+
+후속 변경 검증:
+
+- 통과: `npm run test -- tests/pwa-install-prompt.test.tsx tests/pwa-manifest.test.ts tests/push-service-worker.test.ts` — 18 tests
+- 통과: `npm run build`
+- 통과: `npx oxlint src/shared/components/PwaInstallPrompt.tsx tests/pwa-install-prompt.test.tsx`
+- 화면 레이아웃은 바뀌지 않아 기존 375px/768px/1280px 및 iOS 캡처를 유지했다.
+
+## 후속 변경: 로그인 후 메인 화면에서만 표시
+
+- `PwaInstallPrompt`는 라우터 안에서 로그인 전부터 설치 이벤트를 수신하되, 인증이 완료되고 경로가 메인(`/groupware/overview`)일 때만 배너를 표시한다.
+- 로그인 화면과 메인 이외 경로에서는 안내가 보이지 않는다. 로그인 전에 발생한 `beforeinstallprompt` 이벤트는 로그인 후 메인 화면에서 사용할 수 있다.
+- 회귀 테스트는 비활성 상태에서 이벤트를 수신해도 숨겨져 있고, 활성화 후 재수신 없이 표시되는 동작을 확인한다.
 
 ## 검증
 

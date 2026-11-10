@@ -9,7 +9,6 @@ import AppRouter from './routes/AppRouter';
 import { AppSettingsProvider } from './shared/context/AppSettingsContext';
 import { NotificationProvider } from './shared/context/NotificationContext';
 import { RealtimeBridge } from './shared/components/RealtimeBridge';
-import { PwaInstallPrompt } from './shared/components/PwaInstallPrompt';
 
 const NoticeLoginPopupHost = lazy(() =>
   import('./pages/groupware/community/notice/components/NoticeLoginPopupHost').then(
@@ -44,7 +43,6 @@ function App() {
     <AppSettingsProvider>
       <NotificationProvider>
         <RealtimeBridge />
-        <PwaInstallPrompt />
         <Box
           sx={{
             display: 'flex',
