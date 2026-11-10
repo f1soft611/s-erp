@@ -141,7 +141,7 @@ export function SalesDeliveryPlanCreatePage({
     <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]}
       description={content.description} actionGroups={actions} />
     <Box role="region" aria-label="출하계획 입력 내용"
-      sx={{ p: { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+      sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       <DeliveryPlanForm key={formVersion} gridRef={gridRef} planNo={planNo} orderNo={selectedOrder[0]?.orderNo ?? ''} orderDt={selectedOrder[0]?.orderDt ?? ''}

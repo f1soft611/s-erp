@@ -147,15 +147,20 @@ export function SalesOrderStatusPage({
         <PageMessageArea
           message={search.defaultsError ?? list.error}
           onClose={list.clearError}
+          horizontalPadding="grid"
         />
         {showSearchResultMessage ? (
-          <SearchResultMessage resultCount={list.rows.length} />
+          <SearchResultMessage
+            resultCount={list.rows.length}
+            horizontalPadding="grid"
+          />
         ) : null}
         <Box
+          data-testid="sales-status-content"
           sx={{
             px: { xs: 1, sm: 2 },
-            pb: 2,
             pt: showSearchResultMessage ? 0 : 1,
+            pb: 2,
             display: 'flex',
             flexDirection: 'column',
             flex: 1,

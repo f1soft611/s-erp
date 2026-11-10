@@ -45,6 +45,10 @@ it('selects one shipment and saves its server snapshot', async () => {
   });
   vi.mocked(createStatement).mockResolvedValue(item);
   mount(<SalesStatementCreatePage {...props} />);
+  expect(screen.getByRole('region', { name: '거래명세서 입력 내용' })).toHaveStyle({
+    paddingTop: '8px',
+    paddingBottom: '16px',
+  });
   fireEvent.click(screen.getByRole('button', { name: '출하 선택' }));
   const picker = screen.getByRole('dialog', { name: '출하 선택' });
   fireEvent.click(within(picker).getByRole('button', { name: '검색' }));
@@ -59,6 +63,10 @@ it('opens the same registration form from status detail and prints its stored sn
   vi.mocked(getStatementStatus).mockResolvedValue([{ ...detail, salesStatementId: 3, statementNo: 'TS-1',
     statementDt: '2026-11-09', deliveryNo: 'SD-1', customerCode: 'C1', customerName: '거래처', lineTotalAmt: 220 }]);
   mount(<SalesStatementStatusPage {...props} />);
+  expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+    paddingTop: '8px',
+    paddingBottom: '16px',
+  });
   fireEvent.click(await screen.findByRole('button', { name: 'TS-1 상세 보기' }));
   const panel = await screen.findByRole('region', { name: '거래명세서 상세' });
   await within(panel).findByRole('table', { name: '거래명세서 품목 목록' });

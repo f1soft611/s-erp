@@ -606,7 +606,10 @@ export function SalesOrderCreatePage({
             ? 0
             : error
               ? { xs: 2, sm: 2, lg: 2 }
-              : { xs: 1.5, sm: 2, lg: 3 },
+              : undefined,
+          px: !embedded && !error ? { xs: 1, sm: 2 } : undefined,
+          pt: !embedded && !error ? 1 : undefined,
+          pb: !embedded && !error ? 2 : undefined,
         }}
       >
         {validationMessages.length > 0 && (

@@ -230,6 +230,10 @@ describe('sales order status page', () => {
     const gridArea = screen.getByRole('grid', { name: '수주현황 목록' })
       .parentElement?.parentElement;
     expect(gridArea).toHaveStyle({ paddingTop: '0px' });
+    expect(screen.getByTestId('sales-status-content')).toHaveStyle({
+      paddingTop: '0px',
+      paddingBottom: '16px',
+    });
   });
 
   it('uses the dashboard month instead of an unrelated saved search', async () => {

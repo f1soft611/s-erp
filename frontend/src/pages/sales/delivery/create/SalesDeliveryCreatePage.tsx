@@ -173,7 +173,8 @@ export function SalesDeliveryCreatePage({
   return <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
     {!embedded ? <PageHeader breadcrumbItems={breadcrumbItems.length ? breadcrumbItems : [currentMenuName]} description={content.description} actionGroups={actions} /> : null}
     <Box role="region" aria-label="출하 입력 내용" aria-busy={pending || loading}
-      sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
+      sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+        display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {locked && savedId ? <Button startIcon={<SearchIcon />} disabled={pending || loading} onClick={() => void load(savedId)}>재조회</Button> : null}

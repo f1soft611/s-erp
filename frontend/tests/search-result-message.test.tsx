@@ -40,4 +40,17 @@ describe('shared search result message', () => {
       'rgba(100, 120, 166, 0.16)',
     );
   });
+
+  it('uses the same mobile gutter as the status grid when requested', () => {
+    const { rerender } = render(<SearchResultMessage resultCount={3} />);
+    const defaultClassName = screen.getByRole('status').parentElement?.className;
+
+    rerender(
+      <SearchResultMessage resultCount={3} horizontalPadding="grid" />,
+    );
+
+    expect(screen.getByRole('status').parentElement?.className).not.toBe(
+      defaultClassName,
+    );
+  });
 });

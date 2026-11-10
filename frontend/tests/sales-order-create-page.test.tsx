@@ -47,6 +47,10 @@ describe('sales order entry page', () => {
 
   it('renders the sales order form with its breadcrumb and API notice', () => {
     renderSalesOrderPage();
+    expect(screen.getByRole('region', { name: '수주 입력 내용' })).toHaveStyle({
+      paddingTop: '8px',
+      paddingBottom: '16px',
+    });
 
     const formGrid = screen.getByLabelText('수주번호')
       .closest('.MuiFormControl-root')

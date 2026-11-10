@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Divider, IconButton, Link, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CommonDialog } from '../../../../shared/components/CommonDialog';
@@ -202,16 +202,23 @@ export function SalesDeliveryPlanStatusPage({
         sx={(theme) => ({ width: '100%', height: 40, '& .MuiOutlinedInput-root': {
           height: '100%', borderRadius: '0 6px 6px 0', backgroundColor: theme.palette.background.paper,
         } })} />} />
-    <Box sx={{ px: { xs: 1, sm: 2 }, pb: 2, pt: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1.5 }}>
-      <PageMessageArea message={error} onClose={() => setError('')} />
+    <Box data-testid="sales-status-content" sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, gap: 1 }}>
+      <PageMessageArea
+        message={error}
+        onClose={() => setError('')}
+        horizontalPadding="none"
+      />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <SearchResultMessage resultCount={rows.length} />
-      <Paper variant="outlined" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden', borderRadius: 1 }}>
+      <SearchResultMessage
+        resultCount={rows.length}
+        horizontalPadding="none"
+      />
+      <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
         <F1Grid ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanId"
           loading={loading} showCheckbox={false} height="100%" minHeight={240} selectionMode="row"
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />
-      </Paper>
+      </Box>
     </Box>
       {selected ? <PageAreaOverlay onClose={() => setSelected(null)}>
       <PostDetailPanel title="출하계획 상세" subtitle={`계획번호: ${selected.planNo}`}

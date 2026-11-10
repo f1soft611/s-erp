@@ -1,11 +1,18 @@
 import { useState } from 'react';
-import { PageMessageArea } from './PageMessageArea';
+import {
+  PageMessageArea,
+  type PageMessageHorizontalPadding,
+} from './PageMessageArea';
 
 type SearchResultMessageProps = {
   resultCount: number;
+  horizontalPadding?: PageMessageHorizontalPadding;
 };
 
-export function SearchResultMessage({ resultCount }: SearchResultMessageProps) {
+export function SearchResultMessage({
+  resultCount,
+  horizontalPadding,
+}: SearchResultMessageProps) {
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
@@ -21,6 +28,7 @@ export function SearchResultMessage({ resultCount }: SearchResultMessageProps) {
       severity="info"
       role="status"
       compact
+      horizontalPadding={horizontalPadding}
       onClose={() => setDismissed(true)}
     />
   );

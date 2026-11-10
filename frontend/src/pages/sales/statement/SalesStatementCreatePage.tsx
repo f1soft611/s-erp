@@ -137,7 +137,8 @@ export function SalesStatementCreatePage({
           disabled: pending || dirty, onClick: print }] },
       ]} /> : null}
     <Box role="region" aria-label="거래명세서 입력 내용" aria-busy={pending}
-      sx={{ p: embedded ? 0 : { xs: 1.5, sm: 2, lg: 3 }, display: 'flex', flexDirection: 'column',
+      sx={{ px: embedded ? 0 : { xs: 1, sm: 2 }, pt: embedded ? 0 : 1, pb: embedded ? 0 : 2,
+        display: 'flex', flexDirection: 'column',
         minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}

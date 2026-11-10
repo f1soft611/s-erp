@@ -15,9 +15,9 @@
 ## 영향 범위
 
 - `frontend/src/pages/groupware/documents/write/data/documentPresentation.ts`: 상태·업무 구분 semantic color 및 variant.
-- `frontend/src/shared/components/PageMessageArea.tsx`: 정보성 메시지 배경을 페이지 캔버스와 구별되도록 조정.
+- `frontend/src/shared/components/PageMessageArea.tsx`: 정보성 메시지 배경 대비를 높이고, 오류/결과 메시지 다음 콘텐츠의 중복 상단 패딩을 공통 제거.
 - `frontend/src/pages/groupware/documents/status/data/documentStatusColumns.tsx`: 문서현황 상태 배지를 공통 결재 표시 메타데이터에 연결.
-- `frontend/src/pages/sales/order/status/SalesOrderStatusPage.tsx`: 검색 결과 안내와 목록 사이의 중복 수직 여백을 제거.
+- `frontend/src/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage.tsx`: 메시지 주변 콘텐츠 간격을 공통 8px 단위에 맞춤.
 - `frontend/src/pages/groupware/documents/write/components/DocumentApprovalDetailFeed.tsx`: 문서 상태/구분 배지 반경.
 - `frontend/src/pages/groupware/documents/write/components/ApprovalNoticePanel.tsx`: 결재 알림 상태 배지 반경.
 - `frontend/src/pages/groupware/community/notice/components/NoticeCategoryBadge.tsx`: outlined 공지 구분 배지, 대비 및 기존 코드별 색상 유지.

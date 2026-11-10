@@ -2,6 +2,8 @@ import { Alert, Box, type AlertProps } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import type { ReactNode } from 'react';
 
+export type PageMessageHorizontalPadding = 'grid' | 'none';
+
 type PageMessageAreaProps = {
   message: string;
   onClose?: () => void;
@@ -9,6 +11,7 @@ type PageMessageAreaProps = {
   action?: ReactNode;
   role?: 'alert' | 'status';
   compact?: boolean;
+  horizontalPadding?: PageMessageHorizontalPadding;
 };
 
 function normalizePageMessage(message: string): string {
@@ -36,6 +39,7 @@ export function PageMessageArea({
   action,
   role = 'alert',
   compact = false,
+  horizontalPadding,
 }: PageMessageAreaProps) {
   const normalizedMessage = normalizePageMessage(message);
 
@@ -44,9 +48,15 @@ export function PageMessageArea({
   return (
     <Box
       sx={{
-        px: { xs: 1.5, sm: 3 },
+        px:
+          horizontalPadding === 'grid'
+            ? { xs: 1, sm: 2 }
+            : horizontalPadding === 'none'
+              ? 0
+              : { xs: 1.5, sm: 3 },
         pt: compact ? 1 : 2,
         pb: compact ? 1 : 2,
+        '& + .MuiBox-root': { pt: 0 },
       }}
     >
       <Alert
