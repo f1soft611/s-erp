@@ -651,11 +651,6 @@ export function SalesOrderCreatePage({
               size="small"
               value={loadedOrder?.orderNo ?? '저장 시 자동 채번'}
               slotProps={{ input: { readOnly: true } }}
-              sx={{
-                '& .MuiInputBase-input': {
-                  fontSize: { xs: '0.75rem', sm: '1rem' },
-                },
-              }}
             />
             <TextField
               label="수주일자"
