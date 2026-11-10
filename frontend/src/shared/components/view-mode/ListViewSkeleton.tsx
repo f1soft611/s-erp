@@ -31,7 +31,7 @@ export function ListViewSkeleton() {
             variant="rounded"
             width={18}
             height={20}
-            sx={{ borderRadius: 0.5, bgcolor: 'action.hover' }}
+            sx={{ borderRadius: 1, bgcolor: 'action.hover' }}
           />
           <Box sx={{ minWidth: 0 }}>
             <Box

@@ -295,10 +295,10 @@ describe('common notice view mode components', () => {
             dateLabel: '2026-10-14',
             categoryLabel: '기안',
             categoryColor: 'primary',
+            categoryVariant: 'outlined',
             statusLabel: '결재진행중',
             statusColor: 'info',
             statusVariant: 'filled',
-            badgeBorderRadius: '8px',
           },
         ]}
       />,
@@ -310,8 +310,9 @@ describe('common notice view mode components', () => {
     expect(kindChip).not.toBeNull();
     if (!statusChip || !kindChip) throw new Error('Expected document Chips to render.');
     expect(statusChip).toHaveClass('MuiChip-filled');
-    expect(statusChip).toHaveStyle({ borderRadius: '8px' });
-    expect(kindChip).toHaveStyle({ borderRadius: '8px' });
+    expect(kindChip).toHaveClass('MuiChip-outlined');
+    expect(statusChip).toHaveStyle({ borderRadius: '6px' });
+    expect(kindChip).toHaveStyle({ borderRadius: '6px' });
   });
 
   it('keeps default list status styling when document presentation is omitted', () => {

@@ -39,7 +39,7 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
           </Stack>
         </Stack>
         <Box aria-label="거래명세서 요약" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' },
-          gap: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
+          gap: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
           <Box><Typography variant="caption" color="text.secondary">거래처</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{item.customerName || '-'}</Typography>
             <Typography variant="body2">명세일: {item.statementDt}　출하번호: {item.deliveryNo}</Typography></Box>
@@ -47,7 +47,7 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
             <Typography variant="h5" sx={{ fontWeight: 800 }}>{amount(item.totalAmt)}</Typography></Box>
         </Box>
         <Box role="group" aria-label="거래명세서 기본정보"
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 1.5, sm: 2 } }}>
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 1.5, sm: 2 } }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>기본정보</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
             <Typography variant="body2">공급자: {item.supplierName || '-'}</Typography>
@@ -58,7 +58,7 @@ export function StatementDetailPanel({ item, loading, error, canEdit, onClose, o
         </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>거래명세서 품목 ({item.details.length}건)</Typography>
-          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflowX: 'auto' }}>
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
             <Table size="small" aria-label="거래명세서 품목 목록" sx={{ minWidth: 560 }}>
               <TableHead><TableRow><TableCell>행</TableCell><TableCell>품목코드</TableCell><TableCell>품목명</TableCell>
                 <TableCell align="right">수량</TableCell><TableCell align="right">단가</TableCell><TableCell align="right">합계</TableCell></TableRow></TableHead>

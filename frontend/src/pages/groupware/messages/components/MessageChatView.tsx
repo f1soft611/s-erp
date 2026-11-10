@@ -234,7 +234,7 @@ export function MessageChatView({
                   sx={{
                     px: 1.5,
                     py: 0.25,
-                    borderRadius: 10,
+                    borderRadius: 1,
                     bgcolor: alpha(theme.palette.text.primary, isDark ? 0.12 : 0.06),
                     fontSize: '0.72rem',
                   }}
@@ -307,7 +307,7 @@ export function MessageChatView({
                       minWidth: 0,
                       px: 1.25,
                       py: 0.75,
-                      borderRadius: '12px',
+                      borderRadius: '6px',
                       bgcolor: mine ? sentBubble : receivedBubble,
                       color: mine ? primary.contrastText : 'text.primary',
                       border: mine ? 'none' : `1px solid ${receivedBorder}`,

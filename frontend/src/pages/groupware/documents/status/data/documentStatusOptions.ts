@@ -35,15 +35,6 @@ export const DOCUMENT_STATUSES = new Set(DOCUMENT_STATUS_OPTIONS.map(({ value })
 export const PARTICIPANT_TYPES = new Set(PARTICIPANT_TYPE_OPTIONS.map(({ value }) => value));
 export const ACTION_STATUSES = new Set(ACTION_STATUS_OPTIONS.map(({ value }) => value));
 
-export const STATUS_COLORS = {
-  DRAFT: 'default',
-  PENDING: 'info',
-  IN_PROGRESS: 'info',
-  REVISION_REQUESTED: 'warning',
-  COMPLETED: 'success',
-  REJECTED: 'error',
-} as const;
-
 export const STATUS_LABELS: Record<string, string> = Object.fromEntries(
   DOCUMENT_STATUS_OPTIONS.map(({ value, label }) => [value, label]),
 );

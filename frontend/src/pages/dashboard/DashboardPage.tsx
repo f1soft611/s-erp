@@ -976,7 +976,7 @@ function DashboardPage() {
                             sx: {
                               mt: 1,
                               width: 'min(300px, calc(100vw - 24px))',
-                              borderRadius: 2.5,
+                              borderRadius: 1,
                               border: `1px solid ${theme.palette.divider}`,
                               boxShadow:
                                 theme.palette.mode === 'dark'

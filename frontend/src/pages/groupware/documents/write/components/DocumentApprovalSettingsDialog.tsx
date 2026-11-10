@@ -1056,7 +1056,7 @@ export function DocumentApprovalSettingsDialog({
                       '&[data-drop-position="before"]::before, &[data-drop-position="after"]::after':
                         {
                           backgroundColor: 'primary.main',
-                          borderRadius: 2,
+                          borderRadius: 1,
                           boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
                           content: '""',
                           height: 3,

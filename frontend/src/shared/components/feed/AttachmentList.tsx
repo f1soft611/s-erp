@@ -59,7 +59,7 @@ export function AttachmentList({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderRadius: 1.5,
+              borderRadius: 1,
               border: `1px solid ${
                 isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.18)'
               }`,
@@ -159,7 +159,7 @@ export function AttachmentList({
                   width: 32,
                   height: 32,
                   p: 0,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   borderColor: isDark
                     ? 'rgba(148,163,184,0.28)'
                     : 'rgba(148,163,184,0.25)',

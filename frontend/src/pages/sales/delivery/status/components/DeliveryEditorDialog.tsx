@@ -28,7 +28,7 @@ export function DeliveryEditorDialog({ id, mode, page, permissions, onClose, onS
       disabled={actions.deleteDisabled} onClick={actions.remove}>삭제</Button> : undefined}
     actions={editing ? <>
       {actions?.canSave ? <AppSaveButton variant="contained" saving={actions.saving} disabled={actions.saveDisabled}
-        sx={{ borderRadius: 1.5, fontWeight: 700, minWidth: 96, px: 2.5 }} onClick={actions.save}>저장</AppSaveButton> : null}
+        sx={{ borderRadius: 1, fontWeight: 700, minWidth: 96, px: 2.5 }} onClick={actions.save}>저장</AppSaveButton> : null}
       <Button disabled={actions?.saving} onClick={close}>취소</Button>
     </> : <Button onClick={close}>닫기</Button>}>
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>

@@ -519,7 +519,7 @@ function GridHeaderInner<T extends object>({
                       top: 4,
                       bottom: 4,
                       width: 3,
-                      borderRadius: 999,
+                      borderRadius: 1,
                       backgroundColor: 'primary.main',
                     }
                   : undefined,
@@ -531,7 +531,7 @@ function GridHeaderInner<T extends object>({
                       top: 4,
                       bottom: 4,
                       width: 3,
-                      borderRadius: 999,
+                      borderRadius: 1,
                       backgroundColor: 'primary.main',
                     }
                   : undefined,

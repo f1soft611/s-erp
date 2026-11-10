@@ -95,7 +95,7 @@
 }
 
 .f1-docs-search .MuiOutlinedInput-root {
-  border-radius: 999px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -161,7 +161,7 @@
   min-height: 34px;
   justify-content: space-between;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--f1-doc-text-muted);
   font-size: 11px;
   font-weight: 800;
@@ -193,7 +193,7 @@
 .f1-docs-search-status {
   margin: 0 8px 10px;
   padding: 8px 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--f1-doc-primary-soft);
   color: var(--f1-doc-primary);
   font-weight: 700;
@@ -206,7 +206,7 @@
   justify-content: flex-start;
   min-height: 36px;
   padding: 7px 10px;
-  border-radius: 10px;
+  border-radius: 6px;
   color: var(--f1-doc-text-soft);
   text-transform: none;
   font-weight: 600;
@@ -353,7 +353,7 @@
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--f1-doc-border);
-  border-radius: 10px;
+  border-radius: 6px;
 }
 
 .f1-doc-api-table-wrap .MuiTable-root {
@@ -398,7 +398,7 @@
   position: relative;
   background: var(--f1-doc-code-bg);
   color: var(--f1-doc-code-text);
-  border-radius: 14px;
+  border-radius: 6px;
   padding: 48px 20px 18px;
   overflow: auto;
   margin-top: 14px;
@@ -432,7 +432,7 @@
   margin-top: 38px;
   background: var(--f1-doc-surface-strong);
   border: 1px solid var(--f1-doc-border);
-  border-radius: 16px;
+  border-radius: 6px;
   box-shadow: var(--f1-doc-shadow);
 }
 
@@ -452,7 +452,7 @@
 .f1-doc-grid-wrap {
   min-width: 0;
   overflow: auto;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--f1-doc-border);
   background: rgba(148, 163, 184, 0.04);
   padding: 8px;
@@ -533,7 +533,7 @@
     overflow: visible;
     padding: 8px 12px;
     border: 1px solid var(--f1-doc-border);
-    border-radius: 12px;
+    border-radius: 6px;
     background: var(--f1-doc-surface);
   }
 
@@ -598,7 +598,7 @@
     overflow: visible;
     padding: 8px 12px;
     border: 1px solid var(--f1-doc-border);
-    border-radius: 12px;
+    border-radius: 6px;
     background: var(--f1-doc-surface);
   }
 

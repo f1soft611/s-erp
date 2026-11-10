@@ -109,7 +109,7 @@ export function InboxPanel({
     <Paper
       data-testid={testId}
       variant="outlined"
-      sx={[{ minWidth: 0, borderRadius: 2, overflow: 'auto' }, ...(Array.isArray(sx) ? sx : [sx])]}
+      sx={[{ minWidth: 0, borderRadius: 1, overflow: 'auto' }, ...(Array.isArray(sx) ? sx : [sx])]}
     >
       {children}
     </Paper>
@@ -220,7 +220,7 @@ export function InboxListItem({
                   flexShrink: 0,
                   px: 0.75,
                   minWidth: 20,
-                  borderRadius: 10,
+                  borderRadius: 1,
                   bgcolor: 'error.main',
                   color: 'error.contrastText',
                   fontSize: '0.75rem',

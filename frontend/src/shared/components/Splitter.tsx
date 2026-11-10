@@ -316,7 +316,7 @@ export function Splitter({
               display: 'block',
               width: resolvedDirection === 'horizontal' ? '2px' : '32px',
               height: resolvedDirection === 'vertical' ? '2px' : '32px',
-              borderRadius: 999,
+              borderRadius: 1,
               backgroundColor: 'rgba(100, 116, 139, 0.9)',
             }}
           />

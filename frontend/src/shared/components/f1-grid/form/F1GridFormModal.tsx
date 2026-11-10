@@ -185,7 +185,7 @@ export function F1GridFormModal<T extends object>({
           <Button
             onClick={applyDraft}
             sx={{
-              borderRadius: 1.5,
+              borderRadius: 1,
               fontWeight: 700,
               minWidth: 96,
               px: 2.5,
@@ -197,7 +197,7 @@ export function F1GridFormModal<T extends object>({
           <Button
             onClick={onCancel}
             sx={{
-              borderRadius: 1.5,
+              borderRadius: 1,
               fontWeight: 600,
               px: 2,
             }}
@@ -231,7 +231,7 @@ export function F1GridFormModal<T extends object>({
                 borderColor: 'divider',
                 borderLeft: 2,
                 borderLeftColor: 'primary.main',
-                borderRadius: '10px',
+                borderRadius: '6px',
                 boxShadow: '0 1px 0 rgba(15, 23, 42, 0.03)',
                 display: 'grid',
                 gap: 1.15,

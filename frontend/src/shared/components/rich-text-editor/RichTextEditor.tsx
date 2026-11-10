@@ -183,7 +183,7 @@ const toolbarIconButtonSx = (active: boolean) => ({
   height: 32,
   flexShrink: 0,
   border: 0,
-  borderRadius: 0.75,
+  borderRadius: 1,
   p: 0,
   color: active ? 'text.primary' : 'text.secondary',
   bgcolor: active ? 'action.selected' : 'transparent',
@@ -496,7 +496,7 @@ export function RichTextEditor({
         width: '10px',
         height: '10px',
         border: '1px solid #1d4ed8',
-        borderRadius: '2px',
+        borderRadius: '6px',
         backgroundColor: '#ffffff',
         pointerEvents: 'auto',
         touchAction: 'none',
@@ -752,7 +752,7 @@ export function RichTextEditorToolbar({
         width: 20,
         height: 20,
         p: 0,
-        borderRadius: 0.5,
+        borderRadius: 1,
         border: 1,
         borderColor: textColor === color ? 'text.primary' : 'divider',
       }}
@@ -762,7 +762,7 @@ export function RichTextEditorToolbar({
           width: 14,
           height: 14,
           bgcolor: color,
-          borderRadius: 0.25,
+          borderRadius: 1,
         }}
       />
     </IconButton>
@@ -870,7 +870,7 @@ export function RichTextEditorToolbar({
             p: 0.5,
             border: 1,
             borderColor: 'divider',
-            borderRadius: 1.5,
+            borderRadius: 1,
             bgcolor: 'background.paper',
             maxWidth: 'min(520px, calc(100vw - 64px))',
             overflowX: 'auto',
@@ -881,7 +881,7 @@ export function RichTextEditorToolbar({
             },
             '&::-webkit-scrollbar-thumb': {
               backgroundColor: 'rgba(100, 116, 139, 0.65)',
-              borderRadius: 3,
+              borderRadius: 1,
             },
             '&::-webkit-scrollbar-track': {
               backgroundColor: 'transparent',

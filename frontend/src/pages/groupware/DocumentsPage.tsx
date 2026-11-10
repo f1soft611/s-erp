@@ -46,7 +46,7 @@ export function DocumentsPage({
               <Card
                 key={card.label}
                 sx={{
-                  borderRadius: 3,
+                  borderRadius: 1,
                   border: '1px solid rgba(148,163,184,0.18)',
                   boxShadow: 'none',
                   bgcolor: 'background.paper',
@@ -88,7 +88,7 @@ export function DocumentsPage({
           >
             <Card
               sx={{
-                borderRadius: 3,
+                borderRadius: 1,
                 border: '1px solid rgba(148,163,184,0.18)',
                 boxShadow: 'none',
               }}
@@ -116,7 +116,7 @@ export function DocumentsPage({
                         flexDirection: 'column',
                         gap: 0.5,
                         border: '1px solid rgba(148,163,184,0.18)',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         p: 1.5,
                       }}
                     >
@@ -147,7 +147,7 @@ export function DocumentsPage({
 
             <Card
               sx={{
-                borderRadius: 3,
+                borderRadius: 1,
                 border: '1px solid rgba(148,163,184,0.18)',
                 boxShadow: 'none',
               }}

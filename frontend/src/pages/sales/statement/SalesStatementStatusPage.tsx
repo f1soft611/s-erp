@@ -116,7 +116,7 @@ export function SalesStatementStatusPage(props: StatementPageProps) {
       searchField={<TextField size="small" margin="none" placeholder="명세번호/출하번호/거래처/품목 검색" value={keyword}
         onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') search(applied); }}
         slotProps={{ htmlInput: { 'aria-label': '거래명세서현황 빠른 검색' } }}
-        sx={{ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: '100%', borderRadius: '0 8px 8px 0' } }} />} />
+        sx={{ width: '100%', height: 40, '& .MuiOutlinedInput-root': { height: '100%', borderRadius: '0 6px 6px 0' } }} />} />
     <PageMessageArea message={error} onClose={() => setError('')} />
     {loaded && !loading && !error ? <SearchResultMessage resultCount={rows.length} /> : null}
     <Box sx={{ px: { xs: 1, sm: 2 }, pb: 2, pt: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 360, flex: 1 }}>

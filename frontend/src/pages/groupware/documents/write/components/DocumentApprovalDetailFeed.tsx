@@ -183,7 +183,7 @@ const approvalLineStatusBorderColors: Record<ApprovalLineStatusTone, string> = {
   warning: 'warning.light',
 };
 
-const approvalBadgeBorderRadius = '8px';
+const approvalBadgeBorderRadius = '6px';
 const completedApprovalStatuses = new Set(['APPROVED', 'REJECTED', 'RETURNED']);
 type ReasonAction = Extract<
   DocumentApprovalActionRequest['action'],
@@ -1329,6 +1329,7 @@ export function DocumentApprovalDetailFeed(
             label={kindPresentation.label}
             size="small"
             color={kindPresentation.color}
+            variant={kindPresentation.variant}
             sx={{
               height: 28,
               fontWeight: 700,
@@ -1349,7 +1350,7 @@ export function DocumentApprovalDetailFeed(
           : {
               border: '1px solid',
               borderColor: 'divider',
-              borderRadius: 2,
+              borderRadius: 1,
               p: { xs: 1.5, sm: 2 },
               bgcolor: 'background.paper',
             }
@@ -1447,7 +1448,7 @@ export function DocumentApprovalDetailFeed(
                   gap: 1.5,
                   border: '1px solid',
                   borderColor: 'divider',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: { xs: 1.5, sm: 2 },
                   bgcolor: 'background.default',
                   minWidth: 0,
@@ -1555,7 +1556,7 @@ export function DocumentApprovalDetailFeed(
                                         approvalLineStatusBorderColors[
                                           statusTone
                                         ],
-                                      borderRadius: 1.5,
+                                      borderRadius: 1,
                                       overflow: 'hidden',
                                       boxShadow: isCurrent ? 2 : 0,
                                     }}
@@ -1786,7 +1787,7 @@ export function DocumentApprovalDetailFeed(
                                       p: 1,
                                       border: '1px solid',
                                       borderColor: 'divider',
-                                      borderRadius: 1.5,
+                                      borderRadius: 1,
                                       bgcolor: 'background.paper',
                                     }}
                                   >
@@ -1841,7 +1842,7 @@ export function DocumentApprovalDetailFeed(
                                                   approvalLineStatusColors[
                                                     statusTone
                                                   ],
-                                                borderRadius: '99px',
+                                                borderRadius: '6px',
                                                 color:
                                                   approvalLineStatusColors[
                                                     statusTone
@@ -1876,7 +1877,7 @@ export function DocumentApprovalDetailFeed(
                                                 py: 0.75,
                                                 border: '1px solid',
                                                 borderColor: 'divider',
-                                                borderRadius: '10px',
+                                                borderRadius: '6px',
                                                 bgcolor: 'background.paper',
                                               }}
                                             >
@@ -2002,7 +2003,7 @@ export function DocumentApprovalDetailFeed(
                                         py: 0.75,
                                         border: '1px solid',
                                         borderColor: 'divider',
-                                        borderRadius: '10px',
+                                        borderRadius: '6px',
                                         bgcolor: 'background.paper',
                                       }}
                                     >

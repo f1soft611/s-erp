@@ -627,7 +627,7 @@ export function SalesOrderCreatePage({
         />
         <Paper
           variant="outlined"
-          sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 2 }}
+          sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}
         >
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
             수주 기본정보
@@ -752,7 +752,7 @@ export function SalesOrderCreatePage({
             minHeight: 320,
             minWidth: 0,
             overflow: 'hidden',
-            borderRadius: 2,
+            borderRadius: 1,
           }}
         >
           <Box

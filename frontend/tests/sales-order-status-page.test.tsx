@@ -219,6 +219,19 @@ describe('sales order status page', () => {
     );
   });
 
+  it('keeps equal vertical spacing around the search result message', async () => {
+    renderStatusPage();
+    const message = await screen.findByRole('status');
+    expect(message.parentElement).toHaveStyle({
+      paddingTop: '8px',
+      paddingBottom: '8px',
+    });
+
+    const gridArea = screen.getByRole('grid', { name: '수주현황 목록' })
+      .parentElement?.parentElement;
+    expect(gridArea).toHaveStyle({ paddingTop: '0px' });
+  });
+
   it('uses the dashboard month instead of an unrelated saved search', async () => {
       window.sessionStorage.setItem('s-erp:page:sales-order-status', JSON.stringify({
         version: 1, value: { keyword: '이전 검색', detailValues: { status: '완료' } },

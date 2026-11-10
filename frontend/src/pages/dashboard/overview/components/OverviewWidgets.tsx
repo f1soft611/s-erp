@@ -16,13 +16,13 @@ export function OverviewPanel({ title, caption, icon, action, children, loading 
 }) {
   return (
     <Paper component="section" aria-label={title} elevation={0} sx={{
-      minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 3,
+      minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1,
       overflow: 'hidden', bgcolor: 'background.paper', height: '100%', display: 'flex', flexDirection: 'column',
     }}>
       <Stack direction="row" sx={{ px: { xs: 2, sm: 2.5 }, pt: 2.5, pb: 2, gap: 1.25, alignItems: 'center' }}>
         <Box sx={(theme) => ({
           display: 'flex', color: 'primary.main', flexShrink: 0,
-          ...(focus && { p: 1.1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.09) }),
+          ...(focus && { p: 1.1, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.09) }),
         })}>
           {loading ? <Skeleton variant="rounded" width={20} height={20} /> : icon}
         </Box>
@@ -52,7 +52,7 @@ export function OverviewListRow({ children, onClick, label, notice = false, pinn
   return (
     <ButtonBase onClick={onClick} aria-label={label} disabled={loading} sx={(theme) => ({
       width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.5, textAlign: 'left',
-      p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, border: '1px solid',
+      p: { xs: 1.5, sm: 1.75 }, borderRadius: 1, border: '1px solid',
       borderColor: notice && !pinned ? 'transparent' : 'divider',
       bgcolor: pinned ? 'action.hover' : 'background.paper',
       ...(notice && !pinned && { '& + &': { borderTopColor: 'divider' } }),
@@ -75,7 +75,7 @@ export function MetricCard({ label, value, unit, hint, icon, tone = 'primary', o
     <ButtonBase onClick={onClick} disabled={loading} data-testid={loading ? 'metric-skeleton' : undefined}
       aria-label={loading ? undefined : `${label} ${formatNumber(value)}${unit}`} sx={(theme) => ({
       display: 'flex', flexDirection: 'column', alignItems: 'stretch', textAlign: 'left',
-      minWidth: 0, width: '100%', p: { xs: 2, sm: 2.5 }, borderRadius: 3,
+      minWidth: 0, width: '100%', p: { xs: 2, sm: 2.5 }, borderRadius: 1,
       border: '1px solid', borderColor: theme.palette.divider, bgcolor: 'background.paper',
       transition: 'border-color 160ms, box-shadow 160ms',
       '&:hover': { borderColor: theme.palette[tone].main, boxShadow: `0 8px 24px ${alpha(theme.palette[tone].main, 0.09)}` },
@@ -88,7 +88,7 @@ export function MetricCard({ label, value, unit, hint, icon, tone = 'primary', o
         </Typography>
         <Box sx={(theme) => ({
           color: theme.palette[tone].main, bgcolor: alpha(theme.palette[tone].main, 0.1),
-          borderRadius: 2, p: 0.85, display: 'flex', flexShrink: 0,
+          borderRadius: 1, p: 0.85, display: 'flex', flexShrink: 0,
         })}>{loading ? <Skeleton variant="rounded" width={20} height={20} /> : icon}</Box>
       </Stack>
       <Typography component="div" sx={{
@@ -127,7 +127,7 @@ export function OverviewEmpty({ children }: { children: ReactNode }) {
 
 export function OverviewError({ label, onRetry }: { label: string; onRetry: () => void }) {
   return (
-    <Alert severity="warning" sx={{ borderRadius: 2, alignItems: 'center', '& .MuiAlert-message': { minWidth: 0 } }}>
+    <Alert severity="warning" sx={{ borderRadius: 1, alignItems: 'center', '& .MuiAlert-message': { minWidth: 0 } }}>
       <Typography sx={{ fontSize: '0.82rem' }}>{label}{label.endsWith('현황') ? '을' : '를'} 불러오지 못했습니다.</Typography>
       <Button size="small" color="inherit" aria-label={`${label} 다시 조회`} onClick={onRetry} sx={{ mt: 0.75 }}>
         다시 조회
@@ -181,7 +181,7 @@ function SkeletonList({ kind }: { kind: 'work' | 'notice' | 'due' }) {
     <Stack spacing={1}>
       {[0, 1, 2].map((row) => (
         <OverviewListRow key={row} loading notice={kind === 'notice'} pinned={kind === 'notice' && row === 0}>
-          {kind === 'due' && <Skeleton variant="rounded" width={46} height={61} sx={{ flexShrink: 0, borderRadius: 2 }} />}
+          {kind === 'due' && <Skeleton variant="rounded" width={46} height={61} sx={{ flexShrink: 0, borderRadius: 1 }} />}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {(kind === 'work' || (kind === 'notice' && row === 0)) && <Skeleton variant="rounded" width={54} height={22} sx={{ mb: 0.9, borderRadius: 1 }} />}
             {kind === 'due' && <Skeleton width={58} height={16} sx={{ mb: 0.5 }} />}

@@ -114,7 +114,7 @@ export function MessageThreadListItem({ thread, selected, onClick, now }: Messag
               minWidth: 18,
               height: 18,
               px: 0.6,
-              borderRadius: 9,
+              borderRadius: 1,
               bgcolor: 'error.main',
               color: 'error.contrastText',
               fontSize: '0.68rem',

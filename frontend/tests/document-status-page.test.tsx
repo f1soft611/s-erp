@@ -154,6 +154,25 @@ describe('document status page', () => {
     await screen.findByRole('grid', { name: '문서현황' });
   });
 
+  it('uses the shared info tone for completed business-contact documents', async () => {
+    api.get.mockImplementation((path: string) => {
+      if (path.includes('/common/system-date')) {
+        return Promise.resolve({ today: SYSTEM_TODAY });
+      }
+      return path.includes('/documents/search?')
+        ? Promise.resolve({
+            resultList: [{ ...row, documentType: 'BUSINESS_CONTACT' }],
+            totalRowCount: 1,
+          })
+        : Promise.resolve({});
+    });
+
+    renderDocumentStatusPage();
+
+    const sentStatus = await screen.findByText('발송완료');
+    expect(sentStatus.closest('.MuiChip-root')).toHaveClass('MuiChip-colorInfo');
+  });
+
   it('applies and displays the requested dashboard scope on the read-only page', async () => {
     renderDocumentStatusPage('read', true, false, 'REVISION_REQUESTED');
 

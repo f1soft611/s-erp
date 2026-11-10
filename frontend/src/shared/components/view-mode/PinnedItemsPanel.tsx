@@ -45,7 +45,7 @@ export function PinnedItemsPanel<T extends CommonViewItem>({
               minWidth: 0,
               border: '1px solid',
               borderColor: 'divider',
-              borderRadius: 1.5,
+              borderRadius: 1,
               px: 1.5,
               py: 1,
               bgcolor: alpha(

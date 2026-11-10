@@ -1,4 +1,5 @@
 import { Alert, Box, type AlertProps } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { ReactNode } from 'react';
 
 type PageMessageAreaProps = {
@@ -53,7 +54,13 @@ export function PageMessageArea({
         onClose={onClose}
         action={action}
         role={role}
-        sx={{
+        sx={(theme) => ({
+          ...(severity === 'info' && {
+            backgroundColor: alpha(
+              theme.palette.info.main,
+              theme.palette.mode === 'dark' ? 0.24 : 0.16,
+            ),
+          }),
           overflowWrap: 'anywhere',
           whiteSpace: 'pre-line',
           ...(action && {
@@ -61,7 +68,7 @@ export function PageMessageArea({
             '& .MuiAlert-message': { flex: '1 1 240px', minWidth: 0 },
             '& .MuiAlert-action': { m: 0, p: 0, alignSelf: 'center' },
           }),
-        }}
+        })}
       >
         {normalizedMessage}
       </Alert>

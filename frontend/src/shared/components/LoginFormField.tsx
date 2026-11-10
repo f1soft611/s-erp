@@ -49,7 +49,7 @@ function LoginFormField({
             sx: (theme) => {
               const isDark = theme.palette.mode === 'dark';
               return {
-                borderRadius: 2,
+                borderRadius: 1,
                 backgroundColor: isDark ? '#0f172a' : '#f8fafc',
                 color: isDark ? '#e2e8f0' : '#0f172a',
                 minHeight: 56,

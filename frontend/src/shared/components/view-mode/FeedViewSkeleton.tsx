@@ -11,7 +11,7 @@ export function FeedViewSkeleton() {
         <Card
           key={index}
           sx={{
-            borderRadius: 3,
+            borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider',
             boxShadow: 'none',
@@ -28,7 +28,7 @@ export function FeedViewSkeleton() {
                 variant="rounded"
                 width={72}
                 height={24}
-                sx={{ borderRadius: 999 }}
+                sx={{ borderRadius: 1 }}
               />
             </Box>
             <Skeleton variant="text" width="65%" height={28} sx={{ mb: 1 }} />

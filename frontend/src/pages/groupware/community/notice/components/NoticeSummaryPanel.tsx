@@ -19,7 +19,7 @@ export function NoticeSummaryPanel({
     <Stack spacing={2}>
       <Card
         sx={{
-          borderRadius: 3,
+          borderRadius: 1,
           border: `1px solid ${
             isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
           }`,
@@ -68,7 +68,7 @@ export function NoticeSummaryPanel({
 
       <Card
         sx={{
-          borderRadius: 3,
+          borderRadius: 1,
           border: `1px solid ${
             isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.18)'
           }`,
@@ -93,7 +93,7 @@ export function NoticeSummaryPanel({
                     display: 'grid',
                     gap: 0.5,
                     p: 1.2,
-                    borderRadius: 2,
+                    borderRadius: 1,
                     bgcolor: isDark ? 'rgba(148,163,184,0.06)' : '#f8fafc',
                   }}
                 >

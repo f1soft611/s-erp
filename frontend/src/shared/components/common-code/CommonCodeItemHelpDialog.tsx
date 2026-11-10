@@ -216,7 +216,7 @@ export function CommonCodeItemHelpDialog({
                 variant="contained"
                 saving={saving}
                 sx={{
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   fontWeight: 700,
                   minWidth: 96,
                   px: 2.5,

@@ -78,7 +78,7 @@ export function DashboardModuleSection({
             }}
             aria-label={name}
             sx={{
-              borderRadius: 1.5,
+              borderRadius: 1,
               minHeight: isMobile ? 44 : 56,
               minWidth: isMobile ? 68 : 0,
               flexShrink: 0,
@@ -165,7 +165,7 @@ export function DashboardModuleSection({
             }}
             aria-label="즐겨찾기"
             sx={{
-              borderRadius: 1.5,
+              borderRadius: 1,
               minHeight: isMobile ? 44 : 56,
               minWidth: isMobile ? 68 : 0,
               flexShrink: 0,

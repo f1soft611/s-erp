@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from 'vitest';
 import { SearchResultMessage } from '../src/shared/components/SearchResultMessage';
+import { createAppTheme } from '../src/theme/theme';
 
 describe('shared search result message', () => {
   it('shows a dismissible empty-result status without a reset action', () => {
@@ -25,5 +27,17 @@ describe('shared search result message', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('uses a visible informational background against the app canvas', () => {
+    render(
+      <ThemeProvider theme={createAppTheme()}>
+        <SearchResultMessage resultCount={30} />
+      </ThemeProvider>,
+    );
+
+    expect(getComputedStyle(screen.getByRole('status')).backgroundColor).toBe(
+      'rgba(100, 120, 166, 0.16)',
+    );
   });
 });

@@ -50,7 +50,7 @@ export function ImageViewerDialog({
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: 'hidden',
             bgcolor: 'background.paper',
             color: 'text.primary',

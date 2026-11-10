@@ -96,7 +96,7 @@ export function CommonDialog({
             bgcolor: surfaceBackground,
             border: fullScreen ? 0 : 1,
             borderColor: 'divider',
-            borderRadius: fullScreen ? 0 : 1,
+            borderRadius: fullScreen ? 0 : 1.5,
             boxShadow: fullScreen
               ? 'none'
               : '0 18px 50px rgba(15, 23, 42, 0.12)',
