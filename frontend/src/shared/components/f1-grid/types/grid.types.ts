@@ -269,6 +269,7 @@ export type F1GridProps<T extends object> = {
   onDataSourceError?: (error: Error) => void;
   columns: F1GridColumn<T>[];
   rowKey: keyof T;
+  /** 768px 미만에서는 미지정 시 편집 가능 Grid의 행 폼이 기본 활성화된다. enabled: false로 끌 수 있다. */
   rowFormPlugin?: F1GridRowFormPlugin<T>;
   ariaLabel?: string;
   columnLine?: boolean;

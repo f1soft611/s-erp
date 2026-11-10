@@ -14,7 +14,7 @@ import {
   type ReactElement,
   type Ref,
 } from 'react';
-import { Box, Divider, Menu, MenuItem } from '@mui/material';
+import { Box, Divider, Menu, MenuItem, useMediaQuery } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { AppLoadingSpinner } from '../../AppLoadingSpinner';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
@@ -47,6 +47,7 @@ import type {
   F1GridProps,
   F1GridRef,
   F1GridRowId,
+  F1GridRowFormPlugin,
   F1GridSavedRow,
   F1GridSort,
   F1GridValidationError,
@@ -118,6 +119,7 @@ import {
 const GRID_ROW_FORM_ACTION_COLUMN_WIDTH = 48;
 const GRID_ROW_VIRTUALIZATION_THRESHOLD = 200;
 const GRID_COLUMN_VIRTUALIZATION_THRESHOLD = 12;
+const DEFAULT_MOBILE_ROW_FORM_PLUGIN = {};
 
 function hasSameColumnIndexes(
   current: ReadonlySet<number>,
@@ -349,8 +351,17 @@ function F1GridInner<T extends object>(
       ),
     [editorPlugins, editors],
   );
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const resolvedRowFormPlugin: F1GridRowFormPlugin<T> | undefined = rowFormPlugin ?? (
+    rowFormSession || (isMobile && columns.some((column) =>
+      column.type !== 'rownumber' &&
+      (column.editable || (column.type === 'checkbox' && column.editable === undefined)),
+    ))
+      ? DEFAULT_MOBILE_ROW_FORM_PLUGIN
+      : undefined
+  );
   const rowFormActive = Boolean(
-    rowFormPlugin && rowFormPlugin.enabled !== false,
+    resolvedRowFormPlugin && resolvedRowFormPlugin.enabled !== false,
   );
 
   function resolveEditContext(
@@ -1639,6 +1650,11 @@ function F1GridInner<T extends object>(
       return result !== false;
     });
     if (!pluginStartResult) return;
+
+    if (isMobile && rowFormActive) {
+      openEditRowForm(row);
+      return;
+    }
 
     setFocusedCell(getCell(rowId, columnIndex));
     setEditingCell(getCell(rowId, columnIndex));
@@ -3257,7 +3273,7 @@ function F1GridInner<T extends object>(
           설정을 기본값으로 복원
         </MenuItem>
       </Menu>
-      {rowFormActive && rowFormPlugin && rowFormSession ? (
+      {rowFormActive && resolvedRowFormPlugin && rowFormSession ? (
         <F1GridFormModal
           open
           mode={rowFormSession.mode}
@@ -3266,7 +3282,7 @@ function F1GridInner<T extends object>(
           columns={columns}
           rowKey={rowKey}
           validationRows={activeRows}
-          plugin={rowFormPlugin}
+          plugin={resolvedRowFormPlugin}
           externalErrors={rowFormErrors}
           onValidationErrors={onValidationErrors}
           onCancel={closeRowForm}

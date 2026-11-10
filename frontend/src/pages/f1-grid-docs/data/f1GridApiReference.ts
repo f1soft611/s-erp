@@ -37,8 +37,8 @@ const sections: DocSection[] = [
       api(
         'rowFormPlugin',
         'F1GridRowFormPlugin<T>',
-        '설정된 경우 컬럼 form 메타데이터를 사용하는 행 신규·수정 폼을 활성화.',
-        '미지정',
+        '컬럼 form 메타데이터 기반 신규·수정 폼. 768px 미만 편집 가능 Grid는 미지정 시 자동 활성화하며 enabled: false로 끌 수 있음.',
+        '모바일 자동 / 데스크톱 미지정',
       ),
       api('ariaLabel', 'string', '그리드 접근성 이름.', "'F1-GRID'"),
       api('columnLine', 'boolean', '컬럼 사이 세로 구분선을 표시.', 'true'),

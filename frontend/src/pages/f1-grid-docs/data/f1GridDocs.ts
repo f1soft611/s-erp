@@ -250,14 +250,14 @@ export const f1GridDocs: F1GridDoc[] = [
     sections: [
       {
         type: 'prose',
-        heading: 'Activate explicitly',
-        body: 'rowFormPlugin을 전달하고 enabled가 false가 아닐 때만 우측 고정 상세 열과 신규·수정 모달이 활성화됩니다. 상세 열은 해제할 수 없는 폼 플러그인 전용 우측 pin 1번 영역이며, 사용자가 다른 컬럼을 오른쪽 고정하면 상세 열 왼쪽의 2번 이후 고정 영역에 배치됩니다. 플러그인이 없거나 비활성이면 인라인 편집과 즉시 행 추가를 포함한 기존 동작이 그대로 유지됩니다.',
+        heading: 'Mobile defaults and explicit activation',
+        body: '768px 미만에서는 별도 옵션 없이 편집 가능 Grid의 행 폼이 기본 활성화됩니다. addRow는 폼 적용 시에만 행을 추가하고 취소하면 초안을 버리며, 기존 행은 상세 버튼이나 startEdit로 수정합니다. 열린 폼은 화면 크기가 바뀌어도 유지됩니다. rowFormPlugin을 명시하면 enabled가 false가 아닐 때 활성화되고, enabled: false는 모바일 자동 폼도 끕니다. 상세 열은 해제할 수 없는 우측 pin 1번 영역이며 다른 우측 고정 컬럼은 그 왼쪽에 배치됩니다. 데스크톱에서 플러그인 미지정은 기존 인라인 편집과 즉시 행 추가를 유지합니다.',
       },
       {
         type: 'api',
         heading: 'F1GridRowFormPlugin',
         rows: [
-          ['rowFormPlugin', 'F1GridRowFormPlugin<T>', '선택형 행 폼 플러그인'],
+          ['rowFormPlugin', 'F1GridRowFormPlugin<T>', '모바일 기본 행 폼 및 명시적 설정'],
           ['enabled', 'boolean (기본 true)', '상세 열과 모달 활성화 여부'],
           [
             'getTitle / getDescription',

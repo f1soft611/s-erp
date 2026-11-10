@@ -717,6 +717,7 @@ function DashboardPage() {
     <Box
       sx={{
         display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
         height: '100vh',
         minHeight: 0,
         overflow: 'hidden',

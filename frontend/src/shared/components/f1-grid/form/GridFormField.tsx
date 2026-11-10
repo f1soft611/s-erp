@@ -136,6 +136,11 @@ export function GridFormField<T extends object>({
       },
     },
     slotProps: {
+      inputLabel: {
+        shrink: column.type === 'date' || column.type === 'datetime' || column.type === 'time'
+          ? true
+          : undefined,
+      },
       htmlInput: {
         readOnly,
         'aria-describedby': error ? helperTextId : undefined,

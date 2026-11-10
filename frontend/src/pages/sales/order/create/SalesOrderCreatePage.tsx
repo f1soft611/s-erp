@@ -752,7 +752,7 @@ export function SalesOrderCreatePage({
           variant="outlined"
           sx={{
             display: 'flex',
-            flex: 1,
+            flex: '1 0 auto',
             flexDirection: 'column',
             minHeight: 320,
             minWidth: 0,
@@ -784,7 +784,7 @@ export function SalesOrderCreatePage({
             {isReadOnly ? null : (
             <Box
               data-testid="sales-order-detail-toolbar"
-              sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+              sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}
             >
               {canWrite ? (
                 <Button
@@ -809,7 +809,7 @@ export function SalesOrderCreatePage({
             </Box>
             )}
           </Box>
-          <Box sx={{ flex: 1, minHeight: 260, minWidth: 0, px: 1 }}>
+          <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
             <SalesOrderDetailGrid
               key={gridKey}
               gridRef={gridRef}
