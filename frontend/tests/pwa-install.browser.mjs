@@ -13,6 +13,16 @@ await mkdir(screenshotDirectory, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
 try {
+  async function hideDevelopmentCredentials(page) {
+    await page.evaluate(() => {
+      const label = Array.from(document.querySelectorAll('.MuiTypography-root'))
+        .find((element) => element.textContent?.trim() === '개발용 테스트 계정입니다.');
+      const accountBox = label?.parentElement;
+      if (!accountBox) throw new Error('Development account block was not found for screenshot redaction');
+      accountBox.remove();
+    });
+  }
+
   const page = await browser.newPage({ viewport: { width: 375, height: 844 } });
   await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
   await page.getByLabel('업체코드').waitFor();
@@ -33,6 +43,7 @@ try {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByLabel('업체코드').waitFor();
+    await hideDevelopmentCredentials(page);
     await page.evaluate(() => {
       window.__pwaPromptCalls = 0;
       const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
@@ -45,6 +56,10 @@ try {
     const installButton = page.getByRole('button', { name: '앱 설치' });
     await installButton.waitFor({ state: 'visible' });
     const reminder = page.getByRole('alert');
+    await page.waitForFunction(() => {
+      const alert = document.querySelector('[role="alert"]');
+      return alert && Number.parseFloat(getComputedStyle(alert).opacity) >= 0.99;
+    });
     const bounds = await reminder.boundingBox();
     assert.ok(bounds, `install reminder has no bounds at ${width}px`);
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width, `install reminder exceeds ${width}px`);
@@ -72,6 +87,11 @@ try {
     await iosPage.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
     await iosPage.getByLabel('업체코드').waitFor();
     await iosPage.getByText(/공유 메뉴에서 홈 화면에 추가/).waitFor({ state: 'visible' });
+    await hideDevelopmentCredentials(iosPage);
+    await iosPage.waitForFunction(() => {
+      const alert = document.querySelector('[role="alert"]');
+      return alert && Number.parseFloat(getComputedStyle(alert).opacity) >= 0.99;
+    });
     await iosPage.screenshot({
       path: path.join(screenshotDirectory, 'pwa-install-ios-manual.png'),
       fullPage: true,
