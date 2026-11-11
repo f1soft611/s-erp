@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Divider, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { createPolicy, updatePolicy } from '../services/systemPolicy.service';
 import { initialPolicyValue, newPolicy, POLICY_TYPES, validatePolicy, type PolicyPayload, type PolicyValueType, type SystemPolicy } from '../types/systemPolicy.types';
@@ -44,9 +45,17 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
   };
   return (
     <>
-      <Dialog open fullWidth maxWidth="md" onClose={close} aria-labelledby="policy-editor-title">
-        <DialogTitle id="policy-editor-title">{policy ? '정책 수정' : '정책 추가'}</DialogTitle>
-        <DialogContent dividers>
+      <CommonDialog
+        open
+        size="md"
+        onClose={close}
+        title={policy ? '정책 수정' : '정책 추가'}
+        titleId="policy-editor-title"
+        actions={<>
+          <Button variant="contained" disabled={saving} onClick={() => void save()}>{saving ? '저장 중' : '저장'}</Button>
+          <Button disabled={saving} onClick={close}>취소</Button>
+        </>}
+      >
           <Stack spacing={2.5}>
             {error && <Alert severity="error">{error}</Alert>}
             <Alert severity="info">{policy?.systemPolicy ? '시스템 필수 정책입니다. 허용된 정책값만 변경할 수 있습니다.' : '정책 등록은 설정값을 저장합니다. 실제 업무 적용에는 해당 기능의 정책 연동이 필요합니다.'}</Alert>
@@ -86,12 +95,7 @@ export function PolicyEditor({ policy, onClose, onSaved }: { policy: SystemPolic
             {policy?.policyCode === 'DELIVERY_PLAN_MODE' && <Alert severity="warning">기존 출하계획이 있으면 운영 방식을 바꿀 수 없습니다. 기존 계획을 자동 변환하지 않습니다.</Alert>}
             {policy?.policyCode === 'OVER_DELIVERY_POLICY' && <Alert severity="warning">차단으로 전환해도 기존 초과 출하 실적은 유지됩니다. 이후 저장은 차단 정책으로 검증합니다.</Alert>}
           </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button variant="contained" disabled={saving} onClick={() => void save()}>{saving ? '저장 중' : '저장'}</Button>
-          <Button disabled={saving} onClick={close}>취소</Button>
-        </DialogActions>
-      </Dialog>
+      </CommonDialog>
       <UnsavedChangesConfirmDialog open={discardOpen} onCancel={() => setDiscardOpen(false)} onContinue={onClose} continueLabel="변경 버리기" />
     </>
   );

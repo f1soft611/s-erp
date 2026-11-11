@@ -507,6 +507,9 @@ describe('sales order entry page', () => {
 
     await waitFor(() => expect(deleteSalesOrderMock).toHaveBeenCalledWith(300));
     expect(await screen.findByText(/수주가 삭제되었습니다/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '수주 삭제' })).not.toBeInTheDocument(),
+    );
     expect(screen.getByLabelText('수주번호')).toHaveValue('저장 시 자동 채번');
     expect(screen.getByLabelText('견적번호')).toHaveValue('');
     expect(screen.queryAllByRole('row', { name: /order-line-.*행 선택/ })).toHaveLength(0);
@@ -516,7 +519,6 @@ describe('sales order entry page', () => {
   }, 15000);
 
   it('resets the header and detail grid with the new button after confirming unsaved changes', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderSalesOrderPage();
     const today = (screen.getByLabelText(/수주일자/) as HTMLInputElement).value;
     await selectCustomer();
@@ -525,21 +527,23 @@ describe('sales order entry page', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세 행 추가' }));
 
     fireEvent.click(screen.getByRole('button', { name: '신규' }));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('신규로 초기화'));
+    let confirmation = await screen.findByRole('dialog', { name: '확인' });
+    expect(confirmation).toHaveTextContent('신규로 초기화');
+    fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByLabelText('견적번호')).toHaveValue('QT-100');
 
-    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: '신규' }));
+    confirmation = await screen.findByRole('dialog', { name: '확인' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '확인' }));
 
-    expect(screen.getByLabelText('견적번호')).toHaveValue('');
+    await waitFor(() => expect(screen.getByLabelText('견적번호')).toHaveValue(''));
     expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue('');
     expect(screen.getByLabelText(/수주일자/)).toHaveValue(today);
     expect(screen.queryAllByRole('row', { name: /order-line-.*행 선택/ })).toHaveLength(0);
 
-    confirm.mockClear();
     fireEvent.click(screen.getByRole('button', { name: '신규' }));
-    expect(confirm).not.toHaveBeenCalled();
-    confirm.mockRestore();
+    expect(screen.queryByRole('dialog', { name: '확인' })).not.toBeInTheDocument();
   }, 15000);
 
   it('shows new/save only with write permission and delete only with delete permission', () => {

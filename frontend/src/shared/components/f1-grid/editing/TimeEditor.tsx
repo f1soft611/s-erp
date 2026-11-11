@@ -1,7 +1,5 @@
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import {
-  Dialog,
-  DialogContent,
   IconButton,
   InputAdornment,
   TextField,
@@ -11,6 +9,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { useState, type KeyboardEvent } from 'react';
+import { CommonDialog } from '../../CommonDialog';
 
 type TimeEditorProps = {
   value: string;
@@ -104,20 +103,23 @@ export function TimeEditor({
           },
         }}
       />
-      <Dialog open={open} onClose={() => setOpen(false)}>
-        <DialogContent>
-          <DigitalClock
-            value={parsedValue}
-            onChange={(nextValue) => {
-              const nextTime = nextValue?.isValid()
-                ? nextValue.format(TIME_FORMAT)
-                : '';
-              onChange(nextTime);
-              setOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <CommonDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="시간 선택"
+        size="sm"
+      >
+        <DigitalClock
+          value={parsedValue}
+          onChange={(nextValue) => {
+            const nextTime = nextValue?.isValid()
+              ? nextValue.format(TIME_FORMAT)
+              : '';
+            onChange(nextTime);
+            setOpen(false);
+          }}
+        />
+      </CommonDialog>
     </LocalizationProvider>
   );
 }

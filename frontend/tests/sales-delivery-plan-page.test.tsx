@@ -393,26 +393,25 @@ it('keeps split rows grouped with their order line after reopening a saved plan'
 });
 
 it('retains edited values after deleting a split row and warns before closing', async () => {
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-  try {
-    render(<SalesDeliveryPlanStatusPage {...props} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-    await screen.findByRole('group', { name: '출하계획 정보' });
-    fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
-    const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
-    let grid = within(dialog).getByRole('grid');
-    editCell(grid, 0, 5, '6');
-    fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
-    grid = within(dialog).getByRole('grid');
-    const secondRow = planCell(grid, 1, 5).closest('[role="row"]') as HTMLElement;
-    fireEvent.click(within(secondRow).getByRole('button', { name: '분할행 삭제' }));
-    grid = within(dialog).getByRole('grid');
-    expect(planCell(grid, 0, 5)).toHaveTextContent('6');
-    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(dialog).toBeInTheDocument();
-  } finally { confirm.mockRestore(); }
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  const dialog = screen.getByRole('dialog', { name: '출하계획 수정' });
+  let grid = within(dialog).getByRole('grid');
+  editCell(grid, 0, 5, '6');
+  fireEvent.click(within(grid).getByRole('button', { name: '분할' }));
+  grid = within(dialog).getByRole('grid');
+  const secondRow = planCell(grid, 1, 5).closest('[role="row"]') as HTMLElement;
+  fireEvent.click(within(secondRow).getByRole('button', { name: '분할행 삭제' }));
+  grid = within(dialog).getByRole('grid');
+  expect(planCell(grid, 0, 5)).toHaveTextContent('6');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  const confirmation = await screen.findByRole('dialog', { name: '확인' });
+  expect(confirmation).toHaveTextContent('저장되지 않은 출하계획 내용이 있습니다.');
+  fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
+  expect(dialog).toBeInTheDocument();
 });
 
 it('applies registration quantity validation in status editing', async () => {

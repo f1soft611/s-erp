@@ -597,6 +597,7 @@ export function DocumentComposerDialog({
         <UnsavedChangesConfirmDialog
           open={documentKindConfirmOpen}
           title="문서 유형 변경"
+          subtitle="유형 변경 시 결재선과 참조자가 초기화됩니다."
           description="다른 문서 유형으로 이동하시겠습니까? 결재선과 참조자는 초기화되며, 제목과 본문은 유지됩니다."
           cancelLabel="취소"
           continueLabel="이동"

@@ -12,9 +12,6 @@ import {
   Box,
   Card,
   CardContent,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   List,
   ListItemButton,
   ListItemText,
@@ -27,6 +24,7 @@ import {
   saveCommonCodeBatch,
 } from '../services/commonCodeManagement.service';
 import Splitter from '../../../../../shared/components/Splitter';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import {
   F1Grid,
@@ -1120,14 +1118,13 @@ export const CommonCodeManagementPanel = forwardRef<
                 />
               )}
             </Box>
-            <Dialog
+            <CommonDialog
               open={parentPickerOpen}
               onClose={() => setParentPickerOpen(false)}
-              maxWidth="sm"
-              fullWidth
+              title="상위코드 선택"
+              size="sm"
             >
-              <DialogTitle>상위코드 선택</DialogTitle>
-              <DialogContent dividers sx={{ p: 0 }}>
+              <Box sx={{ mx: { xs: -2, sm: -3 }, my: -2 }}>
                 <List disablePadding>
                   {parentPickerOptions.length > 0 ? (
                     parentPickerOptions.map((item) => (
@@ -1156,8 +1153,8 @@ export const CommonCodeManagementPanel = forwardRef<
                     />
                   )}
                 </List>
-              </DialogContent>
-            </Dialog>
+              </Box>
+            </CommonDialog>
           </CardContent>
         </Card>
       </Splitter>

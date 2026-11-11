@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import {
   Alert,
+  Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -73,15 +71,31 @@ export function ArchiveFileEditDialog({
   };
 
   return (
-    <Dialog
+    <CommonDialog
       open={file !== null}
-      onClose={saving ? undefined : onClose}
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby="archive-file-edit-title"
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      title="파일 정보 수정"
+      titleId="archive-file-edit-title"
+      size="sm"
+      actions={
+        <>
+          <AppSaveButton
+            variant="contained"
+            saving={saving}
+            onClick={() => void handleSave()}
+            disabled={saving}
+          >
+            저장
+          </AppSaveButton>
+          <Button onClick={onClose} disabled={saving}>
+            취소
+          </Button>
+        </>
+      }
     >
-      <DialogTitle id="archive-file-edit-title">파일 정보 수정</DialogTitle>
-      <DialogContent sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
+      <Box sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
         {error && <Alert severity="error">{error}</Alert>}
         <TextField
           autoFocus
@@ -111,20 +125,7 @@ export function ArchiveFileEditDialog({
               ))}
           </Select>
         </FormControl>
-      </DialogContent>
-      <DialogActions>
-        <AppSaveButton
-          variant="contained"
-          saving={saving}
-          onClick={() => void handleSave()}
-          disabled={saving}
-        >
-          저장
-        </AppSaveButton>
-        <Button onClick={onClose} disabled={saving}>
-          취소
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </CommonDialog>
   );
 }

@@ -5,11 +5,6 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   IconButton,
   Popover,
@@ -2309,79 +2304,76 @@ export function DocumentApprovalDetailFeed(
           </Alert>
         )}
       </CommonDialog>
-      <Dialog
+      <CommonDialog
         open={cancelDialogType !== null}
         onClose={() => !isActing && setCancelDialogType(null)}
-        aria-labelledby="approval-cancel-dialog-title"
+        title={cancelDialogType === 'submission' ? '결재신청 취소' : '승인 취소'}
+        description={
+          cancelDialogType === 'submission'
+            ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
+            : '본인의 승인을 취소합니다.'
+        }
+        size="xs"
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => void handleCancelDocumentAction()}
+              disabled={isActing}
+            >
+              {isActing
+                ? '취소 중...'
+                : cancelDialogType === 'submission'
+                  ? '상신 취소'
+                  : '승인 취소'}
+            </Button>
+            <Button
+              onClick={() => setCancelDialogType(null)}
+              disabled={isActing}
+            >
+              닫기
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="approval-cancel-dialog-title">
-          {cancelDialogType === 'submission' ? '결재신청 취소' : '승인 취소'}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {cancelDialogType === 'submission'
-              ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
-              : '본인의 승인을 취소합니다.'}
-          </DialogContentText>
-          {actionError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {actionError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => void handleCancelDocumentAction()}
-            disabled={isActing}
-          >
-            {isActing
-              ? '취소 중...'
-              : cancelDialogType === 'submission'
-                ? '상신 취소'
-                : '승인 취소'}
-          </Button>
-          <Button onClick={() => setCancelDialogType(null)} disabled={isActing}>
-            닫기
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {actionError}
+          </Alert>
+        )}
+      </CommonDialog>
+      <CommonDialog
         open={isDeleteDialogOpen}
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
-        aria-labelledby="approval-delete-dialog-title"
+        title="문서를 삭제하시겠습니까?"
+        description="삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다."
+        size="xs"
+        actions={
+          <>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => void handleDeleteDocument()}
+              disabled={isDeleting}
+            >
+              {isDeleting ? '삭제 중...' : '삭제'}
+            </Button>
+            <Button
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              취소
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="approval-delete-dialog-title">
-          문서를 삭제하시겠습니까?
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다.
-          </DialogContentText>
-          {actionError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {actionError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleDeleteDocument()}
-            disabled={isDeleting}
-          >
-            {isDeleting ? '삭제 중...' : '삭제'}
-          </Button>
-          <Button
-            onClick={() => setIsDeleteDialogOpen(false)}
-            disabled={isDeleting}
-          >
-            취소
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {actionError}
+          </Alert>
+        )}
+      </CommonDialog>
       <DocumentReferenceAddDialog
         open={isReferenceAddDialogOpen}
         options={referenceAddOptions}

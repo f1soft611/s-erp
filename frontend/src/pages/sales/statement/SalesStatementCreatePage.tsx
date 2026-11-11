@@ -9,6 +9,7 @@ import { Alert, Box, IconButton, InputAdornment, Paper, TextField, Typography } 
 import { PageHeader } from '../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../shared/components/UnsavedChangesConfirmDialog';
+import { useCommonConfirmDialog } from '../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { F1Grid, type F1GridColumn } from '../../../shared/components/f1-grid';
 import { getDelivery, localDate } from '../delivery/create/services/salesDelivery.service';
@@ -61,6 +62,7 @@ export function SalesStatementCreatePage({
   const canSave = canRead && mode !== 'view' && Boolean(id ? permissions?.update : permissions?.create);
   const canDelete = canRead && mode !== 'view' && Boolean(id && permissions?.delete);
   const editable = canSave && !pending;
+  const { confirm, dialog } = useCommonConfirmDialog();
   const dirty = JSON.stringify([source?.salesDeliveryId ?? null, date, remark]) !== baseline;
   useUnsavedChangesBeforeUnload(dirty);
   const blocker = useBlocker(!embedded && (dirty || pending));
@@ -108,12 +110,17 @@ export function SalesStatementCreatePage({
     finally { busy.current = false; setPending(false); }
   }, [editable, source, date, remark, id, apply, onSaved]);
   const remove = useCallback(async () => {
-    if (!canDelete || !id || busy.current || !window.confirm('거래명세서를 삭제하시겠습니까?')) return;
+    if (!canDelete || !id || busy.current) return;
+    if (!(await confirm({ title: '거래명세서 삭제', description: '거래명세서를 삭제하시겠습니까?' }))) return;
     busy.current = true; setPending(true); setError('');
     try { await deleteStatement(id); reset(); onDeleted?.(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '거래명세서 삭제에 실패했습니다.'); }
     finally { busy.current = false; setPending(false); }
-  }, [canDelete, id, reset, onDeleted]);
+  }, [canDelete, id, reset, onDeleted, confirm]);
+  const handleNew = useCallback(async () => {
+    if (dirty && !(await confirm({ description: '입력 내용을 초기화하시겠습니까?' }))) return;
+    reset();
+  }, [confirm, dirty, reset]);
   const print = useCallback(() => setPrinting(true), []);
   useEffect(() => {
     if (embedded) onEmbeddedActionsChange?.({
@@ -128,7 +135,7 @@ export function SalesStatementCreatePage({
       description={content.description} actionGroups={[
         { key: 'write', actions: [
           { label: '신규', icon: NoteAddOutlinedIcon, visible: Boolean(permissions?.create), disabled: pending,
-            onClick: () => { if (!dirty || window.confirm('입력 내용을 초기화하시겠습니까?')) reset(); } },
+            onClick: () => void handleNew() },
           { label: '저장', icon: SaveIcon, visible: canSave, disabled: !editable, saving: pending, onClick: () => void save() },
         ] },
         { key: 'delete', actions: [{ label: '삭제', icon: DeleteForeverOutlinedIcon, visible: canDelete,
@@ -177,5 +184,6 @@ export function SalesStatementCreatePage({
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}
       onCancel={() => blocker.state === 'blocked' && blocker.reset()}
       onContinue={() => blocker.state === 'blocked' && blocker.proceed()} />
+    {dialog}
   </Box>;
 }

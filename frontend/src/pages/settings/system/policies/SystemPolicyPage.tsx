@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { getStoredAuth } from '../../../../shared/services/authService';
 import type { MenuPermission } from '../../../dashboard/types/dashboard';
@@ -132,17 +133,26 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
         setNotice('정책이 저장되었습니다.');
         setEditor(null);
       }} />}
-      <Dialog open={Boolean(deleting)} fullWidth maxWidth="xs" onClose={() => { if (!busy.current) setDeleting(null); }} aria-labelledby="policy-delete-title">
-        <DialogTitle id="policy-delete-title">정책 삭제</DialogTitle>
-        <DialogContent>
+      <CommonDialog
+        open={Boolean(deleting)}
+        size="xs"
+        title="정책 삭제"
+        onClose={() => { if (!busy.current) setDeleting(null); }}
+        actions={<>
+          <Button color="error" variant="contained" disabled={deleteBusy} onClick={() => void remove()}>삭제</Button>
+          <Button disabled={deleteBusy} onClick={() => setDeleting(null)}>취소</Button>
+        </>}
+      >
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <Typography sx={{ overflowWrap: 'anywhere' }}>‘{deleting?.policyName}’ 정책을 삭제하시겠습니까? 삭제 이력은 보존됩니다.</Typography>
-        </DialogContent>
-        <DialogActions><Button color="error" variant="contained" disabled={deleteBusy} onClick={() => void remove()}>삭제</Button><Button disabled={deleteBusy} onClick={() => setDeleting(null)}>취소</Button></DialogActions>
-      </Dialog>
-      <Dialog open={Boolean(history)} fullWidth maxWidth="md" onClose={() => { ++historyId.current; setHistory(null); }} aria-labelledby="policy-history-title">
-        <DialogTitle id="policy-history-title">정책 변경 이력 · {history?.policy.policyName}</DialogTitle>
-        <DialogContent dividers>
+      </CommonDialog>
+      <CommonDialog
+        open={Boolean(history)}
+        size="md"
+        title={`정책 변경 이력 · ${history?.policy.policyName ?? ''}`}
+        onClose={() => { ++historyId.current; setHistory(null); }}
+        actions={<Button onClick={() => { ++historyId.current; setHistory(null); }}>닫기</Button>}
+      >
           <Stack spacing={2}>
             {history?.loading && <Typography role="status">변경 이력 조회 중</Typography>}
             {history?.error && <Alert severity="error">{history.error}</Alert>}
@@ -153,9 +163,7 @@ export function SystemPolicyPage({ isPlatformAdmin, selectedMenuPermissions, bre
               <Typography component="pre" variant="body2" sx={{ whiteSpace: 'pre-wrap', m: 0, overflowWrap: 'anywhere' }}>{JSON.stringify(entry.beforeValue)} → {JSON.stringify(entry.afterValue)}</Typography>
             </Paper>)}
           </Stack>
-        </DialogContent>
-        <DialogActions><Button onClick={() => { ++historyId.current; setHistory(null); }}>닫기</Button></DialogActions>
-      </Dialog>
+      </CommonDialog>
     </Box>
   );
 }

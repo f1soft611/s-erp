@@ -276,6 +276,34 @@ describe('CommonDialog', () => {
     });
   });
 
+  it('uses a supplied title id and close button label', () => {
+    render(
+      <CommonDialog
+        open
+        title="이미지 보기"
+        titleId="image-viewer-title"
+        closeButtonLabel="이미지 뷰어 닫기"
+        onClose={vi.fn()}
+        size="xl"
+      >
+        <p>본문</p>
+      </CommonDialog>,
+    );
+
+    expect(screen.getByRole('dialog')).toHaveAttribute(
+      'aria-labelledby',
+      'image-viewer-title',
+    );
+    expect(screen.getByRole('heading', { name: '이미지 보기' })).toHaveAttribute(
+      'id',
+      'image-viewer-title',
+    );
+    expect(
+      screen.getByRole('button', { name: '이미지 뷰어 닫기' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveStyle({ maxWidth: '1200px' });
+  });
+
   it('allows a modal-specific paper height without changing fill mode limits', () => {
     render(
       <CommonDialog

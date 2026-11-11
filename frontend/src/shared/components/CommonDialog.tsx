@@ -16,13 +16,15 @@ import { useTheme } from '@mui/material/styles';
 import { useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-export type CommonDialogSize = 'xs' | 'sm' | 'md' | 'lg';
+export type CommonDialogSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type CommonDialogBodyMode = 'content' | 'fill';
 
 export type CommonDialogProps = {
   open: boolean;
   onClose: () => void;
   title: string;
+  titleId?: string;
+  closeButtonLabel?: string;
   description?: ReactNode;
   titleAside?: ReactNode;
   children: ReactNode;
@@ -44,6 +46,8 @@ export function CommonDialog({
   open,
   onClose,
   title,
+  titleId: titleIdProp,
+  closeButtonLabel = '닫기',
   description,
   titleAside,
   children,
@@ -60,10 +64,19 @@ export function CommonDialog({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const fullScreen = fullScreenOnMobile && isMobile;
-  const titleId = useId();
+  const generatedTitleId = useId();
+  const titleId = titleIdProp ?? generatedTitleId;
   const descriptionId = useId();
   const maxWidth =
-    size === 'xs' ? 480 : size === 'sm' ? 600 : size === 'lg' ? 990 : 820;
+    size === 'xs'
+      ? 480
+      : size === 'sm'
+        ? 600
+        : size === 'lg'
+          ? 990
+          : size === 'xl'
+            ? 1200
+            : 820;
   const hasFooter = Boolean(footerStart || actions);
   const surfaceBackground =
     surfaceBackgroundColor ??
@@ -163,9 +176,9 @@ export function CommonDialog({
             </Typography>
           )}
         </Box>
-        <Tooltip title="닫기">
+        <Tooltip title={closeButtonLabel}>
           <IconButton
-            aria-label="닫기"
+            aria-label={closeButtonLabel}
             onClick={onClose}
             size="small"
             sx={{ flexShrink: 0, mt: -0.25 }}

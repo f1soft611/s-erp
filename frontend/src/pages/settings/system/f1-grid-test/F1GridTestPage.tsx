@@ -2,10 +2,6 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControlLabel,
   Paper,
   Switch,
@@ -27,6 +23,7 @@ import {
 } from '../../../../shared/components/f1-grid';
 import { DateEditor } from '../../../../shared/components/f1-grid/editing/DateEditor';
 import { normalizeDateInput } from '../../../../shared/components/f1-grid/editing/DateEditor';
+import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import type {
   ModuleItem,
@@ -558,9 +555,13 @@ export function F1GridTestPage({
       )}
 
       {/* 코드 픽커 다이얼로그 */}
-      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)}>
-        <DialogTitle>품목 코드 선택</DialogTitle>
-        <DialogContent>
+      <CommonDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="품목 코드 선택"
+        size="sm"
+        actions={<Button onClick={() => setPickerOpen(false)}>닫기</Button>}
+      >
           <Typography variant="body2" sx={{ mb: 2 }}>
             팝업에서 선택한 품목 정보가 해당 행의 여러 컬럼에 일괄 반영됩니다.
           </Typography>
@@ -594,11 +595,7 @@ export function F1GridTestPage({
               ITEM-003: SUS304 볼트 너트 세트 M16 (부자재)
             </Button>
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPickerOpen(false)}>닫기</Button>
-        </DialogActions>
-      </Dialog>
+      </CommonDialog>
     </Box>
   );
 }

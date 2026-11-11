@@ -10,6 +10,7 @@ import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
 import { PostDetailPanel } from '../../../../shared/components/feed/PostDetailPanel';
 import { PageAreaOverlay } from '../../../../shared/components/view-mode/PageAreaOverlay';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../shared/components/f1-grid';
+import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { DeliveryPlanForm } from '../components/DeliveryPlanForm';
 import type { PageSearchField, PageSearchFieldValue } from '../../../../shared/components/page-search/searchFields';
 import type { MenuTreeNode } from '../../../dashboard/types/dashboard';
@@ -48,6 +49,7 @@ function InfoGroup({ title, children }: { title: string; children: ReactNode }) 
 export function SalesDeliveryPlanStatusPage({
   currentMenuName, content, breadcrumbItems, selectedModule, selectedMenuPermissions: permissions,
 }: DeliveryPlanPageProps) {
+  const { confirm, dialog } = useCommonConfirmDialog();
   const [filters, setFilters] = useState<DeliveryPlanFilters>(() => defaultDeliveryPlanFilters());
   const [rows, setRows] = useState<DeliveryPlanStatusRow[]>([]);
   const [selected, setSelected] = useState<DeliveryPlanStatusRow | null>(null);
@@ -154,10 +156,17 @@ export function SalesDeliveryPlanStatusPage({
   if (!permissions?.read) return <Alert severity="warning">출하계획 현황 조회 권한이 없습니다.</Alert>;
 
   const canEdit = Boolean(permissions.update || registrationCanUpdate(selectedModule.tree));
-  const closeDialog = () => {
+  const closeDialog = async () => {
     if (loading) return;
-    if (dialogMode === 'edit' && JSON.stringify(editGridRef.current?.getActiveRows() ?? editRows) !== JSON.stringify(planRowsFromDetails(details))
-      && !window.confirm('저장되지 않은 출하계획 내용이 있습니다. 닫으시겠습니까?')) return;
+    if (
+      dialogMode === 'edit' &&
+      JSON.stringify(editGridRef.current?.getActiveRows() ?? editRows) !== JSON.stringify(planRowsFromDetails(details)) &&
+      !(await confirm({
+        description: '저장되지 않은 출하계획 내용이 있습니다. 닫으시겠습니까?',
+      }))
+    ) {
+      return;
+    }
     setDialogMode(null);
     setEditRows(planRowsFromDetails(details));
     setError('');
@@ -277,5 +286,6 @@ export function SalesDeliveryPlanStatusPage({
       </Box>
       </Box>
     </CommonDialog> : null}
+    {dialog}
   </Box>;
 }

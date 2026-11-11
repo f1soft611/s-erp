@@ -715,6 +715,16 @@ describe('Document write page', () => {
     expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
     const confirmation = await screen.findByRole('dialog', { name: '문서 유형 변경' });
+    const header = confirmation.querySelector('.MuiDialogTitle-root')?.parentElement;
+    expect(header).toHaveTextContent(
+      '유형 변경 시 결재선과 참조자가 초기화됩니다.',
+    );
+    expect(header).not.toHaveTextContent(
+      '다른 문서 유형으로 이동하시겠습니까?',
+    );
+    expect(confirmation.querySelector('.MuiDialogContent-root')).toHaveTextContent(
+      '다른 문서 유형으로 이동하시겠습니까? 결재선과 참조자는 초기화되며, 제목과 본문은 유지됩니다.',
+    );
     fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
     await waitForElementToBeRemoved(confirmation);
     expect(screen.getByRole('tab', { name: '기안서' })).toHaveAttribute('aria-selected', 'true');

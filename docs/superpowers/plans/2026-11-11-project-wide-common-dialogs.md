@@ -6,6 +6,8 @@
 
 **Architecture:** `CommonDialog` becomes the only direct MUI `Dialog` renderer. Other dialog components keep their existing responsibilities and content but use the shared shell; `UnsavedChangesConfirmDialog` retains its public API and delegates its UI to `CommonDialog`.
 
+Confirmation headers contain only the title and optional short subtitle; the full confirmation message belongs in the dialog body.
+
 **Tech Stack:** React, TypeScript, MUI, Vitest, React Testing Library, Vite.
 
 ---
@@ -164,7 +166,50 @@ Use `CommonDialog size="xl" bodyMode="fill" paperHeight="90vh"` with its existin
 
 Run the existing common-code, archive, notification, document-write, and image-viewer Vitest files. Expected: selection, confirmation, save/delete, error, and image accessibility behavior pass.
 
-### Task 6: Verify the project-wide invariant and document results
+### Task 6: Replace native browser confirmations
+
+**Files:**
+- Create: `frontend/src/shared/hooks/useCommonConfirmDialog.tsx`
+- Create: `frontend/tests/use-common-confirm-dialog.test.tsx`
+- Modify: `frontend/src/pages/sales/statement/StatementEditorDialog.tsx`
+- Modify: `frontend/src/pages/sales/statement/SalesStatementCreatePage.tsx`
+- Modify: `frontend/src/pages/sales/delivery/status/components/DeliveryEditorDialog.tsx`
+- Modify: `frontend/src/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage.tsx`
+- Modify: `frontend/src/pages/sales/delivery/create/SalesDeliveryCreatePage.tsx`
+- Modify: `frontend/src/pages/sales/order/status/components/SalesOrderEditorDialog.tsx`
+- Modify: `frontend/src/pages/sales/order/create/SalesOrderCreatePage.tsx`
+
+- [ ] **Step 1: Add failing async confirmation tests**
+
+Test a small component using the hook: calling `confirm({ description: '계속하시겠습니까?' })` opens a CommonDialog; clicking `확인` resolves `true`; cancel, Escape, and backdrop resolve `false`. Also verify a second request resolves the previous request as false.
+
+- [ ] **Step 2: Run the hook test and confirm it fails**
+
+Run from `frontend`: `npm run test -- tests/use-common-confirm-dialog.test.tsx`
+
+Expected: the test initially fails because the hook does not exist.
+
+- [ ] **Step 3: Implement the hook**
+
+Return `{ confirm, dialog }`. Store the active options and Promise resolver in state/ref; render a `CommonDialog size="xs"` with generic `확인` and `취소` actions. Resolve true only from confirmation; resolve false from cancel, close, or a replaced request. Resolve any pending request as false during unmount cleanup.
+
+- [ ] **Step 4: Verify the hook**
+
+Run `npm run test -- tests/use-common-confirm-dialog.test.tsx`; expected all outcomes pass.
+
+- [ ] **Step 5: Replace every native confirm call**
+
+Use the hook in all seven listed components. Change existing click/close handlers to await the Promise and return without their original action when false. Render `{dialog}` in each component. Keep the existing confirmation text verbatim.
+
+- [ ] **Step 6: Add the contributor rule**
+
+In `frontend/AGENTS.md`, add a “공통 다이얼로그 및 확인” rule: use `CommonDialog` for confirmation/input/selection/info modals; use the shared confirmation hook for destructive/discard confirmations; do not use browser-native `alert`, `confirm`, or `prompt`; use existing notification patterns for simple notices. Clarify that PWA install `event.prompt()` is not a native prompt dialog.
+
+- [ ] **Step 7: Run affected sales tests**
+
+Run the existing statement, delivery, delivery-plan, and sales-order test files. Expected: prior close/delete/reset/type-change decisions still proceed or cancel as before.
+
+### Task 7: Verify the project-wide invariant and document results
 
 **Files:**
 - Modify: `docs/spec/20261111/20261111_002_프론트엔드_공통다이얼로그_표준화_상세사양서.md`

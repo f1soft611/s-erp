@@ -3,6 +3,7 @@ import { Box, Button } from '@mui/material';
 import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
 import { AppSaveButton } from '../../../../../shared/components/AppSaveButton';
 import { CommonDialog } from '../../../../../shared/components/CommonDialog';
+import { useCommonConfirmDialog } from '../../../../../shared/hooks/useCommonConfirmDialog';
 import type { MenuPermission, ModuleItem, PageContent } from '../../../../dashboard/types/dashboard';
 import {
   SalesOrderCreatePage,
@@ -34,6 +35,7 @@ export function SalesOrderEditorDialog({
 }: SalesOrderEditorDialogProps) {
   const dirtyRef = useRef(false);
   const [actionState, setActionState] = useState<SalesOrderEmbeddedActionState | null>(null);
+  const { confirm, dialog } = useCommonConfirmDialog();
   const open = mode !== null && salesOrderId !== null;
   const isEditMode = mode === 'edit';
 
@@ -41,16 +43,18 @@ export function SalesOrderEditorDialog({
     dirtyRef.current = dirty;
   }, []);
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (
       dirtyRef.current &&
-      !window.confirm('저장되지 않은 수주 내용이 있습니다. 닫으면 입력 내용이 사라집니다. 닫으시겠습니까?')
+      !(await confirm({
+        description: '저장되지 않은 수주 내용이 있습니다. 닫으면 입력 내용이 사라집니다. 닫으시겠습니까?',
+      }))
     ) {
       return;
     }
     dirtyRef.current = false;
     onClose();
-  }, [onClose]);
+  }, [confirm, onClose]);
 
   const footerActions = isEditMode ? (
     <>
@@ -87,36 +91,39 @@ export function SalesOrderEditorDialog({
     ) : undefined;
 
   return (
-    <CommonDialog
-      open={open}
-      onClose={handleClose}
-      title={isEditMode ? '수주 수정' : '수주 상세보기'}
-      size="lg"
-      bodyMode="fill"
-      paperHeight="min(900px, 92vh)"
-      fullScreenOnMobile
-      actions={footerActions}
-      footerStart={footerStart}
-    >
-      {open ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-          <SalesOrderCreatePage
-            key={`${mode}-${salesOrderId}`}
-            selectedModule={selectedModule}
-            currentMenuName="수주등록"
-            content={EMBEDDED_CONTENT}
-            breadcrumbItems={[]}
-            selectedMenuPermissions={isEditMode ? permissions : undefined}
-            mode={mode}
-            salesOrderId={salesOrderId}
-            embedded
-            onSaved={onSaved}
-            onDeleted={onDeleted}
-            onDirtyChange={handleDirtyChange}
-            onEmbeddedActionsChange={setActionState}
-          />
-        </Box>
-      ) : null}
-    </CommonDialog>
+    <>
+      <CommonDialog
+        open={open}
+        onClose={handleClose}
+        title={isEditMode ? '수주 수정' : '수주 상세보기'}
+        size="lg"
+        bodyMode="fill"
+        paperHeight="min(900px, 92vh)"
+        fullScreenOnMobile
+        actions={footerActions}
+        footerStart={footerStart}
+      >
+        {open ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <SalesOrderCreatePage
+              key={`${mode}-${salesOrderId}`}
+              selectedModule={selectedModule}
+              currentMenuName="수주등록"
+              content={EMBEDDED_CONTENT}
+              breadcrumbItems={[]}
+              selectedMenuPermissions={isEditMode ? permissions : undefined}
+              mode={mode}
+              salesOrderId={salesOrderId}
+              embedded
+              onSaved={onSaved}
+              onDeleted={onDeleted}
+              onDirtyChange={handleDirtyChange}
+              onEmbeddedActionsChange={setActionState}
+            />
+          </Box>
+        ) : null}
+      </CommonDialog>
+      {dialog}
+    </>
   );
 }

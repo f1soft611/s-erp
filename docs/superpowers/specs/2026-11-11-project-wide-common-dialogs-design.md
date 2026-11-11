@@ -18,10 +18,13 @@ Approach 1 directly meets the expanded request and minimizes future drift. `Comm
 - Add `sm` (600px) and `xl` (1200px) widths to preserve existing selector and image-viewer footprints.
 - Add optional `titleId` and `closeButtonLabel` props so existing accessibility IDs and the image viewer's descriptive close label remain intact.
 - Preserve modal content, API calls, button labels/order, pending-state guards, Escape/backdrop behavior, errors, and submit/cancel callbacks.
+- Replace synchronous `window.confirm()` calls with a shared async `useCommonConfirmDialog()` hook that returns `Promise<boolean>`; retain each existing message and only continue the original action after confirmation.
+- Add a frontend instruction requiring `CommonDialog` for modal UI and prohibiting native `alert`/`confirm`/`prompt` in business flows.
 - Keep non-dialog overlays (`Popover`, `Menu`, `Drawer`, and print portals) unchanged.
 
 ## Validation
 
 - Add focused CommonDialog size/accessibility tests and a shared unsaved-confirmation shell test before implementation.
+- Test async common confirmation outcomes before replacing native confirmation calls.
 - Run existing feature tests for affected areas, the full frontend Vitest suite, and `npm run build`.
 - Check 375px, 768px, and 1280px browser layouts and record representative screenshots in the dated result directory.
