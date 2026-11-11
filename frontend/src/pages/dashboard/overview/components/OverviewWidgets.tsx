@@ -153,7 +153,7 @@ export function OverviewSkeleton() {
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
           <Box data-testid="work-skeleton">
-            <OverviewPanel loading focus title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순" icon={null}
+            <OverviewPanel loading focus title="지금 결재할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순" icon={null}
               footer={<><Skeleton width={90} height={18} /><Skeleton width={90} height={28} /></>}>
               <SkeletonList kind="work" />
             </OverviewPanel>

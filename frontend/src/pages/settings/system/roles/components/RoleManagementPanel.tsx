@@ -4,10 +4,6 @@ import {
   Card,
   CardContent,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   List,
   ListItemButton,
   ListItemText,
@@ -31,6 +27,7 @@ import {
   type F1GridRef,
 } from '../../../../../shared/components/f1-grid';
 import Splitter from '../../../../../shared/components/Splitter';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 import { UnsavedChangesConfirmDialog } from '../../../../../shared/components/UnsavedChangesConfirmDialog';
 import type { RoleManagementRow } from '../types/roleManagement.types';
 import {
@@ -1015,15 +1012,33 @@ export const RoleManagementPanel = forwardRef<
           </CardContent>
         </Card>
       </Splitter>
-      <Dialog
+      <CommonDialog
         open={userDialogOpen}
         onClose={() => setUserDialogOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="user-add-dialog-title"
+        size="sm"
+        title="사용자 추가"
+        titleId="user-add-dialog-title"
+        actions={
+          <>
+            <Button onClick={() => setUserDialogOpen(false)}>취소</Button>
+            <Button
+              variant="contained"
+              disabled={saving || !candidateLoginId}
+              onClick={() => {
+                if (saving || saveInFlightRef.current) return;
+                userGridRef.current?.setCellValue(
+                  candidateLoginId,
+                  'assigned',
+                  true,
+                );
+                setUserDialogOpen(false);
+              }}
+            >
+              추가
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="user-add-dialog-title">사용자 추가</DialogTitle>
-        <DialogContent>
           <TextField
             margin="none"
             fullWidth
@@ -1051,26 +1066,7 @@ export const RoleManagementPanel = forwardRef<
               </ListItemButton>
             ))}
           </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUserDialogOpen(false)}>취소</Button>
-          <Button
-            variant="contained"
-            disabled={saving || !candidateLoginId}
-            onClick={() => {
-              if (saving || saveInFlightRef.current) return;
-              userGridRef.current?.setCellValue(
-                candidateLoginId,
-                'assigned',
-                true,
-              );
-              setUserDialogOpen(false);
-            }}
-          >
-            추가
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </CommonDialog>
       <UnsavedChangesConfirmDialog
         open={roleSwitchDialogOpen}
         title="저장하지 않은 변경사항"

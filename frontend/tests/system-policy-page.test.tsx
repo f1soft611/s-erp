@@ -87,7 +87,13 @@ it('confirms deletion of custom policies and shows change history', async () => 
   render(<SystemPolicyPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: '사용자 정책 이력' }));
   expect(await screen.findByText('운영자')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+  const historyDialog = screen.getByRole('dialog', { name: '정책 변경 이력 · 사용자 정책' });
+  fireEvent.click(
+    within(within(historyDialog).getByTestId('common-dialog-actions')).getByRole(
+      'button',
+      { name: '닫기' },
+    ),
+  );
   fireEvent.click(await screen.findByRole('button', { name: '사용자 정책 삭제' }));
   expect(deletePolicy).not.toHaveBeenCalled();
   fireEvent.click(within(screen.getByRole('dialog', { name: '정책 삭제' })).getByRole('button', { name: '삭제', exact: true }));

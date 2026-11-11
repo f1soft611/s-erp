@@ -11,6 +11,7 @@ import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import { CustomerPicker, MaterialPickerDialog } from '../../../../shared/components/master-picker/MasterPickers';
 import type { F1GridChanges, F1GridRef } from '../../../../shared/components/f1-grid';
@@ -58,6 +59,7 @@ export function SalesDeliveryCreatePage({
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [confirm, setConfirm] = useState<'new' | 'delete' | null>(null);
   const [overDelivery, setOverDelivery] = useState<{ payload: DeliveryPayload; message: string } | null>(null);
+  const { confirm: requestConfirmation, dialog } = useCommonConfirmDialog();
   const grid = useRef<F1GridRef<DeliveryRow>>(null);
   const busy = useRef(false);
   const materialPatch = useRef<((changes: Partial<DeliveryRow>) => void) | null>(null);
@@ -195,9 +197,17 @@ export function SalesDeliveryCreatePage({
                 setForm((current) => ({ ...current, customerId: customer.id, customerCode: customer.code, customerName: customer.name }));
               }} />
             <TextField select size="small" label="출하구분" value={form.deliveryType} disabled={!editable || Boolean(savedId)}
-              onChange={(event) => {
-                const next = { ...emptyDelivery(), deliveryDt: form.deliveryDt, deliveryType: event.target.value as DeliveryForm['deliveryType'] };
-                if (form.details.length && !window.confirm('출하구분을 변경하면 거래처와 상세가 초기화됩니다. 계속하시겠습니까?')) return;
+              onChange={async (event) => {
+                const deliveryType = event.target.value as DeliveryForm['deliveryType'];
+                if (
+                  form.details.length &&
+                  !(await requestConfirmation({
+                    description: '출하구분을 변경하면 거래처와 상세가 초기화됩니다. 계속하시겠습니까?',
+                  }))
+                ) {
+                  return;
+                }
+                const next = { ...emptyDelivery(), deliveryDt: form.deliveryDt, deliveryType };
                 setForm(next); setRows([]); setGridKey((value) => value + 1);
               }}>
               <MenuItem value="DIRECT">직출하</MenuItem><MenuItem value="ORDER">수주출하</MenuItem>
@@ -272,5 +282,6 @@ export function SalesDeliveryCreatePage({
     <UnsavedChangesConfirmDialog open={blocker.state === 'blocked'} disableContinue={pending}
       onCancel={() => blocker.state === 'blocked' && blocker.reset()}
       onContinue={() => blocker.state === 'blocked' && blocker.proceed()} />
+    {dialog}
   </Box>;
 }

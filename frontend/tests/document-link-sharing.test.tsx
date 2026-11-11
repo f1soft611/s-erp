@@ -169,21 +169,46 @@ describe('document sharing UI', () => {
     expect(screen.queryByRole('menuitem', { name: '문서 수정' })).not.toBeInTheDocument();
   });
 
-  it('groups sharing and reference actions apart from available document management actions', () => {
+  it('groups approval actions before sharing and document management actions', () => {
+    const approvalActions = [
+      { label: '승인', onSelect: vi.fn() },
+      { label: '반려', onSelect: vi.fn() },
+    ];
     render(<DocumentActionsMenu isDrafter documentStatus="DRAFT"
+      approvalActions={approvalActions}
       onShare={vi.fn()} onAddReferences={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
 
     const menu = screen.getByRole('menu');
     expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent))
-      .toEqual(['문서 공유하기', '참조자 추가하기', '문서 수정', '삭제']);
-    const divider = within(menu).getByRole('separator');
+      .toEqual(['승인', '반려', '문서 공유하기', '참조자 추가하기', '문서 수정', '삭제']);
+    const [approvalDivider, documentDivider] = within(menu).getAllByRole('separator');
+    if (!approvalDivider || !documentDivider) throw new Error('Missing menu group divider.');
+    const rejectItem = within(menu).getByRole('menuitem', { name: '반려' });
+    const shareItem = within(menu).getByRole('menuitem', { name: '문서 공유하기' });
     const referenceItem = within(menu).getByRole('menuitem', { name: '참조자 추가하기' });
     const editItem = within(menu).getByRole('menuitem', { name: '문서 수정' });
-    expect(Boolean(referenceItem.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING))
+    expect(Boolean(rejectItem.compareDocumentPosition(approvalDivider) & Node.DOCUMENT_POSITION_FOLLOWING))
       .toBe(true);
-    expect(Boolean(divider.compareDocumentPosition(editItem) & Node.DOCUMENT_POSITION_FOLLOWING))
+    expect(Boolean(approvalDivider.compareDocumentPosition(shareItem) & Node.DOCUMENT_POSITION_FOLLOWING))
       .toBe(true);
+    expect(Boolean(referenceItem.compareDocumentPosition(documentDivider) & Node.DOCUMENT_POSITION_FOLLOWING))
+      .toBe(true);
+    expect(Boolean(documentDivider.compareDocumentPosition(editItem) & Node.DOCUMENT_POSITION_FOLLOWING))
+      .toBe(true);
+  });
+
+  it('closes the menu and runs the selected approval action', async () => {
+    const onApprove = vi.fn();
+    render(<DocumentActionsMenu
+      approvalActions={[{ label: '승인', onSelect: onApprove }]}
+      onShare={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '승인' }));
+
+    expect(onApprove).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   });
 
   it('does not render a divider when no document management actions are available', () => {

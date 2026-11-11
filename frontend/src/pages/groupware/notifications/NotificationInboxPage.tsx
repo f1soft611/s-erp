@@ -6,10 +6,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   List,
   Tooltip,
@@ -17,6 +13,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../../shared/context/NotificationContext';
+import { CommonDialog } from '../../../shared/components/CommonDialog';
 import { useRealtimeRefresh } from '../../../shared/hooks/useRealtimeRefresh';
 import {
   archiveNotification,
@@ -337,24 +334,32 @@ export function NotificationInboxPage() {
           </Button>
         </Box>
       )}
-      <Dialog
+      <CommonDialog
         open={confirmArchiveRead}
         onClose={() => !archivingRead && setConfirmArchiveRead(false)}
-        aria-labelledby="archive-read-notifications-title"
+        title="읽은 알림 정리"
+        description="현재 선택한 알림 구분의 읽은 알림을 숨깁니다. 원본 업무 기록은 삭제되지 않습니다."
+        size="xs"
+        actions={
+          <>
+            <Button
+              onClick={() => setConfirmArchiveRead(false)}
+              disabled={archivingRead}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={() => void hideReadNotifications()}
+              disabled={archivingRead}
+              variant="contained"
+            >
+              {archivingRead ? '정리 중...' : '정리'}
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="archive-read-notifications-title">읽은 알림 정리</DialogTitle>
-        <DialogContent>
-          현재 선택한 알림 구분의 읽은 알림을 숨깁니다. 원본 업무 기록은 삭제되지 않습니다.
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmArchiveRead(false)} disabled={archivingRead}>
-            취소
-          </Button>
-          <Button onClick={() => void hideReadNotifications()} disabled={archivingRead} variant="contained">
-            {archivingRead ? '정리 중...' : '정리'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {null}
+      </CommonDialog>
     </InboxPageShell>
   );
 }

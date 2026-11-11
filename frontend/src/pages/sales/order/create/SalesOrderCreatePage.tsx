@@ -16,6 +16,7 @@ import {
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageMessageArea } from '../../../../shared/components/PageMessageArea';
 import { UnsavedChangesConfirmDialog } from '../../../../shared/components/UnsavedChangesConfirmDialog';
+import { useCommonConfirmDialog } from '../../../../shared/hooks/useCommonConfirmDialog';
 import { useUnsavedChangesBeforeUnload } from '../../../../shared/hooks/useUnsavedChangesBeforeUnload';
 import {
   MaterialPickerDialog,
@@ -128,6 +129,7 @@ export function SalesOrderCreatePage({
   onDirtyChange,
   onEmbeddedActionsChange,
 }: Props) {
+  const { confirm, dialog } = useCommonConfirmDialog();
   const isReadOnly = mode === 'view';
   const gridRef = useRef<F1GridRef<SalesOrderDetailRow>>(null);
   const savingRef = useRef(false);
@@ -456,21 +458,22 @@ export function SalesOrderCreatePage({
     }
   }, [isDeletable, loadedOrder, onDeleted, resetToNewOrder]);
 
-  const handleNew = useCallback(() => {
+  const handleNew = useCallback(async () => {
     if (savingRef.current) {
       return;
     }
     if (
       hasUnsavedChanges &&
-      !window.confirm(
-        '저장되지 않은 수주 내용이 있습니다. 신규로 초기화하면 입력 내용이 사라집니다. 계속하시겠습니까?',
-      )
+      !(await confirm({
+        description:
+          '저장되지 않은 수주 내용이 있습니다. 신규로 초기화하면 입력 내용이 사라집니다. 계속하시겠습니까?',
+      }))
     ) {
       return;
     }
     resetToNewOrder();
     setNotice('');
-  }, [hasUnsavedChanges, resetToNewOrder]);
+  }, [confirm, hasUnsavedChanges, resetToNewOrder]);
 
   const actions = useMemo<PermissionActionGroupDefinition[]>(
     () => [
@@ -856,6 +859,7 @@ export function SalesOrderCreatePage({
         onCancel={() => setDeleteConfirmOpen(false)}
         onContinue={() => void confirmDelete()}
       />
+      {dialog}
     </Box>
   );
 }

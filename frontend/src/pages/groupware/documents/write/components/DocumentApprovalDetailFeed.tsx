@@ -5,11 +5,6 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   IconButton,
   Popover,
@@ -1148,8 +1143,80 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
+  const approvalActions = [
+    ...(canProcess
+      ? [
+          {
+            label: '승인',
+            onSelect: () => {
+              void handleAction('APPROVED');
+            },
+            disabled: isActing,
+          },
+          {
+            label: '반려',
+            onSelect: () => openReasonDialog('REJECTED'),
+            disabled: isActing,
+          },
+          {
+            label: '보완요청',
+            onSelect: () => openReasonDialog('RETURNED'),
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canConfirmFinal
+      ? [
+          {
+            label: '최종확인',
+            onSelect: () => {
+              void handleFinalConfirmation();
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canConfirmReference
+      ? [
+          {
+            label: '확인',
+            onSelect: () => {
+              void handleReferenceConfirmation();
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canCancelSubmission
+      ? [
+          {
+            label: '상신 취소',
+            onSelect: () => {
+              setActionError('');
+              setCancelDialogType('submission');
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canCancelApproval
+      ? [
+          {
+            label: '승인 취소',
+            onSelect: () => {
+              setActionError('');
+              setCancelDialogType('approval');
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+  ];
+
   const documentMenu = detail ? (
     <DocumentActionsMenu
+      approvalActions={approvalActions}
+      disabled={isActing}
       onShare={() => {
         void (async () => {
           try {
@@ -1192,105 +1259,9 @@ export function DocumentApprovalDetailFeed(
   const kindPresentation = displayDocumentType
     ? getDocumentKindPresentation(displayDocumentType)
     : null;
-  const approvalActionButtonSx = {
-    px: 1.25,
-    py: 0.5,
-  };
   const documentToolbar =
     statusPresentation && kindPresentation ? (
       <DocumentApprovalToolbar
-        approvalActions={
-          <>
-            {canProcess && (
-              <>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={approvalActionButtonSx}
-                  onClick={() => void handleAction('APPROVED')}
-                  disabled={isActing}
-                >
-                  승인
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  sx={approvalActionButtonSx}
-                  onClick={() => openReasonDialog('REJECTED')}
-                  disabled={isActing}
-                >
-                  반려
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="warning"
-                  sx={approvalActionButtonSx}
-                  onClick={() => openReasonDialog('RETURNED')}
-                  disabled={isActing}
-                >
-                  보완요청
-                </Button>
-              </>
-            )}
-            {canConfirmFinal && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                sx={approvalActionButtonSx}
-                onClick={() => void handleFinalConfirmation()}
-                disabled={isActing}
-              >
-                최종확인
-              </Button>
-            )}
-            {canConfirmReference && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                sx={approvalActionButtonSx}
-                onClick={() => void handleReferenceConfirmation()}
-                disabled={isActing}
-              >
-                확인
-              </Button>
-            )}
-            {canCancelSubmission && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                sx={approvalActionButtonSx}
-                disabled={isActing}
-                onClick={() => {
-                  setActionError('');
-                  setCancelDialogType('submission');
-                }}
-              >
-                상신 취소
-              </Button>
-            )}
-            {canCancelApproval && (
-              <Button
-                size="small"
-                variant="contained"
-                color="error"
-                sx={approvalActionButtonSx}
-                disabled={isActing}
-                onClick={() => {
-                  setActionError('');
-                  setCancelDialogType('approval');
-                }}
-              >
-                승인 취소
-              </Button>
-            )}
-          </>
-        }
         status={
           <Chip
             label={statusPresentation.label}
@@ -2333,79 +2304,76 @@ export function DocumentApprovalDetailFeed(
           </Alert>
         )}
       </CommonDialog>
-      <Dialog
+      <CommonDialog
         open={cancelDialogType !== null}
         onClose={() => !isActing && setCancelDialogType(null)}
-        aria-labelledby="approval-cancel-dialog-title"
+        title={cancelDialogType === 'submission' ? '결재신청 취소' : '승인 취소'}
+        description={
+          cancelDialogType === 'submission'
+            ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
+            : '본인의 승인을 취소합니다.'
+        }
+        size="xs"
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => void handleCancelDocumentAction()}
+              disabled={isActing}
+            >
+              {isActing
+                ? '취소 중...'
+                : cancelDialogType === 'submission'
+                  ? '상신 취소'
+                  : '승인 취소'}
+            </Button>
+            <Button
+              onClick={() => setCancelDialogType(null)}
+              disabled={isActing}
+            >
+              닫기
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="approval-cancel-dialog-title">
-          {cancelDialogType === 'submission' ? '결재신청 취소' : '승인 취소'}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {cancelDialogType === 'submission'
-              ? '결재신청을 취소하고 임시저장 상태로 되돌립니다.'
-              : '본인의 승인을 취소합니다.'}
-          </DialogContentText>
-          {actionError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {actionError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => void handleCancelDocumentAction()}
-            disabled={isActing}
-          >
-            {isActing
-              ? '취소 중...'
-              : cancelDialogType === 'submission'
-                ? '상신 취소'
-                : '승인 취소'}
-          </Button>
-          <Button onClick={() => setCancelDialogType(null)} disabled={isActing}>
-            닫기
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {actionError}
+          </Alert>
+        )}
+      </CommonDialog>
+      <CommonDialog
         open={isDeleteDialogOpen}
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
-        aria-labelledby="approval-delete-dialog-title"
+        title="문서를 삭제하시겠습니까?"
+        description="삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다."
+        size="xs"
+        actions={
+          <>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => void handleDeleteDocument()}
+              disabled={isDeleting}
+            >
+              {isDeleting ? '삭제 중...' : '삭제'}
+            </Button>
+            <Button
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              취소
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="approval-delete-dialog-title">
-          문서를 삭제하시겠습니까?
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            삭제한 문서는 목록에서 숨겨지며 복구할 수 없습니다.
-          </DialogContentText>
-          {actionError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {actionError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleDeleteDocument()}
-            disabled={isDeleting}
-          >
-            {isDeleting ? '삭제 중...' : '삭제'}
-          </Button>
-          <Button
-            onClick={() => setIsDeleteDialogOpen(false)}
-            disabled={isDeleting}
-          >
-            취소
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {actionError}
+          </Alert>
+        )}
+      </CommonDialog>
       <DocumentReferenceAddDialog
         open={isReferenceAddDialogOpen}
         options={referenceAddOptions}

@@ -1,6 +1,7 @@
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import { Alert, Box, Button } from '@mui/material';
 import { UserSelectEditor, type F1GridUserValue } from '../../../../../shared/components/f1-grid/editing/UserSelectEditor';
 import type { F1GridUserOption } from '../../../../../shared/components/f1-grid/types/grid.types';
+import { CommonDialog } from '../../../../../shared/components/CommonDialog';
 
 type DocumentReferenceAddDialogProps = {
   open: boolean;
@@ -30,15 +31,27 @@ export function DocumentReferenceAddDialog({
   };
 
   return (
-    <Dialog
+    <CommonDialog
       open={open}
       onClose={() => !isSubmitting && onClose()}
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby="document-reference-add-title"
+      title="참조자 추가"
+      titleId="document-reference-add-title"
+      size="sm"
+      actions={
+        <>
+          <Button
+            variant="contained"
+            onClick={onSubmit}
+            disabled={isSubmitting || selectedUserIds.length === 0}
+          >
+            {isSubmitting ? '추가 중...' : '참조자 추가'}
+          </Button>
+          <Button onClick={onClose} disabled={isSubmitting}>
+            취소
+          </Button>
+        </>
+      }
     >
-      <DialogTitle id="document-reference-add-title">참조자 추가</DialogTitle>
-      <DialogContent>
         <Box sx={{ pt: 1 }}>
           <UserSelectEditor
             value={selectedUserIds}
@@ -68,19 +81,6 @@ export function DocumentReferenceAddDialog({
             {info}
           </Alert>
         )}
-      </DialogContent>
-      <DialogActions sx={{ flexWrap: 'wrap' }}>
-        <Button
-          variant="contained"
-          onClick={onSubmit}
-          disabled={isSubmitting || selectedUserIds.length === 0}
-        >
-          {isSubmitting ? '추가 중...' : '참조자 추가'}
-        </Button>
-        <Button onClick={onClose} disabled={isSubmitting}>
-          취소
-        </Button>
-      </DialogActions>
-    </Dialog>
+    </CommonDialog>
   );
 }

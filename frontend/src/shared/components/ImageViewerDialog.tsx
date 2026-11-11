@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react';
-import CloseIcon from '@mui/icons-material/Close';
-import {
-  Box,
-  Dialog,
-  DialogContent,
-  IconButton,
-  Typography,
-} from '@mui/material';
+import { Box } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import { CommonDialog } from './CommonDialog';
 
 export type ImageViewerDialogProps = {
   open: boolean;
@@ -41,58 +35,24 @@ export function ImageViewerDialog({
   }
 
   return (
-    <Dialog
+    <CommonDialog
       open={open}
       onClose={onClose}
-      maxWidth="lg"
-      fullWidth
-      aria-labelledby="image-viewer-dialog-title"
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 1,
-            overflow: 'hidden',
-            bgcolor: 'background.paper',
-            color: 'text.primary',
-            border: '1px solid',
-            borderColor: 'divider',
-          },
-        },
-      }}
+      title={title}
+      titleId="image-viewer-dialog-title"
+      closeButtonLabel="이미지 뷰어 닫기"
+      size="xl"
+      bodyMode="fill"
+      paperHeight="90vh"
+      surfaceBackgroundColor={theme.palette.background.paper}
     >
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          px: 2,
-          py: 1.25,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-        }}
-      >
-        <Typography
-          id="image-viewer-dialog-title"
-          variant="subtitle1"
-          sx={{ fontWeight: 700, color: 'text.primary' }}
-        >
-          {title}
-        </Typography>
-        <IconButton
-          aria-label="이미지 뷰어 닫기"
-          onClick={onClose}
-          sx={{ color: 'text.primary' }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </Box>
-
-      <DialogContent
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
+          height: '100%',
+          minHeight: 0,
           p: 1.5,
           backgroundColor: 'background.default',
           overflow: 'auto',
@@ -130,7 +90,7 @@ export function ImageViewerDialog({
             }}
           />
         </Box>
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </CommonDialog>
   );
 }

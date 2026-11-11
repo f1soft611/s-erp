@@ -6,15 +6,12 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import { CommonCodeItemHelpDialog } from '../../../../shared/components/common-code/CommonCodeItemHelpDialog';
+import { CommonDialog } from '../../../../shared/components/CommonDialog';
 import { PageHeader } from '../../../../shared/components/PageHeader';
 import { PageLoadBoundary } from '../../../../shared/components/PageLoadBoundary';
 import { PageSearchArea } from '../../../../shared/components/PageSearchArea';
@@ -709,33 +706,35 @@ export function ArchiveBoardPage({
         onSave={(file, payload) => mutations.updateFile(file, payload)}
       />
 
-      <Dialog
+      <CommonDialog
         open={deletingFile !== null}
-        onClose={mutations.isDeleting ? undefined : () => setDeletingFile(null)}
-        aria-labelledby="archive-delete-title"
-        aria-describedby="archive-delete-description"
+        onClose={() => {
+          if (!mutations.isDeleting) setDeletingFile(null);
+        }}
+        title="자료 삭제 확인"
+        description={`${deletingFile?.fileName} 파일을 삭제하시겠습니까?`}
+        size="xs"
+        actions={
+          <>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => void handleConfirmDelete()}
+              disabled={mutations.isDeleting}
+            >
+              삭제 확인
+            </Button>
+            <Button
+              onClick={() => setDeletingFile(null)}
+              disabled={mutations.isDeleting}
+            >
+              취소
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="archive-delete-title">자료 삭제 확인</DialogTitle>
-        <DialogContent id="archive-delete-description">
-          {deletingFile?.fileName} 파일을 삭제하시겠습니까?
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleConfirmDelete()}
-            disabled={mutations.isDeleting}
-          >
-            삭제 확인
-          </Button>
-          <Button
-            onClick={() => setDeletingFile(null)}
-            disabled={mutations.isDeleting}
-          >
-            취소
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {null}
+      </CommonDialog>
     </Box>
   );
 }

@@ -2,14 +2,11 @@ import { useState } from 'react';
 import {
   Button,
   Divider,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Menu,
   MenuItem,
   TextField,
 } from '@mui/material';
+import { CommonDialog } from '../../../shared/components/CommonDialog';
 import type {
   FavoriteFolder,
   FavoriteMenu,
@@ -223,32 +220,40 @@ export function MenuFavoriteContextMenu({
           </>
         )}
       </Menu>
-      <Dialog open={dialog !== null} onClose={closeDialog} fullWidth maxWidth="xs">
-        <DialogTitle>{dialog === 'rename' ? '폴더 이름 변경' : '즐겨찾기 폴더 만들기'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            margin="dense"
-            label="폴더명"
-            value={folderName}
-            onChange={(event) => setFolderName(event.target.value)}
-            slotProps={{ htmlInput: { maxLength: 40 } }}
-            error={folderName.trim().length === 0 || folderName.trim().length > 40}
-            helperText="공백 제외 1~40자"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
+      <CommonDialog
+        open={dialog !== null}
+        onClose={closeDialog}
+        size="xs"
+        title={dialog === 'rename' ? '폴더 이름 변경' : '즐겨찾기 폴더 만들기'}
+        actions={
+          <>
+            <Button
               variant="contained"
-            onClick={() => void submitFolder()}
-            disabled={!folderName.trim() || folderName.trim().length > 40 || submitting}
-          >
-            저장
-          </Button>
-          <Button onClick={closeDialog}>취소</Button>
-        </DialogActions>
-      </Dialog>
+              onClick={() => void submitFolder()}
+              disabled={
+                !folderName.trim() ||
+                folderName.trim().length > 40 ||
+                submitting
+              }
+            >
+              저장
+            </Button>
+            <Button onClick={closeDialog}>취소</Button>
+          </>
+        }
+      >
+        <TextField
+          autoFocus
+          fullWidth
+          margin="dense"
+          label="폴더명"
+          value={folderName}
+          onChange={(event) => setFolderName(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 40 } }}
+          error={folderName.trim().length === 0 || folderName.trim().length > 40}
+          helperText="공백 제외 1~40자"
+        />
+      </CommonDialog>
     </>
   );
 }

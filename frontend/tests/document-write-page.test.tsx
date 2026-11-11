@@ -67,16 +67,10 @@ const approvalLineTemplateApi = vi.hoisted(() => ({
 
 let restoreImagePreloader: (() => void) | undefined;
 
-function getButtonGeometry(button: HTMLElement) {
-  const style = getComputedStyle(button);
-  return [
-    style.height,
-    style.minHeight,
-    style.paddingTop,
-    style.paddingBottom,
-    style.paddingLeft,
-    style.paddingRight,
-  ];
+async function clickDocumentMenuItem(scope: HTMLElement, label: string) {
+  await waitFor(() => expect(composerApi.fetchMyProfile).toHaveBeenCalled());
+  fireEvent.click(await within(scope).findByRole('button', { name: '문서 더보기' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: label, exact: true }));
 }
 
 afterEach(() => {
@@ -721,6 +715,16 @@ describe('Document write page', () => {
     expect(screen.queryByRole('dialog', { name: '문서 유형 변경' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '업무연락' }));
     const confirmation = await screen.findByRole('dialog', { name: '문서 유형 변경' });
+    const header = confirmation.querySelector('.MuiDialogTitle-root')?.parentElement;
+    expect(header).toHaveTextContent(
+      '유형 변경 시 결재선과 참조자가 초기화됩니다.',
+    );
+    expect(header).not.toHaveTextContent(
+      '다른 문서 유형으로 이동하시겠습니까?',
+    );
+    expect(confirmation.querySelector('.MuiDialogContent-root')).toHaveTextContent(
+      '다른 문서 유형으로 이동하시겠습니까? 결재선과 참조자는 초기화되며, 제목과 본문은 유지됩니다.',
+    );
     fireEvent.click(within(confirmation).getByRole('button', { name: '취소' }));
     await waitForElementToBeRemoved(confirmation);
     expect(screen.getByRole('tab', { name: '기안서' })).toHaveAttribute('aria-selected', 'true');
@@ -1391,6 +1395,7 @@ describe('Document write page', () => {
   }, 15000);
 
   it('renders at the groupware write route instead of the coming-soon page', async () => {
+    mockPaginatedDocumentLists();
     render(<DashboardContent {...pageProps} />);
     await screen.findByRole('region', { name: '리스트형 문서 목록' });
 
@@ -2871,6 +2876,7 @@ describe('Document write page', () => {
   });
 
   it('lets the drafter cancel a pending submission after confirmation', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -2906,32 +2912,27 @@ describe('Document write page', () => {
     fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
 
     expect(screen.queryByRole('button', { name: '승인 취소' })).not.toBeInTheDocument();
+    await screen.findByTestId('approval-detail-card');
     composerApi.cancelDocumentSubmission.mockRejectedValueOnce(
       new Error('문서 상태가 변경되어 취소할 수 없습니다.'),
     );
-    const cancelSubmissionButton = await screen.findByRole('button', {
-      name: '상신 취소',
-    });
-    const commentSubmitButton = within(
-      screen.getByTestId('post-detail-panel'),
-    ).getByRole('button', { name: '등록' });
-    expect(getButtonGeometry(cancelSubmissionButton)).toEqual(
-      getButtonGeometry(commentSubmitButton),
-    );
-    expect(cancelSubmissionButton).toHaveClass(
-      'MuiButton-contained',
-      'MuiButton-colorError',
-    );
-    fireEvent.click(cancelSubmissionButton);
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '상신 취소' }));
     expect(
       await screen.findByRole('dialog', { name: '결재신청 취소' }),
     ).toHaveTextContent('임시저장 상태로 되돌립니다.');
-    fireEvent.click(screen.getByRole('button', { name: '상신 취소 확인' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: '결재신청 취소' }))
+        .getByRole('button', { name: '상신 취소' }),
+    );
 
     expect(
       await screen.findByText('문서 상태가 변경되어 취소할 수 없습니다.'),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '상신 취소 확인' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: '결재신청 취소' }))
+        .getByRole('button', { name: '상신 취소' }),
+    );
     await waitFor(() => {
       expect(composerApi.cancelDocumentSubmission).toHaveBeenCalledTimes(2);
     });
@@ -2941,6 +2942,7 @@ describe('Document write page', () => {
   });
 
   it('lets an approver cancel their own approval only before a later stage acts', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -2984,21 +2986,13 @@ describe('Document write page', () => {
     });
     fireEvent.click(await within(listRegion).findByRole('button', { name: /문서 A/ }));
 
-    const cancelApprovalButton = await screen.findByRole('button', {
-      name: '승인 취소',
-    });
-    const commentSubmitButton = within(
-      screen.getByTestId('post-detail-panel'),
-    ).getByRole('button', { name: '등록' });
-    expect(getButtonGeometry(cancelApprovalButton)).toEqual(
-      getButtonGeometry(commentSubmitButton),
+    await screen.findByTestId('approval-detail-card');
+    fireEvent.click(screen.getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '승인 취소' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: '승인 취소' }))
+        .getByRole('button', { name: '승인 취소' }),
     );
-    expect(cancelApprovalButton).toHaveClass(
-      'MuiButton-contained',
-      'MuiButton-colorError',
-    );
-    fireEvent.click(cancelApprovalButton);
-    fireEvent.click(screen.getByRole('button', { name: '승인 취소 확인' }));
 
     await waitFor(() => {
       expect(composerApi.cancelDocumentApproval).toHaveBeenCalledWith(1);
@@ -3009,6 +3003,7 @@ describe('Document write page', () => {
   });
 
   it('does not offer approval cancellation after the final approval completes the document', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -4044,21 +4039,19 @@ describe('Document write page', () => {
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
   }, 20000);
 
-  it('shows the ordered approval toolbar to a feed approver', async () => {
+  it('shows approval actions first in the more menu for a feed approver', async () => {
     mockPendingFeedForCurrentApprover();
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
 
     const card = await screen.findByTestId('document-write-item');
     const toolbar = within(card).getByTestId('document-approval-toolbar');
-    const approve = await within(toolbar).findByRole('button', { name: '승인' });
     await waitFor(() =>
       expect(composerApi.fetchMyProfile).toHaveBeenCalledTimes(1),
     );
-    const reject = within(toolbar).getByRole('button', { name: '반려' });
-    const returnForRevision = within(toolbar).getByRole('button', {
-      name: '보완요청',
-    });
+    expect(within(toolbar).queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '반려' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '보완요청' })).not.toBeInTheDocument();
     const statusChip = within(toolbar).getByText('결재진행중').closest('.MuiChip-root');
     const kindChip = within(toolbar).getByText('기안').closest('.MuiChip-root');
     if (!statusChip || !kindChip) throw new Error('Missing document badges.');
@@ -4066,68 +4059,47 @@ describe('Document write page', () => {
     const pin = within(toolbar).getByRole('button', {
       name: '상단 고정 문서 A',
     });
-    const commentSubmitButton = within(card).getByRole('button', {
-      name: '등록',
-    });
-    const orderedElements = [
-      approve,
-      reject,
-      returnForRevision,
-      statusChip,
-      kindChip,
-      divider,
-      pin,
-    ];
-    const actionButtonStyles = [approve, reject, returnForRevision].map(
-      (button) => getComputedStyle(button),
-    );
-
+    fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
+    const menu = await screen.findByRole('menu');
+    const menuItems = within(menu).getAllByRole('menuitem');
+    expect(menuItems.map((item) => item.textContent)).toEqual([
+      '승인',
+      '반려',
+      '보완요청',
+      '문서 공유하기',
+      '참조자 추가하기',
+    ]);
+    const menuDividers = within(menu).getAllByRole('separator');
+    expect(menuDividers).toHaveLength(1);
+    expect(
+      menuItems[2]?.compareDocumentPosition(menuDividers[0]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      menuDividers[0]?.compareDocumentPosition(menuItems[3]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(getComputedStyle(statusChip).height).toBe('28px');
     expect(getComputedStyle(kindChip).height).toBe('28px');
     expect(getComputedStyle(toolbar).columnGap).toBe('4px');
-    expect(parseFloat(getComputedStyle(statusChip).marginRight)).toBe(0);
-    expect(parseFloat(getComputedStyle(pin).marginLeft)).toBe(0);
-    expect(parseFloat(getComputedStyle(kindChip).marginRight)).toBe(0);
-    expect(actionButtonStyles.map((style) => style.minHeight)).toEqual([
-      getComputedStyle(commentSubmitButton).minHeight,
-      getComputedStyle(commentSubmitButton).minHeight,
-      getComputedStyle(commentSubmitButton).minHeight,
-    ]);
-    expect([approve, reject, returnForRevision].map(getButtonGeometry)).toEqual([
-      getButtonGeometry(commentSubmitButton),
-      getButtonGeometry(commentSubmitButton),
-      getButtonGeometry(commentSubmitButton),
-    ]);
     expect(getComputedStyle(divider).marginRight).toBe('0px');
-    expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary');
-    expect(reject).toHaveClass('MuiButton-contained', 'MuiButton-colorError');
-    expect(returnForRevision).toHaveClass('MuiButton-outlined', 'MuiButton-colorWarning');
     expect(statusChip).toHaveClass('MuiChip-filled');
-    expect(statusChip).toHaveStyle({ borderRadius: '8px' });
-    expect(kindChip).toHaveStyle({ borderRadius: '8px' });
-    expect(getComputedStyle(statusChip).borderRadius).toBe(
-      getComputedStyle(kindChip).borderRadius,
-    );
+    expect(statusChip).toHaveStyle({ borderRadius: '6px' });
+    expect(kindChip).toHaveStyle({ borderRadius: '6px' });
     expect(
-      within(toolbar).queryByRole('button', { name: '상신 취소' }),
+      within(menu).queryByRole('menuitem', { name: '상신 취소' }),
     ).not.toBeInTheDocument();
     expect(
-      within(toolbar).queryByRole('button', { name: '승인 취소' }),
+      within(menu).queryByRole('menuitem', { name: '승인 취소' }),
     ).not.toBeInTheDocument();
-    for (let index = 0; index < orderedElements.length - 1; index += 1) {
-      const current = orderedElements[index];
-      const next = orderedElements[index + 1];
-      if (!current || !next) throw new Error('Missing toolbar element.');
-      expect(
-        current.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).not.toBe(0);
-    }
+    expect(getComputedStyle(pin).marginLeft).toBe('0px');
     expect(screen.getByTestId('approval-line-participant-90')).toHaveStyle({
       borderColor: muiTheme.palette.info.main,
     });
   });
 
-  it('places detail approval actions before the status and keeps the opinion field', async () => {
+  it('does not expose approval actions in the detail toolbar and keeps the opinion field', async () => {
+    mockPaginatedDocumentLists();
     composerApi.getDocumentApprovalDetail.mockResolvedValueOnce({
       electronicApprovalId: 1,
       eabusNo: '001',
@@ -4164,14 +4136,22 @@ describe('Document write page', () => {
     );
 
     const toolbar = await screen.findByTestId('document-approval-toolbar');
-    const approve = await within(toolbar).findByRole('button', { name: '승인' });
-    const status = within(toolbar).getByText('결재진행중');
+    await waitFor(() =>
+      expect(composerApi.fetchMyProfile).toHaveBeenCalledTimes(1),
+    );
+    expect(within(toolbar).queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
     expect(
-      approve.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(
-      screen.getByRole('textbox', { name: '처리 의견' }),
+      await screen.findByRole('textbox', { name: '처리 의견' }),
     ).toBeInTheDocument();
+    fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
+    const menu = await screen.findByRole('menu');
+    const menuItems = within(menu).getAllByRole('menuitem');
+    expect(menuItems.slice(0, 3).map((item) => item.textContent)).toEqual([
+      '승인',
+      '반려',
+      '보완요청',
+    ]);
+    expect(menuItems[3]).toHaveTextContent('문서 공유하기');
   });
 
   it.each([
@@ -4184,6 +4164,7 @@ describe('Document write page', () => {
     if (!record) throw new Error('Missing document fixture.');
     composerApi.getDocumentApprovalDetail.mockResolvedValue(toFeedRecord(record, {
       isDrafter: false,
+      documentStatus: 'PENDING',
       approvalLines: [{
         electronicApprovalLineId: 93,
         stageOrder: 2,
@@ -4203,7 +4184,7 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    await clickDocumentMenuItem(screen.getByTestId('approval-detail-card'), label);
     let dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(dialog).toHaveStyle({ maxWidth: '480px' });
     expect(dialog).toHaveAccessibleDescription('처리 사유를 입력해 주세요.');
@@ -4218,13 +4199,13 @@ describe('Document write page', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기', exact: true }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogTitle })).not.toBeInTheDocument());
     expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    await clickDocumentMenuItem(screen.getByTestId('approval-detail-card'), label);
     dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(within(dialog).getByRole('textbox', { name: '처리 사유' })).toHaveValue('');
     fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: dialogTitle })).not.toBeInTheDocument());
     expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+    await clickDocumentMenuItem(screen.getByTestId('approval-detail-card'), label);
     dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(within(dialog).getByRole('textbox', { name: '처리 사유' })).toHaveValue('');
     fireEvent.change(within(dialog).getByRole('textbox', { name: '처리 사유' }), {
@@ -4306,7 +4287,7 @@ describe('Document write page', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: '처리 의견' }), {
       target: { value: '승인 의견' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '승인', exact: true }));
+    await clickDocumentMenuItem(screen.getByTestId('approval-detail-card'), '승인');
     await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2),
@@ -4356,7 +4337,7 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(await screen.findByRole('button', { name: '승인', exact: true }));
+    await clickDocumentMenuItem(screen.getByTestId('approval-detail-card'), '승인');
 
     expect(await screen.findByText('댓글 재조회 실패')).toBeInTheDocument();
     expect(composerNotifications.showSuccess).toHaveBeenCalledWith(
@@ -4376,6 +4357,7 @@ describe('Document write page', () => {
     if (!record) throw new Error('Missing document fixture.');
     composerApi.getDocumentApprovalDetail.mockResolvedValue(toFeedRecord(record, {
       isDrafter: kind === 'submission',
+      documentStatus: kind === 'submission' ? 'PENDING' : 'IN_PROGRESS',
       approvalLines: kind === 'approval' ? [{
         electronicApprovalLineId: 93,
         stageOrder: 2,
@@ -4397,10 +4379,14 @@ describe('Document write page', () => {
     await waitFor(() =>
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(1),
     );
-    fireEvent.click(await screen.findByRole('button', { name: buttonLabel, exact: true }));
+    await clickDocumentMenuItem(
+      screen.getByTestId('approval-detail-card'),
+      buttonLabel,
+    );
     const dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(cancelApi).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel, exact: true }));
+    await waitFor(() => expect(cancelApi).toHaveBeenCalledWith(1));
     await waitFor(() => expect(onActionComplete).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2),
@@ -4422,6 +4408,7 @@ describe('Document write page', () => {
     if (!record) throw new Error('Missing document fixture.');
     const feedRecord = toFeedRecord(record, {
       isDrafter: kind === 'submission',
+      documentStatus: kind === 'submission' ? 'PENDING' : 'IN_PROGRESS',
       approvalLines: kind === 'approval' ? [{
         electronicApprovalLineId: 93,
         stageOrder: 2,
@@ -4445,13 +4432,16 @@ describe('Document write page', () => {
       employeeId="emp-1"
       onActionComplete={onActionComplete} onEditDocument={vi.fn()}
     />);
-    fireEvent.click(await screen.findByRole('button', { name: buttonLabel, exact: true }));
+    const toolbar = screen.getByTestId('document-approval-toolbar');
+    fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: buttonLabel, exact: true }));
     let dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(cancelApi).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
     await waitForElementToBeRemoved(dialog);
     expect(cancelApi).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: buttonLabel, exact: true }));
+    fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: buttonLabel, exact: true }));
     dialog = await screen.findByRole('dialog', { name: dialogTitle });
     fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel, exact: true }));
     expect(await within(dialog).findByText('취소 처리 실패')).toBeInTheDocument();
@@ -4496,8 +4486,15 @@ describe('Document write page', () => {
       }}
       employeeId="emp-1" onActionComplete={vi.fn()} onEditDocument={vi.fn()}
     />);
-    await screen.findByTestId('document-approval-toolbar');
-    expect(screen.queryByRole('button', { name: /상신 취소|승인 취소/ })).toBeNull();
+    const toolbar = await screen.findByTestId('document-approval-toolbar');
+    expect(
+      within(toolbar).queryByRole('button', { name: /상신 취소|승인 취소/ }),
+    ).toBeNull();
+    fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu).queryByRole('menuitem', { name: /상신 취소|승인 취소/ }),
+    ).toBeNull();
   });
 
   it('shows a feed approval error when the direct approval request fails', async () => {
@@ -4509,7 +4506,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
 
     const card = await screen.findByTestId('document-write-item');
-    fireEvent.click(await within(card).findByRole('button', { name: '승인' }));
+    await clickDocumentMenuItem(card, '승인');
 
     expect(
       await within(card).findByText('승인 처리에 실패했습니다.'),
@@ -4541,11 +4538,14 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '사원 정보 다시 시도' }));
     expect(
-      await within(await screen.findByTestId('document-write-item')).findByRole(
+      within(await screen.findByTestId('document-write-item')).getByRole(
         'button',
-        { name: '승인' },
+        { name: '문서 더보기' },
       ),
     ).toBeInTheDocument();
+    const card = await screen.findByTestId('document-write-item');
+    fireEvent.click(within(card).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menuitem', { name: '승인' })).toBeInTheDocument();
     expect(composerApi.fetchMyProfile).toHaveBeenCalledTimes(2);
   });
 
@@ -4572,7 +4572,7 @@ describe('Document write page', () => {
       fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
 
       const card = await screen.findByTestId('document-write-item');
-      fireEvent.click(await within(card).findByRole('button', { name: label }));
+      await clickDocumentMenuItem(card, label);
 
       const dialog = await screen.findByRole('dialog', { name: dialogTitle });
       expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
@@ -7151,9 +7151,12 @@ describe('Document write page', () => {
       const onActionComplete = vi.fn();
       render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
         onClose={vi.fn()} onActionComplete={onActionComplete} onEditDocument={vi.fn()} detailRefreshToken={0} />);
-      const button = await screen.findByRole('button', { name: '최종확인', exact: true });
-      expect(screen.queryByRole('button', { name: '승인', exact: true })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: '반려', exact: true })).not.toBeInTheDocument();
+      const approvalCard = await screen.findByTestId('approval-detail-card');
+      fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+      const menu = await screen.findByRole('menu');
+      const item = within(menu).getByRole('menuitem', { name: '최종확인', exact: true });
+      expect(within(menu).queryByRole('menuitem', { name: '승인', exact: true })).not.toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: '반려', exact: true })).not.toBeInTheDocument();
       expect(screen.queryByText('내부 최종확인 참여자')).not.toBeInTheDocument();
       composerApi.listApprovalComments.mockResolvedValue({
         comments: [], hasPrevious: false, nextBeforeCommentId: null, resultCnt: 0,
@@ -7163,8 +7166,8 @@ describe('Document write page', () => {
           writerName: '기안자', createdAt: '2026-11-02T02:00:00Z',
         }],
       });
-      fireEvent.click(button);
-      expect(button).toBeDisabled();
+      fireEvent.click(item);
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       await act(async () => finish());
       await waitFor(() => {
         expect(composerApi.confirmDocumentFinalConfirmation).toHaveBeenCalledWith(record.electronicApprovalId);
@@ -7172,8 +7175,9 @@ describe('Document write page', () => {
         expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(2);
         expect(onActionComplete).toHaveBeenCalledOnce();
         expect(onActionComplete).toHaveBeenCalledWith({ quiet: true });
-        expect(screen.queryByRole('button', { name: '최종확인', exact: true })).not.toBeInTheDocument();
       });
+      fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+      expect(screen.queryByRole('menuitem', { name: '최종확인', exact: true })).not.toBeInTheDocument();
       expect(await screen.findByText('기안자가 최종 확인을 완료했습니다.')).toBeInTheDocument();
       expect(screen.getAllByText(documentStatus === 'COMPLETED' ? '승인' : '반려').length).toBeGreaterThan(0);
       expect(composerApi.processDocumentApprovalAction).not.toHaveBeenCalled();
@@ -7205,8 +7209,11 @@ describe('Document write page', () => {
     render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
       onClose={vi.fn()} onActionComplete={vi.fn()} onEditDocument={vi.fn()} detailRefreshToken={0} />);
     await screen.findByRole('heading', { name: '문서 상세' });
-    expect(screen.queryByRole('button', { name: '최종확인', exact: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '승인', exact: true })).not.toBeInTheDocument();
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryByRole('menuitem', { name: '최종확인', exact: true })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: '승인', exact: true })).not.toBeInTheDocument();
   });
 
   it('keeps final-confirmation failures visible without refreshing as success', async () => {
@@ -7223,9 +7230,11 @@ describe('Document write page', () => {
     const onActionComplete = vi.fn();
     render(<DocumentApprovalDetailFeed open electronicApprovalId={record.electronicApprovalId}
       onClose={vi.fn()} onActionComplete={onActionComplete} onEditDocument={vi.fn()} detailRefreshToken={0} />);
-    fireEvent.click(await screen.findByRole('button', { name: '최종확인', exact: true }));
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    await clickDocumentMenuItem(approvalCard, '최종확인');
     expect(await screen.findByText('최종확인 권한이 없습니다.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '최종확인', exact: true })).toBeEnabled();
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menuitem', { name: '최종확인', exact: true })).toBeEnabled();
     expect(onActionComplete).not.toHaveBeenCalled();
     expect(composerApi.getDocumentApprovalDetail).toHaveBeenCalledOnce();
   });
@@ -7274,12 +7283,14 @@ describe('Document write page', () => {
       />,
     );
 
-    const confirmButton = await screen.findByRole('button', {
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    const menu = await screen.findByRole('menu');
+    fireEvent.click(within(menu).getByRole('menuitem', {
       name: '확인',
       exact: true,
-    });
-    fireEvent.click(confirmButton);
-    expect(confirmButton).toBeDisabled();
+    }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
     await act(async () => {
       resolveConfirmation({
@@ -7297,9 +7308,8 @@ describe('Document write page', () => {
       expect(onActionComplete).toHaveBeenCalledOnce();
       expect(onActionComplete).toHaveBeenCalledWith({ quiet: true });
     });
-    expect(
-      screen.queryByRole('button', { name: '확인', exact: true }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    expect(screen.queryByRole('menuitem', { name: '확인', exact: true })).not.toBeInTheDocument();
   });
 
   it('does not offer reference confirmation to a different authenticated employee', async () => {
@@ -7332,9 +7342,10 @@ describe('Document write page', () => {
     );
 
     await screen.findByRole('heading', { name: '문서 상세' });
-    expect(
-      screen.queryByRole('button', { name: '확인', exact: true }),
-    ).not.toBeInTheDocument();
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '확인', exact: true })).not.toBeInTheDocument();
   });
 
   it('does not offer reference confirmation to an approval participant', async () => {
@@ -7367,9 +7378,10 @@ describe('Document write page', () => {
     );
 
     await screen.findByRole('heading', { name: '문서 상세' });
-    expect(
-      screen.queryByRole('button', { name: '확인', exact: true }),
-    ).not.toBeInTheDocument();
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '확인', exact: true })).not.toBeInTheDocument();
   });
 
   it('allows an unconfirmed reference to confirm a sent business contact', async () => {
@@ -7403,9 +7415,9 @@ describe('Document write page', () => {
       />,
     );
 
-    expect(
-      await screen.findByRole('button', { name: '확인', exact: true }),
-    ).toBeInTheDocument();
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+    expect(await screen.findByRole('menuitem', { name: '확인', exact: true })).toBeInTheDocument();
   });
 
   it.each([
@@ -7445,9 +7457,10 @@ describe('Document write page', () => {
       );
 
       await screen.findByRole('heading', { name: '문서 상세' });
-      expect(
-        screen.queryByRole('button', { name: '확인', exact: true }),
-      ).not.toBeInTheDocument();
+      const approvalCard = await screen.findByTestId('approval-detail-card');
+      fireEvent.click(within(approvalCard).getByRole('button', { name: '문서 더보기' }));
+      expect(await screen.findByRole('menu')).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: '확인', exact: true })).not.toBeInTheDocument();
     },
   );
 
@@ -7482,9 +7495,8 @@ describe('Document write page', () => {
         detailRefreshToken={0}
       />,
     );
-    fireEvent.click(
-      await screen.findByRole('button', { name: '확인', exact: true }),
-    );
+    const approvalCard = await screen.findByTestId('approval-detail-card');
+    await clickDocumentMenuItem(approvalCard, '확인');
 
     expect(
       await screen.findByRole('alert'),
