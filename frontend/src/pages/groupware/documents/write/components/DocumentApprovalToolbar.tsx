@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Divider, Stack } from '@mui/material';
 
 type DocumentApprovalToolbarProps = {
-  approvalActions?: ReactNode;
   status: ReactNode;
   pinControl: ReactNode;
   moreMenu?: ReactNode;
@@ -10,7 +9,6 @@ type DocumentApprovalToolbarProps = {
 };
 
 export function DocumentApprovalToolbar({
-  approvalActions,
   status,
   pinControl,
   moreMenu,
@@ -31,7 +29,6 @@ export function DocumentApprovalToolbar({
         width: { xs: '100%', sm: 'auto' },
       }}
     >
-      {approvalActions}
       {status}
       {documentKind}
       {pinControl ? (

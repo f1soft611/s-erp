@@ -1148,8 +1148,80 @@ export function DocumentApprovalDetailFeed(
     }
   };
 
+  const approvalActions = [
+    ...(canProcess
+      ? [
+          {
+            label: '승인',
+            onSelect: () => {
+              void handleAction('APPROVED');
+            },
+            disabled: isActing,
+          },
+          {
+            label: '반려',
+            onSelect: () => openReasonDialog('REJECTED'),
+            disabled: isActing,
+          },
+          {
+            label: '보완요청',
+            onSelect: () => openReasonDialog('RETURNED'),
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canConfirmFinal
+      ? [
+          {
+            label: '최종확인',
+            onSelect: () => {
+              void handleFinalConfirmation();
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canConfirmReference
+      ? [
+          {
+            label: '확인',
+            onSelect: () => {
+              void handleReferenceConfirmation();
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canCancelSubmission
+      ? [
+          {
+            label: '상신 취소',
+            onSelect: () => {
+              setActionError('');
+              setCancelDialogType('submission');
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+    ...(canCancelApproval
+      ? [
+          {
+            label: '승인 취소',
+            onSelect: () => {
+              setActionError('');
+              setCancelDialogType('approval');
+            },
+            disabled: isActing,
+          },
+        ]
+      : []),
+  ];
+
   const documentMenu = detail ? (
     <DocumentActionsMenu
+      approvalActions={approvalActions}
+      disabled={isActing}
       onShare={() => {
         void (async () => {
           try {
@@ -1192,105 +1264,9 @@ export function DocumentApprovalDetailFeed(
   const kindPresentation = displayDocumentType
     ? getDocumentKindPresentation(displayDocumentType)
     : null;
-  const approvalActionButtonSx = {
-    px: 1.25,
-    py: 0.5,
-  };
   const documentToolbar =
     statusPresentation && kindPresentation ? (
       <DocumentApprovalToolbar
-        approvalActions={
-          <>
-            {canProcess && (
-              <>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={approvalActionButtonSx}
-                  onClick={() => void handleAction('APPROVED')}
-                  disabled={isActing}
-                >
-                  승인
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  sx={approvalActionButtonSx}
-                  onClick={() => openReasonDialog('REJECTED')}
-                  disabled={isActing}
-                >
-                  반려
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="warning"
-                  sx={approvalActionButtonSx}
-                  onClick={() => openReasonDialog('RETURNED')}
-                  disabled={isActing}
-                >
-                  보완요청
-                </Button>
-              </>
-            )}
-            {canConfirmFinal && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                sx={approvalActionButtonSx}
-                onClick={() => void handleFinalConfirmation()}
-                disabled={isActing}
-              >
-                최종확인
-              </Button>
-            )}
-            {canConfirmReference && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                sx={approvalActionButtonSx}
-                onClick={() => void handleReferenceConfirmation()}
-                disabled={isActing}
-              >
-                확인
-              </Button>
-            )}
-            {canCancelSubmission && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                sx={approvalActionButtonSx}
-                disabled={isActing}
-                onClick={() => {
-                  setActionError('');
-                  setCancelDialogType('submission');
-                }}
-              >
-                상신 취소
-              </Button>
-            )}
-            {canCancelApproval && (
-              <Button
-                size="small"
-                variant="contained"
-                color="error"
-                sx={approvalActionButtonSx}
-                disabled={isActing}
-                onClick={() => {
-                  setActionError('');
-                  setCancelDialogType('approval');
-                }}
-              >
-                승인 취소
-              </Button>
-            )}
-          </>
-        }
         status={
           <Chip
             label={statusPresentation.label}

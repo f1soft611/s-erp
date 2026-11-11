@@ -3,7 +3,14 @@ import { Divider, IconButton, Menu, MenuItem } from '@mui/material';
 import { useState } from 'react';
 import type { ApprovalDocumentStatus } from '../types/documentWrite.types';
 
+type DocumentApprovalMenuAction = {
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+};
+
 type DocumentActionsMenuProps = {
+  approvalActions?: DocumentApprovalMenuAction[];
   isDrafter?: boolean;
   documentStatus?: ApprovalDocumentStatus;
   disabled?: boolean;
@@ -14,6 +21,7 @@ type DocumentActionsMenuProps = {
 };
 
 export function DocumentActionsMenu({
+  approvalActions = [],
   isDrafter,
   documentStatus,
   disabled = false,
@@ -38,6 +46,19 @@ export function DocumentActionsMenu({
         <MoreVertIcon fontSize="small" />
       </IconButton>
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+        {approvalActions.map((action) => (
+          <MenuItem
+            key={action.label}
+            disabled={action.disabled}
+            onClick={() => {
+              setAnchor(null);
+              action.onSelect();
+            }}
+          >
+            {action.label}
+          </MenuItem>
+        ))}
+        {approvalActions.length > 0 && <Divider />}
         <MenuItem onClick={() => {
           setAnchor(null);
           onShare();

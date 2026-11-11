@@ -126,7 +126,7 @@ export function OverviewPage({ selectedModule, currentMenuName }: OverviewPagePr
                 xs: '1fr', md: overview.canReadApprovals && overview.canReadNotices ? '1fr 1fr' : '1fr',
               }, gap: 2.5 }}>
                 {overview.canReadApprovals && overview.approvalStatus === 'ready' && approval && (
-                  <OverviewPanel focus title="지금 확인할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순"
+                  <OverviewPanel focus title="지금 결재할 업무" caption="결재 대기 및 보완요청 · 최근 변경 순"
                     icon={<AssignmentOutlined fontSize="small" />}
                     footer={<><Typography>내 처리·보완 업무</Typography><Button size="small" onClick={() => navigate(approvalPath)}>문서 업무 보기 <ArrowOutwardRounded sx={{ ml: 0.5, fontSize: 14 }} /></Button></>}>
                     {approval.notices.length === 0 ? <OverviewEmpty>처리할 업무가 없습니다.</OverviewEmpty> : (
