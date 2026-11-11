@@ -25,6 +25,7 @@ import { CompanyInfoPage } from '../../co/master/company/CompanyInfoPage';
 import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseManagementPage';
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
+import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStandardRecipePage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
@@ -204,6 +205,18 @@ export function DashboardContent({
         breadcrumbItems={breadcrumbItems}
         selectedMenuPermissions={selectedMenuPermissions}
         isTenantAdmin={isTenantAdmin}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'co' && currentPageKey === 'work-standard-recipe') {
+    return (
+      <WorkStandardRecipePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
       />
     );
   }
