@@ -16,7 +16,7 @@ import type { PageSearchField, PageSearchFieldValue } from '../../../../shared/c
 import type { MenuTreeNode } from '../../../dashboard/types/dashboard';
 import { SearchResultMessage } from '../../../../shared/components/SearchResultMessage';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
-import type { DeliveryPlanDetail, DeliveryPlanFilters, DeliveryPlanPageProps, DeliveryPlanStatusRow, PlanRow } from '../types/salesDeliveryPlan.types';
+import type { DeliveryPlanDetail, DeliveryPlanFilters, DeliveryPlanItem, DeliveryPlanPageProps, DeliveryPlanStatusRow, PlanRow } from '../types/salesDeliveryPlan.types';
 import { defaultDeliveryPlanFilters, getDeliveryPlan, getDeliveryPlanStatus, planRowsFromDetails, updateDeliveryPlan, validDeliveryPlanPeriod, validateDeliveryPlan } from '../services/salesDeliveryPlan.service';
 
 const fields: PageSearchField[] = [
@@ -52,7 +52,7 @@ export function SalesDeliveryPlanStatusPage({
   const { confirm, dialog } = useCommonConfirmDialog();
   const [filters, setFilters] = useState<DeliveryPlanFilters>(() => defaultDeliveryPlanFilters());
   const [rows, setRows] = useState<DeliveryPlanStatusRow[]>([]);
-  const [selected, setSelected] = useState<DeliveryPlanStatusRow | null>(null);
+  const [selected, setSelected] = useState<DeliveryPlanItem | DeliveryPlanStatusRow | null>(null);
   const [details, setDetails] = useState<DeliveryPlanDetail[]>([]);
   const [editRows, setEditRows] = useState<PlanRow[]>([]);
   const editGridRef = useRef<F1GridRef<PlanRow>>(null);
@@ -144,7 +144,7 @@ export function SalesDeliveryPlanStatusPage({
   }];
   const columns = useMemo<F1GridColumn<DeliveryPlanStatusRow>[]>(() => [
     { field: 'salesDeliveryPlanId', headerName: 'No', type: 'rownumber', width: 56, align: 'center' },
-    { field: 'planNo', headerName: '계획번호', width: 150, align: 'center',
+    { field: 'planNo', headerName: '계획번호', width: 150, align: 'center', mergeRows: true,
       renderCell: ({ row }) => <Link component="button" type="button" underline="hover" aria-label={`${row.planNo} 상세 보기`}
         onClick={(event) => { event.stopPropagation(); void open(row); }}
         sx={{ position: 'relative', zIndex: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -152,6 +152,13 @@ export function SalesDeliveryPlanStatusPage({
     { field: 'orderNo', headerName: '수주번호', width: 150, align: 'center' },
     { field: 'orderDt', headerName: '수주일자', type: 'date', width: 100, align: 'center' },
     { field: 'customerName', headerName: '거래처', width: 180, align: 'left' },
+    { field: 'planDt', headerName: '계획일', type: 'date', width: 100, align: 'center' },
+    { field: 'materialCode', headerName: '품목코드', width: 120, align: 'center' },
+    { field: 'materialName', headerName: '품목명', width: 180, align: 'left' },
+    { field: 'orderQty', headerName: '수주수량', type: 'decimal', width: 110, align: 'right' },
+    { field: 'plannedQty', headerName: '계획수량', type: 'decimal', width: 110, align: 'right' },
+    { field: 'deliveredQty', headerName: '출하수량', type: 'decimal', width: 110, align: 'right' },
+    { field: 'remainingQty', headerName: '출하잔량', type: 'decimal', width: 110, align: 'right' },
   ], [open]);
   if (!permissions?.read) return <Alert severity="warning">출하계획 현황 조회 권한이 없습니다.</Alert>;
 
@@ -171,6 +178,16 @@ export function SalesDeliveryPlanStatusPage({
     setEditRows(planRowsFromDetails(details));
     setError('');
   };
+  const orderNumbers = Array.from(new Set(details.map((detail) => detail.orderNo))).join(', ');
+  const orderDates = Array.from(new Set(details.map((detail) => detail.orderDt))).join(', ');
+  const customerNames = Array.from(new Set(details.map((detail) => detail.customerName))).join(', ');
+  const customerCodes = Array.from(new Set(details.map((detail) => detail.customerCode))).join(', ');
+  const planDates = Array.from(new Set(details.map((detail) => detail.planDt ?? '').filter(Boolean))).join(', ');
+  const selectedOrderNumbers = orderNumbers || (selected && 'orderNo' in selected ? selected.orderNo : '');
+  const selectedOrderDates = orderDates || (selected && 'orderDt' in selected ? selected.orderDt : '');
+  const selectedCustomerNames = customerNames || (selected && 'customerName' in selected ? selected.customerName : '');
+  const selectedCustomerCodes = customerCodes || (selected && 'customerCode' in selected ? selected.customerCode : '');
+  const selectedPlanDates = planDates;
   const detailTable = <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
     <Table size="small" sx={{ minWidth: 660, '& .MuiTableCell-head': { bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700, whiteSpace: 'nowrap' },
       '& .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root': { borderBottom: 0 } }} aria-label="출하계획 상세 목록">
@@ -204,7 +221,7 @@ export function SalesDeliveryPlanStatusPage({
         const next = defaultDeliveryPlanFilters();
         setFilters(next); setDetailValues({ planDt: { from: next.planDtFrom, to: next.planDtTo } }); void runSearch(next);
       }} detailLoading={loading} onDefaultSearch={() => void search()}
-      searchField={<TextField size="small" margin="none" placeholder="계획번호/수주번호/거래처 검색"
+      searchField={<TextField size="small" margin="none" placeholder="계획번호/수주번호/거래처/품목 검색"
         value={filters.keyword} onChange={(event) => setFilters((value) => ({ ...value, keyword: event.target.value }))}
         onKeyDown={(event) => { if (event.key === 'Enter') void search(); }}
         slotProps={{ htmlInput: { 'aria-label': '출하계획현황 빠른 검색' } }}
@@ -223,7 +240,7 @@ export function SalesDeliveryPlanStatusPage({
         horizontalPadding="none"
       />
       <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanId"
+        <F1Grid ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId"
           loading={loading} showCheckbox={false} height="100%" minHeight={240} selectionMode="row"
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />
@@ -254,18 +271,19 @@ export function SalesDeliveryPlanStatusPage({
           <Box aria-label="출하계획 요약" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) auto' },
             alignItems: 'center', gap: { xs: 1.5, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: { xs: 2, sm: 2.5 }, bgcolor: 'action.hover' }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="caption" color="text.secondary" component="div">거래처</Typography>
-              <Typography variant="h6" component="div" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{selected.customerName || '-'}</Typography>
+              <Typography variant="caption" color="text.secondary" component="div">수주번호</Typography>
+              <Typography variant="h6" component="div" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{selectedOrderNumbers || '-'}</Typography>
+              <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>거래처</Typography>
+              <Typography variant="body1" component="div" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{selectedCustomerNames || '-'}</Typography>
               <Stack direction="row" spacing={2} useFlexGap sx={{ mt: 1, flexWrap: 'wrap' }}>
                 <InfoItem label="계획번호">{selected.planNo}</InfoItem>
-                <InfoItem label="수주번호">{selected.orderNo}</InfoItem>
-                <InfoItem label="수주일자">{selected.orderDt}</InfoItem>
+                <InfoItem label="수주일자">{selectedOrderDates}</InfoItem>
               </Stack>
             </Box>
           </Box>
           <Box aria-label="출하계획 기본정보" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
-            <InfoGroup title="출하계획 정보"><InfoItem label="계획번호">{selected.planNo}</InfoItem><InfoItem label="수주번호">{selected.orderNo}</InfoItem></InfoGroup>
-            <InfoGroup title="거래처 정보"><InfoItem label="거래처코드">{selected.customerCode}</InfoItem><InfoItem label="수주일자">{selected.orderDt}</InfoItem></InfoGroup>
+            <InfoGroup title="출하계획 정보"><InfoItem label="계획번호">{selected.planNo}</InfoItem><InfoItem label="계획일">{selectedPlanDates}</InfoItem></InfoGroup>
+            <InfoGroup title="거래처 정보"><InfoItem label="거래처코드">{selectedCustomerCodes}</InfoItem><InfoItem label="수주일자">{selectedOrderDates}</InfoItem></InfoGroup>
           </Box>
           <Box sx={{ minWidth: 0 }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
             <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700 }}>출하계획 품목</Typography>
@@ -280,8 +298,8 @@ export function SalesDeliveryPlanStatusPage({
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         <PageMessageArea message={error} onClose={() => setError('')} />
-        <DeliveryPlanForm gridRef={editGridRef} planNo={selected.planNo} orderNo={selected.orderNo} orderDt={selected.orderDt}
-          customerName={selected.customerName} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading}
+        <DeliveryPlanForm gridRef={editGridRef} planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
+          customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading}
           canSelectOrder={false} onSelectOrder={() => undefined} />
       </Box>
       </Box>

@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { SalesDeliveryPlanCreatePage } from '../src/pages/sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
 import { SalesDeliveryPlanStatusPage } from '../src/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
 import { createDeliveryPlan, getDeliveryPlan, getDeliveryPlanByOrder, getDeliveryPlanStatus, searchPlanSourceOrders, updateDeliveryPlan } from '../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service';
-import type { DeliveryPlanItem, PlanSourceOrderRow } from '../src/pages/sales/delivery-plan/types/salesDeliveryPlan.types';
+import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from '../src/pages/sales/delivery-plan/types/salesDeliveryPlan.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
 vi.mock('../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service', async (original) => ({
@@ -23,9 +23,7 @@ const source: PlanSourceOrderRow = {
   planDt: '2026-11-08', remainingPlanQty: 10,
 };
 const plan: DeliveryPlanItem = {
-  salesDeliveryPlanId: 9, tenantId: 71, planNo: 'DP-9', salesOrderId: 7,
-  orderNo: 'SO-7', orderDt: '2026-11-04', customerId: 10, customerCode: 'C10',
-  customerName: '거래처', createdBy: 'user01',
+  salesDeliveryPlanId: 9, tenantId: 71, planNo: 'DP-9', createdBy: 'user01',
   details: [{
     salesDeliveryPlanDetailId: 90, salesDeliveryPlanId: 9, salesOrderId: 7,
     salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04', customerId: 10,
@@ -33,6 +31,13 @@ const plan: DeliveryPlanItem = {
     unit: 'EA', lineNo: 1, planDt: '2026-11-08', plannedQty: 10,
     deliveredQty: 0, remainingQty: 10, orderQty: 10,
   }],
+};
+const statusRow: DeliveryPlanStatusRow = {
+  salesDeliveryPlanId: 9, salesDeliveryPlanDetailId: 90, planNo: 'DP-9',
+  salesOrderId: 7, salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04',
+  customerId: 10, customerCode: 'C10', customerName: '거래처',
+  materialId: 20, materialCode: 'M20', materialName: '품목', unit: 'EA', lineNo: 1,
+  planDt: '2026-11-08', orderQty: 10, plannedQty: 10, deliveredQty: 0, remainingQty: 10,
 };
 const props = {
   selectedModule: { id: 'sales', tree: [] } as unknown as ModuleItem,
@@ -59,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([source]);
   vi.mocked(createDeliveryPlan).mockResolvedValue(plan);
-  vi.mocked(getDeliveryPlanStatus).mockResolvedValue([plan]);
+  vi.mocked(getDeliveryPlanStatus).mockResolvedValue([statusRow]);
   vi.mocked(getDeliveryPlan).mockResolvedValue(plan);
   vi.mocked(getDeliveryPlanByOrder).mockResolvedValue(plan);
   vi.mocked(updateDeliveryPlan).mockResolvedValue(plan);
@@ -105,6 +110,23 @@ it('uses the standard grid for the status list', async () => {
   });
   expect(grid.parentElement).not.toHaveClass('MuiPaper-outlined');
   expect(grid).toHaveStyle({ borderWidth: '1px' });
+});
+
+it('renders each item status row for one plan and opens the containing plan', async () => {
+  const statusRows = [
+    { ...statusRow, materialName: '품목1' },
+    { ...statusRow, salesDeliveryPlanDetailId: 91, salesOrderId: 8, salesOrderDetailId: 80,
+      orderNo: 'SO-8', materialId: 30, materialCode: 'M30', materialName: '품목2' },
+  ];
+  vi.mocked(getDeliveryPlanStatus).mockResolvedValue(statusRows);
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+
+  const grid = await screen.findByRole('grid', { name: '출하계획 현황 목록' });
+  expect(await within(grid).findByText('M20')).toBeInTheDocument();
+  expect(within(grid).getByText('M30')).toBeInTheDocument();
+  expect(within(grid).getAllByRole('button', { name: 'DP-9 상세 보기' })).toHaveLength(1);
+  fireEvent.click(within(grid).getByRole('button', { name: 'DP-9 상세 보기' }));
+  await waitFor(() => expect(getDeliveryPlan).toHaveBeenCalledWith(9));
 });
 
 it('edits plan quantity as a native grid cell and saves it', async () => {

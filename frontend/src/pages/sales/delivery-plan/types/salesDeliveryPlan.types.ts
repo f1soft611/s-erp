@@ -46,12 +46,6 @@ export type DeliveryPlanItem = {
   salesDeliveryPlanId: number;
   tenantId: number;
   planNo: string;
-  salesOrderId: number;
-  orderNo: string;
-  orderDt: string;
-  customerId: number;
-  customerCode: string;
-  customerName: string;
   createdBy: string | null;
   createdByName?: string | null;
   createdByProfileImage?: string | null;
@@ -59,9 +53,31 @@ export type DeliveryPlanItem = {
   details: DeliveryPlanDetail[];
 };
 
-export type DeliveryPlanStatusRow = Omit<DeliveryPlanItem, 'details'> & {
-  plannedCount?: number;
-  deliveredCount?: number;
+export type DeliveryPlanStatusRow = {
+  salesDeliveryPlanId: number;
+  salesDeliveryPlanDetailId: number;
+  planNo: string;
+  salesOrderId: number;
+  salesOrderDetailId: number;
+  orderNo: string;
+  orderDt: string;
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  unit: string | null;
+  lineNo: number;
+  planDt: string;
+  orderQty: number;
+  plannedQty: number;
+  deliveredQty: number;
+  remainingQty: number;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
 };
 
 export type DeliveryPlanFilters = {
