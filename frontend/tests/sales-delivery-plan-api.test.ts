@@ -15,13 +15,12 @@ const source: PlanSourceOrderRow = {
   customerId: 10, customerCode: 'C10', customerName: '거래처', deliveryPlace: '창고',
   deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
   materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, unitPrice: 100,
-  planDt: '2026-11-08',
+  planDt: '2026-11-08', remainingPlanQty: 10,
 };
 const request: DeliveryPlanRequest = {
-  salesOrderId: 7,
   details: [
-    { salesDeliveryPlanDetailId: null, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 4 },
-    { salesDeliveryPlanDetailId: null, salesOrderDetailId: 70, planDt: '2026-11-09', plannedQty: 6 },
+    { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 4 },
+    { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70, planDt: '2026-11-09', plannedQty: 6 },
   ],
 };
 
@@ -36,6 +35,24 @@ describe('sales delivery plan contract', () => {
     expect(validateDeliveryPlan({
       ...request, details: [{ ...request.details[0], plannedQty: 0 }],
     }, [source])).toContain('수량');
+  });
+
+  it('validates split capacity using the remaining source quantity', () => {
+    const partiallyPlanned = { ...source, remainingPlanQty: 8 };
+    expect(validateDeliveryPlan(request, [partiallyPlanned])).toContain('초과');
+  });
+
+  it('validates different orders independently when detail IDs match', () => {
+    const otherOrder = {
+      ...source, salesOrderId: 8, orderNo: 'SO-8', orderQty: 4, remainingPlanQty: 4,
+    };
+    const multiOrderRequest = {
+      details: [
+        { ...request.details[0], salesOrderId: 7, plannedQty: 8 },
+        { ...request.details[1], salesOrderId: 8, plannedQty: 4 },
+      ],
+    };
+    expect(validateDeliveryPlan(multiOrderRequest, [source, otherOrder])).toBe('');
   });
 
   it('requires a valid period and initializes status filters to the current month', () => {

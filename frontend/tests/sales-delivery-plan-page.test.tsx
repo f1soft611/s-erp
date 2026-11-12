@@ -20,7 +20,7 @@ const source: PlanSourceOrderRow = {
   customerId: 10, customerCode: 'C10', customerName: '거래처', deliveryPlace: '창고',
   deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
   materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, unitPrice: 100,
-  planDt: '2026-11-08',
+  planDt: '2026-11-08', remainingPlanQty: 10,
 };
 const plan: DeliveryPlanItem = {
   salesDeliveryPlanId: 9, tenantId: 71, planNo: 'DP-9', salesOrderId: 7,
@@ -28,7 +28,8 @@ const plan: DeliveryPlanItem = {
   customerName: '거래처', createdBy: 'user01',
   details: [{
     salesDeliveryPlanDetailId: 90, salesDeliveryPlanId: 9, salesOrderId: 7,
-    salesOrderDetailId: 70, materialId: 20, materialCode: 'M20', materialName: '품목',
+    salesOrderDetailId: 70, orderNo: 'SO-7', orderDt: '2026-11-04', customerId: 10,
+    customerCode: 'C10', customerName: '거래처', materialId: 20, materialCode: 'M20', materialName: '품목',
     unit: 'EA', lineNo: 1, planDt: '2026-11-08', plannedQty: 10,
     deliveredQty: 0, remainingQty: 10, orderQty: 10,
   }],
@@ -190,56 +191,64 @@ it('loads and updates an existing AUTO plan instead of creating another plan', a
   editCell(grid, 0, 5, '7');
   fireEvent.click(screen.getByRole('button', { name: '수정 저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
-    salesOrderId: 7,
-    details: [{ salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70,
+    details: [{ salesDeliveryPlanDetailId: 90, salesOrderId: 7, salesOrderDetailId: 70,
       planDt: '2026-11-13', plannedQty: 7 }],
   }));
   expect(createDeliveryPlan).not.toHaveBeenCalled();
 });
 
-it('registers a plan from an order and includes its source detail identity', async () => {
+it('registers only selected source item rows from multiple orders with their remaining quantities', async () => {
   vi.mocked(searchPlanSourceOrders).mockResolvedValue([
-    source, { ...source, salesOrderDetailId: 71, materialId: 21, materialCode: 'M21', materialName: '품목2', orderQty: 4 },
-    { ...source, salesOrderId: 8, salesOrderDetailId: 80, orderNo: 'SO-8' },
+    { ...source, remainingPlanQty: 6 },
+    { ...source, salesOrderDetailId: 71, materialId: 21, materialCode: 'M21', materialName: '품목2',
+      orderQty: 4, remainingPlanQty: 4 },
+    { ...source, salesOrderId: 8, salesOrderDetailId: 80, orderNo: 'SO-8', materialId: 30,
+      materialCode: 'M30', materialName: '품목3', orderQty: 5, remainingPlanQty: 3 },
   ]);
   render(<SalesDeliveryPlanCreatePage {...props}
     selectedMenuPermissions={{ read: true, create: true, update: false, delete: false, excel: false }} />);
   fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
-  fireEvent.click((await screen.findAllByRole('button', { name: 'SO-7', exact: true }))[0]);
+  const sourceGrid = await screen.findByRole('grid', { name: '계획대상 수주 품목 목록' });
+  const rows = within(sourceGrid).getAllByRole('row');
+  const firstRow = rows.find((row) => within(row).queryByText('품목', { exact: true })) as HTMLElement;
+  const secondOrderRow = rows.find((row) => within(row).queryByText('품목3', { exact: true })) as HTMLElement;
+  fireEvent.click(within(firstRow).getByRole('checkbox'));
+  fireEvent.click(within(secondOrderRow).getByRole('checkbox'));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '선택', exact: true }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(screen.getByLabelText('수주번호')).toHaveValue('SO-7');
+  expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))
+    .getByRole('textbox', { name: '수주번호' })).toHaveValue('SO-7, SO-8');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDeliveryPlan).toHaveBeenCalledWith({
-    salesOrderId: 7,
-    details: [{ salesDeliveryPlanDetailId: null, salesOrderDetailId: 70,
-      planDt: '2026-11-08', plannedQty: 10 }, { salesDeliveryPlanDetailId: null, salesOrderDetailId: 71,
-      planDt: '2026-11-08', plannedQty: 4 }],
+    details: [
+      { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70,
+        planDt: '2026-11-08', plannedQty: 6 },
+      { salesDeliveryPlanDetailId: null, salesOrderId: 8, salesOrderDetailId: 80,
+        planDt: '2026-11-08', plannedQty: 3 },
+    ],
   }));
   expect(await screen.findByText('출하계획이 등록되었습니다. 계획번호: DP-9')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '신규', exact: true }));
   expect(screen.getByLabelText('계획번호')).toHaveValue('저장 시 자동 채번');
-  expect(screen.getByLabelText('수주번호')).toHaveValue('');
+  expect(within(screen.getByRole('region', { name: '출하계획 입력 내용' }))
+    .getByRole('textbox', { name: '수주번호' })).toHaveValue('');
 });
 
-it('matches search control dimensions and highlights an order row without selecting it', async () => {
+it('matches search control dimensions and provides explicit item selection actions', async () => {
   render(<SalesDeliveryPlanCreatePage {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '수주 선택' }));
-  const dialog = screen.getByRole('dialog', { name: '계획대상 수주 선택' });
+  const dialog = screen.getByRole('dialog', { name: '계획대상 수주 품목 선택' });
   const input = within(dialog).getByRole('textbox', { name: '수주번호·거래처 검색' });
   const button = within(dialog).getByRole('button', { name: '검색' });
   expect(getComputedStyle(input.closest('.MuiOutlinedInput-root')!).height).toBe('40px');
   expect(getComputedStyle(button).height).toBe('40px');
   expect(getComputedStyle(button).minWidth).toBe('88px');
   fireEvent.submit(input.closest('form')!);
-  const number = await within(dialog).findByRole('button', { name: 'SO-7', exact: true });
-  const row = number.closest('[role="row"]')!;
-  fireEvent.mouseDown(within(row as HTMLElement).getByRole('gridcell', { name: '품목' }), { button: 0 });
-  expect(row.querySelector('[data-row-selection-overlay]')).not.toBeNull();
+  const grid = await within(dialog).findByRole('grid', { name: '계획대상 수주 품목 목록' });
+  expect(within(grid).getAllByRole('checkbox')).toHaveLength(2);
+  expect(within(dialog).getByRole('button', { name: '선택', exact: true })).toBeDisabled();
   expect(dialog).toBeInTheDocument();
-  fireEvent.click(number);
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(screen.getByLabelText('수주번호')).toHaveValue('SO-7');
 });
 
 it('loads, edits, and saves plan quantities from the status detail', async () => {
@@ -254,8 +263,7 @@ it('loads, edits, and saves plan quantities from the status detail', async () =>
   editCell(detailTable, 0, 5, '8');
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
-    salesOrderId: 7,
-    details: [{ salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70,
+    details: [{ salesDeliveryPlanDetailId: 90, salesOrderId: 7, salesOrderDetailId: 70,
       planDt: '2026-11-08', plannedQty: 8 }],
   }));
 });
@@ -327,10 +335,9 @@ it('uses the registration form in status editing and saves split rows', async ()
   expect(planCell(splitGrid, 0, 6)).toHaveTextContent('10');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
-    salesOrderId: 7,
     details: [
-      { salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 6 },
-      { salesDeliveryPlanDetailId: null, salesOrderDetailId: 70, planDt: null, plannedQty: 4 },
+      { salesDeliveryPlanDetailId: 90, salesOrderId: 7, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 6 },
+      { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70, planDt: null, plannedQty: 4 },
     ],
   }));
 });
@@ -363,10 +370,10 @@ it('inserts a split after its source and immediately edits the new quantity', as
   fireEvent.keyDown(editor!, { key: 'Enter' });
   fireEvent.click(within(dialog).getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(updateDeliveryPlan).toHaveBeenCalledWith(9, {
-    salesOrderId: 7, details: [
-      { salesDeliveryPlanDetailId: 90, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 6 },
-      { salesDeliveryPlanDetailId: null, salesOrderDetailId: 70, planDt: null, plannedQty: 4 },
-      { salesDeliveryPlanDetailId: 91, salesOrderDetailId: 71, planDt: '2026-11-08', plannedQty: 4 },
+    details: [
+      { salesDeliveryPlanDetailId: 90, salesOrderId: 7, salesOrderDetailId: 70, planDt: '2026-11-08', plannedQty: 6 },
+      { salesDeliveryPlanDetailId: null, salesOrderId: 7, salesOrderDetailId: 70, planDt: null, plannedQty: 4 },
+      { salesDeliveryPlanDetailId: 91, salesOrderId: 7, salesOrderDetailId: 71, planDt: '2026-11-08', plannedQty: 4 },
     ],
   }));
 });

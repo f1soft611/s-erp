@@ -112,9 +112,9 @@ export function SalesDeliveryPlanStatusPage({
   const save = async () => {
     if (!selected) return;
     const request = {
-      salesOrderId: selected.salesOrderId,
       details: (editGridRef.current?.getActiveRows() ?? editRows).map((row) => ({
         salesDeliveryPlanDetailId: row.salesDeliveryPlanDetailId,
+        salesOrderId: row.salesOrderId,
         salesOrderDetailId: row.salesOrderDetailId,
         planDt: row.planDt,
         plannedQty: Number(row.plannedQty),
