@@ -1,6 +1,6 @@
 import { InputBase } from '@mui/material';
 import type { KeyboardEvent } from 'react';
-import { normalizeGridNumberInput } from '../utils/grid.utils';
+import { useF1GridNumberDraft } from './useF1GridNumberDraft';
 
 type NumberEditorProps = {
   value: string;
@@ -17,7 +17,8 @@ export function NumberEditor({
   onKeyDown,
   selectOnFocus = true,
 }: NumberEditorProps) {
-  const normalizedValue = normalizeGridNumberInput(value, decimalPlaces);
+  const { displayedValue, normalizeInput, clearDraft } =
+    useF1GridNumberDraft(value, decimalPlaces);
 
   return (
     <InputBase
@@ -25,10 +26,9 @@ export function NumberEditor({
       fullWidth
       type="number"
       inputMode="numeric"
-      value={normalizedValue}
-      onChange={(event) =>
-        onChange(normalizeGridNumberInput(event.target.value, decimalPlaces))
-      }
+      value={displayedValue}
+      onChange={(event) => onChange(normalizeInput(event.target.value))}
+      onBlur={clearDraft}
       onKeyDown={onKeyDown}
       onFocus={(event) => {
         if (!selectOnFocus) return;

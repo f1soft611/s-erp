@@ -82,7 +82,7 @@ export function normalizeGridNumberInput(
   const unsigned = sign ? trimComma.slice(1) : trimComma;
 
   if (decimalPlaces === 0) {
-    const digits = unsigned.replace(/[^\d]/g, '');
+    const digits = unsigned.split('.')[0].replace(/[^\d]/g, '');
     return digits ? `${sign}${digits}` : sign;
   }
 

@@ -19,7 +19,7 @@ describe('document status search helpers', () => {
 
   it('maps trimmed inputs and date ranges to the existing filter names', () => {
     expect(toDocumentStatusFilters(' plan ', {
-      electronicApprovalId: 41,
+      documentNo: ' DOC-41 ',
       title: ' Annual ',
       documentType: 'DRAFTING',
       documentStatus: 'COMPLETED',
@@ -33,7 +33,7 @@ describe('document status search helpers', () => {
       updatedAt: { from: '2026-10-01', to: '' },
     })).toEqual({
       keyword: 'plan',
-      electronicApprovalId: '41',
+      documentNo: 'DOC-41',
       title: 'Annual',
       documentType: 'DRAFTING',
       documentStatus: 'COMPLETED',

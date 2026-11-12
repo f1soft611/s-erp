@@ -586,6 +586,8 @@ const columns: F1GridColumn<Item>[] = [
 
 `decimalPlaces`를 지정하면 기존처럼 표시 소수점 자릿수를 고정한다. 예를 들어 `decimalPlaces: 2`는 `1.2`를 `1.20`으로 표시한다. 이 옵션은 편집 입력 정규화에도 사용되며, 옵션을 생략해도 편집 입력을 5자리로 제한하지 않는다.
 
+편집 입력에서 `decimalPlaces: 0`은 소수점 이하를 버린다. 예를 들어 `12.34`는 `12`, `-12.34`는 `-12`가 된다. 셀 편집과 행 폼에서 입력 중에는 원문을 임시 표시하고 저장값은 정규화하며, 포커스를 잃거나 셀 편집을 확정하면 정수를 표시한다.
+
 ```typescript
 { field: 'amount', headerName: '금액', type: 'number' } // 최대 5자리, 끝의 0 생략
 { field: 'unitPrice', headerName: '단가', type: 'number', decimalPlaces: 2 } // 1.2 -> 1.20

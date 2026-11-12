@@ -270,6 +270,18 @@ function toFeedRecord(
   };
 }
 
+function clickComposerClose() {
+  const closeButton = within(screen.getByRole('dialog', { name: '문서 작성' }))
+    .getAllByRole('button', { name: '닫기' })
+    .find((button) => button.textContent === '닫기');
+  if (!closeButton) throw new Error('Missing composer close action.');
+  fireEvent.click(closeButton);
+}
+
+function toPage<T>(records: T[]) {
+  return { resultList: records, totalRowCount: records.length };
+}
+
 function mockPaginatedDocumentLists() {
   composerApi.listDocumentApprovals.mockImplementation(
     (
@@ -431,6 +443,9 @@ const draftFormTemplate = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.values(composerApi).forEach((mock) => mock.mockReset());
+  Object.values(approvalLineTemplateApi).forEach((mock) => mock.mockReset());
+  Object.values(composerNotifications).forEach((mock) => mock.mockReset());
   approvalLineTemplateApi.list.mockResolvedValue([]);
   composerApi.fetchDraftFormUsers.mockResolvedValue([]);
   composerApi.fetchDraftFormOptions.mockResolvedValue({
@@ -472,14 +487,7 @@ beforeEach(() => {
     electronicApprovalId: 1,
     documentStatus: 'PENDING',
   });
-  composerApi.listDocumentApprovals.mockImplementation(
-    (_scope, _documentType, _documentId, includeDetails) =>
-      Promise.resolve(
-        includeDetails
-          ? defaultDocumentRecords.map((record) => toFeedRecord(record))
-          : defaultDocumentRecords,
-      ),
-  );
+  mockPaginatedDocumentLists();
   composerApi.listPinnedDocumentApprovals.mockResolvedValue([]);
   composerApi.pinDocumentApproval.mockReset().mockImplementation((electronicApprovalId: number) =>
     Promise.resolve({ electronicApprovalId, pinned: true }),
@@ -1639,6 +1647,8 @@ describe('Document write page', () => {
         'IN_PROGRESS',
         undefined,
         undefined,
+        false,
+        { offset: 0, limit: 20 },
       ),
     );
 
@@ -1657,6 +1667,8 @@ describe('Document write page', () => {
         'ALL',
         undefined,
         undefined,
+        false,
+        { offset: 0, limit: 20 },
       ),
     );
     expect(screen.queryByText('#결재 진행 중')).not.toBeInTheDocument();
@@ -1705,6 +1717,7 @@ describe('Document write page', () => {
         undefined,
         undefined,
         true,
+        { offset: 0, limit: 20 },
       ),
     );
 
@@ -1722,6 +1735,7 @@ describe('Document write page', () => {
         undefined,
         undefined,
         true,
+        { offset: 0, limit: 20 },
       ),
     );
     expect(screen.getByTestId('document-feed')).toBeInTheDocument();
@@ -1744,6 +1758,8 @@ describe('Document write page', () => {
         'ALL',
         'DRAFTING',
         undefined,
+        false,
+        { offset: 0, limit: 20 },
       ),
     );
 
@@ -1760,6 +1776,8 @@ describe('Document write page', () => {
         'ALL',
         undefined,
         undefined,
+        false,
+        { offset: 0, limit: 20 },
       ),
     );
     expect(screen.queryByText('#기안서')).not.toBeInTheDocument();
@@ -1780,6 +1798,7 @@ describe('Document write page', () => {
       undefined,
       undefined,
       true,
+      { offset: 0, limit: 20 },
     );
     fireEvent.click(screen.getByRole('button', { name: '리스트형 보기' }));
     expect(screen.getByTestId('list-view-skeleton')).toBeInTheDocument();
@@ -1787,19 +1806,27 @@ describe('Document write page', () => {
       'ALL',
       undefined,
       undefined,
+      false,
+      { offset: 0, limit: 20 },
     );
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('ignores a late feed response after switching back to the lightweight list', async () => {
-    let resolveFeed!: (records: DocumentApprovalFeedRecord[]) => void;
+    let resolveFeed!: (page: {
+      resultList: DocumentApprovalFeedRecord[];
+      totalRowCount: number;
+    }) => void;
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) =>
         includeDetails
-          ? new Promise<DocumentApprovalFeedRecord[]>((resolve) => {
+          ? new Promise((resolve) => {
               resolveFeed = resolve;
             })
-          : Promise.resolve(defaultDocumentRecords),
+          : Promise.resolve({
+              resultList: defaultDocumentRecords,
+              totalRowCount: defaultDocumentRecords.length,
+            }),
     );
     render(<DashboardContent {...pageProps} />);
 
@@ -1814,13 +1841,14 @@ describe('Document write page', () => {
     expect(within(listRegion).getByRole('button', { name: /문서 A/ })).toBeInTheDocument();
 
     await act(async () => {
-      resolveFeed(
-        defaultDocumentRecords.map((record) =>
+      resolveFeed({
+        resultList: defaultDocumentRecords.map((record) =>
           toFeedRecord(record, {
             contentsHtml: '<p>늦게 도착한 피드</p>',
           }),
         ),
-      );
+        totalRowCount: defaultDocumentRecords.length,
+      });
     });
 
     expect(screen.queryByTestId('document-feed')).not.toBeInTheDocument();
@@ -1830,6 +1858,8 @@ describe('Document write page', () => {
       'ALL',
       undefined,
       undefined,
+      false,
+      { offset: 0, limit: 20 },
     );
   });
 
@@ -1905,7 +1935,13 @@ describe('Document write page', () => {
     const documentButton = await within(listRegion).findByRole('button', {
       name: /문서 A/,
     });
-    expect(composerApi.listDocumentApprovals).toHaveBeenCalledWith('ALL', undefined, undefined);
+    expect(composerApi.listDocumentApprovals).toHaveBeenCalledWith(
+      'ALL',
+      undefined,
+      undefined,
+      false,
+      { offset: 0, limit: 20 },
+    );
     fireEvent.click(documentButton);
 
     expect(await screen.findByTestId('page-area-overlay')).toBeInTheDocument();
@@ -2548,8 +2584,8 @@ describe('Document write page', () => {
       expect.stringContaining('합의자 E'),
     ]);
     expect(agreementParticipants[0]).toHaveStyle({
-      flexDirection: 'row',
-      borderRadius: '10px',
+      display: 'flex',
+      borderRadius: '6px',
     });
     expect(agreementStage).toHaveTextContent('재무팀');
     expect(screen.getByTestId('approval-line-agreement-participant-76')
@@ -2558,7 +2594,7 @@ describe('Document write page', () => {
     expect(screen.getByTestId('approval-line-agreement-status-72')).toHaveTextContent('처리 중');
     expect(screen.getByTestId('approval-line-agreement-status-76')).toHaveTextContent('승인');
     expect(screen.getByTestId('approval-line-agreement-status-72'))
-      .toHaveStyle({ borderRadius: '99px' });
+      .toHaveStyle({ borderRadius: '6px' });
     const agreementWithoutDepartment = screen.getByTestId(
       'approval-line-agreement-participant-72',
     );
@@ -3136,6 +3172,8 @@ describe('Document write page', () => {
         1,
         '<p>새 검토 의견</p>',
         undefined,
+        [],
+        false,
       );
     });
     await waitFor(() =>
@@ -3712,12 +3750,15 @@ describe('Document write page', () => {
     await screen.findByRole('dialog', { name: '문서 작성' });
     await screen.findByRole('textbox', { name: '기안자' }, { timeout: 10000 });
 
-    let resolveDocuments!: (records: DocumentApprovalRecord[]) => void;
+    let resolveDocuments!: (page: {
+      resultList: DocumentApprovalRecord[];
+      totalRowCount: number;
+    }) => void;
     let resolveSummary!: (summary: DocumentApprovalSummary) => void;
     let resolveDetail!: (detail: DocumentApprovalDetail) => void;
     composerApi.listDocumentApprovals.mockImplementationOnce(
       () =>
-        new Promise<DocumentApprovalRecord[]>((resolve) => {
+        new Promise<{ resultList: DocumentApprovalRecord[]; totalRowCount: number }>((resolve) => {
           resolveDocuments = resolve;
         }),
     );
@@ -3734,7 +3775,7 @@ describe('Document write page', () => {
         }),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    clickComposerClose();
     await waitForElementToBeRemoved(() =>
       screen.queryByRole('dialog', { name: '문서 작성' }),
     );
@@ -3751,7 +3792,7 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveDocuments([]);
+      resolveDocuments({ resultList: [], totalRowCount: 0 });
       resolveSummary({
         actionRequiredCount: 0,
         inProgressCount: 0,
@@ -3798,7 +3839,7 @@ describe('Document write page', () => {
     ] as const;
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) =>
-        Promise.resolve(includeDetails
+        Promise.resolve({ resultList: includeDetails
           ? [...defaultDocumentRecords, { ...defaultDocumentRecords[0], electronicApprovalId: 7 }].map((record, index) => {
               const [eventType] = events[index];
               return toFeedRecord(record, {
@@ -3810,7 +3851,7 @@ describe('Document write page', () => {
                 }],
               });
             })
-          : defaultDocumentRecords),
+          : defaultDocumentRecords, totalRowCount: includeDetails ? defaultDocumentRecords.length + 1 : defaultDocumentRecords.length }),
     );
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
@@ -3919,7 +3960,7 @@ describe('Document write page', () => {
   it('renders every filtered document as a complete feed card with comments and reactions', async () => {
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) =>
-        Promise.resolve(
+        Promise.resolve(toPage(
           includeDetails
             ? defaultDocumentRecords.map((record) =>
                 toFeedRecord(record, {
@@ -3957,7 +3998,7 @@ describe('Document write page', () => {
                 }),
               )
             : defaultDocumentRecords,
-        ),
+        )),
     );
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
@@ -4033,6 +4074,7 @@ describe('Document write page', () => {
       undefined,
       undefined,
       true,
+      { offset: 0, limit: 20 },
     );
     expect(composerApi.getDocumentApprovalDetail).not.toHaveBeenCalled();
     expect(composerApi.listApprovalComments).toHaveBeenCalledTimes(1);
@@ -4437,7 +4479,11 @@ describe('Document write page', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: buttonLabel, exact: true }));
     let dialog = await screen.findByRole('dialog', { name: dialogTitle });
     expect(cancelApi).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    const footerClose = within(dialog)
+      .getAllByRole('button', { name: '닫기' })
+      .find((button) => button.textContent === '닫기');
+    if (!footerClose) throw new Error('Missing dialog close action.');
+    fireEvent.click(footerClose);
     await waitForElementToBeRemoved(dialog);
     expect(cancelApi).not.toHaveBeenCalled();
     fireEvent.click(within(toolbar).getByRole('button', { name: '문서 더보기' }));
@@ -4788,30 +4834,32 @@ describe('Document write page', () => {
     let feedRequest = 0;
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) => {
-        if (!includeDetails) return Promise.resolve(defaultDocumentRecords);
+        if (!includeDetails) return Promise.resolve(toPage(defaultDocumentRecords));
         if (feedRequest++ === 0) {
           return Promise.reject(new Error('피드 목록 조회에 실패했습니다.'));
         }
-        return Promise.resolve(
+        return Promise.resolve(toPage(
           defaultDocumentRecords.map((record) =>
             toFeedRecord(record, {
               contentsHtml: `<p>재시도한 본문 ${record.electronicApprovalId}</p>`,
             }),
           ),
-        );
+        ));
       },
     );
     render(<DashboardContent {...pageProps} />);
     fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('피드 목록 조회에 실패했습니다.');
-    expect(screen.queryByTestId('document-write-item')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(alert).toHaveTextContent('정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    expect(screen.queryAllByTestId('document-write-item')).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole('button', { name: '전자결재 목록 다시 불러오기' }),
+    );
+    expect(await screen.findAllByTestId('document-write-item')).toHaveLength(6);
     expect(
       await screen.findByText('재시도한 본문 1'),
     ).toBeInTheDocument();
-    expect(screen.getAllByTestId('document-write-item')).toHaveLength(6);
     expect(screen.queryByTestId('page-area-overlay')).not.toBeInTheDocument();
   }, 20000);
 
@@ -4819,14 +4867,14 @@ describe('Document write page', () => {
     let feedRequest = 0;
     composerApi.listDocumentApprovals.mockImplementation(
       (_scope, _documentType, _documentId, includeDetails) => {
-        if (!includeDetails) return Promise.resolve(defaultDocumentRecords);
+        if (!includeDetails) return Promise.resolve(toPage(defaultDocumentRecords));
         feedRequest += 1;
         if (feedRequest === 3) {
           return Promise.reject(new Error('필터 적용 후 피드 조회에 실패했습니다.'));
         }
-        return Promise.resolve(
+        return Promise.resolve(toPage(
           defaultDocumentRecords.map((record) => toFeedRecord(record)),
-        );
+        ));
       },
     );
     render(<DashboardContent {...pageProps} />);
@@ -4836,7 +4884,7 @@ describe('Document write page', () => {
     fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
     await screen.findByRole('dialog', { name: '문서 작성' });
     await waitForComposerReady();
-    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    clickComposerClose();
     await waitForElementToBeRemoved(() =>
       screen.queryByRole('dialog', { name: '문서 작성' }),
     );
@@ -4852,8 +4900,47 @@ describe('Document write page', () => {
     expect(
       await screen.findByText('필터 적용 후 피드 조회에 실패했습니다.'),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId('document-write-item')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('document-write-item')).toHaveLength(0);
   }, 20000);
+
+  it('retains feed cards and displays the error when a quiet refresh fails', async () => {
+    let feedRequest = 0;
+    composerApi.listDocumentApprovals.mockImplementation(
+      (_scope, _documentType, _documentId, includeDetails) => {
+        if (!includeDetails) return Promise.resolve(toPage(defaultDocumentRecords));
+        if (++feedRequest === 2) {
+          return Promise.reject(new Error('조용한 갱신에 실패했습니다.'));
+        }
+        return Promise.resolve(toPage(defaultDocumentRecords.map((record) => toFeedRecord(record))));
+      },
+    );
+    render(<DashboardContent {...pageProps} />);
+    fireEvent.click(screen.getByRole('button', { name: '피드형 보기' }));
+    expect(await screen.findAllByTestId('document-write-item')).toHaveLength(6);
+
+    fireEvent.click(screen.getByRole('button', { name: /문서 작성/ }));
+    await screen.findByRole('dialog', { name: '문서 작성' });
+    await waitForComposerReady();
+    clickComposerClose();
+
+    expect(await screen.findByText('조용한 갱신에 실패했습니다.')).toBeInTheDocument();
+    expect(screen.getAllByTestId('document-write-item')).toHaveLength(6);
+  }, 20000);
+
+  it('clears prior results if a quiet refresh and filter change occur together', async () => {
+    const { result } = renderHook(() => useDocumentWritePage());
+    await waitFor(() => expect(result.current.listDocuments.length).toBeGreaterThan(0));
+    composerApi.listDocumentApprovals.mockRejectedValueOnce(new Error('조회 실패'));
+
+    act(() => {
+      result.current.refresh({ quiet: true });
+      result.current.setSelectedKind('기안서');
+    });
+
+    await waitFor(() => expect(result.current.loadError).toBe('조회 실패'));
+    expect(result.current.listDocuments).toHaveLength(0);
+    expect(result.current.pinnedDocuments).toHaveLength(0);
+  });
 
   it('switches to feed mode and opens the document composer with available tabs', async () => {
     render(<DashboardContent {...pageProps} />);
@@ -5515,7 +5602,7 @@ describe('Document write page', () => {
         exact: true,
       });
       expect(badge).toHaveStyle({
-        backgroundColor: muiTheme.palette.primary.light,
+        borderStyle: 'solid',
         borderRadius: '50%',
       });
       expect(badge).toHaveAttribute('aria-label', `참여 순번 ${sequence}`);
@@ -6263,7 +6350,7 @@ describe('Document write page', () => {
       '작성 중 제목',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    clickComposerClose();
     await waitForElementToBeRemoved(() =>
       screen.queryByRole('dialog', { name: '문서 작성' }),
     );
@@ -6528,7 +6615,7 @@ describe('Document write page', () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    clickComposerClose();
 
     await waitForElementToBeRemoved(() =>
       screen.queryByRole('dialog', { name: '문서 작성' }),
