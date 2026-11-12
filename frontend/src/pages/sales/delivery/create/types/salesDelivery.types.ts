@@ -9,6 +9,7 @@ export type DeliveryDetail = {
   materialName: string | null;
   materialSpec?: string | null;
   unit: string | null;
+  salesOrderId: number | null;
   salesOrderDetailId: number | null;
   salesDeliveryPlanDetailId: number | null;
   deliveryQty: number;
@@ -55,7 +56,7 @@ export type DeliveryForm = {
 export type DeliveryPayload = Pick<DeliveryForm, 'deliveryDt' | 'deliveryType' | 'salesOrderId' | 'deliveryPlace' | 'deliveryMethod' | 'remark'> & {
   customerId: number;
   overDeliveryConfirmed?: boolean;
-  details: { materialId: number; salesOrderDetailId: number | null; salesDeliveryPlanDetailId: number | null;
+  details: { materialId: number; salesOrderId: number | null; salesOrderDetailId: number | null; salesDeliveryPlanDetailId: number | null;
     deliveryQty: number; unitPrice: number; vatAmt: number }[];
 };
 export type SourceOrderRow = {

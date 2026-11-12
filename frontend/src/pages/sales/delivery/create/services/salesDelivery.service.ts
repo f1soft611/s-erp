@@ -18,17 +18,19 @@ export function deliveryAmounts(qty: number, price: number, vat?: number) {
 }
 export function newDeliveryRow(): DeliveryRow {
   return { rowId: `delivery-${crypto.randomUUID()}`, materialId: null, materialCode: '', materialName: '', unit: '',
-    salesOrderDetailId: null, salesDeliveryPlanDetailId: null, deliveryQty: 0, unitPrice: 0, ...deliveryAmounts(0, 0) };
+    salesOrderId: null, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    deliveryQty: 0, unitPrice: 0, ...deliveryAmounts(0, 0) };
 }
 export function sourceOrderForm(rows: SourceOrderRow[], deliveryDt: string): DeliveryForm {
   if (!rows.length) throw new Error('수주를 선택해 주세요.');
   const source = rows[0];
+  const orderNos = [...new Set(rows.map((row) => row.orderNo))];
   return { ...emptyDelivery(), deliveryDt, deliveryType: 'ORDER', customerId: source.customerId,
     customerCode: source.customerCode, customerName: source.customerName, salesOrderId: source.salesOrderId,
-    orderNo: source.orderNo, deliveryPlace: source.deliveryPlace ?? '', deliveryMethod: source.deliveryMethod ?? '',
-    details: rows.filter((row) => row.salesOrderId === source.salesOrderId).map((row) => ({
+    orderNo: orderNos.join(', '), deliveryPlace: source.deliveryPlace ?? '', deliveryMethod: source.deliveryMethod ?? '',
+    details: rows.map((row) => ({
       ...newDeliveryRow(), materialId: row.materialId, materialCode: row.materialCode, materialName: row.materialName,
-      unit: row.unit, salesOrderDetailId: row.salesOrderDetailId,
+      unit: row.unit, salesOrderId: row.salesOrderId, salesOrderDetailId: row.salesOrderDetailId,
       salesDeliveryPlanDetailId: row.salesDeliveryPlanDetailId, deliveryQty: Math.max(Number(row.remainingQty), 0),
       unitPrice: Number(row.unitPrice), ...deliveryAmounts(Math.max(Number(row.remainingQty), 0), Number(row.unitPrice)),
     })) };
@@ -63,7 +65,9 @@ export function validateDelivery(form: DeliveryForm): string {
     if (!numeric(row.vatAmt)) return 'VAT는 0 이상의 소수 2자리 값이어야 합니다.';
     if (!numeric(row.supplyAmt) || !numeric(row.totalAmt)) return '계산된 금액이 허용 범위를 초과했습니다.';
     if (form.deliveryType === 'ORDER') {
-      if (!row.salesOrderDetailId || !row.salesDeliveryPlanDetailId) return '출하계획 상세를 선택해 주세요.';
+      if (!(row.salesOrderId ?? form.salesOrderId) || !row.salesOrderDetailId || !row.salesDeliveryPlanDetailId) {
+        return '출하계획 상세를 선택해 주세요.';
+      }
       if (planIds.has(row.salesDeliveryPlanDetailId)) return '중복 출하계획 상세는 사용할 수 없습니다.';
       planIds.add(row.salesDeliveryPlanDetailId);
     }
@@ -75,6 +79,7 @@ export function buildDeliveryPayload(form: DeliveryForm): DeliveryPayload {
     salesOrderId: form.deliveryType === 'ORDER' ? form.salesOrderId : null,
     deliveryPlace: form.deliveryPlace.trim(), deliveryMethod: form.deliveryMethod.trim(), remark: form.remark.trim(),
     details: form.details.map((row) => ({ materialId: Number(row.materialId),
+    salesOrderId: form.deliveryType === 'ORDER' ? row.salesOrderId ?? form.salesOrderId : null,
       salesOrderDetailId: form.deliveryType === 'ORDER' ? row.salesOrderDetailId : null,
       salesDeliveryPlanDetailId: form.deliveryType === 'ORDER' ? row.salesDeliveryPlanDetailId : null,
       deliveryQty: row.deliveryQty, unitPrice: row.unitPrice, vatAmt: row.vatAmt })) };

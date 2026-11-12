@@ -214,7 +214,7 @@ export function SalesDeliveryCreatePage({
             </TextField>
             <TextField fullWidth size="small" label="연결 수주번호" value={form.orderNo}
               slotProps={{ input: { readOnly: true, endAdornment: form.deliveryType === 'ORDER' ? <InputAdornment position="end">
-                <Tooltip title="계획 선택"><span><IconButton size="small" aria-label="계획 선택" disabled={!editable || Boolean(savedId)}
+                <Tooltip title="수주 선택"><span><IconButton size="small" aria-label="수주 선택" disabled={!editable || Boolean(savedId)}
                   onClick={() => setSourceOpen(true)}><SearchIcon fontSize="small" /></IconButton></span></Tooltip>
               </InputAdornment> : null } }} />
             <TextField size="small" label="출하장소" value={form.deliveryPlace} disabled={!editable} onChange={(event) => change('deliveryPlace', event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
