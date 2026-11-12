@@ -65,6 +65,22 @@ class SalesDeliveryPlanMapperTest {
     }
 
     @Test
+    void returnsPlanStatusAtPlanDetailGranularity() throws Exception {
+        String status = normalize(sql(parse(), "selectPlanStatus").getSql());
+
+        assertThat(status).contains("pd.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId",
+                "pd.sales_delivery_plan_id AS salesDeliveryPlanId",
+                "pd.sales_order_id AS salesOrderId",
+                "oh.order_no AS orderNo",
+                "c.customer_name AS customerName",
+                "m.material_code AS materialCode",
+                "pd.plan_dt >=", "pd.plan_dt <=", "pd.planned_qty AS plannedQty",
+                "pd.delivered_qty AS deliveredQty",
+                "pd.planned_qty - pd.delivered_qty AS remainingQty")
+                .doesNotContain("GROUP BY");
+    }
+
+    @Test
     void limitsPlanMutationsToTheCurrentTenantAndReferencedDocument() throws Exception {
         Configuration configuration = parse();
         String insertDetail = normalize(sql(configuration, "insertPlanDetail").getSql());

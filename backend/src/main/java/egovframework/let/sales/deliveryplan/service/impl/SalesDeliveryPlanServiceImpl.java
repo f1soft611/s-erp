@@ -29,6 +29,7 @@ import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetail
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanSourceVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusSearchVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO;
 import egovframework.let.sales.deliveryplan.domain.repository.SalesDeliveryPlanDAO;
 import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
@@ -338,7 +339,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     @Override
-    public List<SalesDeliveryPlanVO> listStatus(Long tenantId, String userId,
+    public List<SalesDeliveryPlanStatusVO> listStatus(Long tenantId, String userId,
             SalesDeliveryPlanStatusSearchVO search) throws Exception {
         validatePrincipal(tenantId, userId);
         if (search == null) {

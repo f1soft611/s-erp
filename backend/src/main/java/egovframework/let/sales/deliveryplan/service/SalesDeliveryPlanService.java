@@ -5,6 +5,7 @@ import java.util.List;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanSourceVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusSearchVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO;
 
 public interface SalesDeliveryPlanService {
@@ -33,6 +34,6 @@ public interface SalesDeliveryPlanService {
     SalesDeliveryPlanVO update(Long tenantId, String userId, Long planId, SalesDeliveryPlanRequestVO request)
             throws Exception;
 
-    List<SalesDeliveryPlanVO> listStatus(Long tenantId, String userId, SalesDeliveryPlanStatusSearchVO search)
-            throws Exception;
+    List<SalesDeliveryPlanStatusVO> listStatus(Long tenantId, String userId,
+            SalesDeliveryPlanStatusSearchVO search) throws Exception;
 }
