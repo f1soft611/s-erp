@@ -923,21 +923,22 @@
 - 다중 수주 출하는 동일 거래처 수주만 한 문서로 묶으며 헤더에는 첫 상세의 대표 수주 ID를, 상세에는 각 행의 실제 수주 ID를 저장한다. [20261112_008 변경 이력 및 롤백](20261112/20261112_008_change_multi_order_sales_delivery_schema.md).
 - [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
 
-### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 미적용)
+### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 2026-11-12, 미적용)
 
-테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 계획 헤더는 수주당 하나이고, 계획 상세는 수주상세별 납기일/수량을 나눠 저장한다.
+테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 2026-11-12 변경안에서 계획 헤더는 단일 수주를 참조하지 않고 여러 수주의 상세 행을 담을 수 있으며, 각 계획상세가 원 수주와 수주상세를 참조한다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 |---|---|---|---|---|
 | `tb_tenant` | `delivery_plan_mode` | `varchar(10)` | NOT NULL, `AUTO` | 납품계획 모드 (`AUTO`/`MANUAL`) |
 | `tb_sales_delivery_plan_hd` | `sales_delivery_plan_id` | `bigserial` | NOT NULL, PK | 계획 헤더 ID |
-| | `tenant_id`, `sales_order_id` | `bigint` | NOT NULL | tenant와 원 수주 복합 FK |
+| | `tenant_id` | `bigint` | NOT NULL | 테넌트 ID; `(sales_delivery_plan_id, tenant_id)` unique 복합 참조 키의 구성 컬럼 |
 | | `plan_no` | `varchar(30)` | NOT NULL | tenant별 계획번호 |
 | | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
 | | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
 | | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
 | `tb_sales_delivery_plan_dt` | `sales_delivery_plan_detail_id` | `bigserial` | NOT NULL, PK | 계획 상세 ID |
-| | `sales_delivery_plan_id`, `tenant_id`, `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 계획 헤더/원 수주/수주상세/품목 tenant 복합 FK |
+| | `sales_delivery_plan_id`, `tenant_id` | `bigint` | NOT NULL | 계획 헤더 복합 FK; 헤더의 `(sales_delivery_plan_id, tenant_id)` 참조 |
+| | `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 행별 원 수주/수주상세/품목 복합 FK |
 | | `line_no` | `integer` | NOT NULL | 계획서 안 순번 |
 | | `plan_dt` | `date` | NULL | 계획 납기일; NULL은 미정 |
 | | `planned_qty`, `delivered_qty` | `numeric(15,2)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
@@ -946,9 +947,10 @@
 | `tb_sales_delivery_dt` | `sales_delivery_plan_detail_id` | `bigint` | NULL | ORDER 상세 필수, DIRECT 상세 NULL; 계획 상세 복합 FK |
 
 - 계획 상세의 같은 수주상세 복수행을 허용하여 날짜/수량 분할을 지원한다. 계획수량 합은 주문수량 이하이며, 20261105_003 이후 실제 납품량은 비음수·유한수로 유지한다. `BLOCK`은 기준 초과를 서버에서 거부하고 `WARN`은 명시적 확인 후 허용한다. 수주·계획 기준수량은 자동 증가시키지 않는다.
+- 2026-11-12 마이그레이션은 헤더의 `sales_order_id`, 수주당 헤더 unique, 헤더 수주 FK/index 및 그 보조 not-null check를 제거한다. 상세-헤더 FK는 `(sales_delivery_plan_id, tenant_id)`로 바꾸고, 상세별 원 수주/수주상세 FK는 유지한다.
 - 납품상세는 계획상세/tenant/order/order detail 복합 FK를 사용한다. 기존 문서 내 source unique는 계획상세 기준 unique로 바뀐다.
 - migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
-- [DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
+- [20261105 DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [20261112 다중수주 계획 스키마 변경 이력](20261112/20261112_009_change_multi_order_sales_delivery_plan_schema.md), [backend 사본](../../backend/DATABASE), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 
 ### tb_system_policy / tb_system_policy_history (2026-11-05, 미적용)
 
