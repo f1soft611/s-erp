@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ProcessManagementDAO">
+    <resultMap id="node" type="egovframework.let.pr.process.domain.model.ProcessNodeVO">
+        <id property="id" column="id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="code" column="code"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="image" column="image"/>
+        <result property="inactive" column="inactive"/>
+        <result property="productionOutsource" column="production_outsource"/>
+        <result property="purchaseOutsource" column="purchase_outsource"/>
+        <result property="inspection" column="inspection"/>
+        <result property="packing" column="packing"/>
+        <result property="stockManagement" column="stock_management"/>
+        <result property="previousStockOut" column="previous_stock_out"/>
+        <result property="finalProcess" column="final_process"/>
+        <result property="plannedEquipment" column="planned_equipment"/>
+        <result property="actualEquipmentRequired" column="actual_equipment_required"/>
+    </resultMap>
+    <select id="list" resultMap="node">
+        SELECT 'g:' || group_id AS id, NULL AS parent_id, group_id::text AS code,
+               name, description, NULL AS image, inactive,
+               false AS production_outsource, false AS purchase_outsource,
+               false AS inspection, false AS packing, false AS stock_management,
+               false AS previous_stock_out, false AS final_process, false AS planned_equipment,
+               false AS actual_equipment_required
+        FROM tb_process_group WHERE tenant_id = #{value}
+        UNION ALL
+        SELECT 'p:' || process_id, 'g:' || group_id, process_id::text,
+               name, description, image, inactive,
+               production_outsource, purchase_outsource, inspection, packing, stock_management,
+               previous_stock_out, final_process, planned_equipment, actual_equipment_required
+        FROM tb_process WHERE tenant_id = #{value}
+    </select>
+    <select id="insertGroup" resultType="long" affectData="true" flushCache="true">
+        INSERT INTO tb_process_group (tenant_id, name, description, inactive)
+        VALUES (#{tenantId}, #{row.name}, #{row.description}, #{row.inactive})
+        RETURNING group_id
+    </select>
+    <select id="insertProcess" resultType="long" affectData="true" flushCache="true">
+        INSERT INTO tb_process
+        (tenant_id, group_id, name, description, image, inactive, production_outsource,
+         purchase_outsource, inspection, packing, stock_management, previous_stock_out,
+         final_process, planned_equipment, actual_equipment_required)
+        SELECT #{tenantId}, group_id, #{row.name}, #{row.description}, #{row.image}, #{row.inactive},
+               #{row.productionOutsource}, #{row.purchaseOutsource}, #{row.inspection}, #{row.packing},
+               #{row.stockManagement}, #{row.previousStockOut}, #{row.finalProcess},
+               #{row.plannedEquipment}, #{row.actualEquipmentRequired}
+        FROM tb_process_group WHERE tenant_id = #{tenantId} AND group_id = #{groupId}
+        RETURNING process_id
+    </select>
+    <update id="updateGroup">
+        UPDATE tb_process_group SET name = #{row.name}, description = #{row.description},
+            inactive = #{row.inactive}, updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND group_id = #{id}
+    </update>
+    <update id="updateProcess">
+        UPDATE tb_process SET group_id = #{groupId}, name = #{row.name}, description = #{row.description},
+            image = #{row.image}, inactive = #{row.inactive}, production_outsource = #{row.productionOutsource},
+            purchase_outsource = #{row.purchaseOutsource}, inspection = #{row.inspection}, packing = #{row.packing},
+            stock_management = #{row.stockManagement}, previous_stock_out = #{row.previousStockOut},
+            final_process = #{row.finalProcess}, planned_equipment = #{row.plannedEquipment},
+            actual_equipment_required = #{row.actualEquipmentRequired}, updated_at = CURRENT_TIMESTAMP
+        WHERE tenant_id = #{tenantId} AND process_id = #{id}
+          AND EXISTS (SELECT 1 FROM tb_process_group g WHERE g.tenant_id = #{tenantId} AND g.group_id = #{groupId})
+    </update>
+    <delete id="deleteGroup">
+        DELETE FROM tb_process_group g WHERE g.tenant_id = #{tenantId} AND g.group_id = #{id}
+          AND NOT EXISTS (SELECT 1 FROM tb_process p WHERE p.tenant_id = g.tenant_id AND p.group_id = g.group_id)
+    </delete>
+    <delete id="deleteProcess">
+        DELETE FROM tb_process WHERE tenant_id = #{tenantId} AND process_id = #{id}
+    </delete>
+</mapper>

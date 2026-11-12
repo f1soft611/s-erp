@@ -20,6 +20,7 @@ import { AppLoadingSpinner } from '../../AppLoadingSpinner';
 import { useOptionalDisplayScale } from '../../../context/AppSettingsContext';
 import { GridHeader } from './GridHeader';
 import { GridBody } from './GridBody';
+import { GridSummary } from './GridSummary';
 import { F1GridFormModal } from '../form/F1GridFormModal';
 import { exportGridRowsToExcel } from '../export/GridExcelExport';
 import {
@@ -145,6 +146,7 @@ type F1GridRowFormSession<T extends object> = {
 function F1GridInner<T extends object>(
   {
     rows: localRows = [],
+    features,
     dataSource,
     onDataSourceError,
     columns,
@@ -287,6 +289,7 @@ function F1GridInner<T extends object>(
   const contextMenuReopenTimeoutRef = useRef<number | undefined>(undefined);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const summaryScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRef = useRef<HTMLDivElement | null>(null);
   const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const gridContainerWidthRef = useRef(0);
@@ -1869,11 +1872,19 @@ function F1GridInner<T extends object>(
 
     if (event.key === 'Delete') {
       event.preventDefault();
-      if (selectedCount > 0) {
+      const row = visibleRows[currentFocusedRowIndex];
+      const column = visibleColumns[focusedCell.columnIndex];
+      if (column?.type === 'image') {
+        if (row && isCellEditable(column, row)) {
+          setData((current) =>
+            updateGridRow(current, rowKey, focusedCell.rowId, {
+              [column.field]: '',
+            } as Partial<T>),
+          );
+        }
+      } else if (selectedCount > 0) {
         handleDeleteSelectedRows();
       } else {
-        const row = visibleRows[currentFocusedRowIndex];
-        const column = visibleColumns[focusedCell.columnIndex];
         if (row && column && isCellEditable(column, row)) {
           setData((current) =>
             updateGridRow(current, rowKey, focusedCell.rowId, {
@@ -2580,7 +2591,12 @@ function F1GridInner<T extends object>(
   async function handleExportExcelClick() {
     closeContextMenu();
     const fileName = excelFileName ?? `${ariaLabel}-export`;
-    await exportGridRowsToExcel(visibleColumns, visibleRows, fileName);
+    await exportGridRowsToExcel(
+      visibleColumns,
+      visibleRows,
+      fileName,
+      features?.find((feature) => feature.ftype === 'summary')?.dock,
+    );
   }
 
   function handleAutoFitColumnsClick() {
@@ -2899,14 +2915,20 @@ function F1GridInner<T extends object>(
     };
   }, [copiedCellRange, cellSelection, rowIndexById, rowKey]);
 
+  const summaryDock = features?.find((feature) => feature.ftype === 'summary')?.dock;
+
   useEffect(() => {
     const headerScroll = headerScrollRef.current;
     const bodyScroll = bodyScrollRef.current;
+    const summaryScroll = summaryScrollRef.current;
     if (!headerScroll || !bodyScroll) return;
 
     const syncHeaderScroll = () => {
       if (headerScroll.scrollLeft !== bodyScroll.scrollLeft) {
         headerScroll.scrollLeft = bodyScroll.scrollLeft;
+      }
+      if (summaryScroll && summaryScroll.scrollLeft !== bodyScroll.scrollLeft) {
+        summaryScroll.scrollLeft = bodyScroll.scrollLeft;
       }
     };
 
@@ -2918,12 +2940,34 @@ function F1GridInner<T extends object>(
 
     bodyScroll.addEventListener('scroll', syncHeaderScroll, { passive: true });
     headerScroll.addEventListener('scroll', syncBodyScroll, { passive: true });
+    const syncSummaryScroll = () => {
+      if (summaryScroll && bodyScroll.scrollLeft !== summaryScroll.scrollLeft) {
+        bodyScroll.scrollLeft = summaryScroll.scrollLeft;
+      }
+    };
+    summaryScroll?.addEventListener('scroll', syncSummaryScroll, { passive: true });
+    syncHeaderScroll();
 
     return () => {
       bodyScroll.removeEventListener('scroll', syncHeaderScroll);
       headerScroll.removeEventListener('scroll', syncBodyScroll);
+      summaryScroll?.removeEventListener('scroll', syncSummaryScroll);
     };
-  }, []);
+  }, [summaryDock]);
+
+  const summary = summaryDock ? (
+    <GridSummary
+      dock={summaryDock}
+      rows={visibleRows}
+      columns={visibleColumns}
+      columnTracks={columnTracks}
+      columnLine={columnLine}
+      renderedColumnIndexes={renderedColumnIndexes}
+      showCheckbox={showCheckbox}
+      showFormAction={rowFormActive}
+      getPinOffset={getPinOffset}
+    />
+  ) : null;
 
   return (
     <Box
@@ -3009,6 +3053,7 @@ function F1GridInner<T extends object>(
           formActionPinnedShadow={formActionPinnedShadow}
           onReorderColumn={reorderColumn}
         />
+        {summaryDock === 'top' ? summary : null}
       </Box>
       <Box
         ref={bodyScrollRef}
@@ -3161,6 +3206,16 @@ function F1GridInner<T extends object>(
           />
         ) : null}
       </Box>
+      {summaryDock === 'bottom' ? (
+        <Box ref={summaryScrollRef} sx={{
+          width: '100%', overflowX: 'auto', overflowY: 'hidden', flex: '0 0 auto',
+          scrollbarWidth: 'none', boxSizing: 'border-box',
+          paddingRight: `${bodyScrollMetrics.verticalScrollbarWidth}px`,
+          '&::-webkit-scrollbar': { display: 'none' },
+        }}>
+          {summary}
+        </Box>
+      ) : null}
       {isGridLoading ? (
         <Box
           data-testid="f1-grid-loading-overlay"
@@ -3204,10 +3259,14 @@ function F1GridInner<T extends object>(
         </MenuItem>
         <Divider />
         {treeContextMenu && showAddRootInContextMenu ? (
-          <MenuItem onClick={handleAddRootClick}>루트 추가</MenuItem>
+          <MenuItem disabled={treeContextMenu.addRootDisabled} onClick={handleAddRootClick}>
+            {treeContextMenu.addRootLabel ?? '루트 추가'}
+          </MenuItem>
         ) : null}
         {showAddRowInContextMenu ? (
-          <MenuItem onClick={handleAddRowContextClick}>행 추가</MenuItem>
+          <MenuItem disabled={treeContextMenu?.isAddChildDisabled?.(contextMenu?.rowId)} onClick={handleAddRowContextClick}>
+            {treeContextMenu?.addChildLabel ?? '행 추가'}
+          </MenuItem>
         ) : null}
         {!treeContextMenu &&
         showAddRowInContextMenu &&

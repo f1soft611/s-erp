@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPut } from '../src/shared/services/apiClient';
 import { SalesOrderStatusPage } from '../src/pages/sales/order/status/SalesOrderStatusPage';
+import { SalesOrderStatusGrid } from '../src/pages/sales/order/status/components/SalesOrderStatusGrid';
 import { createSalesOrderStatusColumns } from '../src/pages/sales/order/status/data/salesOrderStatusColumns';
 import type { SalesOrderStatusRow } from '../src/pages/sales/order/status/types/salesOrderStatus.types';
 import type { SalesOrderItem } from '../src/pages/sales/order/create/types/salesOrder.types';
@@ -161,7 +162,23 @@ describe('sales order status page', () => {
       }
       return Promise.resolve({ resultList: [statusRow], resultCnt: 1 });
     });
+
     apiPutMock.mockImplementation(() => Promise.resolve({ item: orderItem }));
+  });
+
+  it('displays totals for order quantity and amounts in the status grid', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(4000);
+    render(<SalesOrderStatusGrid rows={[
+      statusRow,
+      { ...statusRow, salesOrderDetailId: 451, orderQty: 3, supplyAmt: 300, vatAmt: 30, totalAmt: 330 },
+    ]} loading={false} canExportExcel onOpenOrder={() => {}} />);
+    const summary = screen.getByTestId('f1-grid-summary-bottom');
+    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('5.00');
+    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('500.00');
+    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('50.00');
+    expect(within(summary).getByRole('gridcell', { name: '합계 집계' })).toHaveTextContent('550.00');
+    expect(within(summary).getByRole('gridcell', { name: '단가 집계' })).toBeEmptyDOMElement();
+    width.mockRestore();
   });
 
   it('shows the empty result message only after success and hides it during retry and errors', async () => {

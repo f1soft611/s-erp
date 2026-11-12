@@ -26,6 +26,7 @@ import { WarehouseManagementPage } from '../../co/master/warehouse/WarehouseMana
 import { MaterialManagementPage } from '../../co/master/materials/MaterialManagementPage';
 import { ItemPartnerPriceManagementPage } from '../../co/master/item-partner-prices/ItemPartnerPriceManagementPage';
 import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStandardRecipePage';
+import { ProcessManagementPage } from '../../pr/process/ProcessManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
 import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
@@ -177,6 +178,11 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  if (selectedModule.id === 'pr' && currentPageKey === 'process-management') {
+    return <ProcessManagementPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
+  }
 
   if (selectedModule.id === 'co' && currentPageKey === 'company-info') {
     return <CompanyInfoPage selectedModule={selectedModule} currentMenuName={currentMenuName}

@@ -133,6 +133,7 @@ export function createSalesOrderDetailColumns(
     {
       field: 'orderQty',
       headerName: '주문수량',
+      summaryType: 'sum',
       type: 'decimal',
       decimalPlaces: 2,
       width: 120,
@@ -161,6 +162,7 @@ export function createSalesOrderDetailColumns(
     {
       field: 'supplyAmount',
       headerName: '공급가',
+      summaryType: 'sum',
       type: 'currency',
       decimalPlaces: 2,
       width: 130,
@@ -170,6 +172,7 @@ export function createSalesOrderDetailColumns(
     {
       field: 'vatAmount',
       headerName: '부가세',
+      summaryType: 'sum',
       type: 'currency',
       decimalPlaces: 2,
       width: 130,
@@ -187,6 +190,7 @@ export function createSalesOrderDetailColumns(
     {
       field: 'totalAmount',
       headerName: '라인합계',
+      summaryType: 'sum',
       type: 'currency',
       decimalPlaces: 2,
       width: 140,

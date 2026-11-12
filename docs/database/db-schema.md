@@ -1,5 +1,17 @@
 # DB 스키마 상세 정리
 
+### 공정관리: tb_process_group / tb_process
+
+| 테이블 | 주요 컬럼 | 설명 |
+| --- | --- | --- |
+| tb_process_group | group_id, tenant_id, name, description, inactive | 테넌트별 공정그룹 |
+| tb_process | process_id, tenant_id, group_id, name, description, image, inactive | 그룹별 공정 및 PNG/JPEG 데이터 URL |
+| tb_process | production_outsource, purchase_outsource, inspection, packing, stock_management, previous_stock_out, final_process, planned_equipment, actual_equipment_required | 공정별 선택 속성 |
+| 공통 | created_at, updated_at | 생성·수정 시각 |
+
+- `(tenant_id, group_id)` 복합 외래키로 다른 테넌트의 공정그룹 참조를 방지한다.
+- 생성 및 롤백 이력은 `20261112/20261112_003_change_process_management_schema.md`를 참조한다.
+
 ### 1-1. tb_tenant
 
 | 컬럼                         | 타입      | 설명                                     |

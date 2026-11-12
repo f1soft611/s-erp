@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { Box, Checkbox } from '@mui/material';
 import { CellEditor } from '../editing/CellEditor';
+import { ImageField } from '../editing/ImageField';
 import type {
   F1GridColumn,
   F1GridDraftValue,
@@ -176,6 +177,7 @@ const GridCellInner = <T extends object>({
     }),
     [column, row, rowId, rowIndex, value],
   );
+  const imageContent = column.type === 'image' ? column.renderCell?.(cellRenderContext) : undefined;
   const displayValue = useMemo(
     () =>
       column.type === 'rownumber'
@@ -409,6 +411,9 @@ const GridCellInner = <T extends object>({
             onCheckboxChange(event.target.checked);
           }}
         />
+      ) : column.type === 'image' ? (
+        imageContent !== undefined ? imageContent
+          : <ImageField label={column.headerName} value={value} disabled={!editable} onChange={onSelectChange} cell />
       ) : editing ? (
         <CellEditor
           column={column}

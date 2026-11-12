@@ -6,6 +6,7 @@ import {
   FormControl,
   FormControlLabel,
   FormHelperText,
+  FormLabel,
   IconButton,
   InputAdornment,
   MenuItem,
@@ -24,6 +25,7 @@ import { useF1GridNumberDraft } from '../editing/useF1GridNumberDraft';
 import { UserSelectEditor } from '../editing/UserSelectEditor';
 import { normalizeF1GridInput } from '../editing/inputFormat';
 import { useF1GridFormattedInput } from '../editing/useF1GridFormattedInput';
+import { ImageField } from '../editing/ImageField';
 
 export type GridFormFieldProps<T extends object> = {
   column: F1GridColumn<T>;
@@ -157,6 +159,16 @@ export function GridFormField<T extends object>({
       formHelperText: { id: helperTextId },
     },
   };
+
+  if (column.type === 'image') {
+    return (
+      <FormControl disabled={disabled} error={Boolean(error)}>
+        <FormLabel>{renderRequiredFieldLabel(column.headerName, isRequired)}</FormLabel>
+        <ImageField label={column.headerName} value={displayedValue} disabled={disabled || readOnly} onChange={applyValue} />
+        {error ? <FormHelperText>{error}</FormHelperText> : null}
+      </FormControl>
+    );
+  }
 
   if (column.type === 'checkbox') {
     return (
