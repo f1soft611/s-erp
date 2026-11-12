@@ -87,6 +87,41 @@ class SalesDeliveryPlanningSchemaContractTest {
     }
 
     @Test
+    void multiOrderDeliveryMigrationRemovesOnlyHeaderOrderConstraintAndGuardsRollback() throws Exception {
+        Path docsDirectory = Paths.get("..", "docs", "database", "20261112");
+        Path backendDirectory = Paths.get("DATABASE", "20261112");
+        String migration = read(docsDirectory.resolve("20261112_008_allow_multi_order_sales_delivery.sql"));
+        assertThat(migration).contains(
+                "ALTER TABLE public.tb_sales_delivery_dt",
+                "DROP CONSTRAINT fk_sales_delivery_dt_hd_order");
+        assertThat(migration).doesNotContain("DROP CONSTRAINT fk_sales_delivery_dt_source",
+                "DROP CONSTRAINT fk_sales_delivery_dt_plan_source",
+                "DROP CONSTRAINT fk_sales_delivery_dt_hd_type");
+
+        String rollback = read(docsDirectory.resolve("20261112_008_rollback_multi_order_sales_delivery.sql"));
+        assertThat(rollback).contains(
+                "LOCK TABLE public.tb_sales_delivery_hd",
+                "LOCK TABLE public.tb_sales_delivery_dt",
+                "d.sales_order_id IS DISTINCT FROM h.sales_order_id",
+                "RAISE EXCEPTION",
+                "ADD CONSTRAINT fk_sales_delivery_dt_hd_order");
+
+        for (String file : new String[] {
+                "20261112_008_allow_multi_order_sales_delivery.sql",
+                "20261112_008_rollback_multi_order_sales_delivery.sql",
+                "20261112_008_change_multi_order_sales_delivery_schema.md"
+        }) {
+            Path docsFile = docsDirectory.resolve(file);
+            Path backendFile = backendDirectory.resolve(file);
+            assertThat(Files.exists(docsFile)).as("docs " + file).isTrue();
+            assertThat(Files.exists(backendFile)).as("backend " + file).isTrue();
+            assertThat(Files.readAllBytes(backendFile))
+                    .as("identical copy of " + file)
+                    .containsExactly(Files.readAllBytes(docsFile));
+        }
+    }
+
+    @Test
     void shipmentLabelMigrationChangesOnlyApprovedLabelsAndHasGuardedIdenticalCopies() throws Exception {
         Path docsDirectory = Paths.get("..", "docs", "database", "20261106");
         Path backendDirectory = Paths.get("DATABASE", "20261106");

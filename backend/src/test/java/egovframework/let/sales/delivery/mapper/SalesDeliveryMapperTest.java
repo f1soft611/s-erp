@@ -45,8 +45,13 @@ class SalesDeliveryMapperTest {
         assertThat(status).contains(
                 "delivery_dt BETWEEN CAST(? AS date) AND CAST(? AS date)",
                 "sales_delivery_detail_id AS salesDeliveryDetailId",
+                "d.sales_order_id AS salesOrderId",
+                "o.sales_order_id = d.sales_order_id",
                 "COALESCE(h.created_by = ?, FALSE) AS writer",
                 "ORDER BY h.delivery_dt DESC");
+        String delivery = normalize(sql(configuration, "selectDelivery").getSql());
+        assertThat(delivery).contains("string_agg(DISTINCT source_order.order_no",
+                "source_detail.sales_delivery_id = h.sales_delivery_id");
         assertThat(normalize(sql(configuration, "existsActiveCustomer").getSql()))
                 .contains("use_at = 'Y'");
         assertThat(normalize(sql(configuration, "existsActiveMaterial").getSql()))

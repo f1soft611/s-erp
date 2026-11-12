@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -60,9 +61,11 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throws Exception {
         validatePrincipal(tenantId, userId);
         validatePayload(payload);
-        SalesDeliverySourceOrderHeaderVO sourceOrder = lockAndValidateOrder(tenantId, payload);
+        validatePrimaryOrder(payload);
+        Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrders =
+                lockAndValidateOrders(tenantId, payload, Collections.<SalesDeliveryDetailVO>emptyList());
         validateCustomer(tenantId, payload.getCustomerId());
-        List<PreparedDetail> details = prepareDetails(tenantId, payload, sourceOrder, null, null);
+        List<PreparedDetail> details = prepareDetails(tenantId, payload, sourceOrders, null, null);
         BigDecimal total = sumTotals(details);
         String deliveryNo = generateDeliveryNo(tenantId, payload.getDeliveryDt());
 
@@ -83,9 +86,9 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throw new IllegalStateException("출하 헤더 저장에 실패했습니다.");
         }
 
-        persistDetails(deliveryId, tenantId, payload.getDeliveryType(), payload.getSalesOrderId(), details);
-        adjustDeliveryShippedQty(tenantId, userId, payload.getSalesOrderId(), details, null);
-        adjustPlanDeliveredQty(tenantId, userId, payload.getSalesOrderId(), details, null);
+        persistDetails(deliveryId, tenantId, payload.getDeliveryType(), details);
+        adjustDeliveryShippedQty(tenantId, userId, details, Collections.<SalesDeliveryDetailVO>emptyList());
+        adjustPlanDeliveredQty(tenantId, userId, details, Collections.<SalesDeliveryDetailVO>emptyList());
         return getDelivery(tenantId, userId, deliveryId);
     }
 
@@ -117,7 +120,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throw deliveryNotFound();
         }
         validateDeliveryLink(observed, payload);
-        SalesDeliverySourceOrderHeaderVO sourceOrder = lockAndValidateOrder(tenantId, payload);
+        List<SalesDeliveryDetailVO> observedDetails = salesDeliveryDAO.selectDeliveryDetails(params);
+        if (observedDetails == null) {
+            observedDetails = new ArrayList<SalesDeliveryDetailVO>();
+        }
+        Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrders =
+                lockAndValidateOrders(tenantId, payload, observedDetails);
         SalesDeliveryVO stored = salesDeliveryDAO.lockDeliveryHeader(params);
         if (stored == null) {
             throw deliveryNotFound();
@@ -128,10 +136,8 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (oldDetails == null) {
             oldDetails = new ArrayList<SalesDeliveryDetailVO>();
         }
-        Map<Long, BigDecimal> oldOrderQuantities = linkedOrderQuantities(oldDetails);
-        Map<Long, BigDecimal> oldPlanQuantities = linkedPlanQuantities(oldDetails);
         List<PreparedDetail> details = prepareDetails(
-                tenantId, payload, sourceOrder, oldPlanQuantities, oldOrderQuantities);
+                tenantId, payload, sourceOrders, linkedPlanQuantities(oldDetails), linkedOrderQuantities(oldDetails));
         BigDecimal total = sumTotals(details);
 
         Map<String, Object> header = deliveryParams(tenantId, salesDeliveryId);
@@ -145,9 +151,9 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             throw deliveryNotFound();
         }
         salesDeliveryDAO.deleteDeliveryDetails(params);
-        persistDetails(salesDeliveryId, tenantId, payload.getDeliveryType(), payload.getSalesOrderId(), details);
-        adjustDeliveryShippedQty(tenantId, userId, payload.getSalesOrderId(), details, oldOrderQuantities);
-        adjustPlanDeliveredQty(tenantId, userId, payload.getSalesOrderId(), details, oldPlanQuantities);
+        persistDetails(salesDeliveryId, tenantId, payload.getDeliveryType(), details);
+        adjustDeliveryShippedQty(tenantId, userId, details, oldDetails);
+        adjustPlanDeliveredQty(tenantId, userId, details, oldDetails);
         return getDelivery(tenantId, userId, salesDeliveryId);
     }
 
@@ -161,8 +167,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         if (observed == null) {
             throw deliveryNotFound();
         }
+        List<SalesDeliveryDetailVO> observedDetails = salesDeliveryDAO.selectDeliveryDetails(params);
+        if (observedDetails == null) {
+            observedDetails = new ArrayList<SalesDeliveryDetailVO>();
+        }
         if (ORDER.equals(observed.getDeliveryType())) {
-            lockSourceOrderForReference(tenantId, observed.getSalesOrderId(), observed.getCustomerId());
+            lockExistingSourceOrders(tenantId, observed.getSalesOrderId(), observed.getCustomerId(), observedDetails);
         }
         SalesDeliveryVO stored = salesDeliveryDAO.lockDeliveryHeader(params);
         if (stored == null) {
@@ -175,14 +185,8 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         }
         List<SalesDeliveryDetailVO> details = salesDeliveryDAO.selectDeliveryDetails(params);
         if (details != null && ORDER.equals(stored.getDeliveryType())) {
-            for (Map.Entry<Long, BigDecimal> entry : linkedOrderQuantities(details).entrySet()) {
-                adjustShippedQty(tenantId, userId, stored.getSalesOrderId(),
-                        entry.getKey(), entry.getValue().negate());
-            }
-            for (Map.Entry<Long, BigDecimal> entry : linkedPlanQuantities(details).entrySet()) {
-                adjustPlanDeliveredQty(tenantId, userId, stored.getSalesOrderId(),
-                        entry.getKey(), null, entry.getValue().negate());
-            }
+            adjustDeliveryShippedQty(tenantId, userId, Collections.<PreparedDetail>emptyList(), details);
+            adjustPlanDeliveredQty(tenantId, userId, Collections.<PreparedDetail>emptyList(), details);
         }
         Map<String, Object> deleteParams = deliveryParams(tenantId, salesDeliveryId);
         deleteParams.put("updatedBy", userId);
@@ -227,14 +231,55 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return salesDeliveryDAO.selectDeliveryStatus(params);
     }
 
-    private SalesDeliverySourceOrderHeaderVO lockAndValidateOrder(
-            Long tenantId, SalesDeliveryRequestVO payload) throws Exception {
-        if (DIRECT.equals(payload.getDeliveryType())) {
-            return null;
+    private void validatePrimaryOrder(SalesDeliveryRequestVO payload) {
+        if (ORDER.equals(payload.getDeliveryType())) {
+            Long firstOrderId = sourceOrderId(payload.getDetails().get(0), payload);
+            if (!same(firstOrderId, payload.getSalesOrderId())) {
+                throw badRequest("대표 수주와 첫 상세의 수주가 일치하지 않습니다.");
+            }
         }
-        SalesDeliverySourceOrderHeaderVO order = lockSourceOrderForReference(
-                tenantId, payload.getSalesOrderId(), payload.getCustomerId());
-        return order;
+    }
+
+    private Map<Long, SalesDeliverySourceOrderHeaderVO> lockAndValidateOrders(
+            Long tenantId, SalesDeliveryRequestVO payload, List<SalesDeliveryDetailVO> existingDetails)
+            throws Exception {
+        Map<Long, SalesDeliverySourceOrderHeaderVO> orders =
+                new LinkedHashMap<Long, SalesDeliverySourceOrderHeaderVO>();
+        if (DIRECT.equals(payload.getDeliveryType())) {
+            return orders;
+        }
+        Set<Long> sourceIds = new HashSet<Long>();
+        sourceIds.add(payload.getSalesOrderId());
+        for (SalesDeliveryDetailRequestVO detail : payload.getDetails()) {
+            sourceIds.add(sourceOrderId(detail, payload));
+        }
+        for (SalesDeliveryDetailVO detail : existingDetails) {
+            if (detail.getSalesOrderId() != null) {
+                sourceIds.add(detail.getSalesOrderId());
+            }
+        }
+        List<Long> orderedIds = new ArrayList<Long>(sourceIds);
+        Collections.sort(orderedIds);
+        for (Long sourceId : orderedIds) {
+            orders.put(sourceId, lockSourceOrderForReference(tenantId, sourceId, payload.getCustomerId()));
+        }
+        return orders;
+    }
+
+    private void lockExistingSourceOrders(Long tenantId, Long primaryOrderId, Long customerId,
+            List<SalesDeliveryDetailVO> details) throws Exception {
+        Set<Long> sourceIds = new HashSet<Long>();
+        sourceIds.add(primaryOrderId);
+        for (SalesDeliveryDetailVO detail : details) {
+            if (detail.getSalesOrderId() != null) {
+                sourceIds.add(detail.getSalesOrderId());
+            }
+        }
+        List<Long> orderedIds = new ArrayList<Long>(sourceIds);
+        Collections.sort(orderedIds);
+        for (Long sourceId : orderedIds) {
+            lockSourceOrderForReference(tenantId, sourceId, customerId);
+        }
     }
 
     private void validateDeliveryLink(SalesDeliveryVO delivery, SalesDeliveryRequestVO payload) {
@@ -266,12 +311,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     }
 
     private List<PreparedDetail> prepareDetails(Long tenantId, SalesDeliveryRequestVO payload,
-            SalesDeliverySourceOrderHeaderVO sourceOrder, Map<Long, BigDecimal> oldPlanQuantities,
+            Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrderHeaders, Map<Long, BigDecimal> oldPlanQuantities,
             Map<Long, BigDecimal> oldOrderQuantities)
             throws Exception {
         List<PreparedDetail> prepared = new ArrayList<PreparedDetail>();
         Map<Long, SalesDeliverySourceOrderVO> sourcePlans = new LinkedHashMap<Long, SalesDeliverySourceOrderVO>();
-        Map<Long, SalesDeliverySourceOrderVO> sourceOrders = new LinkedHashMap<Long, SalesDeliverySourceOrderVO>();
+        Map<Long, SalesDeliverySourceOrderVO> sourceOrderLines = new LinkedHashMap<Long, SalesDeliverySourceOrderVO>();
         Map<Long, BigDecimal> orderQuantities = new LinkedHashMap<Long, BigDecimal>();
         for (SalesDeliveryDetailRequestVO request : payload.getDetails()) {
             if (request == null || request.getMaterialId() == null || request.getMaterialId() < 1L) {
@@ -280,11 +325,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             if (!salesDeliveryDAO.existsActiveMaterial(referenceParams(tenantId, request.getMaterialId()))) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용 가능한 품목을 찾을 수 없습니다.");
             }
-            PreparedDetail detail = prepareDetail(request);
+            PreparedDetail detail = prepareDetail(request, payload);
             if (ORDER.equals(payload.getDeliveryType())) {
-                SalesDeliverySourceOrderVO sourceLine = validateSourceDetail(tenantId, payload, sourceOrder, request);
+                SalesDeliverySourceOrderVO sourceLine =
+                        validateSourceDetail(tenantId, payload, sourceOrderHeaders, request);
                 sourcePlans.put(detail.salesDeliveryPlanDetailId, sourceLine);
-                sourceOrders.put(detail.salesOrderDetailId, sourceLine);
+                sourceOrderLines.put(detail.salesOrderDetailId, sourceLine);
                 addQuantity(orderQuantities, detail.salesOrderDetailId, detail.deliveryQty);
             }
             prepared.add(detail);
@@ -302,7 +348,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                         line.getPlannedQty(), after);
             }
             for (Map.Entry<Long, BigDecimal> entry : orderQuantities.entrySet()) {
-                SalesDeliverySourceOrderVO line = sourceOrders.get(entry.getKey());
+                SalesDeliverySourceOrderVO line = sourceOrderLines.get(entry.getKey());
                 BigDecimal after = valueOrZero(line.getShippedQty())
                         .subtract(previousQuantity(oldOrderQuantities, entry.getKey())).add(entry.getValue());
                 validateCumulativeQuantity(after, "수주 누적출하수량");
@@ -344,17 +390,20 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
     }
 
     private SalesDeliverySourceOrderVO validateSourceDetail(Long tenantId, SalesDeliveryRequestVO payload,
-            SalesDeliverySourceOrderHeaderVO order, SalesDeliveryDetailRequestVO request) throws Exception {
+            Map<Long, SalesDeliverySourceOrderHeaderVO> sourceOrders, SalesDeliveryDetailRequestVO request)
+            throws Exception {
+        Long salesOrderId = sourceOrderId(request, payload);
         Long detailId = request.getSalesOrderDetailId();
         Long planDetailId = request.getSalesDeliveryPlanDetailId();
-        if (payload.getSalesOrderId() == null || detailId == null || detailId.longValue() < 1L
+        if (salesOrderId == null || detailId == null || detailId.longValue() < 1L
                 || planDetailId == null || planDetailId.longValue() < 1L) {
             throw badRequest("수주출하 상세는 출하계획 상세를 선택해야 합니다.");
         }
-        Map<String, Object> params = sourceDetailParams(tenantId, payload.getSalesOrderId(), detailId);
+        Map<String, Object> params = sourceDetailParams(tenantId, salesOrderId, detailId);
         params.put("salesDeliveryPlanDetailId", planDetailId);
         SalesDeliverySourceOrderVO line = salesDeliveryDAO.selectSourcePlanDetail(params);
-        if (line == null || !same(line.getSalesOrderId(), payload.getSalesOrderId())
+        SalesDeliverySourceOrderHeaderVO order = sourceOrders.get(salesOrderId);
+        if (line == null || !same(line.getSalesOrderId(), salesOrderId)
                 || !same(line.getCustomerId(), payload.getCustomerId())
                 || !same(line.getMaterialId(), request.getMaterialId())
                 || !same(line.getSalesOrderDetailId(), detailId)
@@ -365,7 +414,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return line;
     }
 
-    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request) {
+    private PreparedDetail prepareDetail(SalesDeliveryDetailRequestVO request, SalesDeliveryRequestVO payload) {
         if (request.getDeliveryQty() == null || request.getDeliveryQty().signum() <= 0) {
             throw badRequest("출하수량은 0보다 커야 합니다.");
         }
@@ -385,11 +434,12 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         BigDecimal totalAmt = money(supplyAmt.add(vatAmt));
         validateNumeric(vatAmt, "부가세");
         validateNumeric(totalAmt, "라인 합계");
-        return new PreparedDetail(request.getMaterialId(), request.getSalesOrderDetailId(),
+        return new PreparedDetail(request.getMaterialId(), ORDER.equals(payload.getDeliveryType())
+                ? sourceOrderId(request, payload) : null, request.getSalesOrderDetailId(),
                 request.getSalesDeliveryPlanDetailId(), quantity, unitPrice, supplyAmt, vatAmt, totalAmt);
     }
 
-    private void persistDetails(Long deliveryId, Long tenantId, String deliveryType, Long salesOrderId,
+    private void persistDetails(Long deliveryId, Long tenantId, String deliveryType,
             List<PreparedDetail> details) throws Exception {
         int lineNo = 1;
         for (PreparedDetail detail : details) {
@@ -399,7 +449,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
             params.put("deliveryType", deliveryType);
             params.put("lineNo", lineNo++);
             params.put("materialId", detail.materialId);
-            params.put("salesOrderId", salesOrderId);
+            params.put("salesOrderId", detail.salesOrderId);
             params.put("salesOrderDetailId", detail.salesOrderDetailId);
             params.put("salesDeliveryPlanDetailId", detail.salesDeliveryPlanDetailId);
             params.put("deliveryQty", detail.deliveryQty);
@@ -414,24 +464,31 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         }
     }
 
-    private void adjustDeliveryShippedQty(Long tenantId, String userId, Long salesOrderId,
-            List<PreparedDetail> details,
-            Map<Long, BigDecimal> oldQuantities) throws Exception {
-        if (salesOrderId == null) {
-            return;
-        }
+    private void adjustDeliveryShippedQty(Long tenantId, String userId, List<PreparedDetail> details,
+            List<SalesDeliveryDetailVO> oldDetails) throws Exception {
         Map<Long, BigDecimal> newQuantities = new LinkedHashMap<Long, BigDecimal>();
+        Map<Long, Long> newOrderIds = new HashMap<Long, Long>();
         for (PreparedDetail detail : details) {
-            addQuantity(newQuantities, detail.salesOrderDetailId, detail.deliveryQty);
+            if (detail.salesOrderDetailId != null) {
+                addQuantity(newQuantities, detail.salesOrderDetailId, detail.deliveryQty);
+                newOrderIds.put(detail.salesOrderDetailId, detail.salesOrderId);
+            }
+        }
+        Map<Long, BigDecimal> oldQuantities = linkedOrderQuantities(oldDetails);
+        Map<Long, Long> oldOrderIds = new HashMap<Long, Long>();
+        for (SalesDeliveryDetailVO detail : oldDetails) {
+            if (detail.getSalesOrderDetailId() != null) {
+                oldOrderIds.put(detail.getSalesOrderDetailId(), detail.getSalesOrderId());
+            }
         }
         Set<Long> allDetailIds = new HashSet<Long>();
         allDetailIds.addAll(newQuantities.keySet());
-        if (oldQuantities != null) {
-            allDetailIds.addAll(oldQuantities.keySet());
-        }
+        allDetailIds.addAll(oldQuantities.keySet());
         for (Long detailId : allDetailIds) {
             BigDecimal delta = valueOrZero(newQuantities.get(detailId))
-                    .subtract(oldQuantities == null ? ZERO : valueOrZero(oldQuantities.get(detailId)));
+                    .subtract(valueOrZero(oldQuantities.get(detailId)));
+            Long salesOrderId = newOrderIds.containsKey(detailId)
+                    ? newOrderIds.get(detailId) : oldOrderIds.get(detailId);
             if (delta.signum() != 0) {
                 adjustShippedQty(tenantId, userId, salesOrderId, detailId, delta);
             }
@@ -468,30 +525,39 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return result;
     }
 
-    private void adjustPlanDeliveredQty(Long tenantId, String userId, Long salesOrderId,
-            List<PreparedDetail> details, Map<Long, BigDecimal> oldQuantities) throws Exception {
-        if (salesOrderId == null) {
-            return;
-        }
+    private void adjustPlanDeliveredQty(Long tenantId, String userId, List<PreparedDetail> details,
+            List<SalesDeliveryDetailVO> oldDetails) throws Exception {
         Map<Long, BigDecimal> newQuantities = new LinkedHashMap<Long, BigDecimal>();
         Map<Long, Long> sourceDetailIds = new HashMap<Long, Long>();
+        Map<Long, Long> newOrderIds = new HashMap<Long, Long>();
         for (PreparedDetail detail : details) {
             if (detail.salesDeliveryPlanDetailId != null) {
                 addQuantity(newQuantities, detail.salesDeliveryPlanDetailId, detail.deliveryQty);
                 sourceDetailIds.put(detail.salesDeliveryPlanDetailId, detail.salesOrderDetailId);
+                newOrderIds.put(detail.salesDeliveryPlanDetailId, detail.salesOrderId);
+            }
+        }
+        Map<Long, BigDecimal> oldQuantities = linkedPlanQuantities(oldDetails);
+        Map<Long, Long> oldDetailIds = new HashMap<Long, Long>();
+        Map<Long, Long> oldOrderIds = new HashMap<Long, Long>();
+        for (SalesDeliveryDetailVO detail : oldDetails) {
+            if (detail.getSalesDeliveryPlanDetailId() != null) {
+                oldDetailIds.put(detail.getSalesDeliveryPlanDetailId(), detail.getSalesOrderDetailId());
+                oldOrderIds.put(detail.getSalesDeliveryPlanDetailId(), detail.getSalesOrderId());
             }
         }
         Set<Long> allPlanDetailIds = new HashSet<Long>();
         allPlanDetailIds.addAll(newQuantities.keySet());
-        if (oldQuantities != null) {
-            allPlanDetailIds.addAll(oldQuantities.keySet());
-        }
+        allPlanDetailIds.addAll(oldQuantities.keySet());
         for (Long planDetailId : allPlanDetailIds) {
             BigDecimal delta = valueOrZero(newQuantities.get(planDetailId))
-                    .subtract(oldQuantities == null ? ZERO : valueOrZero(oldQuantities.get(planDetailId)));
+                    .subtract(valueOrZero(oldQuantities.get(planDetailId)));
+            Long salesOrderId = newOrderIds.containsKey(planDetailId)
+                    ? newOrderIds.get(planDetailId) : oldOrderIds.get(planDetailId);
+            Long salesOrderDetailId = sourceDetailIds.containsKey(planDetailId)
+                    ? sourceDetailIds.get(planDetailId) : oldDetailIds.get(planDetailId);
             if (delta.signum() != 0) {
-                adjustPlanDeliveredQty(tenantId, userId, salesOrderId, planDetailId,
-                        sourceDetailIds.get(planDetailId), delta);
+                adjustPlanDeliveredQty(tenantId, userId, salesOrderId, planDetailId, salesOrderDetailId, delta);
             }
         }
     }
@@ -536,8 +602,11 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
                 throw badRequest("직출하에는 수주를 연결할 수 없습니다.");
             }
             for (SalesDeliveryDetailRequestVO detail : payload.getDetails()) {
-                if (detail != null && (detail.getSalesOrderDetailId() != null
-                        || detail.getSalesDeliveryPlanDetailId() != null)) {
+                if (detail == null) {
+                    throw badRequest("상세 품목을 입력해 주세요.");
+                }
+                if (detail.getSalesOrderId() != null || detail.getSalesOrderDetailId() != null
+                        || detail.getSalesDeliveryPlanDetailId() != null) {
                     throw badRequest("직출하에는 수주 또는 출하계획 상세를 연결할 수 없습니다.");
                 }
             }
@@ -546,11 +615,17 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         }
         Set<Long> planDetailIds = new HashSet<Long>();
         for (SalesDeliveryDetailRequestVO detail : payload.getDetails()) {
-            if (ORDER.equals(payload.getDeliveryType()) && detail != null
+            if (detail == null) {
+                throw badRequest("상세 품목을 입력해 주세요.");
+            }
+            if (detail.getSalesOrderId() != null && detail.getSalesOrderId() < 1L) {
+                throw badRequest("상세행 수주 ID는 1 이상의 값이어야 합니다.");
+            }
+            if (ORDER.equals(payload.getDeliveryType())
                     && detail.getSalesDeliveryPlanDetailId() == null) {
                 throw badRequest("수주출하는 출하계획 상세를 선택해야 합니다.");
             }
-            if (detail != null && detail.getSalesDeliveryPlanDetailId() != null
+            if (detail.getSalesDeliveryPlanDetailId() != null
                     && !planDetailIds.add(detail.getSalesDeliveryPlanDetailId())) {
                 throw badRequest("같은 출하계획 상세를 중복 등록할 수 없습니다.");
             }
@@ -678,6 +753,10 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         return params;
     }
 
+    private Long sourceOrderId(SalesDeliveryDetailRequestVO detail, SalesDeliveryRequestVO payload) {
+        return detail.getSalesOrderId() == null ? payload.getSalesOrderId() : detail.getSalesOrderId();
+    }
+
     private BigDecimal valueOrZero(BigDecimal value) {
         return value == null ? ZERO : value;
     }
@@ -696,6 +775,7 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
 
     private static final class PreparedDetail {
         private final Long materialId;
+        private final Long salesOrderId;
         private final Long salesOrderDetailId;
         private final Long salesDeliveryPlanDetailId;
         private final BigDecimal deliveryQty;
@@ -704,10 +784,11 @@ public class SalesDeliveryServiceImpl extends EgovAbstractServiceImpl implements
         private final BigDecimal vatAmt;
         private final BigDecimal totalAmt;
 
-        private PreparedDetail(Long materialId, Long salesOrderDetailId, Long salesDeliveryPlanDetailId,
-                BigDecimal deliveryQty,
+        private PreparedDetail(Long materialId, Long salesOrderId, Long salesOrderDetailId,
+                Long salesDeliveryPlanDetailId, BigDecimal deliveryQty,
                 BigDecimal unitPrice, BigDecimal supplyAmt, BigDecimal vatAmt, BigDecimal totalAmt) {
             this.materialId = materialId;
+            this.salesOrderId = salesOrderId;
             this.salesOrderDetailId = salesOrderDetailId;
             this.salesDeliveryPlanDetailId = salesDeliveryPlanDetailId;
             this.deliveryQty = deliveryQty;

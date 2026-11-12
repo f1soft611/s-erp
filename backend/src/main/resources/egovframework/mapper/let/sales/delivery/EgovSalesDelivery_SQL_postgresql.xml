@@ -196,7 +196,15 @@
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
                h.sales_order_id AS salesOrderId,
-               o.order_no AS orderNo,
+               (
+                   SELECT string_agg(DISTINCT source_order.order_no, ', ' ORDER BY source_order.order_no)
+                   FROM tb_sales_delivery_dt source_detail
+                   JOIN tb_sales_order_hd source_order
+                     ON source_order.sales_order_id = source_detail.sales_order_id
+                    AND source_order.tenant_id = source_detail.tenant_id
+                   WHERE source_detail.sales_delivery_id = h.sales_delivery_id
+                     AND source_detail.tenant_id = h.tenant_id
+               ) AS orderNo,
                h.delivery_place AS deliveryPlace,
                h.delivery_method AS deliveryMethod,
                h.remark AS remark,
@@ -206,9 +214,6 @@
         JOIN tb_customer_info c
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
-        LEFT JOIN tb_sales_order_hd o
-          ON o.sales_order_id = h.sales_order_id
-         AND o.tenant_id = h.tenant_id
         WHERE h.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
           AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND h.use_at = 'Y'
@@ -328,7 +333,7 @@
                h.customer_id AS customerId,
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
-               h.sales_order_id AS salesOrderId,
+               d.sales_order_id AS salesOrderId,
                o.order_no AS orderNo,
                h.delivery_place AS deliveryPlace,
                h.delivery_method AS deliveryMethod,
@@ -354,8 +359,8 @@
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
         LEFT JOIN tb_sales_order_hd o
-          ON o.sales_order_id = h.sales_order_id
-         AND o.tenant_id = h.tenant_id
+          ON o.sales_order_id = d.sales_order_id
+         AND o.tenant_id = d.tenant_id
         JOIN tb_material_info m
           ON m.material_id = d.material_id
          AND m.tenant_id = d.tenant_id

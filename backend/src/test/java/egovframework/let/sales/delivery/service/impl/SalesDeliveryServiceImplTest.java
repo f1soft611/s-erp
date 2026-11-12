@@ -136,6 +136,80 @@ class SalesDeliveryServiceImplTest {
     }
 
     @Test
+    void savesAndAdjustsEachDetailAgainstItsOwnSalesOrder() throws Exception {
+        SalesDeliveryRequestVO payload = orderPayload("2");
+        SalesDeliveryDetailRequestVO otherDetail = orderDetail("3");
+        otherDetail.setSalesOrderId(301L);
+        otherDetail.setSalesOrderDetailId(401L);
+        otherDetail.setSalesDeliveryPlanDetailId(901L);
+        otherDetail.setMaterialId(21L);
+        payload.getDetails().get(0).setSalesOrderId(300L);
+        payload.setDetails(Arrays.asList(payload.getDetails().get(0), otherDetail));
+
+        SalesDeliverySourceOrderHeaderVO otherOrder = orderSnapshot();
+        otherOrder.setSalesOrderId(301L);
+        when(dao.lockSourceOrder(anyMap())).thenReturn(orderSnapshot(), otherOrder);
+        SalesDeliverySourceOrderVO firstLine = sourceLine("10", "10", "0");
+        SalesDeliverySourceOrderVO secondLine = sourceLine("10", "10", "0");
+        secondLine.setSalesOrderId(301L);
+        secondLine.setSalesOrderDetailId(401L);
+        secondLine.setSalesDeliveryPlanDetailId(901L);
+        secondLine.setMaterialId(21L);
+        when(dao.selectSourcePlanDetail(anyMap())).thenReturn(firstLine, secondLine);
+        SalesDeliveryVO reloaded = new SalesDeliveryVO();
+        reloaded.setCreatedBy("user01");
+        when(dao.selectDelivery(anyMap())).thenReturn(reloaded);
+        SalesDeliveryDetailVO firstSaved = storedDetail("2");
+        SalesDeliveryDetailVO secondSaved = storedDetail("3");
+        secondSaved.setSalesOrderId(301L);
+        secondSaved.setSalesOrderDetailId(401L);
+        secondSaved.setSalesDeliveryPlanDetailId(901L);
+        secondSaved.setMaterialId(21L);
+        when(dao.selectDeliveryDetails(anyMap())).thenReturn(Arrays.asList(firstSaved, secondSaved));
+
+        service.createDelivery(71L, "user01", payload);
+
+        ArgumentCaptor<Map<String, Object>> savedDetails = ArgumentCaptor.forClass(Map.class);
+        verify(dao, org.mockito.Mockito.times(2)).insertDeliveryDetail(savedDetails.capture());
+        assertThat(savedDetails.getAllValues().get(0)).containsEntry("salesOrderId", 300L)
+                .containsEntry("salesOrderDetailId", 400L);
+        assertThat(savedDetails.getAllValues().get(1)).containsEntry("salesOrderId", 301L)
+                .containsEntry("salesOrderDetailId", 401L);
+        verify(dao).adjustShippedQty(argThat(params ->
+                Long.valueOf(300L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(400L).equals(params.get("salesOrderDetailId"))));
+        verify(dao).adjustShippedQty(argThat(params ->
+                Long.valueOf(301L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(401L).equals(params.get("salesOrderDetailId"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(params ->
+                Long.valueOf(300L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(900L).equals(params.get("salesDeliveryPlanDetailId"))));
+        verify(dao).adjustPlanDeliveredQty(argThat(params ->
+                Long.valueOf(301L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(901L).equals(params.get("salesDeliveryPlanDetailId"))));
+    }
+
+    @Test
+    void rejectsMultiOrderDeliveryWhenSourceCustomersDiffer() throws Exception {
+        SalesDeliveryRequestVO payload = orderPayload("2");
+        SalesDeliveryDetailRequestVO otherDetail = orderDetail("3");
+        otherDetail.setSalesOrderId(301L);
+        otherDetail.setSalesOrderDetailId(401L);
+        otherDetail.setSalesDeliveryPlanDetailId(901L);
+        payload.getDetails().get(0).setSalesOrderId(300L);
+        payload.setDetails(Arrays.asList(payload.getDetails().get(0), otherDetail));
+        SalesDeliverySourceOrderHeaderVO otherOrder = orderSnapshot();
+        otherOrder.setSalesOrderId(301L);
+        otherOrder.setCustomerId(11L);
+        when(dao.lockSourceOrder(anyMap())).thenReturn(orderSnapshot(), otherOrder);
+
+        assertStatus(HttpStatus.CONFLICT, () ->
+                service.createDelivery(71L, "user01", payload));
+
+        verify(dao, never()).insertDeliveryHeader(anyMap());
+    }
+
+    @Test
     void rejectsLinkedOverDeliveryBeforeInsertingDeliveryRows() throws Exception {
         stubOrderAndLine("10", "4", "3");
 
