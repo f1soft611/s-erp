@@ -351,6 +351,7 @@ class SalesDeliveryPlanServiceImplTest {
 
     @Test
     void loadsPlanByOrderWithinAuthenticatedTenant() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
         when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
@@ -360,6 +361,22 @@ class SalesDeliveryPlanServiceImplTest {
         verify(dao).selectPlanByOrder(org.mockito.ArgumentMatchers.argThat(params ->
                 Long.valueOf(71L).equals(params.get("tenantId"))
                         && Long.valueOf(301L).equals(params.get("salesOrderId"))));
+    }
+
+    @Test
+    void rejectsByOrderPlanLookupInManualMode() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("MANUAL");
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> service.getByOrder(71L, "user01", 301L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(dao, never()).selectPlanByOrder(anyMap());
     }
 
     @Test

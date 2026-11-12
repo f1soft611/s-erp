@@ -274,6 +274,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     @Override
     public SalesDeliveryPlanVO getByOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
         validatePrincipal(tenantId, userId);
+        if (!MODE_AUTO.equals(getMode(tenantId))) {
+            throw conflict("수주 기준 출하계획 조회는 AUTO 테넌트에서만 지원합니다.");
+        }
         if (salesOrderId == null || salesOrderId.longValue() < 1L) {
             throw notFound("출하계획을 찾을 수 없습니다.");
         }
