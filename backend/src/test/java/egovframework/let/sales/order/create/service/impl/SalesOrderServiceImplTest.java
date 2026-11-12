@@ -135,11 +135,33 @@ class SalesOrderServiceImplTest {
         org.mockito.Mockito.verify(salesDeliveryPlanService)
                 .createAutomaticPlan(org.mockito.ArgumentMatchers.eq(71L),
                         org.mockito.ArgumentMatchers.eq("user01"), request.capture());
-        assertThat(request.getValue().getSalesOrderId()).isEqualTo(300L);
         assertThat(request.getValue().getDetails()).hasSize(1);
+        assertThat(request.getValue().getDetails().get(0).getSalesOrderId()).isEqualTo(300L);
         assertThat(request.getValue().getDetails().get(0).getSalesOrderDetailId()).isEqualTo(401L);
         assertThat(request.getValue().getDetails().get(0).getPlanDt())
                 .isEqualTo(LocalDate.of(2026, 11, 5));
+    }
+
+    @Test
+    void assignsTheSameSourceOrderToEveryAutomaticPlanDetail() throws Exception {
+        when(salesDeliveryPlanService.lockModeForPlanCreation(71L)).thenReturn("AUTO");
+        when(salesOrderDAO.existsMaterial(argThat(params ->
+                Long.valueOf(21L).equals(params.get("id"))))).thenReturn(true);
+        when(salesOrderDAO.insertOrderDetail(anyMap())).thenReturn(401L, 402L);
+        SalesOrderCreateRequestVO payload = validPayload();
+        payload.setDetails(Arrays.asList(payload.getDetails().get(0), detail(21L, "1", "3", "0.30")));
+
+        service.createOrder(71L, "user01", payload);
+
+        ArgumentCaptor<SalesDeliveryPlanRequestVO> request =
+                ArgumentCaptor.forClass(SalesDeliveryPlanRequestVO.class);
+        org.mockito.Mockito.verify(salesDeliveryPlanService)
+                .createAutomaticPlan(org.mockito.ArgumentMatchers.eq(71L),
+                        org.mockito.ArgumentMatchers.eq("user01"), request.capture());
+        assertThat(request.getValue().getDetails()).extracting("salesOrderId")
+                .containsExactly(300L, 300L);
+        assertThat(request.getValue().getDetails()).extracting("salesOrderDetailId")
+                .containsExactly(401L, 402L);
     }
 
     @Test
