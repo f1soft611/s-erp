@@ -59,7 +59,7 @@ Expected: commit contains only the dated spec and project-plan link; `git diff -
 - Create in both DB trees: `20261112_009_allow_multi_order_sales_delivery_plan.sql`, `20261112_009_rollback_multi_order_sales_delivery_plan.sql`, and `20261112_009_change_multi_order_sales_delivery_plan_schema.md`
 - Modify: `docs/database/db-schema.md`
 
-- [ ] **Step 1: Add a failing schema contract test.** Assert that forward, rollback, and history files exist in both trees and are byte-identical; assert that forward SQL removes the header's singular order constraints/column, establishes a `(sales_delivery_plan_id, tenant_id)` header reference, and replaces the detail FK; assert rollback checks for multi-order plans before restoring a singular order relationship.
+- [ ] **Step 1: Add a failing schema contract test.** Assert that forward, rollback, and history files exist in both trees and are byte-identical; assert that forward SQL removes the header's singular order constraints/column, establishes a `(sales_delivery_plan_id, tenant_id)` header reference, and replaces the detail FK; assert rollback checks that every plan has at least one source detail and exactly one distinct source order before restoring a singular order relationship.
 - [ ] **Step 2: Run the focused contract test and verify the missing migration failure.**
 
 ```powershell
@@ -70,7 +70,7 @@ mvn -q "-Dtest=SalesDeliveryPlanningSchemaContractTest" test
 Expected before migration creation: FAIL because the 20261112_009 paired migration files do not exist.
 
 - [ ] **Step 3: Write the forward migration.** In one transaction, lock the affected plan tables, add a unique `(sales_delivery_plan_id, tenant_id)` key, drop `fk_sales_delivery_plan_dt_hd`, the header-order unique/reference constraints, the header-order FK and index, then drop `tb_sales_delivery_plan_hd.sales_order_id`. Recreate the plan-detail header FK using only plan ID and tenant ID. Keep the existing detail-to-order-detail FK and delivery-to-plan-detail FK unchanged.
-- [ ] **Step 4: Write a guarded rollback and history.** Before restoring the old header column/FKs, abort if any active or inactive plan has more than one distinct source order among its details. For single-order plans, derive the header order ID from plan details, then restore the prior unique/FK/index contract. Record date, constraints, affected tables, apply order, and rollback guard.
+- [ ] **Step 4: Write a guarded rollback and history.** Before restoring the old header column/FKs, abort if any active or inactive plan has zero detail rows or does not have exactly one distinct source order among its details. For valid single-order plans, derive the header order ID from plan details, then restore the prior unique/FK/index contract. Record date, constraints, affected tables, apply order, and rollback guard.
 - [ ] **Step 5: Update the cumulative schema and mirror files.** Update the plan header/detail descriptions in `docs/database/db-schema.md`; copy the three migration/history files byte-for-byte into `backend/DATABASE/20261112`.
 - [ ] **Step 6: Run the focused contract test and commit.**
 
