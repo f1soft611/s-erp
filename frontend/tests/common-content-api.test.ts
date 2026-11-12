@@ -78,6 +78,7 @@ describe('common content API contracts', () => {
     );
     expect(apiMocks.apiDownload).toHaveBeenCalledWith(
       '/api/v1/common/files/8/download?ownerType=NOTICE_COMMENT&ownerId=42',
+      undefined,
     );
   });
 
@@ -91,6 +92,7 @@ describe('common content API contracts', () => {
     expect(apiMocks.apiDelete).toHaveBeenCalledWith('/api/v1/common/files/8');
     expect(apiMocks.apiDownload).toHaveBeenCalledWith(
       '/api/v1/common/files/8/download',
+      undefined,
     );
   });
 
@@ -111,6 +113,7 @@ describe('common content API contracts', () => {
       comments: [{ commentId: 3 }],
       hasPrevious: true,
       nextBeforeCommentId: 2,
+      resultCnt: 0,
     });
 
     expect(apiMocks.apiGet).toHaveBeenCalledWith(
@@ -125,6 +128,7 @@ describe('common content API contracts', () => {
       comments: [{ commentId: 3 }],
       hasPrevious: false,
       nextBeforeCommentId: undefined,
+      resultCnt: 0,
     });
   });
 

@@ -19,8 +19,8 @@ import type {
 } from '../types/grid.types';
 import {
   isGridCheckboxChecked,
-  normalizeGridNumberInput,
 } from '../utils/grid.utils';
+import { useF1GridNumberDraft } from '../editing/useF1GridNumberDraft';
 import { UserSelectEditor } from '../editing/UserSelectEditor';
 import { normalizeF1GridInput } from '../editing/inputFormat';
 import { useF1GridFormattedInput } from '../editing/useF1GridFormattedInput';
@@ -72,6 +72,14 @@ export function GridFormField<T extends object>({
       : column.getValue
         ? column.getValue(row)
         : value;
+  const isNumber =
+    column.type === 'number' ||
+    column.type === 'decimal' ||
+    column.type === 'currency';
+  const numberDraft = useF1GridNumberDraft(
+    String(displayedValue ?? ''),
+    column.decimalPlaces,
+  );
   const options = column.options ?? [];
   const isRequired = Boolean(column.required);
 
@@ -368,10 +376,6 @@ export function GridFormField<T extends object>({
     );
   }
 
-  const isNumber =
-    column.type === 'number' ||
-    column.type === 'decimal' ||
-    column.type === 'currency';
   const inputType = isNumber
     ? 'number'
     : column.type === 'datetime'
@@ -381,7 +385,7 @@ export function GridFormField<T extends object>({
         : 'text';
   const normalizedDisplayValue =
     isNumber && displayedValue !== null && displayedValue !== undefined
-      ? normalizeGridNumberInput(String(displayedValue), column.decimalPlaces)
+      ? numberDraft.displayedValue
       : displayedValue;
 
   return (
@@ -389,6 +393,7 @@ export function GridFormField<T extends object>({
       {...sharedTextFieldProps}
       type={inputType}
       inputRef={inputRef}
+      onBlur={isNumber ? numberDraft.clearDraft : undefined}
       value={
         normalizedDisplayValue == null ? '' : String(normalizedDisplayValue)
       }
@@ -397,9 +402,7 @@ export function GridFormField<T extends object>({
           handleFormattedChange(event);
           return;
         }
-        const nextTextValue = isNumber
-          ? normalizeGridNumberInput(event.target.value, column.decimalPlaces)
-          : event.target.value;
+        const nextTextValue = numberDraft.normalizeInput(event.target.value);
         const nextValue =
           isNumber && nextTextValue !== ''
             ? Number(nextTextValue)

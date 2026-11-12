@@ -142,6 +142,12 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  'work-standard-recipe': {
+    title: '작업표준서 등록(레시피)',
+    description: '제품·반제품의 배합비와 공정절차, 포장 기준을 버전별로 관리합니다.',
+    cards: [],
+    items: [],
+  },
   overview: {
     title: '종합현황',
     description:

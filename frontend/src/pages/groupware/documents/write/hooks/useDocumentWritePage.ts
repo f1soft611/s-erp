@@ -110,6 +110,7 @@ export function useDocumentWritePage(
   const [pinPendingIds, setPinPendingIds] = useState<number[]>([]);
   const [reloadRequest, setReloadRequest] = useState({ version: 0, quiet: false });
   const previousReloadVersion = useRef(0);
+  const previousQuery = useRef('');
   const pageGeneration = useRef(0);
   const nextOffset = useRef(0);
   const inFlightOffset = useRef<number | null>(null);
@@ -143,8 +144,10 @@ export function useDocumentWritePage(
     setIsLoadingMore(false);
     setPageError('');
     const isReload = reloadRequest.version !== previousReloadVersion.current;
-    const isQuietReload = isReload && reloadRequest.quiet;
+    const query = JSON.stringify([viewMode, scope, selectedKind, selectedDocumentId]);
+    const isQuietReload = isReload && reloadRequest.quiet && previousQuery.current === query;
     previousReloadVersion.current = reloadRequest.version;
+    previousQuery.current = query;
     if (!isQuietReload) setIsLoading(true);
     setLoadError('');
     const documentType = selectedKind
@@ -215,6 +218,11 @@ export function useDocumentWritePage(
         if (active) {
           fail(error);
           setHasNextPage(false);
+          if (!isQuietReload) {
+            setDocuments([]);
+            setPinnedDocuments([]);
+            setFeedDocuments([]);
+          }
           setLoadError(
             error instanceof Error
               ? error.message

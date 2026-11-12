@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { createRef } from 'react';
+import { createRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { F1Grid } from '../src/shared/components/f1-grid';
 import { getGridColumnPinOffsets } from '../src/shared/components/f1-grid/columns/GridColumnPin';
@@ -39,6 +39,52 @@ it.each(['date', 'datetime', 'time'] as const)('keeps an empty %s field label ab
   const input = screen.getByLabelText('일정');
   const label = document.querySelector(`label[for="${input.id}"]`);
   expect(label).toHaveAttribute('data-shrink', 'true');
+});
+
+it('truncates the decimal portion of an integer field in the row form', () => {
+  const onPatch = vi.fn();
+  render(
+    <GridFormField
+      column={{ field: 'quantity', headerName: '수량', type: 'number', decimalPlaces: 0 }}
+      row={{ quantity: 0 }}
+      mode="edit"
+      value={0}
+      readOnly={false}
+      onPatch={onPatch}
+    />,
+  );
+  fireEvent.change(screen.getByRole('spinbutton', { name: '수량' }), {
+    target: { value: '12.34' },
+  });
+  expect(onPatch).toHaveBeenLastCalledWith({ quantity: 12 });
+});
+
+it('keeps an integer form field typing draft until blur', () => {
+  function Example() {
+    const [row, setRow] = useState({ quantity: 0 });
+    return (
+      <>
+        <GridFormField
+          column={{ field: 'quantity', headerName: '수량', type: 'number', decimalPlaces: 0 }}
+          row={row}
+          mode="edit"
+          value={row.quantity}
+          readOnly={false}
+          onPatch={(patch) => setRow((current) => ({ ...current, ...patch }))}
+        />
+        <output>{row.quantity}</output>
+      </>
+    );
+  }
+  render(<Example />);
+  const input = screen.getByRole('spinbutton', { name: '수량' });
+  fireEvent.change(input, { target: { value: '12.3' } });
+  expect(input).toHaveValue(12.3);
+  fireEvent.change(input, { target: { value: '12.34' } });
+  expect(input).toHaveValue(12.34);
+  expect(screen.getByRole('status')).toHaveTextContent('12');
+  fireEvent.blur(input);
+  expect(input).toHaveValue(12);
 });
 
 describe('F1-Grid form model', () => {

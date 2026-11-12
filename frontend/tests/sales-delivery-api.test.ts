@@ -39,7 +39,7 @@ describe('sales delivery contract', () => {
     const result = sourceOrderForm([{ ...source, remainingQty: -5, deliveredQty: 11 }], '2026-11-04');
     expect(result.details).toHaveLength(1);
     expect(result.details[0]).toMatchObject({ salesDeliveryPlanDetailId: 700, deliveryQty: 0, supplyAmt: 0 });
-    expect(validateDelivery(result)).toContain('납품수량');
+    expect(validateDelivery(result)).toContain('출하수량');
   });
   it.each(['create', 'update'] as const)('converts only the server confirmation conflict for %s into a warning', async (operation) => {
     const request = () => operation === 'create'
@@ -64,7 +64,7 @@ describe('sales delivery contract', () => {
       deliveryQty: 6, unitPrice: 100, vatAmt: 60 }]);
   });
   it('rejects missing headers, source references, duplicate source lines and invalid amounts', () => {
-    expect(validateDelivery({ ...form(), deliveryDt: '', customerId: null })).toContain('납품일자');
+    expect(validateDelivery({ ...form(), deliveryDt: '', customerId: null })).toContain('출하일자');
     expect(validateDelivery({ ...form(), salesOrderId: null })).toContain('수주');
     expect(validateDelivery({ ...form(), details: [form().details[0], form().details[0]] })).toContain('중복');
     expect(validateDelivery({ ...form(), details: [{ ...form().details[0], deliveryQty: 0 }] })).toContain('수량');
