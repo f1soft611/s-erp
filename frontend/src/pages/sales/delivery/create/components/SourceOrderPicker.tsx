@@ -34,7 +34,7 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
   }, []);
   const displayRows = useMemo<SourcePlanRow[]>(() => rows.map((row) => ({
     ...row, excessQty: Math.max(-Number(row.remainingQty), 0),
-  })), [rows]);
+  })).filter((row) => Number(row.remainingQty) > 0), [rows]);
   const columns = useMemo<F1GridColumn<SourcePlanRow>[]>(() => [
     { field: 'orderNo', headerName: '수주번호', width: 150, align: 'center', mergeRows: true },
     { field: 'planNo', headerName: '계획번호', width: 140, align: 'center' },
@@ -49,23 +49,24 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
       renderCell: ({ row }) => Math.max(Number(row.remainingQty), 0).toLocaleString('ko-KR') },
     { field: 'excessQty', headerName: '초과출하', type: 'decimal', width: 90, align: 'right' },
   ], []);
-  const selectedOrderIds = useMemo(() => {
-    const selectedIds = new Set(selectedRowIds.map(String));
-    return new Set(rows.filter((row) => selectedIds.has(String(row.salesDeliveryPlanDetailId)))
-      .map((row) => row.salesOrderId));
-  }, [rows, selectedRowIds]);
+  const selectedPlanDetailIds = useMemo(
+    () => new Set(selectedRowIds.map(String)),
+    [selectedRowIds],
+  );
+  const selectedRows = useMemo(
+    () => displayRows.filter((row) => selectedPlanDetailIds.has(String(row.salesDeliveryPlanDetailId))),
+    [displayRows, selectedPlanDetailIds],
+  );
   const select = () => {
-    if (!selectedOrderIds.size) return;
-    const selectedRows = rows.filter((row) => selectedOrderIds.has(row.salesOrderId));
     if (new Set(selectedRows.map((row) => row.customerId)).size !== 1) {
-      setError('서로 다른 거래처의 수주는 한 출하 문서에 함께 선택할 수 없습니다.');
+      setError('서로 다른 거래처의 품목은 한 출하 문서에 함께 선택할 수 없습니다.');
       return;
     }
     onSelect(selectedRows);
   };
   return <CommonDialog open={open} onClose={onClose} title="수주 선택" size="lg" fullScreenOnMobile
     bodyMode="fill" paperHeight="min(900px, 85vh)" actions={<>
-      <Button variant="contained" disabled={loading || selectedOrderIds.size === 0} onClick={select}>선택</Button>
+      <Button variant="contained" disabled={loading || selectedRows.length === 0} onClick={select}>선택</Button>
       <Button onClick={onClose}>닫기</Button>
     </>}>
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, minWidth: 0, gap: 1.5 }}>

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.egovframe.rte.fdl.cmmn.EgovAbstractServiceImpl;
 import org.springframework.http.HttpStatus;
@@ -23,11 +24,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import egovframework.let.common.idsequence.service.IdSequenceService;
 import egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderHeaderVO;
-import egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailRequestVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanSourceVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusSearchVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO;
 import egovframework.let.sales.deliveryplan.domain.repository.SalesDeliveryPlanDAO;
 import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
@@ -89,7 +91,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     @Override
-    public List<SalesDeliverySourceOrderVO> listSourceOrders(Long tenantId, String keyword) throws Exception {
+    public List<SalesDeliveryPlanSourceVO> listSourceOrders(Long tenantId, String keyword) throws Exception {
         validateTenant(tenantId);
         Map<String, Object> params = tenantParams(tenantId);
         params.put("deliveryPlanMode", getMode(tenantId));
@@ -116,6 +118,10 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         validatePrincipal(tenantId, userId);
         if (!MODE_AUTO.equals(lockModeForPlanCreation(tenantId))) {
             throw conflict("MANUAL 테넌트의 출하계획은 사용자가 직접 등록해야 합니다.");
+        }
+        validateRequest(request, false);
+        if (requestOrderIds(request.getDetails()).size() != 1) {
+            throw badRequest("자동 출하계획은 한 수주의 상세만 포함할 수 있습니다.");
         }
         persistPlan(tenantId, userId, request);
     }
@@ -152,6 +158,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         Map<Long, SalesDeliveryPlanDetailVO> currentByOrderDetail =
                 new HashMap<Long, SalesDeliveryPlanDetailVO>();
         for (SalesDeliveryPlanDetailVO detail : dao.selectPlanDetails(planParams)) {
+            if (!same(detail.getSalesOrderId(), salesOrderId)) {
+                throw conflict("자동 출하계획의 모든 상세는 해당 수주에 속해야 합니다.");
+            }
             if (currentByOrderDetail.put(detail.getSalesOrderDetailId(), detail) != null) {
                 throw conflict("자동 출하계획에서 수주 상세가 중복 참조됩니다.");
             }
@@ -164,6 +173,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             }
             SalesDeliveryPlanDetailVO existing = currentByOrderDetail.remove(orderDetailId);
             SalesDeliveryPlanDetailRequestVO detail = new SalesDeliveryPlanDetailRequestVO();
+            detail.setSalesOrderId(salesOrderId);
             detail.setSalesOrderDetailId(orderDetailId);
             detail.setPlanDt(line.getPlanDt());
             detail.setPlannedQty(line.getOrderQty());
@@ -201,42 +211,33 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     private SalesDeliveryPlanVO createPlan(Long tenantId, String userId, SalesDeliveryPlanRequestVO request)
             throws Exception {
         Long planId = persistPlan(tenantId, userId, request);
-        Map<String, Object> orderParams = orderParams(tenantId, request.getSalesOrderId());
-        SalesDeliveryPlanVO result = dao.selectPlanByOrder(orderParams);
+        Map<String, Object> planParams = planParams(tenantId, planId);
+        SalesDeliveryPlanVO result = dao.selectPlanHeader(planParams);
         if (result == null) {
             throw new IllegalStateException("저장한 출하계획을 다시 조회할 수 없습니다.");
         }
-        result.setDetails(dao.selectPlanDetails(planParams(tenantId, planId)));
+        result.setDetails(dao.selectPlanDetails(planParams));
         return result;
     }
 
     private Long persistPlan(Long tenantId, String userId, SalesDeliveryPlanRequestVO request) throws Exception {
         validateRequest(request, false);
 
-        Map<String, Object> orderParams = orderParams(tenantId, request.getSalesOrderId());
-        SalesDeliverySourceOrderHeaderVO order = dao.lockSourceOrder(orderParams);
-        if (order == null) {
-            throw notFound("수주를 찾을 수 없습니다.");
-        }
-        if (!EDITABLE_ORDER_STATUS.equals(order.getStatus())) {
-            throw conflict("수주등록 상태의 수주만 출하계획을 등록할 수 있습니다.");
-        }
-        if (dao.selectPlanByOrder(orderParams) != null) {
-            throw conflict("수주에 이미 출하계획이 등록되어 있습니다.");
-        }
-
-        List<SalesDeliveryPlanDetailVO> orderLines = dao.selectOrderLines(orderParams);
-        Map<Long, SalesDeliveryPlanDetailVO> linesById = indexOrderLines(orderLines);
-        Map<Long, BigDecimal> quantities = validateAndSumDetails(request, linesById, null);
-        for (SalesDeliveryPlanDetailVO line : linesById.values()) {
+        Map<Long, SalesDeliverySourceOrderHeaderVO> ordersById =
+                lockSourceOrders(tenantId, requestOrderIds(request.getDetails()));
+        Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource =
+                loadSourceLines(tenantId, ordersById.keySet());
+        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(request, linesBySource, null);
+        for (SourceKey key : quantities.keySet()) {
+            SalesDeliveryPlanDetailVO line = linesBySource.get(key);
             if (isPositive(line.getShippedQty())) {
                 throw conflict("출하 이력이 있는 수주에는 새 출하계획을 등록할 수 없습니다.");
             }
         }
-        validateTotals(quantities, linesById, null, false);
+        validateTotals(tenantId, quantities, linesBySource, null, null, false);
 
         String planNo = generatePlanNo(tenantId);
-        Map<String, Object> header = orderParams(tenantId, request.getSalesOrderId());
+        Map<String, Object> header = tenantParams(tenantId);
         header.put("planNo", planNo);
         header.put("createdBy", userId);
         Long planId = dao.insertPlanHeader(header);
@@ -246,8 +247,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
 
         int lineNo = 1;
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
-            SalesDeliveryPlanDetailVO orderLine = linesById.get(detail.getSalesOrderDetailId());
-            Map<String, Object> params = detailParams(tenantId, request.getSalesOrderId(), planId,
+            SalesDeliveryPlanDetailVO orderLine = linesBySource.get(
+                    new SourceKey(detail.getSalesOrderId(), detail.getSalesOrderDetailId()));
+            Map<String, Object> params = detailParams(tenantId, detail.getSalesOrderId(), planId,
                     orderLine, detail, lineNo++, userId);
             Long detailId = dao.insertPlanDetail(params);
             if (detailId == null || detailId.longValue() < 1L) {
@@ -273,6 +275,9 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     @Override
     public SalesDeliveryPlanVO getByOrder(Long tenantId, String userId, Long salesOrderId) throws Exception {
         validatePrincipal(tenantId, userId);
+        if (!MODE_AUTO.equals(getMode(tenantId))) {
+            throw conflict("수주 기준 출하계획 조회는 AUTO 테넌트에서만 지원합니다.");
+        }
         if (salesOrderId == null || salesOrderId.longValue() < 1L) {
             throw notFound("출하계획을 찾을 수 없습니다.");
         }
@@ -298,29 +303,29 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         if (plan == null) {
             throw notFound("출하계획을 찾을 수 없습니다.");
         }
-        Map<String, Object> orderParams = orderParams(tenantId, plan.getSalesOrderId());
-        SalesDeliverySourceOrderHeaderVO order = dao.lockSourceOrder(orderParams);
-        if (order == null) {
-            throw notFound("수주를 찾을 수 없습니다.");
+        List<SalesDeliveryPlanDetailVO> beforeLock = dao.selectPlanDetails(planParams);
+        Set<Long> sourceOrderIds = requestOrderIds(request.getDetails());
+        for (SalesDeliveryPlanDetailVO detail : beforeLock) {
+            sourceOrderIds.add(detail.getSalesOrderId());
         }
+        Map<Long, SalesDeliverySourceOrderHeaderVO> ordersById = lockSourceOrders(tenantId, sourceOrderIds);
         boolean allowExcess = "WARN".equals(getOverDeliveryPolicy(tenantId));
         SalesDeliveryPlanVO lockedPlan = dao.lockPlanHeader(planParams);
         if (lockedPlan == null) {
             throw notFound("출하계획을 찾을 수 없습니다.");
         }
-        if (!same(plan.getSalesOrderId(), request.getSalesOrderId())) {
-            throw conflict("저장된 출하계획의 수주는 변경할 수 없습니다.");
-        }
-        if (!EDITABLE_ORDER_STATUS.equals(order.getStatus())) {
-            throw conflict("수주등록 상태의 수주만 출하계획을 수정할 수 있습니다.");
-        }
 
         List<SalesDeliveryPlanDetailVO> current = dao.selectPlanDetails(planParams);
         Map<Long, SalesDeliveryPlanDetailVO> currentById = indexPlanDetails(current);
-        List<SalesDeliveryPlanDetailVO> orderLines = dao.selectOrderLines(orderParams);
-        Map<Long, SalesDeliveryPlanDetailVO> linesById = indexOrderLines(orderLines);
-        Map<Long, BigDecimal> quantities = validateAndSumDetails(request, linesById, currentById);
-        validateTotals(quantities, linesById, currentById, allowExcess);
+        for (SalesDeliveryPlanDetailVO detail : current) {
+            if (!sourceOrderIds.contains(detail.getSalesOrderId())) {
+                throw conflict("출하계획 원본 수주가 동시에 변경되었습니다.");
+            }
+        }
+        Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource =
+                loadSourceLines(tenantId, ordersById.keySet());
+        Map<SourceKey, BigDecimal> quantities = validateAndSumDetails(request, linesBySource, currentById);
+        validateTotals(tenantId, quantities, linesBySource, currentById, planId, allowExcess);
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
             if (detail.getSalesDeliveryPlanDetailId() != null) {
                 SalesDeliveryPlanDetailVO stored = currentById.get(detail.getSalesDeliveryPlanDetailId());
@@ -329,12 +334,12 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                 }
             }
         }
-        persistChanges(tenantId, userId, planId, request, linesById, currentById);
+        persistChanges(tenantId, userId, planId, request, linesBySource, currentById);
         return get(tenantId, userId, planId);
     }
 
     @Override
-    public List<SalesDeliveryPlanVO> listStatus(Long tenantId, String userId,
+    public List<SalesDeliveryPlanStatusVO> listStatus(Long tenantId, String userId,
             SalesDeliveryPlanStatusSearchVO search) throws Exception {
         validatePrincipal(tenantId, userId);
         if (search == null) {
@@ -353,7 +358,7 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     private void persistChanges(Long tenantId, String userId, Long planId, SalesDeliveryPlanRequestVO request,
-            Map<Long, SalesDeliveryPlanDetailVO> linesById,
+            Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource,
             Map<Long, SalesDeliveryPlanDetailVO> currentById) throws Exception {
         Set<Long> retainedIds = new HashSet<Long>();
         int nextLineNo = 1;
@@ -363,10 +368,11 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
             }
         }
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
-            SalesDeliveryPlanDetailVO source = linesById.get(detail.getSalesOrderDetailId());
+            SalesDeliveryPlanDetailVO source = linesBySource.get(
+                    new SourceKey(detail.getSalesOrderId(), detail.getSalesOrderDetailId()));
             Long detailId = detail.getSalesDeliveryPlanDetailId();
             if (detailId == null) {
-                Map<String, Object> params = detailParams(tenantId, request.getSalesOrderId(), planId, source,
+                Map<String, Object> params = detailParams(tenantId, detail.getSalesOrderId(), planId, source,
                         detail, nextLineNo, userId);
                 nextLineNo++;
                 Long insertedId = dao.insertPlanDetail(params);
@@ -376,11 +382,12 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                 continue;
             }
             SalesDeliveryPlanDetailVO stored = currentById.get(detailId);
-            if (stored == null || !same(stored.getSalesOrderDetailId(), detail.getSalesOrderDetailId())) {
+            if (stored == null || !same(stored.getSalesOrderId(), detail.getSalesOrderId())
+                    || !same(stored.getSalesOrderDetailId(), detail.getSalesOrderDetailId())) {
                 throw badRequest("출하계획 상세 항목이 올바르지 않습니다.");
             }
             retainedIds.add(detailId);
-            Map<String, Object> params = detailParams(tenantId, request.getSalesOrderId(), planId, source,
+            Map<String, Object> params = detailParams(tenantId, detail.getSalesOrderId(), planId, source,
                     detail, stored.getLineNo(), userId);
             boolean changed = !same(stored.getPlanDt(), detail.getPlanDt())
                     || !sameDecimal(stored.getPlannedQty(), detail.getPlannedQty());
@@ -411,16 +418,19 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         }
     }
 
-    private Map<Long, BigDecimal> validateAndSumDetails(SalesDeliveryPlanRequestVO request,
-            Map<Long, SalesDeliveryPlanDetailVO> linesById,
+    private Map<SourceKey, BigDecimal> validateAndSumDetails(SalesDeliveryPlanRequestVO request,
+            Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource,
             Map<Long, SalesDeliveryPlanDetailVO> currentById) {
-        Map<Long, BigDecimal> totals = new LinkedHashMap<Long, BigDecimal>();
+        Map<SourceKey, BigDecimal> totals = new LinkedHashMap<SourceKey, BigDecimal>();
         Set<Long> detailIds = new HashSet<Long>();
         for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
-            if (detail == null || detail.getSalesOrderDetailId() == null) {
+            if (detail == null || detail.getSalesOrderId() == null || detail.getSalesOrderId().longValue() < 1L
+                    || detail.getSalesOrderDetailId() == null
+                    || detail.getSalesOrderDetailId().longValue() < 1L) {
                 throw badRequest("수주 상세를 선택해 주세요.");
             }
-            if (!linesById.containsKey(detail.getSalesOrderDetailId())) {
+            SourceKey key = new SourceKey(detail.getSalesOrderId(), detail.getSalesOrderDetailId());
+            if (!linesBySource.containsKey(key)) {
                 throw badRequest("수주에 포함되지 않은 상세 항목입니다.");
             }
             validateQuantity(detail.getPlannedQty());
@@ -429,27 +439,30 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                     throw badRequest("출하계획 상세 항목이 중복되었거나 올바르지 않습니다.");
                 }
                 SalesDeliveryPlanDetailVO stored = currentById.get(detail.getSalesDeliveryPlanDetailId());
-                if (stored == null) {
+                if (stored == null || !same(stored.getSalesOrderId(), detail.getSalesOrderId())
+                        || !same(stored.getSalesOrderDetailId(), detail.getSalesOrderDetailId())) {
                     throw badRequest("출하계획 상세 항목이 올바르지 않습니다.");
                 }
             }
-            BigDecimal previous = totals.get(detail.getSalesOrderDetailId());
-            totals.put(detail.getSalesOrderDetailId(),
+            BigDecimal previous = totals.get(key);
+            totals.put(key,
                     (previous == null ? ZERO : previous).add(detail.getPlannedQty()));
         }
         return totals;
     }
 
-    private void validateTotals(Map<Long, BigDecimal> totals,
-            Map<Long, SalesDeliveryPlanDetailVO> linesById,
-            Map<Long, SalesDeliveryPlanDetailVO> currentById, boolean allowExcess) {
-        for (Map.Entry<Long, BigDecimal> entry : totals.entrySet()) {
-            SalesDeliveryPlanDetailVO orderLine = linesById.get(entry.getKey());
+    private void validateTotals(Long tenantId, Map<SourceKey, BigDecimal> totals,
+            Map<SourceKey, SalesDeliveryPlanDetailVO> linesBySource,
+            Map<Long, SalesDeliveryPlanDetailVO> currentById, Long currentPlanId,
+            boolean allowExcess) throws Exception {
+        for (Map.Entry<SourceKey, BigDecimal> entry : totals.entrySet()) {
+            SalesDeliveryPlanDetailVO orderLine = linesBySource.get(entry.getKey());
             BigDecimal ceiling = orderLine.getOrderQty();
             if (currentById != null && !allowExcess) {
                 BigDecimal delivered = ZERO;
                 for (SalesDeliveryPlanDetailVO current : currentById.values()) {
-                    if (same(current.getSalesOrderDetailId(), entry.getKey())) {
+                    if (same(current.getSalesOrderId(), entry.getKey().salesOrderId)
+                            && same(current.getSalesOrderDetailId(), entry.getKey().salesOrderDetailId)) {
                         delivered = delivered.add(zeroIfNull(current.getDeliveredQty()));
                     }
                 }
@@ -457,22 +470,68 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
                     throw conflict("계획수량은 이미 출하된 수량보다 적을 수 없습니다.");
                 }
             }
-            if (ceiling == null || entry.getValue().compareTo(ceiling) > 0) {
+            Map<String, Object> params = orderParams(tenantId, entry.getKey().salesOrderId);
+            params.put("salesOrderDetailId", entry.getKey().salesOrderDetailId);
+            params.put("currentPlanId", currentPlanId);
+            BigDecimal otherPlanned = zeroIfNull(dao.sumOtherPlannedQty(params));
+            if (ceiling == null || otherPlanned.add(entry.getValue()).compareTo(ceiling) > 0) {
                 throw conflict("수주 상세의 계획수량 합계가 수주수량을 초과합니다.");
             }
         }
     }
 
-    private Map<Long, SalesDeliveryPlanDetailVO> indexOrderLines(List<SalesDeliveryPlanDetailVO> rows) {
-        Map<Long, SalesDeliveryPlanDetailVO> result = new LinkedHashMap<Long, SalesDeliveryPlanDetailVO>();
-        if (rows != null) {
-            for (SalesDeliveryPlanDetailVO row : rows) {
-                if (row.getSalesOrderDetailId() != null) {
-                    result.put(row.getSalesOrderDetailId(), row);
+    private Map<SourceKey, SalesDeliveryPlanDetailVO> loadSourceLines(Long tenantId, Iterable<Long> orderIds)
+            throws Exception {
+        Map<SourceKey, SalesDeliveryPlanDetailVO> result =
+                new LinkedHashMap<SourceKey, SalesDeliveryPlanDetailVO>();
+        for (Long orderId : orderIds) {
+            List<SalesDeliveryPlanDetailVO> rows = dao.selectOrderLines(orderParams(tenantId, orderId));
+            if (rows != null) {
+                for (SalesDeliveryPlanDetailVO row : rows) {
+                    if (same(orderId, row.getSalesOrderId()) && row.getSalesOrderDetailId() != null) {
+                        result.put(new SourceKey(orderId, row.getSalesOrderDetailId()), row);
+                    }
                 }
             }
         }
         return result;
+    }
+
+    private Map<Long, SalesDeliverySourceOrderHeaderVO> lockSourceOrders(Long tenantId, Iterable<Long> orderIds)
+            throws Exception {
+        Set<Long> sortedIds = new TreeSet<Long>();
+        for (Long orderId : orderIds) {
+            if (orderId == null || orderId.longValue() < 1L) {
+                throw badRequest("수주를 선택해 주세요.");
+            }
+            sortedIds.add(orderId);
+        }
+        Map<Long, SalesDeliverySourceOrderHeaderVO> result =
+                new LinkedHashMap<Long, SalesDeliverySourceOrderHeaderVO>();
+        for (Long orderId : sortedIds) {
+            SalesDeliverySourceOrderHeaderVO order = dao.lockSourceOrder(orderParams(tenantId, orderId));
+            if (order == null) {
+                throw notFound("수주를 찾을 수 없습니다.");
+            }
+            if (!EDITABLE_ORDER_STATUS.equals(order.getStatus())) {
+                throw conflict("수주등록 상태의 수주만 출하계획을 등록할 수 있습니다.");
+            }
+            result.put(orderId, order);
+        }
+        return result;
+    }
+
+    private Set<Long> requestOrderIds(List<SalesDeliveryPlanDetailRequestVO> details) {
+        Set<Long> orderIds = new TreeSet<Long>();
+        if (details != null) {
+            for (SalesDeliveryPlanDetailRequestVO detail : details) {
+                if (detail == null || detail.getSalesOrderId() == null) {
+                    throw badRequest("수주를 선택해 주세요.");
+                }
+                orderIds.add(detail.getSalesOrderId());
+            }
+        }
+        return orderIds;
     }
 
     private Map<Long, SalesDeliveryPlanDetailVO> indexPlanDetails(List<SalesDeliveryPlanDetailVO> rows) {
@@ -510,27 +569,6 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
         return params;
     }
 
-    private SalesDeliveryPlanDetailVO copyPlanDetail(SalesDeliveryPlanDetailVO source,
-            SalesDeliveryPlanDetailRequestVO request, Long planId, Long detailId, Map<String, Object> params) {
-        SalesDeliveryPlanDetailVO result = new SalesDeliveryPlanDetailVO();
-        result.setSalesDeliveryPlanId(planId);
-        result.setSalesDeliveryPlanDetailId(detailId);
-        result.setSalesOrderId(source.getSalesOrderId());
-        result.setSalesOrderDetailId(source.getSalesOrderDetailId());
-        result.setMaterialId(source.getMaterialId());
-        result.setMaterialCode(source.getMaterialCode());
-        result.setMaterialName(source.getMaterialName());
-        result.setUnit(source.getUnit());
-        result.setLineNo((Integer) params.get("lineNo"));
-        result.setPlanDt(request.getPlanDt());
-        result.setPlannedQty(request.getPlannedQty());
-        result.setDeliveredQty(ZERO);
-        result.setRemainingQty(request.getPlannedQty());
-        result.setOrderQty(source.getOrderQty());
-        result.setShippedQty(source.getShippedQty());
-        return result;
-    }
-
     private String generatePlanNo(Long tenantId) throws Exception {
         String dateKey = LocalDate.now().toString().replace("-", "");
         Long sequence = sequenceService.nextValue(PLAN_NO_GENERATOR_KEY, tenantId.toString(), dateKey);
@@ -545,9 +583,8 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
     }
 
     private void validateRequest(SalesDeliveryPlanRequestVO request, boolean update) {
-        if (request == null || request.getSalesOrderId() == null || request.getSalesOrderId().longValue() < 1L
-                || request.getDetails() == null || request.getDetails().isEmpty()) {
-            throw badRequest("수주와 출하계획 상세를 입력해 주세요.");
+        if (request == null || request.getDetails() == null || request.getDetails().isEmpty()) {
+            throw badRequest("출하계획 상세를 입력해 주세요.");
         }
         if (!update) {
             for (SalesDeliveryPlanDetailRequestVO detail : request.getDetails()) {
@@ -649,5 +686,33 @@ public class SalesDeliveryPlanServiceImpl extends EgovAbstractServiceImpl implem
 
     private ResponseStatusException conflict(String message) {
         return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    }
+
+    private static final class SourceKey {
+        private final Long salesOrderId;
+        private final Long salesOrderDetailId;
+
+        private SourceKey(Long salesOrderId, Long salesOrderDetailId) {
+            this.salesOrderId = salesOrderId;
+            this.salesOrderDetailId = salesOrderDetailId;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof SourceKey)) {
+                return false;
+            }
+            SourceKey that = (SourceKey) other;
+            return salesOrderId.equals(that.salesOrderId)
+                    && salesOrderDetailId.equals(that.salesOrderDetailId);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * salesOrderId.hashCode() + salesOrderDetailId.hashCode();
+        }
     }
 }

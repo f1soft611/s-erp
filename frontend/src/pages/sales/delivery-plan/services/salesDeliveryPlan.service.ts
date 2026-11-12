@@ -7,12 +7,14 @@ import type {
 const PATH = '/api/v1/sales/delivery-plans';
 
 export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
-  const groups = new Map<number, PlanRow[]>();
+  const groups = new Map<string, PlanRow[]>();
   for (const detail of details) {
-    const group = groups.get(detail.salesOrderDetailId) ?? [];
+    const sourceKey = `${detail.salesOrderId}:${detail.salesOrderDetailId}`;
+    const group = groups.get(sourceKey) ?? [];
     group.push({
       rowId: String(detail.salesDeliveryPlanDetailId),
       salesDeliveryPlanDetailId: detail.salesDeliveryPlanDetailId,
+      salesOrderId: detail.salesOrderId,
       salesOrderDetailId: detail.salesOrderDetailId,
       planDt: detail.planDt,
       plannedQty: Number(detail.plannedQty),
@@ -20,9 +22,11 @@ export function planRowsFromDetails(details: DeliveryPlanDetail[]): PlanRow[] {
       materialCode: detail.materialCode,
       materialName: detail.materialName,
       unit: detail.unit,
+      orderNo: detail.orderNo,
+      customerName: detail.customerName,
       orderQty: Number(detail.orderQty),
     });
-    groups.set(detail.salesOrderDetailId, group);
+    groups.set(sourceKey, group);
   }
   return Array.from(groups.values()).flat();
 }
@@ -46,25 +50,31 @@ export function validDeliveryPlanPeriod(filters: Pick<DeliveryPlanFilters, 'plan
     && filters.planDtFrom <= filters.planDtTo;
 }
 
-export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: Pick<PlanSourceOrderRow, 'salesOrderDetailId' | 'orderQty'>[]) {
-  if (!request.salesOrderId || !Number.isSafeInteger(request.salesOrderId)) return '수주를 선택해 주세요.';
+type PlanCapacitySource = Pick<PlanSourceOrderRow, 'salesOrderId' | 'salesOrderDetailId' | 'orderQty'>
+  & { remainingPlanQty?: number };
+
+export function validateDeliveryPlan(request: DeliveryPlanRequest, sourceRows: PlanCapacitySource[]) {
   if (!request.details.length) return '계획 상세를 1건 이상 입력해 주세요.';
-  const validLines = new Map(sourceRows.map((row) => [row.salesOrderDetailId, row]));
-  const totals = new Map<number, number>();
+  const validLines = new Map(sourceRows.map((row) => [
+    `${row.salesOrderId}:${row.salesOrderDetailId}`, row,
+  ]));
+  const totals = new Map<string, number>();
   for (const detail of request.details) {
-    if (!validLines.has(detail.salesOrderDetailId)) return '수주에 포함되지 않은 상세 항목입니다.';
+    const sourceKey = `${detail.salesOrderId}:${detail.salesOrderDetailId}`;
+    if (!validLines.has(sourceKey)) return '수주에 포함되지 않은 상세 항목입니다.';
     if (!Number.isFinite(detail.plannedQty) || detail.plannedQty <= 0
       || detail.plannedQty > 9_999_999_999_999.99
       || Math.abs(detail.plannedQty * 100 - Math.round(detail.plannedQty * 100)) >= 0.01) {
       return '계획수량은 0보다 큰 소수 둘째 자리 값이어야 합니다.';
     }
     if (detail.planDt !== null && !validDate(detail.planDt)) return '계획일자를 확인해 주세요.';
-    totals.set(detail.salesOrderDetailId,
-      (totals.get(detail.salesOrderDetailId) ?? 0) + detail.plannedQty);
+    totals.set(sourceKey, (totals.get(sourceKey) ?? 0) + detail.plannedQty);
   }
-  for (const [detailId, total] of totals) {
-    const source = validLines.get(detailId);
-    if (source && total > Number(source.orderQty)) return '계획수량 합계가 수주수량을 초과했습니다.';
+  for (const [sourceKey, total] of totals) {
+    const source = validLines.get(sourceKey);
+    if (source && total > Number(source.remainingPlanQty ?? source.orderQty)) {
+      return '계획수량 합계가 수주수량을 초과했습니다.';
+    }
   }
   return '';
 }

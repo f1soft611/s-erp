@@ -122,6 +122,70 @@ class SalesDeliveryPlanningSchemaContractTest {
     }
 
     @Test
+    void multiOrderPlanningMigrationRemovesHeaderOrderAndGuardsRollback() throws Exception {
+        Path docsDirectory = Paths.get("..", "docs", "database", "20261112");
+        Path backendDirectory = Paths.get("DATABASE", "20261112");
+        String migrationFile = "20261112_009_allow_multi_order_sales_delivery_plan.sql";
+        String rollbackFile = "20261112_009_rollback_multi_order_sales_delivery_plan.sql";
+        String historyFile = "20261112_009_change_multi_order_sales_delivery_plan_schema.md";
+
+        for (String file : new String[] { migrationFile, rollbackFile, historyFile }) {
+            Path docsFile = docsDirectory.resolve(file);
+            Path backendFile = backendDirectory.resolve(file);
+            assertThat(Files.exists(docsFile)).as("docs " + file).isTrue();
+            assertThat(Files.exists(backendFile)).as("backend " + file).isTrue();
+            assertThat(Files.readAllBytes(backendFile))
+                    .as("identical copy of " + file)
+                    .containsExactly(Files.readAllBytes(docsFile));
+        }
+
+        String migration = read(docsDirectory.resolve(migrationFile));
+        assertThat(migration).contains(
+                "BEGIN;",
+                "LOCK TABLE public.tb_sales_delivery_plan_hd",
+                "LOCK TABLE public.tb_sales_delivery_plan_dt",
+                "DROP CONSTRAINT uq_sales_delivery_plan_hd_order",
+                "DROP CONSTRAINT uq_sales_delivery_plan_hd_reference",
+                "DROP CONSTRAINT fk_sales_delivery_plan_hd_order",
+                "DROP CONSTRAINT tb_sales_delivery_plan_hd_sales_order_id_not_null",
+                "DROP INDEX IF EXISTS public.ix_sales_delivery_plan_hd_tenant_order",
+                "DROP COLUMN sales_order_id",
+                "ADD CONSTRAINT uq_sales_delivery_plan_hd_plan_tenant",
+                "UNIQUE (sales_delivery_plan_id, tenant_id)",
+                "DROP CONSTRAINT fk_sales_delivery_plan_dt_hd",
+                "ADD CONSTRAINT fk_sales_delivery_plan_dt_hd",
+                "FOREIGN KEY (sales_delivery_plan_id, tenant_id)",
+                "REFERENCES public.tb_sales_delivery_plan_hd (sales_delivery_plan_id, tenant_id)",
+                "COMMIT;");
+        assertThat(migration).doesNotContain(
+                "DROP CONSTRAINT fk_sales_delivery_plan_dt_order_line",
+                "DROP CONSTRAINT fk_sales_delivery_dt_plan_source");
+
+        String rollback = read(docsDirectory.resolve(rollbackFile));
+        assertThat(rollback).contains(
+                "BEGIN;",
+                "LOCK TABLE public.tb_sales_delivery_plan_hd",
+                "LOCK TABLE public.tb_sales_delivery_plan_dt",
+                "NOT EXISTS",
+                "COUNT(DISTINCT d.sales_order_id) <> 1",
+                "HAVING COUNT(*) > 1",
+                "RAISE EXCEPTION",
+                "ADD COLUMN sales_order_id BIGINT",
+                "SET sales_order_id =",
+                "SET NOT NULL",
+                "ADD CONSTRAINT tb_sales_delivery_plan_hd_sales_order_id_not_null",
+                "CHECK (sales_order_id IS NOT NULL)",
+                "ADD CONSTRAINT fk_sales_delivery_plan_hd_order",
+                "ADD CONSTRAINT fk_sales_delivery_plan_dt_hd",
+                "FOREIGN KEY (sales_delivery_plan_id, tenant_id, sales_order_id)",
+                "DROP CONSTRAINT uq_sales_delivery_plan_hd_plan_tenant",
+                "FROM (",
+                "SELECT DISTINCT sales_delivery_plan_id, tenant_id, sales_order_id",
+                "COMMIT;");
+        assertThat(rollback).doesNotContain("WHERE h.use_at");
+    }
+
+    @Test
     void shipmentLabelMigrationChangesOnlyApprovedLabelsAndHasGuardedIdenticalCopies() throws Exception {
         Path docsDirectory = Paths.get("..", "docs", "database", "20261106");
         Path backendDirectory = Paths.get("DATABASE", "20261106");

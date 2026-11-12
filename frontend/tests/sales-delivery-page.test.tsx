@@ -259,7 +259,7 @@ it('keeps source-order search controls together in a full-width modal form', asy
   fireEvent.submit(searchForm);
   await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith('SO-찾기'));
 });
-it('selects every plan row for multiple checked orders after confirmation', async () => {
+it('selects only checked plan-detail rows across multiple plans', async () => {
   const base = {
     salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
     customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
@@ -287,7 +287,25 @@ it('selects every plan row for multiple checked orders after confirmation', asyn
   fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
-  expect(onSelect).toHaveBeenCalledWith(rows);
+  expect(onSelect).toHaveBeenCalledOnce();
+  expect(onSelect.mock.calls[0][0].map((row) => row.salesDeliveryPlanDetailId)).toEqual([700, 800]);
+});
+it('does not show zero-balance plan details in the delivery picker', async () => {
+  const base = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
+  };
+  vi.mocked(searchSourceOrders).mockResolvedValue([
+    base,
+    { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701, planNo: 'DP-2', remainingQty: 0 },
+  ]);
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(within(grid).getAllByRole('row')).toHaveLength(2);
+  expect(within(grid).queryByText('DP-2')).not.toBeInTheDocument();
 });
 it('keeps the order picker open when checked orders belong to different customers', async () => {
   const base = {
@@ -311,7 +329,7 @@ it('keeps the order picker open when checked orders belong to different customer
   fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
   fireEvent.click(within(dialog).getByRole('button', { name: '선택', exact: true }));
-  expect(await within(dialog).findByText('서로 다른 거래처의 수주는 한 출하 문서에 함께 선택할 수 없습니다.')).toBeInTheDocument();
+  expect(await within(dialog).findByText('서로 다른 거래처의 품목은 한 출하 문서에 함께 선택할 수 없습니다.')).toBeInTheDocument();
   expect(onSelect).not.toHaveBeenCalled();
 });
 it('combines multiple same-customer orders into one delivery with per-line source IDs', async () => {
@@ -345,7 +363,6 @@ it('combines multiple same-customer orders into one delivery with per-line sourc
     salesOrderId: 7,
     details: [
       expect.objectContaining({ salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700 }),
-      expect.objectContaining({ salesOrderId: 7, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701 }),
       expect.objectContaining({ salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800 }),
     ],
   })));
