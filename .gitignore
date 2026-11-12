@@ -19,6 +19,7 @@ backend/backend-prod
 frontend/dist/
 frontend/node_modules/
 node_modules
+.worktrees/
 
 # Private keys, certificates, and credential exports
 *.pem
