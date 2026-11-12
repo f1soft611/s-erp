@@ -13,12 +13,51 @@ export const deliveryMenuResponse = {
     }],
   }],
 };
-export const deliverySourceRows = [{
-  salesOrderId: 7, salesOrderDetailId: 70, orderNo: 'SO-TEST-7', orderDt: '2026-11-04',
-  customerId: 10, customerCode: 'C10', customerName: '검증 거래처', deliveryPlace: '검증 창고',
-  deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20', materialName: '검증 품목', unit: 'EA',
-  orderQty: 10, shippedQty: 4, remainingQty: 6, unitPrice: 100,
-}];
+const planDetail = (salesOrderId, salesOrderDetailId, orderNo, lineNo, materialId, materialCode, materialName) => ({
+  salesOrderId, salesOrderDetailId, orderNo, orderDt: '2026-11-04', customerId: 10,
+  customerCode: 'C10', customerName: '검증 거래처', deliveryPlace: '검증 창고',
+  deliveryMethod: '택배', lineNo, materialId, materialCode, materialName, unit: 'EA',
+  orderQty: 10, shippedQty: 0, unitPrice: 100, planDt: '2026-11-08', remainingPlanQty: 10,
+});
+export const deliveryPlanSourceRows = [
+  planDetail(7, 70, 'SO-TEST-7', 1, 20, 'M20', '검증 품목 1'),
+  planDetail(7, 71, 'SO-TEST-7', 2, 21, 'M21', '검증 품목 2'),
+  planDetail(8, 80, 'SO-TEST-8', 1, 30, 'M30', '검증 품목 3'),
+];
+const planItemDetails = [
+  {
+    ...deliveryPlanSourceRows[0], salesDeliveryPlanDetailId: 90, salesDeliveryPlanId: 9,
+    plannedQty: 10, deliveredQty: 0, remainingQty: 10,
+  },
+  {
+    ...deliveryPlanSourceRows[2], salesDeliveryPlanDetailId: 92, salesDeliveryPlanId: 9,
+    plannedQty: 10, deliveredQty: 0, remainingQty: 10,
+  },
+];
+export const deliveryPlanItem = {
+  salesDeliveryPlanId: 9, tenantId: 71, planNo: 'DP-TEST-9', createdBy: 'delivery-browser-test',
+  details: planItemDetails,
+};
+export const deliveryPlanStatusRows = planItemDetails.map((detail) => ({
+  ...detail, planNo: deliveryPlanItem.planNo,
+}));
+export const deliverySourceRows = [
+  {
+    ...planDetail(7, 70, 'SO-TEST-7', 1, 20, 'M20', '검증 품목 1'),
+    salesDeliveryPlanDetailId: 700, planNo: 'DP-TEST-1', planDt: '2026-11-08',
+    plannedQty: 10, deliveredQty: 4, remainingQty: 6,
+  },
+  {
+    ...planDetail(7, 71, 'SO-TEST-7', 2, 21, 'M21', '검증 품목 2'),
+    salesDeliveryPlanDetailId: 701, planNo: 'DP-TEST-1', planDt: '2026-11-08',
+    plannedQty: 10, deliveredQty: 0, remainingQty: 10,
+  },
+  {
+    ...planDetail(8, 80, 'SO-TEST-8', 1, 30, 'M30', '검증 품목 3'),
+    salesDeliveryPlanDetailId: 800, planNo: 'DP-TEST-2', planDt: '2026-11-09',
+    plannedQty: 10, deliveredQty: 0, remainingQty: 10,
+  },
+];
 export const deliveryBrowserItem = {
   salesDeliveryId: 1, deliveryNo: 'SD-20261104-0001', deliveryDt: '2026-11-04', deliveryType: 'DIRECT',
   customerId: 10, customerCode: 'C10', customerName: '검증 거래처', salesOrderId: null, orderNo: null,
@@ -62,6 +101,11 @@ export async function installSalesDeliveryBrowserMocks(page) {
     if (url.pathname === '/api/v1/co/master/materials') return reply({ resultList: [{
       materialId: 20, materialCode: 'M20', materialName: '검증 품목', unit: 'EA', useAt: 'Y',
     }] });
+    const planBase = '/api/v1/sales/delivery-plans';
+    if (url.pathname === `${planBase}/source-orders`) return reply({ items: deliveryPlanSourceRows });
+    if (url.pathname === `${planBase}/status`) return reply({ items: deliveryPlanStatusRows });
+    if (url.pathname === planBase && method === 'POST') return reply({ item: deliveryPlanItem }, 201);
+    if (url.pathname === `${planBase}/9`) return reply({ item: deliveryPlanItem });
     const base = '/api/v1/sales/deliveries';
     if (url.pathname === `${base}/source-orders`) return reply({ items: deliverySourceRows });
     if (url.pathname === `${base}/status`) {

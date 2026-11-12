@@ -2,20 +2,24 @@ import type { MenuPermission, ModuleItem, PageContent } from '../../../dashboard
 
 export type DeliveryPlanDetailRequest = {
   salesDeliveryPlanDetailId: number | null;
+  salesOrderId: number;
   salesOrderDetailId: number;
   planDt: string | null;
   plannedQty: number;
 };
 
 export type DeliveryPlanRequest = {
-  salesOrderId: number;
   details: DeliveryPlanDetailRequest[];
 };
 
 export type DeliveryPlanDetail = DeliveryPlanDetailRequest & {
   salesDeliveryPlanDetailId: number;
   salesDeliveryPlanId: number;
-  salesOrderId: number;
+  orderNo: string;
+  orderDt: string;
+  customerId: number;
+  customerCode: string;
+  customerName: string;
   materialId: number;
   materialCode: string;
   materialName: string;
@@ -32,19 +36,16 @@ export type PlanRow = DeliveryPlanDetailRequest & {
   materialCode: string;
   materialName: string;
   unit: string | null;
+  orderNo: string;
+  customerName: string;
   orderQty: number;
+  remainingPlanQty?: number;
 };
 
 export type DeliveryPlanItem = {
   salesDeliveryPlanId: number;
   tenantId: number;
   planNo: string;
-  salesOrderId: number;
-  orderNo: string;
-  orderDt: string;
-  customerId: number;
-  customerCode: string;
-  customerName: string;
   createdBy: string | null;
   createdByName?: string | null;
   createdByProfileImage?: string | null;
@@ -52,9 +53,31 @@ export type DeliveryPlanItem = {
   details: DeliveryPlanDetail[];
 };
 
-export type DeliveryPlanStatusRow = Omit<DeliveryPlanItem, 'details'> & {
-  plannedCount?: number;
-  deliveredCount?: number;
+export type DeliveryPlanStatusRow = {
+  salesDeliveryPlanId: number;
+  salesDeliveryPlanDetailId: number;
+  planNo: string;
+  salesOrderId: number;
+  salesOrderDetailId: number;
+  orderNo: string;
+  orderDt: string;
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  unit: string | null;
+  lineNo: number;
+  planDt: string;
+  orderQty: number;
+  plannedQty: number;
+  deliveredQty: number;
+  remainingQty: number;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
 };
 
 export type DeliveryPlanFilters = {
@@ -73,6 +96,7 @@ export type DeliveryPlanPageProps = {
 };
 
 export type PlanSourceOrderRow = {
+  selectionKey?: string;
   salesOrderId: number;
   salesOrderDetailId: number;
   orderNo: string;
@@ -91,4 +115,5 @@ export type PlanSourceOrderRow = {
   shippedQty: number;
   unitPrice: number;
   planDt: string | null;
+  remainingPlanQty: number;
 };

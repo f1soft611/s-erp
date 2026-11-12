@@ -22,6 +22,7 @@ export type F1GridEditorType =
   | 'autocomplete'
   | 'user'
   | 'code'
+  | 'image'
   | 'rownumber';
 
 export type F1GridOption = {
@@ -149,6 +150,7 @@ export type F1GridEditorPlugin<T extends object> = {
 export type F1GridColumn<T extends object> = {
   field: keyof T;
   headerName: string;
+  summaryType?: 'sum' | 'average' | 'min' | 'max';
   headerGroup?: string;
   form?: F1GridColumnFormOptions<T>;
   search?: F1GridColumnSearchOptions;
@@ -255,6 +257,10 @@ export type F1GridDataSource<T extends object> = {
 export type F1GridContextMenuTreeConfig = {
   onAddRoot: () => void;
   onAddChild: (targetRowId?: F1GridRowId) => void;
+  addRootLabel?: string;
+  addChildLabel?: string;
+  addRootDisabled?: boolean;
+  isAddChildDisabled?: (targetRowId?: F1GridRowId) => boolean;
 };
 
 export type F1GridValidationError = {
@@ -265,6 +271,7 @@ export type F1GridValidationError = {
 
 export type F1GridProps<T extends object> = {
   rows?: T[];
+  features?: Array<{ ftype: 'summary'; dock: 'top' | 'bottom' }>;
   dataSource?: F1GridDataSource<T>;
   onDataSourceError?: (error: Error) => void;
   columns: F1GridColumn<T>[];

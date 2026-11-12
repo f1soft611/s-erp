@@ -13,12 +13,6 @@ public class SalesDeliveryPlanVO implements Serializable {
     private Long salesDeliveryPlanId;
     private Long tenantId;
     private String planNo;
-    private Long salesOrderId;
-    private String orderNo;
-    private String orderDt;
-    private Long customerId;
-    private String customerCode;
-    private String customerName;
     private String createdBy;
     private String createdByName;
     private String createdByProfileImage;

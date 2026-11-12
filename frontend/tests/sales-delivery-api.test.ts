@@ -27,13 +27,19 @@ function form(): DeliveryForm {
 
 describe('sales delivery contract', () => {
   beforeEach(() => vi.clearAllMocks());
-  it('loads one source order with customer and remaining quantities', () => {
-    const result = sourceOrderForm([source, { ...source, salesOrderId: 8 }], '2026-11-04');
+  it('loads multiple source orders with per-line references and combined order numbers', () => {
+    const result = sourceOrderForm([
+      source,
+      { ...source, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800, orderNo: 'SO-8' },
+    ], '2026-11-04');
     expect(result.customerId).toBe(10);
     expect(result.salesOrderId).toBe(7);
-    expect(result.details).toHaveLength(1);
-    expect(result.details[0]).toMatchObject({ deliveryQty: 6, salesOrderDetailId: 70,
+    expect(result.orderNo).toBe('SO-7, SO-8');
+    expect(result.details).toHaveLength(2);
+    expect(result.details[0]).toMatchObject({ deliveryQty: 6, salesOrderId: 7, salesOrderDetailId: 70,
       salesDeliveryPlanDetailId: 700, vatAmt: 60 });
+    expect(result.details[1]).toMatchObject({ salesOrderId: 8, salesOrderDetailId: 80,
+      salesDeliveryPlanDetailId: 800 });
   });
   it('keeps exhausted plan rows selectable without initializing a negative delivery quantity', () => {
     const result = sourceOrderForm([{ ...source, remainingQty: -5, deliveredQty: 11 }], '2026-11-04');
@@ -60,7 +66,7 @@ describe('sales delivery contract', () => {
   it('sends direct references as null and excludes display/server amount fields', () => {
     const payload = buildDeliveryPayload({ ...form(), deliveryType: 'DIRECT' });
     expect(payload.salesOrderId).toBeNull();
-    expect(payload.details).toEqual([{ materialId: 20, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    expect(payload.details).toEqual([{ materialId: 20, salesOrderId: null, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
       deliveryQty: 6, unitPrice: 100, vatAmt: 60 }]);
   });
   it('rejects missing headers, source references, duplicate source lines and invalid amounts', () => {

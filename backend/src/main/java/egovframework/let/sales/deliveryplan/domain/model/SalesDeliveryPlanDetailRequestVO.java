@@ -12,6 +12,7 @@ import lombok.Setter;
 public class SalesDeliveryPlanDetailRequestVO implements Serializable {
     private static final long serialVersionUID = 1L;
     private Long salesDeliveryPlanDetailId;
+    private Long salesOrderId;
     private Long salesOrderDetailId;
     private LocalDate planDt;
     private BigDecimal plannedQty;

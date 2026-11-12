@@ -57,7 +57,9 @@ class SalesDeliveryPlanServiceImplTest {
 
         when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("MANUAL");
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
-        when(dao.selectPlanByOrder(anyMap())).thenReturn(null, new SalesDeliveryPlanVO());
+        SalesDeliveryPlanVO saved = new SalesDeliveryPlanVO();
+        saved.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(saved);
         when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
         when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
         when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
@@ -102,7 +104,7 @@ class SalesDeliveryPlanServiceImplTest {
 
         service.createAutomaticPlan(71L, "user01", request(detail(null, 801L, "10")));
 
-        verify(dao).selectPlanByOrder(anyMap());
+        verify(dao, never()).selectPlanHeader(anyMap());
         verify(dao).insertPlanHeader(anyMap());
         verify(dao).insertPlanDetail(anyMap());
     }
@@ -130,7 +132,7 @@ class SalesDeliveryPlanServiceImplTest {
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
         SalesDeliveryPlanVO savedPlan = new SalesDeliveryPlanVO();
         savedPlan.setSalesDeliveryPlanId(701L);
-        when(dao.selectPlanByOrder(anyMap())).thenReturn(null, savedPlan);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(savedPlan);
         when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
         when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
         when(dao.insertPlanDetail(anyMap())).thenReturn(801L);
@@ -151,7 +153,7 @@ class SalesDeliveryPlanServiceImplTest {
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
         SalesDeliveryPlanVO savedPlan = new SalesDeliveryPlanVO();
         savedPlan.setSalesDeliveryPlanId(701L);
-        when(dao.selectPlanByOrder(anyMap())).thenReturn(null, savedPlan);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(savedPlan);
         when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
         when(dao.selectPlanDetails(anyMap())).thenReturn(Arrays.asList(
                 new SalesDeliveryPlanDetailVO(), new SalesDeliveryPlanDetailVO()));
@@ -170,7 +172,92 @@ class SalesDeliveryPlanServiceImplTest {
         verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
                 row -> new BigDecimal("4.00").equals(row.get("plannedQty"))));
         verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
-                row -> new BigDecimal("6.00").equals(row.get("plannedQty"))));
+                row -> new BigDecimal("6.00").equals(row.get("plannedQty"))
+                        && Long.valueOf(301L).equals(row.get("salesOrderId"))
+                        && Long.valueOf(801L).equals(row.get("salesOrderDetailId"))));
+        verify(dao, org.mockito.Mockito.times(2)).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
+                row -> Long.valueOf(301L).equals(row.get("salesOrderId"))
+                        && Long.valueOf(801L).equals(row.get("salesOrderDetailId"))));
+    }
+
+    @Test
+    void createsOneManualPlanFromSelectedDetailsAcrossOrdersAfterAscendingLocks() throws Exception {
+        SalesDeliverySourceOrderHeaderVO secondOrder = order();
+        secondOrder.setSalesOrderId(302L);
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order(), secondOrder);
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null);
+        when(dao.selectOrderLines(org.mockito.ArgumentMatchers.argThat(
+                params -> params != null && Long.valueOf(301L).equals(params.get("salesOrderId")))))
+                .thenReturn(Collections.singletonList(orderLine()));
+        SalesDeliveryPlanDetailVO secondOrderLine = orderLine();
+        secondOrderLine.setSalesOrderId(302L);
+        secondOrderLine.setSalesOrderDetailId(802L);
+        when(dao.selectOrderLines(org.mockito.ArgumentMatchers.argThat(
+                params -> params != null && Long.valueOf(302L).equals(params.get("salesOrderId")))))
+                .thenReturn(Collections.singletonList(secondOrderLine));
+        SalesDeliveryPlanVO saved = new SalesDeliveryPlanVO();
+        saved.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(saved);
+        when(dao.insertPlanHeader(anyMap())).thenReturn(701L);
+        when(dao.insertPlanDetail(anyMap())).thenReturn(801L, 802L);
+        when(sequenceService.nextValue(
+                org.mockito.ArgumentMatchers.eq("SALES_DELIVERY_PLAN_NO"),
+                org.mockito.ArgumentMatchers.eq("71"),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        SalesDeliveryPlanRequestVO request = request(
+                detail(302L, null, 802L, "5"),
+                detail(301L, null, 801L, "4"));
+
+        SalesDeliveryPlanVO created = service.create(71L, "user01", request);
+
+        assertThat(created.getSalesDeliveryPlanId()).isEqualTo(701L);
+        verify(dao).insertPlanHeader(anyMap());
+        verify(dao, org.mockito.Mockito.times(2)).insertPlanDetail(anyMap());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(dao);
+        order.verify(dao).lockSourceOrder(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(301L).equals(params.get("salesOrderId"))));
+        order.verify(dao).lockSourceOrder(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(302L).equals(params.get("salesOrderId"))));
+        verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(301L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(801L).equals(params.get("salesOrderDetailId"))));
+        verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(302L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(802L).equals(params.get("salesOrderDetailId"))));
+        verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(
+                params -> Long.valueOf(301L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(801L).equals(params.get("salesOrderDetailId"))));
+    }
+
+    @Test
+    void rejectsOrderDetailPairThatDoesNotBelongToRequestedOrder() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null);
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+
+        assertThatThrownBy(() -> service.create(71L, "user01",
+                request(detail(301L, null, 899L, "1"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(dao, never()).insertPlanHeader(anyMap());
+    }
+
+    @Test
+    void rejectsProposedQtyAboveOrderDetailCapacityAcrossOtherPlans() throws Exception {
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(null);
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        when(dao.sumOtherPlannedQty(anyMap())).thenReturn(new BigDecimal("5.00"));
+
+        assertThatThrownBy(() -> service.create(71L, "user01",
+                request(detail(301L, null, 801L, "6"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(dao, never()).insertPlanHeader(anyMap());
     }
 
     @Test
@@ -186,12 +273,38 @@ class SalesDeliveryPlanServiceImplTest {
     }
 
     @Test
+    void rejectsRepeatedExistingPlanDetailIdsDuringUpdate() throws Exception {
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        SalesDeliveryPlanDetailVO stored = orderLine();
+        stored.setSalesDeliveryPlanDetailId(901L);
+        stored.setSalesDeliveryPlanId(701L);
+        stored.setPlannedQty(new BigDecimal("10.00"));
+        stored.setDeliveredQty(BigDecimal.ZERO);
+        when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
+        when(dao.lockPlanHeader(anyMap())).thenReturn(plan);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.singletonList(stored));
+        when(dao.lockSourceOrder(anyMap())).thenReturn(order());
+        when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(orderLine()));
+        SalesDeliveryPlanDetailRequestVO first = detail(901L, 801L, "4");
+        SalesDeliveryPlanDetailRequestVO second = detail(901L, 801L, "6");
+
+        assertThatThrownBy(() -> service.update(71L, "user01", 701L, request(first, second)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(dao, never()).updatePlanDetail(anyMap());
+        verify(dao, never()).insertPlanDetail(anyMap());
+        verify(dao, never()).deletePlanDetail(anyMap());
+    }
+
+    @Test
     void allowsAutoPlanReadsAndStatusQueriesWithoutAllowingManualCreation() throws Exception {
         when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         when(dao.lockTenantModeForPlanCreation(71L)).thenReturn("AUTO");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
-        plan.setSalesOrderId(301L);
         when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
         when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.emptyList());
         SalesDeliveryPlanStatusSearchVO search = new SalesDeliveryPlanStatusSearchVO();
@@ -217,7 +330,6 @@ class SalesDeliveryPlanServiceImplTest {
         when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
-        plan.setSalesOrderId(301L);
         when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
         when(dao.lockPlanHeader(anyMap())).thenReturn(plan);
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
@@ -239,6 +351,7 @@ class SalesDeliveryPlanServiceImplTest {
 
     @Test
     void loadsPlanByOrderWithinAuthenticatedTenant() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("AUTO");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
         when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
@@ -248,6 +361,22 @@ class SalesDeliveryPlanServiceImplTest {
         verify(dao).selectPlanByOrder(org.mockito.ArgumentMatchers.argThat(params ->
                 Long.valueOf(71L).equals(params.get("tenantId"))
                         && Long.valueOf(301L).equals(params.get("salesOrderId"))));
+    }
+
+    @Test
+    void rejectsByOrderPlanLookupInManualMode() throws Exception {
+        when(dao.selectTenantMode(71L)).thenReturn("MANUAL");
+        SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
+        plan.setSalesDeliveryPlanId(701L);
+        when(dao.selectPlanByOrder(anyMap())).thenReturn(plan);
+        when(dao.selectPlanDetails(anyMap())).thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> service.getByOrder(71L, "user01", 301L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(error -> ((ResponseStatusException) error).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(dao, never()).selectPlanByOrder(anyMap());
     }
 
     @Test
@@ -280,6 +409,7 @@ class SalesDeliveryPlanServiceImplTest {
         when(dao.selectOrderLines(anyMap())).thenReturn(Collections.singletonList(line));
         SalesDeliveryPlanDetailVO stored = new SalesDeliveryPlanDetailVO();
         stored.setSalesDeliveryPlanDetailId(901L);
+        stored.setSalesOrderId(301L);
         stored.setSalesOrderDetailId(801L);
         stored.setLineNo(1);
         stored.setPlannedQty(new BigDecimal("10.00"));
@@ -298,7 +428,6 @@ class SalesDeliveryPlanServiceImplTest {
         when(dao.selectTenantOverDeliveryPolicy(71L)).thenReturn("WARN");
         SalesDeliveryPlanVO plan = new SalesDeliveryPlanVO();
         plan.setSalesDeliveryPlanId(701L);
-        plan.setSalesOrderId(301L);
         when(dao.selectPlanHeader(anyMap())).thenReturn(plan);
         when(dao.lockPlanHeader(anyMap())).thenReturn(plan);
         when(dao.lockSourceOrder(anyMap())).thenReturn(order());
@@ -368,7 +497,8 @@ class SalesDeliveryPlanServiceImplTest {
 
         verify(dao, never()).updatePlanDetail(anyMap());
         verify(dao).insertPlanDetail(org.mockito.ArgumentMatchers.argThat(params ->
-                Long.valueOf(802L).equals(params.get("salesOrderDetailId"))
+                Long.valueOf(301L).equals(params.get("salesOrderId"))
+                        && Long.valueOf(802L).equals(params.get("salesOrderDetailId"))
                         && Integer.valueOf(2).equals(params.get("lineNo"))
                         && new BigDecimal("5.00").equals(params.get("plannedQty"))
                         && LocalDate.of(2026, 11, 20).equals(params.get("planDt"))));
@@ -394,13 +524,23 @@ class SalesDeliveryPlanServiceImplTest {
 
     private SalesDeliveryPlanRequestVO request(SalesDeliveryPlanDetailRequestVO... details) {
         SalesDeliveryPlanRequestVO request = new SalesDeliveryPlanRequestVO();
-        request.setSalesOrderId(301L);
+        for (SalesDeliveryPlanDetailRequestVO detail : details) {
+            if (detail.getSalesOrderId() == null) {
+                detail.setSalesOrderId(301L);
+            }
+        }
         request.setDetails(Arrays.asList(details));
         return request;
     }
 
     private SalesDeliveryPlanDetailRequestVO detail(Long planDetailId, Long orderDetailId, String quantity) {
+        return detail(301L, planDetailId, orderDetailId, quantity);
+    }
+
+    private SalesDeliveryPlanDetailRequestVO detail(
+            Long orderId, Long planDetailId, Long orderDetailId, String quantity) {
         SalesDeliveryPlanDetailRequestVO detail = new SalesDeliveryPlanDetailRequestVO();
+        detail.setSalesOrderId(orderId);
         detail.setSalesDeliveryPlanDetailId(planDetailId);
         detail.setSalesOrderDetailId(orderDetailId);
         detail.setPlannedQty(new BigDecimal(quantity));

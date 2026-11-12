@@ -1,5 +1,17 @@
 # DB 스키마 상세 정리
 
+### 공정관리: tb_process_group / tb_process
+
+| 테이블 | 주요 컬럼 | 설명 |
+| --- | --- | --- |
+| tb_process_group | group_id, tenant_id, name, description, inactive | 테넌트별 공정그룹 |
+| tb_process | process_id, tenant_id, group_id, name, description, image, inactive | 그룹별 공정 및 PNG/JPEG 데이터 URL |
+| tb_process | production_outsource, purchase_outsource, inspection, packing, stock_management, previous_stock_out, final_process, planned_equipment, actual_equipment_required | 공정별 선택 속성 |
+| 공통 | created_at, updated_at | 생성·수정 시각 |
+
+- `(tenant_id, group_id)` 복합 외래키로 다른 테넌트의 공정그룹 참조를 방지한다.
+- 생성 및 롤백 이력은 `20261112/20261112_003_change_process_management_schema.md`를 참조한다.
+
 ### 1-1. tb_tenant
 
 | 컬럼                         | 타입      | 설명                                     |
@@ -898,7 +910,7 @@
 | | `delivery_dt` | `date` | NOT NULL | 납품일자 |
 | | `delivery_type` | `varchar(10)` | NOT NULL | ORDER 수주납품 / DIRECT 직납품 |
 | | `customer_id` | `bigint` | NOT NULL | tenant 복합 거래처 FK |
-| | `sales_order_id` | `bigint` | NULL | 연결 수주 FK, 직납품 NULL |
+| | `sales_order_id` | `bigint` | NULL | 대표 수주 ID, 직납품 NULL |
 | | `delivery_place`, `delivery_method` | `varchar(200)`, `varchar(50)` | NULL | 납품장소/배송방법 |
 | | `total_amt` | `numeric(15,2)` | NOT NULL, 0 | 상세 합계 합산 |
 | | `remark` | `varchar(500)` | NULL | 비고 |
@@ -910,33 +922,35 @@
 | | `delivery_type` | `varchar(10)` | NOT NULL | 부모와 동일한 구분, 복합 FK |
 | | `line_no` | `integer` | NOT NULL | 양수, 문서 내 유일 순번 |
 | | `material_id` | `bigint` | NOT NULL | tenant 복합 품목 FK |
-| | `sales_order_id`, `sales_order_detail_id` | `bigint` | NULL | 수주납품에서만 둘 다 필수 |
+| | `sales_order_id`, `sales_order_detail_id` | `bigint` | NULL | 수주납품은 행별 원 수주 및 수주상세 ID 필수 |
 | | `delivery_qty` | `numeric(15,2)` | NOT NULL | 양수 납품수량 |
 | | `unit_price`, `supply_amt`, `total_amt` | `numeric(15,2)` | NOT NULL | 비음수 단가/공급가/합계 |
 | | `vat_amt` | `numeric(15,2)` | NOT NULL, 0 | 비음수 부가세 |
 
-- 부모/상세의 tenant, 구분 및 연결 수주를 복합 FK로 제한한다. DIRECT는 source IDs가 모두 NULL, ORDER는 모두 NOT NULL인 CHECK를 둔다.
+- 부모/상세의 tenant와 구분은 복합 FK로 제한한다. 상세별 수주·수주상세 및 계획상세 복합 FK가 각 행의 원 수주를 검증하며, 헤더의 대표 수주에 종속시키는 복합 FK는 다중 수주 출하를 위해 제거한다. DIRECT는 source IDs가 모두 NULL, ORDER는 모두 NOT NULL인 CHECK를 둔다.
 - 기존 `tb_sales_order_dt`에 `(sales_order_detail_id,sales_order_id,tenant_id,material_id)` 복합 UNIQUE를 추가한다. 납품상세는 이 키를 참조하여 수주·품목·tenant 일치를 보장한다.
 - 수량 양수, 금액 비음수/NaN 거부, 상세 합계=공급가+VAT CHECK. 문서 내 중복 수주상세는 UNIQUE로 제한한다.
 - tenant+일자/거래처/수주참조, 상세 tenant+품목/수주참조 인덱스를 제공한다.
 - 납품 저장/수정/삭제는 수주 헤더 잠금 후 기존 `shipped_qty`를 증감한다. 논리삭제 후에도 납품상세 이력은 유지되며 연결 수주의 상세 재생성/삭제는 차단한다.
+- 다중 수주 출하는 동일 거래처 수주만 한 문서로 묶으며 헤더에는 첫 상세의 대표 수주 ID를, 상세에는 각 행의 실제 수주 ID를 저장한다. [20261112_008 변경 이력 및 롤백](20261112/20261112_008_change_multi_order_sales_delivery_schema.md).
 - [DDL/메뉴/롤백 및 변경이력](20261104/20261104_001_change_sales_delivery_schema.md), [backend 사본](../../backend/DATABASE/20261104), [상세사양](../spec/20261104/20261104_001_납품관리_상세사양서.md). 스크립트 작성만 수행하며 실제 DB에는 적용하지 않는다.
 
-### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 미적용)
+### tb_sales_delivery_plan_hd / tb_sales_delivery_plan_dt (2026-11-05, 2026-11-12, 미적용)
 
-테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 계획 헤더는 수주당 하나이고, 계획 상세는 수주상세별 납기일/수량을 나눠 저장한다.
+테넌트의 `delivery_plan_mode`에 따라 수주 저장 시 계획을 자동 생성하거나 사용자가 수동 등록한다. 2026-11-12 변경안에서 계획 헤더는 단일 수주를 참조하지 않고 여러 수주의 상세 행을 담을 수 있으며, 각 계획상세가 원 수주와 수주상세를 참조한다.
 
 | 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
 |---|---|---|---|---|
 | `tb_tenant` | `delivery_plan_mode` | `varchar(10)` | NOT NULL, `AUTO` | 납품계획 모드 (`AUTO`/`MANUAL`) |
 | `tb_sales_delivery_plan_hd` | `sales_delivery_plan_id` | `bigserial` | NOT NULL, PK | 계획 헤더 ID |
-| | `tenant_id`, `sales_order_id` | `bigint` | NOT NULL | tenant와 원 수주 복합 FK |
+| | `tenant_id` | `bigint` | NOT NULL | 테넌트 ID; `(sales_delivery_plan_id, tenant_id)` unique 복합 참조 키의 구성 컬럼 |
 | | `plan_no` | `varchar(30)` | NOT NULL | tenant별 계획번호 |
 | | `use_at` | `char(1)` | NOT NULL, `Y` | 사용여부 |
 | | `created_by`, `updated_by` | `varchar(100)` | NULL | 등록/수정 로그인 코드 |
 | | `created_at`, `updated_at` | `timestamp without time zone` | 생성 시 CURRENT_TIMESTAMP, 수정 NULL | 감사 일시 |
 | `tb_sales_delivery_plan_dt` | `sales_delivery_plan_detail_id` | `bigserial` | NOT NULL, PK | 계획 상세 ID |
-| | `sales_delivery_plan_id`, `tenant_id`, `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 계획 헤더/원 수주/수주상세/품목 tenant 복합 FK |
+| | `sales_delivery_plan_id`, `tenant_id` | `bigint` | NOT NULL | 계획 헤더 복합 FK; 헤더의 `(sales_delivery_plan_id, tenant_id)` 참조 |
+| | `sales_order_id`, `sales_order_detail_id`, `material_id` | `bigint` | NOT NULL | 행별 원 수주/수주상세/품목 복합 FK |
 | | `line_no` | `integer` | NOT NULL | 계획서 안 순번 |
 | | `plan_dt` | `date` | NULL | 계획 납기일; NULL은 미정 |
 | | `planned_qty`, `delivered_qty` | `numeric(15,2)` | 계획 양수, 납품 누계 기본 0 | 계획 및 실납품수량 |
@@ -945,9 +959,10 @@
 | `tb_sales_delivery_dt` | `sales_delivery_plan_detail_id` | `bigint` | NULL | ORDER 상세 필수, DIRECT 상세 NULL; 계획 상세 복합 FK |
 
 - 계획 상세의 같은 수주상세 복수행을 허용하여 날짜/수량 분할을 지원한다. 계획수량 합은 주문수량 이하이며, 20261105_003 이후 실제 납품량은 비음수·유한수로 유지한다. `BLOCK`은 기준 초과를 서버에서 거부하고 `WARN`은 명시적 확인 후 허용한다. 수주·계획 기준수량은 자동 증가시키지 않는다.
+- 2026-11-12 마이그레이션은 헤더의 `sales_order_id`, 수주당 헤더 unique, 헤더 수주 FK/index 및 그 보조 not-null check를 제거한다. 상세-헤더 FK는 `(sales_delivery_plan_id, tenant_id)`로 바꾸고, 상세별 원 수주/수주상세 FK는 유지한다.
 - 납품상세는 계획상세/tenant/order/order detail 복합 FK를 사용한다. 기존 문서 내 source unique는 계획상세 기준 unique로 바뀐다.
 - migration은 모든 기존 주문과 주문상세를 초기 계획으로 변환하고 기존 ORDER 납품행을 해당 계획상세에 연결한다. 계획 delivered_qty는 `shipped_qty` 현재값으로 초기화한다.
-- [DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [backend 사본](../../backend/DATABASE/20261105), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
+- [20261105 DDL·계획상세 변경 및 메뉴/롤백 이력](20261105/20261105_002_change_sales_delivery_planning_schema.md), [20261112 다중수주 계획 스키마 변경 이력](20261112/20261112_009_change_multi_order_sales_delivery_plan_schema.md), [backend 사본](../../backend/DATABASE), [상세사양](../spec/20261105/20261105_002_납품계획_연계_납품흐름_개편_상세사양서.md). SQL은 작성만 했으며 실제 DB에는 적용하지 않았다.
 
 ### tb_system_policy / tb_system_policy_history (2026-11-05, 미적용)
 
@@ -1062,6 +1077,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ## 변경 이력
 
+- 2026-11-12: 동일 거래처의 여러 수주를 한 출하 문서로 등록할 수 있도록 상세-헤더 대표 수주 복합 FK만 제거하는 `20261112_008`을 정의했다. 읽기 전용 PostgreSQL MCP로 상세 수주 컬럼과 관련 복합 FK를 확인했고, 상세별 수주/계획 외래키는 유지한다. 실제 DB에는 적용하지 않았다. [docs/database/20261112](20261112) 및 [backend 사본](../../backend/DATABASE/20261112) 참고.
 - 2026-11-11: 기준정보 모듈에 `CO_WORK_STD`(작업표준서 관리)와 `CO_WORK_STD_RECIPE`(작업표준서 등록(레시피), `/co/work-standard/work-standard-recipe`) 메뉴 seed와 가드형 롤백 `20261111_003`을 정의했다. 스키마 변경은 없으며 `CO_MATERIAL` 역할 권한을 복사한다. 읽기 전용 MCP로 `tb_menu` 구조·기준정보 메뉴 경로·권한 코드·신규 코드 미존재를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261111](20261111) 및 [backend 사본](../../backend/DATABASE/20261111) 참고.
 - 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 본 작업에서 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. 후속 MCP `list_tables`/`describe_table`(tb_tenant, tb_sales_delivery_plan_hd, tb_sales_order_hd, tb_system_policy, tb_id_sequence) 재확인 시 정책 테이블이 기본 DB에 존재했으나 본 작업이 적용한 것은 아니다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
 - 2026-11-03: 공통 알림의 추가 채널을 위한 Web Push subscription/outbox/delivery 저장 구조와 due/lease 인덱스 초안 `20261103_001`을 정의했다. 구현 후 검토에서 읽기 전용 PostgreSQL MCP `list_tables`와 `describe_table`로 `tb_notification`, `tb_user`, `tb_tenant`의 현재 메타데이터를 재확인했고 데이터 행은 조회하지 않았으며, 실제 DB에 DDL을 적용하지 않았다. [backend/DATABASE/20261103](../../backend/DATABASE/20261103) 및 [docs/database/20261103](20261103) 참고.

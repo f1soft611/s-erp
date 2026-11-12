@@ -35,9 +35,11 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
       width: 150, align: 'right', onValueChange: (_row, value) => ({ plannedQty: Number(value) }) },
     { field: 'salesOrderDetailId', headerName: '합계', width: 110, align: 'right',
       renderCell: ({ row }) => {
-        const total = rows.filter((item) => item.salesOrderDetailId === row.salesOrderDetailId)
+        const total = rows.filter((item) => item.salesOrderId === row.salesOrderId
+          && item.salesOrderDetailId === row.salesOrderDetailId)
           .reduce((sum, item) => sum + Number(item.plannedQty), 0);
-        return <Box sx={{ color: total > row.orderQty ? 'error.main' : 'text.primary' }}>
+        const capacity = Number(row.remainingPlanQty ?? row.orderQty);
+        return <Box sx={{ color: total > capacity ? 'error.main' : 'text.primary' }}>
           {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
         </Box>;
       } },
@@ -53,13 +55,16 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
             pendingEdit.current = split.rowId;
             replaceRows([...active.slice(0, index + 1), split, ...active.slice(index + 1)]);
           }}>분할</Button>
-        {rows.filter((item) => item.salesOrderDetailId === row.salesOrderDetailId).length > 1
+        {rows.filter((item) => item.salesOrderId === row.salesOrderId
+          && item.salesOrderDetailId === row.salesOrderDetailId).length > 1
           ? <Button size="small" color="error" aria-label="분할행 삭제" disabled={!editable} sx={{ minWidth: 0, px: 1 }}
             onClick={() => replaceRows((gridRef.current?.getActiveRows() ?? rows)
               .filter((item) => item.rowId !== row.rowId))}>
             <DeleteOutlinedIcon fontSize="small" />
           </Button> : null}
       </Box> },
+    { field: 'orderNo', headerName: '수주번호', width: 140, align: 'center', mergeRows: true },
+    { field: 'customerName', headerName: '거래처', width: 150, align: 'left', mergeRows: true },
   ], [editable, gridRef, replaceRows, rows]);
   return <>
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, minWidth: 0, borderRadius: 1 }}>

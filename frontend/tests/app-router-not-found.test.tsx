@@ -53,6 +53,51 @@ afterEach(() => {
 });
 
 describe('AppRouter not found fallback', () => {
+  it('opens the authorized process management route', async () => {
+    window.localStorage.setItem('s-erp-auth', JSON.stringify({
+      tenantCode: 'TEST', userId: 'test', accessToken: 'token', refreshToken: '',
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    }));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/menus/my')) {
+        return new Response(JSON.stringify({ resultCode: '200', result: {
+          user: { userId: 'test', roles: [] },
+          menus: [{
+            menuId: 1, name: '생산관리', path: '/pr',
+            children: [{ menuId: 2, name: '기준정보', path: '/pr/master', children: [{
+              menuId: 3, name: '공정관리', path: '/pr/master/process-management', children: [],
+              permissions: { read: true, create: true, update: true, delete: true, excel: false },
+            }] }],
+          }],
+        } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        resultCode: '200', result: { resultList: [] },
+      }), { status: 200 });
+    }));
+    render(
+      <AppSettingsProvider>
+        <MemoryRouter initialEntries={['/pr/master/process-management']}>
+          <AppRouter />
+        </MemoryRouter>
+      </AppSettingsProvider>,
+    );
+    expect(await screen.findByRole('grid', { name: '공정관리' }, { timeout: 25000 })).toBeVisible();
+    expect(screen.queryByText('요청하신 페이지를 찾을 수 없습니다')).not.toBeInTheDocument();
+  }, 30000);
+
+  it('redirects an unauthenticated process route to login', async () => {
+    render(
+      <AppSettingsProvider>
+        <MemoryRouter initialEntries={['/pr/master/process-management']}>
+          <AppRouter />
+        </MemoryRouter>
+      </AppSettingsProvider>,
+    );
+    expect(await screen.findByRole('heading', { name: '통합 MES 시스템 로그인' }, { timeout: 10000 })).toBeVisible();
+  }, 15000);
+
   it.each(['/search', '/search/'])('allows the authenticated common search page without a registered database menu: %s', async (path) => {
     window.localStorage.setItem('s-erp-auth', JSON.stringify({
       tenantCode: 'TEST', userId: 'test', accessToken: 'token', refreshToken: '',

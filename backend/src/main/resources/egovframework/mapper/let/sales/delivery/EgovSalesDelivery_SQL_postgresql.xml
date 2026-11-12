@@ -73,7 +73,6 @@
         JOIN tb_sales_delivery_plan_hd ph
           ON ph.sales_delivery_plan_id = pd.sales_delivery_plan_id
          AND ph.tenant_id = pd.tenant_id
-         AND ph.sales_order_id = pd.sales_order_id
          AND ph.use_at = 'Y'
         JOIN tb_sales_order_hd h
           ON h.sales_order_id = pd.sales_order_id
@@ -115,19 +114,19 @@
                pd.delivered_qty AS deliveredQty,
                pd.planned_qty - pd.delivered_qty AS remainingQty,
                d.unit_price AS unitPrice
-        FROM tb_sales_order_hd h
-        JOIN tb_sales_order_dt d
-          ON d.sales_order_id = h.sales_order_id
-         AND d.tenant_id = h.tenant_id
+        FROM tb_sales_delivery_plan_dt pd
         JOIN tb_sales_delivery_plan_hd ph
-          ON ph.sales_order_id = h.sales_order_id
-         AND ph.tenant_id = h.tenant_id
+          ON ph.sales_delivery_plan_id = pd.sales_delivery_plan_id
+         AND ph.tenant_id = pd.tenant_id
          AND ph.use_at = 'Y'
-        JOIN tb_sales_delivery_plan_dt pd
-          ON pd.sales_delivery_plan_id = ph.sales_delivery_plan_id
-         AND pd.sales_order_id = d.sales_order_id
-         AND pd.sales_order_detail_id = d.sales_order_detail_id
-         AND pd.tenant_id = d.tenant_id
+        JOIN tb_sales_order_hd h
+          ON h.sales_order_id = pd.sales_order_id
+         AND h.tenant_id = pd.tenant_id
+        JOIN tb_sales_order_dt d
+          ON d.sales_order_detail_id = pd.sales_order_detail_id
+         AND d.sales_order_id = pd.sales_order_id
+         AND d.tenant_id = pd.tenant_id
+         AND d.material_id = pd.material_id
         JOIN tb_customer_info c
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
@@ -140,18 +139,15 @@
         WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND h.use_at = 'Y'
           AND h.status NOT IN ('수주취소', '취소', '출하완료', '완료')
-          AND (pd.planned_qty &gt; pd.delivered_qty OR EXISTS (
-              SELECT 1 FROM tb_tenant t
-              WHERE t.tenant_id = h.tenant_id
-                AND t.use_at = 'Y'
-                AND t.over_delivery_policy = 'WARN'
-          ))
+          AND pd.planned_qty &gt; pd.delivered_qty
         <if test="keyword != null and keyword != ''">
           AND (h.order_no ILIKE '%' || #{keyword} || '%'
                OR c.customer_code ILIKE '%' || #{keyword} || '%'
-               OR c.customer_name ILIKE '%' || #{keyword} || '%')
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
         </if>
-        ORDER BY h.order_dt DESC, h.sales_order_id DESC, pd.line_no
+        ORDER BY h.order_dt DESC, h.sales_order_id DESC, ph.sales_delivery_plan_id DESC, pd.line_no
         LIMIT #{limit}
     </select>
 
@@ -196,7 +192,15 @@
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
                h.sales_order_id AS salesOrderId,
-               o.order_no AS orderNo,
+               (
+                   SELECT string_agg(DISTINCT source_order.order_no, ', ' ORDER BY source_order.order_no)
+                   FROM tb_sales_delivery_dt source_detail
+                   JOIN tb_sales_order_hd source_order
+                     ON source_order.sales_order_id = source_detail.sales_order_id
+                    AND source_order.tenant_id = source_detail.tenant_id
+                   WHERE source_detail.sales_delivery_id = h.sales_delivery_id
+                     AND source_detail.tenant_id = h.tenant_id
+               ) AS orderNo,
                h.delivery_place AS deliveryPlace,
                h.delivery_method AS deliveryMethod,
                h.remark AS remark,
@@ -206,9 +210,6 @@
         JOIN tb_customer_info c
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
-        LEFT JOIN tb_sales_order_hd o
-          ON o.sales_order_id = h.sales_order_id
-         AND o.tenant_id = h.tenant_id
         WHERE h.sales_delivery_id = #{salesDeliveryId, jdbcType=BIGINT}
           AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
           AND h.use_at = 'Y'
@@ -328,7 +329,7 @@
                h.customer_id AS customerId,
                c.customer_code AS customerCode,
                c.customer_name AS customerName,
-               h.sales_order_id AS salesOrderId,
+               d.sales_order_id AS salesOrderId,
                o.order_no AS orderNo,
                h.delivery_place AS deliveryPlace,
                h.delivery_method AS deliveryMethod,
@@ -354,8 +355,8 @@
           ON c.customer_id = h.customer_id
          AND c.tenant_id = h.tenant_id
         LEFT JOIN tb_sales_order_hd o
-          ON o.sales_order_id = h.sales_order_id
-         AND o.tenant_id = h.tenant_id
+          ON o.sales_order_id = d.sales_order_id
+         AND o.tenant_id = d.tenant_id
         JOIN tb_material_info m
           ON m.material_id = d.material_id
          AND m.tenant_id = d.tenant_id

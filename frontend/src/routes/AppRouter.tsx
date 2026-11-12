@@ -145,6 +145,14 @@ function AppRouter() {
             }
           />
           <Route
+            path="/pr/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/settings/*"
             element={
               <ProtectedRoute>

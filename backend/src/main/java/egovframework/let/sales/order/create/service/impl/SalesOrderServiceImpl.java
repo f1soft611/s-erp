@@ -105,11 +105,11 @@ public class SalesOrderServiceImpl extends EgovAbstractServiceImpl implements Sa
         }
         if ("AUTO".equals(deliveryPlanMode)) {
             SalesDeliveryPlanRequestVO planRequest = new SalesDeliveryPlanRequestVO();
-            planRequest.setSalesOrderId(salesOrderId);
             List<SalesDeliveryPlanDetailRequestVO> planDetails =
                     new ArrayList<SalesDeliveryPlanDetailRequestVO>();
             for (SalesOrderDetailVO savedDetail : savedDetails) {
                 SalesDeliveryPlanDetailRequestVO planDetail = new SalesDeliveryPlanDetailRequestVO();
+                planDetail.setSalesOrderId(salesOrderId);
                 planDetail.setSalesOrderDetailId(savedDetail.getSalesOrderDetailId());
                 planDetail.setPlanDt(savedDetail.getDeliveryDt() == null
                         ? payload.getDeliveryDt() : savedDetail.getDeliveryDt());

@@ -99,6 +99,8 @@ const columns: F1GridColumn<ExportRow>[] = [
 
 async function readExportedWorkbook(
   rows: ExportRow[],
+  exportColumns = columns,
+  dock?: 'top' | 'bottom',
 ): Promise<ExcelJS.Workbook> {
   let exportedBlob: Blob | undefined;
   const originalCreateObjectURL = Object.getOwnPropertyDescriptor(
@@ -125,7 +127,7 @@ async function readExportedWorkbook(
     .mockImplementation(() => {});
 
   try {
-    await exportGridRowsToExcel(columns, rows, 'export-test');
+    await exportGridRowsToExcel(exportColumns, rows, 'export-test', dock);
     if (!exportedBlob) throw new Error('Excel export did not create a Blob.');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await exportedBlob.arrayBuffer());
@@ -148,6 +150,51 @@ async function readExportedWorkbook(
 describe('F1-Grid Excel export cell types', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it.each([undefined, 'top', 'bottom'] as const)('exports displayed row numbers with summary dock %s', async (dock) => {
+    const rowNumberColumns: F1GridColumn<ExportRow>[] = [
+      { field: 'rowNumber', headerName: 'No', type: 'rownumber', getValue: () => 999 },
+      { field: 'amount', headerName: 'Amount', type: 'number', summaryType: 'sum' },
+    ];
+    const rows = [
+      { rowNumber: 70, amount: 10 },
+      { amount: 20 },
+    ] as ExportRow[];
+    const sheet = (await readExportedWorkbook(rows, rowNumberColumns, dock)).getWorksheet('Sheet1')!;
+    const start = dock === 'top' ? 3 : 2;
+    expect(sheet.getCell(`A${start}`).value).toBe(1);
+    expect(sheet.getCell(`A${start + 1}`).value).toBe(2);
+    expect(sheet.getCell(`A${start}`).type).toBe(ExcelJS.ValueType.Number);
+    expect(sheet.getCell(`A${start}`).numFmt).toBe('0');
+    if (dock) expect(sheet.getCell(`A${dock === 'top' ? 2 : 4}`).value).toBeNull();
+    expect(rows[0].rowNumber).toBe(70);
+  });
+
+  it.each(['top', 'bottom'] as const)('exports %s summary as formatted numeric cells', async (dock) => {
+    const summaryColumns: F1GridColumn<ExportRow>[] = [
+      { ...columns[0] },
+      { ...columns[1], summaryType: 'sum' },
+      { ...columns[2], summaryType: 'average' },
+      { field: 'defaultAmount', headerName: 'Minimum', type: 'number', summaryType: 'min' },
+      { field: 'defaultIntegerNumber', headerName: 'Maximum', type: 'number', summaryType: 'max' },
+      { field: 'empty', headerName: 'Empty', type: 'number', summaryType: 'sum' },
+    ];
+    const rows = [
+      { materialCode: 'a', amount: '10', price: 4, defaultAmount: -2, defaultIntegerNumber: 5, empty: null },
+      { materialCode: 'b', amount: 20, price: 8, defaultAmount: 3, defaultIntegerNumber: 9, empty: '' },
+    ] as ExportRow[];
+    const sheet = (await readExportedWorkbook(rows, summaryColumns, dock)).getWorksheet('Sheet1')!;
+    const summaryRow = dock === 'top' ? 2 : 4;
+    expect(sheet.getCell(`A${summaryRow}`).value).toBeNull();
+    expect(sheet.getCell(`B${summaryRow}`).value).toBe(30);
+    expect(sheet.getCell(`B${summaryRow}`).numFmt).toBe('#,##0.00');
+    expect(sheet.getCell(`C${summaryRow}`).value).toBe(6);
+    expect(sheet.getCell(`C${summaryRow}`).numFmt).toBe('"₩"#,##0');
+    expect(sheet.getCell(`D${summaryRow}`).value).toBe(-2);
+    expect(sheet.getCell(`E${summaryRow}`).value).toBe(9);
+    expect(sheet.getCell(`F${summaryRow}`).value).toBeNull();
+    expect(sheet.getCell(`A${dock === 'top' ? 3 : 2}`).value).toBe('a');
   });
 
   it('exports typed values, Grid-aligned date text and invalid-value fallbacks', async () => {
@@ -210,7 +257,7 @@ describe('F1-Grid Excel export cell types', () => {
     expect(sheet?.getCell('J2').value).toBe('not-a-number');
     expect(sheet?.getCell('K2').value).toBe('2026-02-29');
     expect(sheet?.getCell('K2').alignment?.horizontal).toBe('left');
-    expect(sheet?.getCell('L2').value).toBe(7);
+    expect(sheet?.getCell('L2').value).toBe(1);
     const exportedTimeWithSeconds = sheet?.getCell('M2').value;
     if (!(exportedTimeWithSeconds instanceof Date)) {
       throw new Error('Expected ExcelJS to read the formatted time serial as a Date.');

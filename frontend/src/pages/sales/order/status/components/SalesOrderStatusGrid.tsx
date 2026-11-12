@@ -29,7 +29,8 @@ export function SalesOrderStatusGrid({
       rowKey="salesOrderDetailId"
       rows={rows}
       loading={loading}
-      showCheckbox={false}
+      features={[{ ftype: 'summary', dock: 'bottom' }]}
+      showCheckbox
       selectionMode="row"
       selectRowOnContextMenu={false}
       allowAddRowInContextMenu={false}

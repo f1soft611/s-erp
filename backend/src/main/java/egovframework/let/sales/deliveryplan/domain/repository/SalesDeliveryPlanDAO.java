@@ -1,5 +1,6 @@
 package egovframework.let.sales.deliveryplan.domain.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -7,8 +8,9 @@ import org.egovframe.rte.psl.dataaccess.EgovAbstractMapper;
 import org.springframework.stereotype.Repository;
 
 import egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderHeaderVO;
-import egovframework.let.sales.delivery.domain.model.SalesDeliverySourceOrderVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanSourceVO;
+import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanStatusVO;
 import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanVO;
 
 @Repository("salesDeliveryPlanDAO")
@@ -49,8 +51,13 @@ public class SalesDeliveryPlanDAO extends EgovAbstractMapper {
         return selectList("SalesDeliveryPlanDAO.selectOrderLines", params);
     }
 
-    public List<SalesDeliverySourceOrderVO> selectPlanSourceOrders(Map<String, Object> params) throws Exception {
+    public List<SalesDeliveryPlanSourceVO> selectPlanSourceOrders(Map<String, Object> params) throws Exception {
         return selectList("SalesDeliveryPlanDAO.selectPlanSourceOrders", params);
+    }
+
+    public BigDecimal sumOtherPlannedQty(Map<String, Object> params) throws Exception {
+        BigDecimal quantity = selectOne("SalesDeliveryPlanDAO.sumOtherPlannedQty", params);
+        return quantity == null ? BigDecimal.ZERO : quantity;
     }
 
     public Long insertPlanHeader(Map<String, Object> params) throws Exception {
@@ -74,7 +81,7 @@ public class SalesDeliveryPlanDAO extends EgovAbstractMapper {
         return count == null ? 0 : count;
     }
 
-    public List<SalesDeliveryPlanVO> selectPlanStatus(Map<String, Object> params) throws Exception {
+    public List<SalesDeliveryPlanStatusVO> selectPlanStatus(Map<String, Object> params) throws Exception {
         return selectList("SalesDeliveryPlanDAO.selectPlanStatus", params);
     }
 }

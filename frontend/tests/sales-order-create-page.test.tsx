@@ -162,11 +162,17 @@ describe('sales order entry page', () => {
 
     const grid = screen.getByRole('grid', { name: '수주 상세 목록' });
     expect(within(grid).getByRole('gridcell', { name: '200.00' })).toBeInTheDocument();
+    const summary = within(grid).getByTestId('f1-grid-summary-bottom');
+    expect(within(summary).getByRole('gridcell', { name: '주문수량 집계' })).toHaveTextContent('2.00');
+    expect(within(summary).getByRole('gridcell', { name: '공급가 집계' })).toHaveTextContent('200.00');
+    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('220.00');
     expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
       /공급가 합계\s*200\.00\s*부가세 합계\s*20\.00\s*총 합계\s*220\.00/,
     );
 
     editCell(6, '30');
+    expect(within(summary).getByRole('gridcell', { name: '부가세 집계' })).toHaveTextContent('30.00');
+    expect(within(summary).getByRole('gridcell', { name: '라인합계 집계' })).toHaveTextContent('230.00');
     expect(screen.getByLabelText('수주 금액 합계')).toHaveTextContent(
       /공급가 합계\s*200\.00\s*부가세 합계\s*30\.00\s*총 합계\s*230\.00/,
     );

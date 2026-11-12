@@ -370,7 +370,7 @@ function F1TreeInner<T extends object>(
       disableFiltering
       onChangesChange={handleChangesChange}
       rowProjection={(gridRows) => projectRows(gridRows)}
-      treeContextMenu={{
+      treeContextMenu={gridProps.treeContextMenu ?? {
         onAddRoot: () => {
           pendingChildInsertRef.current = undefined;
           gridRef.current?.addRow();
@@ -396,8 +396,17 @@ function F1TreeInner<T extends object>(
           : undefined;
         return (
           <Box
-            sx={{ display: 'flex', alignItems: 'center', pl: meta.depth * 2 }}
+            sx={{ position: 'relative', display: 'flex', alignItems: 'center', pl: meta.depth * 2 }}
           >
+            {meta.depth > 0 ? (
+              <Box aria-hidden="true" data-f1-tree-branch=""
+                sx={{
+                  position: 'absolute', left: meta.hasChildren ? (meta.depth - 1) * 16 + 4 : meta.depth * 16 + 17,
+                  top: '50%', transform: 'translateY(-65%)',
+                  width: 10, height: 12, borderLeft: 1, borderBottom: 1,
+                  borderColor: 'text.disabled', pointerEvents: 'none',
+                }} />
+            ) : null}
             {treeCheckbox ? (
               <Checkbox
                 size="small"

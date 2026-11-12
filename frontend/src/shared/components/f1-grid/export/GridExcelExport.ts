@@ -1,5 +1,6 @@
 import type { F1GridColumn } from '../types/grid.types';
 import { getCellDisplayValue, getGridDateValue } from '../utils/grid.utils';
+import { calculateGridSummary } from '../utils/gridSummary';
 
 type ExportCellValue = string | number | boolean | Date | null;
 
@@ -157,6 +158,7 @@ export async function exportGridRowsToExcel<T extends object>(
   columns: F1GridColumn<T>[],
   rows: T[],
   fileName: string,
+  summaryDock?: 'top' | 'bottom',
 ): Promise<void> {
   const ExcelJS = await import('exceljs');
 
@@ -172,9 +174,26 @@ export async function exportGridRowsToExcel<T extends object>(
       horizontal: column.headerAlign ?? 'center',
     };
   });
-  rows.forEach((row) => {
+  const addSummaryRow = () => {
+    const values = columns.map((column) =>
+      column.summaryType ? calculateGridSummary(rows, column) : undefined,
+    );
+    const excelRow = worksheet.addRow(values.map((value) => value ?? null));
+    columns.forEach((column, index) => {
+      const excelCell = excelRow.getCell(index + 1);
+      excelCell.font = { bold: true };
+      excelCell.alignment = getGridCellAlignment(column);
+      if (values[index] !== undefined) {
+        excelCell.numFmt = getNumericFormat(column, values[index]);
+      }
+    });
+  };
+  if (summaryDock === 'top') addSummaryRow();
+  rows.forEach((row, rowIndex) => {
     const cells = columns.map((column) => {
-      const rawValue = column.getValue?.(row) ?? row[column.field];
+      const rawValue = column.type === 'rownumber'
+        ? rowIndex + 1
+        : column.getValue?.(row) ?? row[column.field];
       return getTypedExcelCell(column, rawValue);
     });
     const excelRow = worksheet.addRow(cells.map((cell) => cell.value));
@@ -185,6 +204,7 @@ export async function exportGridRowsToExcel<T extends object>(
     });
   });
 
+  if (summaryDock === 'bottom') addSummaryRow();
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

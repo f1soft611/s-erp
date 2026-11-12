@@ -41,6 +41,7 @@ export function SalesOrderDetailGrid({
       storageKey="sales-order-create-detail-grid-v1"
       rows={rows}
       columns={columns}
+      features={[{ ftype: 'summary', dock: 'bottom' }]}
       rowKey="rowId"
       createRow={createSalesOrderDetailRow}
       createDuplicate={duplicateSalesOrderDetailRow}

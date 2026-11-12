@@ -22,7 +22,7 @@ class SalesDeliveryPlanMapperTest {
         Configuration configuration = parse();
         for (String id : Arrays.asList(
                 "selectTenantMode", "lockTenantModeForPlanCreation", "lockSourceOrder", "selectPlanByOrder", "selectPlanHeader",
-                "lockPlanHeader", "selectPlanDetails", "selectOrderLines", "selectPlanSourceOrders",
+                "lockPlanHeader", "selectPlanDetails", "selectOrderLines", "selectPlanSourceOrders", "sumOtherPlannedQty",
                 "insertPlanHeader", "insertPlanDetail", "updatePlanDetail", "deletePlanDetail",
                 "countDeliveryReferences", "selectPlanStatus")) {
             assertThat(configuration.hasStatement("SalesDeliveryPlanDAO." + id)).as(id).isTrue();
@@ -31,14 +31,26 @@ class SalesDeliveryPlanMapperTest {
         assertThat(modeLock).contains("SELECT delivery_plan_mode", "FROM tb_tenant", "tenant_id = ?", "FOR SHARE")
                 .doesNotContain("FOR UPDATE");
         String header = normalize(sql(configuration, "selectPlanHeader").getSql());
-        assertThat(header).contains("ph.tenant_id = ?", "ph.use_at = 'Y'");
+        assertThat(header).contains("ph.tenant_id = ?", "ph.use_at = 'Y'")
+                .doesNotContain("ph.sales_order_id", "oh.order_no", "customer_name");
+        String byOrder = normalize(sql(configuration, "selectPlanByOrder").getSql());
+        assertThat(byOrder).contains("pd.sales_order_id = ?", "pd.tenant_id = ?", "ph.use_at = 'Y'")
+                .doesNotContain("ph.sales_order_id");
         String orderLock = normalize(sql(configuration, "lockSourceOrder").getSql());
         assertThat(orderLock).contains("FOR UPDATE OF h", "h.tenant_id = ?");
         String planLock = normalize(sql(configuration, "lockPlanHeader").getSql());
         assertThat(planLock).contains("FOR UPDATE OF ph", "ph.tenant_id = ?");
         String remaining = normalize(sql(configuration, "selectPlanSourceOrders").getSql());
         assertThat(remaining).contains("COALESCE(od.delivery_dt, h.delivery_dt) AS planDt",
-                "h.status = '수주등록'", "NOT EXISTS");
+                "h.status = '수주등록'", "AS remainingPlanQty", "SUM(pd.planned_qty)");
+        String otherTotals = normalize(sql(configuration, "sumOtherPlannedQty").getSql());
+        assertThat(otherTotals).contains("pd.sales_order_id = ?", "pd.sales_order_detail_id = ?",
+                "ph.use_at = 'Y'", "pd.sales_delivery_plan_id <> ?");
+        String details = normalize(sql(configuration, "selectPlanDetails").getSql());
+        assertThat(details).contains("oh.order_no AS orderNo", "to_char(oh.order_dt, 'YYYY-MM-DD') AS orderDt",
+                "c.customer_code AS customerCode", "c.customer_name AS customerName");
+        String insertHeader = normalize(sql(configuration, "insertPlanHeader").getSql());
+        assertThat(insertHeader).contains("plan_no", "created_by").doesNotContain("sales_order_id");
     }
 
     @Test
@@ -50,6 +62,22 @@ class SalesDeliveryPlanMapperTest {
                 "u.login_id = la.login_id", "u.tenant_id = la.tenant_id");
         assertThat(normalize(sql(configuration, "selectPlanStatus").getSql())).doesNotContain("profile_image");
         assertThat(normalize(sql(configuration, "lockPlanHeader").getSql())).doesNotContain("profile_image");
+    }
+
+    @Test
+    void returnsPlanStatusAtPlanDetailGranularity() throws Exception {
+        String status = normalize(sql(parse(), "selectPlanStatus").getSql());
+
+        assertThat(status).contains("pd.sales_delivery_plan_detail_id AS salesDeliveryPlanDetailId",
+                "pd.sales_delivery_plan_id AS salesDeliveryPlanId",
+                "pd.sales_order_id AS salesOrderId",
+                "oh.order_no AS orderNo",
+                "c.customer_name AS customerName",
+                "m.material_code AS materialCode",
+                "pd.plan_dt >=", "pd.plan_dt <=", "pd.planned_qty AS plannedQty",
+                "pd.delivered_qty AS deliveredQty",
+                "pd.planned_qty - pd.delivered_qty AS remainingQty")
+                .doesNotContain("GROUP BY");
     }
 
     @Test
@@ -86,6 +114,7 @@ class SalesDeliveryPlanMapperTest {
         params.put("planDtFrom", "2026-11-01");
         params.put("planDtTo", "2026-11-30");
         params.put("plannedQty", new java.math.BigDecimal("10.00"));
+        params.put("currentPlanId", 500L);
         params.put("deliveredQty", new java.math.BigDecimal("0.00"));
         params.put("keyword", "SO");
         params.put("limit", 200);

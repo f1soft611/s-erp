@@ -20,7 +20,7 @@ const item = {
   customerId: 10, customerCode: 'C10', customerName: '거래처', salesOrderId: null, orderNo: null,
   deliveryPlace: '원래 장소', deliveryMethod: '', remark: '', totalAmt: 220, writer: false,
   details: [{ salesDeliveryDetailId: 2, lineNo: 1, materialId: 20, materialCode: 'M20', materialName: '품목',
-    unit: 'EA', salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    unit: 'EA', salesOrderId: null, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
     deliveryQty: 2, unitPrice: 100, supplyAmt: 200, vatAmt: 20, totalAmt: 220 }],
 };
 const props = {
@@ -46,11 +46,11 @@ beforeEach(() => {
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
   vi.mocked(getDeliveryStatus).mockResolvedValue([]);
 });
-it('opens the shipment plan selector using the icon inside the order field', () => {
+it('opens the sales order selector using the icon inside the order field', () => {
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
-  expect(screen.getByRole('button', { name: '계획 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
+  expect(screen.getByRole('button', { name: '수주 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
 });
 it('preserves edits on failed save and permits update without writer ownership', async () => {
   vi.mocked(updateDelivery).mockRejectedValue(new Error('잔량 초과'));
@@ -199,7 +199,7 @@ it('creates direct delivery from shared customer/material pickers with edited qu
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
     deliveryType: 'DIRECT', customerId: 10, salesOrderId: null,
-    details: [{ materialId: 20, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
+    details: [{ materialId: 20, salesOrderId: null, salesOrderDetailId: null, salesDeliveryPlanDetailId: null,
       deliveryQty: 2, unitPrice: 100, vatAmt: 20 }],
   })));
 }, 15000);
@@ -215,17 +215,17 @@ it('selects one order, populates remaining lines and prevents source identity ed
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox'));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
-  fireEvent.click(screen.getByRole('button', { name: '계획 선택', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
   fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
-  const sourceGrid = await screen.findByRole('grid', { name: '출하 대상 계획 목록' });
+  const sourceGrid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
   expect(within(sourceGrid).getByRole('gridcell', { name: '거래처' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(sourceGrid).getByRole('gridcell', { name: 'M20' })).toHaveStyle({ justifyContent: 'center' });
   expect(within(sourceGrid).getByRole('gridcell', { name: '품목' })).toHaveStyle({ justifyContent: 'center' });
   const sourceRow = within(sourceGrid).getByRole('gridcell', { name: 'M20' }).closest('[role="row"]')!;
-  fireEvent.mouseDown(within(sourceRow as HTMLElement).getByRole('gridcell', { name: 'M20' }), { button: 0 });
-  expect(sourceRow.querySelector('[data-row-selection-overlay]')).not.toBeNull();
-  expect(screen.getByRole('dialog', { name: '출하계획 선택' })).toBeInTheDocument();
-  fireEvent.click(await screen.findByRole('button', { name: 'DP-1', exact: true }));
+  expect(within(sourceRow as HTMLElement).getByRole('checkbox')).toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: '수주 선택' })).toBeInTheDocument();
+  fireEvent.click(within(sourceRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
   expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7');
   const deliveryGrid = screen.getByRole('grid', { name: '출하 상세 목록' });
   const deliveryCells = within(deliveryGrid).getAllByRole('gridcell');
@@ -238,7 +238,7 @@ it('selects one order, populates remaining lines and prevents source identity ed
   fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
   await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
     salesOrderId: 7, deliveryType: 'ORDER',
-    details: [{ materialId: 20, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700,
+    details: [{ materialId: 20, salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700,
       deliveryQty: 6, unitPrice: 100, vatAmt: 60 }],
   })));
 }, 15000);
@@ -247,9 +247,9 @@ it('keeps source-order search controls together in a full-width modal form', asy
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox'));
   fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
-  fireEvent.click(screen.getByRole('button', { name: '계획 선택', exact: true }));
-  const searchForm = await screen.findByRole('form', { name: '출하계획 선택 검색' });
-  const searchInput = within(searchForm).getByRole('textbox', { name: '계획번호·수주번호·거래처 검색' });
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
+  const searchForm = await screen.findByRole('form', { name: '수주 선택 검색' });
+  const searchInput = within(searchForm).getByRole('textbox', { name: '수주번호·거래처 검색' });
   const searchButton = within(searchForm).getByRole('button', { name: '검색', exact: true });
   const searchField = searchInput.closest('.MuiOutlinedInput-root');
   expect(searchField).not.toBeNull();
@@ -259,23 +259,114 @@ it('keeps source-order search controls together in a full-width modal form', asy
   fireEvent.submit(searchForm);
   await waitFor(() => expect(searchSourceOrders).toHaveBeenCalledWith('SO-찾기'));
 });
-it('selects all plan rows belonging to the clicked order only', async () => {
+it('selects only checked plan-detail rows across multiple plans', async () => {
   const base = {
     salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
     customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
     deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
     materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
   };
-  const rows = [base, { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701 },
-    { ...base, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800, planNo: 'DP-2' }];
+  const rows = [
+    base,
+    { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701, planNo: 'DP-1-2', lineNo: 2 },
+    { ...base, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800, orderNo: 'SO-8', planNo: 'DP-2' },
+  ];
   vi.mocked(searchSourceOrders).mockResolvedValue(rows);
   const onSelect = vi.fn();
   render(<SourceOrderPicker open onClose={() => undefined} onSelect={onSelect} />);
   fireEvent.click(screen.getByRole('button', { name: '검색' }));
-  const buttons = await screen.findAllByRole('button', { name: 'DP-1', exact: true });
-  fireEvent.click(buttons[0]);
-  expect(onSelect).toHaveBeenCalledWith(rows.slice(0, 2));
+  const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(within(grid).getByRole('columnheader', { name: '전체 행 선택' })).toBeInTheDocument();
+  expect(within(grid).getByRole('columnheader', { name: '수주번호' })).toBeInTheDocument();
+  expect(within(grid).getByRole('columnheader', { name: '계획번호' })).toBeInTheDocument();
+  expect(within(grid).getAllByRole('gridcell', { name: 'SO-7' })).toHaveLength(1);
+  expect(within(grid).getByRole('gridcell', { name: 'DP-1' })).toBeInTheDocument();
+  expect(within(grid).getByRole('gridcell', { name: 'DP-1-2' })).toBeInTheDocument();
+  const firstRow = within(grid).getByRole('gridcell', { name: 'DP-1' }).closest('[role="row"]')!;
+  const secondRow = within(grid).getByRole('gridcell', { name: 'SO-8' }).closest('[role="row"]')!;
+  fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
+  expect(onSelect).toHaveBeenCalledOnce();
+  expect(onSelect.mock.calls[0][0].map((row) => row.salesDeliveryPlanDetailId)).toEqual([700, 800]);
 });
+it('does not show zero-balance plan details in the delivery picker', async () => {
+  const base = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
+  };
+  vi.mocked(searchSourceOrders).mockResolvedValue([
+    base,
+    { ...base, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701, planNo: 'DP-2', remainingQty: 0 },
+  ]);
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={() => undefined} />);
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  expect(within(grid).getAllByRole('row')).toHaveLength(2);
+  expect(within(grid).queryByText('DP-2')).not.toBeInTheDocument();
+});
+it('keeps the order picker open when checked orders belong to different customers', async () => {
+  const base = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
+  };
+  vi.mocked(searchSourceOrders).mockResolvedValue([
+    base,
+    { ...base, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800,
+      orderNo: 'SO-8', customerId: 11, customerCode: 'C11', customerName: '다른 거래처' },
+  ]);
+  const onSelect = vi.fn();
+  render(<SourceOrderPicker open onClose={() => undefined} onSelect={onSelect} />);
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  const dialog = await screen.findByRole('dialog', { name: '수주 선택' });
+  const grid = within(dialog).getByRole('grid', { name: '출하 대상 수주 목록' });
+  const firstRow = within(grid).getAllByRole('gridcell', { name: 'SO-7' })[0].closest('[role="row"]')!;
+  const secondRow = within(grid).getByRole('gridcell', { name: 'SO-8' }).closest('[role="row"]')!;
+  fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(within(dialog).getByRole('button', { name: '선택', exact: true }));
+  expect(await within(dialog).findByText('서로 다른 거래처의 품목은 한 출하 문서에 함께 선택할 수 없습니다.')).toBeInTheDocument();
+  expect(onSelect).not.toHaveBeenCalled();
+});
+it('combines multiple same-customer orders into one delivery with per-line source IDs', async () => {
+  const base = {
+    salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700, orderNo: 'SO-7', orderDt: '2026-11-04',
+    customerId: 10, customerCode: 'C10', customerName: '거래처', planNo: 'DP-1', planDt: '2026-11-08',
+    deliveryPlace: '창고', deliveryMethod: '택배', lineNo: 1, materialId: 20, materialCode: 'M20',
+    materialName: '품목', unit: 'EA', orderQty: 10, shippedQty: 0, plannedQty: 5, deliveredQty: 0, remainingQty: 5, unitPrice: 100,
+  };
+  vi.mocked(searchSourceOrders).mockResolvedValue([
+    base,
+    { ...base, salesOrderId: 7, salesOrderDetailId: 71, salesDeliveryPlanDetailId: 701, lineNo: 2 },
+    { ...base, salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800, orderNo: 'SO-8',
+      materialId: 21, materialCode: 'M21', materialName: '품목2', remainingQty: 3 },
+  ]);
+  vi.mocked(createDelivery).mockResolvedValue({ ...item, deliveryType: 'ORDER' } as Awaited<ReturnType<typeof createDelivery>>);
+  mount(<SalesDeliveryCreatePage {...props} />);
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
+  fireEvent.click(screen.getByRole('option', { name: '수주출하' }));
+  fireEvent.click(screen.getByRole('button', { name: '수주 선택', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+  const grid = await screen.findByRole('grid', { name: '출하 대상 수주 목록' });
+  const firstRow = within(grid).getAllByRole('gridcell', { name: 'SO-7' })[0].closest('[role="row"]')!;
+  const secondRow = within(grid).getByRole('gridcell', { name: 'SO-8' }).closest('[role="row"]')!;
+  fireEvent.click(within(firstRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(within(secondRow as HTMLElement).getByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: '선택', exact: true }));
+  expect(screen.getByLabelText('연결 수주번호')).toHaveValue('SO-7, SO-8');
+  fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+  await waitFor(() => expect(createDelivery).toHaveBeenCalledWith(expect.objectContaining({
+    salesOrderId: 7,
+    details: [
+      expect.objectContaining({ salesOrderId: 7, salesOrderDetailId: 70, salesDeliveryPlanDetailId: 700 }),
+      expect.objectContaining({ salesOrderId: 8, salesOrderDetailId: 80, salesDeliveryPlanDetailId: 800 }),
+    ],
+  })));
+}, 15000);
 it('confirms deletion before requesting and resets to a new direct document', async () => {
   vi.mocked(deleteDelivery).mockResolvedValue();
   mount(<SalesDeliveryCreatePage {...props} salesDeliveryId={1} />);

@@ -100,6 +100,12 @@ export const defaultPage: PageContent = {
 };
 
 export const pageContentMap: Record<string, PageContent> = {
+  'process-management': {
+    title: '공정관리',
+    description: '공정그룹과 공정을 관리합니다.',
+    cards: [],
+    items: [],
+  },
   policies: {
     title: '시스템 정책',
     description: '현재 회사의 업무 정책을 타입별로 등록하고 적용값을 관리합니다.',
