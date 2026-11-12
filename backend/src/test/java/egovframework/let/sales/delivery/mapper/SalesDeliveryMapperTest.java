@@ -83,6 +83,24 @@ class SalesDeliveryMapperTest {
     }
 
     @Test
+    void planSourceQueriesUseDetailOwnershipAndOnlyPositiveDeliveryBalances() throws Exception {
+        Configuration configuration = parse();
+        String sourceRows = normalize(sql(configuration, "selectSourceOrders").getSql());
+        assertThat(sourceRows).contains(
+                "ph.sales_delivery_plan_id = pd.sales_delivery_plan_id",
+                "h.sales_order_id = pd.sales_order_id",
+                "d.sales_order_detail_id = pd.sales_order_detail_id",
+                "pd.planned_qty > pd.delivered_qty")
+                .doesNotContain("ph.sales_order_id", "OR EXISTS (");
+
+        String sourceDetail = normalize(sql(configuration, "selectSourcePlanDetail").getSql());
+        assertThat(sourceDetail).contains(
+                "ph.sales_delivery_plan_id = pd.sales_delivery_plan_id",
+                "pd.sales_order_id = ?", "od.sales_order_detail_id = pd.sales_order_detail_id")
+                .doesNotContain("ph.sales_order_id");
+    }
+
+    @Test
     void locksBothOrderAndDeliveryHeadersAndRetainsDeletedDeliveryReferences() throws Exception {
         Configuration configuration = parse();
         String orderLock = normalize(sql(configuration, "lockSourceOrder").getSql());
@@ -97,10 +115,11 @@ class SalesDeliveryMapperTest {
     }
 
     @Test
-    void warnSourcesIncludeExhaustedPlansAndCounterUpdatesReadServerPolicy() throws Exception {
+    void sourceSearchRequiresPositiveBalanceWhileCounterUpdatesRetainWarnPolicy() throws Exception {
         Configuration configuration = parse();
         assertThat(normalize(sql(configuration, "selectSourceOrders").getSql()))
-                .contains("over_delivery_policy = 'WARN'", "pd.planned_qty - pd.delivered_qty AS remainingQty");
+                .contains("pd.planned_qty > pd.delivered_qty", "pd.planned_qty - pd.delivered_qty AS remainingQty")
+                .doesNotContain("over_delivery_policy = 'WARN'", "OR EXISTS (");
         for (String id : Arrays.asList("adjustShippedQty", "adjustPlanDeliveredQty")) {
             assertThat(normalize(sql(configuration, id).getSql()))
                     .contains("over_delivery_policy = 'WARN'", ">= 0", "? <= 0");
