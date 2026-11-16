@@ -20,6 +20,8 @@ describe('ApprovalNoticePanel', () => {
       <ApprovalNoticePanel
         items={[{
           ...item,
+          date: '2026.10.14',
+          dateSourceLabel: '상신일',
           submittedDate: '2026.10.14',
           statusColor: 'info',
           statusVariant: 'filled',
@@ -54,11 +56,23 @@ describe('ApprovalNoticePanel', () => {
     });
   });
 
-  it('does not substitute the list date when the submitted date is missing', () => {
-    render(<ApprovalNoticePanel items={[item]} onSelect={() => undefined} />);
+  it.each(['수정일', '작성일'] as const)(
+    'shows the selected %s when the submitted date is missing', (dateSourceLabel) => {
+      render(<ApprovalNoticePanel items={[{ ...item, dateSourceLabel, submittedDate: '' }]}
+        onSelect={() => undefined} />);
 
+      expect(screen.getByText(dateSourceLabel)).toBeInTheDocument();
+      expect(screen.getByText(item.date)).toBeInTheDocument();
+    },
+  );
+
+  it('uses the neutral label and placeholder when no date is selected', () => {
+    render(<ApprovalNoticePanel items={[{ ...item, date: '', submittedDate: '2026.10.14' }]}
+      onSelect={() => undefined} />);
+
+    expect(screen.getByText('일자')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.queryByText(item.date)).not.toBeInTheDocument();
+    expect(screen.queryByText('2026.10.14')).not.toBeInTheDocument();
   });
 
   it('left-aligns the full-width notice and constrains long titles', () => {
