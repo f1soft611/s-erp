@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseRequestConfirmDAO">
+
+    <sql id="detailColumns">
+        h.purchase_request_id AS purchaseRequestId,
+        h.request_no AS requestNo,
+        h.request_dt AS requestDt,
+        ru.user_nm AS requesterName,
+        dept.department_nm AS requestDeptName,
+        d.purchase_request_detail_id AS purchaseRequestDetailId,
+        d.line_no AS lineNo,
+        d.material_id AS materialId,
+        m.material_code AS materialCode,
+        m.material_name AS materialName,
+        m.material_spec AS materialSpec,
+        m.unit AS unit,
+        d.request_qty AS requestQty,
+        d.request_delivery_dt AS requestDeliveryDt,
+        d.use_type AS useType,
+        uci.item_nm AS useTypeName,
+        d.request_remark AS requestRemark,
+        d.confirm_qty AS confirmQty,
+        d.confirm_delivery_dt AS confirmDeliveryDt,
+        d.warehouse_id AS warehouseId,
+        w.warehouse_name AS warehouseName,
+        d.order_type AS orderType,
+        oci.item_nm AS orderTypeName,
+        d.supplier_id AS supplierId,
+        c.customer_code AS supplierCode,
+        c.customer_name AS supplierName,
+        d.unit_price AS unitPrice,
+        d.currency_code AS currencyCode,
+        d.amount AS amount,
+        d.confirm_remark AS confirmRemark,
+        d.order_close_at AS orderCloseAt
+    </sql>
+
+    <sql id="detailJoins">
+        FROM tb_purchase_request_hd h
+        JOIN tb_purchase_request_dt d
+          ON d.purchase_request_id = h.purchase_request_id
+         AND d.tenant_id = h.tenant_id
+        LEFT JOIN tb_user ru
+          ON ru.user_id = h.requester_id
+        LEFT JOIN tb_department dept
+          ON dept.department_id = h.request_dept_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_common_code_group ucg
+          ON ucg.tenant_id = d.tenant_id
+         AND ucg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item uci
+          ON uci.group_id = ucg.common_code_group_id
+         AND uci.item_code = d.use_type
+        LEFT JOIN tb_common_code_group ocg
+          ON ocg.tenant_id = d.tenant_id
+         AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+          ON oci.group_id = ocg.common_code_group_id
+         AND oci.item_code = d.order_type
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = d.warehouse_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = d.supplier_id
+         AND c.tenant_id = d.tenant_id
+    </sql>
+
+    <select id="selectCandidates" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmCandidateVO">
+        SELECT h.purchase_request_id AS purchaseRequestId,
+               d.purchase_request_detail_id AS purchaseRequestDetailId,
+               h.request_no AS requestNo,
+               h.request_dt AS requestDt,
+               ru.user_nm AS requesterName,
+               h.status AS requestStatus,
+               d.line_no AS lineNo,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               d.request_qty AS requestQty,
+               d.request_delivery_dt AS requestDeliveryDt,
+               uci.item_nm AS useTypeName,
+               d.request_remark AS requestRemark
+        FROM tb_purchase_request_hd h
+        JOIN tb_purchase_request_dt d
+          ON d.purchase_request_id = h.purchase_request_id
+         AND d.tenant_id = h.tenant_id
+        LEFT JOIN tb_user ru
+          ON ru.user_id = h.requester_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_common_code_group ucg
+          ON ucg.tenant_id = d.tenant_id
+         AND ucg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item uci
+          ON uci.group_id = ucg.common_code_group_id
+         AND uci.item_code = d.use_type
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND h.status IN ('REQUESTED', 'PARTIALLY_CONFIRMED')
+          AND d.purchase_confirm_id IS NULL
+        <if test="keyword != null and keyword != ''">
+          AND (h.request_no ILIKE '%' || #{keyword} || '%'
+               OR ru.user_nm ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY h.request_dt DESC, h.request_no DESC, d.line_no
+        LIMIT 500
+    </select>
+
+    <!-- 확정 전에 상세 행을 ID 순서로 잠근다. 삭제된 요청의 행은 결과에서 빠진다. -->
+    <select id="selectDetailLocksForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseRequestDetailLockVO">
+        SELECT d.purchase_request_detail_id AS purchaseRequestDetailId,
+               d.purchase_request_id AS purchaseRequestId,
+               d.purchase_confirm_id AS purchaseConfirmId
+        FROM tb_purchase_request_dt d
+        JOIN tb_purchase_request_hd h
+          ON h.purchase_request_id = d.purchase_request_id
+         AND h.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND d.purchase_request_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY d.purchase_request_detail_id
+        FOR UPDATE OF d
+    </select>
+
+    <select id="selectDetailLocks" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseRequestDetailLockVO">
+        SELECT d.purchase_request_detail_id AS purchaseRequestDetailId,
+               d.purchase_request_id AS purchaseRequestId,
+               d.purchase_confirm_id AS purchaseConfirmId
+        FROM tb_purchase_request_dt d
+        JOIN tb_purchase_request_hd h
+          ON h.purchase_request_id = d.purchase_request_id
+         AND h.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND d.purchase_request_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+    </select>
+
+    <select id="selectDetailsByIds" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmDetailVO">
+        SELECT <include refid="detailColumns"/>
+        <include refid="detailJoins"/>
+        WHERE h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND d.purchase_request_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY h.request_no, d.line_no
+    </select>
+
+    <select id="selectDetailsByConfirm" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseRequestConfirmDetailVO">
+        SELECT <include refid="detailColumns"/>
+        <include refid="detailJoins"/>
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND d.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+        ORDER BY h.request_no, d.line_no
+    </select>
+
+    <select id="selectConfirms" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmListItemVO">
+        SELECT pc.purchase_confirm_id AS purchaseConfirmId,
+               pc.confirm_no AS confirmNo,
+               pc.confirm_dt AS confirmDt,
+               cu.user_nm AS confirmerName,
+               pc.currency_code AS currencyCode,
+               pc.total_amt AS totalAmt,
+               (SELECT count(DISTINCT d.purchase_request_id) FROM tb_purchase_request_dt d
+                 WHERE d.purchase_confirm_id = pc.purchase_confirm_id
+                   AND d.tenant_id = pc.tenant_id) AS requestCount,
+               pc.remark AS remark,
+               pc.use_at AS useAt
+        FROM tb_purchase_confirm_hd pc
+        LEFT JOIN tb_user cu
+          ON cu.user_id = pc.confirmer_id
+        WHERE pc.tenant_id = #{tenantId, jdbcType=BIGINT}
+        <if test="useAt != null and useAt != ''">
+          AND pc.use_at = #{useAt}
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (pc.confirm_no ILIKE '%' || #{keyword} || '%'
+               OR cu.user_nm ILIKE '%' || #{keyword} || '%'
+               OR pc.remark ILIKE '%' || #{keyword} || '%'
+               OR EXISTS (SELECT 1 FROM tb_purchase_request_dt d
+                           JOIN tb_purchase_request_hd h
+                             ON h.purchase_request_id = d.purchase_request_id
+                            AND h.tenant_id = d.tenant_id
+                           WHERE d.purchase_confirm_id = pc.purchase_confirm_id
+                             AND d.tenant_id = pc.tenant_id
+                             AND h.request_no ILIKE '%' || #{keyword} || '%'))
+        </if>
+        ORDER BY pc.confirm_dt DESC, pc.confirm_no DESC
+        LIMIT 200
+    </select>
+
+    <select id="selectConfirm" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseConfirmVO">
+        SELECT pc.purchase_confirm_id AS purchaseConfirmId,
+               pc.tenant_id AS tenantId,
+               pc.confirm_no AS confirmNo,
+               pc.confirm_dt AS confirmDt,
+               cu.user_nm AS confirmerName,
+               pc.currency_code AS currencyCode,
+               pc.total_amt AS totalAmt,
+               pc.remark AS remark,
+               pc.use_at AS useAt,
+               uu.user_nm AS updatedByName,
+               to_char(pc.updated_at, 'YYYY-MM-DD HH24:MI') AS updatedAt
+        FROM tb_purchase_confirm_hd pc
+        LEFT JOIN tb_user cu
+          ON cu.user_id = pc.confirmer_id
+        LEFT JOIN tb_login_account ula
+          ON ula.login_code = pc.updated_by
+         AND ula.tenant_id = pc.tenant_id
+        LEFT JOIN tb_user uu
+          ON uu.login_id = ula.login_id
+         AND uu.tenant_id = ula.tenant_id
+        WHERE pc.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+          AND pc.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectConfirmUseAtForUpdate" parameterType="map" resultType="string">
+        SELECT pc.use_at
+        FROM tb_purchase_confirm_hd pc
+        WHERE pc.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+          AND pc.tenant_id = #{tenantId, jdbcType=BIGINT}
+        FOR UPDATE OF pc
+    </select>
+
+    <!-- 유효한 발주 행이 이 확정의 품목 행을 쓰고 있으면 true -->
+    <select id="existsActiveOrderByConfirm" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_purchase_order_dt od
+            JOIN tb_purchase_order_hd oh
+              ON oh.purchase_order_id = od.purchase_order_id
+             AND oh.tenant_id = od.tenant_id
+            JOIN tb_purchase_request_dt d
+              ON d.purchase_request_detail_id = od.purchase_request_detail_id
+            WHERE oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND oh.use_at = 'Y'
+              AND d.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+        )
+    </select>
+
+    <select id="selectUserId" parameterType="map" resultType="long">
+        SELECT u.user_id
+        FROM tb_login_account la
+        JOIN tb_user u
+          ON u.login_id = la.login_id
+         AND u.tenant_id = la.tenant_id
+        WHERE la.login_code = #{loginCode}
+          AND la.tenant_id = #{tenantId, jdbcType=BIGINT}
+        LIMIT 1
+    </select>
+
+    <select id="existsWarehouse" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM tb_warehouse
+            WHERE warehouse_id = #{id, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND disuse_at = 'N'
+        )
+    </select>
+
+    <select id="existsOrderType" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g
+              ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND g.group_code = 'PURCHASE_ORDER_TYPE'
+              AND g.use_at = 'Y'
+              AND i.item_code = #{code}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <select id="existsSupplier" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM tb_customer_info
+            WHERE customer_id = #{id, jdbcType=BIGINT}
+              AND tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND use_at = 'Y'
+        )
+    </select>
+
+    <select id="insertConfirmHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_purchase_confirm_hd (
+            tenant_id, confirm_no, confirm_dt, confirmer_id, currency_code, total_amt, remark, created_by
+        ) VALUES (
+            #{tenantId, jdbcType=BIGINT}, #{confirmNo}, CAST(#{confirmDt} AS date), #{confirmerId, jdbcType=BIGINT},
+            #{currencyCode}, #{totalAmt, jdbcType=NUMERIC}, #{remark}, #{createdBy}
+        )
+        RETURNING purchase_confirm_id
+    </select>
+
+    <update id="updateDetailConfirm" parameterType="map">
+        UPDATE tb_purchase_request_dt
+        SET confirm_qty = #{confirmQty, jdbcType=NUMERIC},
+            confirm_delivery_dt = CAST(#{confirmDeliveryDt} AS date),
+            warehouse_id = #{warehouseId, jdbcType=BIGINT},
+            order_type = #{orderType},
+            supplier_id = #{supplierId, jdbcType=BIGINT},
+            unit_price = #{unitPrice, jdbcType=NUMERIC},
+            currency_code = #{currencyCode},
+            amount = #{amount, jdbcType=NUMERIC},
+            confirm_remark = #{confirmRemark},
+            order_close_at = 'N',
+            purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND purchase_confirm_id IS NULL
+    </update>
+
+    <!-- 요청 상태·합계를 상세 확정 여부로 다시 계산한다. -->
+    <update id="refreshRequestStatuses" parameterType="map">
+        UPDATE tb_purchase_request_hd h
+        SET status = CASE
+                WHEN s.confirmed_count = 0 THEN 'REQUESTED'
+                WHEN s.confirmed_count = s.total_count THEN 'CONFIRMED'
+                ELSE 'PARTIALLY_CONFIRMED'
+            END,
+            total_amt = s.confirmed_amt,
+            updated_by = #{updatedBy},
+            updated_at = now()
+        FROM (
+            SELECT d.purchase_request_id,
+                   count(*) AS total_count,
+                   count(d.purchase_confirm_id) AS confirmed_count,
+                   COALESCE(sum(d.amount) FILTER (WHERE d.purchase_confirm_id IS NOT NULL), 0) AS confirmed_amt
+            FROM tb_purchase_request_dt d
+            WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND d.purchase_request_id IN
+              <foreach collection="purchaseRequestIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+            GROUP BY d.purchase_request_id
+        ) s
+        WHERE h.purchase_request_id = s.purchase_request_id
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <update id="updateDetailOrderClose" parameterType="map">
+        UPDATE tb_purchase_request_dt
+        SET order_close_at = #{orderCloseAt},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+          AND order_close_at &lt;&gt; #{orderCloseAt}
+    </update>
+
+    <select id="selectRequestIdsByConfirm" parameterType="map" resultType="long">
+        SELECT DISTINCT d.purchase_request_id
+        FROM tb_purchase_request_dt d
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND d.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+        ORDER BY d.purchase_request_id
+    </select>
+
+    <update id="clearDetailsByConfirm" parameterType="map">
+        UPDATE tb_purchase_request_dt d
+        SET confirm_qty = NULL,
+            confirm_delivery_dt = NULL,
+            supplier_id = NULL,
+            warehouse_id = NULL,
+            order_type = NULL,
+            unit_price = NULL,
+            currency_code = NULL,
+            amount = 0,
+            confirm_remark = NULL,
+            order_close_at = 'N',
+            purchase_confirm_id = NULL,
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND d.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+    </update>
+
+
+    <update id="cancelConfirmHeader" parameterType="map">
+        UPDATE tb_purchase_confirm_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <!-- 거래구분 매입 단가만 쓴다. trade_type은 단가관리 화면이 저장하는 값('매입')을 그대로 쓴다. -->
+    <select id="selectDefaultUnitPrice" parameterType="map"
+            resultType="egovframework.let.materials.request.confirm.domain.model.PurchaseUnitPriceVO">
+        SELECT p.unit_price AS unitPrice,
+               p.currency AS currency
+        FROM tb_item_partner_price p
+        WHERE p.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND p.material_id = #{materialId, jdbcType=BIGINT}
+          AND p.customer_id = #{supplierId, jdbcType=BIGINT}
+          AND p.trade_type = '매입'
+          AND p.use_at = 'Y'
+          AND p.start_dt &lt;= CAST(#{baseDt} AS date)
+          AND (p.end_dt IS NULL OR p.end_dt &gt;= CAST(#{baseDt} AS date))
+        ORDER BY p.start_dt DESC, p.price_id DESC
+        LIMIT 1
+    </select>
+</mapper>

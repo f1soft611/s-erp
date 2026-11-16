@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseRequestStatusDAO">
+
+    <select id="selectRequestStatusList" parameterType="map"
+            resultType="egovframework.let.materials.request.status.domain.model.PurchaseRequestStatusVO">
+        SELECT h.purchase_request_id AS purchaseRequestId,
+               d.purchase_request_detail_id AS purchaseRequestDetailId,
+               h.request_no AS requestNo,
+               h.request_dt AS requestDt,
+               ru.user_nm AS requesterName,
+               dept.department_nm AS requestDeptName,
+               h.status AS status,
+               h.remark AS remark,
+               d.line_no AS lineNo,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               d.request_qty AS requestQty,
+               d.request_delivery_dt AS requestDeliveryDt,
+               d.use_type AS useType,
+               ci.item_nm AS useTypeName,
+               d.request_remark AS requestRemark,
+               d.confirm_qty AS confirmQty
+        FROM tb_purchase_request_hd h
+        JOIN tb_purchase_request_dt d
+          ON d.purchase_request_id = h.purchase_request_id
+         AND d.tenant_id = h.tenant_id
+        LEFT JOIN tb_user ru
+          ON ru.user_id = h.requester_id
+        LEFT JOIN tb_department dept
+          ON dept.department_id = h.request_dept_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_common_code_group cg
+          ON cg.tenant_id = d.tenant_id
+         AND cg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item ci
+          ON ci.group_id = cg.common_code_group_id
+         AND ci.item_code = d.use_type
+        WHERE h.tenant_id = #{tenantId}
+          AND h.use_at = 'Y'
+        <if test="keyword != null">
+          AND (h.request_no ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%'
+               OR ru.user_nm ILIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="requestNo != null">
+          AND h.request_no ILIKE '%' || #{requestNo} || '%'
+        </if>
+        <if test="requesterKeyword != null">
+          AND ru.user_nm ILIKE '%' || #{requesterKeyword} || '%'
+        </if>
+        <if test="status != null">
+          AND h.status = #{status}
+        </if>
+        <if test="materialKeyword != null">
+          AND (m.material_code ILIKE '%' || #{materialKeyword} || '%'
+               OR m.material_name ILIKE '%' || #{materialKeyword} || '%')
+        </if>
+        <if test="useType != null">
+          AND d.use_type = #{useType}
+        </if>
+        <if test="requestDtFrom != null">
+          AND h.request_dt &gt;= CAST(#{requestDtFrom} AS date)
+        </if>
+        <if test="requestDtTo != null">
+          AND h.request_dt &lt;= CAST(#{requestDtTo} AS date)
+        </if>
+        <if test="requestDeliveryDtFrom != null">
+          AND d.request_delivery_dt &gt;= CAST(#{requestDeliveryDtFrom} AS date)
+        </if>
+        <if test="requestDeliveryDtTo != null">
+          AND d.request_delivery_dt &lt;= CAST(#{requestDeliveryDtTo} AS date)
+        </if>
+        ORDER BY h.request_dt DESC, h.request_no DESC, d.line_no
+    </select>
+</mapper>

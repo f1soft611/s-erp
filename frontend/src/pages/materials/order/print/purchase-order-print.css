@@ -1,0 +1,41 @@
+.order-print-host { display: none; }
+.order-print-preview { width: fit-content; margin-left: auto; margin-right: auto; }
+.order-print-sheet { width: 190mm; color: #111; font: 10px sans-serif; }
+.order-print-page { box-sizing: border-box; width: 190mm; min-height: 277mm; padding: 3mm 0; background: white; display: flex; flex-direction: column; gap: 2mm; }
+.order-print-page h1 { font-size: 20px; text-align: center; margin: 0 0 1mm; letter-spacing: .3em; text-decoration: underline; }
+.order-print-head { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; align-items: stretch; }
+.order-print-sheet table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+.order-print-sheet th, .order-print-sheet td { border: 1px solid #555; padding: .8mm 1.2mm; overflow-wrap: anywhere; }
+.order-print-sheet th { background: #f5f5f5; font-weight: 700; text-align: center; }
+.order-print-vendor th { width: 24%; }
+.order-print-company th { width: 32%; }
+.order-print-logo { height: 15mm; text-align: center; vertical-align: middle; }
+.order-print-logo img { max-height: 13mm; max-width: 100%; object-fit: contain; }
+.order-print-sign { position: relative; }
+.order-print-sign img { position: absolute; right: 1mm; top: 50%; transform: translateY(-50%); width: 14mm; height: 14mm; object-fit: contain; }
+.order-print-total { border: 2px solid #222; padding: 1.2mm 4mm; display: flex; justify-content: space-between; gap: 4mm; font-size: 12px; }
+.order-print-items { flex: 1; }
+.order-print-items th:nth-child(1) { width: 11%; }
+.order-print-items th:nth-child(2) { width: 33%; }
+.order-print-items th:nth-child(3) { width: 12%; }
+.order-print-items th:nth-child(4), .order-print-items th:nth-child(5), .order-print-items th:nth-child(6) { width: 10%; }
+.order-print-items th:nth-child(7) { width: 14%; }
+.order-print-items td { height: 6mm; }
+.order-print-items .number, .order-print-summary td { text-align: right; }
+.order-print-items .center { text-align: center; }
+.order-print-summary th, .order-print-summary td { white-space: nowrap; }
+.order-print-remark { font-size: 9px; overflow-wrap: anywhere; }
+@page { size: A4; margin: 10mm; }
+/*
+ * 영업 거래명세표 CSS(statement-print.css)는 앱 전체에 body > :not(.statement-print-host)를 !important로 숨긴다.
+ * 그 규칙을 이기려면 발주서 인쇄 중(body.order-printing)에만 더 구체적인 !important 규칙으로 발주서 영역을 보인다.
+ * 발주서 인쇄가 아닐 때는 아무 규칙도 적용되지 않아 거래명세표 인쇄에 영향이 없다.
+ */
+@media print {
+  body.order-printing > :not(.order-print-host) { display: none !important; }
+  html body.order-printing > .order-print-host { display: block !important; }
+  .order-print-sheet, .order-print-page { width: 100%; }
+  .order-print-page { break-after: page; }
+  .order-print-page:last-child { break-after: auto; }
+  .order-print-items tr { break-inside: avoid; }
+}
