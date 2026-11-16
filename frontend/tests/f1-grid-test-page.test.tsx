@@ -1,15 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { F1GridTestPage } from '../src/pages/settings/system/f1-grid-test/F1GridTestPage';
-import {
-  moduleItems,
-  pageContentMap,
-} from '../src/pages/dashboard/services/dashboardData';
+import { DashboardContent } from '../src/pages/dashboard/components/DashboardContent';
+import { pageContentMap } from '../src/pages/dashboard/services/dashboardData';
+import { settingsModule } from './fixtures/settings-module';
 
 describe('F1 Grid test page', () => {
   it('registers the F1 Grid test menu and renders its full options grid and toolbar', () => {
     expect(
-      moduleItems.find((module) => module.id === 'settings')?.menus,
+      settingsModule.menus,
     ).toContainEqual(
       expect.objectContaining({
         name: 'F1 Grid 테스트',
@@ -18,9 +17,11 @@ describe('F1 Grid test page', () => {
     );
 
     render(
-      <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+      <DashboardContent
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
+        currentPageKey="f1-grid-test"
+        breadcrumbItems={['환경설정', 'F1 Grid 테스트']}
         content={pageContentMap['f1-grid-test']}
       />,
     );
@@ -50,7 +51,7 @@ describe('F1 Grid test page', () => {
   it('moves the default pinned item code column before unpinned columns', () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -62,16 +63,16 @@ describe('F1 Grid test page', () => {
       .filter((label): label is string => Boolean(label));
 
     expect(headerLabels.slice(0, 3)).toEqual([
-      '품목코드',
+      '품목코드*',
       '사용여부',
-      '품목명 (Row Merge)',
+      '품목명 (Row Merge)*',
     ]);
   });
 
   it('renders a standalone date editor for shortcut input testing', () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -85,7 +86,7 @@ describe('F1 Grid test page', () => {
   it('updates item code and patch values through the code picker dialog', async () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -115,7 +116,7 @@ describe('F1 Grid test page', () => {
   it('runs validation and displays success notification', async () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -133,7 +134,7 @@ describe('F1 Grid test page', () => {
   it('supports adding and duplicating rows through toolbar', async () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -149,7 +150,7 @@ describe('F1 Grid test page', () => {
   it('renders a long wrap-text sample with row height controls', () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -160,17 +161,17 @@ describe('F1 Grid test page', () => {
       name: /행 높이 조절/,
     });
 
-    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '32');
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '28.8');
 
     fireEvent.keyDown(rowHeightHandles[0], { key: 'ArrowDown' });
 
-    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '36');
+    expect(rowHeightHandles[0]).toHaveAttribute('aria-valuenow', '32.8');
   });
 
   it('provides column resize handles on all column headers', () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -189,7 +190,7 @@ describe('F1 Grid test page', () => {
   it('shows the normalized result after entering a date shortcut', async () => {
     render(
       <F1GridTestPage
-        selectedModule={moduleItems.find((module) => module.id === 'settings')!}
+        selectedModule={settingsModule}
         currentMenuName="F1 Grid 테스트"
         content={pageContentMap['f1-grid-test']}
       />,
@@ -199,7 +200,7 @@ describe('F1 Grid test page', () => {
     fireEvent.change(dateInput, { target: { value: '0701' } });
 
     await waitFor(() => {
-      expect(screen.getByText('2026-07-01')).toBeVisible();
+      expect(screen.getByText(`${new Date().getFullYear()}-07-01`)).toBeVisible();
     });
   });
 });

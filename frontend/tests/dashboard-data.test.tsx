@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPageContent,
-  moduleItems,
 } from '../src/pages/dashboard/services/dashboardData';
 import { buildModuleDescriptors } from '../src/pages/dashboard/services/menuService';
+import { settingsModule } from './fixtures/settings-module';
 
 describe('Dashboard data', () => {
   it('keeps dashboard module icons lightweight for fast login route startup', () => {
-    expect(moduleItems[0].icon).toBeTruthy();
-    expect(typeof (moduleItems[0].icon as { type?: unknown }).type).toBe(
+    expect(settingsModule.icon).toBeTruthy();
+    expect(typeof (settingsModule.icon as { type?: unknown }).type).toBe(
       'function',
     );
   });
