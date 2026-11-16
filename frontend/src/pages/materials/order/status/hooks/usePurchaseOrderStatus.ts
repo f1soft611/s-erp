@@ -1,0 +1,191 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toPageSearchFields } from '../../../../../shared/components/page-search/searchFields';
+import { useInitialLoadState } from '../../../../../shared/hooks/useInitialLoadState';
+import { usePageSearchDefaults } from '../../../../../shared/hooks/usePageSearchDefaults';
+import { usePageSessionState } from '../../../../../shared/hooks/usePageSessionState';
+import { getPurchaseOrder } from '../../create/services/purchaseOrder.service';
+import type { PurchaseOrderPageMode } from '../../create/PurchaseOrderCreatePage';
+import type { PurchaseOrderItem } from '../../create/types/purchaseOrder.types';
+import { createPurchaseOrderStatusColumns } from '../data/purchaseOrderStatusColumns';
+import {
+  clonePurchaseOrderStatusSearchValues,
+  isPurchaseOrderStatusSearchSession,
+  searchPurchaseOrderStatus,
+  toPurchaseOrderStatusFilters,
+} from '../services/purchaseOrderStatus.service';
+import type {
+  PurchaseOrderStatusFilters,
+  PurchaseOrderStatusRow,
+  PurchaseOrderStatusSearchSession,
+  PurchaseOrderStatusSearchValues,
+} from '../types/purchaseOrderStatus.types';
+
+const SESSION_KEY = 's-erp:page:materials-purchase-order-status';
+
+/** 검색어·상세검색 값과 기본값, 세션 보존을 관리한다. (구매요청현황 검색 훅과 같은 동작) */
+export function usePurchaseOrderStatusSearch() {
+  const detailFields = useMemo(() => toPageSearchFields(createPurchaseOrderStatusColumns()), []);
+  const {
+    values: defaultValues,
+    loading: defaultsLoading,
+    error: defaultsError,
+    retry: retryDefaults,
+    initialLoad: defaultsInitialLoad,
+  } = usePageSearchDefaults(detailFields);
+  const { state: searchSession, setState: setSearchSession } =
+    usePageSessionState<PurchaseOrderStatusSearchSession | null>(SESSION_KEY, null, {
+      version: 1,
+      validate: (value): value is PurchaseOrderStatusSearchSession | null =>
+        value === null || isPurchaseOrderStatusSearchSession(value),
+      persistWhen: (value) => value !== null,
+    });
+  const [keyword, setKeyword] = useState(searchSession?.keyword ?? '');
+  const [detailValues, setDetailValues] = useState<PurchaseOrderStatusSearchValues>(
+    () => clonePurchaseOrderStatusSearchValues(searchSession?.detailValues ?? {}),
+  );
+  const [appliedFilters, setAppliedFilters] = useState<PurchaseOrderStatusFilters | null>(() =>
+    searchSession ? toPurchaseOrderStatusFilters(searchSession.keyword, searchSession.detailValues) : null,
+  );
+
+  const applySnapshot = useCallback((snapshot: PurchaseOrderStatusSearchSession) => {
+    setSearchSession(snapshot);
+    setAppliedFilters(toPurchaseOrderStatusFilters(snapshot.keyword, snapshot.detailValues));
+  }, [setSearchSession]);
+
+  useEffect(() => {
+    if (!defaultValues || searchSession !== null) return;
+    const snapshot = { keyword: '', detailValues: clonePurchaseOrderStatusSearchValues(defaultValues) };
+    setKeyword('');
+    setDetailValues(snapshot.detailValues);
+    applySnapshot(snapshot);
+  }, [applySnapshot, defaultValues, searchSession]);
+
+  const applySearch = useCallback((values: PurchaseOrderStatusSearchValues = detailValues) => {
+    applySnapshot({ keyword, detailValues: clonePurchaseOrderStatusSearchValues(values) });
+  }, [applySnapshot, detailValues, keyword]);
+
+  const resetSearch = useCallback(() => {
+    if (!defaultValues) return;
+    const snapshot = { keyword: '', detailValues: clonePurchaseOrderStatusSearchValues(defaultValues) };
+    setKeyword('');
+    setDetailValues(snapshot.detailValues);
+    applySnapshot(snapshot);
+  }, [applySnapshot, defaultValues]);
+
+  return {
+    keyword,
+    setKeyword,
+    detailFields,
+    detailValues,
+    appliedDetailValues: searchSession?.detailValues ?? {},
+    setDetailValues,
+    searchAreaDefaultValues: searchSession === null ? (defaultValues ?? {}) : {},
+    appliedFilters,
+    defaultsInitialized: appliedFilters !== null,
+    defaultsLoading,
+    defaultsError,
+    defaultsInitialLoad,
+    retryDefaults,
+    applySearch,
+    resetSearch,
+  };
+}
+
+/** 적용된 검색 조건으로 목록을 조회한다. */
+export function usePurchaseOrderStatusList(filters: PurchaseOrderStatusFilters | null) {
+  const [rows, setRows] = useState<PurchaseOrderStatusRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [error, setError] = useState('');
+  const [retryRequest, setRetryRequest] = useState({ version: 0, quiet: false });
+  const previousRetryVersion = useRef(0);
+  const { start, succeed, fail, ...initialLoad } = useInitialLoadState();
+
+  useEffect(() => {
+    if (!filters) return undefined;
+    let cancelled = false;
+    const quiet = retryRequest.quiet && retryRequest.version !== previousRetryVersion.current;
+    previousRetryVersion.current = retryRequest.version;
+    start();
+    setHasLoaded(false);
+    if (!quiet) setLoading(true);
+    setError('');
+    void searchPurchaseOrderStatus(filters)
+      .then((result) => {
+        if (cancelled) return;
+        setRows(result);
+        setHasLoaded(true);
+        succeed();
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return;
+        fail(loadError);
+        setError(loadError instanceof Error ? loadError.message : '발주현황을 조회하지 못했습니다.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, retryRequest, start, succeed, fail]);
+
+  const clearError = useCallback(() => setError(''), []);
+  const retry = useCallback(() => setRetryRequest((current) => ({ version: current.version + 1, quiet: false })), []);
+  const refreshQuietly = useCallback(
+    () => setRetryRequest((current) => ({ version: current.version + 1, quiet: true })),
+    [],
+  );
+
+  return { initialLoad, rows, loading, hasLoaded, error, clearError, retry, refreshQuietly };
+}
+
+export type PurchaseOrderEditorMode = Extract<PurchaseOrderPageMode, 'edit' | 'view' | 'close'>;
+
+/** 선택한 발주의 상세 패널과 조회/수정 다이얼로그 상태를 관리한다. */
+export function usePurchaseOrderStatusDetail() {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [item, setItem] = useState<PurchaseOrderItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [editorMode, setEditorMode] = useState<PurchaseOrderEditorMode | null>(null);
+
+  useEffect(() => {
+    if (selectedId === null) return undefined;
+    let active = true;
+    setLoading(true);
+    setError('');
+    getPurchaseOrder(selectedId)
+      .then((loaded) => {
+        if (active) setItem(loaded);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setItem(null);
+        setError(loadError instanceof Error ? loadError.message : '발주 상세를 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refreshToken, selectedId]);
+
+  const openDetail = useCallback((purchaseOrderId: number) => {
+    setItem((current) => (current?.purchaseOrderId === purchaseOrderId ? current : null));
+    setSelectedId(purchaseOrderId);
+  }, []);
+  const closeDetail = useCallback(() => {
+    setSelectedId(null);
+    setItem(null);
+    setError('');
+    setEditorMode(null);
+  }, []);
+  const refreshDetail = useCallback(() => setRefreshToken((token) => token + 1), []);
+  const openEditor = useCallback((mode: PurchaseOrderEditorMode) => setEditorMode(mode), []);
+  const closeEditor = useCallback(() => setEditorMode(null), []);
+
+  return { selectedId, item, loading, error, editorMode, openDetail, closeDetail, refreshDetail, openEditor, closeEditor };
+}

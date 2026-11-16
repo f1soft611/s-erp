@@ -137,6 +137,14 @@ function AppRouter() {
             }
           />
           <Route
+            path="/materials/*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/co/*"
             element={
               <ProtectedRoute>
