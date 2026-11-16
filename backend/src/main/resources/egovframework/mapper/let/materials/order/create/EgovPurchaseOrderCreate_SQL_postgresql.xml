@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseOrderDAO">
+
+    <!-- 유효한 발주 행의 확정 행별 기발주 수량 -->
+    <sql id="orderedQtySubquery">
+        (SELECT od.purchase_request_detail_id AS purchase_request_detail_id,
+                sum(od.order_qty) AS ordered_qty
+         FROM tb_purchase_order_dt od
+         JOIN tb_purchase_order_hd oh
+           ON oh.purchase_order_id = od.purchase_order_id
+          AND oh.tenant_id = od.tenant_id
+         WHERE oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+           AND oh.use_at = 'Y'
+         GROUP BY od.purchase_request_detail_id)
+    </sql>
+
+    <!-- 확정이 유효하고 발주대기 마감이 아니며 잔량이 남은 확정 품목 행 -->
+    <select id="selectCandidates" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderCandidateVO">
+        SELECT d.purchase_request_detail_id AS purchaseRequestDetailId,
+               h.request_no AS requestNo,
+               pc.confirm_no AS confirmNo,
+               pc.confirm_dt AS confirmDt,
+               d.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               m.material_type_code AS materialTypeCode,
+               CASE WHEN m.inspect_type = 'Y' THEN 'Y' ELSE 'N' END AS inspectAt,
+               d.confirm_qty AS confirmQty,
+               COALESCE(o.ordered_qty, 0) AS orderedQty,
+               d.confirm_qty - COALESCE(o.ordered_qty, 0) AS remainQty,
+               d.request_delivery_dt AS requestDeliveryDt,
+               d.confirm_delivery_dt AS confirmDeliveryDt,
+               d.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               d.unit_price AS unitPrice,
+               d.currency_code AS currencyCode,
+               d.order_type AS orderType,
+               oci.item_nm AS orderTypeName,
+               d.use_type AS useType,
+               uci.item_nm AS useTypeName,
+               d.confirm_remark AS remark,
+               CAST(NULL AS numeric) AS stockQty
+        FROM tb_purchase_request_dt d
+        JOIN tb_purchase_request_hd h
+          ON h.purchase_request_id = d.purchase_request_id
+         AND h.tenant_id = d.tenant_id
+        JOIN tb_purchase_confirm_hd pc
+          ON pc.purchase_confirm_id = d.purchase_confirm_id
+         AND pc.tenant_id = d.tenant_id
+        LEFT JOIN <include refid="orderedQtySubquery"/> o
+          ON o.purchase_request_detail_id = d.purchase_request_detail_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = d.supplier_id
+         AND c.tenant_id = d.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = d.warehouse_id
+        LEFT JOIN tb_common_code_group ocg
+          ON ocg.tenant_id = d.tenant_id
+         AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+          ON oci.group_id = ocg.common_code_group_id
+         AND oci.item_code = d.order_type
+        LEFT JOIN tb_common_code_group ucg
+          ON ucg.tenant_id = d.tenant_id
+         AND ucg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item uci
+          ON uci.group_id = ucg.common_code_group_id
+         AND uci.item_code = d.use_type
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND pc.use_at = 'Y'
+          AND d.order_close_at = 'N'
+          AND d.confirm_qty - COALESCE(o.ordered_qty, 0) > 0
+        <if test="fromDt != null">
+          AND pc.confirm_dt &gt;= CAST(#{fromDt} AS date)
+        </if>
+        <if test="toDt != null">
+          AND pc.confirm_dt &lt;= CAST(#{toDt} AS date)
+        </if>
+        <if test="keyword != null and keyword != ''">
+          AND (pc.confirm_no ILIKE '%' || #{keyword} || '%'
+               OR h.request_no ILIKE '%' || #{keyword} || '%'
+               OR c.customer_name ILIKE '%' || #{keyword} || '%'
+               OR m.material_code ILIKE '%' || #{keyword} || '%'
+               OR m.material_name ILIKE '%' || #{keyword} || '%')
+        </if>
+        ORDER BY c.customer_name, pc.confirm_dt DESC, pc.confirm_no, d.line_no
+        LIMIT 500
+    </select>
+
+    <!-- 발주 대상 확정 행 상태. forUpdate가 true이면 행을 ID 순서로 잠근다. -->
+    <select id="selectConfirmRows" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderConfirmRowVO">
+        SELECT d.purchase_request_detail_id AS purchaseRequestDetailId,
+               d.purchase_confirm_id AS purchaseConfirmId,
+               pc.use_at AS confirmUseAt,
+               d.material_id AS materialId,
+               m.material_type_code AS materialTypeCode,
+               CASE WHEN m.inspect_type = 'Y' THEN 'Y' ELSE 'N' END AS inspectAt,
+               d.confirm_qty AS confirmQty,
+               COALESCE((SELECT sum(od.order_qty)
+                           FROM tb_purchase_order_dt od
+                           JOIN tb_purchase_order_hd oh
+                             ON oh.purchase_order_id = od.purchase_order_id
+                            AND oh.tenant_id = od.tenant_id
+                          WHERE od.purchase_request_detail_id = d.purchase_request_detail_id
+                            AND oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+                            AND oh.use_at = 'Y'), 0) AS orderedQty,
+               d.order_close_at AS orderCloseAt,
+               d.supplier_id AS supplierId,
+               d.currency_code AS currencyCode,
+               d.order_type AS orderType,
+               d.use_type AS useType,
+               d.warehouse_id AS warehouseId,
+               d.confirm_delivery_dt AS confirmDeliveryDt
+        FROM tb_purchase_request_dt d
+        JOIN tb_purchase_request_hd h
+          ON h.purchase_request_id = d.purchase_request_id
+         AND h.tenant_id = d.tenant_id
+        LEFT JOIN tb_purchase_confirm_hd pc
+          ON pc.purchase_confirm_id = d.purchase_confirm_id
+         AND pc.tenant_id = d.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        WHERE d.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+          AND d.purchase_request_detail_id IN
+          <foreach collection="detailIds" item="id" open="(" separator="," close=")">#{id, jdbcType=BIGINT}</foreach>
+        ORDER BY d.purchase_request_detail_id
+        <if test="forUpdate">
+        FOR UPDATE OF d
+        </if>
+    </select>
+
+    <select id="selectMaterialDefault" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderMaterialDefaultVO">
+        SELECT m.material_id AS materialId,
+               m.material_type_code AS materialTypeCode,
+               CASE WHEN m.inspect_type = 'Y' THEN 'Y' ELSE 'N' END AS inspectAt
+        FROM tb_material_info m
+        WHERE m.material_id = #{materialId, jdbcType=BIGINT}
+          AND m.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND m.delete_status = 'N'
+          AND m.deleted_at IS NULL
+    </select>
+
+    <select id="existsTaxType" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g
+              ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId, jdbcType=BIGINT}
+              AND g.group_code = 'PURCHASE_TAX_TYPE'
+              AND g.use_at = 'Y'
+              AND i.item_code = #{code}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <!-- 저장과 같은 문장에서 회사·구매처·발주자 정보를 복사(스냅샷)해 마스터가 바뀌어도 발주서 출력값을 보존한다. -->
+    <select id="insertOrderHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_purchase_order_hd (
+            tenant_id, order_no, order_dt, supplier_id, orderer_id, order_dept_id, currency_code,
+            source_type, tax_type, vat_included_at, supply_amt, vat_amt, total_amt, remark, created_by,
+            company_name, company_business_no, company_president_name, company_post_code, company_address,
+            company_telephone_no, company_facsimile_no, company_stamp_image, company_logo_image,
+            vendor_name, vendor_business_no, vendor_president_name, vendor_post_code, vendor_address,
+            vendor_telephone_no, vendor_facsimile_no, vendor_charge,
+            orderer_name, orderer_mobile_no
+        )
+        SELECT t.tenant_id, #{orderNo}, CAST(#{orderDt} AS date), #{supplierId, jdbcType=BIGINT},
+               #{ordererId, jdbcType=BIGINT}, #{orderDeptId, jdbcType=BIGINT}, #{currencyCode},
+               #{sourceType}, #{taxType}, #{vatIncludedAt}, #{supplyAmt, jdbcType=NUMERIC},
+               #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC}, #{remark}, #{createdBy},
+               t.tenant_nm, t.business_registration_number, t.president_name, t.post_code, t.address,
+               t.telephone_no, t.facsimile_no, t.stamp_image, t.logo_image,
+               c.customer_name, c.business_no, c.president_name, c.post_code, c.address,
+               c.telephone_no, c.facsimile_no, c.customer_charge,
+               u.user_nm, u.mobile_no
+        FROM tb_tenant t
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = #{supplierId, jdbcType=BIGINT}
+         AND c.tenant_id = t.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = #{ordererId, jdbcType=BIGINT}
+        WHERE t.tenant_id = #{tenantId, jdbcType=BIGINT}
+        RETURNING purchase_order_id
+    </select>
+
+    <select id="insertOrderDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_purchase_order_dt (
+            purchase_order_id, tenant_id, line_no, purchase_request_detail_id, material_id, order_qty,
+            unit_price, delivery_dt, warehouse_id, order_type, use_type, inspect_at,
+            supply_amt, vat_amt, total_amt, remark, created_by
+        ) VALUES (
+            #{purchaseOrderId, jdbcType=BIGINT}, #{tenantId, jdbcType=BIGINT}, #{lineNo},
+            #{purchaseRequestDetailId, jdbcType=BIGINT}, #{materialId, jdbcType=BIGINT},
+            #{orderQty, jdbcType=NUMERIC}, #{unitPrice, jdbcType=NUMERIC}, CAST(#{deliveryDt} AS date),
+            #{warehouseId, jdbcType=BIGINT}, #{orderType}, #{useType}, #{inspectAt},
+            #{supplyAmt, jdbcType=NUMERIC}, #{vatAmt, jdbcType=NUMERIC}, #{totalAmt, jdbcType=NUMERIC},
+            #{remark}, #{createdBy}
+        )
+        RETURNING purchase_order_detail_id
+    </select>
+
+    <!-- 수정·취소 전에 발주 헤더를 잠근다. 없으면 null. -->
+    <select id="selectOrderForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderVO">
+        SELECT oh.purchase_order_id AS purchaseOrderId,
+               oh.order_no AS orderNo,
+               oh.supplier_id AS supplierId,
+               oh.currency_code AS currencyCode,
+               oh.source_type AS sourceType,
+               oh.tax_type AS taxType,
+               oh.vat_included_at AS vatIncludedAt,
+               oh.use_at AS useAt
+        FROM tb_purchase_order_hd oh
+        WHERE oh.purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+        FOR UPDATE OF oh
+    </select>
+
+    <update id="updateOrderHeader" parameterType="map">
+        UPDATE tb_purchase_order_hd
+        SET order_dt = CAST(#{orderDt} AS date),
+            tax_type = #{taxType},
+            vat_included_at = #{vatIncludedAt},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <update id="updateOrderDetail" parameterType="map">
+        UPDATE tb_purchase_order_dt
+        SET line_no = #{lineNo},
+            order_qty = #{orderQty, jdbcType=NUMERIC},
+            unit_price = #{unitPrice, jdbcType=NUMERIC},
+            delivery_dt = CAST(#{deliveryDt} AS date),
+            warehouse_id = #{warehouseId, jdbcType=BIGINT},
+            inspect_at = #{inspectAt},
+            supply_amt = #{supplyAmt, jdbcType=NUMERIC},
+            vat_amt = #{vatAmt, jdbcType=NUMERIC},
+            total_amt = #{totalAmt, jdbcType=NUMERIC},
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_order_detail_id = #{purchaseOrderDetailId, jdbcType=BIGINT}
+          AND purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <!-- 입고대기 마감 값만 바꾼다. 다른 컬럼은 건드리지 않는다. -->
+    <update id="updateReceiptClose" parameterType="map">
+        UPDATE tb_purchase_order_dt
+        SET receipt_close_at = #{receiptCloseAt},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_order_detail_id = #{purchaseOrderDetailId, jdbcType=BIGINT}
+          AND purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND receipt_close_at &lt;&gt; #{receiptCloseAt}
+    </update>
+
+    <delete id="deleteOrderDetail" parameterType="map">
+        DELETE FROM tb_purchase_order_dt
+        WHERE purchase_order_detail_id = #{purchaseOrderDetailId, jdbcType=BIGINT}
+          AND purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="cancelOrderHeader" parameterType="map">
+        UPDATE tb_purchase_order_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <!-- 직접 발주가 자동 생성한 구매요청 상세 행을 발주 값에 맞춘다. -->
+    <update id="updateAutoRequestDetail" parameterType="map">
+        UPDATE tb_purchase_request_dt
+        SET request_qty = #{orderQty, jdbcType=NUMERIC},
+            request_delivery_dt = CAST(#{deliveryDt} AS date),
+            confirm_qty = #{orderQty, jdbcType=NUMERIC},
+            confirm_delivery_dt = CAST(#{deliveryDt} AS date),
+            warehouse_id = #{warehouseId, jdbcType=BIGINT},
+            unit_price = #{unitPrice, jdbcType=NUMERIC},
+            amount = #{amount, jdbcType=NUMERIC},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteAutoRequestDetail" parameterType="map">
+        DELETE FROM tb_purchase_request_dt
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <!-- 확정 합계를 묶인 상세 금액 합으로 다시 계산한다. -->
+    <update id="refreshConfirmTotal" parameterType="map">
+        UPDATE tb_purchase_confirm_hd pc
+        SET total_amt = COALESCE((SELECT sum(d.amount)
+                                    FROM tb_purchase_request_dt d
+                                   WHERE d.purchase_confirm_id = pc.purchase_confirm_id
+                                     AND d.tenant_id = pc.tenant_id), 0),
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE pc.purchase_confirm_id = #{purchaseConfirmId, jdbcType=BIGINT}
+          AND pc.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <!-- 발주서 출력 헤더. 스냅샷이 있으면 스냅샷, 없는 기존 발주는 현재 정보로 대체한다. -->
+    <select id="selectOrderPrint" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderPrintVO">
+        SELECT oh.purchase_order_id AS purchaseOrderId,
+               oh.order_no AS orderNo,
+               oh.order_dt AS orderDt,
+               oh.currency_code AS currencyCode,
+               oh.tax_type AS taxType,
+               oh.vat_included_at AS vatIncludedAt,
+               oh.supply_amt AS supplyAmt,
+               oh.vat_amt AS vatAmt,
+               oh.total_amt AS totalAmt,
+               oh.remark AS remark,
+               oh.print_at AS printAt,
+               oh.use_at AS useAt,
+               COALESCE(oh.company_name, t.tenant_nm) AS companyName,
+               COALESCE(oh.company_business_no, t.business_registration_number) AS companyBusinessNo,
+               COALESCE(oh.company_president_name, t.president_name) AS companyPresidentName,
+               COALESCE(oh.company_post_code, t.post_code) AS companyPostCode,
+               COALESCE(oh.company_address, t.address) AS companyAddress,
+               COALESCE(oh.company_telephone_no, t.telephone_no) AS companyTelephoneNo,
+               COALESCE(oh.company_facsimile_no, t.facsimile_no) AS companyFacsimileNo,
+               COALESCE(oh.company_stamp_image, t.stamp_image) AS companyStampImage,
+               COALESCE(oh.company_logo_image, t.logo_image) AS companyLogoImage,
+               COALESCE(oh.vendor_name, c.customer_name) AS vendorName,
+               COALESCE(oh.vendor_business_no, c.business_no) AS vendorBusinessNo,
+               COALESCE(oh.vendor_president_name, c.president_name) AS vendorPresidentName,
+               COALESCE(oh.vendor_post_code, c.post_code) AS vendorPostCode,
+               COALESCE(oh.vendor_address, c.address) AS vendorAddress,
+               COALESCE(oh.vendor_telephone_no, c.telephone_no) AS vendorTelephoneNo,
+               COALESCE(oh.vendor_facsimile_no, c.facsimile_no) AS vendorFacsimileNo,
+               COALESCE(oh.vendor_charge, c.customer_charge) AS vendorCharge,
+               COALESCE(oh.orderer_name, u.user_nm) AS ordererName,
+               COALESCE(oh.orderer_mobile_no, u.mobile_no) AS ordererMobileNo
+        FROM tb_purchase_order_hd oh
+        LEFT JOIN tb_tenant t
+          ON t.tenant_id = oh.tenant_id
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = oh.supplier_id
+         AND c.tenant_id = oh.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = oh.orderer_id
+        WHERE oh.purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectOrderPrintDetails" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderPrintDetailVO">
+        SELECT od.line_no AS lineNo,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               od.order_qty AS orderQty,
+               od.unit_price AS unitPrice,
+               od.delivery_dt AS deliveryDt,
+               od.supply_amt AS supplyAmt,
+               od.vat_amt AS vatAmt,
+               od.total_amt AS totalAmt,
+               od.remark AS remark
+        FROM tb_purchase_order_dt od
+        LEFT JOIN tb_material_info m
+          ON m.material_id = od.material_id
+         AND m.tenant_id = od.tenant_id
+        WHERE od.purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND od.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY od.line_no
+    </select>
+
+    <!-- 인쇄 버튼을 누르면 출력했다고 기록한다. 이미 출력한 발주도 일시·출력자를 갱신한다. -->
+    <update id="updatePrintMark" parameterType="map">
+        UPDATE tb_purchase_order_hd
+        SET print_at = 'Y',
+            printed_at = now(),
+            printed_by = #{printedBy},
+            updated_by = #{printedBy},
+            updated_at = now()
+        WHERE purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND use_at = 'Y'
+    </update>
+
+    <select id="selectOrder" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderVO">
+        SELECT oh.purchase_order_id AS purchaseOrderId,
+               oh.order_no AS orderNo,
+               oh.order_dt AS orderDt,
+               oh.supplier_id AS supplierId,
+               c.customer_code AS supplierCode,
+               c.customer_name AS supplierName,
+               u.user_nm AS ordererName,
+               oh.currency_code AS currencyCode,
+               oh.source_type AS sourceType,
+               oh.tax_type AS taxType,
+               oh.vat_included_at AS vatIncludedAt,
+               oh.supply_amt AS supplyAmt,
+               oh.vat_amt AS vatAmt,
+               oh.total_amt AS totalAmt,
+               oh.print_at AS printAt,
+               oh.remark AS remark,
+               oh.use_at AS useAt
+        FROM tb_purchase_order_hd oh
+        LEFT JOIN tb_customer_info c
+          ON c.customer_id = oh.supplier_id
+         AND c.tenant_id = oh.tenant_id
+        LEFT JOIN tb_user u
+          ON u.user_id = oh.orderer_id
+        WHERE oh.purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND oh.tenant_id = #{tenantId, jdbcType=BIGINT}
+    </select>
+
+    <select id="selectOrderDetails" parameterType="map"
+            resultType="egovframework.let.materials.order.create.domain.model.PurchaseOrderDetailVO">
+        SELECT od.purchase_order_detail_id AS purchaseOrderDetailId,
+               od.line_no AS lineNo,
+               od.purchase_request_detail_id AS purchaseRequestDetailId,
+               h.request_no AS requestNo,
+               pc.confirm_no AS confirmNo,
+               od.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               od.order_qty AS orderQty,
+               od.unit_price AS unitPrice,
+               od.delivery_dt AS deliveryDt,
+               od.warehouse_id AS warehouseId,
+               w.warehouse_name AS warehouseName,
+               od.order_type AS orderType,
+               oci.item_nm AS orderTypeName,
+               od.use_type AS useType,
+               uci.item_nm AS useTypeName,
+               od.inspect_at AS inspectAt,
+               od.supply_amt AS supplyAmt,
+               od.vat_amt AS vatAmt,
+               od.total_amt AS totalAmt,
+               od.receipt_close_at AS receiptCloseAt,
+               od.remark AS remark,
+               rd.confirm_qty AS confirmQty,
+               rd.confirm_qty - COALESCE((SELECT sum(o2.order_qty)
+                                            FROM tb_purchase_order_dt o2
+                                            JOIN tb_purchase_order_hd h2
+                                              ON h2.purchase_order_id = o2.purchase_order_id
+                                             AND h2.tenant_id = o2.tenant_id
+                                           WHERE o2.purchase_request_detail_id = od.purchase_request_detail_id
+                                             AND h2.tenant_id = #{tenantId, jdbcType=BIGINT}
+                                             AND h2.use_at = 'Y'
+                                             AND o2.purchase_order_detail_id &lt;&gt; od.purchase_order_detail_id), 0) AS remainQty,
+               rd.supplier_id AS confirmSupplierId,
+               rd.unit_price AS confirmUnitPrice,
+               rd.confirm_delivery_dt AS confirmDeliveryDt,
+               rd.warehouse_id AS confirmWarehouseId
+        FROM tb_purchase_order_dt od
+        JOIN tb_purchase_request_dt rd
+          ON rd.purchase_request_detail_id = od.purchase_request_detail_id
+        JOIN tb_purchase_request_hd h
+          ON h.purchase_request_id = rd.purchase_request_id
+         AND h.tenant_id = rd.tenant_id
+        LEFT JOIN tb_purchase_confirm_hd pc
+          ON pc.purchase_confirm_id = rd.purchase_confirm_id
+         AND pc.tenant_id = rd.tenant_id
+        LEFT JOIN tb_material_info m
+          ON m.material_id = od.material_id
+         AND m.tenant_id = od.tenant_id
+        LEFT JOIN tb_warehouse w
+          ON w.warehouse_id = od.warehouse_id
+        LEFT JOIN tb_common_code_group ocg
+          ON ocg.tenant_id = od.tenant_id
+         AND ocg.group_code = 'PURCHASE_ORDER_TYPE'
+        LEFT JOIN tb_common_code_item oci
+          ON oci.group_id = ocg.common_code_group_id
+         AND oci.item_code = od.order_type
+        LEFT JOIN tb_common_code_group ucg
+          ON ucg.tenant_id = od.tenant_id
+         AND ucg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item uci
+          ON uci.group_id = ucg.common_code_group_id
+         AND uci.item_code = od.use_type
+        WHERE od.purchase_order_id = #{purchaseOrderId, jdbcType=BIGINT}
+          AND od.tenant_id = #{tenantId, jdbcType=BIGINT}
+        ORDER BY od.line_no
+    </select>
+</mapper>
