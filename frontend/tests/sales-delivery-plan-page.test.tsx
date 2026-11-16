@@ -1,18 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createRef, type ReactNode } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { DeliveryDetailGrid } from '../src/pages/sales/delivery/create/components/DeliveryDetailGrid';
-import { newDeliveryRow } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
-import type { DeliveryRow } from '../src/pages/sales/delivery/create/types/salesDelivery.types';
-import { SalesDeliveryPlanCreatePage } from '../src/pages/sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
-import { SalesDeliveryPlanStatusPage } from '../src/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
-import { createDeliveryPlan, getDeliveryPlan, getDeliveryPlanByOrder, getDeliveryPlanStatus, searchPlanSourceOrders, updateDeliveryPlan } from '../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service';
-import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from '../src/pages/sales/delivery-plan/types/salesDeliveryPlan.types';
+import { DeliveryDetailGrid } from '../src/pages/sales/shipment/delivery/create/components/DeliveryDetailGrid';
+import { newDeliveryRow } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
+import type { DeliveryRow } from '../src/pages/sales/shipment/delivery/create/types/salesDelivery.types';
+import { SalesDeliveryPlanCreatePage } from '../src/pages/sales/shipment/deliveryplan/create/SalesDeliveryPlanCreatePage';
+import { SalesDeliveryPlanStatusPage } from '../src/pages/sales/shipment/deliveryplan/status/SalesDeliveryPlanStatusPage';
+import { createDeliveryPlan, getDeliveryPlan, getDeliveryPlanByOrder, getDeliveryPlanStatus, searchPlanSourceOrders, updateDeliveryPlan } from '../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service';
+import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from '../src/pages/sales/shipment/deliveryplan/types/salesDeliveryPlan.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 import type { F1GridRef } from '../src/shared/components/f1-grid';
 import { AppSettingsContext } from '../src/shared/context/AppSettingsContext';
 
-vi.mock('../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service', async (original) => ({
+vi.mock('../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service', async (original) => ({
   ...await original<object>(),
   createDeliveryPlan: vi.fn(), getDeliveryPlan: vi.fn(), getDeliveryPlanByOrder: vi.fn(), getDeliveryPlanStatus: vi.fn(),
   searchPlanSourceOrders: vi.fn(), updateDeliveryPlan: vi.fn(),

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { StatementPrint } from '../src/pages/sales/statement/StatementPrint';
-import type { StatementItem } from '../src/pages/sales/statement/types';
+import { StatementPrint } from '../src/pages/sales/shipment/statement/components/StatementPrint';
+import type { StatementItem } from '../src/pages/sales/shipment/statement/types/salesStatement.types';
 
 it('prints two identical copies on each sheet and preserves all item rows and the saved seal', () => {
   const rows = Array.from({ length: 25 }, (_, index) => ({

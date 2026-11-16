@@ -5,8 +5,8 @@ import {
   buildDeliveryPayload, validateDelivery, sourceOrderForm, createDelivery,
   getDelivery, updateDelivery, deleteDelivery, searchSourceOrders, getDeliveryStatus,
   defaultDeliveryFilters, validDeliveryPeriod, restoreDeliveryFilters,
-} from '../src/pages/sales/delivery/create/services/salesDelivery.service';
-import type { DeliveryForm, SourceOrderRow } from '../src/pages/sales/delivery/create/types/salesDelivery.types';
+} from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
+import type { DeliveryForm, SourceOrderRow } from '../src/pages/sales/shipment/delivery/create/types/salesDelivery.types';
 
 vi.mock('../src/shared/services/apiClient', () => ({
   apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn(),

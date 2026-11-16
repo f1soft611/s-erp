@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { SalesDeliveryCreatePage } from '../src/pages/sales/delivery/create/SalesDeliveryCreatePage';
-import { SalesDeliveryStatusPage } from '../src/pages/sales/delivery/status/SalesDeliveryStatusPage';
-import { SourceOrderPicker } from '../src/pages/sales/delivery/create/components/SourceOrderPicker';
-import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
+import { SalesDeliveryCreatePage } from '../src/pages/sales/shipment/delivery/create/SalesDeliveryCreatePage';
+import { SalesDeliveryStatusPage } from '../src/pages/sales/shipment/delivery/status/SalesDeliveryStatusPage';
+import { SourceOrderPicker } from '../src/pages/sales/shipment/delivery/create/components/SourceOrderPicker';
+import { createDelivery, getDelivery, updateDelivery, getDeliveryStatus, searchSourceOrders, deleteDelivery, OverDeliveryConfirmationRequired } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
-vi.mock('../src/pages/sales/delivery/create/services/salesDelivery.service', async (original) => ({
+vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.service', async (original) => ({
   ...await original<object>(), createDelivery: vi.fn(), getDelivery: vi.fn(), updateDelivery: vi.fn(),
   getDeliveryStatus: vi.fn(), searchSourceOrders: vi.fn(), deleteDelivery: vi.fn(),
 }));

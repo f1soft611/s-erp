@@ -1,17 +1,17 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { SalesStatementCreatePage } from '../src/pages/sales/statement/SalesStatementCreatePage';
-import { SalesStatementStatusPage } from '../src/pages/sales/statement/SalesStatementStatusPage';
-import { createStatement, getStatement, getStatementStatus, searchStatementSources } from '../src/pages/sales/statement/statement.service';
-import { getDelivery } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
+import { SalesStatementCreatePage } from '../src/pages/sales/shipment/statement/create/SalesStatementCreatePage';
+import { SalesStatementStatusPage } from '../src/pages/sales/shipment/statement/status/SalesStatementStatusPage';
+import { createStatement, getStatement, getStatementStatus, searchStatementSources } from '../src/pages/sales/shipment/statement/services/salesStatement.service';
+import { getDelivery } from '../src/pages/sales/shipment/delivery/create/services/salesDelivery.service';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
 
-vi.mock('../src/pages/sales/statement/statement.service', () => ({
+vi.mock('../src/pages/sales/shipment/statement/services/salesStatement.service', () => ({
   createStatement: vi.fn(), updateStatement: vi.fn(), deleteStatement: vi.fn(),
   getStatement: vi.fn(), getStatementStatus: vi.fn(), searchStatementSources: vi.fn(),
 }));
-vi.mock('../src/pages/sales/delivery/create/services/salesDelivery.service', async (original) => ({
+vi.mock('../src/pages/sales/shipment/delivery/create/services/salesDelivery.service', async (original) => ({
   ...await original<object>(), getDelivery: vi.fn(),
 }));
 const source = { salesDeliveryId: 1, deliveryNo: 'SD-1', deliveryDt: '2026-11-09',

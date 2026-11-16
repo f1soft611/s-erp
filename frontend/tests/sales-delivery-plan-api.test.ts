@@ -3,8 +3,8 @@ import { apiGet, apiPost, apiPut } from '../src/shared/services/apiClient';
 import {
   createDeliveryPlan, defaultDeliveryPlanFilters, getDeliveryPlan, getDeliveryPlanStatus,
   searchPlanSourceOrders, updateDeliveryPlan, validDeliveryPlanPeriod, validateDeliveryPlan,
-} from '../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service';
-import type { DeliveryPlanRequest, PlanSourceOrderRow } from '../src/pages/sales/delivery-plan/types/salesDeliveryPlan.types';
+} from '../src/pages/sales/shipment/deliveryplan/services/salesDeliveryPlan.service';
+import type { DeliveryPlanRequest, PlanSourceOrderRow } from '../src/pages/sales/shipment/deliveryplan/types/salesDeliveryPlan.types';
 
 vi.mock('../src/shared/services/apiClient', () => ({
   apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(),
