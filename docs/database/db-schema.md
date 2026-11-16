@@ -1131,10 +1131,60 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ---
 
+### tb_purchase_order_hd / tb_purchase_order_dt (2026-11-13)
+
+구매자재 모듈의 발주. MES TMA107(발주 메인)·TMA108(발주 상세)을 핵심 항목만 남겨 재설계했다. 발주서 1건은 구매처 1곳·통화 1종이며, 확정 품목 행을 불러오거나 품목을 직접 골라 발주한다(직접 발주는 MR·MC를 자동 생성). 확정 행 잔량은 `확정수량 − 유효 발주 행 수량 합`이다. 상태·공통코드 값은 영문 코드로 저장한다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_purchase_order_hd` | `purchase_order_id` | `bigserial` | NOT NULL, PK | 발주 ID |
+| | `tenant_id` | `bigint` | NOT NULL | tenant FK |
+| | `order_no` | `varchar(30)` | NOT NULL | tenant별 유일 번호 `PO-yyyyMMdd-NNNN` |
+| | `order_dt` | `date` | NOT NULL | 발주일 |
+| | `supplier_id` | `bigint` | NOT NULL | 구매처 거래처 복합 FK |
+| | `orderer_id` | `bigint` | NOT NULL | 발주자 `tb_user` FK |
+| | `order_dept_id` | `bigint` | NULL | 발주부서 `tb_department` FK |
+| | `currency_code` | `varchar(10)` | NOT NULL, `KRW` | 통화 |
+| | `source_type` | `varchar(10)` | NOT NULL | `CONFIRM` 확정 불러오기 / `DIRECT` 직접 발주 |
+| | `tax_type` | `varchar(20)` | NOT NULL, `TAXABLE` | 부가세구분, 공통코드 `PURCHASE_TAX_TYPE` |
+| | `vat_included_at` | `char(1)` | NOT NULL, `N` | 부가세 포함 여부, 과세만 `Y` 가능(CHECK) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 행 합계 |
+| | `print_at` | `char(1)` | NOT NULL, `N` | 발주서 출력 여부(`인쇄` 버튼 클릭 시 `Y`) |
+| | `printed_at`, `printed_by` | `timestamp`, `varchar(100)` | NULL | 마지막 출력 일시·출력자 (20261113_006) |
+| | `company_name`, `company_business_no`, `company_president_name` | `varchar` | NULL | 회사 상호·사업자번호·대표자 스냅샷 (발주 저장 시 `tb_tenant`에서 복사, 20261113_006) |
+| | `company_post_code`, `company_address`, `company_telephone_no`, `company_facsimile_no` | `varchar` | NULL | 회사 우편번호·주소·전화·팩스 스냅샷 |
+| | `company_stamp_image`, `company_logo_image` | `text` | NULL | 회사 직인·로고 이미지 스냅샷(데이터 URL) |
+| | `vendor_name`, `vendor_business_no`, `vendor_president_name`, `vendor_post_code`, `vendor_address`, `vendor_telephone_no`, `vendor_facsimile_no`, `vendor_charge` | `varchar` | NULL | 구매처(수신) 정보 스냅샷(`tb_customer_info`에서 복사, `vendor_charge`=참조 담당자) |
+| | `orderer_name`, `orderer_mobile_no` | `varchar` | NULL | 발주자 이름·휴대폰번호 스냅샷(`tb_user`에서 복사) |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `use_at` | `char(1)` | NOT NULL, `Y` | `N` = 발주 취소(이력 보존) |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 감사 컬럼 | | |
+| `tb_purchase_order_dt` | `purchase_order_detail_id` | `bigserial` | NOT NULL, PK | 상세 ID |
+| | `purchase_order_id`, `tenant_id` | `bigint` | NOT NULL | 헤더 복합 FK (cascade) |
+| | `line_no` | `integer` | NOT NULL | 행 순번 (> 0) |
+| | `purchase_request_detail_id` | `bigint` | NOT NULL | 확정(구매요청 상세) 행 FK, 분할발주 시 중복 가능 |
+| | `material_id` | `bigint` | NOT NULL | 품목 복합 FK |
+| | `order_qty` | `numeric(15,2)` | NOT NULL | 발주수량 (> 0) |
+| | `unit_price` | `numeric(15,2)` | NULL | 발주단가(빈값 허용) |
+| | `delivery_dt` | `date` | NOT NULL | 납기일 |
+| | `warehouse_id` | `bigint` | NOT NULL | 입고창고 FK |
+| | `order_type`, `use_type` | `varchar(50)` | NOT NULL | 발주구분 `PURCHASE_ORDER_TYPE`, 사용용도 `PURCHASE_USE_TYPE` |
+| | `inspect_at` | `char(1)` | NOT NULL, `N` | 검사대상(기본값은 `tb_material_info.inspect_type`) |
+| | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, `0` | 공급가·세액·합계(영업 수주와 같은 이름) |
+| | `receipt_close_at` | `char(1)` | NOT NULL, `N` | 입고대기 마감(진행관리 작업에서 사용) |
+| | `remark` | `varchar(500)` | NULL | 비고 |
+| | `created_by`, `created_at`, `updated_by`, `updated_at` | 헤더와 동일 | | 감사 컬럼 |
+
+- [생성 SQL](20261113/20261113_002_create_purchase_order_schema.sql), [롤백 SQL](20261113/20261113_002_rollback_purchase_order_schema.sql), [변경 이력](20261113/20261113_002_change_purchase_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261113) 참고.
+- 메뉴: [20261113_003](20261113/20261113_003_change_purchase_order_menu.md). 부가세구분 공통코드: [20261113_001](20261113/20261113_001_change_purchase_tax_type_codes.md).
+
 ## 변경 이력
 
 - 2026-11-16: 전자결재 워크플로 알림을 공통 알림 저장소에 연결하기 위해 `tb_notification.chk_notification_event_source`에 `APPROVAL_WORKFLOW` / `APPROVAL_STATUS_EVENT` 쌍을 추가하는 `20261116_001`을 정의했다. 기본 PostgreSQL MCP의 테이블/컬럼 metadata 조회는 성공했으나 CHECK 제약 조회는 실패했다. 저장소 DDL을 대체 근거로 사용했으며 실제 DB에는 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 - 2026-11-12: 동일 거래처의 여러 수주를 한 출하 문서로 등록할 수 있도록 상세-헤더 대표 수주 복합 FK만 제거하는 `20261112_008`을 정의했다. 읽기 전용 PostgreSQL MCP로 상세 수주 컬럼과 관련 복합 FK를 확인했고, 상세별 수주/계획 외래키는 유지한다. 실제 DB에는 적용하지 않았다. [docs/database/20261112](20261112) 및 [backend 사본](../../backend/DATABASE/20261112) 참고.
+- 2026-11-13: 발주서 출력용 스냅샷·출력 컬럼 `20261113_006`을 정의했다. `tb_purchase_order_hd`에 회사·구매처·발주자 스냅샷과 출력 일시·출력자를 추가한다(기존 발주는 NULL, 출력 시 현재 정보로 대체). 읽기 전용 MCP로 원본 컬럼 구조를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261113](20261113) 참고.
+- 2026-11-13: 구매자재 메뉴 그룹 재구성 `20261113_004`(구매관리 → 구매요청관리, 발주관리 그룹 신설·발주등록 이동)와 발주현황 메뉴 `MATERIALS_ORDER_STATUS` seed `20261113_005`를 정의했다. 테이블 변경은 없고 실제 DB에는 적용하지 않았다. [docs/database/20261113](20261113) 참고.
+- 2026-11-13: 발주 테이블 `tb_purchase_order_hd`/`tb_purchase_order_dt` 생성 `20261113_002`, 발주등록 메뉴 `20261113_003`, 부가세구분 공통코드 `20261113_001`을 정의했다. 읽기 전용 MCP로 구매요청·확정·거래처·창고·단가 구조와 기존 메뉴를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261113](20261113) 참고.
 - 2026-11-12: 구매요청확정 품목 단위 확정 `20261112_006`을 정의했다. 확정 연결을 `tb_purchase_request_dt.purchase_confirm_id`로 옮기고 헤더 연결을 삭제, 요청 상태에 `PARTIALLY_CONFIRMED` 추가. 격리된 PGlite에서 002→005→006 적용·제약·롤백 중단 조건을 검증했다.
 - 2026-11-12: 구매요청확정 묶음 확정 구조 `20261112_005`를 정의했다. `tb_purchase_confirm_hd`(확정번호 MC) 신설, `tb_purchase_request_hd`에 `purchase_confirm_id` 추가·`confirm_dt`/`confirmer_id` 이전 후 삭제, 기존 확정 데이터 이전(통화 혼합 시 중단). 격리된 PGlite에서 이전·제약·롤백을 검증했다.
 - 2026-11-12: 구매자재 공통코드(발주구분·사용용도) seed `20261112_001`, 구매요청 헤더/상세 테이블과 `MATERIALS` 모듈·구매요청등록 메뉴 `20261112_002`, 구매요청현황 메뉴 `20261112_003`을 정의했다. 읽기 전용 MCP로 메타데이터만 확인했고 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 생성·제약·재실행·롤백을 검증했다. [docs/database/20261112](20261112) 참고.
