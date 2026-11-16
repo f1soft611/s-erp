@@ -225,9 +225,7 @@ export function SalesOrderCreatePage({
       setCustomer(nextCustomer);
       setOrderDate(header.orderDt);
       setQuotationNumber(header.quotNo);
-      setSelectedQuotationCustomerId(
-        header.quotNo.trim() ? nextCustomer?.id ?? null : null,
-      );
+      setSelectedQuotationCustomerId(null);
       setDeliveryDate(header.deliveryDt);
       setDeliveryPlace(header.deliveryPlace);
       setDeliveryMethod(header.deliveryMethod);

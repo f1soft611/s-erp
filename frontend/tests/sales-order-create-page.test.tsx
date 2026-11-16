@@ -212,7 +212,7 @@ describe('sales order entry page', () => {
     });
   }, 15000);
 
-  it('clears a loaded quotation number when the order customer changes', async () => {
+  it('preserves a loaded legacy quotation number when the order customer changes', async () => {
     searchOrderCustomersMock.mockResolvedValue([
       { id: 10, code: 'C-10', name: '거래처 10' },
       { id: 20, code: 'C-20', name: '거래처 20' },
@@ -233,7 +233,7 @@ describe('sales order entry page', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText('견적번호')).toHaveValue('');
+      expect(screen.getByLabelText('견적번호')).toHaveValue('Q-LOADED');
     });
   }, 15000);
 
