@@ -40,7 +40,7 @@ public interface DocumentApprovalDraftSupportService {
 
     void validateSubmissionLines(List<ApprovalLineVO> approvalLines, LoginVO user);
 
-    void insertSystemEvent(LoginVO user, Long approvalId, String eventType, String content) throws Exception;
+    Long insertSystemEvent(LoginVO user, Long approvalId, String eventType, String content) throws Exception;
 
     void insertDraftSavedMessage(LoginVO user, Long approvalId) throws Exception;
 

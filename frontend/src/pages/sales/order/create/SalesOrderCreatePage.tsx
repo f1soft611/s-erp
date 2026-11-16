@@ -650,6 +650,14 @@ export function SalesOrderCreatePage({
               rowGap: 1,
               '& > .MuiFormControl-root': { m: 0 },
               '& > .MuiStack-root': { mt: 0 },
+              '& > .MuiFormControl-root .MuiInputBase-root.Mui-disabled': {
+                backgroundColor: 'action.disabledBackground',
+              },
+              ...(!isEditable && {
+                '& > .MuiStack-root .MuiInputBase-root': {
+                  backgroundColor: 'action.disabledBackground',
+                },
+              }),
             }}
           >
             <TextField
@@ -657,6 +665,7 @@ export function SalesOrderCreatePage({
               size="small"
               value={loadedOrder?.orderNo ?? '저장 시 자동 채번'}
               slotProps={{ input: { readOnly: true } }}
+              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
             />
             <TextField
               label="수주일자"
@@ -733,6 +742,7 @@ export function SalesOrderCreatePage({
               size="small"
               value={loadedOrder?.status ?? EDITABLE_ORDER_STATUS}
               slotProps={{ input: { readOnly: true } }}
+              sx={{ '& .MuiInputBase-root': { backgroundColor: 'action.disabledBackground' } }}
             />
             <TextField
               label="비고"
