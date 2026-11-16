@@ -81,6 +81,19 @@ AI 에이전트는 코드 수정 전에 [docs](docs) 를 우선 확인해야 합
 
 ---
 
+## 메뉴·업무별 소스 구조 통일
+
+- 메뉴의 상위 업무 분류와 하위 기능을 먼저 확인하고 프론트, 백엔드, Mapper 리소스, 테스트에서 같은 업무 계층과 영문 폴더명을 사용합니다. 기능을 기존 분류 바깥에 임의로 평면 배치하지 않습니다.
+- 영업관리의 출하 상위 폴더는 `shipment`이며 하위 기능은 반드시 `delivery`, `deliveryplan`, `statement`를 같은 깊이에 둡니다.
+  - 프론트: `frontend/src/pages/sales/shipment/{delivery,deliveryplan,statement}`
+  - 백엔드: `backend/src/main/java/egovframework/let/sales/shipment/{delivery,deliveryplan,statement}`
+  - Mapper: `backend/src/main/resources/egovframework/mapper/let/sales/shipment/{delivery,deliveryplan,statement}`
+  - 백엔드 테스트: `backend/src/test/java/egovframework/let/sales/shipment/{delivery,deliveryplan,statement}`
+- 과거 구조인 프론트 `sales/delivery/plan`, `sales/delivery/statement` 및 백엔드 `sales/{delivery,deliveryplan,statement}`를 새 기능의 기준으로 재사용하지 않습니다. 과거 날짜별 문서는 당시 구조를 기록한 이력이므로 현재 지침을 우선합니다.
+- 프론트는 페이지와 `components`, `hooks`, `services`, `types`, `data` 등 역할별 소스를 분리하고, 백엔드는 `controller`, `service`, `service/impl`, `domain/model`, `domain/repository` 계층을 따릅니다. 실제 역할이 없는 빈 폴더나 파일은 만들지 않습니다.
+- 소스 이동 시 import, Java package/FQCN, Mapper 모델 참조, 테스트 리소스와 브라우저 동적 import를 함께 갱신합니다. 소스 경로에 맞추려고 메뉴 URL, page key, API, Bean/Mapper 이름 또는 SQL을 임의 변경하지 않습니다.
+- 상세 구조는 각 영역 `AGENTS.md`와 [출하관리 공통 소스 구조 사양](docs/spec/20261116/20261116_016_출하관리_공통소스구조_상세사양서.md)을 따릅니다.
+
 ## 전용 문서 연결 구조
 
 이 프로젝트는 루트 규칙과 영역별 전용 규칙을 분리해서 관리합니다.

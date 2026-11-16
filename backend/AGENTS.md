@@ -40,6 +40,34 @@
 - 현재 `pom.xml`의 `source/target=1.8`은 최신 JDK API 사용까지 차단하지 않습니다. Java 변경 시 관련 Maven 테스트 외에 JDK 9+의 `javac --release 8` 또는 JDK 8 컴파일 등으로 변경한 운영 코드의 Java 8 API 호환성을 검증합니다.
 - 최신 JDK에서 빌드·테스트가 통과했다는 이유만으로 Java 8 운영 호환성을 단정하지 않습니다. 검증 범위와 미확인 사항을 결과 문서에 기록합니다.
 
+## 영업관리 출하 패키지 구조 (필수)
+
+출하 업무는 `sales.shipment`로 묶고 `delivery`, `deliveryplan`, `statement`를 형제 패키지로 둡니다.
+이전 `sales.delivery`, `sales.deliveryplan`, `sales.statement`에 새 운영·테스트 패키지를 만들지 않습니다.
+
+```text
+src/main/java/egovframework/let/sales/shipment/
+  delivery/
+  deliveryplan/
+  statement/
+
+src/main/resources/egovframework/mapper/let/sales/shipment/
+  delivery/
+  deliveryplan/
+  statement/
+
+src/test/java/egovframework/let/sales/shipment/
+  delivery/
+  deliveryplan/
+  statement/
+```
+
+- 각 업무의 내부 계층은 `controller`, `service` 인터페이스, `service/impl`, `domain/model`, `domain/repository`를 기준으로 필요한 책임만 분리합니다. 폴더 통일을 위해 동작과 무관한 계층·VO·인터페이스를 형식적으로 추가하지 않습니다.
+- 운영 코드와 대응 테스트·Mapper 리소스의 업무 경로를 일치시킵니다. 다른 업무가 참조하는 import와 Mapper `resultType` 등 완전한 모델 클래스명, 테스트 리소스 경로도 같은 작업에서 갱신합니다.
+- 소스 위치 이동만으로 API 주소·DTO 필드·권한·트랜잭션·Bean 이름·MyBatis namespace·SQL을 변경하지 않습니다.
+- Mapper 이동은 읽기 전용 DB MCP 사전 확인과 기존 SQL 계약 유지 검증을 포함합니다. 스키마가 바뀌지 않으면 위치 이동만을 위한 SQL 마이그레이션은 만들지 않습니다.
+- 패키지/Mapper 이동 후 이전 빌드 산출물이 중복 로드되지 않도록 Maven의 정상 clean 절차로 재빌드하고, 관련 Controller/Service/Mapper 테스트와 Java 8 API 호환 컴파일을 확인합니다.
+
 ## DB 변경 규칙
 
 백엔드 작업에서 다음이 필요한 경우 반드시 스크립트를 생성합니다.

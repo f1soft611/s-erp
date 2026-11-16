@@ -119,6 +119,43 @@ src/
 - 너무 작은 파일 단위로 쪼개지 말고, 재사용 여부와 복잡도 기준으로 분리합니다.
 - `hook`은 여러 컴포넌트에서 재사용되거나 로직이 복잡할 때 만들며, 단순한 페이지 전용 상태는 같은 파일에 둘 수 있습니다.
 
+## 영업관리 출하 소스 구조 (필수)
+
+출하관리의 세 기능은 `shipment` 아래의 형제 폴더로 구성합니다. 과거 `sales/delivery/plan`이나 `sales/delivery/statement` 아래에 새 파일을 만들지 않습니다.
+
+```text
+src/pages/sales/shipment/
+  delivery/
+    create/
+    status/
+  deliveryplan/
+    create/
+    status/
+    components/
+    services/
+    types/
+  statement/
+    create/
+      components/
+      hooks/
+      data/
+      types/
+    status/
+      components/
+      hooks/
+      data/
+    components/
+    data/
+    services/
+    types/
+```
+
+- 등록·현황 페이지는 각각 `create`, `status`에 두고 화면 조립을 담당합니다. 복합 상태·조회·저장 흐름은 `hooks`, UI는 `components`, API는 `services`, 계약·props는 `types`, 컬럼·초기값·정적 옵션·순수 변환은 `data`로 분리합니다.
+- 등록·현황이 함께 쓰는 코드는 해당 업무 폴더의 공통 역할별 폴더에 둡니다. 하나의 업무만 사용하는 코드를 `src/shared`로 올리거나 서로 같은 UI·로직을 복제하지 않습니다.
+- 위 예시는 업무 계층과 책임을 설명합니다. 사용하지 않는 역할 폴더를 형식적으로 만들지 않습니다.
+- 경로 변경 시 대시보드 연결, 전체 소비자의 import와 mock, 브라우저 테스트의 동적 import를 함께 갱신합니다. 메뉴 URL·page key·API 주소를 소스 디렉터리에 맞춰 변경하지 않습니다.
+- 검증은 관련 등록·현황·서비스 테스트, 빌드, 변경 영역 lint와 필요한 실제 브라우저 흐름을 포함합니다.
+
 ## 검증 기준
 
 ```bash
