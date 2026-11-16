@@ -6,6 +6,7 @@ public class DocumentApprovalWorkflowDocumentVO {
     private String documentType;
     private String documentStatus;
     private String drafterId;
+    private String title;
 
     public Long getElectronicApprovalId() { return electronicApprovalId; }
     public void setElectronicApprovalId(Long electronicApprovalId) { this.electronicApprovalId = electronicApprovalId; }
@@ -15,4 +16,6 @@ public class DocumentApprovalWorkflowDocumentVO {
     public void setDocumentStatus(String documentStatus) { this.documentStatus = documentStatus; }
     public String getDrafterId() { return drafterId; }
     public void setDrafterId(String drafterId) { this.drafterId = drafterId; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 }

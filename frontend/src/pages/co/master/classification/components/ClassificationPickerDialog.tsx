@@ -81,7 +81,7 @@ function PickerContent({ kind, level, parentId, onSelect, onClose }: Omit<Props,
           setLoading(true); setError(''); setSelectedId(undefined); setAttempt((value) => value + 1);
         }}>다시 조회</Button>}>{error}</Alert> : rows.length === 0
           ? <Alert severity="info">등록된 분류가 없습니다. 분류 설정에서 먼저 등록해 주세요.</Alert>
-          : <F1Tree rows={rows} columns={columns} rowKey="id" parentKey="parentId"
+          : <F1Tree storageKey={`classification-picker-${kind}-${level ?? 'all'}-v1`} rows={rows} columns={columns} rowKey="id" parentKey="parentId"
             treeColumn="name" ariaLabel="분류 선택 트리" height="100%" minHeight={200}
             showCheckbox={false} defaultExpandAll getRowOrder={(row) => row.sortSeq}
             onSelectionChange={(ids) => setSelectedId(typeof ids[0] === 'number' ? ids[0] : undefined)}

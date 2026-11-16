@@ -1451,6 +1451,7 @@ export function DocumentApprovalSettingsDialog({
           <F1Grid
             key={templateGridKey}
             ref={templateGridRef}
+            storageKey={`document-approval-favorites-${mode}-v1`}
             rows={templates.map((template) => ({ ...template, actions: '' }))}
             columns={favoriteColumns}
             rowKey="templateId"

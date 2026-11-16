@@ -421,7 +421,7 @@ public class DocumentApprovalDraftSupportServiceImpl extends EgovAbstractService
     }
 
     @Override
-    public void insertSystemEvent(LoginVO user, Long approvalId, String eventType, String content) throws Exception {
+    public Long insertSystemEvent(LoginVO user, Long approvalId, String eventType, String content) throws Exception {
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", user.getTenantId());
         params.put("ownerType", OWNER_TYPE);
@@ -431,9 +431,11 @@ public class DocumentApprovalDraftSupportServiceImpl extends EgovAbstractService
         params.put("content", content);
         params.put("writerId", user.getId());
         params.put("writerName", user.getName());
-        if (commonCommentDAO.insertSystemComment(params) == null) {
+        Long eventId = commonCommentDAO.insertSystemComment(params);
+        if (eventId == null) {
             throw new IllegalStateException("결재 시스템 이력 기록에 실패했습니다.");
         }
+        return eventId;
     }
 
     @Override

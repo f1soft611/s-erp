@@ -641,6 +641,7 @@ export function RichTextEditor({
         },
         richTextEditorContentStyles,
         contentSx ? { '& .ProseMirror': contentSx } : {},
+        readOnly ? { '& .ProseMirror': { backgroundColor: 'action.disabledBackground' } } : {},
         scrollMode === 'container'
           ? {
               display: 'block',

@@ -164,7 +164,15 @@ export function GridFormField<T extends object>({
     return (
       <FormControl disabled={disabled} error={Boolean(error)}>
         <FormLabel>{renderRequiredFieldLabel(column.headerName, isRequired)}</FormLabel>
-        <ImageField label={column.headerName} value={displayedValue} disabled={disabled || readOnly} onChange={applyValue} />
+        <Box data-f1-grid-form-image sx={{
+          ...(disabled || readOnly ? {
+            backgroundColor: 'action.disabledBackground',
+            borderRadius: 1,
+            minHeight: 38,
+          } : {}),
+        }}>
+          <ImageField label={column.headerName} value={displayedValue} disabled={disabled || readOnly} onChange={applyValue} />
+        </Box>
         {error ? <FormHelperText>{error}</FormHelperText> : null}
       </FormControl>
     );
@@ -186,6 +194,10 @@ export function GridFormField<T extends object>({
             marginRight: 0,
             minHeight: 38,
             my: 0,
+            ...(disabled || readOnly ? {
+              backgroundColor: 'action.disabledBackground',
+              borderRadius: 1,
+            } : {}),
           }}
           control={
             <Checkbox

@@ -40,7 +40,9 @@ public class NotificationServiceImpl implements NotificationService {
         boolean supportedEvent = ("APPROVAL_COMMENT_MENTION".equals(eventType)
                 && "APPROVAL_COMMENT".equals(sourceType))
                 || ("DIRECT_MESSAGE_RECEIVED".equals(eventType)
-                && "DIRECT_MESSAGE".equals(sourceType));
+                && "DIRECT_MESSAGE".equals(sourceType))
+                || ("APPROVAL_WORKFLOW".equals(eventType)
+                && "APPROVAL_STATUS_EVENT".equals(sourceType));
         if (tenantId == null || tenantId <= 0 || recipientUserId == null || recipientUserId <= 0
                 || sourceId == null || sourceId <= 0 || !supportedEvent
                 || !StringUtils.hasText(title) || title.length() > 200
@@ -188,7 +190,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     private void validateEventType(String eventType) {
         if (eventType != null && !"APPROVAL_COMMENT_MENTION".equals(eventType)
-                && !"DIRECT_MESSAGE_RECEIVED".equals(eventType)) {
+                && !"DIRECT_MESSAGE_RECEIVED".equals(eventType)
+                && !"APPROVAL_WORKFLOW".equals(eventType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "알림 구분이 올바르지 않습니다.");
         }
     }

@@ -41,6 +41,18 @@ public class DocumentApprovalDAO extends EgovAbstractMapper {
         return selectList("DocumentApprovalDAO.selectApprovalCommentRecipientUserIds", params);
     }
 
+    public List<Long> selectApprovalWorkflowPendingRecipientUserIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds", params);
+    }
+
+    public List<Long> selectApprovalWorkflowReferenceRecipientUserIds(Map<String, Object> params) throws Exception {
+        return selectList("DocumentApprovalDAO.selectApprovalWorkflowReferenceRecipientUserIds", params);
+    }
+
+    public Long selectApprovalWorkflowDrafterRecipientUserId(Map<String, Object> params) throws Exception {
+        return (Long) selectOne("DocumentApprovalDAO.selectApprovalWorkflowDrafterRecipientUserId", params);
+    }
+
     public Long insertDocumentApprovalMain(Map<String, Object> params) throws Exception {
         return (Long) selectOne("DocumentApprovalDAO.insertDocumentApprovalMain", params);
     }

@@ -110,6 +110,15 @@ export function createAppTheme(mode: AppThemeMode = 'light') {
           margin: 'normal',
         },
       },
+      MuiInputBase: {
+        styleOverrides: {
+          root: ({ theme }) => ({
+            '&.Mui-disabled, &:is(.Mui-readOnly, :has(input[readonly]), :has(textarea[readonly])):not(.app-selectable-readonly):not(:has(button[aria-label$=" 선택"]:not(:disabled)))': {
+              backgroundColor: theme.palette.action.disabledBackground,
+            },
+          }),
+        },
+      },
     },
   });
 }

@@ -44,6 +44,17 @@ describe('NotificationInboxPage', () => {
           createdAt: '2026-10-30T09:31:00',
           readAt: null,
         },
+        {
+          notificationId: 9,
+          eventType: 'APPROVAL_WORKFLOW',
+          sourceType: 'APPROVAL_STATUS_EVENT',
+          sourceId: 91,
+          targetId: 42,
+          title: '결재 요청',
+          summary: '기안 요청',
+          createdAt: '2026-10-30T09:32:00',
+          readAt: null,
+        },
       ],
       hasNext: false,
       nextBeforeNotificationId: null,
@@ -55,6 +66,7 @@ describe('NotificationInboxPage', () => {
   it.each([
     ['DIRECT_MESSAGE_RECEIVED', 'DIRECT_MESSAGE', null, '/groupware/messages?messageId=82'],
     ['APPROVAL_COMMENT_MENTION', 'APPROVAL_COMMENT', 29, '/groupware/doc/write?approvalId=29'],
+    ['APPROVAL_WORKFLOW', 'APPROVAL_STATUS_EVENT', 42, '/groupware/doc/write?approvalId=42'],
   ])('opens the authorized %s detail after a push click', async (eventType, sourceType, targetId, path) => {
     mocks.markNotificationRead.mockResolvedValue({
       notificationId: 14, eventType, sourceType, sourceId: 82, targetId,
@@ -79,14 +91,17 @@ describe('NotificationInboxPage', () => {
 
     const category = await screen.findByRole('img', { name: '문서 멘션' });
     const messageCategory = screen.getByRole('img', { name: '새 쪽지' });
+    const approvalCategory = screen.getByRole('img', { name: '전자결재' });
     const title = screen.getByText('문서 댓글 멘션');
     expect(category.closest('[role="button"]')?.firstElementChild).toBe(category);
     expect(messageCategory.closest('[role="button"]')?.firstElementChild).toBe(messageCategory);
     expect(category).toBeVisible();
+    expect(approvalCategory).toBeVisible();
     expect(category.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('문서 댓글 멘션')).toBeVisible();
     expect(screen.getByText('확인해 주세요')).toBeVisible();
     expect(screen.getByText('새 쪽지 도착')).toBeVisible();
+    expect(screen.getByText('결재 요청')).toBeVisible();
     expect(screen.getByText('일정을 확인해 주세요')).toBeVisible();
   });
 
@@ -106,6 +121,26 @@ describe('NotificationInboxPage', () => {
         beforeNotificationId: undefined,
         unreadOnly: false,
         eventType: 'APPROVAL_COMMENT_MENTION',
+      });
+    });
+  });
+
+  it('filters approval workflow notifications as one inbox category', async () => {
+    render(
+      <MemoryRouter>
+        <NotificationInboxPage />
+      </MemoryRouter>,
+    );
+
+    const typeFilter = await screen.findByRole('group', { name: '알림 구분' });
+    fireEvent.click(within(typeFilter).getByRole('button', { name: '전자결재' }));
+
+    await waitFor(() => {
+      expect(mocks.listNotifications).toHaveBeenLastCalledWith({
+        limit: 20,
+        beforeNotificationId: undefined,
+        unreadOnly: false,
+        eventType: 'APPROVAL_WORKFLOW',
       });
     });
   });

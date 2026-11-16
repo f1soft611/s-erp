@@ -108,6 +108,22 @@ function renderSettings(
   return { onClose, onApply };
 }
 
+it.each([
+  [undefined, 'approval'],
+  ['approval', 'approval'],
+  ['reference', 'reference'],
+] as const)('persists the %s favorites layout under its mode key', async (mode, keyMode) => {
+  const key = `document-approval-favorites-${keyMode}-v1`;
+  localStorage.removeItem(key);
+  renderSettings({ mode });
+  const label = keyMode === 'reference' ? '자주 쓰는 참조자' : '자주 쓰는 결재선';
+  await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '설정' }));
+  await screen.findByRole('grid', { name: `${label} 목록` });
+  await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
+  localStorage.removeItem(key);
+});
+
 function createDataTransfer() {
   const payload = new Map<string, string>();
   return {
@@ -1268,16 +1284,14 @@ describe('DocumentApprovalSettingsDialog', () => {
     expect(
       await within(getTemplateManager()).findByText(/이름 변경 실패/),
     ).toBeInTheDocument();
-    expect(
-      within(getTemplateGrid()).getByRole('gridcell', {
+    await waitFor(() => {
+      expect(within(getTemplateGrid()).getByRole('gridcell', {
         name: '서버 저장 이름',
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(getTemplateGrid()).getByRole('gridcell', {
+      })).toBeInTheDocument();
+      expect(within(getTemplateGrid()).getByRole('gridcell', {
         name: '실패 후 재시도할 이름',
-      }),
-    ).toBeInTheDocument();
+      })).toBeInTheDocument();
+    });
     const saveButton = within(getTemplateManager()).getByRole('button', {
       name: '저장',
       exact: true,
@@ -1293,11 +1307,11 @@ describe('DocumentApprovalSettingsDialog', () => {
       10,
       '실패 후 재시도할 이름',
     );
-    expect(
+    await waitFor(() => expect(
       within(getTemplateGrid()).getByRole('gridcell', {
         name: '재시도 성공 이름',
       }),
-    ).toBeInTheDocument();
+    ).toBeInTheDocument());
   });
 
   it('confirms before loading with unsaved names and preserves changes when cancelled', async () => {

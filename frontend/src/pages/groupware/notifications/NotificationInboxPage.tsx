@@ -42,6 +42,10 @@ const notificationTypeIndicators: Record<NotificationEventType, { label: string;
     label: '문서 멘션',
     icon: <DescriptionOutlined fontSize="small" />,
   },
+  APPROVAL_WORKFLOW: {
+    label: '전자결재',
+    icon: <DescriptionOutlined fontSize="small" />,
+  },
   DIRECT_MESSAGE_RECEIVED: {
     label: '새 쪽지',
     icon: <MailOutlineOutlined fontSize="small" />,
@@ -245,7 +249,7 @@ export function NotificationInboxPage() {
   return (
     <InboxPageShell
       title="알림함"
-      description="업무 멘션과 쪽지 알림을 확인하고 정리합니다."
+      description="      전자결재, 업무 멘션과 쪽지 알림을 확인하고 정리합니다."
       toolbar={
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -261,6 +265,7 @@ export function NotificationInboxPage() {
               options={[
                 { value: 'ALL', label: '전체 유형' },
                 { value: 'APPROVAL_COMMENT_MENTION', label: '문서 멘션' },
+                { value: 'APPROVAL_WORKFLOW', label: '전자결재' },
                 { value: 'DIRECT_MESSAGE_RECEIVED', label: '새 쪽지' },
               ]}
               onChange={setTypeFilter}

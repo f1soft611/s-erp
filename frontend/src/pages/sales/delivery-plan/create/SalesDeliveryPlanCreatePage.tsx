@@ -176,7 +176,7 @@ export function SalesDeliveryPlanCreatePage({
       sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 2, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
       <PageMessageArea message={error} onClose={() => setError('')} />
       {notice ? <Alert severity="success">{notice}</Alert> : null}
-      <DeliveryPlanForm key={formVersion} gridRef={gridRef} planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}
+      <DeliveryPlanForm key={formVersion} gridRef={gridRef} storageKey="sales-delivery-plan-create-details-v1" planNo={planNo} orderNo={selectedOrderNo} orderDt={selectedOrderDates}
         customerName={selectedCustomers} rows={rows} setRows={setRows} editable={canWrite}
         canSelectOrder={canSelectOrder && planId === null} onSelectOrder={openSourcePicker} />
     </Box>
@@ -198,7 +198,7 @@ export function SalesDeliveryPlanCreatePage({
       </Box>
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 240, overflow: 'hidden' }}>
-        <F1Grid ref={sourceGridRef} ariaLabel="계획대상 수주 품목 목록" rows={sourceRows} columns={sourceColumns} rowKey="selectionKey"
+        <F1Grid ref={sourceGridRef} storageKey="sales-delivery-plan-source-order-picker-v1" ariaLabel="계획대상 수주 품목 목록" rows={sourceRows} columns={sourceColumns} rowKey="selectionKey"
           loading={loading} showCheckbox={deliveryPlanMode === 'MANUAL'} multiSelect={deliveryPlanMode === 'MANUAL'}
           selectionMode="row" onSelectionChange={setSelectedSourceKeys} canExportExcel={false} height="100%"
           allowAddRowInContextMenu={false} allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} />

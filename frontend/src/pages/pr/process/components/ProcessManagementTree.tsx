@@ -49,7 +49,7 @@ export function ProcessManagementTree({
   const columns = useMemo(() => createProcessColumns(canEdit), [canEdit]);
 
   return (
-    <F1Tree key={version} ref={treeRef} ariaLabel="공정관리" rows={rows} rowKey="id" parentKey="parentId"
+    <F1Tree key={version} ref={treeRef} storageKey="process-management-tree-v1" ariaLabel="공정관리" rows={rows} rowKey="id" parentKey="parentId"
       treeColumn="name" columns={columns} height="100%" rowHeight={80} defaultExpandAll showCheckbox selectionMode="row"
       multiSelect={false} loading={loading} onSelectionChange={onSelection}
       createRow={() => createProcessRow(true)} onChangesChange={onChanges}

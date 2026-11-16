@@ -1,8 +1,12 @@
 export type NotificationEventType =
   | 'APPROVAL_COMMENT_MENTION'
+  | 'APPROVAL_WORKFLOW'
   | 'DIRECT_MESSAGE_RECEIVED';
 
-export type NotificationSourceType = 'APPROVAL_COMMENT' | 'DIRECT_MESSAGE';
+export type NotificationSourceType =
+  | 'APPROVAL_COMMENT'
+  | 'APPROVAL_STATUS_EVENT'
+  | 'DIRECT_MESSAGE';
 
 export interface NotificationItem {
   notificationId: number;

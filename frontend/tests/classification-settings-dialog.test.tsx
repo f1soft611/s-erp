@@ -36,6 +36,14 @@ beforeEach(() => {
 });
 
 describe('classification F1Tree settings', () => {
+  it.each(['item', 'partner'] as const)('persists the %s layout separately', async (kind) => {
+    const key = `classification-settings-${kind}-v1`;
+    localStorage.removeItem(key);
+    show({ kind });
+    await screen.findByText('Root', { exact: true });
+    expect(localStorage.getItem(key)).not.toBeNull();
+    localStorage.removeItem(key);
+  });
   it.each(['item', 'partner'] as const)('enables %s saving only for modified or added rows', async (kind) => {
     show({ kind });
     await screen.findByText('Root', { exact: true });

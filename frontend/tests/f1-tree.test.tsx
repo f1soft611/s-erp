@@ -86,19 +86,28 @@ describe('F1Tree interaction', () => {
     { field: 'name' as const, headerName: '메뉴명', editable: true },
   ];
 
-  it('marks descendants, including intermediate parents, without marking roots', () => {
+  it('marks only leaf descendants, including after collapsing and expanding a parent', () => {
     render(
-      <F1Tree rows={[...rows, { ...rows[1], id: 'grandchild', parentId: 'child', name: 'Grandchild' }]}
+      <F1Tree rows={[
+        ...rows,
+        { ...rows[1], id: 'grandchild', parentId: 'child', name: 'Grandchild' },
+        { ...rows[0], id: 'standalone', name: 'Standalone' },
+      ]}
         columns={columns} rowKey="id" parentKey="parentId" treeColumn="name" defaultExpandAll />,
     );
     const root = document.querySelector('[data-f1-grid-row-id="root"]')!;
     const child = document.querySelector('[data-f1-grid-row-id="child"]')!;
     const grandchild = document.querySelector('[data-f1-grid-row-id="grandchild"]')!;
+    const standalone = document.querySelector('[data-f1-grid-row-id="standalone"]')!;
     expect(root.querySelector('[data-f1-tree-branch]')).toBeNull();
-    expect(child.querySelector('[data-f1-tree-branch]')).toHaveAttribute('aria-hidden', 'true');
+    expect(standalone.querySelector('[data-f1-tree-branch]')).toBeNull();
+    expect(child.querySelector('[data-f1-tree-branch]')).toBeNull();
     expect(grandchild.querySelector('[data-f1-tree-branch]')).toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Child 접기' }));
     expect(screen.queryByText('Grandchild')).not.toBeInTheDocument();
+    expect(child.querySelector('[data-f1-tree-branch]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Child 펼치기' }));
+    expect(document.querySelector('[data-f1-grid-row-id="grandchild"] [data-f1-tree-branch]')).toBeInTheDocument();
   });
 
   it('uses the same loading spinner as F1Grid', () => {

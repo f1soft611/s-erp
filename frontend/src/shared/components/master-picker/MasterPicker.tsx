@@ -50,6 +50,7 @@ export function MasterPicker({
           slotProps={{
             input: {
               readOnly: true,
+              className: disabled ? undefined : 'app-selectable-readonly',
               endAdornment: triggerMode === 'icon' ? (
                 <InputAdornment position="end">
                   <Tooltip title={`${label} 선택`}>

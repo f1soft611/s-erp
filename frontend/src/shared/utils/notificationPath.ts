@@ -10,7 +10,7 @@ export function resolvePushNotificationPath(notificationId: unknown): string | n
 }
 
 export function resolveNotificationPath(item: NotificationItem): string | null {
-  if (item.sourceType === 'APPROVAL_COMMENT') {
+  if (item.sourceType === 'APPROVAL_COMMENT' || item.sourceType === 'APPROVAL_STATUS_EVENT') {
     return item.targetId === null
       ? null
       : `${DOCUMENT_WRITE_PATH}?approvalId=${item.targetId}`;

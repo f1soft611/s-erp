@@ -45,6 +45,29 @@ describe('sales order entry page', () => {
     getSalesOrderMock.mockResolvedValue(loadedOrder());
   });
 
+  it('읽기전용 배경을 실제 편집 가능 여부에 따라 표시한다', () => {
+    renderSalesOrderPage();
+    const background = (label: string) => {
+      const input = screen.getByLabelText(new RegExp(label), { selector: 'input, textarea' });
+      return getComputedStyle(input.closest('.MuiInputBase-root')!).backgroundColor;
+    };
+
+    expect(background('수주번호')).toBe('rgba(0, 0, 0, 0.12)');
+    expect(background('수주상태')).toBe('rgba(0, 0, 0, 0.12)');
+    expect(background('거래처')).not.toBe('rgba(0, 0, 0, 0.12)');
+    expect(background('견적번호')).not.toBe('rgba(0, 0, 0, 0.12)');
+    expect(screen.getByRole('button', { name: '거래처 선택' })).toBeEnabled();
+  });
+
+  it('권한이 없으면 모든 기본정보에 읽기전용 배경을 표시한다', () => {
+    renderSalesOrderPage({ read: true, create: false, update: false, delete: false });
+    for (const label of ['수주번호', '수주일자', '거래처', '견적번호', '납기일자', '납품장소', '배송방법', '수주상태', '비고']) {
+      const input = screen.getByLabelText(new RegExp(label), { selector: 'input, textarea' });
+      expect(getComputedStyle(input.closest('.MuiInputBase-root')!).backgroundColor).toBe('rgba(0, 0, 0, 0.12)');
+    }
+    expect(screen.getByRole('button', { name: '거래처 선택' })).toBeDisabled();
+  });
+
   it('renders the sales order form with its breadcrumb and API notice', () => {
     renderSalesOrderPage();
     expect(screen.getByRole('region', { name: '수주 입력 내용' })).toHaveStyle({

@@ -24,7 +24,7 @@
                n.read_at AS readAt
         FROM public.tb_notification n
         LEFT JOIN public.tb_common_comment c
-          ON n.source_type = 'APPROVAL_COMMENT'
+          ON n.source_type IN ('APPROVAL_COMMENT', 'APPROVAL_STATUS_EVENT')
          AND c.tenant_id = n.tenant_id
          AND c.comment_id = n.source_id
          AND c.owner_type = 'APPROVAL'
@@ -57,7 +57,7 @@
                n.read_at AS readAt
         FROM public.tb_notification n
         LEFT JOIN public.tb_common_comment c
-          ON n.source_type = 'APPROVAL_COMMENT'
+          ON n.source_type IN ('APPROVAL_COMMENT', 'APPROVAL_STATUS_EVENT')
          AND c.tenant_id = n.tenant_id
          AND c.comment_id = n.source_id
          AND c.owner_type = 'APPROVAL'

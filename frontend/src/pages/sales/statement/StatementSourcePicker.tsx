@@ -41,7 +41,7 @@ export function StatementSourcePicker({ open, onClose, onSelect }: {
       </Box>
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="출하 선택 목록" rows={rows} columns={columns} rowKey="salesDeliveryId"
+        <F1Grid storageKey="sales-statement-source-picker-v1" ariaLabel="출하 선택 목록" rows={rows} columns={columns} rowKey="salesDeliveryId"
           loading={loading} showCheckbox={false} selectionMode="row" canExportExcel={false}
           allowAddRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           allowDuplicateRowInContextMenu={false} height="100%" />

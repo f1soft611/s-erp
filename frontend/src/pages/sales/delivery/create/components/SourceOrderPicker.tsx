@@ -82,7 +82,7 @@ export function SourceOrderPicker({ open, onClose, onSelect }: {
       </Box>
       <PageMessageArea message={error} />
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 240, overflow: 'hidden' }}>
-      <F1Grid ref={grid} ariaLabel="출하 대상 수주 목록" rows={displayRows} columns={columns} rowKey="salesDeliveryPlanDetailId"
+      <F1Grid ref={grid} storageKey="sales-delivery-source-order-picker-v1" ariaLabel="출하 대상 수주 목록" rows={displayRows} columns={columns} rowKey="salesDeliveryPlanDetailId"
         loading={loading} showCheckbox multiSelect selectionMode="row" onSelectionChange={setSelectedRowIds}
         canExportExcel={false} allowAddRowInContextMenu={false}
         allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} height="100%" />

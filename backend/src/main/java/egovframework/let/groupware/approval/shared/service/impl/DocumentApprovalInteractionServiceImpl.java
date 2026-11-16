@@ -170,11 +170,17 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
 
         String eventType = businessContact ? "COMPLETED"
                 : "REVISION_REQUESTED".equals(previousStatus) ? "RESUBMITTED" : "SUBMITTED";
-        draftSupportService.insertSystemEvent(user, electronicApprovalId, eventType,
+        Long eventId = draftSupportService.insertSystemEvent(user, electronicApprovalId, eventType,
                 businessContact ? "업무연락이 발송되었습니다."
                     : "RESUBMITTED".equals(eventType) ? "문서가 재상신되었습니다." : "문서가 결재신청되었습니다.");
         imageStorageService.completeOwnerSave(user.getTenantId(), OWNER_TYPE, electronicApprovalId,
                 draftSupportService.toStorageUploads(request.getTemporaryImages()), imageSave.getRetainedFileIds());
+        List<Long> recipientUserIds = businessContact
+                ? documentApprovalDAO.selectApprovalWorkflowReferenceRecipientUserIds(params)
+                : documentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds(params);
+        String notificationTitle = businessContact ? "업무연락 도착"
+                : "RESUBMITTED".equals(eventType) ? "재상신 결재 요청" : "결재 요청";
+        notifyApprovalRecipients(user, eventId, recipientUserIds, notificationTitle, request.getTitle());
         return draftSupportService.persistedDraftResponse(user, electronicApprovalId);
     }
 
@@ -228,6 +234,8 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
 
         String nextStatus;
         boolean completed = false;
+        boolean nextStageActivated = false;
+        Integer activatedNextStage = null;
         if ("REJECTED".equals(action)) {
             nextStatus = "REJECTED";
         } else if ("RETURNED".equals(action)) {
@@ -251,6 +259,8 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
                     if (documentApprovalDAO.activateApprovalStage(stageParams) <= 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "다음 결재 단계를 활성화할 수 없습니다.");
                     }
+                    nextStageActivated = true;
+                    activatedNextStage = nextStage;
                     nextStatus = "IN_PROGRESS";
                 }
             }
@@ -266,7 +276,7 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
 
         String actionText = "APPROVED".equals(action) ? "문서가 승인되었습니다."
                 : "REJECTED".equals(action) ? "문서가 반려되었습니다." : "문서 보완이 요청되었습니다.";
-        draftSupportService.insertSystemEvent(user, electronicApprovalId, action,
+        Long actionEventId = draftSupportService.insertSystemEvent(user, electronicApprovalId, action,
                 StringUtils.hasText(actionComment) ? actionText + " 사유: " + actionComment : actionText);
         if (drafterFinalConfirmationRequired
                 && ("COMPLETED".equals(nextStatus) || "REJECTED".equals(nextStatus))) {
@@ -278,10 +288,55 @@ public class DocumentApprovalInteractionServiceImpl extends EgovAbstractServiceI
                 throw new IllegalStateException("기안자 최종확인 결재선을 활성화할 수 없습니다.");
             }
         }
-        if (completed && !drafterFinalConfirmationRequired) {
-            draftSupportService.insertSystemEvent(user, electronicApprovalId, "COMPLETED", "문서 결재가 완료되었습니다.");
+        if ("REJECTED".equals(action) || "RETURNED".equals(action)) {
+            Long drafterUserId = selectApprovalDrafterUserId(params);
+            notifyApprovalRecipients(user, actionEventId, Collections.singletonList(drafterUserId),
+                    "REJECTED".equals(action) ? "문서 반려" : "문서 보완 요청", document.getTitle());
+        } else if (nextStageActivated) {
+            Map<String, Object> recipientParams = new HashMap<>(params);
+            recipientParams.put("stageOrder", activatedNextStage);
+            List<Long> recipientUserIds =
+                    documentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds(recipientParams);
+            notifyApprovalRecipients(user, actionEventId, recipientUserIds, "결재 요청", document.getTitle());
+        } else if (completed && drafterFinalConfirmationRequired) {
+            Long drafterUserId = selectApprovalDrafterUserId(params);
+            notifyApprovalRecipients(user, actionEventId, Collections.singletonList(drafterUserId),
+                    "최종 확인 요청", document.getTitle());
+        } else if (completed) {
+            Long completionEventId = draftSupportService.insertSystemEvent(user, electronicApprovalId,
+                    "COMPLETED", "문서 결재가 완료되었습니다.");
+            Long drafterUserId = selectApprovalDrafterUserId(params);
+            notifyApprovalRecipients(user, completionEventId, Collections.singletonList(drafterUserId),
+                    "최종 승인", document.getTitle());
         }
         return draftSupportService.workflowResponse(electronicApprovalId, nextStatus);
+    }
+
+    private Long selectApprovalDrafterUserId(Map<String, Object> params) throws Exception {
+        Long drafterUserId = documentApprovalDAO.selectApprovalWorkflowDrafterRecipientUserId(params);
+        if (drafterUserId == null || drafterUserId.longValue() <= 0) {
+            throw new IllegalStateException("전자결재 기안자 알림 수신자를 확인할 수 없습니다.");
+        }
+        return drafterUserId;
+    }
+
+    private void notifyApprovalRecipients(LoginVO actor, Long eventId, List<Long> recipientUserIds,
+            String title, String summary) throws Exception {
+        if (recipientUserIds == null) {
+            throw new IllegalStateException("전자결재 알림 수신자 조회 결과를 확인할 수 없습니다.");
+        }
+        Set<Long> notifiedUserIds = new HashSet<>();
+        for (Long recipientUserId : recipientUserIds) {
+            if (recipientUserId == null || recipientUserId.longValue() <= 0) {
+                throw new IllegalStateException("전자결재 알림 수신자 정보가 올바르지 않습니다.");
+            }
+            if (String.valueOf(recipientUserId).equals(actor.getUniqId())
+                    || !notifiedUserIds.add(recipientUserId)) {
+                continue;
+            }
+            notificationService.createEvent(actor.getTenantId(), recipientUserId,
+                    "APPROVAL_WORKFLOW", "APPROVAL_STATUS_EVENT", eventId, title, summary);
+        }
     }
 
     private void insertFinalConfirmationLine(LoginVO user, Long electronicApprovalId,

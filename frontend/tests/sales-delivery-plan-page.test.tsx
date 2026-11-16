@@ -1,10 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createRef, type ReactNode } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { DeliveryDetailGrid } from '../src/pages/sales/delivery/create/components/DeliveryDetailGrid';
+import { newDeliveryRow } from '../src/pages/sales/delivery/create/services/salesDelivery.service';
+import type { DeliveryRow } from '../src/pages/sales/delivery/create/types/salesDelivery.types';
 import { SalesDeliveryPlanCreatePage } from '../src/pages/sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
 import { SalesDeliveryPlanStatusPage } from '../src/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
 import { createDeliveryPlan, getDeliveryPlan, getDeliveryPlanByOrder, getDeliveryPlanStatus, searchPlanSourceOrders, updateDeliveryPlan } from '../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service';
 import type { DeliveryPlanItem, DeliveryPlanStatusRow, PlanSourceOrderRow } from '../src/pages/sales/delivery-plan/types/salesDeliveryPlan.types';
 import type { ModuleItem } from '../src/pages/dashboard/types/dashboard';
+import type { F1GridRef } from '../src/shared/components/f1-grid';
+import { AppSettingsContext } from '../src/shared/context/AppSettingsContext';
 
 vi.mock('../src/pages/sales/delivery-plan/services/salesDeliveryPlan.service', async (original) => ({
   ...await original<object>(),
@@ -81,6 +87,26 @@ it('uses the standard grid for the registration details', () => {
     .getByRole('button', { name: '수주 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
 });
 
+it('persists registration and status detail layouts separately', async () => {
+  const createKey = 'sales-delivery-plan-create-details-v1';
+  const statusKey = 'sales-delivery-plan-status-details-v1';
+  localStorage.removeItem(createKey);
+  localStorage.removeItem(statusKey);
+  const create = render(<SalesDeliveryPlanCreatePage {...props} />);
+  expect(localStorage.getItem(createKey)).not.toBeNull();
+  create.unmount();
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  await screen.findByRole('grid', { name: '출하계획 상세 목록' });
+  expect(localStorage.getItem(statusKey)).not.toBeNull();
+  expect(localStorage.getItem(createKey)).not.toBeNull();
+  localStorage.removeItem(createKey);
+  localStorage.removeItem(statusKey);
+});
+
 it('opens plan details by clicking the plan number like shipment status', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
@@ -151,20 +177,42 @@ it('edits plan quantity as a native grid cell and saves it', async () => {
   })));
 });
 
-it('matches shipment form row height and basic information spacing', async () => {
-  render(<SalesDeliveryPlanStatusPage {...props} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
-  await screen.findByRole('group', { name: '출하계획 정보' });
-  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
-  fireEvent.click(screen.getByRole('menuitem', { name: '자세히보기' }));
-  const dialog = screen.getByRole('dialog', { name: '출하계획 상세보기' });
-  const grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
-  const body = grid.querySelector('[data-f1-grid-selecting]')!;
-  expect(getComputedStyle(body).gridTemplateRows).toContain('32px');
-  const infoGrid = within(dialog).getByLabelText('계획번호').closest('.MuiFormControl-root')!.parentElement!;
-  expect(getComputedStyle(infoGrid).rowGap).toBe('8px');
-  expect(getComputedStyle(infoGrid).columnGap).toBe('16px');
-});
+it.each([[null, 28.8], [1.2, 38.4]])(
+  'matches shipment form row height and spacing at display scale %s',
+  async (scale, expectedHeight) => {
+    const wrap = (node: ReactNode) => scale === null ? node : (
+      <AppSettingsContext.Provider value={{
+        themeMode: 'light', setThemeMode: vi.fn(), displayScale: scale, setDisplayScale: vi.fn(),
+      }}>{node}</AppSettingsContext.Provider>
+    );
+    const shipment = render(wrap(<DeliveryDetailGrid rows={[newDeliveryRow()]}
+      gridRef={createRef<F1GridRef<DeliveryRow>>()} disabled={false} source={false}
+      onChanges={vi.fn()} onSelection={vi.fn()} onMaterial={vi.fn()} />));
+    const shipmentGrid = screen.getByRole('grid', { name: '출하 상세 목록' });
+    const shipmentHeight = Number(within(shipmentGrid)
+      .getByRole('button', { name: /행 높이 조절/ }).getAttribute('aria-valuenow'));
+    expect(shipmentHeight).toBeCloseTo(expectedHeight);
+    expect(getComputedStyle(shipmentGrid.querySelector('[data-f1-grid-selecting]')!)
+      .gridTemplateRows).toContain(`${shipmentHeight}px`);
+    shipment.unmount();
+
+    render(wrap(<SalesDeliveryPlanStatusPage {...props} />));
+    fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+    await screen.findByRole('group', { name: '출하계획 정보' });
+    fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '자세히보기' }));
+    const dialog = screen.getByRole('dialog', { name: '출하계획 상세보기' });
+    const grid = within(dialog).getByRole('grid', { name: '출하계획 상세 목록' });
+    const planHeight = Number(within(grid).getByRole('button', { name: /행 높이 조절/ })
+      .getAttribute('aria-valuenow'));
+    expect(planHeight).toBeCloseTo(shipmentHeight);
+    expect(getComputedStyle(grid.querySelector('[data-f1-grid-selecting]')!)
+      .gridTemplateRows).toContain(`${planHeight}px`);
+    const infoGrid = within(dialog).getByLabelText('계획번호').closest('.MuiFormControl-root')!.parentElement!;
+    expect(getComputedStyle(infoGrid).rowGap).toBe('8px');
+    expect(getComputedStyle(infoGrid).columnGap).toBe('16px');
+  },
+);
 
 it('commits a cell when save is clicked without pressing Enter', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);

@@ -173,7 +173,7 @@ export function SalesStatementCreatePage({
           <Typography variant="caption" color="text.secondary">출하 품목과 금액을 저장 시점 기준으로 보관합니다.</Typography>
         </Box>
         <Box sx={{ minHeight: 260, minWidth: 0, flex: '1 0 260px', overflow: 'hidden', px: 1 }}>
-          <F1Grid ariaLabel="거래명세서 상세 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId"
+          <F1Grid storageKey="sales-statement-create-details-v1" ariaLabel="거래명세서 상세 목록" rows={rows} columns={columns} rowKey="salesStatementDetailId"
             showCheckbox={false} selectionMode="row" canExportExcel={false} allowAddRowInContextMenu={false}
             allowDeleteRowInContextMenu={false} allowDuplicateRowInContextMenu={false} height="100%" />
         </Box>

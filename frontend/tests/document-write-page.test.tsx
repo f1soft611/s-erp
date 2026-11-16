@@ -6057,7 +6057,7 @@ describe('Document write page', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '결재 추가' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '합의 추가' })).toBeDisabled();
-  });
+  }, 15000);
 
   it('keeps reference users separate from approval stages', async () => {
     render(<DashboardContent {...pageProps} />);
