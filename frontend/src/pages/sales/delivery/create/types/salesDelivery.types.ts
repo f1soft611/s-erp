@@ -33,6 +33,9 @@ export type DeliveryItem = {
   remark: string | null;
   totalAmt: number;
   createdBy?: string | null;
+  createdByName?: string | null;
+  createdByProfileImage?: string | null;
+  createdAt?: string | null;
   writer?: boolean | null;
   details: DeliveryDetail[];
 };

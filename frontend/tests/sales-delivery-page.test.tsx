@@ -46,6 +46,21 @@ beforeEach(() => {
   vi.mocked(getDelivery).mockResolvedValue(item as Awaited<ReturnType<typeof getDelivery>>);
   vi.mocked(getDeliveryStatus).mockResolvedValue([]);
 });
+it('shows the delivery creator name, profile image, and registration time in status detail', async () => {
+  vi.mocked(getDeliveryStatus).mockResolvedValue([{ ...item, ...item.details[0] }] as Awaited<ReturnType<typeof getDeliveryStatus>>);
+  vi.mocked(getDelivery).mockResolvedValue({
+    ...item, createdBy: 'user01', createdByName: '홍길동',
+    createdByProfileImage: '/profile/user01.png', createdAt: '2026-11-16 13:00',
+  } as Awaited<ReturnType<typeof getDelivery>>);
+
+  mount(<SalesDeliveryStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SD-1 상세 보기' }));
+
+  const panel = await screen.findByRole('region', { name: '출하 상세' });
+  expect(within(panel).getByText('홍길동')).toBeInTheDocument();
+  expect(within(panel).getByText('작성자 · 등록 2026-11-16 13:00')).toBeInTheDocument();
+  expect(within(panel).getByRole('img', { name: '홍길동' })).toHaveAttribute('src', '/profile/user01.png');
+});
 it('opens the sales order selector using the icon inside the order field', () => {
   mount(<SalesDeliveryCreatePage {...props} />);
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '출하구분' }));
