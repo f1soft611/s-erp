@@ -64,17 +64,20 @@ class NotificationServiceImplTest {
     }
 
     @Test
-    void enqueuesBothSupportedNotificationEventTypes() throws Exception {
-        when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 1);
-        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L, 74L);
+    void enqueuesAllSupportedNotificationEventTypes() throws Exception {
+        when(notificationDAO.insertNotification(anyMap())).thenReturn(1, 1, 1);
+        when(notificationDAO.selectNotificationId(anyMap())).thenReturn(73L, 74L, 75L);
 
         service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED", "DIRECT_MESSAGE",
                 72L, "Title", "Summary");
         service.createEvent(4L, 19L, "APPROVAL_COMMENT_MENTION", "APPROVAL_COMMENT",
                 75L, "Title", "Summary");
+        service.createEvent(4L, 19L, "APPROVAL_WORKFLOW", "APPROVAL_STATUS_EVENT",
+                76L, "Title", "Summary");
 
         verify(pushDeliveryService).enqueue(73L);
         verify(pushDeliveryService).enqueue(74L);
+        verify(pushDeliveryService).enqueue(75L);
     }
 
     @Test
@@ -159,6 +162,10 @@ class NotificationServiceImplTest {
     void rejectsMismatchedNotificationSourceAndEvent() throws Exception {
         assertBadRequest(() -> service.createEvent(4L, 19L, "DIRECT_MESSAGE_RECEIVED",
                 "APPROVAL_COMMENT", 72L, "New message", "Preview"));
+        assertBadRequest(() -> service.createEvent(4L, 19L, "APPROVAL_WORKFLOW",
+                "APPROVAL_COMMENT", 72L, "Approval", "Preview"));
+        assertBadRequest(() -> service.createEvent(4L, 19L, "APPROVAL_COMMENT_MENTION",
+                "APPROVAL_STATUS_EVENT", 72L, "Mention", "Preview"));
 
         verify(notificationDAO, never()).insertNotification(anyMap());
     }
@@ -187,6 +194,18 @@ class NotificationServiceImplTest {
                         && Long.valueOf(12L).equals(params.get("userId"))
                         && Boolean.TRUE.equals(params.get("unreadOnly"))
                         && "DIRECT_MESSAGE_RECEIVED".equals(params.get("eventType"))));
+    }
+
+    @Test
+    void filtersNotificationsByApprovalWorkflowEventType() throws Exception {
+        when(notificationDAO.selectNotifications(anyMap())).thenReturn(Collections.emptyList());
+
+        service.list(authenticatedUser(), 20, null, true, "APPROVAL_WORKFLOW");
+
+        verify(notificationDAO).selectNotifications(argThat(params ->
+                Long.valueOf(4L).equals(params.get("tenantId"))
+                        && Long.valueOf(12L).equals(params.get("userId"))
+                        && "APPROVAL_WORKFLOW".equals(params.get("eventType"))));
     }
 
     @Test

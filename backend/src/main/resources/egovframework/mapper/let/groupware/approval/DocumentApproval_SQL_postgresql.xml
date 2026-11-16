@@ -70,6 +70,7 @@
         <result property="documentType" column="document_type"/>
         <result property="documentStatus" column="document_status"/>
         <result property="drafterId" column="drafter_id"/>
+        <result property="title" column="title"/>
     </resultMap>
 
     <resultMap id="draftResponse"
@@ -208,7 +209,7 @@
     </select>
 
     <select id="selectDocumentApprovalForUpdate" parameterType="map" resultMap="workflowDocument">
-        SELECT electronic_approval_id, document_type, document_status, drafter_id
+        SELECT electronic_approval_id, document_type, document_status, drafter_id, title
         FROM public.tb_electronic_approval_main
         WHERE tenant_id = #{tenantId}
           AND electronic_approval_id = #{electronicApprovalId}
@@ -1329,6 +1330,70 @@
               )
           )
         ORDER BY u.user_id
+    </select>
+
+    <select id="selectApprovalWorkflowPendingRecipientUserIds" parameterType="map" resultType="long">
+        SELECT DISTINCT u.user_id
+        FROM public.tb_electronic_approval_main m
+        JOIN public.tb_electronic_approval_line_info line
+          ON line.tenant_id = m.tenant_id
+         AND line.electronic_approval_id = m.electronic_approval_id
+        JOIN public.tb_user u
+          ON u.tenant_id = line.tenant_id
+         AND CAST(u.user_id AS varchar) = line.participant_user_id
+         AND u.use_at = 'Y'
+        JOIN public.tb_login_account la
+          ON la.tenant_id = u.tenant_id
+         AND la.login_id = u.login_id
+         AND la.use_at = 'Y'
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
+          AND line.action_status = 'PENDING'
+          AND line.participant_type IN ('APPROVAL', 'AGREEMENT')
+        <if test="stageOrder != null">
+            AND line.stage_order = #{stageOrder}
+        </if>
+        ORDER BY u.user_id
+    </select>
+
+    <select id="selectApprovalWorkflowReferenceRecipientUserIds" parameterType="map" resultType="long">
+        SELECT DISTINCT u.user_id
+        FROM public.tb_electronic_approval_main m
+        JOIN public.tb_electronic_approval_line_info line
+          ON line.tenant_id = m.tenant_id
+         AND line.electronic_approval_id = m.electronic_approval_id
+        JOIN public.tb_user u
+          ON u.tenant_id = line.tenant_id
+         AND CAST(u.user_id AS varchar) = line.participant_user_id
+         AND u.use_at = 'Y'
+        JOIN public.tb_login_account la
+          ON la.tenant_id = u.tenant_id
+         AND la.login_id = u.login_id
+         AND la.use_at = 'Y'
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
+          AND line.participant_type = 'REFERENCE'
+        ORDER BY u.user_id
+    </select>
+
+    <select id="selectApprovalWorkflowDrafterRecipientUserId" parameterType="map" resultType="long">
+        SELECT DISTINCT u.user_id
+        FROM public.tb_electronic_approval_main m
+        JOIN public.tb_user u
+          ON u.tenant_id = m.tenant_id
+         AND u.use_at = 'Y'
+        JOIN public.tb_login_account la
+          ON la.tenant_id = u.tenant_id
+         AND la.login_id = u.login_id
+         AND la.use_at = 'Y'
+        WHERE m.tenant_id = #{tenantId}
+          AND m.electronic_approval_id = #{electronicApprovalId}
+          AND m.deleted_yn = 'N'
+          AND m.drafter_id IN (la.login_code, CAST(u.user_id AS varchar))
+        ORDER BY u.user_id
+        LIMIT 1
     </select>
 
     <select id="selectDraftDrafterId" parameterType="map" resultType="string">

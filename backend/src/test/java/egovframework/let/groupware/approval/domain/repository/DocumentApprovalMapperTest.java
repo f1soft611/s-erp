@@ -58,6 +58,46 @@ class DocumentApprovalMapperTest {
     }
 
     @Test
+    void workflowRecipientQueriesAreTenantScopedAndRequireActiveAccounts() throws Exception {
+        Configuration configuration = new Configuration();
+        parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", 4L);
+        params.put("electronicApprovalId", 77L);
+        params.put("stageOrder", 3);
+
+        String pendingSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(pendingSql)
+                .contains("m.tenant_id = ?", "m.electronic_approval_id = ?", "m.deleted_yn = 'N'",
+                        "line.action_status = 'PENDING'", "line.participant_type IN ('APPROVAL', 'AGREEMENT')",
+                        "line.stage_order = ?", "u.use_at = 'Y'", "la.use_at = 'Y'",
+                        "CAST(u.user_id AS varchar) = line.participant_user_id", "SELECT DISTINCT u.user_id");
+
+        params.remove("stageOrder");
+        pendingSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(pendingSql).doesNotContain("line.stage_order = ?");
+
+        String referenceSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalWorkflowReferenceRecipientUserIds")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(referenceSql)
+                .contains("m.tenant_id = ?", "m.electronic_approval_id = ?", "m.deleted_yn = 'N'",
+                        "line.participant_type = 'REFERENCE'", "u.use_at = 'Y'", "la.use_at = 'Y'");
+
+        String drafterSql = configuration
+                .getMappedStatement("DocumentApprovalDAO.selectApprovalWorkflowDrafterRecipientUserId")
+                .getBoundSql(params).getSql().replaceAll("\\s+", " ");
+        assertThat(drafterSql)
+                .contains("m.tenant_id = ?", "m.electronic_approval_id = ?", "m.deleted_yn = 'N'",
+                        "m.drafter_id IN (la.login_code, CAST(u.user_id AS varchar))",
+                        "u.use_at = 'Y'", "la.use_at = 'Y'", "LIMIT 1");
+    }
+
+    @Test
     void filePagesUseRelatedDocumentAccessAndStableFileCursor() throws Exception {
         Configuration configuration = new Configuration();
         parseMapper(configuration, "egovframework/mapper/let/groupware/approval/DocumentApproval_SQL_postgresql.xml");
@@ -569,6 +609,12 @@ class DocumentApprovalMapperTest {
         assertThat(configuration.hasStatement("DocumentApprovalDAO.softDeleteDocumentApproval")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.updateDocumentApprovalStatus")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectCurrentPendingApprovalLine")).isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalWorkflowPendingRecipientUserIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalWorkflowReferenceRecipientUserIds"))
+                .isTrue();
+        assertThat(configuration.hasStatement("DocumentApprovalDAO.selectApprovalWorkflowDrafterRecipientUserId"))
+                .isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.updateApprovalLineAction")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectPendingApprovalCountForStage")).isTrue();
         assertThat(configuration.hasStatement("DocumentApprovalDAO.selectNextWaitingApprovalStage")).isTrue();

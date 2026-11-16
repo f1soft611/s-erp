@@ -18,6 +18,18 @@ class NotificationMapperXmlTest {
         assertTrue(query.contains("<if test=\"eventType != null\"> AND n.event_type = #{eventType}"));
         assertTrue(query.contains("n.notification_id &lt; #{beforeNotificationId}"));
         assertTrue(query.contains("LIMIT #{limit}"));
+        assertTrue(query.contains("n.source_type IN ('APPROVAL_COMMENT', 'APPROVAL_STATUS_EVENT')"));
+        assertTrue(query.contains("c.owner_type = 'APPROVAL'"));
+    }
+
+    @Test
+    void ownedNotificationResolvesApprovalWorkflowSourceToItsDocument() throws Exception {
+        String query = selectBlock(readMapper(), "selectOwnedNotification").replaceAll("\\s+", " ");
+
+        assertTrue(query.contains("n.source_type IN ('APPROVAL_COMMENT', 'APPROVAL_STATUS_EVENT')"));
+        assertTrue(query.contains("c.comment_id = n.source_id"));
+        assertTrue(query.contains("c.owner_type = 'APPROVAL'"));
+        assertTrue(query.contains("c.owner_id AS targetId"));
     }
 
     @Test

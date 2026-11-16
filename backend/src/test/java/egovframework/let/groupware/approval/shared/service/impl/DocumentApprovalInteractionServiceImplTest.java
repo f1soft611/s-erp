@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.Invocation;
 import org.springframework.http.HttpStatus;
@@ -76,6 +77,15 @@ class DocumentApprovalInteractionServiceImplTest {
     private final EmbeddedImageStorageService imageStorageService = mock(EmbeddedImageStorageService.class);
     private final LoginVO author = author();
     private final RichTextDocumentSanitizer documentSanitizer = new RichTextDocumentSanitizer();
+
+    @BeforeEach
+    void setUpWorkflowNotificationDefaults() throws Exception {
+        when(approvalDAO.selectApprovalWorkflowPendingRecipientUserIds(anyMap()))
+            .thenReturn(Collections.emptyList());
+        when(approvalDAO.selectApprovalWorkflowReferenceRecipientUserIds(anyMap()))
+            .thenReturn(Collections.emptyList());
+        when(approvalDAO.selectApprovalWorkflowDrafterRecipientUserId(anyMap())).thenReturn(101L);
+    }
 
     @Test
     void filePageReturnsTwentyItemsAndUsesLastVisibleFileAsCursor() throws Exception {
@@ -146,10 +156,13 @@ class DocumentApprovalInteractionServiceImplTest {
         when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(approvalDAO.selectApprovalWorkflowReferenceRecipientUserIds(anyMap()))
+            .thenReturn(Collections.singletonList(202L));
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
         when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("COMPLETED"));
 
-        assertThat(sharedService().submit(author, 77L, request).getDocumentStatus()).isEqualTo("COMPLETED");
+        assertThat(sharedService(notificationService).submit(author, 77L, request).getDocumentStatus())
+            .isEqualTo("COMPLETED");
         verify(approvalDAO).insertDocumentApprovalLine(argThat(params ->
             "REFERENCE".equals(params.get("participantType"))
                 && params.get("actionStatus") == null && params.get("pendingAt") == null
@@ -159,6 +172,8 @@ class DocumentApprovalInteractionServiceImplTest {
         verify(commentDAO).insertSystemComment(argThat(params ->
             "COMPLETED".equals(params.get("eventType"))
                 && "업무연락이 발송되었습니다.".equals(params.get("content"))));
+        verify(notificationService).createEvent(4L, 202L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 91L, "업무연락 도착", "기안 요청");
     }
 
     @Test
@@ -838,6 +853,8 @@ class DocumentApprovalInteractionServiceImplTest {
         when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        when(approvalDAO.selectApprovalWorkflowPendingRecipientUserIds(anyMap()))
+            .thenReturn(Arrays.asList(101L, 202L, 202L));
         DocumentApprovalDraftVO persisted = new DocumentApprovalDraftVO();
         persisted.setElectronicApprovalId(77L);
         persisted.setEabusNo("001");
@@ -846,7 +863,7 @@ class DocumentApprovalInteractionServiceImplTest {
         persisted.setSubmittedAt(submittedAt);
         when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(persisted);
 
-        DocumentApprovalDraftVO submitted = sharedService().submit(author, 77L, request());
+        DocumentApprovalDraftVO submitted = sharedService(notificationService).submit(author, 77L, request());
 
         assertThat(submitted.getDocumentStatus()).isEqualTo("PENDING");
         assertThat(submitted.getEabusNo()).isEqualTo("001");
@@ -874,6 +891,32 @@ class DocumentApprovalInteractionServiceImplTest {
                 && "PENDING".equals(params.get("nextDocumentStatus"))));
         verify(commentDAO).insertSystemComment(argThat(params ->
             "SUBMITTED".equals(params.get("eventType")) && Long.valueOf(77L).equals(params.get("ownerId"))));
+        verify(notificationService).createEvent(4L, 202L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 91L, "결재 요청", "기안 요청");
+        verify(notificationService, never()).createEvent(4L, 101L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 91L, "결재 요청", "기안 요청");
+    }
+
+    @Test
+    void resubmissionNotifiesCurrentPendingApproversWithResubmissionTitle() throws Exception {
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap()))
+            .thenReturn(workflowDocument("REVISION_REQUESTED"));
+        when(approvalDAO.selectActiveParticipants(anyMap())).thenReturn(Arrays.asList(
+            participant("101", "작성자", "기획팀"),
+            participant("202", "결재자", "재무팀")));
+        when(approvalDAO.updateDocumentApprovalMain(anyMap())).thenReturn(1);
+        when(approvalDAO.deleteDocumentApprovalLines(anyMap())).thenReturn(2);
+        when(approvalDAO.insertDocumentApprovalLine(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(approvalDAO.selectApprovalWorkflowPendingRecipientUserIds(anyMap()))
+            .thenReturn(Collections.singletonList(202L));
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(91L);
+        when(approvalDAO.selectDraftDocumentStatus(anyMap())).thenReturn(draftResponse("PENDING"));
+
+        assertThat(sharedService(notificationService).submit(author, 77L, request()).getDocumentStatus())
+            .isEqualTo("PENDING");
+        verify(notificationService).createEvent(4L, 202L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 91L, "재상신 결재 요청", "기안 요청");
     }
 
     @Test
@@ -934,9 +977,11 @@ class DocumentApprovalInteractionServiceImplTest {
         when(approvalDAO.selectNextWaitingApprovalStage(anyMap())).thenReturn(3);
         when(approvalDAO.activateApprovalStage(anyMap())).thenReturn(1);
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(approvalDAO.selectApprovalWorkflowPendingRecipientUserIds(anyMap()))
+            .thenReturn(Collections.singletonList(303L));
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
 
-        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
+        DocumentApprovalDraftVO result = sharedService(notificationService).processAction(approver, 77L, request);
 
         assertThat(result.getDocumentStatus()).isEqualTo("IN_PROGRESS");
         verify(approvalDAO).activateApprovalStage(argThat(params ->
@@ -946,6 +991,26 @@ class DocumentApprovalInteractionServiceImplTest {
                 && "IN_PROGRESS".equals(params.get("nextDocumentStatus"))));
         verify(commentDAO).insertSystemComment(argThat(params ->
             "APPROVED".equals(params.get("eventType"))));
+        verify(notificationService).createEvent(4L, 303L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 92L, "결재 요청", "기안 요청");
+    }
+
+    @Test
+    void sameStageApprovalDoesNotNotifyWhileAnotherParticipantIsPending() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("PENDING"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.selectPendingApprovalCountForStage(anyMap())).thenReturn(1L);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        assertThat(sharedService(notificationService).processAction(approver, 77L, request).getDocumentStatus())
+            .isEqualTo("IN_PROGRESS");
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -962,9 +1027,10 @@ class DocumentApprovalInteractionServiceImplTest {
         when(approvalDAO.selectNextWaitingApprovalStage(anyMap())).thenReturn(null);
         when(approvalDAO.activateFinalConfirmationLine(anyMap())).thenReturn(1);
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(approvalDAO.selectApprovalWorkflowDrafterRecipientUserId(anyMap())).thenReturn(101L);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
 
-        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
+        DocumentApprovalDraftVO result = sharedService(notificationService).processAction(approver, 77L, request);
 
         assertThat(result.getDocumentStatus()).isEqualTo("COMPLETED");
         assertThat(org.mockito.Mockito.mockingDetails(approvalDAO).getInvocations())
@@ -972,6 +1038,32 @@ class DocumentApprovalInteractionServiceImplTest {
                 && Long.valueOf(77L).equals(((Map<?, ?>) invocation.getArgument(0)).get("electronicApprovalId")));
         verify(commentDAO).insertSystemComment(argThat(params -> "APPROVED".equals(params.get("eventType"))));
         verify(commentDAO, never()).insertSystemComment(argThat(params -> "COMPLETED".equals(params.get("eventType"))));
+        verify(notificationService).createEvent(4L, 101L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 92L, "최종 확인 요청", "기안 요청");
+    }
+
+    @Test
+    void finalApprovalNotifiesDrafterUsingCompletionHistoryId() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("APPROVED");
+        DocumentApprovalWorkflowDocumentVO document = workflowDocument("IN_PROGRESS");
+        document.setDocumentType("EXPENSE_RESOLUTION");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(document);
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.selectPendingApprovalCountForStage(anyMap())).thenReturn(0L);
+        when(approvalDAO.selectNextWaitingApprovalStage(anyMap())).thenReturn(null);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L, 93L);
+
+        assertThat(sharedService(notificationService).processAction(approver, 77L, request).getDocumentStatus())
+            .isEqualTo("COMPLETED");
+        verify(commentDAO).insertSystemComment(argThat(params ->
+            "COMPLETED".equals(params.get("eventType"))));
+        verify(notificationService).createEvent(4L, 101L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 93L, "최종 승인", "기안 요청");
     }
 
     @Test
@@ -994,6 +1086,7 @@ class DocumentApprovalInteractionServiceImplTest {
         when(legacyDao.selectNextWaitingApprovalStage(anyMap())).thenReturn(null);
         when(legacyDao.activateFinalConfirmationLine(anyMap())).thenReturn(0);
         when(legacyDao.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(legacyDao.selectApprovalWorkflowDrafterRecipientUserId(anyMap())).thenReturn(101L);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
 
         DocumentApprovalDraftVO result = sharedService(legacyDao).processAction(approver, 77L, request);
@@ -1017,9 +1110,10 @@ class DocumentApprovalInteractionServiceImplTest {
         when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
         when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
         when(approvalDAO.activateFinalConfirmationLine(anyMap())).thenReturn(1);
+        when(approvalDAO.selectApprovalWorkflowDrafterRecipientUserId(anyMap())).thenReturn(101L);
         when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
 
-        DocumentApprovalDraftVO result = sharedService().processAction(approver, 77L, request);
+        DocumentApprovalDraftVO result = sharedService(notificationService).processAction(approver, 77L, request);
 
         assertThat(result.getDocumentStatus()).isEqualTo("REJECTED");
         verify(approvalDAO).activateFinalConfirmationLine(argThat(params ->
@@ -1028,6 +1122,28 @@ class DocumentApprovalInteractionServiceImplTest {
         verify(approvalDAO).updateDocumentApprovalStatus(argThat(params ->
             "REJECTED".equals(params.get("nextDocumentStatus"))));
         verify(commentDAO).insertSystemComment(argThat(params -> "REJECTED".equals(params.get("eventType"))));
+        verify(notificationService).createEvent(4L, 101L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 92L, "문서 반려", "기안 요청");
+    }
+
+    @Test
+    void returnNotifiesDrafterWithoutActivatingFinalConfirmation() throws Exception {
+        LoginVO approver = participantUser("login-202", "202", "결재자");
+        DocumentApprovalActionRequestVO request = new DocumentApprovalActionRequestVO();
+        request.setAction("RETURNED");
+        request.setActionComment("보완 사유");
+        when(approvalDAO.selectDocumentApprovalForUpdate(anyMap())).thenReturn(workflowDocument("IN_PROGRESS"));
+        when(approvalDAO.selectCurrentPendingApprovalLine(anyMap()))
+            .thenReturn(pendingLine(22L, 2, "APPROVAL", "202"));
+        when(approvalDAO.updateApprovalLineAction(anyMap())).thenReturn(1);
+        when(approvalDAO.updateDocumentApprovalStatus(anyMap())).thenReturn(1);
+        when(commentDAO.insertSystemComment(anyMap())).thenReturn(92L);
+
+        assertThat(sharedService(notificationService).processAction(approver, 77L, request).getDocumentStatus())
+            .isEqualTo("REVISION_REQUESTED");
+        verify(approvalDAO, never()).activateFinalConfirmationLine(anyMap());
+        verify(notificationService).createEvent(4L, 101L, "APPROVAL_WORKFLOW",
+            "APPROVAL_STATUS_EVENT", 92L, "문서 보완 요청", "기안 요청");
     }
 
     @Test
@@ -1550,6 +1666,7 @@ class DocumentApprovalInteractionServiceImplTest {
         document.setDocumentType("DRAFTING");
         document.setDocumentStatus(status);
         document.setDrafterId("login-author");
+        document.setTitle("기안 요청");
         return document;
     }
 
