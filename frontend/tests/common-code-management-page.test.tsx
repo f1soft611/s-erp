@@ -1,5 +1,6 @@
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -44,48 +45,58 @@ vi.mock('../src/shared/components/f1-grid', async () => {
   >('../src/shared/components/f1-grid');
   const React = await import('react');
 
-  return {
-    ...actual,
-    F1Tree: React.forwardRef(function MockTree(props: any, ref) {
-      if (treeRefState.useRealTree) {
-        return <actual.F1Tree {...props} ref={ref} />;
-      }
-      React.useImperativeHandle(ref, () => ({
-        getSelectedRows: () => [],
-        getSelectedRowIds: () => ['1'],
-        clearSelection: vi.fn(),
-        addRow: vi.fn(),
-        addChildRow: vi.fn(),
-        deleteSelectedRows: () => {
-          props.onDeleteBlocked?.(['1']);
-        },
-        restoreDeletedRows: vi.fn(),
-        duplicateSelectedRows: vi.fn(),
-        getRows: () => props.rows ?? [],
-        getActiveRows: () => props.rows ?? [],
-        getChanges: () => ({
-          insertedRows: [],
-          updatedRows: [],
-          deletedRows: [],
-        }),
-        validate: () => true,
-        startEdit: vi.fn(),
-        stopEdit: vi.fn(),
-        setCellValue: vi.fn(),
-        expandRow: vi.fn(),
-        collapseRow: vi.fn(),
-        expandAll: vi.fn(),
-        collapseAll: vi.fn(),
-        isExpanded: () => true,
-      }));
+  const MockTree = React.forwardRef(function MockTree(props: any, ref) {
+    const { onDeleteBlocked } = props;
+    React.useImperativeHandle(ref, () => ({
+      getSelectedRows: () => [],
+      getSelectedRowIds: () => ['1'],
+      clearSelection: vi.fn(),
+      setSelectedRowIds: vi.fn(),
+      addRow: vi.fn(),
+      addChildRow: vi.fn(),
+      deleteSelectedRows: () => {
+        onDeleteBlocked?.(['1']);
+      },
+      restoreDeletedRows: vi.fn(),
+      duplicateSelectedRows: vi.fn(),
+      getRows: () => props.rows ?? [],
+      getActiveRows: () => props.rows ?? [],
+      getChanges: () => ({
+        insertedRows: [],
+        updatedRows: [],
+        deletedRows: [],
+      }),
+      validate: () => true,
+      startEdit: vi.fn(),
+      stopEdit: vi.fn(),
+      setCellValue: vi.fn(),
+      expandRow: vi.fn(),
+      collapseRow: vi.fn(),
+      expandAll: vi.fn(),
+      collapseAll: vi.fn(),
+      isExpanded: () => true,
+    }));
 
+    React.useEffect(() => {
       treeRefState.current = {
         deleteSelectedRows: () => {
-          props.onDeleteBlocked?.(['1']);
+          onDeleteBlocked?.(['1']);
         },
       };
+      return () => {
+        treeRefState.current = null;
+      };
+    }, [onDeleteBlocked]);
 
-      return <div data-testid="mock-f1-tree" />;
+    return <div data-testid="mock-f1-tree" />;
+  });
+
+  return {
+    ...actual,
+    F1Tree: React.forwardRef(function TreeSelector(props: any, ref) {
+      return treeRefState.useRealTree
+        ? <actual.F1Tree {...props} ref={ref} />
+        : <MockTree {...props} ref={ref} />;
     }),
   };
 });
@@ -142,7 +153,8 @@ const commonCodeItems = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  treeRefState.useRealTree = false;
+  treeRefState.useRealTree = true;
+  treeRefState.current = null;
   apiMocks.apiGet.mockImplementation((path: string) => {
     if (path === '/api/v1/co/master/common-code/groups') {
       return Promise.resolve({ resultList: commonCodeGroups });
@@ -159,22 +171,23 @@ beforeEach(() => {
 
 describe('CommonCode management page', () => {
   const pageSessionKey = 's-erp:page:common-code-management';
-  let previousPageSession: string | null | undefined;
+  let previousPageSession: string | null;
+
+  beforeEach(() => {
+    previousPageSession = window.sessionStorage.getItem(pageSessionKey);
+    window.sessionStorage.removeItem(pageSessionKey);
+  });
 
   afterEach(() => {
-    if (previousPageSession === undefined) return;
+    cleanup();
     if (previousPageSession === null) {
       window.sessionStorage.removeItem(pageSessionKey);
     } else {
       window.sessionStorage.setItem(pageSessionKey, previousPageSession);
     }
-    previousPageSession = undefined;
   });
 
   function renderRealPage() {
-    previousPageSession = window.sessionStorage.getItem(pageSessionKey);
-    window.sessionStorage.removeItem(pageSessionKey);
-    treeRefState.useRealTree = true;
     return render(
       <ThemeProvider theme={createTheme()}>
         <NotificationProvider>
@@ -576,6 +589,7 @@ describe('CommonCode management page', () => {
 
   it('shows an error when a group is blocked from deletion because it still has child content', async () => {
     const onError = vi.fn();
+    treeRefState.useRealTree = false;
 
     render(
       <ThemeProvider theme={createTheme()}>
@@ -1151,6 +1165,7 @@ describe('CommonCode management page', () => {
       </ThemeProvider>,
     );
 
+    await screen.findByRole('gridcell', { name: '거래명세서' });
     const secondGroupCell = await screen.findByRole('gridcell', {
       name: '첨부문서구분',
     });
@@ -1348,7 +1363,7 @@ describe('CommonCode management page', () => {
       </ThemeProvider>,
     );
 
-    await screen.findByRole('grid', { name: '공통코드 그룹 트리' });
+    await screen.findByRole('gridcell', { name: '거래명세서' });
 
     const secondGroupCell = await screen.findByRole('gridcell', {
       name: '첨부문서구분',
@@ -1421,7 +1436,7 @@ describe('CommonCode management page', () => {
       </ThemeProvider>,
     );
 
-    await screen.findByRole('grid', { name: '공통코드 그룹 트리' });
+    await screen.findByRole('gridcell', { name: '거래명세서' });
 
     fireEvent.click(
       await screen.findByRole('gridcell', { name: '첨부문서구분' }),
