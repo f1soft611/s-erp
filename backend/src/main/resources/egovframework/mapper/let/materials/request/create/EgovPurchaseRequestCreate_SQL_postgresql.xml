@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="PurchaseRequestDAO">
+
+    <select id="selectRequester" parameterType="map"
+            resultType="egovframework.let.materials.request.create.domain.model.PurchaseRequestRequesterVO">
+        SELECT u.user_id AS userId,
+               u.department_id AS departmentId
+        FROM tb_login_account la
+        JOIN tb_user u
+          ON u.login_id = la.login_id
+         AND u.tenant_id = la.tenant_id
+        WHERE la.login_code = #{loginCode}
+          AND la.tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
+
+    <select id="selectMaterialTypeCode" parameterType="map" resultType="string">
+        SELECT material_type_code
+        FROM tb_material_info
+        WHERE material_id = #{id, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND delete_status = 'N'
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="existsUseType" parameterType="map" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM tb_common_code_item i
+            JOIN tb_common_code_group g
+              ON g.common_code_group_id = i.group_id
+            WHERE g.tenant_id = #{tenantId}
+              AND g.group_code = 'PURCHASE_USE_TYPE'
+              AND g.use_at = 'Y'
+              AND i.item_code = #{code}
+              AND i.use_at = 'Y'
+        )
+    </select>
+
+    <select id="insertRequestHeader" parameterType="map" resultType="long">
+        INSERT INTO tb_purchase_request_hd (
+            tenant_id, request_no, request_dt, requester_id, request_dept_id,
+            status, total_amt, remark, created_by
+        ) VALUES (
+            #{tenantId}, #{requestNo}, CAST(#{requestDt} AS date), #{requesterId}, #{requestDeptId, jdbcType=BIGINT},
+            #{status}, 0, #{remark}, #{createdBy}
+        )
+        RETURNING purchase_request_id
+    </select>
+
+    <select id="insertRequestDetail" parameterType="map" resultType="long">
+        INSERT INTO tb_purchase_request_dt (
+            purchase_request_id, tenant_id, line_no, material_id, request_qty,
+            request_delivery_dt, use_type, request_remark, created_by
+        ) VALUES (
+            #{purchaseRequestId}, #{tenantId}, #{lineNo}, #{materialId}, #{requestQty},
+            CAST(#{requestDeliveryDt} AS date), #{useType}, #{requestRemark}, #{createdBy}
+        )
+        RETURNING purchase_request_detail_id
+    </select>
+
+    <select id="selectRequest" parameterType="map"
+            resultType="egovframework.let.materials.request.create.domain.model.PurchaseRequestVO">
+        SELECT h.purchase_request_id AS purchaseRequestId,
+               h.tenant_id AS tenantId,
+               h.request_no AS requestNo,
+               h.request_dt AS requestDt,
+               h.requester_id AS requesterId,
+               ru.user_nm AS requesterName,
+               h.request_dept_id AS requestDeptId,
+               d.department_nm AS requestDeptName,
+               h.status AS status,
+               h.total_amt AS totalAmt,
+               h.remark AS remark,
+               h.created_by AS createdBy,
+               cu.user_nm AS createdByName,
+               to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt,
+               h.updated_by AS updatedBy,
+               uu.user_nm AS updatedByName,
+               to_char(h.updated_at, 'YYYY-MM-DD HH24:MI') AS updatedAt
+        FROM tb_purchase_request_hd h
+        LEFT JOIN tb_user ru
+          ON ru.user_id = h.requester_id
+        LEFT JOIN tb_department d
+          ON d.department_id = h.request_dept_id
+        LEFT JOIN tb_login_account cla
+          ON cla.login_code = h.created_by
+         AND cla.tenant_id = h.tenant_id
+        LEFT JOIN tb_user cu
+          ON cu.login_id = cla.login_id
+         AND cu.tenant_id = cla.tenant_id
+        LEFT JOIN tb_login_account ula
+          ON ula.login_code = h.updated_by
+         AND ula.tenant_id = h.tenant_id
+        LEFT JOIN tb_user uu
+          ON uu.login_id = ula.login_id
+         AND uu.tenant_id = ula.tenant_id
+        WHERE h.purchase_request_id = #{purchaseRequestId}
+          AND h.tenant_id = #{tenantId}
+          AND h.use_at = 'Y'
+    </select>
+
+    <select id="selectRequestForUpdate" parameterType="map"
+            resultType="egovframework.let.materials.request.create.domain.model.PurchaseRequestVO">
+        SELECT h.purchase_request_id AS purchaseRequestId,
+               h.tenant_id AS tenantId,
+               h.status AS status
+        FROM tb_purchase_request_hd h
+        WHERE h.purchase_request_id = #{purchaseRequestId, jdbcType=BIGINT}
+          AND h.tenant_id = #{tenantId, jdbcType=BIGINT}
+          AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+
+    <select id="selectRequestDetails" parameterType="map"
+            resultType="egovframework.let.materials.request.create.domain.model.PurchaseRequestDetailVO">
+        SELECT d.purchase_request_detail_id AS purchaseRequestDetailId,
+               d.purchase_request_id AS purchaseRequestId,
+               d.line_no AS lineNo,
+               d.material_id AS materialId,
+               m.material_code AS materialCode,
+               m.material_name AS materialName,
+               m.material_spec AS materialSpec,
+               m.unit AS unit,
+               d.request_qty AS requestQty,
+               d.request_delivery_dt AS requestDeliveryDt,
+               d.use_type AS useType,
+               ci.item_nm AS useTypeName,
+               d.request_remark AS requestRemark,
+               d.confirm_qty AS confirmQty
+        FROM tb_purchase_request_dt d
+        LEFT JOIN tb_material_info m
+          ON m.material_id = d.material_id
+         AND m.tenant_id = d.tenant_id
+        LEFT JOIN tb_common_code_group cg
+          ON cg.tenant_id = d.tenant_id
+         AND cg.group_code = 'PURCHASE_USE_TYPE'
+        LEFT JOIN tb_common_code_item ci
+          ON ci.group_id = cg.common_code_group_id
+         AND ci.item_code = d.use_type
+        WHERE d.purchase_request_id = #{purchaseRequestId}
+          AND d.tenant_id = #{tenantId}
+        ORDER BY d.line_no
+    </select>
+
+    <update id="updateRequestHeader" parameterType="map">
+        UPDATE tb_purchase_request_hd
+        SET request_dt = CAST(#{requestDt} AS date),
+            remark = #{remark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_id = #{purchaseRequestId}
+          AND tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </update>
+
+    <update id="shiftDetailLineNos" parameterType="map">
+        UPDATE tb_purchase_request_dt
+        SET line_no = line_no + 100000
+        WHERE purchase_request_id = #{purchaseRequestId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <update id="updateRequestDetail" parameterType="map">
+        UPDATE tb_purchase_request_dt
+        SET line_no = #{lineNo, jdbcType=INTEGER},
+            material_id = #{materialId},
+            request_qty = #{requestQty},
+            request_delivery_dt = CAST(#{requestDeliveryDt} AS date),
+            use_type = #{useType},
+            request_remark = #{requestRemark},
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND purchase_request_id = #{purchaseRequestId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </update>
+
+    <delete id="deleteRequestDetail" parameterType="map">
+        DELETE FROM tb_purchase_request_dt
+        WHERE purchase_request_detail_id = #{purchaseRequestDetailId, jdbcType=BIGINT}
+          AND purchase_request_id = #{purchaseRequestId, jdbcType=BIGINT}
+          AND tenant_id = #{tenantId, jdbcType=BIGINT}
+    </delete>
+
+    <update id="softDeleteRequestHeader" parameterType="map">
+        UPDATE tb_purchase_request_hd
+        SET use_at = 'N',
+            updated_by = #{updatedBy},
+            updated_at = now()
+        WHERE purchase_request_id = #{purchaseRequestId}
+          AND tenant_id = #{tenantId}
+          AND use_at = 'Y'
+    </update>
+</mapper>

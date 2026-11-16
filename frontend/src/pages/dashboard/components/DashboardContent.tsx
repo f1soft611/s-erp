@@ -35,6 +35,9 @@ import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/Sa
 import { SalesDeliveryPlanStatusPage } from '../../sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
 import { SalesStatementCreatePage } from '../../sales/statement/SalesStatementCreatePage';
 import { SalesStatementStatusPage } from '../../sales/statement/SalesStatementStatusPage';
+import { PurchaseRequestCreatePage } from '../../materials/request/create/PurchaseRequestCreatePage';
+import { PurchaseRequestStatusPage } from '../../materials/request/status/PurchaseRequestStatusPage';
+import { PurchaseRequestConfirmPage } from '../../materials/request/confirm/PurchaseRequestConfirmPage';
 import { DraftFormManagementPage } from '../../co/workflow/form/DraftFormManagementPage';
 import { F1GridTestPage } from '../../settings/system/f1-grid-test/F1GridTestPage';
 import { F1GridDocsPage } from '../../f1-grid-docs/F1GridDocsPage';
@@ -258,6 +261,16 @@ export function DashboardContent({
         selectedMenuPermissions={selectedMenuPermissions}
       />
     );
+  }
+
+  if (selectedModule.id === 'materials'
+    && (currentPageKey === 'request-create' || currentPageKey === 'request-status'
+      || currentPageKey === 'request-confirm')) {
+    const PurchaseRequestPage = currentPageKey === 'request-create'
+      ? PurchaseRequestCreatePage
+      : currentPageKey === 'request-confirm' ? PurchaseRequestConfirmPage : PurchaseRequestStatusPage;
+    return <PurchaseRequestPage selectedModule={selectedModule} currentMenuName={currentMenuName}
+      content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions} />;
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'create') {
