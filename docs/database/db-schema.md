@@ -1045,17 +1045,18 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ### 공통 알림·1:1 쪽지 (DDL 초안, 미적용)
 
-`20261030_005`는 수신자별 공통 알림과 1:1 쪽지함을 위한 신규 저장 구조다. 알림 읽음 상태와 쪽지 읽음 상태는 별도 관리하며, 댓글 멘션/쪽지 도착만 현재 알림 이벤트로 제한한다.
+`20261030_005`는 수신자별 공통 알림과 1:1 쪽지함을 위한 저장 구조다. 알림 읽음 상태와 쪽지 읽음 상태는 별도 관리한다. `20261116_001`은 전자결재 상태 이벤트를 추가하며, 현재 허용 쌍은 문서 댓글 멘션, 쪽지 도착, 전자결재 워크플로 이력이다.
 
 | 테이블 | 주요 컬럼 및 제약 |
 |---|---|
-| `tb_notification` | `notification_id` PK, `tenant_id`, `recipient_user_id`, `event_type`, polymorphic `source_type/source_id`, `title`, `summary`, nullable `read_at`, nullable `archived_at`, `created_at`; `(tenant_id, recipient_user_id, event_type, source_type, source_id)` unique |
+| `tb_notification` | `notification_id` PK, `tenant_id`, `recipient_user_id`, `event_type`, polymorphic `source_type/source_id`, `title`, `summary`, nullable `read_at`, nullable `archived_at`, `created_at`; `(tenant_id, recipient_user_id, event_type, source_type, source_id)` unique; allowed pairs: `APPROVAL_COMMENT_MENTION`/`APPROVAL_COMMENT`, `DIRECT_MESSAGE_RECEIVED`/`DIRECT_MESSAGE`, `APPROVAL_WORKFLOW`/`APPROVAL_STATUS_EVENT` |
 | `tb_direct_message_thread` | `thread_id` PK, `tenant_id`, 참여자 2명, nullable `subject`, `created_at`, `updated_at`, nullable `participant_a_hidden_at`/`participant_b_hidden_at`(20261030_009); 두 사용자 ID 오름차순 CHECK 및 `(tenant_id, thread_id)` unique |
 | `tb_direct_message` | `message_id` PK, `tenant_id`, `thread_id`, 발신/수신 사용자, plain-text `content`, `created_at`, nullable 수신자 `read_at`; `(tenant_id, thread_id)` 복합 FK 및 발신/수신자 구분 CHECK |
 
 - tenant/user FK와 사용자별 미읽음, 대화 참여자별 목록, 대화 메시지 순서 인덱스를 포함한다. tenant 소속/문서 접근 및 대화 참가자 권한은 서버 서비스에서도 검증한다.
 - `20261030_008`은 알림 수신자별 숨김을 위한 `tb_notification.archived_at`과 active page/unread partial index를 추가한다. 보관은 soft archive이며 원본 댓글/쪽지와 알림 row를 물리 삭제하지 않는다. migration 초안은 실제 DB에 적용하지 않는다.
 - `20261030_009`는 1:1 쪽지 대화방 참여자별 삭제(숨김)를 위한 `tb_direct_message_thread.participant_a_hidden_at`/`participant_b_hidden_at`을 추가한다. 숨긴 사용자에게는 숨김 시각 이후 메시지만 보이며, 상대가 새 쪽지를 보내면 대화방이 다시 나타난다. 쪽지 row는 물리 삭제하지 않는다. migration 초안은 실제 DB에 적용하지 않는다.
+- `20261116_001`은 `tb_notification` CHECK 허용 목록에 `APPROVAL_WORKFLOW` / `APPROVAL_STATUS_EVENT`를 추가한다. 시스템 이력 댓글 ID가 source ID이며 해당 댓글의 `owner_id`를 문서 이동 target으로 사용한다. migration/rollback은 참고 초안으로 실제 DB에 적용하지 않는다. CHECK 제약의 현재 라이브 정의는 MCP 조회 실패로 확인하지 못했으며, 저장소의 `20261030_005` DDL을 대체 근거로 사용했다.
 - 읽기 전용 MCP에서 세 테이블의 컬럼, FK/CHECK/UNIQUE 제약 및 인덱스가 현재 존재하며 위 DDL 초안과 일치함을 확인했다. 행 데이터는 조회하지 않았고, 이 작업에서는 DB에 적용하지 않았다. 해당 DDL/rollback은 현재 DB에 실행하지 않는다.
 - [설계](../superpowers/specs/2026-10-30-unified-notifications-design.md), [상세사양](../spec/20261030/20261030_005_공통알림_쪽지함_통합_상세사양서.md), [DDL/rollback/변경 이력](20261030/20261030_005_change_notification_message_schema.md) 및 [backend 사본](../../backend/DATABASE/20261030) 참고. DDL/rollback 모두 미적용.
 
@@ -1077,6 +1078,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 
 ## 변경 이력
 
+- 2026-11-16: 전자결재 워크플로 알림을 공통 알림 저장소에 연결하기 위해 `tb_notification.chk_notification_event_source`에 `APPROVAL_WORKFLOW` / `APPROVAL_STATUS_EVENT` 쌍을 추가하는 `20261116_001`을 정의했다. 기본 PostgreSQL MCP의 테이블/컬럼 metadata 조회는 성공했으나 CHECK 제약 조회는 실패했다. 저장소 DDL을 대체 근거로 사용했으며 실제 DB에는 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 - 2026-11-12: 동일 거래처의 여러 수주를 한 출하 문서로 등록할 수 있도록 상세-헤더 대표 수주 복합 FK만 제거하는 `20261112_008`을 정의했다. 읽기 전용 PostgreSQL MCP로 상세 수주 컬럼과 관련 복합 FK를 확인했고, 상세별 수주/계획 외래키는 유지한다. 실제 DB에는 적용하지 않았다. [docs/database/20261112](20261112) 및 [backend 사본](../../backend/DATABASE/20261112) 참고.
 - 2026-11-11: 기준정보 모듈에 `CO_WORK_STD`(작업표준서 관리)와 `CO_WORK_STD_RECIPE`(작업표준서 등록(레시피), `/co/work-standard/work-standard-recipe`) 메뉴 seed와 가드형 롤백 `20261111_003`을 정의했다. 스키마 변경은 없으며 `CO_MATERIAL` 역할 권한을 복사한다. 읽기 전용 MCP로 `tb_menu` 구조·기준정보 메뉴 경로·권한 코드·신규 코드 미존재를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261111](20261111) 및 [backend 사본](../../backend/DATABASE/20261111) 참고.
 - 2026-11-05: PLATFORM_ADMIN 전용 시스템 정책 저장소 `tb_system_policy`/`tb_system_policy_history`, 기본 정책(납품계획 운영모드·초과납품 정책) 현재값 복제 seed, `ST_SYSTEM_POLICY` 메뉴 seed와 데이터 보존형 롤백 `20261105_004`를 정의했다. 읽기 전용 PostgreSQL MCP `list_tables`(정책 테이블 부재)와 `describe_table`(tb_tenant, tb_user, tb_menu, tb_module, tb_role, tb_permission, tb_menu_permission, tb_role_menu_permission, tb_sales_delivery_plan_hd, tb_user_menu_favorite)로 메타데이터만 확인했고 데이터 행은 조회하지 않았다. 본 작업에서 실제 DB에는 적용하지 않았으며 격리된 PGlite에서 검증했다. 후속 MCP `list_tables`/`describe_table`(tb_tenant, tb_sales_delivery_plan_hd, tb_sales_order_hd, tb_system_policy, tb_id_sequence) 재확인 시 정책 테이블이 기본 DB에 존재했으나 본 작업이 적용한 것은 아니다. [backend/DATABASE/20261105](../../backend/DATABASE/20261105) 및 [docs/database/20261105](20261105) 참고.
