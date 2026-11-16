@@ -6,7 +6,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import { F1Grid, type F1GridColumn, type F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PlanRow } from '../types/salesDeliveryPlan.types';
 
-export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows, setRows, gridRef, editable, canSelectOrder, onSelectOrder }: {
+export function DeliveryPlanForm({ storageKey, planNo, orderNo, orderDt, customerName, rows, setRows, gridRef, editable, canSelectOrder, onSelectOrder }: {
+  storageKey: string;
   planNo: string; orderNo: string; orderDt: string; customerName: string;
   rows: PlanRow[]; setRows: Dispatch<SetStateAction<PlanRow[]>>;
   gridRef: RefObject<F1GridRef<PlanRow> | null>;
@@ -88,7 +89,7 @@ export function DeliveryPlanForm({ planNo, orderNo, orderDt, customerName, rows,
           <Typography variant="caption" color="text.secondary">같은 수주 품목을 예정일별로 분할할 수 있습니다.</Typography></Box>
       </Box>
       <Box sx={{ flex: '1 0 260px', minHeight: 260, minWidth: 0, overflow: 'hidden', px: 1 }}>
-        <F1Grid key={gridVersion} ref={gridRef} ariaLabel="출하계획 상세 목록" rows={rows} columns={columns} rowKey="rowId"
+        <F1Grid key={gridVersion} ref={gridRef} storageKey={storageKey} ariaLabel="출하계획 상세 목록" rows={rows} columns={columns} rowKey="rowId"
           onChangesChange={() => {
             const active = gridRef.current?.getActiveRows();
             if (active) setRows((current) => JSON.stringify(active) === JSON.stringify(current) ? current : active);

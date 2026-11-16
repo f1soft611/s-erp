@@ -240,7 +240,7 @@ export function SalesDeliveryPlanStatusPage({
         horizontalPadding="none"
       />
       <Box data-testid="delivery-plan-status-grid-shell" sx={{ flex: 1, minHeight: 240, minWidth: 0, overflow: 'hidden' }}>
-        <F1Grid ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId"
+        <F1Grid storageKey="sales-delivery-plan-status-grid-v1" ariaLabel="출하계획 현황 목록" rows={rows} columns={columns} rowKey="salesDeliveryPlanDetailId"
           loading={loading} showCheckbox={false} height="100%" minHeight={240} selectionMode="row"
           allowAddRowInContextMenu={false} allowDuplicateRowInContextMenu={false} allowDeleteRowInContextMenu={false}
           canExportExcel={Boolean(permissions?.excel)} />
@@ -298,7 +298,7 @@ export function SalesDeliveryPlanStatusPage({
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <Box sx={{ p: 0, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1, overflowX: 'hidden', overflowY: 'auto', gap: 2 }}>
         <PageMessageArea message={error} onClose={() => setError('')} />
-        <DeliveryPlanForm gridRef={editGridRef} planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
+        <DeliveryPlanForm gridRef={editGridRef} storageKey="sales-delivery-plan-status-details-v1" planNo={selected.planNo} orderNo={selectedOrderNumbers} orderDt={selectedOrderDates}
           customerName={selectedCustomerNames} rows={editRows} setRows={setEditRows} editable={dialogMode === 'edit' && !loading}
           canSelectOrder={false} onSelectOrder={() => undefined} />
       </Box>

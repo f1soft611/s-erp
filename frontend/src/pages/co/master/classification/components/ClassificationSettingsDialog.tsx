@@ -223,7 +223,7 @@ function SettingsContent({ kind, canCreate, canUpdate, onClose }: Omit<Props, 'o
               event.stopPropagation();
             }
           }}>
-          <F1Tree key={treeKey} ref={treeRef} rows={rows} columns={columns}
+          <F1Tree key={treeKey} ref={treeRef} storageKey={`classification-settings-${kind}-v1`} rows={rows} columns={columns}
             rowKey="id" parentKey="parentId" treeColumn="name" ariaLabel="분류 트리"
             height={mobile ? 360 : 440} minHeight={200} showCheckbox={false} defaultExpandAll
             getRowOrder={(row) => row.sortSeq} loading={loading && !saving}

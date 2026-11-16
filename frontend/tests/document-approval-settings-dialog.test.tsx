@@ -108,6 +108,22 @@ function renderSettings(
   return { onClose, onApply };
 }
 
+it.each([
+  [undefined, 'approval'],
+  ['approval', 'approval'],
+  ['reference', 'reference'],
+] as const)('persists the %s favorites layout under its mode key', async (mode, keyMode) => {
+  const key = `document-approval-favorites-${keyMode}-v1`;
+  localStorage.removeItem(key);
+  renderSettings({ mode });
+  const label = keyMode === 'reference' ? '자주 쓰는 참조자' : '자주 쓰는 결재선';
+  await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '설정' }));
+  await screen.findByRole('grid', { name: `${label} 목록` });
+  await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
+  localStorage.removeItem(key);
+});
+
 function createDataTransfer() {
   const payload = new Map<string, string>();
   return {

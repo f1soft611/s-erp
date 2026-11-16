@@ -87,6 +87,26 @@ it('uses the standard grid for the registration details', () => {
     .getByRole('button', { name: '수주 선택' }).closest('.MuiInputAdornment-root')).not.toBeNull();
 });
 
+it('persists registration and status detail layouts separately', async () => {
+  const createKey = 'sales-delivery-plan-create-details-v1';
+  const statusKey = 'sales-delivery-plan-status-details-v1';
+  localStorage.removeItem(createKey);
+  localStorage.removeItem(statusKey);
+  const create = render(<SalesDeliveryPlanCreatePage {...props} />);
+  expect(localStorage.getItem(createKey)).not.toBeNull();
+  create.unmount();
+  render(<SalesDeliveryPlanStatusPage {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));
+  await screen.findByRole('group', { name: '출하계획 정보' });
+  fireEvent.click(screen.getByRole('button', { name: '출하계획 더보기' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '수정' }));
+  await screen.findByRole('grid', { name: '출하계획 상세 목록' });
+  expect(localStorage.getItem(statusKey)).not.toBeNull();
+  expect(localStorage.getItem(createKey)).not.toBeNull();
+  localStorage.removeItem(createKey);
+  localStorage.removeItem(statusKey);
+});
+
 it('opens plan details by clicking the plan number like shipment status', async () => {
   render(<SalesDeliveryPlanStatusPage {...props} />);
   fireEvent.click(await screen.findByRole('button', { name: 'DP-9 상세 보기' }));

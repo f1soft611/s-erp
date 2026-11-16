@@ -22,6 +22,18 @@ const select = (id: number) => fireEvent.click(within(
 const confirm = () => screen.getByRole('button', { name: '선택', exact: true });
 
 describe('classification picker', () => {
+  it.each([
+    ['item', undefined, 'classification-picker-item-all-v1'],
+    ['partner', 1, 'classification-picker-partner-1-v1'],
+    ['partner', 2, 'classification-picker-partner-2-v1'],
+  ] as const)('persists the %s level %s layout separately', async (kind, level, key) => {
+    localStorage.removeItem(key);
+    render(<ClassificationPickerDialog open kind={kind} level={level} onClose={vi.fn()} onSelect={vi.fn()} />);
+    await screen.findByText('Root', { exact: true });
+    expect(localStorage.getItem(key)).not.toBeNull();
+    localStorage.removeItem(key);
+  });
+
   it.each([['item', undefined], ['partner', 1], ['partner', 2]] as const)(
     'shows only select then cancel in the %s level %s footer', async (kind, level) => {
       render(<ClassificationPickerDialog open kind={kind} level={level} onClose={vi.fn()} onSelect={vi.fn()} />);
