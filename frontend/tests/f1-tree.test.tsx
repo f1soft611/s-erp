@@ -479,6 +479,35 @@ describe('F1Tree interaction', () => {
     expect(childTreeCheckbox).not.toBeChecked();
   });
 
+  it('places leaf branch markers in the disclosure slot beside tree checkboxes', () => {
+    render(
+      <F1Tree
+        rows={[
+          ...rows,
+          { ...rows[1], id: 'grandchild', parentId: 'child', name: 'Grandchild' },
+        ]}
+        columns={columns}
+        rowKey="id"
+        parentKey="parentId"
+        treeColumn="name"
+        defaultExpanded="all"
+        treeCheckbox
+      />,
+    );
+
+    const marker = document.querySelector(
+      '[data-f1-grid-row-id="grandchild"] [data-f1-tree-branch]',
+    )!;
+    const treeCheckbox = screen.getByRole('checkbox', {
+      name: 'Grandchild 트리 선택',
+    });
+    const checkboxRoot = treeCheckbox.closest('.MuiCheckbox-root');
+
+    expect(marker.parentElement).toHaveAttribute('data-f1-tree-disclosure-slot');
+    expect(checkboxRoot).not.toBeNull();
+    expect(checkboxRoot).not.toContainElement(marker);
+  });
+
   it('syncs checkbox-type data columns when treeCheckbox is toggled', () => {
     const columnsWithCheckbox = [
       ...columns,
