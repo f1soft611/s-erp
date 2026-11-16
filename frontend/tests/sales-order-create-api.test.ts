@@ -9,6 +9,7 @@ import {
   updateSalesOrder,
   validateSalesOrderInput,
 } from '../src/pages/sales/order/create/services/salesOrder.service';
+import { searchOrderQuotations } from '../src/pages/sales/order/create/services/salesOrderMaster.service';
 import type {
   SalesOrderCreatePayload,
   SalesOrderCreateResponse,
@@ -194,6 +195,35 @@ describe('sales order create API', () => {
         lineStatus: '대기',
       },
     ]);
+  });
+
+  it('maps quotation options and limits the request to the selected customer', async () => {
+    apiGetMock.mockResolvedValue({
+      resultList: [{
+        quotationId: 71,
+        quotationNo: 'QT-20261116-0001',
+        quotationDt: '2026-11-16',
+        customerId: 10,
+        customerCode: 'C-10',
+        customerName: '거래처 10',
+      }],
+    });
+
+    await expect(searchOrderQuotations(10, '거래처 10')).resolves.toEqual([
+      {
+        id: 71,
+        code: 'QT-20261116-0001',
+        name: '거래처 10',
+        customerId: 10,
+        details: [
+          { label: '견적작성일', value: '2026-11-16' },
+          { label: '거래처코드', value: 'C-10' },
+        ],
+      },
+    ]);
+    expect(apiGetMock).toHaveBeenCalledWith(
+      '/api/v1/sales/quotations/options?customerId=10&keyword=%EA%B1%B0%EB%9E%98%EC%B2%98+10',
+    );
   });
 });
 

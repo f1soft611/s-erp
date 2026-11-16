@@ -29,6 +29,8 @@ import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStanda
 import { ProcessManagementPage } from '../../pr/process/ProcessManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
+import { QuotationCreatePage } from '../../sales/quotation/create/QuotationCreatePage';
+import { QuotationStatusPage } from '../../sales/quotation/status/QuotationStatusPage';
 import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
 import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
 import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
@@ -246,6 +248,30 @@ export function DashboardContent({
     return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
       deliveryPlanMode={deliveryPlanMode} />;
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'quotation-create') {
+    return (
+      <QuotationCreatePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'quotation-status') {
+    return (
+      <QuotationStatusPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {

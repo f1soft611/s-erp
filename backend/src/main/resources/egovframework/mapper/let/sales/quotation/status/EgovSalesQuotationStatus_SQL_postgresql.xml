@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesQuotationStatusDAO">
+    <select id="selectList" parameterType="map" resultType="egovframework.let.sales.quotation.status.domain.model.SalesQuotationStatusVO">
+        SELECT h.quotation_id AS quotationId, h.quotation_no AS quotationNo, h.quotation_dt AS quotationDt,
+        h.submit_dt AS submitDt, h.customer_id AS customerId, c.customer_code AS customerCode,
+        c.customer_name AS customerName, h.customer_reference AS customerReference, h.incoterms,
+        h.payment_term AS paymentTerm, h.valid_term AS validTerm, h.currency_code AS currencyCode,
+        h.remark, h.supply_amt AS supplyAmt, h.vat_amt AS vatAmt, h.total_amt AS totalAmt, h.created_by AS createdBy,
+        d.quotation_detail_id AS quotationDetailId, d.line_no AS lineNo, d.material_id AS materialId,
+        d.material_code AS materialCode, d.material_name AS materialName, d.material_spec AS materialSpec,
+        d.unit, d.quotation_qty AS quotationQty, d.unit_price AS unitPrice, d.line_amt AS lineAmt, d.remark AS detailRemark
+        FROM tb_sales_quotation_hd h
+        JOIN tb_sales_quotation_dt d ON d.quotation_id = h.quotation_id AND d.tenant_id = h.tenant_id
+        JOIN tb_customer_info c ON c.customer_id = h.customer_id AND c.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId} AND h.use_at = 'Y'
+        AND h.quotation_dt &gt;= #{quotationDtFrom,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler}
+        AND h.quotation_dt &lt;= #{quotationDtTo,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler}
+        <if test="submitDtFrom != null">AND h.submit_dt &gt;= #{submitDtFrom,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler}</if>
+        <if test="submitDtTo != null">AND h.submit_dt &lt;= #{submitDtTo,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler}</if>
+        <if test="quotationNo != null">AND h.quotation_no ILIKE '%' || #{quotationNo} || '%'</if>
+        <if test="customerKeyword != null">AND (c.customer_name ILIKE '%' || #{customerKeyword} || '%' OR c.customer_code ILIKE '%' || #{customerKeyword} || '%')</if>
+        <if test="materialKeyword != null">AND d.material_name ILIKE '%' || #{materialKeyword} || '%'</if>
+        ORDER BY h.quotation_dt DESC, h.quotation_id DESC, d.line_no
+    </select>
+</mapper>

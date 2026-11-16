@@ -9,8 +9,11 @@ import {
   Alert,
   Box,
   Button,
+  IconButton,
+  InputAdornment,
   Paper,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { PageHeader } from '../../../../shared/components/PageHeader';
@@ -23,6 +26,7 @@ import {
   CustomerPicker,
 } from '../../../../shared/components/master-picker/MasterPickers';
 import type { MasterPickerOption } from '../../../../shared/components/master-picker/masterPicker.types';
+import { MasterPickerDialog } from '../../../../shared/components/master-picker/MasterPickerDialog';
 import type { F1GridChanges, F1GridRef } from '../../../../shared/components/f1-grid';
 import type { PermissionActionGroupDefinition } from '../../../../shared/components/PermissionGroup';
 import type {
@@ -41,6 +45,8 @@ import {
 import {
   searchOrderCustomers,
   searchOrderMaterials,
+  searchOrderQuotations,
+  type SalesOrderQuotationOption,
 } from './services/salesOrderMaster.service';
 import {
   buildSalesOrderCreatePayload,
@@ -142,11 +148,14 @@ export function SalesOrderCreatePage({
   const [customer, setCustomer] = useState<MasterPickerOption | null>(null);
   const [orderDate, setOrderDate] = useState(initialSnapshot.orderDt);
   const [quotationNumber, setQuotationNumber] = useState('');
+  const [selectedQuotationCustomerId, setSelectedQuotationCustomerId] =
+    useState<number | null>(null);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryPlace, setDeliveryPlace] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [remark, setRemark] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [quotationPickerOpen, setQuotationPickerOpen] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<(string | number)[]>([]);
   const [amounts, setAmounts] = useState(EMPTY_AMOUNTS);
   const [isSaving, setIsSaving] = useState(false);
@@ -216,6 +225,9 @@ export function SalesOrderCreatePage({
       setCustomer(nextCustomer);
       setOrderDate(header.orderDt);
       setQuotationNumber(header.quotNo);
+      setSelectedQuotationCustomerId(
+        header.quotNo.trim() ? nextCustomer?.id ?? null : null,
+      );
       setDeliveryDate(header.deliveryDt);
       setDeliveryPlace(header.deliveryPlace);
       setDeliveryMethod(header.deliveryMethod);
@@ -231,6 +243,7 @@ export function SalesOrderCreatePage({
       selectedMaterialRowIdRef.current = null;
       materialApplyPatchRef.current = null;
       setPickerOpen(false);
+      setQuotationPickerOpen(false);
     },
     [],
   );
@@ -688,6 +701,13 @@ export function SalesOrderCreatePage({
               triggerMode="icon"
               onChange={(value) => {
                 setCustomer(value);
+                if (
+                  selectedQuotationCustomerId !== null &&
+                  value.id !== selectedQuotationCustomerId
+                ) {
+                  setQuotationNumber('');
+                  setSelectedQuotationCustomerId(null);
+                }
                 clearValidationErrors();
               }}
               disabled={!isEditable}
@@ -701,9 +721,31 @@ export function SalesOrderCreatePage({
               value={quotationNumber}
               onChange={(event) => {
                 setQuotationNumber(event.target.value);
+                setSelectedQuotationCustomerId(null);
                 clearValidationErrors();
               }}
               disabled={!isEditable}
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="견적 선택">
+                        <span>
+                          <IconButton
+                            aria-label="견적 선택"
+                            disabled={!isEditable}
+                            edge="end"
+                            onClick={() => setQuotationPickerOpen(true)}
+                            size="small"
+                          >
+                            <SearchOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                },
+              }}
             />
             <TextField
               label="납기일자"
@@ -854,6 +896,21 @@ export function SalesOrderCreatePage({
         search={searchOrderMaterials}
         onClose={closeMaterialPicker}
         onChange={selectMaterial}
+      />
+      <MasterPickerDialog
+        label="견적"
+        open={quotationPickerOpen && isEditable}
+        search={(keyword) =>
+          searchOrderQuotations(customer?.id ?? null, keyword)
+        }
+        onClose={() => setQuotationPickerOpen(false)}
+        onChange={(option) => {
+          const quotation = option as SalesOrderQuotationOption;
+          setQuotationNumber(option.code);
+          setSelectedQuotationCustomerId(quotation.customerId);
+          setQuotationPickerOpen(false);
+          clearValidationErrors();
+        }}
       />
       {embedded ? null : (
         <SalesOrderRouteLeaveGuard when={hasUnsavedChanges} />
