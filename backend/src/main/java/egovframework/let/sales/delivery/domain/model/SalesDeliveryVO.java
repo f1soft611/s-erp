@@ -26,6 +26,9 @@ public class SalesDeliveryVO implements Serializable {
     private String remark;
     private BigDecimal totalAmt;
     private String createdBy;
+    private String createdByName;
+    private String createdByProfileImage;
+    private String createdAt;
     private Boolean writer;
     private List<SalesDeliveryDetailVO> details;
 }

@@ -51,7 +51,14 @@ class SalesDeliveryMapperTest {
                 "ORDER BY h.delivery_dt DESC");
         String delivery = normalize(sql(configuration, "selectDelivery").getSql());
         assertThat(delivery).contains("string_agg(DISTINCT source_order.order_no",
-                "source_detail.sales_delivery_id = h.sales_delivery_id");
+                "source_detail.sales_delivery_id = h.sales_delivery_id",
+                "u.user_nm AS createdByName",
+                "la.profile_image AS createdByProfileImage",
+                "to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt",
+                "la.login_code = h.created_by",
+                "la.tenant_id = h.tenant_id",
+                "u.login_id = la.login_id",
+                "u.tenant_id = la.tenant_id");
         assertThat(normalize(sql(configuration, "existsActiveCustomer").getSql()))
                 .contains("use_at = 'Y'");
         assertThat(normalize(sql(configuration, "existsActiveMaterial").getSql()))

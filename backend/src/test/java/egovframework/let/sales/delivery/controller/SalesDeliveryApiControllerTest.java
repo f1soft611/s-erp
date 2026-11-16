@@ -90,6 +90,24 @@ class SalesDeliveryApiControllerTest {
     }
 
     @Test
+    void deliveryDetailReturnsWriterProfileFields() throws Exception {
+        SalesDeliveryVO delivery = new SalesDeliveryVO();
+        delivery.setSalesDeliveryId(501L);
+        delivery.setCreatedBy("user01");
+        delivery.setCreatedByName("홍길동");
+        delivery.setCreatedByProfileImage("/profile/user01.png");
+        delivery.setCreatedAt("2026-11-16 13:00");
+        when(service.getDelivery(71L, "user01", 501L)).thenReturn(delivery);
+
+        mvc.perform(get(ROOT + "/501"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.item.createdBy").value("user01"))
+                .andExpect(jsonPath("$.result.item.createdByName").value("홍길동"))
+                .andExpect(jsonPath("$.result.item.createdByProfileImage").value("/profile/user01.png"))
+                .andExpect(jsonPath("$.result.item.createdAt").value("2026-11-16 13:00"));
+    }
+
+    @Test
     void refusesRequestsWithoutAuthenticatedPrincipal() throws Exception {
         user = null;
 

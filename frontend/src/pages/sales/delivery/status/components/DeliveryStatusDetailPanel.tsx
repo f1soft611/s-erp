@@ -28,7 +28,7 @@ export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClo
   onClose: () => void; onView: () => void; onEdit: () => void;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const writer = item?.createdBy || '-';
+  const writer = item?.createdByName || item?.createdBy || '-';
   return <PageAreaOverlay onClose={onClose}>
     <PostDetailPanel title="출하 상세" subtitle={item ? `출하번호: ${item.deliveryNo}` : undefined}
       onClose={onClose} isLoading={loading && !item} loadingLabel="출하 상세를 불러오는 중입니다.">
@@ -36,10 +36,11 @@ export function DeliveryStatusDetailPanel({ item, loading, error, canEdit, onClo
       {item ? <Stack spacing={2} sx={{ minWidth: 0 }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0, flex: '1 1 220px' }}>
-            <ProfileAvatar name={writer} fallback={writer.slice(0, 1)} sx={{ width: 40, height: 40, flexShrink: 0 }} />
+            <ProfileAvatar name={writer} imageUrl={item.createdByProfileImage} fallback={writer.slice(0, 1)}
+              sx={{ width: 40, height: 40, flexShrink: 0 }} />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>{writer}</Typography>
-              <Typography variant="caption" color="text.secondary">작성자</Typography>
+              <Typography variant="caption" color="text.secondary">작성자 · 등록 {item.createdAt ?? '-'}</Typography>
             </Box>
           </Stack>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
