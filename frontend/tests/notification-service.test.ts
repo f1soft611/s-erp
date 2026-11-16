@@ -59,6 +59,45 @@ describe('notification service', () => {
     );
   });
 
+  it('accepts approval workflow items only with a positive document target', async () => {
+    apiGet.mockResolvedValue({
+      resultList: [{
+        notificationId: 9,
+        eventType: 'APPROVAL_WORKFLOW',
+        sourceType: 'APPROVAL_STATUS_EVENT',
+        sourceId: 91,
+        targetId: 42,
+        title: '결재 요청',
+        summary: '기안서',
+        createdAt: '2026-11-16T09:30:00',
+        readAt: null,
+      }],
+      hasNext: false,
+      nextBeforeNotificationId: null,
+    });
+
+    await expect(listNotifications()).resolves.toMatchObject({
+      resultList: [{ eventType: 'APPROVAL_WORKFLOW', targetId: 42 }],
+    });
+
+    apiGet.mockResolvedValue({
+      resultList: [{
+        notificationId: 9,
+        eventType: 'APPROVAL_WORKFLOW',
+        sourceType: 'APPROVAL_STATUS_EVENT',
+        sourceId: 91,
+        targetId: 0,
+        title: '결재 요청',
+        summary: '기안서',
+        createdAt: '2026-11-16T09:30:00',
+        readAt: null,
+      }],
+      hasNext: false,
+      nextBeforeNotificationId: null,
+    });
+    await expect(listNotifications()).rejects.toThrow('알림 목록 응답을 확인할 수 없습니다.');
+  });
+
   it('does not turn unread summary or read failures into successful fallbacks', async () => {
     const failure = new Error('network failure');
     apiGet.mockRejectedValueOnce(failure);

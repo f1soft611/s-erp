@@ -18,13 +18,15 @@ function isNotificationItem(value: unknown): value is NotificationItem {
     (value.eventType === 'APPROVAL_COMMENT_MENTION'
       && value.sourceType === 'APPROVAL_COMMENT')
     || (value.eventType === 'DIRECT_MESSAGE_RECEIVED'
-      && value.sourceType === 'DIRECT_MESSAGE');
+      && value.sourceType === 'DIRECT_MESSAGE')
+    || (value.eventType === 'APPROVAL_WORKFLOW'
+      && value.sourceType === 'APPROVAL_STATUS_EVENT');
   return allowedPair
     && Number.isSafeInteger(value.notificationId) && Number(value.notificationId) > 0
     && Number.isSafeInteger(value.sourceId) && Number(value.sourceId) > 0
-    && (value.sourceType === 'APPROVAL_COMMENT'
-      ? Number.isSafeInteger(value.targetId) && Number(value.targetId) > 0
-      : value.targetId === null)
+    && (value.sourceType === 'DIRECT_MESSAGE'
+      ? value.targetId === null
+      : Number.isSafeInteger(value.targetId) && Number(value.targetId) > 0)
     && typeof value.title === 'string'
     && typeof value.summary === 'string'
     && typeof value.createdAt === 'string'
