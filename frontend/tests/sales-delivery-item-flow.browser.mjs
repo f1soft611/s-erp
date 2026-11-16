@@ -8,7 +8,8 @@ import { installSalesDeliveryBrowserMocks } from './fixtures/sales-delivery.brow
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const screenshotDirectory = path.resolve(
   scriptDirectory,
-  '../../docs/result/20261112/sales-delivery-item-flow/screenshots',
+  process.env.SALES_DELIVERY_ITEM_FLOW_SCREENSHOT_DIRECTORY
+    || '../../docs/result/20261112/sales-delivery-item-flow/screenshots',
 );
 const sourcePrefix = process.env.SALES_DELIVERY_ITEM_FLOW_SOURCE_PREFIX || '/src';
 await mkdir(screenshotDirectory, { recursive: true });
@@ -29,9 +30,9 @@ async function mount(kind) {
     const React = (await import('/node_modules/.vite/deps/react.js')).default;
     const ReactDOM = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
     const { NotificationProvider } = await import(`${sourceRoot}/shared/context/NotificationContext.tsx`);
-    const { SalesDeliveryPlanCreatePage } = await import(`${sourceRoot}/pages/sales/delivery-plan/create/SalesDeliveryPlanCreatePage.tsx`);
-    const { SalesDeliveryPlanStatusPage } = await import(`${sourceRoot}/pages/sales/delivery-plan/status/SalesDeliveryPlanStatusPage.tsx`);
-    const { SalesDeliveryCreatePage } = await import(`${sourceRoot}/pages/sales/delivery/create/SalesDeliveryCreatePage.tsx`);
+    const { SalesDeliveryPlanCreatePage } = await import(`${sourceRoot}/pages/sales/shipment/deliveryplan/create/SalesDeliveryPlanCreatePage.tsx`);
+    const { SalesDeliveryPlanStatusPage } = await import(`${sourceRoot}/pages/sales/shipment/deliveryplan/status/SalesDeliveryPlanStatusPage.tsx`);
+    const { SalesDeliveryCreatePage } = await import(`${sourceRoot}/pages/sales/shipment/delivery/create/SalesDeliveryCreatePage.tsx`);
     const routerUrl = performance.getEntriesByType('resource')
       .map((entry) => entry.name)
       .find((url) => url.includes('/node_modules/.vite/deps/react-router-dom.js?v='));

@@ -28,8 +28,8 @@ import egovframework.let.sales.order.create.domain.model.SalesOrderDetailVO;
 import egovframework.let.sales.order.create.domain.model.SalesOrderVO;
 import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.common.idsequence.service.IdSequenceService;
-import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
-import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
+import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
 
 class SalesOrderServiceImplTest {
 

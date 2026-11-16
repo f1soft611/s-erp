@@ -7,6 +7,10 @@ import {
   getSalesOrder,
   updateSalesOrder,
 } from '../src/pages/sales/order/create/services/salesOrder.service';
+import {
+  searchOrderCustomers,
+  searchOrderQuotations,
+} from '../src/pages/sales/order/create/services/salesOrderMaster.service';
 import { SalesOrderCreatePage } from '../src/pages/sales/order/create/SalesOrderCreatePage';
 import type {
   SalesOrderCreated,
@@ -32,9 +36,14 @@ vi.mock('../src/pages/sales/order/create/services/salesOrderMaster.service', () 
   searchOrderMaterials: vi.fn(async () => [
     { id: 20, code: 'M-20', name: '품목 20' },
   ]),
+  searchOrderQuotations: vi.fn(async () => [
+    { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
+  ]),
 }));
 
 const createSalesOrderMock = vi.mocked(createSalesOrder);
+const searchOrderCustomersMock = vi.mocked(searchOrderCustomers);
+const searchOrderQuotationsMock = vi.mocked(searchOrderQuotations);
 const getSalesOrderMock = vi.mocked(getSalesOrder);
 const updateSalesOrderMock = vi.mocked(updateSalesOrder);
 const deleteSalesOrderMock = vi.mocked(deleteSalesOrder);
@@ -43,6 +52,12 @@ describe('sales order entry page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getSalesOrderMock.mockResolvedValue(loadedOrder());
+    searchOrderCustomersMock.mockResolvedValue([
+      { id: 10, code: 'C-10', name: '거래처 10' },
+    ]);
+    searchOrderQuotationsMock.mockResolvedValue([
+      { id: 71, code: 'QT-20261116-0001', name: '거래처 10', customerId: 10 },
+    ]);
   });
 
   it('읽기전용 배경을 실제 편집 가능 여부에 따라 표시한다', () => {
@@ -163,6 +178,64 @@ describe('sales order entry page', () => {
       within(updatedRow).getByRole('gridcell', { name: '품목 20' }),
     ).toBeInTheDocument();
   }, 10000);
+
+  it('selects a quotation into the optional number and clears it when its customer changes', async () => {
+    searchOrderCustomersMock.mockResolvedValue([
+      { id: 10, code: 'C-10', name: '거래처 10' },
+      { id: 20, code: 'C-20', name: '거래처 20' },
+    ]);
+    renderSalesOrderPage();
+    await selectCustomer();
+
+    fireEvent.click(screen.getByRole('button', { name: '견적 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'QT-20261116-0001 거래처 10 선택',
+      }),
+    );
+
+    expect(await screen.findByLabelText('견적번호')).toHaveValue('QT-20261116-0001');
+    expect(searchOrderQuotationsMock).toHaveBeenCalledWith(10, '');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'C-20 거래처 20 선택' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('견적번호')).toHaveValue('');
+    });
+  }, 15000);
+
+  it('preserves a loaded legacy quotation number when the order customer changes', async () => {
+    searchOrderCustomersMock.mockResolvedValue([
+      { id: 10, code: 'C-10', name: '거래처 10' },
+      { id: 20, code: 'C-20', name: '거래처 20' },
+    ]);
+    renderSalesOrderPage(undefined, { mode: 'edit', salesOrderId: 300 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('견적번호')).toHaveValue('Q-LOADED');
+      expect(screen.getByRole('textbox', { name: '거래처' })).toHaveValue(
+        'C-10 · 거래처 10',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '거래처 선택' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'C-20 거래처 20 선택' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('견적번호')).toHaveValue('Q-LOADED');
+    });
+  }, 15000);
 
   it('recalculates line and order totals when grid amounts are edited', () => {
     renderSalesOrderPage();
@@ -589,6 +662,7 @@ describe('sales order entry page', () => {
 
 function renderSalesOrderPage(
   permissions: MenuPermission = { read: true, create: true, update: true, delete: true },
+  order?: { mode: 'edit' | 'view'; salesOrderId: number },
 ) {
   const router = createMemoryRouter(
     [
@@ -597,6 +671,7 @@ function renderSalesOrderPage(
         element: (
           <SalesOrderCreatePage
             {...salesOrderPageProps}
+            {...order}
             selectedMenuPermissions={permissions}
           />
         ),

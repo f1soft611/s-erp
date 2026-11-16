@@ -898,6 +898,40 @@
 - [생성 SQL](20261026/20261026_008_create_sales_order_schema.sql), [롤백 SQL](20261026/20261026_008_rollback_sales_order_schema.sql), [변경 이력](20261026/20261026_008_change_sales_order_schema.md) 및 [backend 사본](../../backend/DATABASE/20261026) 참고.
 - 감사 사용자 길이 보정: [확장 SQL](20261028/20261028_009_expand_sales_order_audit_columns.sql), [안전 롤백](20261028/20261028_009_rollback_sales_order_audit_columns.sql), [변경 이력](20261028/20261028_009_change_sales_order_audit_columns.md). 신규 환경에서도 기존 생성 DDL 후 확장 SQL을 적용한다.
 
+### tb_sales_quotation_hd / tb_sales_quotation_dt (2026-11-16, 미적용)
+
+`20261116_002`에서 견적 헤더·상세 저장 구조를 추가한다. 기본 DB MCP에서 기존 견적 테이블은 없고, 관련 수주·품목·거래처·ID 시퀀스 테이블의 컬럼을 확인했다. 아래 테이블은 설계된 변경이며 실제 DB에는 적용하지 않았다.
+
+| 테이블 | 컬럼 | 타입 | NULL/기본값 | 설명 |
+|---|---|---|---|---|
+| `tb_sales_quotation_hd` | `quotation_id` | `bigserial` | NOT NULL | 헤더 PK |
+|  | `tenant_id` | `bigint` | NOT NULL | 소유 테넌트 |
+|  | `quotation_no` | `varchar(30)` | NOT NULL | 테넌트별 견적번호 |
+|  | `quotation_dt` | `date` | NOT NULL | 견적작성일 |
+|  | `submit_dt` | `date` | NULL | 견적제출일 |
+|  | `customer_id` | `bigint` | NOT NULL | 거래처 FK |
+|  | `customer_reference`, `incoterms`, `payment_term`, `valid_term`, `currency_code` | `varchar` | NULL | 견적 참조·조건·화폐 |
+|  | `remark` | `varchar(500)` | NULL | 비고 |
+|  | `supply_amt`, `vat_amt`, `total_amt` | `numeric(15,2)` | NOT NULL, 기본 `0` | 공급가·부가세·총액 |
+|  | `use_at` | `char(1)` | NOT NULL, 기본 `Y` | 사용 여부 (`Y`/`N`) |
+|  | `created_by`, `updated_by` | `varchar(100)` | NULL | 생성/수정 로그인 코드 |
+|  | `created_at` | `timestamp without time zone` | NOT NULL, `CURRENT_TIMESTAMP` | 생성 일시 |
+|  | `updated_at` | `timestamp without time zone` | NULL | 수정 일시 |
+| `tb_sales_quotation_dt` | `quotation_detail_id` | `bigserial` | NOT NULL | 상세 PK |
+|  | `quotation_id`, `tenant_id` | `bigint` | NOT NULL | 헤더 및 tenant 복합 FK |
+|  | `line_no` | `integer` | NOT NULL | 견적 라인 번호 |
+|  | `material_id` | `bigint` | NULL | 선택한 품목 마스터 FK; 직접 입력이면 NULL |
+|  | `material_code` | `varchar(20)` | NULL | 품목코드 스냅샷 |
+|  | `material_name` | `varchar(200)` | NOT NULL | 품목명 스냅샷 |
+|  | `material_spec` | `varchar(100)` | NULL | 품목규격 스냅샷 |
+|  | `unit` | `varchar(6)` | NULL | 단위 스냅샷 |
+|  | `quotation_qty`, `unit_price`, `line_amt` | `numeric(15,2)` | NOT NULL | 수량·단가·상세 금액 |
+|  | `remark` | `varchar(500)` | NULL | 상세 비고 |
+
+- 헤더의 `(tenant_id, quotation_no)`와 상세의 `(quotation_id, line_no)`는 unique이며, 헤더-상세 및 선택 품목 FK는 tenant 일치 범위를 포함한다.
+- 수주 `tb_sales_order_hd.quot_no`는 기존 optional string 계약을 유지하며 이 변경에서 수정하지 않는다.
+- [생성 SQL](20261116/20261116_002_create_sales_quotation_schema.sql), [롤백 SQL](20261116/20261116_002_rollback_sales_quotation_schema.sql), [변경 이력](20261116/20261116_002_change_sales_quotation_schema.md) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
+
 ### tb_sales_delivery_hd / tb_sales_delivery_dt (2026-11-04, 미적용)
 
 수주 연계 납품과 수주 없는 직납품을 별도 문서로 관리한다. 기본 DB MCP에서 기존 수주/거래처/품목의 컬럼·복합 FK 대상키를 확인했고, 신규 납품 테이블은 아직 존재하지 않는다.
@@ -1181,6 +1215,7 @@ PLATFORM_ADMIN 전용 시스템 정책 관리 화면의 현재 테넌트 정책 
 ## 변경 이력
 
 - 2026-11-16: 전자결재 워크플로 알림을 공통 알림 저장소에 연결하기 위해 `tb_notification.chk_notification_event_source`에 `APPROVAL_WORKFLOW` / `APPROVAL_STATUS_EVENT` 쌍을 추가하는 `20261116_001`을 정의했다. 기본 PostgreSQL MCP의 테이블/컬럼 metadata 조회는 성공했으나 CHECK 제약 조회는 실패했다. 저장소 DDL을 대체 근거로 사용했으며 실제 DB에는 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
+- 2026-11-16: 견적관리의 `quotation-create`/`quotation-status` 메뉴 seed와 기존 수주 메뉴 권한을 복사하는 `20261116_002`를 정의했다. `tb_menu`, `tb_module`, 메뉴/역할 권한 테이블 메타데이터를 MCP로 확인했고 tenant 행은 조회하지 않았다. 승인된 테넌트 ID를 지정해야 하며 이 작업에서는 스키마와 메뉴 seed를 DB에 적용하지 않았다. [docs/database/20261116](20261116) 및 [backend 사본](../../backend/DATABASE/20261116) 참고.
 - 2026-11-12: 동일 거래처의 여러 수주를 한 출하 문서로 등록할 수 있도록 상세-헤더 대표 수주 복합 FK만 제거하는 `20261112_008`을 정의했다. 읽기 전용 PostgreSQL MCP로 상세 수주 컬럼과 관련 복합 FK를 확인했고, 상세별 수주/계획 외래키는 유지한다. 실제 DB에는 적용하지 않았다. [docs/database/20261112](20261112) 및 [backend 사본](../../backend/DATABASE/20261112) 참고.
 - 2026-11-13: 발주서 출력용 스냅샷·출력 컬럼 `20261113_006`을 정의했다. `tb_purchase_order_hd`에 회사·구매처·발주자 스냅샷과 출력 일시·출력자를 추가한다(기존 발주는 NULL, 출력 시 현재 정보로 대체). 읽기 전용 MCP로 원본 컬럼 구조를 확인했고 실제 DB에는 적용하지 않았다. [docs/database/20261113](20261113) 참고.
 - 2026-11-13: 구매자재 메뉴 그룹 재구성 `20261113_004`(구매관리 → 구매요청관리, 발주관리 그룹 신설·발주등록 이동)와 발주현황 메뉴 `MATERIALS_ORDER_STATUS` seed `20261113_005`를 정의했다. 테이블 변경은 없고 실제 DB에는 적용하지 않았다. [docs/database/20261113](20261113) 참고.

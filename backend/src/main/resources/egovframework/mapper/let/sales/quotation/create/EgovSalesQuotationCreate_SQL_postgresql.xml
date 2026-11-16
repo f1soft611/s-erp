@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SalesQuotationDAO">
+    <select id="existsCustomer" parameterType="map" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM tb_customer_info WHERE tenant_id = #{tenantId} AND customer_id = #{id})
+    </select>
+    <select id="existsMaterial" parameterType="map" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM tb_material_info WHERE tenant_id = #{tenantId} AND material_id = #{id})
+    </select>
+    <select id="insertHeader" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_sales_quotation_hd
+        (tenant_id, quotation_no, quotation_dt, submit_dt, customer_id, customer_reference, incoterms,
+         payment_term, valid_term, currency_code, remark, supply_amt, vat_amt, total_amt, created_by)
+        VALUES (#{tenantId}, #{quotationNo},
+        #{quotationDt,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler},
+        #{submitDt,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler},
+        #{customerId}, #{customerReference}, #{incoterms}, #{paymentTerm}, #{validTerm}, #{currencyCode},
+        #{remark}, #{supplyAmt,jdbcType=NUMERIC}, #{vatAmt,jdbcType=NUMERIC}, #{totalAmt,jdbcType=NUMERIC}, #{createdBy})
+        RETURNING quotation_id
+    </select>
+    <select id="insertDetail" parameterType="map" resultType="long" flushCache="true">
+        INSERT INTO tb_sales_quotation_dt
+        (quotation_id, tenant_id, line_no, material_id, material_code, material_name, material_spec, unit,
+         quotation_qty, unit_price, line_amt, remark)
+        VALUES (#{quotationId}, #{tenantId}, #{lineNo}, #{materialId,jdbcType=NUMERIC}, #{materialCode},
+        #{materialName}, #{materialSpec}, #{unit}, #{quotationQty,jdbcType=NUMERIC},
+        #{unitPrice,jdbcType=NUMERIC}, #{lineAmt,jdbcType=NUMERIC}, #{remark})
+        RETURNING quotation_detail_id
+    </select>
+    <select id="selectHeader" parameterType="map" resultType="egovframework.let.sales.quotation.create.domain.model.SalesQuotationVO">
+        SELECT h.quotation_id AS quotationId, h.tenant_id AS tenantId, h.quotation_no AS quotationNo,
+        h.quotation_dt AS quotationDt, h.submit_dt AS submitDt, h.customer_id AS customerId,
+        c.customer_code AS customerCode, c.customer_name AS customerName, h.customer_reference AS customerReference,
+        h.incoterms, h.payment_term AS paymentTerm, h.valid_term AS validTerm, h.currency_code AS currencyCode,
+        h.remark, h.supply_amt AS supplyAmt, h.vat_amt AS vatAmt, h.total_amt AS totalAmt,
+        h.created_by AS createdBy, u.user_nm AS createdByName, la.profile_image AS createdByProfileImage,
+        to_char(h.created_at, 'YYYY-MM-DD HH24:MI') AS createdAt
+        FROM tb_sales_quotation_hd h
+        LEFT JOIN tb_customer_info c ON c.customer_id = h.customer_id AND c.tenant_id = h.tenant_id
+        LEFT JOIN tb_login_account la ON la.login_code = h.created_by AND la.tenant_id = h.tenant_id
+        LEFT JOIN tb_user u ON u.login_id = la.login_id AND u.tenant_id = la.tenant_id
+        WHERE h.tenant_id = #{tenantId} AND h.quotation_id = #{quotationId} AND h.use_at = 'Y'
+    </select>
+    <select id="selectForUpdate" parameterType="map" resultType="egovframework.let.sales.quotation.create.domain.model.SalesQuotationVO">
+        SELECT h.created_by AS createdBy FROM tb_sales_quotation_hd h
+        WHERE h.tenant_id = #{tenantId} AND h.quotation_id = #{quotationId} AND h.use_at = 'Y'
+        FOR UPDATE OF h
+    </select>
+    <select id="selectDetails" parameterType="map" resultType="egovframework.let.sales.quotation.create.domain.model.SalesQuotationDetailVO">
+        SELECT d.quotation_detail_id AS quotationDetailId, d.quotation_id AS quotationId, d.tenant_id AS tenantId,
+        d.line_no AS lineNo, d.material_id AS materialId, d.material_code AS materialCode,
+        d.material_name AS materialName, d.material_spec AS materialSpec, d.unit,
+        d.quotation_qty AS quotationQty, d.unit_price AS unitPrice, d.line_amt AS lineAmt, d.remark
+        FROM tb_sales_quotation_dt d JOIN tb_sales_quotation_hd h
+          ON h.quotation_id = d.quotation_id AND h.tenant_id = d.tenant_id AND h.use_at = 'Y'
+        WHERE d.tenant_id = #{tenantId} AND d.quotation_id = #{quotationId}
+        ORDER BY d.line_no
+    </select>
+    <update id="updateHeader" parameterType="map">
+        UPDATE tb_sales_quotation_hd SET
+        quotation_dt = #{quotationDt,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler},
+        submit_dt = #{submitDt,jdbcType=DATE,typeHandler=egovframework.com.cmm.LocalDateDateTypeHandler},
+        customer_id = #{customerId}, customer_reference = #{customerReference}, incoterms = #{incoterms},
+        payment_term = #{paymentTerm}, valid_term = #{validTerm}, currency_code = #{currencyCode},
+        remark = #{remark}, supply_amt = #{supplyAmt,jdbcType=NUMERIC}, vat_amt = #{vatAmt,jdbcType=NUMERIC},
+        total_amt = #{totalAmt,jdbcType=NUMERIC}, updated_by = #{updatedBy}, updated_at = now()
+        WHERE tenant_id = #{tenantId} AND quotation_id = #{quotationId} AND use_at = 'Y' AND created_by = #{updatedBy}
+    </update>
+    <delete id="deleteDetails" parameterType="map">
+        DELETE FROM tb_sales_quotation_dt WHERE tenant_id = #{tenantId} AND quotation_id = #{quotationId}
+    </delete>
+    <update id="softDelete" parameterType="map">
+        UPDATE tb_sales_quotation_hd SET use_at = 'N', updated_by = #{updatedBy}, updated_at = now()
+        WHERE tenant_id = #{tenantId} AND quotation_id = #{quotationId} AND use_at = 'Y' AND created_by = #{updatedBy}
+    </update>
+    <select id="selectOptions" parameterType="map" resultType="egovframework.let.sales.quotation.create.domain.model.SalesQuotationVO">
+        SELECT h.quotation_id AS quotationId, h.quotation_no AS quotationNo, h.quotation_dt AS quotationDt,
+        h.customer_id AS customerId, c.customer_code AS customerCode, c.customer_name AS customerName
+        FROM tb_sales_quotation_hd h
+        JOIN tb_customer_info c ON c.customer_id = h.customer_id AND c.tenant_id = h.tenant_id
+        WHERE h.tenant_id = #{tenantId} AND h.use_at = 'Y'
+        <if test="customerId != null">AND h.customer_id = #{customerId,jdbcType=NUMERIC}</if>
+        <if test="keyword != null">AND (h.quotation_no ILIKE '%' || #{keyword} || '%' OR c.customer_name ILIKE '%' || #{keyword} || '%')</if>
+        ORDER BY h.quotation_dt DESC, h.quotation_id DESC
+    </select>
+</mapper>

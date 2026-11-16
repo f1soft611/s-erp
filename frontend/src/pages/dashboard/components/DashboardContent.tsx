@@ -29,12 +29,14 @@ import { WorkStandardRecipePage } from '../../co/work-standard/recipe/WorkStanda
 import { ProcessManagementPage } from '../../pr/process/ProcessManagementPage';
 import { SalesOrderCreatePage } from '../../sales/order/create/SalesOrderCreatePage';
 import { SalesOrderStatusPage } from '../../sales/order/status/SalesOrderStatusPage';
-import { SalesDeliveryCreatePage } from '../../sales/delivery/create/SalesDeliveryCreatePage';
-import { SalesDeliveryStatusPage } from '../../sales/delivery/status/SalesDeliveryStatusPage';
-import { SalesDeliveryPlanCreatePage } from '../../sales/delivery-plan/create/SalesDeliveryPlanCreatePage';
-import { SalesDeliveryPlanStatusPage } from '../../sales/delivery-plan/status/SalesDeliveryPlanStatusPage';
-import { SalesStatementCreatePage } from '../../sales/statement/SalesStatementCreatePage';
-import { SalesStatementStatusPage } from '../../sales/statement/SalesStatementStatusPage';
+import { QuotationCreatePage } from '../../sales/quotation/create/QuotationCreatePage';
+import { QuotationStatusPage } from '../../sales/quotation/status/QuotationStatusPage';
+import { SalesDeliveryCreatePage } from '../../sales/shipment/delivery/create/SalesDeliveryCreatePage';
+import { SalesDeliveryStatusPage } from '../../sales/shipment/delivery/status/SalesDeliveryStatusPage';
+import { SalesDeliveryPlanCreatePage } from '../../sales/shipment/deliveryplan/create/SalesDeliveryPlanCreatePage';
+import { SalesDeliveryPlanStatusPage } from '../../sales/shipment/deliveryplan/status/SalesDeliveryPlanStatusPage';
+import { SalesStatementCreatePage } from '../../sales/shipment/statement/create/SalesStatementCreatePage';
+import { SalesStatementStatusPage } from '../../sales/shipment/statement/status/SalesStatementStatusPage';
 import { PurchaseRequestCreatePage } from '../../materials/request/create/PurchaseRequestCreatePage';
 import { PurchaseRequestStatusPage } from '../../materials/request/status/PurchaseRequestStatusPage';
 import { PurchaseOrderCreatePage } from '../../materials/order/create/PurchaseOrderCreatePage';
@@ -251,6 +253,30 @@ export function DashboardContent({
     return <PlanPage selectedModule={selectedModule} currentMenuName={currentMenuName}
       content={content} breadcrumbItems={breadcrumbItems} selectedMenuPermissions={selectedMenuPermissions}
       deliveryPlanMode={deliveryPlanMode} />;
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'quotation-create') {
+    return (
+      <QuotationCreatePage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
+  }
+
+  if (selectedModule.id === 'sales' && currentPageKey === 'quotation-status') {
+    return (
+      <QuotationStatusPage
+        selectedModule={selectedModule}
+        currentMenuName={currentMenuName}
+        content={content}
+        breadcrumbItems={breadcrumbItems}
+        selectedMenuPermissions={selectedMenuPermissions}
+      />
+    );
   }
 
   if (selectedModule.id === 'sales' && currentPageKey === 'status') {

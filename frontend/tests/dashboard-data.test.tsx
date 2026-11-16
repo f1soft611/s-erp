@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildPageContent,
-} from '../src/pages/dashboard/services/dashboardData';
+import { buildPageContent, pageContentMap } from '../src/pages/dashboard/services/dashboardData';
 import { buildModuleDescriptors } from '../src/pages/dashboard/services/menuService';
 import { settingsModule } from './fixtures/settings-module';
 
 describe('Dashboard data', () => {
+  it('registers quotation create and status page content keys', () => {
+    expect(pageContentMap['quotation-create']).toEqual(
+      expect.objectContaining({ title: '견적서작성' }),
+    );
+    expect(pageContentMap['quotation-status']).toEqual(
+      expect.objectContaining({ title: '견적현황' }),
+    );
+  });
+
   it('keeps dashboard module icons lightweight for fast login route startup', () => {
     expect(settingsModule.icon).toBeTruthy();
     expect(typeof (settingsModule.icon as { type?: unknown }).type).toBe(

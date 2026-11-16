@@ -23,9 +23,9 @@ import egovframework.let.sales.order.create.domain.model.SalesOrderVO;
 import egovframework.let.sales.order.create.domain.repository.SalesOrderDAO;
 import egovframework.let.sales.order.create.service.SalesOrderService;
 import egovframework.let.common.idsequence.service.IdSequenceService;
-import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanDetailRequestVO;
-import egovframework.let.sales.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
-import egovframework.let.sales.deliveryplan.service.SalesDeliveryPlanService;
+import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanDetailRequestVO;
+import egovframework.let.sales.shipment.deliveryplan.domain.model.SalesDeliveryPlanRequestVO;
+import egovframework.let.sales.shipment.deliveryplan.service.SalesDeliveryPlanService;
 
 /**
  * 수주 등록 검증, 계산, 채번 및 저장을 처리하는 서비스 구현 클래스.

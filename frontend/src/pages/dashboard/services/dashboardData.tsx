@@ -136,6 +136,18 @@ export const pageContentMap: Record<string, PageContent> = {
     cards: [],
     items: [],
   },
+  'quotation-create': {
+    title: '견적서작성',
+    description: '거래처와 견적 품목을 입력해 견적서를 작성합니다.',
+    cards: [],
+    items: [],
+  },
+  'quotation-status': {
+    title: '견적현황',
+    description: '견적작성일 기준으로 견적과 품목 내역을 조회하고 관리합니다.',
+    cards: [],
+    items: [],
+  },
   materials: {
     title: '품목관리',
     description: '품목의 규격, 분류, 재고 및 소비기한 기준정보를 관리합니다.',

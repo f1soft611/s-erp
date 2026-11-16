@@ -398,15 +398,6 @@ function F1TreeInner<T extends object>(
           <Box
             sx={{ position: 'relative', display: 'flex', alignItems: 'center', pl: meta.depth * 2 }}
           >
-            {meta.depth > 0 && !meta.hasChildren ? (
-              <Box aria-hidden="true" data-f1-tree-branch=""
-                sx={{
-                  position: 'absolute', left: meta.depth * 16 + 17,
-                  top: '50%', transform: 'translateY(-65%)',
-                  width: 10, height: 12, borderLeft: 1, borderBottom: 1,
-                  borderColor: 'text.disabled', pointerEvents: 'none',
-                }} />
-            ) : null}
             {treeCheckbox ? (
               <Checkbox
                 size="small"
@@ -438,7 +429,34 @@ function F1TreeInner<T extends object>(
                 )}
               </IconButton>
             ) : (
-              <Box sx={{ width: 32, flex: '0 0 auto' }} />
+              <Box
+                data-f1-tree-disclosure-slot=""
+                sx={{
+                  position: 'relative',
+                  width: 32,
+                  height: 32,
+                  flex: '0 0 auto',
+                }}
+              >
+                {meta.depth > 0 ? (
+                  <Box
+                    aria-hidden="true"
+                    data-f1-tree-branch=""
+                    sx={{
+                      position: 'absolute',
+                      left: 17,
+                      top: '50%',
+                      transform: 'translateY(-65%)',
+                      width: 10,
+                      height: 12,
+                      borderLeft: 1,
+                      borderBottom: 1,
+                      borderColor: 'text.disabled',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                ) : null}
+              </Box>
             )}
           </Box>
         );

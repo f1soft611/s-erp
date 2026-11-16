@@ -1,0 +1,53 @@
+import type { PageSearchFieldValue } from '../../../../../shared/components/page-search/searchFields';
+
+export type QuotationStatusRow = {
+  quotationId: number;
+  quotationDetailId: number;
+  quotationNo: string;
+  quotationDt: string;
+  submitDt: string | null;
+  customerId: number;
+  customerCode: string | null;
+  customerName: string | null;
+  customerReference: string | null;
+  incoterms: string | null;
+  paymentTerm: string | null;
+  validTerm: string | null;
+  currencyCode: string | null;
+  remark: string | null;
+  supplyAmt: number;
+  vatAmt: number;
+  totalAmt: number;
+  createdBy: string | null;
+  lineNo: number;
+  materialId: number | null;
+  materialCode: string | null;
+  materialName: string;
+  materialSpec: string | null;
+  unit: string | null;
+  quotationQty: number;
+  unitPrice: number;
+  lineAmt: number;
+  detailRemark: string | null;
+};
+
+export type QuotationStatusFilters = {
+  quotationDtFrom: string;
+  quotationDtTo: string;
+  submitDtFrom?: string;
+  submitDtTo?: string;
+  quotationNo?: string;
+  customerKeyword?: string;
+  materialKeyword?: string;
+};
+
+export type QuotationStatusSearchValues = Record<string, PageSearchFieldValue>;
+
+export type QuotationStatusSearchSession = {
+  detailValues: QuotationStatusSearchValues;
+};
+
+export type QuotationStatusListResponse = {
+  resultList?: QuotationStatusRow[];
+  resultCnt?: number;
+};
